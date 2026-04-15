@@ -34,6 +34,7 @@ import { IntroEngineD2 } from "@/components/home/intro-spikes/IntroEngineD2";
 import { IntroEngineH2 } from "@/components/home/intro-spikes/IntroEngineH2";
 import { IntroEngineN2 } from "@/components/home/intro-spikes/IntroEngineN2";
 import { IntroEngineU2 } from "@/components/home/intro-spikes/IntroEngineU2";
+import { IntroEngineD3 } from "@/components/home/intro-spikes/IntroEngineD3";
 import { PATTERN_LABEL, type IntroPattern } from "@/components/home/intro-spikes/types";
 import { useAnimationPhase } from "@/hooks/useAnimationPhase";
 import type { AnimationPhase } from "@/components/teaser/types";
@@ -46,6 +47,7 @@ const VALID_PATTERNS: IntroPattern[] = [
   "P", "Q", "R", "S", "T",
   "U", "V", "W", "X", "Y",
   "A2", "D2", "H2", "N2", "U2",
+  "D3",
 ];
 
 function readPatternFromUrl(): IntroPattern | null {
@@ -137,6 +139,7 @@ export default function TeaserPage() {
             case "H2": return IntroEngineH2;
             case "N2": return IntroEngineN2;
             case "U2": return IntroEngineU2;
+            case "D3": return IntroEngineD3;
             default: return BigBangCanvas;
           }
         })();

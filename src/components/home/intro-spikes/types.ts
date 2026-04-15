@@ -6,7 +6,8 @@ export type IntroPattern =
   | "K" | "L" | "M" | "N" | "O"
   | "P" | "Q" | "R" | "S" | "T"
   | "U" | "V" | "W" | "X" | "Y"
-  | "A2" | "D2" | "H2" | "N2" | "U2";
+  | "A2" | "D2" | "H2" | "N2" | "U2"
+  | "D3";
 
 export interface IntroEngineProps {
   onPhaseChange: (phase: AnimationPhase) => void;
@@ -43,4 +44,5 @@ export const PATTERN_LABEL: Record<IntroPattern, string> = {
   H2: "PICKLEBALL IMPACT+",
   N2: "HOLOGRAM SCAN+",
   U2: "COSMIC SERVE+",
+  D3: "STARFIELD WARP+ (no landing)",
 };
