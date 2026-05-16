@@ -1,37 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type SubmitStatus = "idle" | "submitting" | "success" | "error";
+import { useEmailSubscription } from "@/hooks/useEmailSubscription";
 
 export function EmailSignup() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<SubmitStatus>("idle");
+  const { email, status, isSubmitting, setEmail, submit } = useEmailSubscription();
 
-  const isSubmitting = status === "submitting";
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || isSubmitting) return;
-
-    setStatus("submitting");
-
-    try {
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setStatus("success");
-      } else {
-        setStatus("error");
-      }
-    } catch {
-      setStatus("error");
-    }
+    void submit();
   };
 
   return (

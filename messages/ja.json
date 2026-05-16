@@ -278,7 +278,17 @@
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
     "address": "〒272-0021 千葉県市川市八幡2-16-6 6階",
-    "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー"
+    "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
+    "newsletter": {
+      "heading": "Newsletter",
+      "description": "最新情報・キャンペーンをお届けします",
+      "emailLabel": "メールアドレス",
+      "emailPlaceholder": "your@email.com",
+      "submit": "登録する",
+      "submitting": "送信中...",
+      "successMessage": "登録が完了しました",
+      "errorMessage": "登録に失敗しました。もう一度お試しください。"
+    }
   },
   "About": {
     "photoPlaceholder": "Photo",

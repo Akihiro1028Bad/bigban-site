@@ -2,6 +2,8 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 
+import FooterNewsletter from "./FooterNewsletter";
+
 const NAV_KEYS = ["concept", "facility", "services", "pricing", "access", "about"] as const;
 
 export default function HomeFooter() {
@@ -13,7 +15,13 @@ export default function HomeFooter() {
     <footer className="bg-deep-black">
       <div className="h-px" style={{ background: 'linear-gradient(90deg, transparent, #306EC3, transparent)' }} />
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-12 py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12 py-12 lg:py-16">
+        <FooterNewsletter />
+      </div>
+
+      <div className="border-t border-text-gray/15" />
+
+      <div className="mx-auto max-w-7xl px-6 lg:px-12 py-12 lg:py-16">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
           {/* Left: Logo + Brand display */}
           <div>
