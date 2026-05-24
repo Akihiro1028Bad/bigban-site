@@ -21,7 +21,7 @@ export function buildExerciseGym(locale: Locale): ExerciseGymSchema {
     "@id": `${SITE_URL}/#hyrox`,
     name: "THE PICKLE BANG THEORY — HYROX Training Area",
     url,
-    parentOrganization: { "@id": `${SITE_URL}/#facility` },
+    parentOrganization: { "@id": `${SITE_URL}/#organization` },
     sport: ["HYROX", "Functional Fitness"],
     areaServed: { "@type": "AdministrativeArea", name: "千葉県市川市" },
   };
