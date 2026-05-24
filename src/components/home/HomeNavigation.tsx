@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: "concept", kind: "anchor", href: "/#concept" },
   { id: "facility", kind: "anchor", href: "/#facility" },
   { id: "services", kind: "anchor", href: "/#services" },
+  { id: "hyrox", kind: "page", href: "/hyrox" },
   { id: "pricing", kind: "anchor", href: "/#pricing" },
   { id: "news", kind: "page", href: "/news" },
   { id: "about", kind: "anchor", href: "/#about" },

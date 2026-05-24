@@ -49,6 +49,7 @@ const NAV_ITEMS = [
   { label: "CONCEPT", href: "/#concept" },
   { label: "FACILITY", href: "/#facility" },
   { label: "SERVICES", href: "/#services" },
+  { label: "HYROX", href: "/hyrox" },
   { label: "PRICING", href: "/#pricing" },
   { label: "NEWS", href: "/news" },
   { label: "ABOUT", href: "/#about" },
@@ -74,7 +75,7 @@ describe("HomeNavigation", () => {
     expect(logos).toHaveLength(1);
   });
 
-  it("7つのデスクトップナビリンクと正しいhrefを表示する", () => {
+  it("8つのデスクトップナビリンクと正しいhrefを表示する", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
     for (const item of NAV_ITEMS) {
@@ -95,6 +96,25 @@ describe("HomeNavigation", () => {
     expect(pricingIdx).toBeGreaterThanOrEqual(0);
     expect(newsIdx).toBe(pricingIdx + 1);
     expect(aboutIdx).toBe(newsIdx + 1);
+  });
+
+  it("ナビに HYROX ページリンクがある", () => {
+    renderWithIntl(<HomeNavigation />);
+    const links = screen.getAllByRole("link", { name: "HYROX" });
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]).toHaveAttribute("href", "/hyrox");
+  });
+
+  it("HYROXリンクがSERVICESとPRICINGの間に配置される", () => {
+    renderWithIntl(<HomeNavigation />);
+    const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
+    const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
+    const servicesIdx = links.indexOf("SERVICES");
+    const hyroxIdx = links.indexOf("HYROX");
+    const pricingIdx = links.indexOf("PRICING");
+    expect(servicesIdx).toBeGreaterThanOrEqual(0);
+    expect(hyroxIdx).toBe(servicesIdx + 1);
+    expect(pricingIdx).toBe(hyroxIdx + 1);
   });
 
   it("モバイルメニュー内にもNEWSリンクが含まれる", () => {
