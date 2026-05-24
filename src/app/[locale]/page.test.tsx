@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 const mockGetTranslations = vi.fn();
 
@@ -21,6 +21,9 @@ vi.mock("@/components/home/HomeHero", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeConcept", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFacility", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeHyroxPromo", () => ({
+  default: () => <div data-testid="home-hyrox-promo" />,
+}));
 vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
@@ -113,6 +116,15 @@ describe("Home Page", () => {
     });
     const { container } = render(element);
     expect(container).toBeTruthy();
+  });
+
+  it("HYROX 誘導カードを描画する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    render(element);
+    expect(screen.getByTestId("home-hyrox-promo")).toBeInTheDocument();
   });
 
   it("不正 locale で notFound", async () => {
