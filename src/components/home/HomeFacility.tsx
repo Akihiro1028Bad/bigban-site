@@ -7,6 +7,8 @@ import { motion, useInView } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 
+import { Link } from "@/i18n/navigation";
+
 const FACILITY_IMAGES = [
   { src: "/images/facility.webp", altKey: "court" as const },
   { src: "/images/comingsoon.jpg", altKey: "training" as const },
@@ -264,13 +266,25 @@ export default function HomeFacility() {
                 ease: EASE,
               }}
             >
-              <span className="text-text-light text-sm lg:text-base">
-                {t(`features.${feature.key}`)}
-              </span>
-              {feature.hasNote && (
-                <span className="text-accent/60 text-xs ml-2 tracking-wider">
-                  {t("features.preparing")}
-                </span>
+              {feature.key === "trainingArea" ? (
+                <Link
+                  href="/hyrox"
+                  className="text-text-light text-sm lg:text-base hover:text-accent transition-colors"
+                >
+                  {t(`features.${feature.key}`)}
+                  <span className="text-accent/60 text-xs ml-2 tracking-wider">→</span>
+                </Link>
+              ) : (
+                <>
+                  <span className="text-text-light text-sm lg:text-base">
+                    {t(`features.${feature.key}`)}
+                  </span>
+                  {feature.hasNote && (
+                    <span className="text-accent/60 text-xs ml-2 tracking-wider">
+                      {t("features.preparing")}
+                    </span>
+                  )}
+                </>
               )}
             </motion.div>
           ))}
