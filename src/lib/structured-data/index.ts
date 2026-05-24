@@ -22,3 +22,6 @@ export type { ServiceSchema } from "./service";
 
 export { buildPersonNishimura, buildPersonYoshida } from "./person";
 export type { PersonSchema } from "./person";
+
+export { buildExerciseGym } from "./exerciseGym";
+export type { ExerciseGymSchema } from "./exerciseGym";
