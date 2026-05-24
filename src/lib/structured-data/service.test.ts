@@ -12,10 +12,19 @@ describe("buildServices", () => {
     vi.unstubAllEnvs();
   });
 
-  it("HomeServicesの5サービスすべてを返す", async () => {
+  it("HomeServicesの6サービスすべてを返す", async () => {
     const { buildServices } = await import("./service");
     const services = buildServices();
-    expect(services).toHaveLength(5);
+    expect(services).toHaveLength(6);
+  });
+
+  it("HYROX トレーニングを含む", async () => {
+    const { buildServices } = await import("./service");
+    const services = buildServices();
+    expect(services).toHaveLength(6);
+    expect(services.some((s) => s.serviceType === "HYROXトレーニング")).toBe(
+      true,
+    );
   });
 
   it("各サービスが@contextとServiceを含む", async () => {

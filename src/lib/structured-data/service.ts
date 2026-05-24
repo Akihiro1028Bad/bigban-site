@@ -50,6 +50,12 @@ const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
       "1面ショーコートへのレイアウト変更で本格的な観戦イベントを実現。異業種コラボレーションやプロモーションイベントの会場としても。",
     serviceType: "イベント企画・会場提供",
   },
+  {
+    name: "HYROXトレーニング",
+    description:
+      "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本格的なトレーニングエリアを併設予定。",
+    serviceType: "HYROXトレーニング",
+  },
 ] as const;
 
 const AREA_SERVED = {
