@@ -70,6 +70,11 @@
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
+    },
+    "hyrox": {
+      "title": "HYROX Training Area | THE PICKLE BANG THEORY",
+      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is coming to THE PICKLE BANG THEORY in Motoyawata.",
+      "keywords": ["HYROX", "HYROX Japan", "HYROX Chiba", "HYROX Motoyawata", "HYROX gym", "HYROX training", "functional fitness", "fitness racing"]
     }
   },
   "Navigation": {
@@ -82,6 +87,7 @@
     "access": "ACCESS",
     "reserve": "RESERVE",
     "contact": "CONTACT",
+    "hyrox": "HYROX",
     "mainNav": "Main Navigation",
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu"
@@ -477,5 +483,51 @@
       },
       "fallbackLabel": "Open externally"
     }
+  },
+  "HyroxPage": {
+    "hero": {
+      "kicker": "The World Series of Fitness Racing",
+      "title": "HYROX",
+      "tagline": "RUN. WORKOUT. REPEAT.",
+      "lead": "The second pillar, alongside pickleball. (Copy coming soon)",
+      "cta": "Book a trial",
+      "statusBadge": "COMING SOON"
+    },
+    "whatIs": {
+      "title": "WHAT IS HYROX",
+      "titleJa": "About HYROX",
+      "lead": "A standardized global fitness race combining an 8 km run with 8 functional workout stations. (Details coming soon)",
+      "keyNumbers": {
+        "run": { "value": "8", "labelEn": "KM RUN", "labelJa": "Running" },
+        "workouts": { "value": "8", "labelEn": "WORKOUTS", "labelJa": "Stations" },
+        "race": { "value": "1", "labelEn": "RACE", "labelJa": "Race" }
+      }
+    },
+    "stations": {
+      "title": "8 STATIONS",
+      "titleJa": "The 8 Workouts",
+      "preparing": "Coming soon",
+      "station01": { "name": "SkiErg", "nameJa": "SkiErg", "description": "Coming soon" },
+      "station02": { "name": "Sled Push", "nameJa": "Sled Push", "description": "Coming soon" },
+      "station03": { "name": "Sled Pull", "nameJa": "Sled Pull", "description": "Coming soon" },
+      "station04": { "name": "Burpee Broad Jumps", "nameJa": "Burpee Broad Jumps", "description": "Coming soon" },
+      "station05": { "name": "Rowing", "nameJa": "Rowing", "description": "Coming soon" },
+      "station06": { "name": "Farmers Carry", "nameJa": "Farmers Carry", "description": "Coming soon" },
+      "station07": { "name": "Sandbag Lunges", "nameJa": "Sandbag Lunges", "description": "Coming soon" },
+      "station08": { "name": "Wall Balls", "nameJa": "Wall Balls", "description": "Coming soon" }
+    },
+    "program": {
+      "title": "PROGRAM",
+      "titleJa": "Program & Pricing",
+      "comingSoon": "Coming Soon",
+      "note": "Programs and pricing are being finalized. Stay tuned."
+    }
+  },
+  "HomeHyroxPromo": {
+    "kicker": "NEW TRAINING AREA",
+    "title": "HYROX",
+    "titleEn": "The World Series of Fitness Racing",
+    "description": "A dedicated functional training area is coming soon. (Preparing)",
+    "cta": "DISCOVER HYROX"
   }
 }

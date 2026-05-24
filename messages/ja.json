@@ -81,6 +81,11 @@
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
+    },
+    "hyrox": {
+      "title": "HYROX トレーニングエリア | THE PICKLE BANG THEORY",
+      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアが登場予定。",
+      "keywords": ["HYROX", "ハイロックス", "HYROX 市川", "HYROX 本八幡", "HYROX 千葉", "HYROX ジム", "HYROX トレーニング", "HYROX 体験", "ファンクショナルフィットネス", "機能性トレーニング"]
     }
   },
   "Navigation": {
@@ -93,6 +98,7 @@
     "access": "ACCESS",
     "reserve": "RESERVE",
     "contact": "CONTACT",
+    "hyrox": "HYROX",
     "mainNav": "メインナビゲーション",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる"
@@ -488,5 +494,51 @@
       },
       "fallbackLabel": "外部サイトで開く"
     }
+  },
+  "HyroxPage": {
+    "hero": {
+      "kicker": "The World Series of Fitness Racing",
+      "title": "HYROX",
+      "tagline": "RUN. WORKOUT. REPEAT.",
+      "lead": "ピックルボールと並ぶ、もう一つの主役。（コピー準備中）",
+      "cta": "体験予約",
+      "statusBadge": "COMING SOON"
+    },
+    "whatIs": {
+      "title": "WHAT IS HYROX",
+      "titleJa": "ハイロックスとは",
+      "lead": "ランニング8kmと8種目のファンクショナルワークアウトを組み合わせた、世界統一ルールのフィットネスレース。（本文準備中）",
+      "keyNumbers": {
+        "run": { "value": "8", "labelEn": "KM RUN", "labelJa": "ランニング" },
+        "workouts": { "value": "8", "labelEn": "WORKOUTS", "labelJa": "種目" },
+        "race": { "value": "1", "labelEn": "RACE", "labelJa": "レース" }
+      }
+    },
+    "stations": {
+      "title": "8 STATIONS",
+      "titleJa": "8つの種目",
+      "preparing": "準備中",
+      "station01": { "name": "SkiErg", "nameJa": "スキーエルグ", "description": "準備中" },
+      "station02": { "name": "Sled Push", "nameJa": "スレッドプッシュ", "description": "準備中" },
+      "station03": { "name": "Sled Pull", "nameJa": "スレッドプル", "description": "準備中" },
+      "station04": { "name": "Burpee Broad Jumps", "nameJa": "バーピーブロードジャンプ", "description": "準備中" },
+      "station05": { "name": "Rowing", "nameJa": "ローイング", "description": "準備中" },
+      "station06": { "name": "Farmers Carry", "nameJa": "ファーマーズキャリー", "description": "準備中" },
+      "station07": { "name": "Sandbag Lunges", "nameJa": "サンドバッグランジ", "description": "準備中" },
+      "station08": { "name": "Wall Balls", "nameJa": "ウォールボール", "description": "準備中" }
+    },
+    "program": {
+      "title": "PROGRAM",
+      "titleJa": "プログラム・料金",
+      "comingSoon": "Coming Soon",
+      "note": "プログラム・料金は準備中です。詳細が決まり次第お知らせします。"
+    }
+  },
+  "HomeHyroxPromo": {
+    "kicker": "NEW TRAINING AREA",
+    "title": "HYROX",
+    "titleEn": "The World Series of Fitness Racing",
+    "description": "本格ファンクショナルトレーニングエリアが登場予定。（準備中）",
+    "cta": "DISCOVER HYROX"
   }
 }
