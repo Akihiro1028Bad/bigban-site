@@ -267,7 +267,17 @@
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "Specified Commercial Transactions Act",
     "address": "2-16-6 6F, Yawata, Ichikawa City, Chiba 272-0021",
-    "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー"
+    "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
+    "newsletter": {
+      "heading": "Newsletter",
+      "description": "Stay updated with our latest news and campaigns.",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "your@email.com",
+      "submit": "Subscribe",
+      "submitting": "Sending...",
+      "successMessage": "Thanks for subscribing!",
+      "errorMessage": "Subscription failed. Please try again."
+    }
   },
   "About": {
     "photoPlaceholder": "Photo",
