@@ -18,7 +18,13 @@ describe("HYROX i18n messages", () => {
   });
 
   it("ja に 8 stations が定義されている", () => {
-    const stations = (ja as Record<string, any>).HyroxPage.stations;
+    const stations = (
+      ja as unknown as {
+        HyroxPage: {
+          stations: Record<string, { name: string; nameJa: string }>;
+        };
+      }
+    ).HyroxPage.stations;
     for (let i = 1; i <= 8; i++) {
       const key = `station${String(i).padStart(2, "0")}`;
       expect(stations[key].name).toBeTypeOf("string");
