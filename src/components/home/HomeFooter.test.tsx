@@ -110,6 +110,16 @@ describe("HomeFooter", () => {
     expect(link).toHaveAttribute("href", "/tokushoho");
   });
 
+  it("フッターに HYROX ページへのリンクがある", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: "HYROX" });
+    expect(link).toHaveAttribute("href", "/hyrox");
+  });
+
   it("アクセントセパレーターを持つ", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

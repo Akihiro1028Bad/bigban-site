@@ -66,6 +66,12 @@ export default function HomeFooter() {
             >
               {tFooter("tokushoho")}
             </Link>
+            <Link
+              href="/hyrox"
+              className="text-xs text-text-gray hover:text-text-light transition-colors"
+            >
+              HYROX
+            </Link>
           </div>
           <p className="text-xs text-text-gray">
             {tFooter("address")}
