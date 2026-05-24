@@ -16,5 +16,6 @@ export interface RouteConfig {
 export const SITEMAP_ROUTES: readonly RouteConfig[] = [
   { path: "/", priority: 1.0, changeFrequency: "weekly" },
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/hyrox", priority: 0.8, changeFrequency: "monthly" },
   { path: "/tokushoho", priority: 0.2, changeFrequency: "yearly" },
 ] as const;

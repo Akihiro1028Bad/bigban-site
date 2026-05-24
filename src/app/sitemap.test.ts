@@ -16,16 +16,26 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ3つ + ニュース一覧1つ = 4エントリ（slugなし時）", async () => {
+  it("静的ページ4つ + ニュース一覧1つ = 5エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(5);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
+    expect(urls).toContain(`${PROD_URL}/hyrox`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
     expect(urls).toContain(`${PROD_URL}/news`);
+  });
+
+  it("/hyrox を ja/en alternates 付きで含む", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+
+    const hyrox = entries.find((e) => e.url === `${PROD_URL}/hyrox`);
+    expect(hyrox).toBeDefined();
+    expect(hyrox?.alternates?.languages?.en).toBe(`${PROD_URL}/en/hyrox`);
   });
 
   it("/teaser / /facility / /services は sitemap に含まれない", async () => {
