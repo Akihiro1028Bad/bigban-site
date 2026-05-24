@@ -35,7 +35,6 @@ export default function FooterNewsletter() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="flex flex-col gap-2"
-              noValidate
             >
               <div className="flex">
                 <label htmlFor="footer-newsletter-email" className="sr-only">
