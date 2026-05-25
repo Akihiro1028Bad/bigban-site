@@ -23,11 +23,11 @@ export default function HomeHyroxPromo() {
           <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
           <div className="relative aspect-[16/10] lg:aspect-auto lg:min-h-[320px]">
             <Image
-              src="/images/comingsoon.jpg"
+              src="/images/hyrox.png"
               alt=""
               fill
               sizes="(min-width: 1024px) 50vw, 100vw"
-              className="object-cover opacity-60"
+              className="object-cover opacity-85"
             />
           </div>
           <div className="px-8 py-10 lg:px-12 lg:py-16 flex flex-col justify-center">

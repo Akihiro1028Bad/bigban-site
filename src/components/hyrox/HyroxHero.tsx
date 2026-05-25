@@ -13,14 +13,14 @@ export default function HyroxHero() {
   return (
     <section className="relative min-h-[80vh] flex items-center bg-deep-black overflow-hidden">
       <Image
-        src="/images/comingsoon.jpg"
+        src="/images/hyrox.png"
         alt=""
         fill
         priority
         sizes="100vw"
-        className="object-cover opacity-40"
+        className="object-cover opacity-70"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/70 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-deep-black/90 via-deep-black/40 to-transparent" />
       <div className="relative mx-auto max-w-7xl px-6 lg:px-12 py-32 w-full">
         <motion.span
           className="inline-block text-[10px] tracking-[0.3em] text-accent border border-accent/40 rounded-full px-4 py-1 mb-6"
