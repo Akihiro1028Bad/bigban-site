@@ -47,7 +47,7 @@ describe("buildSportsActivityLocation", () => {
       postalCode: "272-0021",
       addressRegion: "千葉県",
       addressLocality: "市川市",
-      streetAddress: "八幡2-16-6 6階",
+      streetAddress: "八幡2-16-6 八幡ハタビル 6階",
     });
   });
 

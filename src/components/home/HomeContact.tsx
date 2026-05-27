@@ -74,7 +74,7 @@ export default function HomeContact() {
               <div>
                 <p className="text-sm text-text-gray mb-1">Address</p>
                 <p className="text-lg text-text-light">
-                  千葉県市川市八幡2-16-6 6階
+                  千葉県市川市八幡2-16-6 八幡ハタビル 6階
                 </p>
               </div>
               <div>
