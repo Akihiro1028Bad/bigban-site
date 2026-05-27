@@ -65,12 +65,12 @@ describe("AboutPage", () => {
 
   it("CONTACTセクションに施設住所が表示される（JP）", () => {
     renderWithIntl(<AboutPage />);
-    expect(screen.getByText("千葉県市川市八幡2-16-6 6階")).toBeInTheDocument();
+    expect(screen.getByText("千葉県市川市八幡2-16-6 八幡ハタビル 6階")).toBeInTheDocument();
   });
 
   it("CONTACTセクションに施設住所が表示される（EN）", () => {
     renderWithIntl(<AboutPage />, "en");
-    expect(screen.getByText("2-16-6 6F, Yawata, Ichikawa City, Chiba")).toBeInTheDocument();
+    expect(screen.getByText("2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba")).toBeInTheDocument();
   });
 
   it("COMPANYセクションに会社住所が表示される（JP）", () => {
