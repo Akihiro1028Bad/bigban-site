@@ -106,7 +106,7 @@ export default function CrowdfundingPopup({
 
             <div className="relative aspect-[16/10] w-full">
               <Image
-                src="/images/crowdfunding.avif"
+                src="/images/crowdfunding.jpg"
                 alt={t("imageAlt")}
                 fill
                 sizes="(min-width: 640px) 28rem, 100vw"
