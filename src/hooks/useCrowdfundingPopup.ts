@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { isJunePromoActive } from "@/lib/promoSchedule";
 
 const SESSION_KEY = "bigban-crowdfunding-dismissed";
 const TRIGGER_SECTION_ID = "services";
@@ -32,8 +33,10 @@ export function useCrowdfundingPopup() {
   // 早すぎるとファーストビューを邪魔するので、ユーザーが Concept/Facility を読み終えて
   // SERVICES に到達する=ある程度エンゲージしたタイミングで出す設計。
   // sessionStorage で「閉じた」フラグが立っていれば observer を仕掛けない。
+  // クラファン終了後 (JST 6/1 以降) はポップアップ自体を表示しない。
   useEffect(() => {
-    if (!isMounted || !isNotDismissed || hasTriggered.current) return;
+    if (!isMounted || !isNotDismissed || hasTriggered.current || isJunePromoActive())
+      return;
 
     const target = document.getElementById(TRIGGER_SECTION_ID);
     if (!target) return;
