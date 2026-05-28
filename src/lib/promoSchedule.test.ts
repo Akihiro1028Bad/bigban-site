@@ -16,9 +16,8 @@ describe("isJunePromoActive", () => {
     expect(isJunePromoActive(new Date("2026-06-15T03:00:00Z"))).toBe(true);
   });
 
-  it("UTC 上では 6/1 でも JST ではまだ 5/31 の場合は非アクティブ", () => {
-    // 2026-06-01T00:00:00Z = 2026-06-01T09:00:00 JST → アクティブ
-    // 直前の 2026-05-31T15:00:00Z 未満を検証
+  it("境界より前 (JST 5/31 23:00) は非アクティブ", () => {
+    // 2026-05-31T14:00:00Z = JST 2026-05-31 23:00 → まだ5月キャンペーン
     expect(isJunePromoActive(new Date("2026-05-31T14:00:00Z"))).toBe(false);
   });
 
