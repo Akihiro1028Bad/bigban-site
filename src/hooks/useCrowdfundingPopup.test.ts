@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useCrowdfundingPopup } from "./useCrowdfundingPopup";
+import * as promoSchedule from "@/lib/promoSchedule";
 
 const SESSION_KEY = "bigban-crowdfunding-dismissed";
 
@@ -55,6 +56,8 @@ describe("useCrowdfundingPopup", () => {
       writable: true,
     });
     setupIntersectionObserver();
+    // 既定は6月前 (クラファン実施中) を想定。各テストで必要に応じて上書きする。
+    vi.spyOn(promoSchedule, "isJunePromoActive").mockReturnValue(false);
 
     servicesSection = document.createElement("section");
     servicesSection.id = "services";
@@ -179,6 +182,14 @@ describe("useCrowdfundingPopup", () => {
   it("SERVICES セクションが存在しない場合もエラーにならない", () => {
     servicesSection.remove();
     const { result } = renderHook(() => useCrowdfundingPopup());
+    expect(result.current.isOpen).toBe(false);
+  });
+
+  it("JST 6/1以降 (クラファン終了後) は SERVICES 到達でも observer を仕掛けず isOpen は false のまま", () => {
+    vi.spyOn(promoSchedule, "isJunePromoActive").mockReturnValue(true);
+
+    const { result } = renderHook(() => useCrowdfundingPopup());
+    expect(mockObserve).not.toHaveBeenCalled();
     expect(result.current.isOpen).toBe(false);
   });
 });
