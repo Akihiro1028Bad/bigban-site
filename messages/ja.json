@@ -253,7 +253,7 @@
     "mapTitle": "THE PICKLE BANG THEORY 所在地",
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
-    "address": "千葉県市川市八幡2-16-6 6階",
+    "address": "千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "hours": "営業時間：6:00 – 23:00（不定休）",
     "routes": {
       "jr": {
@@ -277,7 +277,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
-    "address": "〒272-0021 千葉県市川市八幡2-16-6 6階",
+    "address": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
       "heading": "Newsletter",
@@ -426,7 +426,7 @@
       "instagram": "Instagram",
       "address": "Address",
       "hours": "Hours",
-      "addressValue": "千葉県市川市八幡2-16-6 6階",
+      "addressValue": "千葉県市川市八幡2-16-6 八幡ハタビル 6階",
       "hoursValue": "6:00 – 23:00"
     }
   },

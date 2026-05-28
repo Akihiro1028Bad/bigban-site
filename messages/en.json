@@ -242,7 +242,7 @@
     "mapTitle": "THE PICKLE BANG THEORY Location",
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
-    "address": "2-16-6 6F, Yawata, Ichikawa City, Chiba",
+    "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
     "hours": "Hours: 6:00 AM – 11:00 PM (Irregular holidays)",
     "routes": {
       "jr": {
@@ -266,7 +266,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "Specified Commercial Transactions Act",
-    "address": "2-16-6 6F, Yawata, Ichikawa City, Chiba 272-0021",
+    "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba 272-0021",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
       "heading": "Newsletter",
@@ -415,7 +415,7 @@
       "instagram": "Instagram",
       "address": "Address",
       "hours": "Hours",
-      "addressValue": "2-16-6 6F, Yawata, Ichikawa City, Chiba",
+      "addressValue": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
       "hoursValue": "6:00 – 23:00"
     }
   },
