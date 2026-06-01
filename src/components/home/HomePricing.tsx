@@ -44,7 +44,7 @@ export default function HomePricing() {
           <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
         </motion.div>
 
-        {/* OPEN記念価格 */}
+        {/* 料金ラベル */}
         <motion.div
           className="text-center mb-6"
           initial={{ opacity: 0, y: 16 }}
@@ -54,9 +54,6 @@ export default function HomePricing() {
         >
           <p className="text-text-light text-sm mb-2">
             {t("perHour")}
-          </p>
-          <p className="text-accent text-sm sm:text-base font-semibold tracking-wide opacity-85">
-            {t("promoText")}
           </p>
           <div className="mx-auto mt-4 w-10 h-px bg-accent/30" />
         </motion.div>
