@@ -79,6 +79,10 @@
         "ティザー"
       ]
     },
+    "reserve": {
+      "title": "予約|THE PICKLE BANG THEORY",
+      "description": "THE PICKLE BANG THEORY のコート予約ページ。ご希望の日時を選んでオンラインでかんたんに予約できます。本八幡駅徒歩1分、6:00–23:00営業。"
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     }
@@ -101,6 +105,44 @@
     "text": "🈹\uFE0F コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
     "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します"
+  },
+  "Reserve": {
+    "hero": {
+      "eyebrow": "RESERVATION",
+      "title": "RESERVE",
+      "subtitle": "コート予約",
+      "lead": "ご希望の日時を選んで、オンラインでかんたんにコートを予約できます。"
+    },
+    "steps": {
+      "heading": "予約の流れ",
+      "headingEn": "HOW TO BOOK",
+      "step01": { "title": "日時を選ぶ", "description": "カレンダーから空き枠を選択します。" },
+      "step02": { "title": "コート・人数を選択", "description": "利用コートと人数・オプションを指定します。" },
+      "step03": { "title": "予約完了（決済）", "description": "お支払い情報を入力して予約を確定します。" }
+    },
+    "calendar": {
+      "title": "BOOK A COURT",
+      "subtitle": "カレンダーから予約",
+      "iframeTitle": "予約カレンダー"
+    },
+    "info": {
+      "heading": "INFORMATION",
+      "hoursLabel": "営業時間",
+      "hoursValue": "6:00 – 23:00（不定休）",
+      "accessLabel": "アクセス",
+      "accessStation": "本八幡駅 徒歩1分",
+      "accessAddress": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階"
+    },
+    "notes": {
+      "heading": "ご利用にあたって",
+      "headingEn": "NOTES",
+      "items": [
+        "ご予約は予約システム上の受付時間に従います。",
+        "キャンセル・変更は予約システムの規定に従います。詳細は予約時にご確認ください。",
+        "開始時刻に遅れた場合も、ご予約枠の時間内でのご利用となります。",
+        "シューズ・ラケット等の貸出は店舗・プランにより異なります。"
+      ]
+    }
   },
   "HomeHero": {
     "headline1": "ピックルボールの",
