@@ -15,13 +15,13 @@ function renderWithIntl(ui: ReactElement) {
 }
 
 describe("ReserveCalendar", () => {
-  it("labola shop 3453 の埋め込み iframe を表示する", () => {
+  it("labola shop 3473 (一日表示) の埋め込み iframe を表示する", () => {
     renderWithIntl(<ReserveCalendar />);
     const iframe = screen.getByTitle("予約カレンダー");
     expect(iframe).toBeInTheDocument();
     expect(iframe).toHaveAttribute(
       "src",
-      "https://yoyaku.labola.jp/r/shop/3453/calendar/?embed=normal&tab_name=%E3%81%99%E3%81%B9%E3%81%A6"
+      "https://yoyaku.labola.jp/r/shop/3473/calendar/?embed=normal&tab_name=%E3%81%99%E3%81%B9%E3%81%A6"
     );
   });
 

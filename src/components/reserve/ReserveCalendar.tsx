@@ -38,7 +38,7 @@ export default function ReserveCalendar() {
           <iframe
             src={LABOLA_CALENDAR_SRC}
             title={t("iframeTitle")}
-            className="w-full h-[640px] md:h-[550px] border-0"
+            className="w-full h-[600px] md:h-[500px] border-0"
           />
         </motion.div>
       </div>
