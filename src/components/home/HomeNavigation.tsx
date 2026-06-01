@@ -7,7 +7,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
-import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { RESERVE_PATH } from "@/constants/site";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 
@@ -132,13 +132,12 @@ export default function HomeNavigation() {
               isJa={isJa}
               onSwitch={handleSwitchLocale}
             />
-            <a
-              href={RESERVE_URL}
-              {...EXTERNAL_LINK_PROPS}
+            <Link
+              href={RESERVE_PATH}
               className="bg-accent text-deep-black px-5 py-2 text-xs font-bold uppercase tracking-widest"
             >
               {t("reserve")}
-            </a>
+            </Link>
           </div>
 
           {/* Mobile: Right side */}
@@ -212,13 +211,13 @@ export default function HomeNavigation() {
             })}
           </nav>
 
-          <a
-            href={RESERVE_URL}
-            {...EXTERNAL_LINK_PROPS}
+          <Link
+            href={RESERVE_PATH}
+            onClick={handleMobileLinkClick}
             className="mt-12 bg-accent text-deep-black px-8 py-3 text-sm font-bold uppercase tracking-widest"
           >
             {t("reserve")}
-          </a>
+          </Link>
         </motion.div>
       )}
     </AnimatePresence>

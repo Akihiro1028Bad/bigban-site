@@ -167,9 +167,7 @@ describe("HomeNavigation", () => {
     renderWithIntl(<HomeNavigation />);
     const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(1);
-    expect(reserveLinks[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(reserveLinks[0]).toHaveAttribute("target", "_blank");
-    expect(reserveLinks[0]).toHaveAttribute("rel", "noopener noreferrer");
+    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve");
   });
 
   it("ハンバーガーメニューの開閉", () => {
@@ -280,7 +278,7 @@ describe("HomeNavigation", () => {
     renderWithIntl(<HomeNavigation />);
     fireEvent.click(screen.getByLabelText("メニューを開く"));
     const dialog = screen.getByRole("dialog");
-    const reserveInDialog = dialog.querySelector("a[href='https://reserva.be/tpbt']");
+    const reserveInDialog = dialog.querySelector("a[href='/reserve']");
     expect(reserveInDialog).toBeInTheDocument();
     expect(reserveInDialog?.textContent).toBe("RESERVE");
   });
