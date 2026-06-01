@@ -123,7 +123,8 @@
     "calendar": {
       "title": "BOOK A COURT",
       "subtitle": "カレンダーから予約",
-      "iframeTitle": "予約カレンダー"
+      "iframeTitle": "予約カレンダー",
+      "scrollHint": "上下にスクロールして全時間帯を表示"
     },
     "info": {
       "heading": "INFORMATION",

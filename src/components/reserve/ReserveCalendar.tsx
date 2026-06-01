@@ -40,6 +40,29 @@ export default function ReserveCalendar() {
             title={t("iframeTitle")}
             className="w-full h-[600px] md:h-[500px] border-0"
           />
+
+          {/* スクロール案内: カレンダー枠の下に独立したスリムバー。
+              iframe コンテンツに一切被らないため最終行も常に見える。 */}
+          <div className="flex items-center justify-center gap-2 border-t border-accent/20 bg-deep-black py-2.5">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-accent motion-safe:animate-bounce"
+            >
+              <line x1="12" y1="4" x2="12" y2="20" />
+              <polyline points="7 8 12 3 17 8" />
+              <polyline points="7 16 12 21 17 16" />
+            </svg>
+            <span className="text-[10px] font-medium tracking-[0.2em] text-accent/90">
+              {t("scrollHint")}
+            </span>
+          </div>
         </motion.div>
       </div>
     </section>

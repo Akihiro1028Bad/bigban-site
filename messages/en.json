@@ -112,7 +112,8 @@
     "calendar": {
       "title": "BOOK A COURT",
       "subtitle": "Reserve from the calendar",
-      "iframeTitle": "Reservation calendar"
+      "iframeTitle": "Reservation calendar",
+      "scrollHint": "Scroll to see all hours"
     },
     "info": {
       "heading": "INFORMATION",

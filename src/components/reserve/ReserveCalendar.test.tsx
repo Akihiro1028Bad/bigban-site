@@ -29,4 +29,11 @@ describe("ReserveCalendar", () => {
     renderWithIntl(<ReserveCalendar />);
     expect(screen.getByText("BOOK A COURT")).toBeInTheDocument();
   });
+
+  it("カレンダー枠下にスクロール案内バーを表示する", () => {
+    renderWithIntl(<ReserveCalendar />);
+    expect(
+      screen.getByText("上下にスクロールして全時間帯を表示")
+    ).toBeInTheDocument();
+  });
 });
