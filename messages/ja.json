@@ -505,6 +505,47 @@
       "words": ["走る。", "鍛える。", "挑戦する。"],
       "body": "すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、<accent>HYROX</accent>。その本格トレーニングエリアが、<strong>本八幡</strong>に登場。"
     },
+    "facility": {
+      "title": "FACILITY",
+      "titleJa": "設備・配置",
+      "preparing": "準備中",
+      "preparingSub": "COMING SOON",
+      "lead": "HYROX公式8種目に対応した本格器具を完備。実際のレースと同じ動線で、8つのステーションを巡るようにトレーニングできます。",
+      "diagramTitle": "サーキット配置図",
+      "diagramAria": "8つのステーションを巡るHYROXサーキットの配置図",
+      "circuitName": "HYROX CIRCUIT",
+      "circuitNameJa": "ハイロックス・サーキット",
+      "circuitMeta": "8 STATIONS · 8KM RUN",
+      "equipmentTitle": "設置器具",
+      "note": "ダンベル・プレート・トレーニングマットなどの補助器具も完備しています。"
+    },
+    "services": {
+      "title": "SERVICES",
+      "titleJa": "サービス",
+      "lead": "目的に合わせて選べる、3つの利用スタイル。初めての方から大会出場を目指す方まで。",
+      "cta": "RESERVE",
+      "ctaJa": "予約",
+      "items": [
+        {
+          "titleEn": "AREA RENTAL",
+          "titleJa": "時間制レンタル",
+          "description": "HYROXエリアを時間単位でレンタル。設置器具を使って自分のペースで自主トレーニング。早朝6:00から深夜23:00まで利用可能です。",
+          "imageAlt": "スレッドプッシュに挑むアスリート"
+        },
+        {
+          "titleEn": "TRIAL",
+          "titleJa": "体験・トライアル",
+          "description": "初めての方向けの体験セッション。コーチがHYROX8種目の動きを一から丁寧にガイドします。手ぶらでも気軽に参加できます。",
+          "imageAlt": "ウォールボールに取り組むアスリート"
+        },
+        {
+          "titleEn": "GROUP SESSION",
+          "titleJa": "グループセッション",
+          "description": "少人数制のコーチングクラス。ランとワークアウトを組み合わせた本格メニューを仲間と追い込む。レベル別で初心者も安心です。",
+          "imageAlt": "仲間とトレーニングするアスリートたち"
+        }
+      ]
+    },
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "ハイロックスとは",
@@ -528,25 +569,53 @@
       "sectionTitle": "CREW",
       "sectionTitleJa": "クルー",
       "name": "関吉大亮",
+      "nameKana": "せきよし だいすけ",
       "nameEn": "DAISUKE SEKIYOSHI",
-      "role": "HYROX担当コーチ",
-      "titles": [
-        "HYROX Japan アンバサダー",
-        "HYROX PRO アスリート",
-        "元スパルタンレース日本代表（2017–2023 / 2018 日韓シリーズ総合優勝）"
+      "intro": "日本におけるHYROXの先駆者であり、現HYROX日本代表。スパルタンレース初代日本王者、トライアスロンでも日本一に輝いた、日本屈指のハイブリッドアスリート。",
+      "profile": "1985年6月25日生・千葉県出身",
+      "achievementsTitle": "ACHIEVEMENTS",
+      "achievementsTitleJa": "実績",
+      "achievements": [
+        {
+          "discipline": "HYROX",
+          "disciplineJa": "ハイロックス",
+          "note": "日本代表 2024〜",
+          "items": [
+            "アジアチャンピオンシップ2026　mix doubles over40 1位",
+            "アジアチャンピオンシップ2025　mix relay overall 2位",
+            "アジアチャンピオンシップ2024　single overall 4位 / age 2位",
+            "HYROX香港2023　Single pro　日本人男子初表彰台（3位）",
+            "その他、表彰台多数"
+          ]
+        },
+        {
+          "discipline": "SPARTAN RACE",
+          "disciplineJa": "スパルタンレース",
+          "note": "日本代表 2017〜2023",
+          "items": [
+            "初代日本チャンピオン",
+            "2018 日韓シリーズ総合優勝",
+            "エリートカテゴリー優勝5回",
+            "その他、表彰台多数"
+          ]
+        },
+        {
+          "discipline": "TRIATHLON",
+          "disciplineJa": "トライアスロン",
+          "note": "",
+          "items": [
+            "2022 エイジグループ JAPANナショナルチャンピオンシップ スプリント 年間ランキング1位",
+            "その他、表彰台多数"
+          ]
+        }
       ],
-      "stats": {
-        "pbLabel": "PERSONAL BEST",
-        "pbValue": "1:01:45",
-        "racesLabel": "RACES / SEASONS",
-        "racesValue": "18 / 3",
-        "apacLabel": "STAGE",
-        "apacValue": "APAC CHAMP.",
-        "signatureLabel": "SIGNATURE",
-        "signatureValue": "WALL BALLS"
-      },
-      "bio": "日本のHYROXシーンを切り拓いてきたPROアスリート。スパルタンレース日本代表として世界を転戦し、現在はHYROX Japanアンバサダーとして競技の普及を牽引。ストイックな鍛錬で限界を更新し続ける。",
-      "instagram": "@syugyou_sou",
+      "careerTitle": "CAREER",
+      "careerTitleJa": "経歴",
+      "career": [
+        "千葉県警察官として22年間勤務",
+        "2026年に退職。現在は会社員として、フィットネス事業を担当。"
+      ],
+      "instagram": "@tac_monk",
       "instagramAria": "関吉大亮のInstagramを開く（新しいタブ）",
       "portraitAlt": "HYROX担当コーチ 関吉大亮",
       "apacAlt": "HYROX APAC選手権での関吉大亮"

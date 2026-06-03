@@ -494,6 +494,47 @@
       "words": ["Run.", "Train.", "Challenge."],
       "body": "The stage to pour it all out is right here. <accent>HYROX</accent>, the ultimate endurance race the world is hooked on — its dedicated training area arrives in <strong>Motoyawata</strong>."
     },
+    "facility": {
+      "title": "FACILITY",
+      "titleJa": "Equipment & Layout",
+      "preparing": "COMING SOON",
+      "preparingSub": "準備中",
+      "lead": "Fully equipped for all 8 official HYROX stations. Train along the same flow as the real race, moving station to station.",
+      "diagramTitle": "Circuit Layout",
+      "diagramAria": "Layout diagram of the HYROX circuit running through 8 stations",
+      "circuitName": "HYROX CIRCUIT",
+      "circuitNameJa": "ハイロックス・サーキット",
+      "circuitMeta": "8 STATIONS · 8KM RUN",
+      "equipmentTitle": "Equipment",
+      "note": "Supporting gear such as dumbbells, plates and training mats is also available."
+    },
+    "services": {
+      "title": "SERVICES",
+      "titleJa": "Services",
+      "lead": "Three ways to train, whatever your goal — from first-timers to athletes aiming for the race.",
+      "cta": "RESERVE",
+      "ctaJa": "予約",
+      "items": [
+        {
+          "titleEn": "AREA RENTAL",
+          "titleJa": "時間制レンタル",
+          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 to 23:00.",
+          "imageAlt": "An athlete driving the sled"
+        },
+        {
+          "titleEn": "TRIAL",
+          "titleJa": "体験・トライアル",
+          "description": "A trial session for first-timers. A coach guides you through all 8 HYROX movements from scratch. Drop in empty-handed.",
+          "imageAlt": "Performing wall balls"
+        },
+        {
+          "titleEn": "GROUP SESSION",
+          "titleJa": "グループセッション",
+          "description": "Small-group coached classes. Push through an authentic mix of running and workouts together, with levels for beginners too.",
+          "imageAlt": "Athletes training together"
+        }
+      ]
+    },
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "About HYROX",
@@ -517,25 +558,53 @@
       "sectionTitle": "CREW",
       "sectionTitleJa": "Meet the Crew",
       "name": "DAISUKE SEKIYOSHI",
+      "nameKana": "関吉大亮",
       "nameEn": "関吉大亮",
-      "role": "HYROX COACH",
-      "titles": [
-        "HYROX Japan Ambassador",
-        "HYROX PRO Athlete",
-        "Former Spartan Race Team Japan (2017–2023 / 2018 Japan-Korea Series Champion)"
+      "intro": "A pioneer of HYROX in Japan and a current HYROX Team Japan athlete — Spartan Race's first-ever Japanese champion and a national triathlon title holder, and one of Japan's finest hybrid athletes.",
+      "profile": "Born June 25, 1985 · From Chiba, Japan",
+      "achievementsTitle": "ACHIEVEMENTS",
+      "achievementsTitleJa": "Achievements",
+      "achievements": [
+        {
+          "discipline": "HYROX",
+          "disciplineJa": "ハイロックス",
+          "note": "Japan National Team, 2024–",
+          "items": [
+            "Asia Championship 2026 — Mixed Doubles O40: 1st",
+            "Asia Championship 2025 — Mixed Relay Overall: 2nd",
+            "Asia Championship 2024 — Singles Overall: 4th / Age Group: 2nd",
+            "HYROX Hong Kong 2023 — Singles Pro: first Japanese man on the podium (3rd)",
+            "Many other podium finishes"
+          ]
+        },
+        {
+          "discipline": "SPARTAN RACE",
+          "disciplineJa": "スパルタンレース",
+          "note": "Japan National Team, 2017–2023",
+          "items": [
+            "Inaugural Japan Champion",
+            "2018 Japan–Korea Series Overall Champion",
+            "5× Elite Category wins",
+            "Many other podium finishes"
+          ]
+        },
+        {
+          "discipline": "TRIATHLON",
+          "disciplineJa": "トライアスロン",
+          "note": "",
+          "items": [
+            "2022 Age-Group Japan National Championship, Sprint — Annual Ranking: 1st",
+            "Many other podium finishes"
+          ]
+        }
       ],
-      "stats": {
-        "pbLabel": "PERSONAL BEST",
-        "pbValue": "1:01:45",
-        "racesLabel": "RACES / SEASONS",
-        "racesValue": "18 / 3",
-        "apacLabel": "STAGE",
-        "apacValue": "APAC CHAMP.",
-        "signatureLabel": "SIGNATURE",
-        "signatureValue": "WALL BALLS"
-      },
-      "bio": "A PRO athlete who helped pioneer Japan's HYROX scene. He raced worldwide with Spartan Race Team Japan and now drives the sport's growth as a HYROX Japan ambassador, relentlessly pushing his limits through disciplined training.",
-      "instagram": "@syugyou_sou",
+      "careerTitle": "CAREER",
+      "careerTitleJa": "Career",
+      "career": [
+        "22 years of service as a Chiba Prefectural Police officer",
+        "Retired in 2026; now works as a company employee in charge of the fitness business"
+      ],
+      "instagram": "@tac_monk",
       "instagramAria": "Open Daisuke Sekiyoshi's Instagram (new tab)",
       "portraitAlt": "HYROX Coach Daisuke Sekiyoshi",
       "apacAlt": "Daisuke Sekiyoshi at the HYROX APAC Championships"
