@@ -508,7 +508,8 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "",
-      "cta": "Book a trial"
+      "cta": "Book a trial",
+      "imageAlt": "An athlete competing in a HYROX race"
     },
     "concept": {
       "words": [

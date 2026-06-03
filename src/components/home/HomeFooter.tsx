@@ -1,19 +1,11 @@
+"use client";
+
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { NAV_ITEMS } from "@/constants/navigation";
 
 import FooterNewsletter from "./FooterNewsletter";
-
-const NAV_ITEMS = [
-  { id: "concept", kind: "anchor", href: "/#concept" },
-  { id: "facility", kind: "anchor", href: "/#facility" },
-  { id: "services", kind: "anchor", href: "/#services" },
-  { id: "hyrox", kind: "page", href: "/hyrox" },
-  { id: "pricing", kind: "anchor", href: "/#pricing" },
-  { id: "news", kind: "page", href: "/news" },
-  { id: "about", kind: "anchor", href: "/#about" },
-  { id: "access", kind: "anchor", href: "/#access" },
-] as const;
 
 export default function HomeFooter() {
   const t = useTranslations("Navigation");

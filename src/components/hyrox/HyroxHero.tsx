@@ -16,7 +16,7 @@ export default function HyroxHero() {
     <section className="relative flex min-h-screen items-center overflow-hidden bg-deep-black">
       <Image
         src="/images/hyrox/hero.jpg"
-        alt=""
+        alt={t("imageAlt")}
         fill
         priority
         sizes="100vw"

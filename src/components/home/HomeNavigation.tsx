@@ -7,6 +7,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { NAV_ITEMS } from "@/constants/navigation";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
@@ -14,17 +15,6 @@ import MenuToggleButton from "./MenuToggleButton";
 import LanguageToggle from "./LanguageToggle";
 
 const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
-
-export const NAV_ITEMS = [
-  { id: "concept", kind: "anchor", href: "/#concept" },
-  { id: "facility", kind: "anchor", href: "/#facility" },
-  { id: "services", kind: "anchor", href: "/#services" },
-  { id: "hyrox", kind: "page", href: "/hyrox" },
-  { id: "pricing", kind: "anchor", href: "/#pricing" },
-  { id: "news", kind: "page", href: "/news" },
-  { id: "about", kind: "anchor", href: "/#about" },
-  { id: "access", kind: "anchor", href: "/#access" },
-] as const;
 
 export default function HomeNavigation() {
   const locale = useLocale();

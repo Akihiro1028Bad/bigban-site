@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RESERVE_URL, INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
-import { NAV_ITEMS } from "./HomeNavigation";
+import { NAV_ITEMS } from "@/constants/navigation";
 import LanguageToggle from "./LanguageToggle";
 
 interface MobileMenuProps {

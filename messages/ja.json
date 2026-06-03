@@ -521,7 +521,8 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "ハイロックス",
-      "cta": "体験予約"
+      "cta": "体験予約",
+      "imageAlt": "HYROXレースに挑むアスリート"
     },
     "concept": {
       "words": [
