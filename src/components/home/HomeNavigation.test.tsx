@@ -209,6 +209,32 @@ describe("HomeNavigation", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("背景（オーバーレイ）クリックでモバイルメニューが閉じる", () => {
+    renderWithIntl(<HomeNavigation />);
+    fireEvent.click(screen.getByLabelText("メニューを開く"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(dialog);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("HYROXページではメニュートグルが上部(top-2.5)に配置される", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const toggle = screen.getByLabelText("メニューを開く");
+    expect(toggle.className).toContain("top-2.5");
+    mockPathname = "/";
+  });
+
+  it("HYROXページでスクロールダウンするとヘッダーが隠れる", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const header = screen.getByRole("banner");
+    Object.defineProperty(window, "scrollY", { value: 200, writable: true });
+    fireEvent.scroll(window);
+    expect(header.className).toContain("md:-translate-y-full");
+    mockPathname = "/";
+  });
+
   it("モバイルメニューのナビリンククリックで自動クローズ", () => {
     renderWithIntl(<HomeNavigation />);
 

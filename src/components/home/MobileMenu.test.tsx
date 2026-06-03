@@ -15,6 +15,46 @@ vi.mock("@/i18n/navigation", () => ({
   ),
 }));
 
+// framer-motion の motion.* を素の要素に差し替え、onDragEnd を捕捉してテストから発火できるようにする
+const dragState = vi.hoisted(() => ({
+  handler: null as
+    | null
+    | ((event: unknown, info: { offset: { x: number; y: number }; velocity: { x: number; y: number } }) => void),
+}));
+
+vi.mock("framer-motion", () => {
+  const MOTION_PROPS = new Set([
+    "initial", "animate", "exit", "variants", "transition", "drag",
+    "dragConstraints", "dragElastic", "onDragEnd", "whileInView",
+    "whileHover", "whileTap", "viewport", "layout",
+  ]);
+  const motion = new Proxy(
+    {},
+    {
+      get: (_target, tag: string) => {
+        const Component = ({ children, ...props }: Record<string, unknown>) => {
+          if (typeof props.onDragEnd === "function") {
+            // テスト用モック: framer-motion の onDragEnd を捕捉してテストから発火する
+            // eslint-disable-next-line react-hooks/immutability
+            dragState.handler = props.onDragEnd as typeof dragState.handler;
+          }
+          const domProps: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(props)) {
+            if (!MOTION_PROPS.has(key)) domProps[key] = value;
+          }
+          const Tag = tag as keyof React.JSX.IntrinsicElements;
+          return <Tag {...domProps}>{children as React.ReactNode}</Tag>;
+        };
+        return Component;
+      },
+    }
+  );
+  return {
+    motion,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
+
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, ...rest } = props;
@@ -140,10 +180,30 @@ describe("MobileMenu", () => {
     expect(screen.getByText("本八幡駅 徒歩1分・24時間利用可")).toBeInTheDocument();
   });
 
-  it("言語トグルで onSwitchLocale が呼ばれる", () => {
+  it("言語トグルで onSwitchLocale が呼ばれる（EN/JP 両方）", () => {
     const { onSwitchLocale } = renderMenu({ isJa: true });
     fireEvent.click(screen.getByRole("button", { name: "EN" }));
     expect(onSwitchLocale).toHaveBeenCalledWith("en");
+    fireEvent.click(screen.getByRole("button", { name: "JP" }));
+    expect(onSwitchLocale).toHaveBeenCalledWith("ja");
+  });
+
+  it("右に大きくスワイプすると onClose が呼ばれる", () => {
+    const { onClose } = renderMenu();
+    dragState.handler?.(null, { offset: { x: 120, y: 0 }, velocity: { x: 0, y: 0 } });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("素早く右にスワイプすると onClose が呼ばれる（速度しきい値）", () => {
+    const { onClose } = renderMenu();
+    dragState.handler?.(null, { offset: { x: 10, y: 0 }, velocity: { x: 800, y: 0 } });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("わずかなドラッグでは onClose が呼ばれない", () => {
+    const { onClose } = renderMenu();
+    dragState.handler?.(null, { offset: { x: 10, y: 0 }, velocity: { x: 0, y: 0 } });
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("表示中は body のスクロールを固定し、閉じると解除する", () => {
