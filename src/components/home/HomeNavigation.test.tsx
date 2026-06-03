@@ -302,7 +302,7 @@ describe("HomeNavigation", () => {
     const dialog = screen.getByRole("dialog");
     const reserveInDialog = dialog.querySelector("a[href='https://reserva.be/tpbt']");
     expect(reserveInDialog).toBeInTheDocument();
-    expect(reserveInDialog?.textContent).toBe("RESERVE");
+    expect(reserveInDialog?.textContent).toContain("RESERVE");
   });
 
   it("英語ロケールでaria-labelが英語になる", () => {

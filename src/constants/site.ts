@@ -14,6 +14,8 @@ export const OG_IMAGE = {
 
 export const RESERVE_URL = "https://reserva.be/tpbt";
 
+export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
+
 export const CAMPFIRE_URL =
   "https://camp-fire.jp/projects/926247/view?utm_campaign=cp_po_share_c_msg_mypage_projects_show";
 

@@ -4,16 +4,20 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
+import MobileMenu, { type MobileMenuVariant } from "./MobileMenu";
+import MenuToggleButton from "./MenuToggleButton";
+
+// TODO(一時プレビュー): デザイン選定後に固定値へ戻す。?menu=A|B|C で切替
+const DEFAULT_MENU_VARIANT: MobileMenuVariant = "C";
 
 const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { id: "concept", kind: "anchor", href: "/#concept" },
   { id: "facility", kind: "anchor", href: "/#facility" },
   { id: "services", kind: "anchor", href: "/#services" },
@@ -33,6 +37,13 @@ export default function HomeNavigation() {
   const activeSection = useActiveSection(SECTION_IDS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isOpen: isCrowdfundingOpen, closePopup } = useCrowdfundingPopup();
+
+  // TODO(一時プレビュー): ?menu=A|B|C でメニューデザインを切替（選定後に削除）
+  const [menuVariant, setMenuVariant] = useState<MobileMenuVariant>(DEFAULT_MENU_VARIANT);
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("menu");
+    if (v === "A" || v === "B" || v === "C") setMenuVariant(v);
+  }, []);
 
   const handleLogoClick = useCallback(
     (e: React.MouseEvent) => {
@@ -62,12 +73,12 @@ export default function HomeNavigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleOpenMenu = useCallback(() => {
-    setIsMobileMenuOpen(true);
-  }, []);
-
   const handleCloseMenu = useCallback(() => {
     setIsMobileMenuOpen(false);
+  }, []);
+
+  const handleToggleMenu = useCallback(() => {
+    setIsMobileMenuOpen((prev) => !prev);
   }, []);
 
   const handleMobileLinkClick = useCallback(() => {
@@ -163,101 +174,32 @@ export default function HomeNavigation() {
             </a>
           </div>
 
-          {/* Mobile: Right side */}
-          <div className="flex md:hidden items-center gap-4">
-            <LanguageToggle
-              isJa={isJa}
-              onSwitch={handleSwitchLocale}
-            />
-            <button
-              aria-label={t("openMenu")}
-              onClick={handleOpenMenu}
-              className="text-text-light"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
 
     </header>
 
+    {/* Mobile: フローティングのメニュートグル（モーフィング、オーバーレイより前面） */}
+    <MenuToggleButton
+      isOpen={isMobileMenuOpen}
+      onClick={handleToggleMenu}
+      labelOpen={t("openMenu")}
+      labelClose={t("closeMenu")}
+      className={`fixed right-4 z-[70] md:hidden ${
+        isHyrox ? "top-2.5" : "top-[calc(var(--promo-banner-h)+0.5rem)]"
+      }`}
+    />
+
     {/* Mobile menu overlay - outside header to avoid stacking context issues */}
-    <AnimatePresence>
-      {isMobileMenuOpen && (
-        <motion.div
-          role="dialog"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center"
-        >
-          <button
-            aria-label={t("closeMenu")}
-            onClick={handleCloseMenu}
-            className="absolute top-6 right-6 text-text-light"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-
-          <nav className="flex flex-col items-center gap-8">
-            {NAV_ITEMS.map((item) => {
-              const className = `flex flex-col items-center leading-tight text-2xl uppercase tracking-widest transition-colors ${
-                activeSection === item.id ? "text-accent" : "text-text-light"
-              }`;
-              const ja = t(`${item.id}Ja`);
-              const label = (
-                <>
-                  <span>{t(item.id)}</span>
-                  {ja ? (
-                    <span
-                      aria-hidden
-                      className="mt-1 text-xs font-normal normal-case tracking-normal text-text-gray"
-                    >
-                      {ja}
-                    </span>
-                  ) : null}
-                </>
-              );
-              return item.kind === "page" ? (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  onClick={handleMobileLinkClick}
-                  className={className}
-                >
-                  {label}
-                </Link>
-              ) : (
-                <a
-                  key={item.id}
-                  href={item.href}
-                  onClick={handleMobileLinkClick}
-                  className={className}
-                >
-                  {label}
-                </a>
-              );
-            })}
-          </nav>
-
-          <a
-            href={RESERVE_URL}
-            {...EXTERNAL_LINK_PROPS}
-            className="mt-12 bg-accent text-deep-black px-8 py-3 text-sm font-bold uppercase tracking-widest"
-          >
-            {t("reserve")}
-          </a>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <MobileMenu
+      isOpen={isMobileMenuOpen}
+      onClose={handleCloseMenu}
+      onLinkClick={handleMobileLinkClick}
+      activeSection={activeSection}
+      isJa={isJa}
+      onSwitchLocale={handleSwitchLocale}
+      variant={menuVariant}
+    />
 
     <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />
     </>
