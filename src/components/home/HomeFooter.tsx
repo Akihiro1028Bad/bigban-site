@@ -5,14 +5,14 @@ import { Link } from "@/i18n/navigation";
 import FooterNewsletter from "./FooterNewsletter";
 
 const NAV_ITEMS = [
-  { id: "concept", href: "/#concept" },
-  { id: "facility", href: "/#facility" },
-  { id: "services", href: "/#services" },
-  { id: "hyrox", href: "/hyrox" },
-  { id: "pricing", href: "/#pricing" },
-  { id: "news", href: "/news" },
-  { id: "about", href: "/#about" },
-  { id: "access", href: "/#access" },
+  { id: "concept", kind: "anchor", href: "/#concept" },
+  { id: "facility", kind: "anchor", href: "/#facility" },
+  { id: "services", kind: "anchor", href: "/#services" },
+  { id: "hyrox", kind: "page", href: "/hyrox" },
+  { id: "pricing", kind: "anchor", href: "/#pricing" },
+  { id: "news", kind: "page", href: "/news" },
+  { id: "about", kind: "anchor", href: "/#about" },
+  { id: "access", kind: "anchor", href: "/#access" },
 ] as const;
 
 export default function HomeFooter() {
@@ -50,12 +50,10 @@ export default function HomeFooter() {
           <nav className="flex flex-wrap gap-x-6 gap-y-3 justify-center lg:justify-center">
             {NAV_ITEMS.map((item) => {
               const ja = t(`${item.id}Ja`);
-              return (
-                <a
-                  key={item.id}
-                  href={item.href}
-                  className="flex flex-col items-center leading-tight text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors"
-                >
+              const className =
+                "flex flex-col items-center leading-tight text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors";
+              const label = (
+                <>
                   <span>{t(item.id)}</span>
                   {ja ? (
                     <span
@@ -65,6 +63,15 @@ export default function HomeFooter() {
                       {ja}
                     </span>
                   ) : null}
+                </>
+              );
+              return item.kind === "page" ? (
+                <Link key={item.id} href={item.href} className={className}>
+                  {label}
+                </Link>
+              ) : (
+                <a key={item.id} href={item.href} className={className}>
+                  {label}
                 </a>
               );
             })}

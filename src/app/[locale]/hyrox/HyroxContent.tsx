@@ -1,5 +1,3 @@
-"use client";
-
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
 import HyroxHero from "@/components/hyrox/HyroxHero";
