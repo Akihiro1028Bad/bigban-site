@@ -499,40 +499,28 @@
     "hero": {
       "kicker": "The World Series of Fitness Racing",
       "title": "HYROX",
-      "tagline": "RUN. WORKOUT. REPEAT.",
-      "lead": "ピックルボールと並ぶ、もう一つの主役。（コピー準備中）",
-      "cta": "体験予約",
-      "statusBadge": "COMING SOON"
+      "titleJa": "ハイロックス",
+      "lead": "心拍も、筋肉も、意志も。すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、HYROX。その本格トレーニングエリアが、THE PICKLE BANG THEORY に登場。",
+      "cta": "体験予約"
     },
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "ハイロックスとは",
-      "lead": "ランニング8kmと8種目のファンクショナルワークアウトを組み合わせた、世界統一ルールのフィットネスレース。（本文準備中）",
-      "keyNumbers": {
-        "run": { "value": "8", "labelEn": "KM RUN", "labelJa": "ランニング" },
-        "workouts": { "value": "8", "labelEn": "WORKOUTS", "labelJa": "種目" },
-        "race": { "value": "1", "labelEn": "RACE", "labelJa": "レース" }
-      }
+      "lead": "HYROX（ハイロックス）は、1kmのランニングと1種目のワークアウトを交互に8セット行う、世界共通ルールのフィットネスレースです。合計8kmを走り抜きながら8つのワークアウトをこなす持久力勝負。初心者からトップアスリートまで、誰もが同じ条件でタイムに挑戦できます。"
     },
     "stations": {
-      "title": "8 STATIONS",
-      "titleJa": "8つの種目",
-      "preparing": "準備中",
-      "bandAlt": "HYROX大会のアリーナ",
-      "station01": { "name": "SkiErg", "nameJa": "スキーエルグ", "description": "準備中" },
-      "station02": { "name": "Sled Push", "nameJa": "スレッドプッシュ", "description": "準備中" },
-      "station03": { "name": "Sled Pull", "nameJa": "スレッドプル", "description": "準備中" },
-      "station04": { "name": "Burpee Broad Jumps", "nameJa": "バーピーブロードジャンプ", "description": "準備中" },
-      "station05": { "name": "Rowing", "nameJa": "ローイング", "description": "準備中" },
-      "station06": { "name": "Farmers Carry", "nameJa": "ファーマーズキャリー", "description": "準備中" },
-      "station07": { "name": "Sandbag Lunges", "nameJa": "サンドバッグランジ", "description": "準備中" },
-      "station08": { "name": "Wall Balls", "nameJa": "ウォールボール", "description": "準備中" }
+      "station01": { "name": "SkiErg", "nameJa": "スキーエルゴ", "description": "スキーの動きを模したマシンを1,000m漕ぐ。広背筋と体幹をフルに使う、レース最初の関門。" },
+      "station02": { "name": "Sled Push", "nameJa": "スレッドプッシュ", "description": "重いソリを50m押して進む。低い姿勢を保ち、脚と体幹のパワーで止まらず押し切る。" },
+      "station03": { "name": "Sled Pull", "nameJa": "スレッドプル", "description": "ロープを手繰ってソリを50m引き寄せる。足を広く構え、背中と握力で全身を使って引く。" },
+      "station04": { "name": "Burpee Broad Jumps", "nameJa": "バーピーブロードジャンプ", "description": "バーピーと立ち幅跳びを繰り返して80m進む。一定のリズムが攻略のカギを握る" },
+      "station05": { "name": "Rowing", "nameJa": "ローイング", "description": "ローイングマシンで1,000mを漕ぐ。脚・背中・腕を順に連動させ、力強いストロークで漕ぎ切る。" },
+      "station06": { "name": "Farmers Carry", "nameJa": "ファーマーズキャリー", "description": "両手に重りを持って200m歩く。胸を張った姿勢を保ち、握力と体幹の持久力で運び切る。" },
+      "station07": { "name": "Sandbag Lunges", "nameJa": "サンドバッグランジ", "description": "サンドバッグを担ぎ、ランジで100m進む。脚への負担が最も大きい、レース後半の難所。" },
+      "station08": { "name": "Wall Balls", "nameJa": "ウォールボール", "description": "メディシンボールをスクワットの勢いで壁へ投げ上げる、100回。リズムを崩さず締めくくる正念場" }
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "プログラム・料金",
-      "comingSoon": "Coming Soon",
-      "note": "プログラム・料金は準備中です。詳細が決まり次第お知らせします。"
+      "titleJa": "プログラム・料金"
     },
     "coach": {
       "eyebrow": "COACH",
@@ -559,25 +547,13 @@
       "instagramAria": "関吉大亮のInstagramを開く（新しいタブ）",
       "portraitAlt": "HYROX担当コーチ 関吉大亮",
       "apacAlt": "HYROX APAC選手権での関吉大亮"
-    },
-    "gallery": {
-      "title": "IN ACTION",
-      "titleJa": "実戦の現場",
-      "items": [
-        { "alt": "サンドバッグキャリー" },
-        { "alt": "サンドバッグランジ" },
-        { "alt": "スレッドプッシュ" },
-        { "alt": "ローイング" },
-        { "alt": "スレッドプル" },
-        { "alt": "フィニッシュへ走る関吉大亮" }
-      ]
     }
   },
   "HomeHyroxPromo": {
     "kicker": "NEW TRAINING AREA",
     "title": "HYROX",
     "titleEn": "The World Series of Fitness Racing",
-    "description": "本格ファンクショナルトレーニングエリアが登場予定。（準備中）",
+    "description": "ランと8種目のワークアウトで競う世界規模のフィットネスレース HYROX。本格トレーニングエリアで体験できます。",
     "cta": "DISCOVER HYROX"
   }
 }

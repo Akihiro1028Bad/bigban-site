@@ -4,11 +4,6 @@ import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxStations from "./HyroxStations";
 
 describe("HyroxStations", () => {
-  it("8 STATIONS 見出しを表示する", () => {
-    renderWithIntl(<HyroxStations />);
-    expect(screen.getByRole("heading", { name: "8 STATIONS" })).toBeInTheDocument();
-  });
-
   it("8種目すべての名称を表示する", () => {
     renderWithIntl(<HyroxStations />);
     expect(screen.getByText("SkiErg")).toBeInTheDocument();
@@ -16,8 +11,8 @@ describe("HyroxStations", () => {
     expect(screen.getByText("08")).toBeInTheDocument();
   });
 
-  it("雰囲気バンド画像を表示する", () => {
-    renderWithIntl(<HyroxStations />);
-    expect(screen.getByAltText("HYROX大会のアリーナ")).toBeInTheDocument();
+  it("各種目を写真付きで表示する（8枚）", () => {
+    const { container } = renderWithIntl(<HyroxStations />);
+    expect(container.querySelectorAll("img")).toHaveLength(8);
   });
 });

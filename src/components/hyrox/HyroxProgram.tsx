@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
+import CourtPriceTable from "@/components/pricing/CourtPriceTable";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -27,20 +28,7 @@ export default function HyroxProgram() {
           <div className="mt-4 w-14 h-[3px] bg-accent" />
         </motion.div>
 
-        <motion.div
-          className="border border-text-gray/15 rounded-sm px-8 py-16 flex flex-col items-center text-center"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-150px" }}
-          transition={{ duration: 1.0, delay: 0.1, ease: EASE }}
-        >
-          <span className="text-accent text-sm tracking-[0.3em] uppercase">
-            {t("comingSoon")}
-          </span>
-          <p className="mt-4 text-text-gray text-sm max-w-md leading-relaxed">
-            {t("note")}
-          </p>
-        </motion.div>
+        <CourtPriceTable />
       </div>
     </section>
   );

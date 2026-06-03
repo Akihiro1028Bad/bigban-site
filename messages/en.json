@@ -488,40 +488,28 @@
     "hero": {
       "kicker": "The World Series of Fitness Racing",
       "title": "HYROX",
-      "tagline": "RUN. WORKOUT. REPEAT.",
-      "lead": "The second pillar, alongside pickleball. (Copy coming soon)",
-      "cta": "Book a trial",
-      "statusBadge": "COMING SOON"
+      "titleJa": "",
+      "lead": "Your heartbeat, your muscles, your will — the stage to pour it all out is right here. HYROX, the ultimate endurance race the world is hooked on. Its dedicated training area arrives at THE PICKLE BANG THEORY.",
+      "cta": "Book a trial"
     },
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "About HYROX",
-      "lead": "A standardized global fitness race combining an 8 km run with 8 functional workout stations. (Details coming soon)",
-      "keyNumbers": {
-        "run": { "value": "8", "labelEn": "KM RUN", "labelJa": "Running" },
-        "workouts": { "value": "8", "labelEn": "WORKOUTS", "labelJa": "Stations" },
-        "race": { "value": "1", "labelEn": "RACE", "labelJa": "Race" }
-      }
+      "lead": "HYROX is a global, standardized fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
     },
     "stations": {
-      "title": "8 STATIONS",
-      "titleJa": "The 8 Workouts",
-      "preparing": "Coming soon",
-      "bandAlt": "HYROX competition arena",
-      "station01": { "name": "SkiErg", "nameJa": "SkiErg", "description": "Coming soon" },
-      "station02": { "name": "Sled Push", "nameJa": "Sled Push", "description": "Coming soon" },
-      "station03": { "name": "Sled Pull", "nameJa": "Sled Pull", "description": "Coming soon" },
-      "station04": { "name": "Burpee Broad Jumps", "nameJa": "Burpee Broad Jumps", "description": "Coming soon" },
-      "station05": { "name": "Rowing", "nameJa": "Rowing", "description": "Coming soon" },
-      "station06": { "name": "Farmers Carry", "nameJa": "Farmers Carry", "description": "Coming soon" },
-      "station07": { "name": "Sandbag Lunges", "nameJa": "Sandbag Lunges", "description": "Coming soon" },
-      "station08": { "name": "Wall Balls", "nameJa": "Wall Balls", "description": "Coming soon" }
+      "station01": { "name": "SkiErg", "nameJa": "SkiErg", "description": "1,000m powered by your upper body and core — the opening leg of the race." },
+      "station02": { "name": "Sled Push", "nameJa": "Sled Push", "description": "Drive a loaded sled 50m. A test of pure leg and full-body power." },
+      "station03": { "name": "Sled Pull", "nameJa": "Sled Pull", "description": "Haul the sled back 50m by rope, calling on your back and grip." },
+      "station04": { "name": "Burpee Broad Jumps", "nameJa": "Burpee Broad Jumps", "description": "Burpees into broad jumps for 80m — the cardio crux of the race." },
+      "station05": { "name": "Rowing", "nameJa": "Rowing", "description": "Row 1,000m with legs, back and arms working in sync." },
+      "station06": { "name": "Farmers Carry", "nameJa": "Farmers Carry", "description": "Carry weights 200m, one in each hand — grip and core under fire." },
+      "station07": { "name": "Sandbag Lunges", "nameJa": "Sandbag Lunges", "description": "Lunge 100m with a sandbag on your shoulders — the brutal back half." },
+      "station08": { "name": "Wall Balls", "nameJa": "Wall Balls", "description": "100 wall-ball throws from a squat. The final test before the line." }
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "Program & Pricing",
-      "comingSoon": "Coming Soon",
-      "note": "Programs and pricing are being finalized. Stay tuned."
+      "titleJa": "Program & Pricing"
     },
     "coach": {
       "eyebrow": "COACH",
@@ -548,25 +536,13 @@
       "instagramAria": "Open Daisuke Sekiyoshi's Instagram (new tab)",
       "portraitAlt": "HYROX Coach Daisuke Sekiyoshi",
       "apacAlt": "Daisuke Sekiyoshi at the HYROX APAC Championships"
-    },
-    "gallery": {
-      "title": "IN ACTION",
-      "titleJa": "On the race floor",
-      "items": [
-        { "alt": "Sandbag carry" },
-        { "alt": "Sandbag lunges" },
-        { "alt": "Sled push" },
-        { "alt": "Rowing" },
-        { "alt": "Sled pull" },
-        { "alt": "Daisuke Sekiyoshi running to the finish" }
-      ]
     }
   },
   "HomeHyroxPromo": {
     "kicker": "NEW TRAINING AREA",
     "title": "HYROX",
     "titleEn": "The World Series of Fitness Racing",
-    "description": "A dedicated functional training area is coming soon. (Preparing)",
+    "description": "HYROX — the global fitness race of running and eight workouts. Experience it at our dedicated training area.",
     "cta": "DISCOVER HYROX"
   }
 }

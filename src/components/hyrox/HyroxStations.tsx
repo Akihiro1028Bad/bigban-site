@@ -7,72 +7,62 @@ import { HYROX_STATIONS } from "./stations";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
+// 各種目に割り当てる写真（一部は暫定の充当）。HYROX_STATIONS と同順。
+const STATION_IMAGES = [
+  "/images/hyrox/action-skierg.jpg",
+  "/images/hyrox/action-sled-push.jpg",
+  "/images/hyrox/action-sled-pull.jpg",
+  "/images/hyrox/action-finish.jpg",
+  "/images/hyrox/action-row.jpg",
+  "/images/hyrox/action-sandbag-carry.jpg",
+  "/images/hyrox/action-lunge.jpg",
+  "/images/hyrox/arena-band.jpg",
+] as const;
+
+// 「WHAT IS HYROX」セクション内に内包されるサブブロック（種目一覧）。
 export default function HyroxStations() {
   const t = useTranslations("HyroxPage.stations");
 
   return (
-    <section className="bg-deep-black pb-24 lg:pb-32">
-      <div className="mx-auto max-w-7xl px-6 lg:px-12">
-        <motion.div
-          className="mb-12"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-150px" }}
-          transition={{ duration: 1.1, ease: EASE }}
-        >
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em] text-text-light">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
-            {t("titleJa")}
-          </p>
-          <div className="mt-4 w-14 h-[3px] bg-accent" />
-        </motion.div>
-
-        <motion.div
-          className="relative mb-12 aspect-[21/9] w-full overflow-hidden border-t-2 border-t-accent"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 1.1, ease: EASE }}
-        >
-          <Image
-            src="/images/hyrox/arena-band.jpg"
-            alt={t("bandAlt")}
-            fill
-            sizes="100vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-deep-black/80 to-transparent" />
-        </motion.div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {HYROX_STATIONS.map((station, i) => (
-            <motion.div
-              key={station.key}
-              className="relative bg-gradient-to-b from-accent/[0.07] to-transparent px-6 py-8"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 1.0, delay: 0.1 + i * 0.06, ease: EASE }}
-            >
-              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
-              <span className="font-serif text-3xl text-accent block mb-3">
+    <div className="mt-12 lg:mt-16">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {HYROX_STATIONS.map((station, i) => (
+          <motion.div
+            key={station.key}
+            className="group relative overflow-hidden border-t-2 border-t-transparent bg-white/[0.02] transition-colors hover:border-t-accent"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.9, delay: 0.05 + i * 0.06, ease: EASE }}
+          >
+            <div className="relative aspect-[4/5] overflow-hidden">
+              <Image
+                src={STATION_IMAGES[i]}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 25vw, 50vw"
+                loading="lazy"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/30 to-transparent" />
+              <span className="absolute left-3 top-3 font-serif text-2xl text-accent">
                 {station.number}
               </span>
-              <span className="text-text-light text-base font-bold tracking-wide block">
-                {t(`${station.key}.name`)}
-              </span>
-              <span className="text-text-gray text-xs block mt-1">
-                {t(`${station.key}.nameJa`)}
-              </span>
-              <span className="text-accent/50 text-[10px] tracking-wider block mt-3">
-                {t("preparing")}
-              </span>
-            </motion.div>
-          ))}
-        </div>
+              <div className="absolute inset-x-0 bottom-0 p-4">
+                <span className="block text-sm font-bold tracking-wide text-text-light">
+                  {t(`${station.key}.name`)}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-text-gray">
+                  {t(`${station.key}.nameJa`)}
+                </span>
+              </div>
+            </div>
+            <p className="px-4 py-4 text-xs leading-relaxed text-text-gray">
+              {t(`${station.key}.description`)}
+            </p>
+          </motion.div>
+        ))}
       </div>
-    </section>
+    </div>
   );
 }

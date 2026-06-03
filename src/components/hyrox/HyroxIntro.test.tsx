@@ -9,10 +9,10 @@ describe("HyroxIntro", () => {
     expect(screen.getByRole("heading", { name: "WHAT IS HYROX" })).toBeInTheDocument();
   });
 
-  it("3つの Key Number ラベル(KM RUN / WORKOUTS / RACE)を表示する", () => {
+  it("キーナンバー表示は出さない", () => {
     renderWithIntl(<HyroxIntro />);
-    expect(screen.getByText("KM RUN")).toBeInTheDocument();
-    expect(screen.getByText("WORKOUTS")).toBeInTheDocument();
-    expect(screen.getByText("RACE")).toBeInTheDocument();
+    expect(screen.queryByText("KM RUN")).not.toBeInTheDocument();
+    expect(screen.queryByText("WORKOUTS")).not.toBeInTheDocument();
+    expect(screen.queryByText("RACE")).not.toBeInTheDocument();
   });
 });

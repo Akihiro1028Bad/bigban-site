@@ -13,23 +13,15 @@ export default function HyroxHero() {
   return (
     <section className="relative min-h-[80vh] flex items-center bg-deep-black overflow-hidden">
       <Image
-        src="/images/hyrox.png"
+        src="/images/hyrox/hero.jpg"
         alt=""
         fill
         priority
         sizes="100vw"
-        className="object-cover opacity-70"
+        className="object-cover opacity-80"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-deep-black/90 via-deep-black/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-deep-black/70 via-deep-black/20 to-transparent" />
       <div className="relative mx-auto max-w-7xl px-6 lg:px-12 py-32 w-full">
-        <motion.span
-          className="inline-block text-[10px] tracking-[0.3em] text-accent border border-accent/40 rounded-full px-4 py-1 mb-6"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, ease: EASE }}
-        >
-          {t("statusBadge")}
-        </motion.span>
         <motion.p
           className="text-xs tracking-[0.3em] text-text-gray uppercase mb-4"
           initial={{ opacity: 0, y: 16 }}
@@ -46,15 +38,17 @@ export default function HyroxHero() {
         >
           {t("title")}
         </motion.h1>
+        {t("titleJa") ? (
+          <motion.p
+            className="mt-3 text-sm sm:text-base tracking-[0.35em] text-text-gray"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.0, delay: 0.35, ease: EASE }}
+          >
+            {t("titleJa")}
+          </motion.p>
+        ) : null}
         <div className="mt-4 w-14 h-[3px] bg-accent" />
-        <motion.p
-          className="mt-6 text-accent text-sm sm:text-base tracking-[0.25em] uppercase"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.0, delay: 0.4, ease: EASE }}
-        >
-          {t("tagline")}
-        </motion.p>
         <p className="mt-6 text-text-gray text-sm sm:text-base max-w-xl leading-relaxed">
           {t("lead")}
         </p>
