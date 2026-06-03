@@ -15,23 +15,25 @@ export default function HomeHyroxPromo() {
     <section className="bg-deep-black text-text-light">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-12 lg:py-20">
         <motion.div
-          className="group relative flex min-h-[440px] items-center overflow-hidden rounded-sm border border-text-gray/15 lg:min-h-[520px]"
+          className="group relative flex min-h-[460px] items-end overflow-hidden rounded-sm border border-text-gray/15 md:items-center lg:min-h-[520px]"
           initial={{ opacity: 0, y: 32 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.2, ease: EASE }}
         >
-          {/* 背景画像 */}
+          {/* 背景画像（モバイルは中央、PCは右寄りに被写体を配置） */}
           <Image
             src="/images/hyrox/hero.jpg"
             alt={t("imageAlt")}
             fill
             sizes="(min-width: 1280px) 1216px, 100vw"
-            className="object-cover object-[70%_center] transition-transform duration-[1200ms] ease-out group-hover:scale-105"
+            className="object-cover object-[60%_30%] transition-transform duration-[1200ms] ease-out group-hover:scale-105 md:object-[70%_center]"
           />
-          {/* 左重心のグラデーション */}
-          <div className="absolute inset-0 bg-gradient-to-r from-deep-black via-deep-black/70 to-deep-black/20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-deep-black/80 to-transparent" />
+          {/* モバイル: 下方向のスクリム（写真を見せつつ下部の文字を読みやすく） */}
+          <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/45 to-deep-black/20 md:hidden" />
+          {/* PC: 左重心のグラデーション */}
+          <div className="absolute inset-0 hidden bg-gradient-to-r from-deep-black via-deep-black/70 to-deep-black/20 md:block" />
+          <div className="absolute inset-0 hidden bg-gradient-to-t from-deep-black/80 to-transparent md:block" />
           {/* アクセントのトップライン */}
           <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
 
