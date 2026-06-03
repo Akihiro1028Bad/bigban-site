@@ -20,7 +20,24 @@ export default function HyroxCoach() {
 
   return (
     <section className="bg-deep-black py-24 lg:py-32">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 lg:grid-cols-2 lg:gap-16 lg:px-12">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <motion.div
+          className="mb-12 lg:mb-16"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-150px" }}
+          transition={{ duration: 1.1, ease: EASE }}
+        >
+          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em] text-text-light">
+            {t("sectionTitle")}
+          </h2>
+          <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
+            {t("sectionTitleJa")}
+          </p>
+          <div className="mt-4 w-14 h-[3px] bg-accent" />
+        </motion.div>
+
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <motion.div
           className="relative"
           initial={{ opacity: 0, y: 32 }}
@@ -54,12 +71,9 @@ export default function HyroxCoach() {
           viewport={{ once: true, margin: "-120px" }}
           transition={{ duration: 1.1, delay: 0.1, ease: EASE }}
         >
-          <p className="mb-4 text-[10px] tracking-[0.4em] text-accent">
-            {t("eyebrow")}
-          </p>
-          <h2 className="font-serif text-4xl font-black tracking-[0.08em] text-text-light sm:text-5xl">
+          <h3 className="font-serif text-4xl font-black tracking-[0.08em] text-text-light sm:text-5xl">
             {t("name")}
-          </h2>
+          </h3>
           <p className="mt-2 text-xs tracking-[0.3em] text-text-gray">
             {t("nameEn")}
           </p>
@@ -105,6 +119,7 @@ export default function HyroxCoach() {
             Instagram {t("instagram")}
           </a>
         </motion.div>
+        </div>
       </div>
     </section>
   );

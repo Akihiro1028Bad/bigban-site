@@ -497,11 +497,13 @@
   },
   "HyroxPage": {
     "hero": {
-      "kicker": "The World Series of Fitness Racing",
       "title": "HYROX",
       "titleJa": "ハイロックス",
-      "lead": "心拍も、筋肉も、意志も。すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、HYROX。その本格トレーニングエリアが、THE PICKLE BANG THEORY に登場。",
       "cta": "体験予約"
+    },
+    "concept": {
+      "words": ["走る。", "鍛える。", "挑戦する。"],
+      "body": "すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、<accent>HYROX</accent>。その本格トレーニングエリアが、<strong>本八幡</strong>に登場。"
     },
     "whatIs": {
       "title": "WHAT IS HYROX",
@@ -523,7 +525,8 @@
       "titleJa": "プログラム・料金"
     },
     "coach": {
-      "eyebrow": "COACH",
+      "sectionTitle": "CREW",
+      "sectionTitleJa": "クルー",
       "name": "関吉大亮",
       "nameEn": "DAISUKE SEKIYOSHI",
       "role": "HYROX担当コーチ",

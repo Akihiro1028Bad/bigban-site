@@ -4,6 +4,11 @@ import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxCoach from "./HyroxCoach";
 
 describe("HyroxCoach", () => {
+  it("セクションタイトル CREW を表示する", () => {
+    renderWithIntl(<HyroxCoach />);
+    expect(screen.getByRole("heading", { name: "CREW" })).toBeInTheDocument();
+  });
+
   it("コーチ名と肩書きを表示する", () => {
     renderWithIntl(<HyroxCoach />);
     expect(

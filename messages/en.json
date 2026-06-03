@@ -486,11 +486,13 @@
   },
   "HyroxPage": {
     "hero": {
-      "kicker": "The World Series of Fitness Racing",
       "title": "HYROX",
       "titleJa": "",
-      "lead": "Your heartbeat, your muscles, your will — the stage to pour it all out is right here. HYROX, the ultimate endurance race the world is hooked on. Its dedicated training area arrives at THE PICKLE BANG THEORY.",
       "cta": "Book a trial"
+    },
+    "concept": {
+      "words": ["Run.", "Train.", "Challenge."],
+      "body": "The stage to pour it all out is right here. <accent>HYROX</accent>, the ultimate endurance race the world is hooked on — its dedicated training area arrives in <strong>Motoyawata</strong>."
     },
     "whatIs": {
       "title": "WHAT IS HYROX",
@@ -512,7 +514,8 @@
       "titleJa": "Program & Pricing"
     },
     "coach": {
-      "eyebrow": "COACH",
+      "sectionTitle": "CREW",
+      "sectionTitleJa": "Meet the Crew",
       "name": "DAISUKE SEKIYOSHI",
       "nameEn": "関吉大亮",
       "role": "HYROX COACH",

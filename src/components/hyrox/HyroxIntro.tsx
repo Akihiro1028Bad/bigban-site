@@ -10,7 +10,7 @@ export default function HyroxIntro() {
   const t = useTranslations("HyroxPage.whatIs");
 
   return (
-    <section className="bg-deep-black py-24 lg:py-32">
+    <section className="bg-deep-black pt-12 pb-24 lg:pt-16 lg:pb-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
