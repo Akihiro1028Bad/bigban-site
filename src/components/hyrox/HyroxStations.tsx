@@ -4,8 +4,8 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { HYROX_STATIONS } from "./stations";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 // 各種目に割り当てる写真（一部は暫定の充当）。HYROX_STATIONS と同順。
 const STATION_IMAGES = [
@@ -38,7 +38,7 @@ export default function HyroxStations() {
             <div className="relative aspect-[4/5] overflow-hidden">
               <Image
                 src={STATION_IMAGES[i]}
-                alt=""
+                alt={t(`${station.key}.name`)}
                 fill
                 sizes="(min-width: 1024px) 25vw, 50vw"
                 loading="lazy"

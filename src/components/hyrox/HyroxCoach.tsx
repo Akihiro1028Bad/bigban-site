@@ -3,11 +3,9 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { COACH_INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
-
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
-const INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
+import { EASE } from "@/constants/motion";
 
 interface AchievementGroup {
   discipline: string;
@@ -85,7 +83,7 @@ export default function HyroxCoach() {
               {t("nameEn")}
             </p>
             <a
-              href={INSTAGRAM_URL}
+              href={COACH_INSTAGRAM_URL}
               {...EXTERNAL_LINK_PROPS}
               aria-label={t("instagramAria")}
               className="mt-3 inline-flex items-center gap-2 text-xs text-text-gray transition-colors hover:text-accent"

@@ -11,6 +11,7 @@ import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
 import MenuToggleButton from "./MenuToggleButton";
+import LanguageToggle from "./LanguageToggle";
 
 const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
 
@@ -192,32 +193,5 @@ export default function HomeNavigation() {
 
     <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />
     </>
-  );
-}
-
-interface LanguageToggleProps {
-  isJa: boolean;
-  onSwitch: (locale: "ja" | "en") => void;
-}
-
-function LanguageToggle({ isJa, onSwitch }: LanguageToggleProps) {
-  return (
-    <div className="flex items-center gap-1 text-xs">
-      <button
-        onClick={() => onSwitch("ja")}
-        aria-pressed={isJa}
-        className={isJa ? "text-text-light cursor-default" : "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer"}
-      >
-        JP
-      </button>
-      <span className="text-text-gray">/</span>
-      <button
-        onClick={() => onSwitch("en")}
-        aria-pressed={!isJa}
-        className={isJa ? "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer" : "text-text-light cursor-default"}
-      >
-        EN
-      </button>
-    </div>
   );
 }

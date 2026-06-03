@@ -8,6 +8,7 @@ import {
   TENNISBEAR_EVENTS_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
+import { EASE } from "@/constants/motion";
 
 interface ServiceConfig {
   number: string;
@@ -28,7 +29,6 @@ const SERVICES: ServiceConfig[] = [
   { number: "05", key: "service05", isReversed: false, isDark: true, imageSrc: "/images/event.jpg", imageAlt: "Events", hasCta: true, ctaUrl: TENNISBEAR_EVENTS_URL },
 ];
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function HomeServices() {
   const t = useTranslations("HomeServices");

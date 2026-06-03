@@ -2,20 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-
-interface PriceRow {
-  timeSlot: string;
-  weekday: string;
-  weekend: string;
-}
-
-const COURT_PRICES: PriceRow[] = [
-  { timeSlot: "6:00-9:00", weekday: "¥4,980", weekend: "¥7,980" },
-  { timeSlot: "9:00-17:00", weekday: "¥5,980", weekend: "¥7,980" },
-  { timeSlot: "17:00-23:00", weekday: "¥7,980", weekend: "¥7,980" },
-];
-
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
+import { EASE } from "@/constants/motion";
+import { COURT_PRICES } from "@/constants/pricing";
 
 // コートレンタル料金テーブル（HomePricing / HyroxProgram 共用）。
 export default function CourtPriceTable() {

@@ -8,6 +8,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 
 import { Link } from "@/i18n/navigation";
+import { EASE } from "@/constants/motion";
 
 const FACILITY_IMAGES = [
   { src: "/images/facility.webp", altKey: "court" as const },
@@ -26,7 +27,6 @@ const FEATURE_KEYS = [
   { key: "showCourt" as const, hasNote: false },
 ];
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function HomeFacility() {
   const t = useTranslations("HomeFacility");

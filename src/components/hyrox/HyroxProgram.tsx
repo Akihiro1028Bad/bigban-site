@@ -3,8 +3,8 @@
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import CourtPriceTable from "@/components/pricing/CourtPriceTable";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function HyroxProgram() {
   const t = useTranslations("HyroxPage.program");

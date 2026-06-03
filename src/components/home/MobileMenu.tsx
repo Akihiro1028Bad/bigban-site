@@ -7,9 +7,9 @@ import { Link } from "@/i18n/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { RESERVE_URL, INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { EASE } from "@/constants/motion";
 import { NAV_ITEMS } from "./HomeNavigation";
-
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
+import LanguageToggle from "./LanguageToggle";
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -18,33 +18,6 @@ interface MobileMenuProps {
   activeSection: string;
   isJa: boolean;
   onSwitchLocale: (locale: "ja" | "en") => void;
-}
-
-interface MenuLangToggleProps {
-  isJa: boolean;
-  onSwitch: (locale: "ja" | "en") => void;
-}
-
-function MenuLangToggle({ isJa, onSwitch }: MenuLangToggleProps) {
-  return (
-    <div className="flex items-center gap-1 text-xs">
-      <button
-        onClick={() => onSwitch("ja")}
-        aria-pressed={isJa}
-        className={isJa ? "text-text-light cursor-default" : "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer"}
-      >
-        JP
-      </button>
-      <span className="text-text-gray">/</span>
-      <button
-        onClick={() => onSwitch("en")}
-        aria-pressed={!isJa}
-        className={isJa ? "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer" : "text-text-light cursor-default"}
-      >
-        EN
-      </button>
-    </div>
-  );
 }
 
 function NavItemLink({
@@ -148,7 +121,7 @@ export default function MobileMenu({
                 height={26}
                 className="h-5 w-auto"
               />
-              <MenuLangToggle isJa={isJa} onSwitch={onSwitchLocale} />
+              <LanguageToggle isJa={isJa} onSwitch={onSwitchLocale} />
             </div>
 
             <motion.nav
