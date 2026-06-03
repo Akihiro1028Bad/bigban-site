@@ -15,4 +15,9 @@ describe("HyroxStations", () => {
     expect(screen.getByText("Wall Balls")).toBeInTheDocument();
     expect(screen.getByText("08")).toBeInTheDocument();
   });
+
+  it("雰囲気バンド画像を表示する", () => {
+    renderWithIntl(<HyroxStations />);
+    expect(screen.getByAltText("HYROX大会のアリーナ")).toBeInTheDocument();
+  });
 });

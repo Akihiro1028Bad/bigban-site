@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { HYROX_STATIONS } from "./stations";
@@ -26,6 +27,23 @@ export default function HyroxStations() {
             {t("titleJa")}
           </p>
           <div className="mt-4 w-14 h-[3px] bg-accent" />
+        </motion.div>
+
+        <motion.div
+          className="relative mb-12 aspect-[21/9] w-full overflow-hidden border-t-2 border-t-accent"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 1.1, ease: EASE }}
+        >
+          <Image
+            src="/images/hyrox/arena-band.jpg"
+            alt={t("bandAlt")}
+            fill
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-deep-black/80 to-transparent" />
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
