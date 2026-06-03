@@ -9,11 +9,8 @@ import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
-import MobileMenu, { type MobileMenuVariant } from "./MobileMenu";
+import MobileMenu from "./MobileMenu";
 import MenuToggleButton from "./MenuToggleButton";
-
-// TODO(一時プレビュー): デザイン選定後に固定値へ戻す。?menu=A|B|C で切替
-const DEFAULT_MENU_VARIANT: MobileMenuVariant = "C";
 
 const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
 
@@ -37,13 +34,6 @@ export default function HomeNavigation() {
   const activeSection = useActiveSection(SECTION_IDS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isOpen: isCrowdfundingOpen, closePopup } = useCrowdfundingPopup();
-
-  // TODO(一時プレビュー): ?menu=A|B|C でメニューデザインを切替（選定後に削除）
-  const [menuVariant, setMenuVariant] = useState<MobileMenuVariant>(DEFAULT_MENU_VARIANT);
-  useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get("menu");
-    if (v === "A" || v === "B" || v === "C") setMenuVariant(v);
-  }, []);
 
   const handleLogoClick = useCallback(
     (e: React.MouseEvent) => {
@@ -198,7 +188,6 @@ export default function HomeNavigation() {
       activeSection={activeSection}
       isJa={isJa}
       onSwitchLocale={handleSwitchLocale}
-      variant={menuVariant}
     />
 
     <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />
