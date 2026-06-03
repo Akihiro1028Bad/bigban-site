@@ -12,7 +12,7 @@ export default function HyroxPicklePromo() {
 
   return (
     <section className="bg-deep-black text-text-light">
-      <div className="mx-auto max-w-7xl px-6 py-12 lg:px-12 lg:py-28">
+      <div className="mx-auto max-w-7xl px-6 py-10 lg:px-12 lg:py-16">
         <motion.div
           className="relative grid grid-cols-1 overflow-hidden rounded-none border border-text-gray/15 lg:grid-cols-2 lg:rounded-sm"
           initial={{ opacity: 0, y: 32 }}

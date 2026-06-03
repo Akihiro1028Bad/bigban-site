@@ -29,10 +29,11 @@ export default function HyroxFacility() {
   const ts = useTranslations("HyroxPage.stations");
 
   return (
-    <section className="bg-deep-black pt-12 pb-24 lg:pt-16 lg:pb-32">
+    <section className="bg-deep-black pt-8 pb-12 lg:pt-12 lg:pb-16">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* 見出し */}
         <motion.div
+          className="text-center"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
@@ -44,7 +45,7 @@ export default function HyroxFacility() {
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("titleJa")}
           </p>
-          <div className="mt-4 h-[3px] w-14 bg-accent" />
+          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
         </motion.div>
 
         {FACILITY_READY ? (

@@ -4,7 +4,16 @@ import { Link } from "@/i18n/navigation";
 
 import FooterNewsletter from "./FooterNewsletter";
 
-const NAV_KEYS = ["concept", "facility", "services", "pricing", "access", "about"] as const;
+const NAV_ITEMS = [
+  { id: "concept", href: "/#concept" },
+  { id: "facility", href: "/#facility" },
+  { id: "services", href: "/#services" },
+  { id: "hyrox", href: "/hyrox" },
+  { id: "pricing", href: "/#pricing" },
+  { id: "news", href: "/news" },
+  { id: "about", href: "/#about" },
+  { id: "access", href: "/#access" },
+] as const;
 
 export default function HomeFooter() {
   const t = useTranslations("Navigation");
@@ -38,16 +47,27 @@ export default function HomeFooter() {
           </div>
 
           {/* Center: Nav links */}
-          <nav className="flex flex-wrap gap-x-6 gap-y-3 lg:justify-center">
-            {NAV_KEYS.map((key) => (
-              <a
-                key={key}
-                href={`/#${key}`}
-                className="text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors"
-              >
-                {t(key)}
-              </a>
-            ))}
+          <nav className="flex flex-wrap gap-x-6 gap-y-3 justify-center lg:justify-center">
+            {NAV_ITEMS.map((item) => {
+              const ja = t(`${item.id}Ja`);
+              return (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  className="flex flex-col items-center leading-tight text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors"
+                >
+                  <span>{t(item.id)}</span>
+                  {ja ? (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[9px] font-normal normal-case tracking-normal text-text-gray"
+                    >
+                      {ja}
+                    </span>
+                  ) : null}
+                </a>
+              );
+            })}
           </nav>
 
         </div>
@@ -65,12 +85,6 @@ export default function HomeFooter() {
               className="text-xs text-text-gray hover:text-text-light transition-colors"
             >
               {tFooter("tokushoho")}
-            </Link>
-            <Link
-              href="/hyrox"
-              className="text-xs text-text-gray hover:text-text-light transition-colors"
-            >
-              HYROX
             </Link>
           </div>
           <p className="text-xs text-text-gray">

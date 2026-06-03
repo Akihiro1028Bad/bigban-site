@@ -85,7 +85,18 @@
     "hyrox": {
       "title": "HYROX トレーニングエリア | THE PICKLE BANG THEORY",
       "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアが登場予定。",
-      "keywords": ["HYROX", "ハイロックス", "HYROX 市川", "HYROX 本八幡", "HYROX 千葉", "HYROX ジム", "HYROX トレーニング", "HYROX 体験", "ファンクショナルフィットネス", "機能性トレーニング"]
+      "keywords": [
+        "HYROX",
+        "ハイロックス",
+        "HYROX 市川",
+        "HYROX 本八幡",
+        "HYROX 千葉",
+        "HYROX ジム",
+        "HYROX トレーニング",
+        "HYROX 体験",
+        "ファンクショナルフィットネス",
+        "機能性トレーニング"
+      ]
     }
   },
   "Navigation": {
@@ -99,12 +110,20 @@
     "reserve": "RESERVE",
     "contact": "CONTACT",
     "hyrox": "HYROX",
+    "conceptJa": "コンセプト",
+    "facilityJa": "施設",
+    "servicesJa": "サービス",
+    "hyroxJa": "ハイロックス",
+    "pricingJa": "料金",
+    "newsJa": "ニュース",
+    "aboutJa": "私たちについて",
+    "accessJa": "アクセス",
     "mainNav": "メインナビゲーション",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる"
   },
   "PromoBanner": {
-    "text": "🈹\uFE0F コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
+    "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
     "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します"
   },
@@ -502,7 +521,11 @@
       "cta": "体験予約"
     },
     "concept": {
-      "words": ["走る。", "鍛える。", "挑戦する。"],
+      "words": [
+        "走る。",
+        "鍛える。",
+        "挑戦する。"
+      ],
       "body": "すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、<accent>HYROX</accent>。その本格トレーニングエリアが、<strong>本八幡</strong>に登場。"
     },
     "facility": {
@@ -522,14 +545,14 @@
     "services": {
       "title": "SERVICES",
       "titleJa": "サービス",
-      "lead": "目的に合わせて選べる、3つの利用スタイル。初めての方から大会出場を目指す方まで。",
+      "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
       "cta": "RESERVE",
       "ctaJa": "予約",
       "items": [
         {
           "titleEn": "AREA RENTAL",
           "titleJa": "時間制レンタル",
-          "description": "HYROXエリアを時間単位でレンタル。設置器具を使って自分のペースで自主トレーニング。早朝6:00から深夜23:00まで利用可能です。",
+          "description": "HYROXエリアを時間単位でレンタル。設置器具を使い、自分のペースで自由にトレーニング。早朝6:00から深夜23:00まで利用できます。",
           "imageAlt": "スレッドプッシュに挑むアスリート"
         },
         {
@@ -541,7 +564,7 @@
         {
           "titleEn": "GROUP SESSION",
           "titleJa": "グループセッション",
-          "description": "少人数制のコーチングクラス。ランとワークアウトを組み合わせた本格メニューを仲間と追い込む。レベル別で初心者も安心です。",
+          "description": "少人数制のコーチングクラス。ランとワークアウトを組み合わせた本格メニューに、仲間と一緒に挑戦。レベル別なので、初心者の方も安心です。",
           "imageAlt": "仲間とトレーニングするアスリートたち"
         }
       ]
@@ -549,17 +572,49 @@
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "ハイロックスとは",
-      "lead": "HYROX（ハイロックス）は、1kmのランニングと1種目のワークアウトを交互に8セット行う、世界共通ルールのフィットネスレースです。合計8kmを走り抜きながら8つのワークアウトをこなす持久力勝負。初心者からトップアスリートまで、誰もが同じ条件でタイムに挑戦できます。"
+      "lead": "HYROX（ハイロックス）は、1kmのランニングと1種目のワークアウトを交互に8セット行うフィットネスレースです。合計8kmを走り抜きながら8つのワークアウトをこなす持久力勝負。初心者からトップアスリートまで、誰もが同じ条件でタイムに挑戦できます。"
     },
     "stations": {
-      "station01": { "name": "SkiErg", "nameJa": "スキーエルゴ", "description": "スキーの動きを模したマシンを1,000m漕ぐ。広背筋と体幹をフルに使う、レース最初の関門。" },
-      "station02": { "name": "Sled Push", "nameJa": "スレッドプッシュ", "description": "重いソリを50m押して進む。低い姿勢を保ち、脚と体幹のパワーで止まらず押し切る。" },
-      "station03": { "name": "Sled Pull", "nameJa": "スレッドプル", "description": "ロープを手繰ってソリを50m引き寄せる。足を広く構え、背中と握力で全身を使って引く。" },
-      "station04": { "name": "Burpee Broad Jumps", "nameJa": "バーピーブロードジャンプ", "description": "バーピーと立ち幅跳びを繰り返して80m進む。一定のリズムが攻略のカギを握る" },
-      "station05": { "name": "Rowing", "nameJa": "ローイング", "description": "ローイングマシンで1,000mを漕ぐ。脚・背中・腕を順に連動させ、力強いストロークで漕ぎ切る。" },
-      "station06": { "name": "Farmers Carry", "nameJa": "ファーマーズキャリー", "description": "両手に重りを持って200m歩く。胸を張った姿勢を保ち、握力と体幹の持久力で運び切る。" },
-      "station07": { "name": "Sandbag Lunges", "nameJa": "サンドバッグランジ", "description": "サンドバッグを担ぎ、ランジで100m進む。脚への負担が最も大きい、レース後半の難所。" },
-      "station08": { "name": "Wall Balls", "nameJa": "ウォールボール", "description": "メディシンボールをスクワットの勢いで壁へ投げ上げる、100回。リズムを崩さず締めくくる正念場" }
+      "station01": {
+        "name": "SkiErg",
+        "nameJa": "スキーエルゴ",
+        "description": "スキーの動きを模したマシンで1,000mを漕ぐ。広背筋と体幹を総動員する、レース最初の関門。"
+      },
+      "station02": {
+        "name": "Sled Push",
+        "nameJa": "スレッドプッシュ",
+        "description": "重いソリを50m押して進む。低い姿勢を保ち、脚と体幹の力で止まらず押し切る。"
+      },
+      "station03": {
+        "name": "Sled Pull",
+        "nameJa": "スレッドプル",
+        "description": "ロープを手繰り、ソリを50m引き寄せる。足を広く構え、背中と腕の力で一気に引き切る。"
+      },
+      "station04": {
+        "name": "Burpee Broad Jumps",
+        "nameJa": "バーピーブロードジャンプ",
+        "description": "バーピーと立ち幅跳びを繰り返し、80m進む。一定のリズムを保てるかが攻略のカギ。"
+      },
+      "station05": {
+        "name": "Rowing",
+        "nameJa": "ローイング",
+        "description": "ローイングマシンで1,000mを漕ぐ。脚から背中、腕へと力を伝え、力強いストロークで漕ぎ切る。"
+      },
+      "station06": {
+        "name": "Farmers Carry",
+        "nameJa": "ファーマーズキャリー",
+        "description": "両手に重りを持ち、200mを歩く。胸を張った姿勢のまま、握力と体幹の持久力で運び切る。"
+      },
+      "station07": {
+        "name": "Sandbag Lunges",
+        "nameJa": "サンドバッグランジ",
+        "description": "サンドバッグを担ぎ、ランジで100m進む。脚への負担が最も大きい、レース後半の難所。"
+      },
+      "station08": {
+        "name": "Wall Balls",
+        "nameJa": "ウォールボール",
+        "description": "メディシンボールを、スクワットの勢いで壁の的へ100回投げる。レースを締めくくる最後の種目。"
+      }
     },
     "program": {
       "title": "PROGRAM",
@@ -632,9 +687,12 @@
   },
   "HomeHyroxPromo": {
     "kicker": "NEW TRAINING AREA",
+    "kickerJa": "新設トレーニングエリア",
     "title": "HYROX",
-    "titleEn": "The World Series of Fitness Racing",
-    "description": "ランと8種目のワークアウトで競う世界規模のフィットネスレース HYROX。本格トレーニングエリアで体験できます。",
-    "cta": "DISCOVER HYROX"
+    "titleJa": "ハイロックス",
+    "tagline": "走る。鍛える。挑戦する。",
+    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY に登場。",
+    "cta": "詳しく見る",
+    "imageAlt": "HYROXレースに挑むアスリート"
   }
 }

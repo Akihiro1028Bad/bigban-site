@@ -15,11 +15,17 @@ describe("HomeHyroxPromo", () => {
   it("HYROX 見出しと CTA を表示する", () => {
     renderWithIntl(<HomeHyroxPromo />);
     expect(screen.getByRole("heading", { name: "HYROX" })).toBeInTheDocument();
-    expect(screen.getByText("DISCOVER HYROX")).toBeInTheDocument();
+    expect(screen.getByText("詳しく見る")).toBeInTheDocument();
   });
 
   it("CTA が /hyrox へのリンク", () => {
     renderWithIntl(<HomeHyroxPromo />);
+    const link = screen.getByRole("link", { name: /詳しく見る/ });
+    expect(link).toHaveAttribute("href", "/hyrox");
+  });
+
+  it("英語ロケールでは CTA が英語になる", () => {
+    renderWithIntl(<HomeHyroxPromo />, { locale: "en" });
     const link = screen.getByRole("link", { name: /DISCOVER HYROX/ });
     expect(link).toHaveAttribute("href", "/hyrox");
   });

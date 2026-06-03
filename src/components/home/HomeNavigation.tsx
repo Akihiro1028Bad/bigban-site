@@ -84,13 +84,20 @@ export default function HomeNavigation() {
   );
 
   const isJa = locale === "ja";
+  const isHyrox = pathname === "/hyrox";
 
   return (
     <>
-    <PromoBanner />
+    {!isHyrox && <PromoBanner />}
     <header
-      className={`fixed top-[var(--promo-banner-h)] left-0 w-full z-50 transition-transform duration-300 ${
-        isNavVisible ? "translate-y-0" : "translate-y-0 md:-translate-y-[calc(100%+var(--promo-banner-h))]"
+      className={`fixed left-0 w-full z-50 transition-transform duration-300 ${
+        isHyrox ? "top-0" : "top-[var(--promo-banner-h)]"
+      } ${
+        isNavVisible
+          ? "translate-y-0"
+          : isHyrox
+            ? "translate-y-0 md:-translate-y-full"
+            : "translate-y-0 md:-translate-y-[calc(100%+var(--promo-banner-h))]"
       }`}
     >
       <div className="site-header-bg backdrop-blur-md bg-deep-black/80">
@@ -115,13 +122,27 @@ export default function HomeNavigation() {
               const className = `text-sm uppercase tracking-widest transition-colors hover:text-text-light ${
                 activeSection === item.id ? "text-accent" : "text-text-gray"
               }`;
+              const ja = t(`${item.id}Ja`);
+              const label = (
+                <span className="flex flex-col items-center leading-tight">
+                  <span>{t(item.id)}</span>
+                  {ja ? (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[9px] font-normal normal-case tracking-normal text-text-gray"
+                    >
+                      {ja}
+                    </span>
+                  ) : null}
+                </span>
+              );
               return item.kind === "page" ? (
                 <Link key={item.id} href={item.href} className={className}>
-                  {t(item.id)}
+                  {label}
                 </Link>
               ) : (
                 <a key={item.id} href={item.href} className={className}>
-                  {t(item.id)}
+                  {label}
                 </a>
               );
             })}
@@ -188,9 +209,23 @@ export default function HomeNavigation() {
 
           <nav className="flex flex-col items-center gap-8">
             {NAV_ITEMS.map((item) => {
-              const className = `text-2xl uppercase tracking-widest transition-colors ${
+              const className = `flex flex-col items-center leading-tight text-2xl uppercase tracking-widest transition-colors ${
                 activeSection === item.id ? "text-accent" : "text-text-light"
               }`;
+              const ja = t(`${item.id}Ja`);
+              const label = (
+                <>
+                  <span>{t(item.id)}</span>
+                  {ja ? (
+                    <span
+                      aria-hidden
+                      className="mt-1 text-xs font-normal normal-case tracking-normal text-text-gray"
+                    >
+                      {ja}
+                    </span>
+                  ) : null}
+                </>
+              );
               return item.kind === "page" ? (
                 <Link
                   key={item.id}
@@ -198,7 +233,7 @@ export default function HomeNavigation() {
                   onClick={handleMobileLinkClick}
                   className={className}
                 >
-                  {t(item.id)}
+                  {label}
                 </Link>
               ) : (
                 <a
@@ -207,7 +242,7 @@ export default function HomeNavigation() {
                   onClick={handleMobileLinkClick}
                   className={className}
                 >
-                  {t(item.id)}
+                  {label}
                 </a>
               );
             })}

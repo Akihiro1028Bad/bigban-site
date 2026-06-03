@@ -22,10 +22,10 @@ export default function HyroxCoach() {
   const career = t.raw("career") as string[];
 
   return (
-    <section className="bg-deep-black py-24 lg:py-32">
+    <section className="bg-deep-black py-12 lg:py-16">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <motion.div
-          className="mb-12 lg:mb-16"
+          className="mb-12 text-center lg:mb-16"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
@@ -37,7 +37,7 @@ export default function HyroxCoach() {
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("sectionTitleJa")}
           </p>
-          <div className="mt-4 h-[3px] w-14 bg-accent" />
+          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
         </motion.div>
 
         {/* 上段：写真＋プロフィール／経歴 */}

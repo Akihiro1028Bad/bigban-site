@@ -74,7 +74,16 @@
     "hyrox": {
       "title": "HYROX Training Area | THE PICKLE BANG THEORY",
       "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is coming to THE PICKLE BANG THEORY in Motoyawata.",
-      "keywords": ["HYROX", "HYROX Japan", "HYROX Chiba", "HYROX Motoyawata", "HYROX gym", "HYROX training", "functional fitness", "fitness racing"]
+      "keywords": [
+        "HYROX",
+        "HYROX Japan",
+        "HYROX Chiba",
+        "HYROX Motoyawata",
+        "HYROX gym",
+        "HYROX training",
+        "functional fitness",
+        "fitness racing"
+      ]
     }
   },
   "Navigation": {
@@ -88,12 +97,20 @@
     "reserve": "RESERVE",
     "contact": "CONTACT",
     "hyrox": "HYROX",
+    "conceptJa": "",
+    "facilityJa": "",
+    "servicesJa": "",
+    "hyroxJa": "",
+    "pricingJa": "",
+    "newsJa": "",
+    "aboutJa": "",
+    "accessJa": "",
     "mainNav": "Main Navigation",
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu"
   },
   "PromoBanner": {
-    "text": "🈹\uFE0F 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
+    "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
     "ariaLabel": "30% off court campaign. Go to reservation page"
   },
@@ -491,7 +508,11 @@
       "cta": "Book a trial"
     },
     "concept": {
-      "words": ["Run.", "Train.", "Challenge."],
+      "words": [
+        "Run.",
+        "Train.",
+        "Challenge."
+      ],
       "body": "The stage to pour it all out is right here. <accent>HYROX</accent>, the ultimate endurance race the world is hooked on — its dedicated training area arrives in <strong>Motoyawata</strong>."
     },
     "facility": {
@@ -538,17 +559,49 @@
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "About HYROX",
-      "lead": "HYROX is a global, standardized fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
+      "lead": "HYROX is a fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
     },
     "stations": {
-      "station01": { "name": "SkiErg", "nameJa": "SkiErg", "description": "1,000m powered by your upper body and core — the opening leg of the race." },
-      "station02": { "name": "Sled Push", "nameJa": "Sled Push", "description": "Drive a loaded sled 50m. A test of pure leg and full-body power." },
-      "station03": { "name": "Sled Pull", "nameJa": "Sled Pull", "description": "Haul the sled back 50m by rope, calling on your back and grip." },
-      "station04": { "name": "Burpee Broad Jumps", "nameJa": "Burpee Broad Jumps", "description": "Burpees into broad jumps for 80m — the cardio crux of the race." },
-      "station05": { "name": "Rowing", "nameJa": "Rowing", "description": "Row 1,000m with legs, back and arms working in sync." },
-      "station06": { "name": "Farmers Carry", "nameJa": "Farmers Carry", "description": "Carry weights 200m, one in each hand — grip and core under fire." },
-      "station07": { "name": "Sandbag Lunges", "nameJa": "Sandbag Lunges", "description": "Lunge 100m with a sandbag on your shoulders — the brutal back half." },
-      "station08": { "name": "Wall Balls", "nameJa": "Wall Balls", "description": "100 wall-ball throws from a squat. The final test before the line." }
+      "station01": {
+        "name": "SkiErg",
+        "nameJa": "SkiErg",
+        "description": "1,000m powered by your upper body and core — the opening leg of the race."
+      },
+      "station02": {
+        "name": "Sled Push",
+        "nameJa": "Sled Push",
+        "description": "Drive a loaded sled 50m. A test of pure leg and full-body power."
+      },
+      "station03": {
+        "name": "Sled Pull",
+        "nameJa": "Sled Pull",
+        "description": "Haul the sled back 50m by rope, calling on your back and grip."
+      },
+      "station04": {
+        "name": "Burpee Broad Jumps",
+        "nameJa": "Burpee Broad Jumps",
+        "description": "Burpees into broad jumps for 80m — the cardio crux of the race."
+      },
+      "station05": {
+        "name": "Rowing",
+        "nameJa": "Rowing",
+        "description": "Row 1,000m with legs, back and arms working in sync."
+      },
+      "station06": {
+        "name": "Farmers Carry",
+        "nameJa": "Farmers Carry",
+        "description": "Carry weights 200m, one in each hand — grip and core under fire."
+      },
+      "station07": {
+        "name": "Sandbag Lunges",
+        "nameJa": "Sandbag Lunges",
+        "description": "Lunge 100m with a sandbag on your shoulders — the brutal back half."
+      },
+      "station08": {
+        "name": "Wall Balls",
+        "nameJa": "Wall Balls",
+        "description": "100 wall-ball throws from a squat. The final test before the line."
+      }
     },
     "program": {
       "title": "PROGRAM",
@@ -621,9 +674,12 @@
   },
   "HomeHyroxPromo": {
     "kicker": "NEW TRAINING AREA",
+    "kickerJa": "",
     "title": "HYROX",
-    "titleEn": "The World Series of Fitness Racing",
-    "description": "HYROX — the global fitness race of running and eight workouts. Experience it at our dedicated training area.",
-    "cta": "DISCOVER HYROX"
+    "titleJa": "The World Series of Fitness Racing",
+    "tagline": "Run. Train. Challenge.",
+    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area arrives at THE PICKLE BANG THEORY.",
+    "cta": "DISCOVER HYROX",
+    "imageAlt": "An athlete competing in a HYROX race"
   }
 }

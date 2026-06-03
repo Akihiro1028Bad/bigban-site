@@ -10,10 +10,10 @@ export default function HyroxProgram() {
   const t = useTranslations("HyroxPage.program");
 
   return (
-    <section className="bg-deep-black pb-24 lg:pb-32 text-text-light">
+    <section className="bg-deep-black pb-12 lg:pb-16 text-text-light">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <motion.div
-          className="mb-10"
+          className="mb-10 text-center"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
@@ -25,7 +25,7 @@ export default function HyroxProgram() {
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
             {t("titleJa")}
           </p>
-          <div className="mt-4 w-14 h-[3px] bg-accent" />
+          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
         </motion.div>
 
         <CourtPriceTable />

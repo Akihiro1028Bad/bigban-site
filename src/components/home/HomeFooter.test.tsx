@@ -57,7 +57,7 @@ describe("HomeFooter", () => {
     ).toBeInTheDocument();
   });
 
-  it("6つのナビリンクを表示する", () => {
+  it("8つのナビリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFooter />
@@ -67,9 +67,11 @@ describe("HomeFooter", () => {
       { name: "CONCEPT", href: "/#concept" },
       { name: "FACILITY", href: "/#facility" },
       { name: "SERVICES", href: "/#services" },
+      { name: "HYROX", href: "/hyrox" },
       { name: "PRICING", href: "/#pricing" },
-      { name: "ACCESS", href: "/#access" },
+      { name: "NEWS", href: "/news" },
       { name: "ABOUT", href: "/#about" },
+      { name: "ACCESS", href: "/#access" },
     ];
 
     for (const link of links) {

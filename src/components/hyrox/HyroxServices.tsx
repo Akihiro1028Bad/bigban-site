@@ -26,11 +26,11 @@ export default function HyroxServices() {
   const items = t.raw("items") as ServiceItem[];
 
   return (
-    <section className="bg-deep-black py-24 lg:py-32">
+    <section className="bg-deep-black py-12 lg:py-16">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* 見出し */}
         <motion.div
-          className="mb-12 lg:mb-16"
+          className="mb-12 text-center lg:mb-16"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
@@ -42,8 +42,8 @@ export default function HyroxServices() {
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("titleJa")}
           </p>
-          <div className="mt-4 h-[3px] w-14 bg-accent" />
-          <p className="mt-8 max-w-2xl text-sm leading-loose text-text-gray lg:text-base">
+          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <p className="mx-auto mt-8 max-w-2xl text-sm leading-loose text-text-gray lg:text-base">
             {t("lead")}
           </p>
         </motion.div>

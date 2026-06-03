@@ -89,10 +89,10 @@ describe("HomeNavigation", () => {
   it("NEWSリンクがPRICINGとABOUTの間に配置される", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
-    const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
-    const pricingIdx = links.indexOf("PRICING");
-    const newsIdx = links.indexOf("NEWS");
-    const aboutIdx = links.indexOf("ABOUT");
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    const pricingIdx = hrefs.indexOf("/#pricing");
+    const newsIdx = hrefs.indexOf("/news");
+    const aboutIdx = hrefs.indexOf("/#about");
     expect(pricingIdx).toBeGreaterThanOrEqual(0);
     expect(newsIdx).toBe(pricingIdx + 1);
     expect(aboutIdx).toBe(newsIdx + 1);
@@ -108,10 +108,10 @@ describe("HomeNavigation", () => {
   it("HYROXリンクがSERVICESとPRICINGの間に配置される", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
-    const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
-    const servicesIdx = links.indexOf("SERVICES");
-    const hyroxIdx = links.indexOf("HYROX");
-    const pricingIdx = links.indexOf("PRICING");
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    const servicesIdx = hrefs.indexOf("/#services");
+    const hyroxIdx = hrefs.indexOf("/hyrox");
+    const pricingIdx = hrefs.indexOf("/#pricing");
     expect(servicesIdx).toBeGreaterThanOrEqual(0);
     expect(hyroxIdx).toBe(servicesIdx + 1);
     expect(pricingIdx).toBe(hyroxIdx + 1);
@@ -123,7 +123,7 @@ describe("HomeNavigation", () => {
     const dialog = screen.getByRole("dialog");
     const newsLink = dialog.querySelector("a[href='/news']");
     expect(newsLink).toBeInTheDocument();
-    expect(newsLink?.textContent).toBe("NEWS");
+    expect(newsLink?.textContent).toContain("NEWS");
   });
 
   it("アクティブセクション(concept)をハイライトする", () => {
