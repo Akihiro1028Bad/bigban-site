@@ -12,11 +12,11 @@ const STATION_IMAGES = [
   "/images/hyrox/action-skierg.jpg",
   "/images/hyrox/action-sled-push.jpg",
   "/images/hyrox/action-sled-pull.jpg",
-  "/images/hyrox/action-finish.jpg",
+  "/images/hyrox/action-burpee.jpg",
   "/images/hyrox/action-row.jpg",
-  "/images/hyrox/action-sandbag-carry.jpg",
+  "/images/hyrox/action-farmers-carry.jpg",
   "/images/hyrox/action-lunge.jpg",
-  "/images/hyrox/arena-band.jpg",
+  "/images/hyrox/action-wallball.jpg",
 ] as const;
 
 // 「WHAT IS HYROX」セクション内に内包されるサブブロック（種目一覧）。
