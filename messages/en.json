@@ -507,6 +507,7 @@
       "title": "8 STATIONS",
       "titleJa": "The 8 Workouts",
       "preparing": "Coming soon",
+      "bandAlt": "HYROX competition arena",
       "station01": { "name": "SkiErg", "nameJa": "SkiErg", "description": "Coming soon" },
       "station02": { "name": "Sled Push", "nameJa": "Sled Push", "description": "Coming soon" },
       "station03": { "name": "Sled Pull", "nameJa": "Sled Pull", "description": "Coming soon" },
@@ -521,6 +522,44 @@
       "titleJa": "Program & Pricing",
       "comingSoon": "Coming Soon",
       "note": "Programs and pricing are being finalized. Stay tuned."
+    },
+    "coach": {
+      "eyebrow": "COACH",
+      "name": "DAISUKE SEKIYOSHI",
+      "nameEn": "関吉大亮",
+      "role": "HYROX COACH",
+      "titles": [
+        "HYROX Japan Ambassador",
+        "HYROX PRO Athlete",
+        "Former Spartan Race Team Japan (2017–2023 / 2018 Japan-Korea Series Champion)"
+      ],
+      "stats": {
+        "pbLabel": "PERSONAL BEST",
+        "pbValue": "1:01:45",
+        "racesLabel": "RACES / SEASONS",
+        "racesValue": "18 / 3",
+        "apacLabel": "STAGE",
+        "apacValue": "APAC CHAMP.",
+        "signatureLabel": "SIGNATURE",
+        "signatureValue": "WALL BALLS"
+      },
+      "bio": "A PRO athlete who helped pioneer Japan's HYROX scene. He raced worldwide with Spartan Race Team Japan and now drives the sport's growth as a HYROX Japan ambassador, relentlessly pushing his limits through disciplined training.",
+      "instagram": "@syugyou_sou",
+      "instagramAria": "Open Daisuke Sekiyoshi's Instagram (new tab)",
+      "portraitAlt": "HYROX Coach Daisuke Sekiyoshi",
+      "apacAlt": "Daisuke Sekiyoshi at the HYROX APAC Championships"
+    },
+    "gallery": {
+      "title": "IN ACTION",
+      "titleJa": "On the race floor",
+      "items": [
+        { "alt": "Sandbag carry" },
+        { "alt": "Sandbag lunges" },
+        { "alt": "Sled push" },
+        { "alt": "Rowing" },
+        { "alt": "Sled pull" },
+        { "alt": "Daisuke Sekiyoshi running to the finish" }
+      ]
     }
   },
   "HomeHyroxPromo": {

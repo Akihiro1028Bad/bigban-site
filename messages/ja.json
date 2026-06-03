@@ -518,6 +518,7 @@
       "title": "8 STATIONS",
       "titleJa": "8つの種目",
       "preparing": "準備中",
+      "bandAlt": "HYROX大会のアリーナ",
       "station01": { "name": "SkiErg", "nameJa": "スキーエルグ", "description": "準備中" },
       "station02": { "name": "Sled Push", "nameJa": "スレッドプッシュ", "description": "準備中" },
       "station03": { "name": "Sled Pull", "nameJa": "スレッドプル", "description": "準備中" },
@@ -532,6 +533,44 @@
       "titleJa": "プログラム・料金",
       "comingSoon": "Coming Soon",
       "note": "プログラム・料金は準備中です。詳細が決まり次第お知らせします。"
+    },
+    "coach": {
+      "eyebrow": "COACH",
+      "name": "関吉大亮",
+      "nameEn": "DAISUKE SEKIYOSHI",
+      "role": "HYROX担当コーチ",
+      "titles": [
+        "HYROX Japan アンバサダー",
+        "HYROX PRO アスリート",
+        "元スパルタンレース日本代表（2017–2023 / 2018 日韓シリーズ総合優勝）"
+      ],
+      "stats": {
+        "pbLabel": "PERSONAL BEST",
+        "pbValue": "1:01:45",
+        "racesLabel": "RACES / SEASONS",
+        "racesValue": "18 / 3",
+        "apacLabel": "STAGE",
+        "apacValue": "APAC CHAMP.",
+        "signatureLabel": "SIGNATURE",
+        "signatureValue": "WALL BALLS"
+      },
+      "bio": "日本のHYROXシーンを切り拓いてきたPROアスリート。スパルタンレース日本代表として世界を転戦し、現在はHYROX Japanアンバサダーとして競技の普及を牽引。ストイックな鍛錬で限界を更新し続ける。",
+      "instagram": "@syugyou_sou",
+      "instagramAria": "関吉大亮のInstagramを開く（新しいタブ）",
+      "portraitAlt": "HYROX担当コーチ 関吉大亮",
+      "apacAlt": "HYROX APAC選手権での関吉大亮"
+    },
+    "gallery": {
+      "title": "IN ACTION",
+      "titleJa": "実戦の現場",
+      "items": [
+        { "alt": "サンドバッグキャリー" },
+        { "alt": "サンドバッグランジ" },
+        { "alt": "スレッドプッシュ" },
+        { "alt": "ローイング" },
+        { "alt": "スレッドプル" },
+        { "alt": "フィニッシュへ走る関吉大亮" }
+      ]
     }
   },
   "HomeHyroxPromo": {
