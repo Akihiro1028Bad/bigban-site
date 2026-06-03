@@ -8,6 +8,7 @@ import HyroxServices from "@/components/hyrox/HyroxServices";
 import HyroxIntro from "@/components/hyrox/HyroxIntro";
 import HyroxCoach from "@/components/hyrox/HyroxCoach";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
+import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
 
 export default function HyroxContent() {
   return (
@@ -20,6 +21,7 @@ export default function HyroxContent() {
         <HyroxIntro />
         <HyroxCoach />
         <HyroxProgram />
+        <HyroxPicklePromo />
       </main>
       <HomeFooter />
     </>

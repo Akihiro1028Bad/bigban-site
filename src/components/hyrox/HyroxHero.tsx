@@ -20,14 +20,17 @@ export default function HyroxHero() {
         fill
         priority
         sizes="100vw"
-        className="object-cover opacity-70"
+        className="object-cover object-center opacity-70"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/40 to-deep-black/20" />
+      {/* 下→上の暗幕 */}
+      <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/55 to-deep-black/25" />
+      {/* 左→右の暗幕（テキスト可読性。モバイルは強め） */}
+      <div className="absolute inset-0 bg-gradient-to-r from-deep-black/85 via-deep-black/35 to-transparent sm:from-deep-black/70 sm:via-deep-black/10" />
 
-      <div className="relative mx-auto w-full max-w-6xl px-6 py-32 lg:px-12">
+      <div className="relative mx-auto w-full max-w-6xl px-6 py-28 sm:py-32 lg:px-12">
         {/* タイトル */}
         <motion.h1
-          className="font-serif text-7xl font-black leading-none tracking-[0.08em] text-text-light sm:text-8xl lg:text-9xl"
+          className="font-serif text-6xl font-black leading-none tracking-[0.06em] text-text-light sm:text-8xl lg:text-9xl"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, delay: 0.1, ease: EASE }}

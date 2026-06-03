@@ -619,6 +619,15 @@
       "instagramAria": "関吉大亮のInstagramを開く（新しいタブ）",
       "portraitAlt": "HYROX担当コーチ 関吉大亮",
       "apacAlt": "HYROX APAC選手権での関吉大亮"
+    },
+    "picklePromo": {
+      "kicker": "MAIN FACILITY",
+      "kickerJa": "メイン施設",
+      "title": "PICKLEBALL",
+      "titleJa": "ピックルボール",
+      "description": "THE PICKLE BANG THEORY は、本八幡駅から徒歩1分のプレミアム・インドアピックルボール施設。プロ仕様のコートで、本格的なピックルボールも楽しめます。",
+      "cta": "ピックルボールを見る",
+      "courtImageAlt": "THE PICKLE BANG THEORY のピックルボールコート"
     }
   },
   "HomeHyroxPromo": {

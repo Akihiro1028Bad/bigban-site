@@ -84,6 +84,15 @@ export default function HyroxCoach() {
             <p className="mt-1 text-xs tracking-[0.3em] text-text-gray">
               {t("nameEn")}
             </p>
+            <a
+              href={INSTAGRAM_URL}
+              {...EXTERNAL_LINK_PROPS}
+              aria-label={t("instagramAria")}
+              className="mt-3 inline-flex items-center gap-2 text-xs text-text-gray transition-colors hover:text-accent"
+            >
+              <InstagramIcon className="h-4 w-4 shrink-0" />
+              <span className="tracking-normal">{t("instagram")}</span>
+            </a>
             <div className="mt-5 h-[3px] w-14 bg-accent" />
             <p className="mt-5 text-base font-medium leading-relaxed text-text-light sm:text-lg">
               {t("intro")}
@@ -111,16 +120,6 @@ export default function HyroxCoach() {
                 ))}
               </ul>
             </div>
-
-            <a
-              href={INSTAGRAM_URL}
-              {...EXTERNAL_LINK_PROPS}
-              aria-label={t("instagramAria")}
-              className="mt-8 inline-flex items-center gap-2 text-xs tracking-[0.2em] text-text-gray transition-colors hover:text-accent"
-            >
-              <InstagramIcon className="h-4 w-4 shrink-0" />
-              <span>{t("instagram")}</span>
-            </a>
           </motion.div>
         </div>
 

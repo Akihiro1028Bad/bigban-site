@@ -69,10 +69,6 @@ export default function HyroxServices() {
                   className="object-cover grayscale transition-all duration-700 group-hover:scale-105 group-hover:grayscale-0"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/40 to-transparent" />
-                {/* 番号バッジ */}
-                <span className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent font-serif text-sm font-black text-deep-black">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
                 {/* タイトル */}
                 <div className="absolute inset-x-0 bottom-0 p-6">
                   <h3 className="font-serif text-2xl font-black tracking-wide text-text-light lg:text-3xl">

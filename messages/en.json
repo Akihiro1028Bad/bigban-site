@@ -608,6 +608,15 @@
       "instagramAria": "Open Daisuke Sekiyoshi's Instagram (new tab)",
       "portraitAlt": "HYROX Coach Daisuke Sekiyoshi",
       "apacAlt": "Daisuke Sekiyoshi at the HYROX APAC Championships"
+    },
+    "picklePromo": {
+      "kicker": "MAIN FACILITY",
+      "kickerJa": "メイン施設",
+      "title": "PICKLEBALL",
+      "titleJa": "ピックルボール",
+      "description": "This is THE PICKLE BANG THEORY, a premium indoor pickleball facility — 1 min from Motoyawata Station. Come experience pickleball on our pro-spec courts.",
+      "cta": "Discover Pickleball",
+      "courtImageAlt": "Pickleball courts at THE PICKLE BANG THEORY"
     }
   },
   "HomeHyroxPromo": {
