@@ -26,13 +26,15 @@ export default function HomeFooter() {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
           {/* Left: Logo + Brand display */}
           <div>
-            <Image
-              src="/logos/yoko-neon.png"
-              alt={tCommon("logoAlt")}
-              width={200}
-              height={32}
-              className="h-8 w-auto"
-            />
+            <Link href="/" className="inline-block">
+              <Image
+                src="/logos/yoko-neon.png"
+                alt={tCommon("logoAlt")}
+                width={200}
+                height={32}
+                className="h-8 w-auto"
+              />
+            </Link>
             <p className="mt-3 text-xs tracking-[0.2em] text-text-gray">
               {tFooter("brandJa")}
             </p>

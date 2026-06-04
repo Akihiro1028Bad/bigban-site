@@ -46,6 +46,16 @@ describe("HomeFooter", () => {
     ).toBeInTheDocument();
   });
 
+  it("ロゴがホーム(/)へのリンクである", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logoLink = screen.getByAltText("THE PICKLE BANG THEORY").closest("a");
+    expect(logoLink).toHaveAttribute("href", "/");
+  });
+
   it("ブランド名（英語＋日本語）を表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
