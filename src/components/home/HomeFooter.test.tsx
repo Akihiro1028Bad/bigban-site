@@ -1,14 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 
 import HomeFooter from "./HomeFooter";
 
+let mockPathname = "/";
+
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ href, children, ...props }: Record<string, unknown>) => (
     <a href={href as string} {...props}>{children as React.ReactNode}</a>
   ),
+  usePathname: () => mockPathname,
 }));
 
 vi.mock("next/image", () => ({
@@ -54,6 +57,35 @@ describe("HomeFooter", () => {
     );
     const logoLink = screen.getByAltText("THE PICKLE BANG THEORY").closest("a");
     expect(logoLink).toHaveAttribute("href", "/");
+  });
+
+  it("ホームでロゴクリックするとページ最上部にスクロールする", () => {
+    mockPathname = "/";
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logo = screen.getByAltText("THE PICKLE BANG THEORY");
+    fireEvent.click(logo);
+    expect(scrollSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+    scrollSpy.mockRestore();
+  });
+
+  it("他ページでロゴクリックしてもscrollToは呼ばれない", () => {
+    mockPathname = "/about";
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logo = screen.getByAltText("THE PICKLE BANG THEORY");
+    fireEvent.click(logo);
+    expect(scrollSpy).not.toHaveBeenCalled();
+    scrollSpy.mockRestore();
+    mockPathname = "/";
   });
 
   it("ブランド名（英語＋日本語）を表示する", () => {

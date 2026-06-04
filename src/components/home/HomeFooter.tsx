@@ -1,8 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import { NAV_ITEMS } from "@/constants/navigation";
 
 import FooterNewsletter from "./FooterNewsletter";
@@ -11,6 +12,17 @@ export default function HomeFooter() {
   const t = useTranslations("Navigation");
   const tFooter = useTranslations("HomeFooter");
   const tCommon = useTranslations("Common");
+  const pathname = usePathname();
+
+  const handleLogoClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (pathname === "/") {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [pathname]
+  );
 
   return (
     <footer className="bg-deep-black">
@@ -26,7 +38,7 @@ export default function HomeFooter() {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
           {/* Left: Logo + Brand display */}
           <div>
-            <Link href="/" className="inline-block">
+            <Link href="/" onClick={handleLogoClick} className="inline-block">
               <Image
                 src="/logos/yoko-neon.png"
                 alt={tCommon("logoAlt")}
