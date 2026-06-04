@@ -111,7 +111,7 @@ const NAV = [
   { name: "HYROX", href: "/hyrox" },
   { name: "PRICING", href: "/#pricing" },
   { name: "NEWS", href: "/news" },
-  { name: "ABOUT", href: "/#about" },
+  { name: "ABOUT", href: "/about" },
   { name: "ACCESS", href: "/#access" },
 ];
 

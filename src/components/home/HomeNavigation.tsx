@@ -14,7 +14,7 @@ import MobileMenu from "./MobileMenu";
 import MenuToggleButton from "./MenuToggleButton";
 import LanguageToggle from "./LanguageToggle";
 
-const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
+const SECTION_IDS = ["concept", "facility", "services", "pricing", "access"];
 
 export default function HomeNavigation() {
   const locale = useLocale();

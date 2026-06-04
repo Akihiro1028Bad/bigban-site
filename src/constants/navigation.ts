@@ -7,6 +7,6 @@ export const NAV_ITEMS = [
   { id: "hyrox", kind: "page", href: "/hyrox" },
   { id: "pricing", kind: "anchor", href: "/#pricing" },
   { id: "news", kind: "page", href: "/news" },
-  { id: "about", kind: "anchor", href: "/#about" },
+  { id: "about", kind: "page", href: "/about" },
   { id: "access", kind: "anchor", href: "/#access" },
 ] as const;

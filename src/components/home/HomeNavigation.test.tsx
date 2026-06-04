@@ -52,7 +52,7 @@ const NAV_ITEMS = [
   { label: "HYROX", href: "/hyrox" },
   { label: "PRICING", href: "/#pricing" },
   { label: "NEWS", href: "/news" },
-  { label: "ABOUT", href: "/#about" },
+  { label: "ABOUT", href: "/about" },
   { label: "ACCESS", href: "/#access" },
 ];
 
@@ -92,7 +92,7 @@ describe("HomeNavigation", () => {
     const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     const pricingIdx = hrefs.indexOf("/#pricing");
     const newsIdx = hrefs.indexOf("/news");
-    const aboutIdx = hrefs.indexOf("/#about");
+    const aboutIdx = hrefs.indexOf("/about");
     expect(pricingIdx).toBeGreaterThanOrEqual(0);
     expect(newsIdx).toBe(pricingIdx + 1);
     expect(aboutIdx).toBe(newsIdx + 1);
