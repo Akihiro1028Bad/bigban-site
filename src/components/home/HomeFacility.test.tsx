@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { setMockUseInView } from "../../../__mocks__/framer-motion";
 import jaMessages from "../../../messages/ja.json";
@@ -220,7 +220,9 @@ describe("HomeFacility", () => {
     const selectCallback = selectCall?.[1] as (() => void) | undefined;
     expect(selectCallback).toBeDefined();
     mockSelectedScrollSnap.mockReturnValue(2);
-    selectCallback!();
+    act(() => {
+      selectCallback!();
+    });
     expect(mockSelectedScrollSnap).toHaveBeenCalled();
   });
 

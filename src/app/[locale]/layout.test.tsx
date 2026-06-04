@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("next/font/google", () => ({
   Orbitron: vi.fn().mockReturnValue({ variable: "--font-orbitron" }),
@@ -51,8 +51,24 @@ import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 describe("LocaleLayout", () => {
+  // ルートレイアウトは <html><body> を返すが、RTL は <div> コンテナに描画するため
+  // 「<html> cannot be a child of <div>」警告が出る（テスト固有の制約）。それのみ抑制する。
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    const original = console.error.bind(console);
+    errorSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      const msg = typeof args[0] === "string" ? args[0] : "";
+      if (msg.includes("cannot be a child of") || msg.includes("hydration error")) {
+        return;
+      }
+      original(...args);
+    });
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
   });
 
   it("renders children with ja locale", async () => {

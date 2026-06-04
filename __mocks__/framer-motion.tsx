@@ -12,6 +12,13 @@ const ANIMATION_PROPS = new Set([
   "viewport",
   "layout",
   "layoutId",
+  "drag",
+  "dragConstraints",
+  "dragElastic",
+  "dragMomentum",
+  "onDragEnd",
+  "onDragStart",
+  "onDrag",
 ]);
 
 const componentCache: Record<string, React.ForwardRefExoticComponent<React.HTMLAttributes<HTMLElement> & { [key: string]: unknown } & React.RefAttributes<HTMLElement>>> = {};
