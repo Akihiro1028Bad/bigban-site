@@ -74,6 +74,7 @@ export default function ReserveSteps() {
         </motion.div>
 
         <motion.ol
+          aria-label={t("heading")}
           className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-8"
           initial="hidden"
           whileInView="visible"

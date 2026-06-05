@@ -24,6 +24,13 @@ describe("ReserveSteps", () => {
     expect(screen.getByText("予約完了（決済）")).toBeInTheDocument();
   });
 
+  it("ステップ一覧（ol）に予約の流れを示す aria-label を付与する", () => {
+    renderWithIntl(<ReserveSteps />);
+    expect(
+      screen.getByRole("list", { name: "予約の流れ" })
+    ).toBeInTheDocument();
+  });
+
   it("各ステップに連番（01・02・03）を表示する", () => {
     renderWithIntl(<ReserveSteps />);
     expect(screen.getByText("01")).toBeInTheDocument();
