@@ -108,6 +108,7 @@
     "mainNav": "Main Navigation",
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
+    "mobileMenuAria": "Mobile menu",
     "menuAccess": "1 min from Motoyawata Sta. · Open 24h",
     "instagramAria": "THE PICKLE BANG THEORY on Instagram",
     "followUs": "Follow us"
@@ -541,18 +542,21 @@
       "ctaJa": "予約",
       "items": [
         {
+          "key": "rental",
           "titleEn": "AREA RENTAL",
           "titleJa": "時間制レンタル",
           "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 to 23:00.",
           "imageAlt": "An athlete driving the sled"
         },
         {
+          "key": "trial",
           "titleEn": "TRIAL",
           "titleJa": "体験・トライアル",
           "description": "A trial session for first-timers. A coach guides you through all 8 HYROX movements from scratch. Drop in empty-handed.",
           "imageAlt": "Performing wall balls"
         },
         {
+          "key": "group",
           "titleEn": "GROUP SESSION",
           "titleJa": "グループセッション",
           "description": "Small-group coached classes. Take on an authentic program with friends—covering technique and tips for each station plus race-day advice. Sessions are tailored to each participant's level, so beginners are welcome too.",

@@ -7,14 +7,12 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
-import { NAV_ITEMS } from "@/constants/navigation";
+import { NAV_ITEMS, SECTION_IDS } from "@/constants/navigation";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
 import MenuToggleButton from "./MenuToggleButton";
 import LanguageToggle from "./LanguageToggle";
-
-const SECTION_IDS = ["concept", "facility", "services", "pricing", "access"];
 
 export default function HomeNavigation() {
   const locale = useLocale();
@@ -139,6 +137,16 @@ export default function HomeNavigation() {
               );
             })}
           </nav>
+
+          {/* Mobile: 予約ボタン（常時表示・主要コンバージョン導線）。
+              右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
+          <a
+            href={RESERVE_URL}
+            {...EXTERNAL_LINK_PROPS}
+            className="mr-12 bg-accent px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-deep-black md:hidden"
+          >
+            {t("reserve")}
+          </a>
 
           {/* Desktop: Right side */}
           <div className="hidden md:flex items-center gap-4">

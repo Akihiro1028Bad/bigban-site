@@ -7,18 +7,6 @@ import { HYROX_STATIONS } from "./stations";
 import { EASE } from "@/constants/motion";
 
 
-// 各種目に割り当てる写真（一部は暫定の充当）。HYROX_STATIONS と同順。
-const STATION_IMAGES = [
-  "/images/hyrox/action-skierg.jpg",
-  "/images/hyrox/action-sled-push.jpg",
-  "/images/hyrox/action-sled-pull.jpg",
-  "/images/hyrox/action-burpee.jpg",
-  "/images/hyrox/action-row.jpg",
-  "/images/hyrox/action-farmers-carry.jpg",
-  "/images/hyrox/action-lunge.jpg",
-  "/images/hyrox/action-wallball.jpg",
-] as const;
-
 // 「WHAT IS HYROX」セクション内に内包されるサブブロック（種目一覧）。
 export default function HyroxStations() {
   const t = useTranslations("HyroxPage.stations");
@@ -37,7 +25,7 @@ export default function HyroxStations() {
           >
             <div className="relative aspect-[4/5] overflow-hidden">
               <Image
-                src={STATION_IMAGES[i]}
+                src={station.image}
                 alt={t(`${station.key}.name`)}
                 fill
                 sizes="(min-width: 1024px) 25vw, 50vw"

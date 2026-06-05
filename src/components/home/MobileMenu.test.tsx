@@ -228,4 +228,104 @@ describe("MobileMenu", () => {
     renderMenu({ locale: "en", isJa: false });
     expect(screen.getByText("1 min from Motoyawata Sta. · Open 24h")).toBeInTheDocument();
   });
+
+  // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---
+
+  function panelFocusables(): HTMLElement[] {
+    const panel = document.querySelector('[data-mobile-menu-panel="true"]');
+    if (!panel) return [];
+    return Array.from(
+      panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+  }
+
+  it("ダイアログに aria-modal=true を設定する", () => {
+    renderMenu();
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("開いたときパネル内の最初の要素へフォーカスを移す", () => {
+    renderMenu();
+    const focusables = panelFocusables();
+    expect(focusables.length).toBeGreaterThan(0);
+    expect(document.activeElement).toBe(focusables[0]);
+  });
+
+  it("最後の要素で Tab すると最初へフォーカスが戻る", () => {
+    renderMenu();
+    const focusables = panelFocusables();
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("中間要素での Tab はフォーカスをラップしない", () => {
+    renderMenu();
+    const focusables = panelFocusables();
+    const middle = focusables[1];
+    middle.focus();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" });
+    expect(document.activeElement).toBe(middle);
+  });
+
+  it("最初の要素で Shift+Tab すると最後へフォーカスが移る", () => {
+    renderMenu();
+    const focusables = panelFocusables();
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    first.focus();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("中間要素での Shift+Tab はフォーカスをラップしない", () => {
+    renderMenu();
+    const focusables = panelFocusables();
+    const middle = focusables[1];
+    middle.focus();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(middle);
+  });
+
+  it("Escape キーで onClose が呼ばれる", () => {
+    const { onClose } = renderMenu();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("Tab/Escape 以外のキーは無視する", () => {
+    const { onClose } = renderMenu();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "a" });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("閉じると開く前にフォーカスしていた要素へ戻す", () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { rerender } = renderMenu();
+    // 開いている間はパネル内へフォーカスが移る
+    expect(document.activeElement).not.toBe(trigger);
+
+    rerender(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <MobileMenu
+          isOpen={false}
+          onClose={vi.fn()}
+          onLinkClick={vi.fn()}
+          activeSection="concept"
+          isJa
+          onSwitchLocale={vi.fn()}
+        />
+      </NextIntlClientProvider>
+    );
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

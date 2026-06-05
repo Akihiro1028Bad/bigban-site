@@ -121,6 +121,7 @@
     "mainNav": "メインナビゲーション",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる",
+    "mobileMenuAria": "モバイルメニュー",
     "menuAccess": "本八幡駅 徒歩1分・24時間利用可",
     "instagramAria": "THE PICKLE BANG THEORY の Instagram",
     "followUs": "フォローはこちら"
@@ -554,18 +555,21 @@
       "ctaJa": "予約",
       "items": [
         {
+          "key": "rental",
           "titleEn": "AREA RENTAL",
           "titleJa": "時間制レンタル",
           "description": "HYROXエリアを時間単位でレンタル。設置器具を使い、自分のペースで自由にトレーニング。早朝6:00から深夜23:00まで利用できます。",
           "imageAlt": "スレッドプッシュに挑むアスリート"
         },
         {
+          "key": "trial",
           "titleEn": "TRIAL",
           "titleJa": "体験・トライアル",
           "description": "初めての方向けの体験セッション。コーチがHYROX8種目の動きを一から丁寧にガイドします。手ぶらでも気軽に参加できます。",
           "imageAlt": "ウォールボールに取り組むアスリート"
         },
         {
+          "key": "group",
           "titleEn": "GROUP SESSION",
           "titleJa": "グループセッション",
           "description": "少人数制のコーチングクラス。各種目のポイントやコツ、レースに向けたアドバイス等、本格メニューに仲間と挑戦。参加者のレベルに合わせた内容となり、初心者の方も安心です。",

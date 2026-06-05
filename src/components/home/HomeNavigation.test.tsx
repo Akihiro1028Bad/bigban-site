@@ -192,6 +192,18 @@ describe("HomeNavigation", () => {
     expect(reserveLinks[0]).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("モバイルヘッダーに常時表示の予約ボタンがある（メニュー未展開時）", () => {
+    renderWithIntl(<HomeNavigation />);
+    // メニュー未展開でもデスクトップ／モバイル両方の予約導線が存在する
+    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    expect(reserveLinks.length).toBeGreaterThanOrEqual(2);
+    const mobileReserve = reserveLinks.find((link) =>
+      link.className.includes("md:hidden")
+    );
+    expect(mobileReserve).toBeDefined();
+    expect(mobileReserve).toHaveAttribute("href", "https://reserva.be/tpbt");
+  });
+
   it("ハンバーガーメニューの開閉", () => {
     renderWithIntl(<HomeNavigation />);
 

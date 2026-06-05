@@ -7,14 +7,16 @@ import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 
-// カード順に対応するアクション写真
-const SERVICE_IMAGES = [
-  "/images/hyrox/service-rental.jpg",
-  "/images/hyrox/service-trial.jpg",
-  "/images/hyrox/service-group.jpg",
-] as const;
+// サービス key と写真を 1:1 で明示的に紐づける。
+// 翻訳ファイル側の items 並び順に依存しないため、順序変更で取り違えない。
+const SERVICE_IMAGE_BY_KEY: Record<string, string> = {
+  rental: "/images/hyrox/service-rental.jpg",
+  trial: "/images/hyrox/service-trial.jpg",
+  group: "/images/hyrox/service-group.jpg",
+};
 
 interface ServiceItem {
+  key: string;
   titleEn: string;
   titleJa: string;
   description: string;
@@ -52,7 +54,7 @@ export default function HyroxServices() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
           {items.map((item, i) => (
             <motion.article
-              key={item.titleEn}
+              key={item.key}
               className="group relative flex flex-col overflow-hidden rounded-sm border border-white/10 bg-deep-black transition-colors duration-500 hover:border-accent/50"
               initial={{ opacity: 0, y: 28 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -62,7 +64,7 @@ export default function HyroxServices() {
               {/* 画像＋タイトルオーバーレイ */}
               <div className="relative aspect-[16/10] overflow-hidden">
                 <Image
-                  src={SERVICE_IMAGES[i]}
+                  src={SERVICE_IMAGE_BY_KEY[item.key]}
                   alt={item.imageAlt}
                   fill
                   sizes="(min-width: 768px) 33vw, 100vw"

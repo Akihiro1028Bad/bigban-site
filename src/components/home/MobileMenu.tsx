@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -42,6 +43,20 @@ function NavItemLink({
   );
 }
 
+// パネル内のフォーカス可能要素を特定するためのセレクタ
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+// パネル本体を DOM から取得するためのマーカー（framer-motion モック下でも ref に依存せず参照できる）
+const PANEL_MARKER = "data-mobile-menu-panel";
+const PANEL_SELECTOR = `[${PANEL_MARKER}="true"]`;
+
+function getFocusableElements(): HTMLElement[] {
+  const panel = document.querySelector(PANEL_SELECTOR);
+  /* istanbul ignore next -- @preserve ダイアログ表示中は常にパネルが存在 (null分岐は到達不可) */
+  if (!panel) return [];
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
 const LIST_VARIANTS = {
   hidden: {},
   show: { transition: { staggerChildren: 0.045, delayChildren: 0.18 } },
@@ -76,11 +91,49 @@ export default function MobileMenu({
     };
   }, [isOpen]);
 
+  // 開いたらパネル内へフォーカスを移し、閉じたら開く前の要素へ戻す
+  useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const [firstFocusable] = getFocusableElements();
+    /* istanbul ignore next -- @preserve 表示中パネルには常にフォーカス可能要素が存在 (undefined分岐は到達不可) */
+    firstFocusable?.focus();
+    return () => {
+      /* istanbul ignore next -- @preserve 開く前は常に要素がフォーカスされている (null分岐は到達不可) */
+      previouslyFocused?.focus?.();
+    };
+  }, [isOpen]);
+
+  // ダイアログ内に Tab フォーカスを閉じ込め、Escape で閉じる
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusables = getFocusableElements();
+    /* istanbul ignore next -- @preserve 表示中パネルには常にフォーカス可能要素が存在 */
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
           role="dialog"
+          aria-modal="true"
+          aria-label={t("mobileMenuAria")}
+          onKeyDown={handleKeyDown}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -88,6 +141,8 @@ export default function MobileMenu({
           onClick={onClose}
         >
           <motion.div
+            {...{ [PANEL_MARKER]: "true" }}
+            tabIndex={-1}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
