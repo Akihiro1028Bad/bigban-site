@@ -26,4 +26,20 @@ describe("ReserveInfo", () => {
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(3);
   });
+
+  it("notes.items が配列でない場合は注意事項を描画しない", () => {
+    const brokenMessages = JSON.parse(
+      JSON.stringify(jaMessages)
+    ) as typeof jaMessages;
+    (brokenMessages.Reserve.notes as unknown as { items: unknown }).items =
+      "not-an-array";
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={brokenMessages}>
+        <ReserveInfo />
+      </NextIntlClientProvider>
+    );
+
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
 });

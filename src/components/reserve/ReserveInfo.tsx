@@ -7,7 +7,9 @@ const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function ReserveInfo() {
   const t = useTranslations("Reserve");
-  const notes = t.raw("notes.items") as string[];
+  // t.raw は unknown を返すため、システム境界として配列であることを検証する。
+  const rawNotes = t.raw("notes.items");
+  const notes = Array.isArray(rawNotes) ? (rawNotes as string[]) : [];
 
   return (
     <section className="bg-deep-black pb-20 lg:pb-28">

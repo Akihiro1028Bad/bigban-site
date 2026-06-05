@@ -38,6 +38,8 @@ export default function ReserveCalendar() {
           <iframe
             src={LABOLA_CALENDAR_SRC}
             title={t("iframeTitle")}
+            loading="lazy"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
             className="w-full h-[600px] md:h-[500px] border-0"
           />
 
@@ -45,6 +47,7 @@ export default function ReserveCalendar() {
               iframe コンテンツに一切被らないため最終行も常に見える。 */}
           <div className="flex items-center justify-center gap-2 border-t border-accent/20 bg-deep-black py-2.5">
             <svg
+              aria-hidden="true"
               width="13"
               height="13"
               viewBox="0 0 24 24"
