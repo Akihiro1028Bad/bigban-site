@@ -73,4 +73,8 @@ function useMotionValue(initial: unknown) {
   };
 }
 
-export { motion, AnimatePresence, useScroll, useTransform, useInView, useMotionValue, setMockUseInView };
+function useReducedMotion() {
+  return false;
+}
+
+export { motion, AnimatePresence, useScroll, useTransform, useInView, useMotionValue, useReducedMotion, setMockUseInView };

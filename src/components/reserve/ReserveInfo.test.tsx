@@ -21,9 +21,9 @@ describe("ReserveInfo", () => {
     expect(screen.getByText("本八幡駅 徒歩1分")).toBeInTheDocument();
   });
 
-  it("注意事項を4件表示する", () => {
+  it("注意事項を3件表示する", () => {
     renderWithIntl(<ReserveInfo />);
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(3);
   });
 });

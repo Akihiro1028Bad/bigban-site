@@ -20,7 +20,30 @@ describe("ReserveSteps", () => {
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(3);
     expect(screen.getByText("日時を選ぶ")).toBeInTheDocument();
-    expect(screen.getByText("コート・人数を選択")).toBeInTheDocument();
+    expect(screen.getByText("予約内容を入力")).toBeInTheDocument();
     expect(screen.getByText("予約完了（決済）")).toBeInTheDocument();
+  });
+
+  it("各ステップに連番（01・02・03）を表示する", () => {
+    renderWithIntl(<ReserveSteps />);
+    expect(screen.getByText("01")).toBeInTheDocument();
+    expect(screen.getByText("02")).toBeInTheDocument();
+    expect(screen.getByText("03")).toBeInTheDocument();
+  });
+
+  it("ステップ01は操作デモ動画を表示する", () => {
+    const { container } = renderWithIntl(<ReserveSteps />);
+    const video = container.querySelector("video");
+    expect(video).toBeInTheDocument();
+    expect(video).toHaveAttribute(
+      "aria-label",
+      "予約カレンダーで日時を選ぶ操作画面"
+    );
+  });
+
+  it("ステップ02・03はスクリーンショット画像を alt 付きで表示する", () => {
+    renderWithIntl(<ReserveSteps />);
+    expect(screen.getByAltText("ご予約内容の確認画面")).toBeInTheDocument();
+    expect(screen.getByAltText("予約完了の画面")).toBeInTheDocument();
   });
 });

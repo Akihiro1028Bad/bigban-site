@@ -105,9 +105,9 @@
     "steps": {
       "heading": "How to Book",
       "headingEn": "HOW TO BOOK",
-      "step01": { "title": "Pick a date & time", "description": "Choose an open slot from the calendar." },
-      "step02": { "title": "Choose court & details", "description": "Select your court, party size and options." },
-      "step03": { "title": "Confirm & pay", "description": "Enter payment details to confirm your booking." }
+      "step01": { "title": "Pick a date & time", "description": "Choose an open slot from the calendar.", "imageAlt": "Selecting a date and time on the booking calendar" },
+      "step02": { "title": "Enter booking details", "description": "Follow the booking form to enter your reservation and contact details.", "imageAlt": "Booking details confirmation screen" },
+      "step03": { "title": "Confirm & pay", "description": "Enter payment details to confirm your booking.", "imageAlt": "Booking complete screen" }
     },
     "calendar": {
       "title": "BOOK A COURT",
@@ -129,8 +129,7 @@
       "items": [
         "Reservations follow the booking system's accepted time window.",
         "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
-        "Late arrivals are accommodated only within the reserved time slot.",
-        "Shoe and paddle rentals vary by location and plan."
+        "Late arrivals are accommodated only within the reserved time slot."
       ]
     }
   },
