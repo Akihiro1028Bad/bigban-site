@@ -44,12 +44,12 @@ describe("PromoBanner", () => {
     expect(screen.getByText(/PBTOPEN30/)).toBeInTheDocument();
   });
 
-  it("JST 6/1以降は6月キャンペーン文言(CAMPFIRE30 / 6\\30まで)へ切り替わる", () => {
+  it("JST 6/1以降は6月キャンペーン文言(CAMPFIRE30 / 7\\31まで)へ切り替わる", () => {
     vi.useFakeTimers();
     vi.setSystemTime(JUNE_JST);
     renderWithIntl(<PromoBanner />, "ja");
     expect(screen.getByText(/CAMPFIRE30/)).toBeInTheDocument();
-    expect(screen.getByText(/6\/30/)).toBeInTheDocument();
+    expect(screen.getByText(/7\/31/)).toBeInTheDocument();
     expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
   });
 
