@@ -123,8 +123,8 @@ export default async function LocaleLayout({
           {children}
         </NextIntlClientProvider>
         <Analytics />
+        <GoogleAnalyticsTag />
       </body>
-      <GoogleAnalyticsTag />
     </html>
   );
 }
