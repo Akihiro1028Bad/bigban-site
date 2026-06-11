@@ -2,7 +2,7 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
 import GoogleAnalyticsTag from "@/components/GoogleAnalyticsTag";
-import { SITE_URL } from "@/constants/site";
+import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import PreHydrationScripts from "@/components/PreHydrationScripts";
 import { notFound } from "next/navigation";
 import { Orbitron, Inter, Noto_Sans_JP } from "next/font/google";
@@ -63,9 +63,11 @@ export async function generateMetadata({
       type: "website",
       siteName: t("og.siteName"),
       locale: locale === "ja" ? "ja_JP" : "en_US",
+      images: [OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
+      images: [OG_IMAGE.url],
     },
     robots: {
       index: true,
