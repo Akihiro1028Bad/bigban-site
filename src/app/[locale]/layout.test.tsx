@@ -132,7 +132,18 @@ describe("generateMetadata", () => {
     });
 
     expect(metadata.openGraph).toBeDefined();
-    expect(metadata.twitter).toMatchObject({ card: "summary_large_image" });
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: "http://localhost:3000/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "THE PICKLE BANG THEORY",
+      },
+    ]);
+    expect(metadata.twitter).toMatchObject({
+      card: "summary_large_image",
+      images: ["http://localhost:3000/opengraph-image.png"],
+    });
     expect(mockGetTranslations).toHaveBeenCalledWith({
       locale: "ja",
       namespace: "Metadata",

@@ -13,7 +13,8 @@ interface Params {
 
 export default async function Image({ params }: Params): Promise<Response> {
   const { locale: rawLocale, slug } = await params;
-  const fallback = `${SITE_URL}${rawLocale === "en" ? "/en" : ""}/opengraph-image`;
+  // ロケール非依存の共通OGP画像 (src/app/opengraph-image.png) へフォールバックする。
+  const fallback = `${SITE_URL}/opengraph-image.png`;
   const locale = parseLocale(rawLocale);
   /* istanbul ignore next -- @preserve middleware で routing 制限済みのため到達不可 (defensive) */
   if (!locale) {

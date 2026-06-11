@@ -29,7 +29,7 @@ describe("news detail opengraph-image", () => {
     expect(res.headers.get("location") ?? "").toContain("w=1200");
   });
 
-  it("eyecatchなし: 共通OGP", async () => {
+  it("eyecatchなし: 共通OGP画像へフォールバック", async () => {
     getNewsDetailMock.mockResolvedValue({
       slug: "x",
       locale: "ja",
@@ -40,37 +40,37 @@ describe("news detail opengraph-image", () => {
       params: Promise.resolve({ locale: "ja", slug: "x" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location") ?? "").toMatch(/opengraph-image/);
+    expect(res.headers.get("location") ?? "").toContain("/opengraph-image.png");
   });
 
-  it("記事なし: 共通OGP", async () => {
+  it("記事なし: 共通OGP画像へフォールバック", async () => {
     getNewsDetailMock.mockResolvedValue(null);
     const { default: handler } = await import("./opengraph-image");
     const res = await handler({
       params: Promise.resolve({ locale: "ja", slug: "none" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location") ?? "").toMatch(/opengraph-image/);
+    expect(res.headers.get("location") ?? "").toContain("/opengraph-image.png");
   });
 
-  it("不正locale: 共通OGPへ", async () => {
+  it("不正locale: 共通OGP画像へフォールバック", async () => {
     const { default: handler } = await import("./opengraph-image");
     const res = await handler({
       params: Promise.resolve({ locale: "fr", slug: "x" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location") ?? "").toMatch(/opengraph-image/);
+    expect(res.headers.get("location") ?? "").toContain("/opengraph-image.png");
   });
 
-  it("locale=en eyecatchなし: /en/opengraph-image にリダイレクト", async () => {
+  it("locale=en でもロケール非依存の共通OGP画像へフォールバック", async () => {
     getNewsDetailMock.mockResolvedValue(null);
     const { default: handler } = await import("./opengraph-image");
     const res = await handler({
       params: Promise.resolve({ locale: "en", slug: "none" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location") ?? "").toMatch(
-      /\/en\/opengraph-image/,
-    );
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/opengraph-image.png");
+    expect(location).not.toContain("/en/");
   });
 });

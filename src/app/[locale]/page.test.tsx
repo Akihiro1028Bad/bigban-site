@@ -86,7 +86,7 @@ describe("Home generateMetadata", () => {
     expect(mockGetTranslations).not.toHaveBeenCalled();
   });
 
-  it("openGraphにimagesを明示しない(opengraph-image.tsxに委譲)", async () => {
+  it("openGraphに共通OGP画像を明示する", async () => {
     mockGetTranslations.mockResolvedValue(buildMockT([]));
 
     const { generateMetadata } = await import("./page");
@@ -94,7 +94,14 @@ describe("Home generateMetadata", () => {
       params: Promise.resolve({ locale: "ja" }),
     });
 
-    expect(metadata.openGraph?.images).toBeUndefined();
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: "http://localhost:3000/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "THE PICKLE BANG THEORY",
+      },
+    ]);
   });
 });
 

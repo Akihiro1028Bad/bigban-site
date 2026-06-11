@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import StructuredData from "@/components/StructuredData";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
-import { SITE_URL } from "@/constants/site";
+import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import { getNewsList } from "@/lib/microcms/queries";
@@ -44,6 +44,7 @@ export async function generateMetadata({
       description: t("about.description"),
       url: canonicalUrl,
       locale: locale === "ja" ? "ja_JP" : "en_US",
+      images: [OG_IMAGE],
     },
     alternates: {
       canonical: canonicalUrl,
