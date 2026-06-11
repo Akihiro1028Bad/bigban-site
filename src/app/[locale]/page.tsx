@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { SITE_URL } from "@/constants/site";
+import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import StructuredData from "@/components/StructuredData";
@@ -49,6 +49,7 @@ export async function generateMetadata({
       description: t("home.description"),
       url: canonicalUrl,
       locale: locale === "ja" ? "ja_JP" : "en_US",
+      images: [OG_IMAGE],
     },
     alternates: {
       canonical: canonicalUrl,
