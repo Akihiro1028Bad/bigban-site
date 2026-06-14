@@ -1,0 +1,116 @@
+/**
+ * GA4 Data API (batchRunReports) から週次データを取得する。
+ *
+ * 各レポート定義について current / prior の2期間ぶんのリクエストを作り、
+ * 1回の batchRunReports で取得 → transform で前週比つきに整形する。
+ */
+
+import type { GrowthConfig } from "./config";
+import type { DateRange } from "./period";
+import { defaultFetch, postJson, type FetchFn } from "./http";
+import {
+  parseGa4Report,
+  mergeRows,
+  type Ga4Report,
+  type MergedRow,
+} from "./transform";
+
+const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
+
+export interface Ga4ReportDef {
+  /** 出力オブジェクトのキー。 */
+  key: string;
+  /** GA4 ディメンション名。サマリーは空配列。 */
+  dimensions: string[];
+  /** GA4 指標名。 */
+  metrics: string[];
+  /** 取得行数の上限(ブレイクダウン用)。 */
+  limit?: number;
+}
+
+/** 既定で取得するレポート群(幅広く)。 */
+export const GA4_REPORTS: Ga4ReportDef[] = [
+  {
+    key: "summary",
+    dimensions: [],
+    metrics: ["sessions", "activeUsers", "engagementRate", "keyEvents"],
+  },
+  {
+    key: "byChannel",
+    dimensions: ["sessionDefaultChannelGroup"],
+    metrics: ["sessions", "activeUsers", "keyEvents"],
+    limit: 20,
+  },
+  {
+    key: "byDevice",
+    dimensions: ["deviceCategory"],
+    metrics: ["sessions", "activeUsers", "engagementRate"],
+  },
+  {
+    key: "topPages",
+    dimensions: ["pagePath"],
+    metrics: ["screenPageViews", "activeUsers"],
+    limit: 20,
+  },
+  {
+    key: "landingPages",
+    dimensions: ["landingPage"],
+    metrics: ["sessions", "activeUsers", "keyEvents"],
+    limit: 20,
+  },
+];
+
+interface FetchGa4Options {
+  config: GrowthConfig;
+  accessToken: string;
+  current: DateRange;
+  prior: DateRange;
+  fetchFn?: FetchFn;
+  reports?: Ga4ReportDef[];
+}
+
+function buildRequest(def: Ga4ReportDef, range: DateRange) {
+  const request: Record<string, unknown> = {
+    dimensions: def.dimensions.map((name) => ({ name })),
+    metrics: def.metrics.map((name) => ({ name })),
+    dateRanges: [{ startDate: range.start, endDate: range.end }],
+  };
+  if (def.limit !== undefined) {
+    request.limit = String(def.limit);
+  }
+  return request;
+}
+
+export async function fetchGa4(
+  options: FetchGa4Options
+): Promise<Record<string, MergedRow[]>> {
+  const {
+    config,
+    accessToken,
+    current,
+    prior,
+    fetchFn = defaultFetch,
+    reports = GA4_REPORTS,
+  } = options;
+
+  const requests = reports.flatMap((def) => [
+    buildRequest(def, current),
+    buildRequest(def, prior),
+  ]);
+
+  const url = `${GA4_ENDPOINT}/properties/${config.ga4PropertyId}:batchRunReports`;
+  const body = await postJson(url, accessToken, { requests }, fetchFn);
+  const allReports = ((body as { reports?: Ga4Report[] }).reports ?? []) as Ga4Report[];
+
+  const result: Record<string, MergedRow[]> = {};
+  reports.forEach((def, index) => {
+    const currentReport = allReports[index * 2] ?? {};
+    const priorReport = allReports[index * 2 + 1] ?? {};
+    result[def.key] = mergeRows(
+      parseGa4Report(currentReport),
+      parseGa4Report(priorReport)
+    );
+  });
+
+  return result;
+}

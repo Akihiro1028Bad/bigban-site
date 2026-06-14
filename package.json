@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "growth:fetch": "tsx scripts/growth/cli.ts",
+    "growth:setup-token": "tsx scripts/growth/setup-token.ts"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +28,7 @@
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
+    "google-auth-library": "^10.7.0",
     "isomorphic-dompurify": "^3.10.0",
     "next": "^16.2.1",
     "next-intl": "^4.9.0",
@@ -53,6 +56,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^29.0.1",
     "msw": "^2.13.6",
+    "tsx": "^4.22.4",
     "typescript-eslint": "^8.57.2",
     "vitest": "^4.1.2"
   }

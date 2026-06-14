@@ -47,7 +47,12 @@ export default defineConfig({
     coverage: {
       provider: "istanbul",
       reporter: ["text", "lcov"],
-      exclude: ["__mocks__/**"],
+      exclude: [
+        "__mocks__/**",
+        // 実行時の薄い入口(実データでの手動検証のためテスト対象外)
+        "scripts/growth/cli.ts",
+        "scripts/growth/setup-token.ts",
+      ],
       thresholds: {
         statements: 100,
         branches: 100,
