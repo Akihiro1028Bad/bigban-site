@@ -48,3 +48,6 @@ tsconfig.tsbuildinfo
 
 # superpowers brainstorm sessions
 .superpowers/
+
+# growth loop: ローカル保存のデータスナップショット(秘密情報を含みうるため管理外)
+/data/snapshots/
