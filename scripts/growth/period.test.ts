@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 
-import { computeWeeklyPeriods } from "./period";
+import { computeWeeklyPeriods, jstDateString } from "./period";
 
 describe("computeWeeklyPeriods", () => {
   it("木曜実行時、直近の確定した先週(月〜日)とその前週を返す", () => {
@@ -37,5 +37,20 @@ describe("computeWeeklyPeriods", () => {
     const result = computeWeeklyPeriods(new Date("2026-01-08T07:00:00+09:00"));
     expect(result.current).toEqual({ start: "2025-12-29", end: "2026-01-04" });
     expect(result.prior).toEqual({ start: "2025-12-22", end: "2025-12-28" });
+  });
+});
+
+describe("jstDateString", () => {
+  it("JST のカレンダー日付を YYYY-MM-DD で返す", () => {
+    expect(jstDateString(new Date("2026-06-18T07:00:00+09:00"))).toBe(
+      "2026-06-18"
+    );
+  });
+
+  it("UTC では前日でも JST の日付に補正する", () => {
+    // 2026-06-18T00:30+09:00 は UTC では 2026-06-17T15:30Z
+    expect(jstDateString(new Date("2026-06-18T00:30:00+09:00"))).toBe(
+      "2026-06-18"
+    );
   });
 });

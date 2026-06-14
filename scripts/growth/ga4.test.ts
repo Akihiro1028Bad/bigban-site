@@ -114,12 +114,58 @@ describe("fetchGa4", () => {
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior });
 
-    expect(globalFetch).toHaveBeenCalledOnce();
+    // 既定5レポート × 2期間 = 10リクエスト → 5件ずつ2バッチ
+    expect(globalFetch).toHaveBeenCalledTimes(2);
     // 既定レポートの各 key が結果に存在する
     for (const def of GA4_REPORTS) {
       expect(result[def.key]).toBeDefined();
     }
     vi.unstubAllGlobals();
+  });
+
+  it("リクエストが5件を超える場合は5件ずつのバッチに分割して呼ぶ", async () => {
+    // 3レポート × 2期間 = 6リクエスト → 5 + 1 の2バッチ
+    const threeReports: Ga4ReportDef[] = [
+      { key: "a", dimensions: [], metrics: ["sessions"] },
+      { key: "b", dimensions: ["deviceCategory"], metrics: ["sessions"] },
+      { key: "c", dimensions: ["pagePath"], metrics: ["sessions"] },
+    ];
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockReturnValueOnce(
+        okResponse({
+          reports: [
+            { metricHeaders: [{ name: "sessions" }], rows: [{ metricValues: [{ value: "10" }] }] }, // a cur
+            { metricHeaders: [{ name: "sessions" }], rows: [{ metricValues: [{ value: "8" }] }] }, // a prior
+            { metricHeaders: [{ name: "sessions" }] }, // b cur
+            { metricHeaders: [{ name: "sessions" }] }, // b prior
+            { metricHeaders: [{ name: "sessions" }] }, // c cur
+          ],
+        })
+      )
+      .mockReturnValueOnce(
+        okResponse({
+          reports: [
+            { metricHeaders: [{ name: "sessions" }] }, // c prior
+          ],
+        })
+      );
+
+    const result = await fetchGa4({
+      config,
+      accessToken: "t",
+      current,
+      prior,
+      fetchFn,
+      reports: threeReports,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body as string).requests).toHaveLength(5);
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body as string).requests).toHaveLength(1);
+    // バッチをまたいでも順序どおり突合される
+    expect(result.a[0].metrics.sessions).toEqual({ current: 10, prior: 8, deltaPct: 25 });
+    expect(result.c).toEqual([]);
   });
 
   it("レスポンスに reports が無くても各 key を空配列で返す", async () => {
