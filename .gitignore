@@ -54,3 +54,6 @@ tsconfig.tsbuildinfo
 
 # growth loop: OAuth クライアント JSON 等の秘密情報置き場
 /secrets/
+
+# growth loop: 生成画像(手動添付用・管理外)
+/data/growth-images/
