@@ -49,6 +49,11 @@ function weekRange(monday: Date): DateRange {
   return { start: formatYmd(monday), end: formatYmd(addDays(monday, 6)) };
 }
 
+/** 実行日(JST)のカレンダー日付を YYYY-MM-DD 形式で返す(スナップショット名等に使う)。 */
+export function jstDateString(reference: Date): string {
+  return formatYmd(jstMidnight(reference));
+}
+
 export function computeWeeklyPeriods(reference: Date): WeeklyPeriods {
   const today = jstMidnight(reference);
   // getUTCDay: 0=日, 1=月, ..., 6=土。月曜起点の経過日数に変換。

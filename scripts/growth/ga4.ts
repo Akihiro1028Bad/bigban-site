@@ -17,6 +17,17 @@ import {
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
+/** batchRunReports は1リクエストにつき最大5レポートまで。 */
+const MAX_BATCH_SIZE = 5;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export interface Ga4ReportDef {
   /** 出力オブジェクトのキー。 */
   key: string;
@@ -99,8 +110,14 @@ export async function fetchGa4(
   ]);
 
   const url = `${GA4_ENDPOINT}/properties/${config.ga4PropertyId}:batchRunReports`;
-  const body = await postJson(url, accessToken, { requests }, fetchFn);
-  const allReports = ((body as { reports?: Ga4Report[] }).reports ?? []) as Ga4Report[];
+
+  // batchRunReports は最大5リクエスト/回のため分割して呼び、結果を順に連結する。
+  const allReports: Ga4Report[] = [];
+  for (const batch of chunk(requests, MAX_BATCH_SIZE)) {
+    const body = await postJson(url, accessToken, { requests: batch }, fetchFn);
+    const reportsInBatch = (body as { reports?: Ga4Report[] }).reports ?? [];
+    allReports.push(...reportsInBatch);
+  }
 
   const result: Record<string, MergedRow[]> = {};
   reports.forEach((def, index) => {
