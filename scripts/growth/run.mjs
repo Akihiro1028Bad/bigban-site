@@ -1,12 +1,15 @@
 /**
  * グロース3モードの起動ランチャー(headless / claude -p)。
- * Windows / macOS 両対応(Node spawn・shell なし)。
+ * Windows / macOS 両対応。
  *
  *   npm run growth:weekly        週次モード(分析→Notionレポート+施策提案)
  *   npm run growth:drafts        下書きモード(承認記事→microCMS下書き+画像)
  *   npm run growth:initiatives   施策実行モード(承認施策→Notion本文に文案/仕様書)
  *
  * 動作確認(claude を起動せずコマンドだけ表示): GROWTH_DRYRUN=1 を付ける。
+ *
+ * プロンプトは引数ではなく**標準入力**で渡す(巨大引数の引用符問題を回避し、
+ * Windows の claude.cmd 起動でも安定させるため)。
  */
 
 import { spawn } from "node:child_process";
@@ -41,9 +44,9 @@ if (!cfg) {
 }
 
 const prompt = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
+// プロンプトは stdin で渡すので引数には含めない
 const args = [
   "-p",
-  prompt,
   "--permission-mode",
   "default",
   "--allowedTools",
@@ -52,18 +55,22 @@ const args = [
   ...DISALLOW,
 ];
 
-const bin = process.platform === "win32" ? "claude.cmd" : "claude";
+const isWin = process.platform === "win32";
 
 if (process.env.GROWTH_DRYRUN) {
   process.stdout.write(
-    `[dry-run] ${bin} ${args
-      .map((a) => (a === prompt ? `<prompt:${cfg.prompt}>` : a))
-      .join(" ")}\n`
+    `[dry-run] (stdin=<prompt:${cfg.prompt}>) claude ${args.join(" ")}\n`
   );
   process.exit(0);
 }
 
-const child = spawn(bin, args, { stdio: "inherit" });
+// Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
+const child = spawn("claude", args, {
+  stdio: ["pipe", "inherit", "inherit"],
+  shell: isWin,
+});
+child.stdin.write(prompt);
+child.stdin.end();
 child.on("exit", (code) => process.exit(code ?? 0));
 child.on("error", (err) => {
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
