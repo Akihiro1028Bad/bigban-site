@@ -53,6 +53,7 @@ export default defineConfig({
         "scripts/growth/cli.ts",
         "scripts/growth/setup-token.ts",
         "scripts/growth/upload-media.ts",
+        "scripts/growth/draft-content.ts",
       ],
       thresholds: {
         statements: 100,
