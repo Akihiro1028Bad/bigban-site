@@ -126,7 +126,7 @@ data source `collection://49694014-8e7d-4e9c-b94c-620341c4fb2e` に1行(1ペー�
 1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
 2. 各案を **コンテンツ作成チーム** で執筆
 3. **画像チーム** で画像を用意(**アイキャッチ必須**、本文画像は任意)
-4. microCMS MCP で **下書き(draft)** 作成(**公開しない**)。title / slug / locale=ja / category / excerpt / displayMode=html / bodyHtml / **eyecatch(必須)** を埋め、末尾に「AI生成の下書き。公開前に確認を」
+4. **下書き(draft)** 作成(**公開しない**)。本文 JSON(title / slug / locale=ja / category / excerpt / displayMode=html / bodyHtml、末尾に「AI生成の下書き。公開前に確認を」)を一時ファイルに書き、`npm run growth:draft-content -- create <json>` で作成 → 出力された contentId を控える。**microCMS MCP は使わない**(headless では未接続のため。スクリプトは管理APIを直接叩くので headless でも動く)。eyecatch は次の画像チームで添付
 5. 当該行の `ステータス` を `下書き作成済み` に更新し、ページ本文に microCMS 下書きのタイトル/ID を追記
 6. `却下` の行は無視する
 
@@ -150,8 +150,9 @@ data source `collection://49694014-8e7d-4e9c-b94c-620341c4fb2e` に1行(1ペー�
    - 担当ロールを形式に合わせて起用: 写真風=**写真家**、イラスト/図解=**イラストレーター**。レイアウトや配色の整えは**デザイナー**
 2. **画像生成** ― `openai-image-gen` スキル(gpt-image-2)で、選んだ形式に沿ったプロンプトで生成。アイキャッチは記事カード/OGP 向けに横長(16:9 目安)、文字なし。本文画像は文字入れ可(図解等)
 3. **画像選定/品質チェック** ― 生成物から「記事内容と合っているか」「プロ品質か(安っぽくない・破綻=不自然な手指/歪みが無い)」で選ぶ。**文字を入れた本文画像は、文字が正しく読めるか・日本語が崩れていないかを必ず確認**し、崩れていたら再生成(難しければ文字なしで生成し、デザイナーが後から正確な文字を載せる)。NG ならプロンプトを直して再生成
-4. **アップロード/添付** ― 採用画像を `npm run growth:upload-media -- <画像パス>` でアップロードし、出力された microCMS アセット URL を取得。`microcms_patch_content`(`isDraft: true`)で下書きの `eyecatch`(必須)/ 本文 img に設定する
-   - MCP の `upload_media`(base64)は大きい画像で不確実なため**使わない**。必ず上記スクリプト経由でアップロードする(管理 API キーが `.env` の `MICROCMS_MANAGEMENT_API_KEY` に必要)
+4. **アップロード/添付** ― 採用画像を `npm run growth:upload-media -- <画像パス>` でアップロードし、出力された microCMS アセット URL を取得。`npm run growth:draft-content -- patch <contentId> <json>`(json に `{"eyecatch":"<URL>"}`)で下書きに eyecatch(必須)を設定。本文 img も同様に URL を使う
+   - microCMS MCP / base64 渡しは**使わない**(headless 非対応・大画像で不確実)。必ずスクリプト経由(管理APIを直接利用。`.env` の `MICROCMS_MANAGEMENT_API_KEY`、content書き込み権限が必要)
+   - 画像は 5MB 上限。生成画像が大きい場合は事前に縮小する
    - 画像は 5MB 上限。生成画像が大きい場合は事前に縮小する
    - `OPENAI_API_KEY` 未設定で画像生成できない場合は、その旨を報告し、アイキャッチ無しでは公開しないよう人間に促す(下書き自体は本文のみで作成)
 
