@@ -23,7 +23,7 @@ THE PICKLE BANG THEORY のグロース運用を AI が行うための手順書�
 
 | 用途 | 先 |
 |------|----|
-| 週次レポート | Notion DB「週次グロースレポート」 data source: `collection://49694014-8e7d-4e9c-b94c-620341c4fb2e`(URL: https://app.notion.com/p/02e56ff5cdfd4fb29146225dbb51561e) |
+| 週次レポート | Notion DB「週次グロースレポート」 data source: `collection://27d6794f-4133-4cd4-9407-491d95c1b82b`(URL: https://app.notion.com/p/f6b304f1375347e39f718ce30dbdef93) |
 | 記事ネタ案(コンテンツの承認ゲート) | Notion DB「記事ネタ案」 data source: `collection://5adab8b1-f182-4123-b963-9463a2580d4a`(URL: https://app.notion.com/p/057f4e5afac243a885a323d1f4b492ba) |
 | 施策提案(コンテンツ以外5カテゴリの承認ゲート) | Notion DB「施策提案」 data source: `collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`(URL: https://app.notion.com/p/af87618b81e94943a8519b4124185114)。承認は「今週の承認待ち」ビューで `ステータス` を1タップ変更 |
 | 記事下書き | microCMS(MCP 経由・**下書きのみ**)。**承認済みネタ案のみ**下書き化 |
@@ -87,7 +87,7 @@ THE PICKLE BANG THEORY のグロース運用を AI が行うための手順書�
 - ロール間で意見が割れた点は「論点」として週次レポート本文に併記(人間の判断材料)
 
 ### 5. Notion へレポート作成
-data source `collection://49694014-8e7d-4e9c-b94c-620341c4fb2e` に1行(1ページ)追加:
+data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ページ)追加:
 - プロパティ: レポート(`週次レポート YYYY-MM-DD〜YYYY-MM-DD`)/ 対象週開始 / セッション / セッション前週比% / クリック_GSC / 表示回数 / 平均掲載順位 / 施策提案数(今回の総数)/ ステータス=`新規`
 - ページ本文の構成:
   1. サマリー(今週の数字と前週比を平易に。良かった点・気になる点)
@@ -152,7 +152,6 @@ data source `collection://49694014-8e7d-4e9c-b94c-620341c4fb2e` に1行(1ペー�
 3. **画像選定/品質チェック** ― 生成物から「記事内容と合っているか」「プロ品質か(安っぽくない・破綻=不自然な手指/歪みが無い)」で選ぶ。**文字を入れた本文画像は、文字が正しく読めるか・日本語が崩れていないかを必ず確認**し、崩れていたら再生成(難しければ文字なしで生成し、デザイナーが後から正確な文字を載せる)。NG ならプロンプトを直して再生成
 4. **アップロード/添付** ― 採用画像を `npm run growth:upload-media -- <画像パス>` でアップロードし、出力された microCMS アセット URL を取得。`npm run growth:draft-content -- patch <contentId> <json>`(json に `{"eyecatch":"<URL>"}`)で下書きに eyecatch(必須)を設定。本文 img も同様に URL を使う
    - microCMS MCP / base64 渡しは**使わない**(headless 非対応・大画像で不確実)。必ずスクリプト経由(管理APIを直接利用。`.env` の `MICROCMS_MANAGEMENT_API_KEY`、content書き込み権限が必要)
-   - 画像は 5MB 上限。生成画像が大きい場合は事前に縮小する
    - 画像は 5MB 上限。生成画像が大きい場合は事前に縮小する
    - `OPENAI_API_KEY` 未設定で画像生成できない場合は、その旨を報告し、アイキャッチ無しでは公開しないよう人間に促す(下書き自体は本文のみで作成)
 
