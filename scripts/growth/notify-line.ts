@@ -75,10 +75,7 @@ async function main(): Promise<void> {
     process.stderr.write("NOTION_TOKEN 未設定のため承認待ち・レポートURLは省略します。\n");
   }
 
-  const approveUrl = buildApproveUrl(
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.APPROVE_SECRET
-  );
+  const approveUrl = buildApproveUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
   const message = buildDigestMessage({
     periodLabel: periodLabel(snapshot),

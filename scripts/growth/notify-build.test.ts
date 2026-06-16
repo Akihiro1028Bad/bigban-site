@@ -103,20 +103,13 @@ describe("buildPublicNotionUrl", () => {
 });
 
 describe("buildApproveUrl", () => {
-  it("末尾スラッシュを除いた承認URLを作る", () => {
-    expect(buildApproveUrl("https://www.thepicklebang.com/", "s3cr3t")).toBe(
-      "https://www.thepicklebang.com/growth/approve?token=s3cr3t"
+  it("末尾スラッシュを除いた承認URLを作る(認証は画面で合言葉入力のためtokenは付けない)", () => {
+    expect(buildApproveUrl("https://www.thepicklebang.com/")).toBe(
+      "https://www.thepicklebang.com/growth/approve"
     );
   });
 
-  it("特殊文字を含むトークンをエンコードする", () => {
-    expect(buildApproveUrl("https://x.com", "a b&c")).toBe(
-      "https://x.com/growth/approve?token=a%20b%26c"
-    );
-  });
-
-  it("URL か secret が欠ければ null", () => {
-    expect(buildApproveUrl(undefined, "s")).toBeNull();
-    expect(buildApproveUrl("https://x.com", undefined)).toBeNull();
+  it("URL が欠ければ null", () => {
+    expect(buildApproveUrl(undefined)).toBeNull();
   });
 });

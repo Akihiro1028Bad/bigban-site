@@ -1,17 +1,17 @@
 # グロース週次 LINE通知 + 承認ページ セットアップ手順
 
-週次グロース分析の結果を LINE グループへ通知し、承認ページ(ログイン不要)で施策を承認/却下するための初期設定。
+週次グロース分析の結果を LINE グループへ通知し、承認ページ(合言葉を入力して入る)で施策を承認/却下するための初期設定。
 コードは実装済み([プラン](../superpowers/plans/2026-06-16-growth-line-notify-approval.md))。ここでは外部サービスの設定と環境変数の記入だけを行う。
 
 ## 全体像
 
 | 役割 | 動く場所 | 必要な環境変数 |
 |------|---------|----------------|
-| 週次LINE通知(`growth:notify-line`) | 自宅PC(headless) | LINE_*, NOTION_TOKEN, NOTION_PUBLIC_DOMAIN, APPROVE_SECRET, NEXT_PUBLIC_SITE_URL |
+| 週次LINE通知(`growth:notify-line`) | 自宅PC(headless) | LINE_*, NOTION_TOKEN, NOTION_PUBLIC_DOMAIN, NEXT_PUBLIC_SITE_URL |
 | 承認ページ(`/growth/approve` + API) | デプロイ済みサイト(Vercel) | NOTION_TOKEN, APPROVE_SECRET |
 | レポート閲覧 | Notion 公開ページ | (公開設定のみ) |
 
-> ポイント: 通知は自宅PC、承認ページはVercel で動くため、**NOTION_TOKEN と APPROVE_SECRET は両方の環境に同じ値**を設定する。
+> ポイント: 通知は自宅PC、承認ページはVercel で動く。**NOTION_TOKEN は両方の環境に同じ値**を設定する。**APPROVE_SECRET(合言葉)は承認ページが動く Vercel 側のみ必須**(URL にトークンを載せず画面で入力するため、PC の通知側では不要)。
 
 ---
 
@@ -44,16 +44,14 @@
    - もしくは LINE Official Account Manager / 開発ツールでグループIDを確認
    - 取得した `C` で始まるIDが `LINE_GROUP_ID`
 
-## 4. 承認ページのトークンを生成
+## 4. 承認ページの合言葉を決める
 
-推測されない長いランダム文字列を作る(例):
-```bash
-openssl rand -hex 32
-```
-出力を `APPROVE_SECRET` に設定する。**このトークンを知る人だけが承認/却下できる**ため、LINEグループ(信頼できるメンバー)内のみで共有する。
+承認ページは URL にトークンを載せず、**画面で「合言葉」を入力して入る**方式。
+この合言葉を `APPROVE_SECRET` に設定する。**合言葉を知る人だけが承認/却下できる**ため、LINEグループ(信頼できるメンバー)内のみで共有する。
 
-- **必須**: 必ず32バイト(`openssl rand -hex 32` = 64文字)以上の暗号学的乱数にする。承認APIにはレート制限が無いため、短い/推測可能なトークンは総当たりのリスクがある。
-- トークンを変更したら、自宅PC の `.env` と Vercel の両方を更新し、再デプロイする。
+- 例として合言葉は `ビックマン`。覚えやすい語でよいが、**社外秘**として扱う。
+- ⚠️ セキュリティ注意: 承認APIにはレート制限が無いため、短い/推測しやすい語は総当たり(ブルートフォース)のリスクがある。承認操作は「Notion のステータス変更(可逆)」のみで金銭・個人情報は扱わないが、心配なら推測されにくい長めの語句にする(例 `openssl rand -hex 16`)。
+- 合言葉を変更したら、自宅PC の `.env` と Vercel の両方を更新し、再デプロイする。
 
 ## 5. 環境変数の記入
 
@@ -63,9 +61,9 @@ LINE_CHANNEL_ACCESS_TOKEN=（手順3）
 LINE_GROUP_ID=（手順3）
 NOTION_PUBLIC_DOMAIN=（手順2 例 pickle.notion.site）
 NOTION_TOKEN=（手順1）
-APPROVE_SECRET=（手順4）
 # 既存。承認ページURLの組み立てに使用
 NEXT_PUBLIC_SITE_URL=https://www.thepicklebang.com
+# APPROVE_SECRET（合言葉）は PC の通知側では不要(Vercel 側のみ必須)
 ```
 
 ### Vercel(Production 環境変数)
@@ -88,7 +86,7 @@ GROWTH_DRYRUN=1 npm run growth:notify-line
 npm run growth:notify-line
 ```
 - LINE に「今週の数字 / やること / 承認待ち件数 / レポートURL / 承認URL」が届けば通知OK。
-- 承認URLをブラウザで開く → 承認待ちが一覧表示され、承認/却下→保存でNotionのステータスが変われば承認ページOK。
+- 承認URL(`/growth/approve`)をブラウザで開く → **合言葉を入力して「入る」** → 承認待ちが一覧表示され、承認/却下→保存でNotionのステータスが変われば承認ページOK。
 - レポートURL(notion.site)がログインなしで開ければ公開OK。
 
 ## 7. 週次の自動運用
@@ -100,6 +98,6 @@ npm run growth:notify-line
 
 - **LINEに届かない**: `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_GROUP_ID` を確認。Bot がグループに入っているか。
 - **承認待ちが空 / レポートURLが出ない**: `NOTION_TOKEN` 未設定か、対象DBがインテグレーションに未接続(手順1-4)。
-- **承認ページが 401**: URLの `token` と Vercel の `APPROVE_SECRET` が一致しているか。
+- **承認ページで「合言葉が違います」**: 入力した合言葉と Vercel の `APPROVE_SECRET` が一致しているか。
 - **承認ページが 500**: Vercel に `NOTION_TOKEN` が未設定。
 - **レポートが開けない(ログイン要求)**: 手順2の Web 公開が未実施。
