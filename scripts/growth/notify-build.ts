@@ -75,12 +75,12 @@ export function buildPublicNotionUrl(
   return `https://${domain}/${pageId.replace(/-/g, "")}`;
 }
 
-/** 承認ページのトークン付きURLを組み立てる。 */
-export function buildApproveUrl(
-  siteUrl: string | undefined,
-  secret: string | undefined
-): string | null {
-  if (!siteUrl || !secret) return null;
+/**
+ * 承認ページのURLを組み立てる。
+ * 認証は画面で合言葉(APPROVE_SECRET)を入力する方式のため、URL にトークンは付けない。
+ */
+export function buildApproveUrl(siteUrl: string | undefined): string | null {
+  if (!siteUrl) return null;
   const base = siteUrl.replace(/\/+$/, "");
-  return `${base}/growth/approve?token=${encodeURIComponent(secret)}`;
+  return `${base}/growth/approve`;
 }

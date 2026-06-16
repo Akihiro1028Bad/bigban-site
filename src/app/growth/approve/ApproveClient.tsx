@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 
 interface PendingItem {
   id: string;
@@ -10,11 +11,6 @@ interface PendingItem {
 }
 
 type Choice = "承認" | "却下";
-type Status = "loading" | "ready" | "error";
-
-interface ApproveClientProps {
-  token: string;
-}
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -24,34 +20,41 @@ function approveUrl(token: string): string {
   return `/api/growth/approve?token=${encodeURIComponent(token)}`;
 }
 
-export function ApproveClient({ token }: ApproveClientProps) {
+export function ApproveClient() {
+  const [passphrase, setPassphrase] = useState("");
+  const [token, setToken] = useState("");
+  const [authed, setAuthed] = useState(false);
   const [items, setItems] = useState<PendingItem[]>([]);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
-  const [status, setStatus] = useState<Status>("loading");
   const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
-      setStatus("error");
-      setMessage("リンクが正しくありません。");
+  async function enter(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const pass = passphrase.trim();
+    if (!pass) {
+      setMessage("合言葉を入力してください。");
       return;
     }
-    (async () => {
-      try {
-        const res = await fetch(approveUrl(token));
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          throw new Error(json.error ?? "取得に失敗しました。");
-        }
-        setItems(json.items);
-        setStatus("ready");
-      } catch (error) {
-        setStatus("error");
-        setMessage(toMessage(error, "取得に失敗しました。"));
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(approveUrl(pass));
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(
+          res.status === 401 ? "合言葉が違います。" : json.error ?? "取得に失敗しました。"
+        );
       }
-    })();
-  }, [token]);
+      setItems(json.items);
+      setToken(pass);
+      setAuthed(true);
+    } catch (error) {
+      setMessage(toMessage(error, "取得に失敗しました。"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function choose(id: string, choice: Choice): void {
     setChoices((prev) => ({ ...prev, [id]: choice }));
@@ -63,7 +66,7 @@ export function ApproveClient({ token }: ApproveClientProps) {
       setMessage("承認または却下を選んでください。");
       return;
     }
-    setSaving(true);
+    setBusy(true);
     try {
       const res = await fetch(approveUrl(token), {
         method: "POST",
@@ -80,13 +83,30 @@ export function ApproveClient({ token }: ApproveClientProps) {
     } catch (error) {
       setMessage(toMessage(error, "保存に失敗しました。"));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (status === "loading") return <p>読み込み中…</p>;
-  if (status === "error") {
-    return <p role="alert">{message}</p>;
+  if (!authed) {
+    return (
+      <main>
+        <h1>承認ページ</h1>
+        <form onSubmit={enter}>
+          <label htmlFor="passphrase">合言葉</label>
+          <input
+            id="passphrase"
+            type="password"
+            value={passphrase}
+            onChange={(event) => setPassphrase(event.target.value)}
+            autoComplete="off"
+          />
+          <button type="submit" disabled={busy}>
+            入る
+          </button>
+        </form>
+        {message ? <p role="alert">{message}</p> : null}
+      </main>
+    );
   }
 
   return (
@@ -117,7 +137,7 @@ export function ApproveClient({ token }: ApproveClientProps) {
           </li>
         ))}
       </ul>
-      <button type="button" onClick={save} disabled={saving}>
+      <button type="button" onClick={save} disabled={busy}>
         まとめて保存
       </button>
     </main>
