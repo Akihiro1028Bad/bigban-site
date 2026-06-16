@@ -96,6 +96,24 @@ npm run growth:weekly
 - `growth:weekly` が完了し、Notion の3DBに書き込まれれば移植成功。
 - **補足(リフレッシュトークンを Windows で取り直す場合)**: OAuth クライアント JSON を `secrets\google-oauth-client.json` に置き、`npm run growth:setup-token` を実行 → ブラウザ同意 → 出力された値を `.env` に反映。
 
+### ⚠ OAuth トークンの失効に注意(テスト=7日で失効)
+
+GA4 / Search Console の取得は Google の **リフレッシュトークン**に依存します。
+OAuth 同意画面のステータスが **「テスト」のままだと、付与から 7 日でトークンが失効**し、
+以降の週次実行が毎回失敗します(失敗時は #224 のエラー通知が LINE に届きます)。
+
+- **推奨: 同意画面を「本番(公開)」に昇格**する(Google Cloud Console → OAuth 同意画面 → アプリを公開)。
+  公開済みアプリのリフレッシュトークンは原則無期限です(6か月未使用などで失効する場合あり)。
+- **テストのまま運用する場合**は、`.env` に失効予定時刻を設定すると、失効 30 日前から
+  LINE 通知の先頭に警告が出ます(テスト運用では発行日 + 7 日を入れる):
+  ```env
+  # 例: 2026-06-16 に発行 → 7日後に失効
+  GROWTH_GOOGLE_TOKEN_EXPIRES_AT=2026-06-23T00:00:00+09:00
+  ```
+- **再取得手順**: `secrets\google-oauth-client.json` を置いて `npm run growth:setup-token` を実行
+  → ブラウザで同意 → 出力された `GROWTH_GOOGLE_REFRESH_TOKEN` を `.env` に反映。
+  併せて `GROWTH_GOOGLE_TOKEN_EXPIRES_AT` も更新する(テスト運用時)。
+
 ### つまずいたら(Windows 特有)
 - `claude` が見つからない: PowerShell を開き直す/`npm i -g @anthropic-ai/claude-code` を再確認。
 - ランチャーが起動しない: `run.mjs` は Windows で `claude.cmd` を shell 経由で起動し、プロンプトは標準入力で渡す実装済み。`$env:GROWTH_DRYRUN=1` で出るコマンドを、手動で `Get-Content scripts\growth\prompts\weekly.md | claude -p --permission-mode default --allowedTools ...` と叩いて切り分け。

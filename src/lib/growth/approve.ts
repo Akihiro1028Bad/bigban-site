@@ -7,11 +7,19 @@ import type { NotionPage } from "./notion";
 
 export type PendingKind = "proposal" | "idea";
 
+/** 承認判断の材料となる 1 行(ラベルと値)。 */
+export interface PendingDetail {
+  label: string;
+  value: string;
+}
+
 export interface PendingItem {
   id: string;
   kind: PendingKind;
   title: string;
   subtitle: string;
+  /** 承認判断に足る根拠(種別ごとに内容が異なる)。空なら []。 */
+  details: PendingDetail[];
 }
 
 export interface Decision {
@@ -41,6 +49,33 @@ function selectName(page: NotionPage, prop: string): string {
   return value?.select?.name ?? "";
 }
 
+function numberValue(page: NotionPage, prop: string): number | null {
+  const value = page.properties[prop] as { number?: number | null } | undefined;
+  return typeof value?.number === "number" ? value.number : null;
+}
+
+/** ラベルと値の候補から、値が空でないものだけを details 行にする。 */
+function buildDetails(
+  candidates: Array<{ label: string; value: string }>
+): PendingDetail[] {
+  return candidates.filter((d) => d.value.length > 0);
+}
+
+function proposalDetails(page: NotionPage): PendingDetail[] {
+  const score = numberValue(page, "優先度スコア");
+  return buildDetails([
+    { label: "優先度スコア", value: score === null ? "" : String(score) },
+    { label: "確度", value: selectName(page, "確度") },
+    { label: "インパクト", value: selectName(page, "インパクト") },
+    { label: "根拠", value: richText(page, "根拠") },
+    { label: "想定アクション", value: richText(page, "想定アクション") },
+  ]);
+}
+
+function ideaDetails(page: NotionPage): PendingDetail[] {
+  return buildDetails([{ label: "優先度", value: selectName(page, "優先度") }]);
+}
+
 /** 施策提案・記事ネタ案のページを承認UI向けの統一形式に整える。 */
 export function toPendingItems(
   proposals: NotionPage[],
@@ -51,12 +86,14 @@ export function toPendingItems(
     kind: "proposal",
     title: titleText(page, "施策名"),
     subtitle: selectName(page, "カテゴリ"),
+    details: proposalDetails(page),
   }));
   const ideaItems: PendingItem[] = ideas.map((page) => ({
     id: page.id,
     kind: "idea",
     title: titleText(page, "タイトル案"),
     subtitle: richText(page, "概要"),
+    details: ideaDetails(page),
   }));
   return [...proposalItems, ...ideaItems];
 }
