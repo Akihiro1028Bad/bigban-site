@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
-import { LINE_PUSH_URL, pushTextMessage } from "./line";
+import { LINE_PUSH_URL, pushFlexMessage, pushTextMessage } from "./line";
+import type { FlexBubble } from "./digest-flex";
 
 function res(ok: boolean, status: number, text = ""): HttpResponse {
   return { ok, status, json: async () => ({}), text: async () => text };
@@ -34,5 +35,36 @@ describe("pushTextMessage", () => {
     await expect(
       pushTextMessage("Gabc", "x", { channelAccessToken: TOKEN, fetchFn })
     ).rejects.toThrow(/401.*invalid token/);
+  });
+});
+
+const bubble: FlexBubble = {
+  type: "bubble",
+  body: { type: "box", layout: "vertical", contents: [{ type: "text", text: "hi" }] },
+};
+
+describe("pushFlexMessage", () => {
+  it("flex メッセージを altText 付きで push する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
+
+    await pushFlexMessage("Gabc", "代替テキスト", bubble, {
+      channelAccessToken: TOKEN,
+      fetchFn,
+    });
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe(LINE_PUSH_URL);
+    expect(JSON.parse(init.body as string)).toEqual({
+      to: "Gabc",
+      messages: [{ type: "flex", altText: "代替テキスト", contents: bubble }],
+    });
+  });
+
+  it("失敗時は HTTP ステータス付きで throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(false, 400, "bad flex"));
+
+    await expect(
+      pushFlexMessage("Gabc", "x", bubble, { channelAccessToken: TOKEN, fetchFn })
+    ).rejects.toThrow(/400.*bad flex/);
   });
 });

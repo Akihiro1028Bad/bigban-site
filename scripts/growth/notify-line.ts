@@ -13,9 +13,10 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildDigestMessage } from "./digest";
+import { buildDigestMessage, buildFailureMessage } from "./digest";
+import { buildDigestFlex } from "./digest-flex";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage, pushTextMessage } from "./line";
 import { getLatestReport, queryDataSource } from "./notion";
 import {
   buildApproveUrl,
@@ -25,6 +26,9 @@ import {
   periodLabel,
 } from "./notify-build";
 import { jstDateString } from "./period";
+import { buildTokenExpiryWarning, parseExpiresAt } from "./token-expiry";
+
+const DEFAULT_WEEKLY_LOG = "data/weekly-cron.log";
 
 // weekly.md と同じ data source ID(承認待ちの照会先・最新レポートの取得先)
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460"; // 施策提案
@@ -41,7 +45,36 @@ function statusFilter(value: string): unknown {
   return { property: "ステータス", select: { equals: value } };
 }
 
+/** トークン失効間近の警告行を組み立てる(設定が無ければ空配列)。 */
+function tokenWarnings(): string[] {
+  const expiresAt = parseExpiresAt(process.env.GROWTH_GOOGLE_TOKEN_EXPIRES_AT);
+  const warning = buildTokenExpiryWarning({ expiresAt, now: Date.now() });
+  return warning ? [warning] : [];
+}
+
+/** 週次実行が異常終了した場合のエラー通知。スナップショット等は読まない。 */
+async function notifyFailure(): Promise<void> {
+  const logPath = process.env.GROWTH_WEEKLY_LOG ?? DEFAULT_WEEKLY_LOG;
+  const message = buildFailureMessage(logPath);
+
+  if (process.env.GROWTH_DRYRUN) {
+    process.stdout.write(`${message}\n`);
+    return;
+  }
+
+  await pushTextMessage(requireEnv("LINE_GROUP_ID"), message, {
+    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+    fetchFn: defaultFetch,
+  });
+  process.stderr.write("LINE グループへ失敗を通知しました。\n");
+}
+
 async function main(): Promise<void> {
+  if (process.env.GROWTH_NOTIFY_ERROR) {
+    await notifyFailure();
+    return;
+  }
+
   const date = jstDateString(new Date());
   const file = path.resolve(process.cwd(), "data", "snapshots", `${date}.json`);
   const snapshot = JSON.parse(await readFile(file, "utf-8"));
@@ -77,21 +110,25 @@ async function main(): Promise<void> {
 
   const approveUrl = buildApproveUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
-  const message = buildDigestMessage({
+  const digestInput = {
     periodLabel: periodLabel(snapshot),
     metrics,
     topActions,
     pendingCount,
     reportUrl,
     approveUrl,
-  });
+    warnings: tokenWarnings(),
+  };
+  // テキストは Flex 非対応環境向けの altText(フォールバック)として活用する。
+  const altText = buildDigestMessage(digestInput);
+  const flex = buildDigestFlex(digestInput);
 
   if (process.env.GROWTH_DRYRUN) {
-    process.stdout.write(`${message}\n`);
+    process.stdout.write(`${altText}\n`);
     return;
   }
 
-  await pushTextMessage(requireEnv("LINE_GROUP_ID"), message, {
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, flex, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
   });

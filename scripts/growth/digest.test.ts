@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { buildDigestMessage } from "./digest";
+import { buildDigestMessage, buildFailureMessage } from "./digest";
 import type { DigestInput } from "./digest";
 
 function baseInput(overrides: Partial<DigestInput> = {}): DigestInput {
@@ -84,5 +84,30 @@ describe("buildDigestMessage", () => {
     );
     expect(msg).toContain("3. c");
     expect(msg).not.toContain("4. d");
+  });
+
+  it("警告がある場合は先頭に表示する", () => {
+    const msg = buildDigestMessage(
+      baseInput({ warnings: ["⚠ トークンの失効が近づいています"] })
+    );
+    const head = msg.split("\n")[0];
+    expect(head).toBe("⚠ トークンの失効が近づいています");
+    expect(msg).toContain("📊 今週のグロース");
+  });
+
+  it("警告が空配列・未指定なら警告行を出さない", () => {
+    const omitted = buildDigestMessage(baseInput());
+    expect(omitted.startsWith("📊")).toBe(true);
+    const empty = buildDigestMessage(baseInput({ warnings: [] }));
+    expect(empty.startsWith("📊")).toBe(true);
+  });
+});
+
+describe("buildFailureMessage", () => {
+  it("自動実行の失敗とログの場所を伝える", () => {
+    const msg = buildFailureMessage("data/weekly-cron.log");
+    expect(msg).toContain("❌");
+    expect(msg).toContain("今週の自動実行に失敗しました");
+    expect(msg).toContain("data/weekly-cron.log");
   });
 });
