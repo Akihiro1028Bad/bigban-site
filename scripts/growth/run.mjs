@@ -62,18 +62,21 @@ if (process.env.GROWTH_DRYRUN) {
     `[dry-run] (stdin=<prompt:${cfg.prompt}>) claude ${args.join(" ")}\n`
   );
   if (mode === "weekly") {
-    process.stdout.write(`[dry-run] then: npm run growth:notify-line\n`);
+    process.stdout.write(
+      `[dry-run] then: npm run growth:notify-line (異常終了時は GROWTH_NOTIFY_ERROR=1 でエラー通知)\n`
+    );
   }
   process.exit(0);
 }
 
-/** npm スクリプトを実行し、終了コードを resolve する。 */
-function runNpm(scriptName) {
+/** npm スクリプトを実行し、終了コードを resolve する。env で追加の環境変数を渡せる。 */
+function runNpm(scriptName, env = {}) {
   return new Promise((resolve) => {
     const npm = isWin ? "npm.cmd" : "npm";
     const proc = spawn(npm, ["run", scriptName], {
       stdio: ["ignore", "inherit", "inherit"],
       shell: isWin,
+      env: { ...process.env, ...env },
     });
     proc.on("exit", (code) => resolve(code ?? 0));
     proc.on("error", (err) => {
@@ -91,13 +94,20 @@ const child = spawn("claude", args, {
 child.stdin.write(prompt);
 child.stdin.end();
 child.on("exit", async (code) => {
+  const exitCode = code ?? 0;
   // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
   // claude の出力には依存せず、スナップショット + Notion から通知を組み立てる。
-  if (mode === "weekly" && (code ?? 0) === 0) {
-    const notifyCode = await runNpm("growth:notify-line");
-    process.exit(notifyCode);
+  // 異常終了(exit≠0)でも、失敗を**沈黙させない**ためにエラー通知を送る。
+  if (mode === "weekly") {
+    const env =
+      exitCode === 0
+        ? {}
+        : { GROWTH_NOTIFY_ERROR: "1", GROWTH_WEEKLY_EXIT_CODE: String(exitCode) };
+    const notifyCode = await runNpm("growth:notify-line", env);
+    // 異常終了時は元の失敗を握り潰さないよう、weekly の終了コードを優先する。
+    process.exit(exitCode !== 0 ? exitCode : notifyCode);
   }
-  process.exit(code ?? 0);
+  process.exit(exitCode);
 });
 child.on("error", (err) => {
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);

@@ -27,6 +27,8 @@ export interface DigestInput {
   pendingCount: number;
   reportUrl: string | null;
   approveUrl: string | null;
+  /** 先頭に表示する警告行(トークン失効間近など)。省略可。 */
+  warnings?: string[];
 }
 
 const MAX_TOP_ACTIONS = 3;
@@ -53,7 +55,9 @@ function positionPhrase(m: MetricValue): string {
 }
 
 export function buildDigestMessage(input: DigestInput): string {
-  const lines: string[] = [`📊 今週のグロース (${input.periodLabel})`, ""];
+  const warnings = input.warnings ?? [];
+  const head = warnings.length > 0 ? [...warnings, ""] : [];
+  const lines: string[] = [...head, `📊 今週のグロース (${input.periodLabel})`, ""];
 
   const m = input.metrics;
   if (m.sessions) {
@@ -81,4 +85,15 @@ export function buildDigestMessage(input: DigestInput): string {
   if (input.approveUrl) lines.push(`承認する → ${input.approveUrl}`);
 
   return lines.join("\n");
+}
+
+/**
+ * 週次の自動実行が異常終了したときに LINE へ送る失敗通知の本文。
+ * スナップショットや Notion を読まずに送れるよう、ログの場所だけを伝える。
+ */
+export function buildFailureMessage(logPath: string): string {
+  return [
+    "❌ 今週の自動実行に失敗しました。",
+    `ログを確認してください: ${logPath}`,
+  ].join("\n");
 }

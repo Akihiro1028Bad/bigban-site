@@ -47,6 +47,7 @@ describe("GET", () => {
             properties: {
               "施策名": { title: [{ plain_text: "市川ページ" }] },
               "カテゴリ": { select: { name: "サイト表示内容" } },
+              "確度": { select: { name: "高" } },
             },
           },
         ],
@@ -60,7 +61,13 @@ describe("GET", () => {
     const json = await res.json();
     expect(json.success).toBe(true);
     expect(json.items).toEqual([
-      { id: "p1", kind: "proposal", title: "市川ページ", subtitle: "サイト表示内容" },
+      {
+        id: "p1",
+        kind: "proposal",
+        title: "市川ページ",
+        subtitle: "サイト表示内容",
+        details: [{ label: "確度", value: "高" }],
+      },
     ]);
     expect(queryDataSource).toHaveBeenCalledTimes(2);
   });

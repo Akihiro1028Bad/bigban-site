@@ -11,6 +11,11 @@ function proposal(id: string, name: string, category: string): NotionPage {
     properties: {
       "施策名": { type: "title", title: [{ plain_text: name }] },
       "カテゴリ": { type: "select", select: { name: category } },
+      "優先度スコア": { type: "number", number: 8.5 },
+      "確度": { type: "select", select: { name: "高" } },
+      "インパクト": { type: "select", select: { name: "大" } },
+      "根拠": { type: "rich_text", rich_text: [{ plain_text: "MEOクエリが増加" }] },
+      "想定アクション": { type: "rich_text", rich_text: [{ plain_text: "GBPを更新" }] },
     },
   };
 }
@@ -22,29 +27,61 @@ function idea(id: string, title: string, summary: string): NotionPage {
     properties: {
       "タイトル案": { type: "title", title: [{ plain_text: title }] },
       "概要": { type: "rich_text", rich_text: [{ plain_text: summary }] },
+      "優先度": { type: "select", select: { name: "中" } },
     },
   };
 }
 
 describe("toPendingItems", () => {
-  it("施策提案と記事ネタ案を統一形式に整える", () => {
-    const items = toPendingItems(
-      [proposal("p1", "市川ページ", "サイト表示内容")],
-      [idea("i1", "猛暑×屋内", "夏向けの集客記事")]
-    );
+  it("施策提案は判断根拠(優先度スコア/確度/インパクト/根拠/想定アクション)を details に持つ", () => {
+    const [item] = toPendingItems([proposal("p1", "市川ページ", "サイト表示内容")], []);
 
-    expect(items).toEqual([
-      { id: "p1", kind: "proposal", title: "市川ページ", subtitle: "サイト表示内容" },
-      { id: "i1", kind: "idea", title: "猛暑×屋内", subtitle: "夏向けの集客記事" },
+    expect(item).toMatchObject({
+      id: "p1",
+      kind: "proposal",
+      title: "市川ページ",
+      subtitle: "サイト表示内容",
+    });
+    expect(item.details).toEqual([
+      { label: "優先度スコア", value: "8.5" },
+      { label: "確度", value: "高" },
+      { label: "インパクト", value: "大" },
+      { label: "根拠", value: "MEOクエリが増加" },
+      { label: "想定アクション", value: "GBPを更新" },
     ]);
   });
 
-  it("欠落プロパティは空文字で埋める", () => {
+  it("記事ネタ案は優先度と概要を持つ", () => {
+    const [item] = toPendingItems([], [idea("i1", "猛暑×屋内", "夏向けの集客記事")]);
+
+    expect(item).toMatchObject({
+      id: "i1",
+      kind: "idea",
+      title: "猛暑×屋内",
+      subtitle: "夏向けの集客記事",
+    });
+    expect(item.details).toEqual([{ label: "優先度", value: "中" }]);
+  });
+
+  it("欠落プロパティは空文字・空 details で埋める", () => {
     const bare: NotionPage = { id: "x", url: "", properties: {} };
     expect(toPendingItems([bare], [bare])).toEqual([
-      { id: "x", kind: "proposal", title: "", subtitle: "" },
-      { id: "x", kind: "idea", title: "", subtitle: "" },
+      { id: "x", kind: "proposal", title: "", subtitle: "", details: [] },
+      { id: "x", kind: "idea", title: "", subtitle: "", details: [] },
     ]);
+  });
+
+  it("優先度スコアが数値でない場合は details から除外する", () => {
+    const noScore: NotionPage = {
+      id: "z",
+      url: "",
+      properties: {
+        "施策名": { type: "title", title: [{ plain_text: "A" }] },
+        "確度": { type: "select", select: { name: "中" } },
+      },
+    };
+    const [item] = toPendingItems([noScore], []);
+    expect(item.details).toEqual([{ label: "確度", value: "中" }]);
   });
 
   it("plain_text 欠落の rich text 要素を空文字に落とす", () => {
@@ -57,8 +94,8 @@ describe("toPendingItems", () => {
       },
     };
     expect(toPendingItems([noPlain], [noPlain])).toEqual([
-      { id: "y", kind: "proposal", title: "", subtitle: "" },
-      { id: "y", kind: "idea", title: "", subtitle: "" },
+      { id: "y", kind: "proposal", title: "", subtitle: "", details: [] },
+      { id: "y", kind: "idea", title: "", subtitle: "", details: [] },
     ]);
   });
 });

@@ -3,14 +3,28 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+interface PendingDetail {
+  label: string;
+  value: string;
+}
+
 interface PendingItem {
   id: string;
   kind: "proposal" | "idea";
   title: string;
   subtitle: string;
+  details?: PendingDetail[];
 }
 
 type Choice = "承認" | "却下";
+
+const KIND_BADGE: Record<PendingItem["kind"], string> = {
+  proposal: "📋 施策",
+  idea: "📝 記事",
+};
+
+// タップ領域 44px(min-h-11 / min-w-11 = 44px)+ AA コントラストを満たす操作ボタン
+const TAP_TARGET = "min-h-11 min-w-11 px-4 rounded-md text-sm font-medium transition-colors";
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -18,6 +32,18 @@ function toMessage(error: unknown, fallback: string): string {
 
 function approveUrl(token: string): string {
   return `/api/growth/approve?token=${encodeURIComponent(token)}`;
+}
+
+function cardClass(choice: Choice | undefined): string {
+  const base = "rounded-lg border p-4 transition-colors";
+  if (choice === "承認") return `${base} border-blue-500 bg-blue-50`;
+  if (choice === "却下") return `${base} border-gray-400 bg-gray-100`;
+  return `${base} border-gray-200 bg-white`;
+}
+
+function choiceButtonClass(active: boolean, activeClass: string): string {
+  const inactive = "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50";
+  return `${TAP_TARGET} ${active ? activeClass : inactive}`;
 }
 
 export function ApproveClient() {
@@ -28,6 +54,8 @@ export function ApproveClient() {
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const selectedCount = Object.keys(choices).length;
 
   async function enter(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -43,7 +71,9 @@ export function ApproveClient() {
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(
-          res.status === 401 ? "合言葉が違います。" : json.error ?? "取得に失敗しました。"
+          res.status === 401
+            ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+            : json.error ?? "取得に失敗しました。"
         );
       }
       setItems(json.items);
@@ -62,10 +92,6 @@ export function ApproveClient() {
 
   async function save(): Promise<void> {
     const decisions = Object.entries(choices).map(([id, decision]) => ({ id, decision }));
-    if (decisions.length === 0) {
-      setMessage("承認または却下を選んでください。");
-      return;
-    }
     setBusy(true);
     try {
       const res = await fetch(approveUrl(token), {
@@ -89,56 +115,108 @@ export function ApproveClient() {
 
   if (!authed) {
     return (
-      <main>
-        <h1>承認ページ</h1>
-        <form onSubmit={enter}>
-          <label htmlFor="passphrase">合言葉</label>
-          <input
-            id="passphrase"
-            type="password"
-            value={passphrase}
-            onChange={(event) => setPassphrase(event.target.value)}
-            autoComplete="off"
-          />
-          <button type="submit" disabled={busy}>
-            入る
+      <main className="mx-auto max-w-md p-6">
+        <h1 className="text-xl font-bold text-gray-900">承認ページ</h1>
+        <p className="mt-2 text-sm text-gray-700">
+          LINE で届いた合言葉を入力してください。
+        </p>
+        <form onSubmit={enter} className="mt-4 space-y-3">
+          <div className="space-y-1">
+            <label htmlFor="passphrase" className="block text-sm font-medium text-gray-800">
+              合言葉
+            </label>
+            <input
+              id="passphrase"
+              type="password"
+              value={passphrase}
+              onChange={(event) => setPassphrase(event.target.value)}
+              autoComplete="off"
+              className="min-h-11 w-full rounded-md border border-gray-300 px-3 text-base text-gray-900"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy}
+            className={`${TAP_TARGET} w-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50`}
+          >
+            確認する
           </button>
         </form>
-        {message ? <p role="alert">{message}</p> : null}
+        {message ? (
+          <p role="alert" className="mt-3 text-sm text-red-700">
+            {message}
+          </p>
+        ) : null}
       </main>
     );
   }
 
   return (
-    <main>
-      <h1>承認待ち {items.length}件</h1>
-      {message ? <p role="status">{message}</p> : null}
-      <ul>
-        {items.map((item) => (
-          <li key={item.id}>
-            <p>{item.title}</p>
-            <p>{item.subtitle}</p>
-            <button
-              type="button"
-              aria-pressed={choices[item.id] === "承認"}
-              aria-label={`承認: ${item.title}`}
-              onClick={() => choose(item.id, "承認")}
-            >
-              承認
-            </button>
-            <button
-              type="button"
-              aria-pressed={choices[item.id] === "却下"}
-              aria-label={`却下: ${item.title}`}
-              onClick={() => choose(item.id, "却下")}
-            >
-              却下
-            </button>
-          </li>
-        ))}
+    <main className="mx-auto max-w-md p-4">
+      <h1 className="text-xl font-bold text-gray-900">承認待ち {items.length}件</h1>
+      {message ? (
+        <p role="status" className="mt-2 text-sm text-gray-700">
+          {message}
+        </p>
+      ) : null}
+      <ul className="mt-4 space-y-3">
+        {items.map((item) => {
+          const choice = choices[item.id];
+          return (
+            <li key={item.id} className={cardClass(choice)} data-decision={choice ?? ""}>
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
+                  {KIND_BADGE[item.kind]}
+                </span>
+                {choice ? (
+                  <span className="text-xs font-semibold text-gray-700">選択中: {choice}</span>
+                ) : null}
+              </div>
+              <p className="mt-2 font-semibold text-gray-900">{item.title}</p>
+              {item.subtitle ? (
+                <p className="text-sm text-gray-600">{item.subtitle}</p>
+              ) : null}
+              {item.details && item.details.length > 0 ? (
+                <dl className="mt-2 space-y-1 text-sm">
+                  {item.details.map((detail) => (
+                    <div key={detail.label} className="flex gap-2">
+                      <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
+                      <dd className="text-gray-800">{detail.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={choice === "承認"}
+                  aria-label={`承認: ${item.title}`}
+                  onClick={() => choose(item.id, "承認")}
+                  className={choiceButtonClass(choice === "承認", "border border-blue-600 bg-blue-600 text-white")}
+                >
+                  承認
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={choice === "却下"}
+                  aria-label={`却下: ${item.title}`}
+                  onClick={() => choose(item.id, "却下")}
+                  className={choiceButtonClass(choice === "却下", "border border-gray-700 bg-gray-700 text-white")}
+                >
+                  却下
+                </button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
-      <button type="button" onClick={save} disabled={busy}>
-        まとめて保存
+      <button
+        type="button"
+        onClick={save}
+        disabled={busy || selectedCount === 0}
+        className={`${TAP_TARGET} mt-4 w-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50`}
+      >
+        {selectedCount}件を確定する
       </button>
     </main>
   );
