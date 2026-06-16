@@ -61,7 +61,26 @@ if (process.env.GROWTH_DRYRUN) {
   process.stdout.write(
     `[dry-run] (stdin=<prompt:${cfg.prompt}>) claude ${args.join(" ")}\n`
   );
+  if (mode === "weekly") {
+    process.stdout.write(`[dry-run] then: npm run growth:notify-line\n`);
+  }
   process.exit(0);
+}
+
+/** npm スクリプトを実行し、終了コードを resolve する。 */
+function runNpm(scriptName) {
+  return new Promise((resolve) => {
+    const npm = isWin ? "npm.cmd" : "npm";
+    const proc = spawn(npm, ["run", scriptName], {
+      stdio: ["ignore", "inherit", "inherit"],
+      shell: isWin,
+    });
+    proc.on("exit", (code) => resolve(code ?? 0));
+    proc.on("error", (err) => {
+      process.stderr.write(`${scriptName} の起動に失敗しました: ${err.message}\n`);
+      resolve(1);
+    });
+  });
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
@@ -71,7 +90,15 @@ const child = spawn("claude", args, {
 });
 child.stdin.write(prompt);
 child.stdin.end();
-child.on("exit", (code) => process.exit(code ?? 0));
+child.on("exit", async (code) => {
+  // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
+  // claude の出力には依存せず、スナップショット + Notion から通知を組み立てる。
+  if (mode === "weekly" && (code ?? 0) === 0) {
+    const notifyCode = await runNpm("growth:notify-line");
+    process.exit(notifyCode);
+  }
+  process.exit(code ?? 0);
+});
 child.on("error", (err) => {
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
   process.exit(1);
