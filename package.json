@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "growth:fetch": "tsx scripts/growth/cli.ts",
+    "growth:existing": "tsx scripts/growth/existing-cli.ts",
     "growth:setup-token": "tsx scripts/growth/setup-token.ts",
     "growth:upload-media": "tsx scripts/growth/upload-media.ts",
     "growth:draft-content": "tsx scripts/growth/draft-content.ts",

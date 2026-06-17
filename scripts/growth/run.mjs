@@ -28,8 +28,16 @@ const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__c
 const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "claude-opus-4-8";
 
 const MODES = {
-  // 週次は growth:fetch のみ実行できれば足りるので Bash を絞る
-  weekly: { prompt: "weekly.md", allow: [...COMMON, "Bash(npm run growth:fetch)"] },
+  // 週次は growth:fetch(取得)と growth:existing(既存行の読み出し)だけ許可する。
+  // 既存行を確実に読めるようにし、headless が冪等性を推測して誤スキップするのを防ぐ。
+  weekly: {
+    prompt: "weekly.md",
+    allow: [
+      ...COMMON,
+      "Bash(npm run growth:fetch)",
+      "Bash(npm run growth:existing)",
+    ],
+  },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
   drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
