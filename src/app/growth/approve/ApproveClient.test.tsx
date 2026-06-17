@@ -59,6 +59,25 @@ describe("ApproveClient", () => {
     expect(screen.getByRole("button", { name: "確認する" })).toBeInTheDocument();
   });
 
+  it("合言葉入力欄は初期状態でtext型(日本語IMEが効く)", () => {
+    mockFetchSequence();
+    render(<ApproveClient />);
+    expect(screen.getByLabelText("合言葉")).toHaveAttribute("type", "text");
+  });
+
+  it("表示/非表示トグルで合言葉の表示を切り替えられる", async () => {
+    mockFetchSequence();
+    render(<ApproveClient />);
+    const input = screen.getByLabelText("合言葉");
+    expect(input).toHaveAttribute("type", "text");
+
+    await userEvent.click(screen.getByRole("button", { name: "合言葉を隠す" }));
+    expect(input).toHaveAttribute("type", "password");
+
+    await userEvent.click(screen.getByRole("button", { name: "合言葉を表示" }));
+    expect(input).toHaveAttribute("type", "text");
+  });
+
   it("合言葉未入力なら促してfetchしない", async () => {
     const fn = mockFetchSequence();
     render(<ApproveClient />);

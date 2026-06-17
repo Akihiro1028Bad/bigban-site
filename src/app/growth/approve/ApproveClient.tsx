@@ -48,6 +48,9 @@ function choiceButtonClass(active: boolean, activeClass: string): string {
 
 export function ApproveClient() {
   const [passphrase, setPassphrase] = useState("");
+  // 既定は表示(text)。type=password は日本語IMEを無効化するため、合言葉が日本語でも
+  // 打てるよう text を既定にし、必要なときだけトグルで隠せるようにする。
+  const [showPassphrase, setShowPassphrase] = useState(true);
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [items, setItems] = useState<PendingItem[]>([]);
@@ -125,14 +128,26 @@ export function ApproveClient() {
             <label htmlFor="passphrase" className="block text-sm font-medium text-gray-800">
               合言葉
             </label>
-            <input
-              id="passphrase"
-              type="password"
-              value={passphrase}
-              onChange={(event) => setPassphrase(event.target.value)}
-              autoComplete="off"
-              className="min-h-11 w-full rounded-md border border-gray-300 px-3 text-base text-gray-900"
-            />
+            <div className="flex gap-2">
+              <input
+                id="passphrase"
+                type={showPassphrase ? "text" : "password"}
+                value={passphrase}
+                onChange={(event) => setPassphrase(event.target.value)}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="min-h-11 w-full rounded-md border border-gray-300 px-3 text-base text-gray-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassphrase((prev) => !prev)}
+                aria-label={showPassphrase ? "合言葉を隠す" : "合言葉を表示"}
+                className={`${TAP_TARGET} shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
+              >
+                {showPassphrase ? "隠す" : "表示"}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
