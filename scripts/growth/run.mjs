@@ -23,11 +23,15 @@ const promptsDir = path.join(here, "prompts");
 // 共通の許可ツール。Notion は headless では mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
 
+// 執筆(下書きモード)は記事品質の勝負所なので既定で Opus 4.8 に固定する(#247)。
+// GROWTH_DRAFTS_MODEL で上書き可能。
+const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "claude-opus-4-8";
+
 const MODES = {
   // 週次は growth:fetch のみ実行できれば足りるので Bash を絞る
   weekly: { prompt: "weekly.md", allow: [...COMMON, "Bash(npm run growth:fetch)"] },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
-  drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"] },
+  drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
 };
 
@@ -54,6 +58,10 @@ const args = [
   "--disallowedTools",
   ...DISALLOW,
 ];
+// モデル指定があるモード(下書き)は --model を付ける
+if (cfg.model) {
+  args.push("--model", cfg.model);
+}
 
 const isWin = process.platform === "win32";
 
