@@ -54,12 +54,12 @@ function removeKey<T>(obj: Record<string, T>, key: string): Record<string, T> {
   return next;
 }
 
-function cardClass(choice: Choice | undefined, failed: boolean): string {
-  const base = "rounded-lg border p-4 transition-colors";
-  if (failed) return `${base} border-red-400 bg-red-50`;
-  if (choice === "承認") return `${base} border-blue-500 bg-blue-50`;
-  if (choice === "却下") return `${base} border-gray-400 bg-gray-100`;
-  return `${base} border-gray-200 bg-white`;
+// #275: 一覧は高密度行。未処理=通常枠 / 処理済み=細い行 / 失敗=赤枠。
+function rowClass(choice: Choice | undefined, failed: boolean): string {
+  const base = "rounded-lg border transition-colors";
+  if (failed) return `${base} border-red-400 bg-red-50 p-3`;
+  if (choice) return `${base} border-gray-200 bg-gray-50 px-3 py-2`;
+  return `${base} border-gray-200 bg-white p-3`;
 }
 
 function choiceButtonClass(activeClass: string): string {
@@ -82,6 +82,8 @@ export function ApproveClient() {
   const [busy, setBusy] = useState(false);
   // #240: 操作後に次の操作対象へフォーカスを移すための一時ターゲット(要素 id)。
   const [focusId, setFocusId] = useState<string | null>(null);
+  // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
+  const [openId, setOpenId] = useState<string | null>(null);
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -185,6 +187,17 @@ export function ApproveClient() {
     }
   }
 
+  // #275: 詳細パネルからの操作。実行して即座にパネルを閉じる(結果は一覧の行に反映)。
+  function decideFromPanel(item: PendingItem, choice: Choice): void {
+    void decide(item, choice);
+    setOpenId(null);
+  }
+
+  function undoFromPanel(item: PendingItem): void {
+    void undo(item);
+    setOpenId(null);
+  }
+
   if (!authed) {
     return (
       <main className="mx-auto max-w-md p-6">
@@ -257,40 +270,79 @@ export function ApproveClient() {
   // #242: 施策/記事をセクション分割し、各セクション内を優先度スコア降順に並べる。
   const proposals = items.filter((item) => item.kind === "proposal").sort(byScoreDesc);
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
+  const openItem = openId ? items.find((item) => item.id === openId) : undefined;
 
+  // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
   function renderItem(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
     const failure = failures[item.id];
-    return (
-      <li
-        key={item.id}
-        className={cardClass(choice, Boolean(failure))}
-        data-decision={choice ?? ""}
+    const detailButton = (
+      <button
+        type="button"
+        aria-label={`詳細: ${item.title}`}
+        onClick={() => setOpenId(item.id)}
+        className={`${TAP_TARGET} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
       >
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
-            {KIND_BADGE[item.kind]}
-          </span>
-          {choice ? (
-            <span className="text-xs font-semibold text-gray-700">{choice}しました</span>
-          ) : null}
-        </div>
-        <p className="mt-2 font-semibold text-gray-900">{item.title}</p>
-        {item.subtitle ? <p className="text-sm text-gray-600">{item.subtitle}</p> : null}
-        {item.details && item.details.length > 0 ? (
-          <details className="mt-2 text-sm">
-            <summary className="cursor-pointer font-medium text-gray-700">詳細を見る</summary>
-            <dl className="mt-2 space-y-1">
-              {item.details.map((detail) => (
-                <div key={detail.label} className="flex gap-2">
-                  <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
-                  <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-        ) : null}
+        詳細
+      </button>
+    );
+    return (
+      <li key={item.id} className={rowClass(choice, Boolean(failure))} data-decision={choice ?? ""}>
+        {choice ? (
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-sm text-gray-700">
+              ✓ <span className="font-semibold">{choice}しました</span>
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm text-gray-800">{item.title}</span>
+            {detailButton}
+            <button
+              type="button"
+              id={`undo-${item.id}`}
+              aria-label={`取り消す: ${item.title}`}
+              onClick={() => undo(item)}
+              disabled={isBusy}
+              className={choiceButtonClass(
+                "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              )}
+            >
+              取り消す
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
+                {KIND_BADGE[item.kind]}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
+                {item.title}
+              </span>
+            </div>
+            <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-2 flex gap-2">
+              <button
+                type="button"
+                id={`approve-${item.id}`}
+                aria-label={`承認: ${item.title}`}
+                onClick={() => decide(item, "承認")}
+                disabled={isBusy}
+                className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+              >
+                承認
+              </button>
+              <button
+                type="button"
+                aria-label={`却下: ${item.title}`}
+                onClick={() => decide(item, "却下")}
+                disabled={isBusy}
+                className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+              >
+                却下
+              </button>
+              {detailButton}
+            </div>
+          </>
+        )}
         {failure ? (
           <div
             role="alert"
@@ -308,46 +360,113 @@ export function ApproveClient() {
             </button>
           </div>
         ) : null}
-        {choice ? (
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-gray-600">保存済み</span>
-            <button
-              type="button"
-              id={`undo-${item.id}`}
-              aria-label={`取り消す: ${item.title}`}
-              onClick={() => undo(item)}
-              disabled={isBusy}
-              className={choiceButtonClass(
-                "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              )}
-            >
-              取り消す
-            </button>
-          </div>
-        ) : (
-          <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-3 flex gap-2">
-            <button
-              type="button"
-              id={`approve-${item.id}`}
-              aria-label={`承認: ${item.title}`}
-              onClick={() => decide(item, "承認")}
-              disabled={isBusy}
-              className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-            >
-              承認
-            </button>
-            <button
-              type="button"
-              aria-label={`却下: ${item.title}`}
-              onClick={() => decide(item, "却下")}
-              disabled={isBusy}
-              className={choiceButtonClass("border border-gray-700 bg-gray-700 text-white")}
-            >
-              却下
-            </button>
-          </div>
-        )}
       </li>
+    );
+  }
+
+  // #275: 詳細パネル(master-detail)。スマホ=全画面シート / PC=右サイドパネル。
+  // 将来の AI 壁打ち・下書き生成は下部の拡張スロットに差し込む(今回は枠のみ)。
+  function renderPanel(item: PendingItem) {
+    const choice = decided[item.id];
+    const isBusy = savingId === item.id;
+    return (
+      <div className="fixed inset-0 z-50 flex">
+        <button
+          type="button"
+          aria-label="オーバーレイを閉じる"
+          onClick={() => setOpenId(null)}
+          className="flex-1 bg-black/40"
+        />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`詳細: ${item.title}`}
+          className="ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem]"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="font-bold text-gray-900">{item.title}</h2>
+            <button
+              type="button"
+              onClick={() => setOpenId(null)}
+              className={`${TAP_TARGET} shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
+            >
+              閉じる
+            </button>
+          </div>
+          {item.subtitle ? <p className="mt-1 text-sm text-gray-600">{item.subtitle}</p> : null}
+
+          {item.details && item.details.length > 0 ? (
+            <dl className="mt-3 space-y-1 text-sm">
+              {item.details.map((detail) => (
+                <div key={detail.label} className="flex gap-2">
+                  <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
+                  <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          <div className="mt-4 flex gap-2">
+            {choice ? (
+              <button
+                type="button"
+                onClick={() => undoFromPanel(item)}
+                disabled={isBusy}
+                className={choiceButtonClass(
+                  "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                承認待ちに戻す
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => decideFromPanel(item, "承認")}
+                  disabled={isBusy}
+                  className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+                >
+                  承認
+                </button>
+                <button
+                  type="button"
+                  onClick={() => decideFromPanel(item, "却下")}
+                  disabled={isBusy}
+                  className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+                >
+                  却下
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* #276/#277 の拡張スロット(今回は枠のみ・機能は後続issue) */}
+          <section aria-label="AI壁打ち" className="mt-6 border-t border-gray-200 pt-4">
+            <h3 className="text-sm font-bold text-gray-700">AIと壁打ち</h3>
+            <textarea
+              aria-label="AI壁打ち（準備中）"
+              disabled
+              placeholder="（準備中）この提案について相談できます"
+              className="mt-2 h-20 w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-sm text-gray-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">準備中（後続のアップデートで利用可能になります）。</p>
+          </section>
+
+          {item.kind === "idea" ? (
+            <section aria-label="下書き生成" className="mt-4 border-t border-gray-200 pt-4">
+              <h3 className="text-sm font-bold text-gray-700">記事の下書きを生成</h3>
+              <button
+                type="button"
+                disabled
+                className={`${TAP_TARGET} mt-2 border border-gray-300 bg-gray-100 text-gray-500`}
+              >
+                下書きを生成
+              </button>
+              <p className="mt-1 text-xs text-gray-400">準備中（後続のアップデートで利用可能になります）。</p>
+            </section>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
@@ -370,16 +489,17 @@ export function ApproveClient() {
       {proposals.length > 0 ? (
         <section className="mt-4">
           <h2 className="text-sm font-bold text-gray-700">施策</h2>
-          <ul className="mt-2 space-y-3">{proposals.map(renderItem)}</ul>
+          <ul className="mt-2 space-y-2">{proposals.map(renderItem)}</ul>
         </section>
       ) : null}
       {ideas.length > 0 ? (
         <section className="mt-4">
           <h2 className="text-sm font-bold text-gray-700">記事</h2>
-          <ul className="mt-2 space-y-3">{ideas.map(renderItem)}</ul>
+          <ul className="mt-2 space-y-2">{ideas.map(renderItem)}</ul>
         </section>
       ) : null}
       <AddProposalForm token={token} onAdded={addProposal} />
+      {openItem ? renderPanel(openItem) : null}
     </main>
   );
 }
