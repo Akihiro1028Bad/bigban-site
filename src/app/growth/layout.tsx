@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 
+import "./growth.css";
+
 /**
  * グロース系ページ(/growth/*)用のレイアウト。
  *
  * ルート layout.tsx は素通し(html/body は [locale] 側にある)ため、
  * locale 外のこのルートでは自前で html/body を与える。
- * サイト本体の暗いテーマ(globals.css)は読み込まず、ブラウザ既定の
- * 読みやすい配色(白背景・黒文字)にする。管理用なので noindex。
+ * サイト本体の暗いテーマ(globals.css)は読み込まず、代わりに growth.css で
+ * Tailwind 本体だけを読み込む(ユーティリティを有効化しつつ、ブラウザ既定の
+ * 読みやすい白背景・黒文字を保つ)。管理用なので noindex。
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
