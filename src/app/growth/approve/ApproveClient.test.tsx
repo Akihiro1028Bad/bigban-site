@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ApproveClient } from "./ApproveClient";
@@ -251,7 +251,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     });
   });
 
-  it("保存失敗時はメッセージを出し、選択前の状態を保つ", async () => {
+  it("保存失敗時はカードに赤エラーと再試行を出し、選択前の状態を保つ(#239)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [proposalItem()] } },
       { ok: false, status: 502, json: { success: false, error: "保存エラー" } }
@@ -262,7 +262,8 @@ describe("ApproveClient 即時保存(#235)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("保存エラー"));
+    expect(await screen.findByText("保存エラー")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再試行: 市川ページ" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
     expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
   });
@@ -277,9 +278,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     await screen.findByText("市川ページ");
 
     await userEvent.click(screen.getByRole("button", { name: "却下: 市川ページ" }));
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました。")
-    );
+    expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
   it("保存中の例外(非Error)は既定メッセージ", async () => {
@@ -292,12 +291,54 @@ describe("ApproveClient 即時保存(#235)", () => {
     await screen.findByText("市川ページ");
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました。")
-    );
+    expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
-  it("取り消し失敗時はメッセージを出し、保存済みのまま残す", async () => {
+  it("再試行で保存をやり直せる(#239)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { ok: false, status: 502, json: { success: false, error: "保存エラー" } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(await screen.findByRole("button", { name: "再試行: 市川ページ" }));
+
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(screen.queryByText("保存エラー")).not.toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "承認" }],
+    });
+  });
+
+  it("1件の保存失敗は他カードに波及しない(#239)", async () => {
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [proposalItem(), proposalItem({ id: "p2", title: "他カード" })],
+        },
+      },
+      { ok: false, status: 502, json: { success: false, error: "保存エラー" } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await screen.findByText("保存エラー");
+    await userEvent.click(screen.getByRole("button", { name: "承認: 他カード" }));
+
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再試行: 市川ページ" })).toBeInTheDocument();
+    expect(screen.getByText("処理済み 1 / 2件")).toBeInTheDocument();
+  });
+
+  it("取り消し失敗時はカードに赤エラーを出し、保存済みのまま残す(#239)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [proposalItem()] } },
       { json: { success: true, updated: 1 } },
@@ -310,8 +351,30 @@ describe("ApproveClient 即時保存(#235)", () => {
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("戻せませんでした"));
+    expect(await screen.findByText("戻せませんでした")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "取り消す: 市川ページ" })).toBeInTheDocument();
+  });
+
+  it("取り消しの再試行で承認待ちへ戻せる(#239)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } },
+      { ok: false, status: 502, json: { success: false, error: "戻せませんでした" } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
+    await screen.findByText("戻せませんでした");
+    await userEvent.click(screen.getByRole("button", { name: "再試行: 市川ページ" }));
+
+    expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[3][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "未処理" }],
+    });
   });
 
   it("タップ領域を確保するクラスを付与する(#227)", async () => {
