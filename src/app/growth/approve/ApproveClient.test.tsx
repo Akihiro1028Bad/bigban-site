@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ApproveClient } from "./ApproveClient";
@@ -108,27 +108,24 @@ describe("ApproveClient 合言葉画面", () => {
     expect(fn.mock.calls[0][0]).toBe(TOKEN_URL);
   });
 
-  it("種別バッジと判断根拠(details)を表示する(#226/#227)", async () => {
+  it("種別バッジを一覧に表示し、判断根拠(details)は詳細パネルで見る(#226/#227)", async () => {
     mockFetchSequence({
       json: { success: true, items: [proposalItem(), ideaItem()] },
     });
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    // バッジは一覧の各行に出る
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
     expect(screen.getByText("📝 記事")).toBeInTheDocument();
-    expect(screen.getByText("優先度スコア")).toBeInTheDocument();
-    expect(screen.getByText("8.5")).toBeInTheDocument();
-    expect(screen.getByText("確度")).toBeInTheDocument();
-  });
+    // 数値根拠は一覧には出さず、詳細パネルに入れる(#275 高密度化)
+    expect(screen.queryByText("優先度スコア")).not.toBeInTheDocument();
 
-  it("詳細は『詳細を見る』の折りたたみに入る(#245)", async () => {
-    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("市川ページ");
-    expect(screen.getByText("詳細を見る")).toBeInTheDocument();
-    expect(screen.getByText("優先度スコア")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("優先度スコア")).toBeInTheDocument();
+    expect(within(dialog).getByText("8.5")).toBeInTheDocument();
+    expect(within(dialog).getByText("確度")).toBeInTheDocument();
   });
 
   it("details も subtitle も無い項目でも壊れない", async () => {
@@ -610,5 +607,133 @@ describe("ApproveClient 空状態/完了(#236)", () => {
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await screen.findByText("承認しました");
     expect(screen.queryByText(/すべて処理しました/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient master-detail/詳細パネル(#275)", () => {
+  it("一覧は高密度化し、詳細はインライン展開せず『詳細』ボタンを出す", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.queryByText("詳細を見る")).not.toBeInTheDocument();
+    expect(screen.queryByText("優先度スコア")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "詳細: 市川ページ" })).toBeInTheDocument();
+  });
+
+  it("詳細ボタンでパネルを開き、閉じるボタンで閉じる", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("市川ページ")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("背景(オーバーレイ)クリックでパネルを閉じる", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "オーバーレイを閉じる" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("パネルから承認するとその場で保存し、パネルが閉じる", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "承認" }));
+
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "承認" }],
+    });
+  });
+
+  it("パネルから却下もできる", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "却下" }));
+
+    expect(await screen.findByText("却下しました")).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "却下" }],
+    });
+  });
+
+  it("処理済みの詳細パネルから承認待ちへ戻せる", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await screen.findByText("承認しました");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "承認待ちに戻す" }));
+
+    expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "未処理" }],
+    });
+  });
+
+  it("記事の詳細パネルには下書き生成スロット(準備中)とAI壁打ち枠がある", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "下書きを生成" })).toBeDisabled();
+    expect(within(dialog).getByLabelText("AI壁打ち（準備中）")).toBeDisabled();
+  });
+
+  it("施策の詳細パネルには下書き生成スロットを出さない(AI壁打ち枠は出す)", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).queryByRole("button", { name: "下書きを生成" })
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("AI壁打ち（準備中）")).toBeInTheDocument();
+  });
+
+  it("details も subtitle も無い項目でも詳細パネルを開ける", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [{ id: "p1", kind: "proposal", title: "A", subtitle: "" }] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("A");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: A" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
