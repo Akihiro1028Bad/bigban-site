@@ -90,6 +90,8 @@ function ideaDetails(page: NotionPage): PendingDetail[] {
     { label: "優先度", value: selectName(page, "優先度") },
     // #238: 記事も施策と同様に判断根拠を出す(空なら buildDetails が除外)。
     { label: "根拠", value: richText(page, "根拠") },
+    // #245: 承認前に記事の中身を把握できるよう構成案(見出しアウトライン)を出す。
+    { label: "構成案", value: richText(page, "構成案") },
   ]);
 }
 
