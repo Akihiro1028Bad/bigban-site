@@ -49,8 +49,19 @@ function proposalItem(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-describe("ApproveClient", () => {
-  it("合言葉画面は入力意図の説明文を表示する(#229)", () => {
+function ideaItem(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: "i1",
+    kind: "idea",
+    title: "猛暑記事",
+    subtitle: "夏の集客",
+    details: [{ label: "優先度", value: "中" }],
+    ...over,
+  };
+}
+
+describe("ApproveClient 合言葉画面", () => {
+  it("入力意図の説明文を表示する(#229)", () => {
     mockFetchSequence();
     render(<ApproveClient />);
     expect(
@@ -88,35 +99,22 @@ describe("ApproveClient", () => {
 
   it("正しい合言葉で承認待ちを一覧表示し、合言葉をtokenとして送る", async () => {
     const fn = mockFetchSequence({
-      json: {
-        success: true,
-        items: [
-          proposalItem(),
-          { id: "i1", kind: "idea", title: "猛暑記事", subtitle: "夏の集客", details: [{ label: "優先度", value: "中" }] },
-        ],
-      },
+      json: { success: true, items: [proposalItem(), ideaItem()] },
     });
     render(<ApproveClient />);
     await login();
-    expect(await screen.findByText("承認待ち 2件")).toBeInTheDocument();
-    expect(screen.getByText("市川ページ")).toBeInTheDocument();
+    expect(await screen.findByText("市川ページ")).toBeInTheDocument();
     expect(screen.getByText("猛暑記事")).toBeInTheDocument();
     expect(fn.mock.calls[0][0]).toBe(TOKEN_URL);
   });
 
   it("種別バッジと判断根拠(details)を表示する(#226/#227)", async () => {
     mockFetchSequence({
-      json: {
-        success: true,
-        items: [
-          proposalItem(),
-          { id: "i1", kind: "idea", title: "猛暑記事", subtitle: "夏の集客", details: [{ label: "優先度", value: "中" }] },
-        ],
-      },
+      json: { success: true, items: [proposalItem(), ideaItem()] },
     });
     render(<ApproveClient />);
     await login();
-    await screen.findByText("承認待ち 2件");
+    await screen.findByText("市川ページ");
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
     expect(screen.getByText("📝 記事")).toBeInTheDocument();
     expect(screen.getByText("優先度スコア")).toBeInTheDocument();
@@ -132,22 +130,6 @@ describe("ApproveClient", () => {
     await login();
     expect(await screen.findByText("A")).toBeInTheDocument();
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
-  });
-
-  it("承認/却下の選択がボタンの押下状態に反映される(#227)", async () => {
-    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("承認待ち 1件");
-
-    const approveBtn = screen.getByRole("button", { name: "承認: 市川ページ" });
-    expect(approveBtn).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(approveBtn);
-    expect(approveBtn).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "却下: 市川ページ" })).toHaveAttribute(
-      "aria-pressed",
-      "false"
-    );
   });
 
   it("合言葉が違うと401で導線付きメッセージを出す(#229)", async () => {
@@ -179,90 +161,166 @@ describe("ApproveClient", () => {
     await login();
     expect(await screen.findByRole("alert")).toHaveTextContent("取得に失敗しました。");
   });
+});
 
-  it("保存ボタンは未選択なら無効・件数つきラベルになる(#228)", async () => {
+describe("ApproveClient 即時保存(#235)", () => {
+  it("確定ボタンは無く、進捗(処理済み)を表示する", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await login();
-    await screen.findByText("承認待ち 1件");
+    await screen.findByText("市川ページ");
+    expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
+    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+  });
 
-    const save = screen.getByRole("button", { name: "0件を確定する" });
-    expect(save).toBeDisabled();
+  it("承認を押すとその場で1件保存し、保存済み表示と取り消すを出す", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
-    expect(screen.getByRole("button", { name: "1件を確定する" })).toBeEnabled();
+
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取り消す: 市川ページ" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "承認: 市川ページ" })).not.toBeInTheDocument();
+    expect(screen.getByText("処理済み 1 / 1件")).toBeInTheDocument();
+
+    const post = fn.mock.calls[1];
+    expect(post[0]).toBe(TOKEN_URL);
+    expect(post[1].method).toBe("POST");
+    expect(JSON.parse(post[1].body)).toEqual({ decisions: [{ id: "p1", decision: "承認" }] });
+  });
+
+  it("却下を押すと却下で保存する", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "却下: 市川ページ" }));
+
+    expect(await screen.findByText("却下しました")).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "却下" }],
+    });
+  });
+
+  it("取り消すで施策を承認待ち(未処理)へ戻し、選択し直せる", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
+
+    expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
+    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
+      decisions: [{ id: "p1", decision: "未処理" }],
+    });
+  });
+
+  it("記事の取り消しは提案中へ戻す", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem()] } },
+      { json: { success: true, updated: 1 } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り消す: 猛暑記事" }));
+
+    await screen.findByRole("button", { name: "承認: 猛暑記事" });
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
+      decisions: [{ id: "i1", decision: "提案中" }],
+    });
+  });
+
+  it("保存失敗時はメッセージを出し、選択前の状態を保つ", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { ok: false, status: 502, json: { success: false, error: "保存エラー" } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("保存エラー"));
+    expect(screen.getByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
+    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+  });
+
+  it("error の無い保存失敗は既定メッセージ(success:false)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: false } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "却下: 市川ページ" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました。")
+    );
+  });
+
+  it("保存中の例外(非Error)は既定メッセージ", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      "boom"
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました。")
+    );
+  });
+
+  it("取り消し失敗時はメッセージを出し、保存済みのまま残す", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } },
+      { ok: false, status: 502, json: { success: false, error: "戻せませんでした" } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("戻せませんでした"));
+    expect(screen.getByRole("button", { name: "取り消す: 市川ページ" })).toBeInTheDocument();
   });
 
   it("タップ領域を確保するクラスを付与する(#227)", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await login();
-    await screen.findByText("承認待ち 1件");
+    await screen.findByText("市川ページ");
     expect(screen.getByRole("button", { name: "承認: 市川ページ" }).className).toMatch(
       /min-h-11/
-    );
-  });
-
-  it("選択して保存すると反映し、保存済みを一覧から消す", async () => {
-    const fn = mockFetchSequence(
-      {
-        json: {
-          success: true,
-          items: [
-            { id: "p1", kind: "proposal", title: "残す", subtitle: "x", details: [] },
-            { id: "p2", kind: "proposal", title: "消える", subtitle: "y", details: [] },
-          ],
-        },
-      },
-      { json: { success: true, updated: 1 } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("承認待ち 2件");
-
-    await userEvent.click(screen.getByRole("button", { name: "承認: 消える" }));
-    await userEvent.click(screen.getByRole("button", { name: "1件を確定する" }));
-
-    expect(await screen.findByText("承認待ち 1件")).toBeInTheDocument();
-    expect(screen.getByText("残す")).toBeInTheDocument();
-    expect(screen.queryByText("消える")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("1件を保存しました。");
-
-    const postCall = fn.mock.calls[1];
-    expect(postCall[0]).toBe(TOKEN_URL);
-    expect(postCall[1].method).toBe("POST");
-    expect(JSON.parse(postCall[1].body)).toEqual({ decisions: [{ id: "p2", decision: "承認" }] });
-  });
-
-  it("保存失敗時はエラーメッセージを出す", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [proposalItem({ title: "A", subtitle: "x" })] } },
-      { ok: false, status: 502, json: { success: false, error: "保存エラー" } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("承認待ち 1件");
-
-    await userEvent.click(screen.getByRole("button", { name: "却下: A" }));
-    await userEvent.click(screen.getByRole("button", { name: "1件を確定する" }));
-
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("保存エラー"));
-  });
-
-  it("error の無い保存失敗は既定メッセージ", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [proposalItem({ title: "A", subtitle: "x" })] } },
-      { ok: false, status: 502, json: { success: false } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("承認待ち 1件");
-
-    await userEvent.click(screen.getByRole("button", { name: "承認: A" }));
-    await userEvent.click(screen.getByRole("button", { name: "1件を確定する" }));
-
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("保存に失敗しました。")
     );
   });
 });

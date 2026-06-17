@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
-import { parseDecisions, toPendingItems } from "./approve";
+import { parseDecisions, pendingStatus, toPendingItems } from "./approve";
 
 function proposal(id: string, name: string, category: string): NotionPage {
   return {
@@ -112,6 +112,19 @@ describe("parseDecisions", () => {
     expect(result[0]).toEqual({ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" });
   });
 
+  it("承認待ちへ戻すステータス(未処理/提案中)も受け付ける(#235 取り消し)", () => {
+    const result = parseDecisions({
+      decisions: [
+        { id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "未処理" },
+        { id: "5adab8b1f1824123b9639463a2580d4a", decision: "提案中" },
+      ],
+    });
+    expect(result).toEqual([
+      { id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "未処理" },
+      { id: "5adab8b1f1824123b9639463a2580d4a", decision: "提案中" },
+    ]);
+  });
+
   it.each([
     [null, /不正なリクエスト/],
     [{}, /配列/],
@@ -126,5 +139,15 @@ describe("parseDecisions", () => {
     ],
   ])("不正な入力 %# を弾く", (input, pattern) => {
     expect(() => parseDecisions(input)).toThrow(pattern);
+  });
+});
+
+describe("pendingStatus", () => {
+  it("施策提案の承認待ちは未処理", () => {
+    expect(pendingStatus("proposal")).toBe("未処理");
+  });
+
+  it("記事ネタ案の承認待ちは提案中", () => {
+    expect(pendingStatus("idea")).toBe("提案中");
   });
 });
