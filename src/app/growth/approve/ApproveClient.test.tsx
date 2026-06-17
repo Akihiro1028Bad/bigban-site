@@ -388,6 +388,29 @@ describe("ApproveClient 即時保存(#235)", () => {
   });
 });
 
+describe("ApproveClient 公開タイミングの明示(#237)", () => {
+  it("承認＝制作キュー追加・この場では非公開の補足を表示する", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.getByText(/この場では公開されません/)).toBeInTheDocument();
+  });
+
+  it("完了表示に公開タイミングの注記を含む", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    expect(await screen.findByText(/公開はまだされません/)).toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 空状態/完了(#236)", () => {
   it("承認待ち0件のとき空状態を表示し、操作ボタンを出さない", async () => {
     mockFetchSequence({ json: { success: true, items: [] } });
