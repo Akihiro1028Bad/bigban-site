@@ -45,11 +45,11 @@ describe("toPendingItems", () => {
       subtitle: "サイト表示内容",
     });
     expect(item.details).toEqual([
+      { label: "根拠", value: "MEOクエリが増加" },
+      { label: "想定アクション", value: "GBPを更新" },
       { label: "優先度スコア", value: "8.5" },
       { label: "確度", value: "高" },
       { label: "インパクト", value: "大" },
-      { label: "根拠", value: "MEOクエリが増加" },
-      { label: "想定アクション", value: "GBPを更新" },
     ]);
   });
 
@@ -63,9 +63,9 @@ describe("toPendingItems", () => {
       subtitle: "夏向けの集客記事",
     });
     expect(item.details).toEqual([
-      { label: "優先度", value: "中" },
       { label: "根拠", value: "関連検索が前月比2.1倍" },
       { label: "構成案", value: "導入→H2基準3つ→CTA" },
+      { label: "優先度", value: "中" },
     ]);
   });
 
