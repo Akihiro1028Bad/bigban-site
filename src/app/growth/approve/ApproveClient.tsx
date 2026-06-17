@@ -16,6 +16,11 @@ interface PendingItem {
   title: string;
   subtitle: string;
   details?: PendingDetail[];
+  score?: number;
+}
+
+function byScoreDesc(a: PendingItem, b: PendingItem): number {
+  return (b.score ?? 0) - (a.score ?? 0);
 }
 
 type Choice = "承認" | "却下";
@@ -215,6 +220,100 @@ export function ApproveClient() {
   }
 
   const allDone = processed === items.length;
+  // #242: 施策/記事をセクション分割し、各セクション内を優先度スコア降順に並べる。
+  const proposals = items.filter((item) => item.kind === "proposal").sort(byScoreDesc);
+  const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
+
+  function renderItem(item: PendingItem) {
+    const choice = decided[item.id];
+    const isBusy = savingId === item.id;
+    const failure = failures[item.id];
+    return (
+      <li
+        key={item.id}
+        className={cardClass(choice, Boolean(failure))}
+        data-decision={choice ?? ""}
+      >
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
+            {KIND_BADGE[item.kind]}
+          </span>
+          {choice ? (
+            <span className="text-xs font-semibold text-gray-700">{choice}しました</span>
+          ) : null}
+        </div>
+        <p className="mt-2 font-semibold text-gray-900">{item.title}</p>
+        {item.subtitle ? <p className="text-sm text-gray-600">{item.subtitle}</p> : null}
+        {item.details && item.details.length > 0 ? (
+          <details className="mt-2 text-sm">
+            <summary className="cursor-pointer font-medium text-gray-700">詳細を見る</summary>
+            <dl className="mt-2 space-y-1">
+              {item.details.map((detail) => (
+                <div key={detail.label} className="flex gap-2">
+                  <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
+                  <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        ) : null}
+        {failure ? (
+          <div
+            role="alert"
+            className="mt-2 flex items-center justify-between gap-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800"
+          >
+            <span>{failure.message}</span>
+            <button
+              type="button"
+              aria-label={`再試行: ${item.title}`}
+              onClick={failure.retry}
+              disabled={isBusy}
+              className={choiceButtonClass("shrink-0 border border-red-600 bg-red-600 text-white")}
+            >
+              再試行
+            </button>
+          </div>
+        ) : null}
+        {choice ? (
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs text-gray-600">保存済み</span>
+            <button
+              type="button"
+              aria-label={`取り消す: ${item.title}`}
+              onClick={() => undo(item)}
+              disabled={isBusy}
+              className={choiceButtonClass(
+                "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              )}
+            >
+              取り消す
+            </button>
+          </div>
+        ) : (
+          <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-3 flex gap-2">
+            <button
+              type="button"
+              aria-label={`承認: ${item.title}`}
+              onClick={() => decide(item, "承認")}
+              disabled={isBusy}
+              className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+            >
+              承認
+            </button>
+            <button
+              type="button"
+              aria-label={`却下: ${item.title}`}
+              onClick={() => decide(item, "却下")}
+              disabled={isBusy}
+              className={choiceButtonClass("border border-gray-700 bg-gray-700 text-white")}
+            >
+              却下
+            </button>
+          </div>
+        )}
+      </li>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-md p-4">
@@ -232,104 +331,18 @@ export function ApproveClient() {
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
         </p>
       ) : null}
-      <ul className="mt-4 space-y-3">
-        {items.map((item) => {
-          const choice = decided[item.id];
-          const isBusy = savingId === item.id;
-          const failure = failures[item.id];
-          return (
-            <li
-              key={item.id}
-              className={cardClass(choice, Boolean(failure))}
-              data-decision={choice ?? ""}
-            >
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
-                  {KIND_BADGE[item.kind]}
-                </span>
-                {choice ? (
-                  <span className="text-xs font-semibold text-gray-700">{choice}しました</span>
-                ) : null}
-              </div>
-              <p className="mt-2 font-semibold text-gray-900">{item.title}</p>
-              {item.subtitle ? (
-                <p className="text-sm text-gray-600">{item.subtitle}</p>
-              ) : null}
-              {item.details && item.details.length > 0 ? (
-                <details className="mt-2 text-sm">
-                  <summary className="cursor-pointer font-medium text-gray-700">
-                    詳細を見る
-                  </summary>
-                  <dl className="mt-2 space-y-1">
-                    {item.details.map((detail) => (
-                      <div key={detail.label} className="flex gap-2">
-                        <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
-                        <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </details>
-              ) : null}
-              {failure ? (
-                <div
-                  role="alert"
-                  className="mt-2 flex items-center justify-between gap-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800"
-                >
-                  <span>{failure.message}</span>
-                  <button
-                    type="button"
-                    aria-label={`再試行: ${item.title}`}
-                    onClick={failure.retry}
-                    disabled={isBusy}
-                    className={choiceButtonClass(
-                      "shrink-0 border border-red-600 bg-red-600 text-white"
-                    )}
-                  >
-                    再試行
-                  </button>
-                </div>
-              ) : null}
-              {choice ? (
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-gray-600">保存済み</span>
-                  <button
-                    type="button"
-                    aria-label={`取り消す: ${item.title}`}
-                    onClick={() => undo(item)}
-                    disabled={isBusy}
-                    className={choiceButtonClass(
-                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    取り消す
-                  </button>
-                </div>
-              ) : (
-                <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    aria-label={`承認: ${item.title}`}
-                    onClick={() => decide(item, "承認")}
-                    disabled={isBusy}
-                    className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-                  >
-                    承認
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`却下: ${item.title}`}
-                    onClick={() => decide(item, "却下")}
-                    disabled={isBusy}
-                    className={choiceButtonClass("border border-gray-700 bg-gray-700 text-white")}
-                  >
-                    却下
-                  </button>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {proposals.length > 0 ? (
+        <section className="mt-4">
+          <h2 className="text-sm font-bold text-gray-700">施策</h2>
+          <ul className="mt-2 space-y-3">{proposals.map(renderItem)}</ul>
+        </section>
+      ) : null}
+      {ideas.length > 0 ? (
+        <section className="mt-4">
+          <h2 className="text-sm font-bold text-gray-700">記事</h2>
+          <ul className="mt-2 space-y-3">{ideas.map(renderItem)}</ul>
+        </section>
+      ) : null}
     </main>
   );
 }

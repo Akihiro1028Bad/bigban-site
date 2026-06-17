@@ -20,7 +20,12 @@ export interface PendingItem {
   subtitle: string;
   /** 承認判断に足る根拠(種別ごとに内容が異なる)。空なら []。 */
   details: PendingDetail[];
+  /** 並べ替え用の優先度スコア(施策=優先度スコア / 記事=優先度ランク)。降順表示。 */
+  score: number;
 }
+
+// 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。
+const PRIORITY_RANK: Record<string, number> = { 高: 3, 中: 2, 低: 1 };
 
 /** 承認待ちステータス(種別ごとに名前が異なる)。取り消し時の復帰先。 */
 export type PendingStatus = "未処理" | "提案中";
@@ -108,6 +113,7 @@ export function toPendingItems(
     title: titleText(page, "施策名"),
     subtitle: selectName(page, "カテゴリ"),
     details: proposalDetails(page),
+    score: numberValue(page, "優先度スコア") ?? 0,
   }));
   const ideaItems: PendingItem[] = ideas.map((page) => ({
     id: page.id,
@@ -115,6 +121,7 @@ export function toPendingItems(
     title: titleText(page, "タイトル案"),
     subtitle: richText(page, "概要"),
     details: ideaDetails(page),
+    score: PRIORITY_RANK[selectName(page, "優先度")] ?? 0,
   }));
   return [...proposalItems, ...ideaItems];
 }
