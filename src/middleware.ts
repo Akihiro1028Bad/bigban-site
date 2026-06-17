@@ -32,5 +32,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images|logos|.*\\..*).*)"],
+  // growth は locale 非依存の管理ページ(/growth/approve)。i18n ルーティング対象外にする
+  matcher: ["/((?!api|growth|_next/static|_next/image|favicon.ico|images|logos|.*\\..*).*)"],
 };
