@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import { pendingStatus } from "@/lib/growth/approve";
@@ -78,14 +78,23 @@ export function ApproveClient() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
+
+  // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
+  function failAuth(text: string): void {
+    setMessage(text);
+    const input = passphraseRef.current;
+    /* istanbul ignore else -- 合言葉入力欄は認証前画面で常にマウント済み */
+    if (input) input.focus();
+  }
 
   async function enter(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const pass = passphrase.trim();
     if (!pass) {
-      setMessage("合言葉を入力してください。");
+      failAuth("合言葉を入力してください。");
       return;
     }
     setBusy(true);
@@ -104,7 +113,7 @@ export function ApproveClient() {
       setToken(pass);
       setAuthed(true);
     } catch (error) {
-      setMessage(toMessage(error, "取得に失敗しました。"));
+      failAuth(toMessage(error, "取得に失敗しました。"));
     } finally {
       setBusy(false);
     }
@@ -172,12 +181,15 @@ export function ApproveClient() {
             <div className="flex gap-2">
               <input
                 id="passphrase"
+                ref={passphraseRef}
                 type={showPassphrase ? "text" : "password"}
                 value={passphrase}
                 onChange={(event) => setPassphrase(event.target.value)}
                 autoComplete="off"
                 autoCapitalize="off"
                 spellCheck={false}
+                aria-invalid={message ? true : undefined}
+                aria-describedby={message ? "passphrase-error" : undefined}
                 className="min-h-11 w-full rounded-md border border-gray-300 px-3 text-base text-gray-900"
               />
               <button
@@ -199,7 +211,7 @@ export function ApproveClient() {
           </button>
         </form>
         {message ? (
-          <p role="alert" className="mt-3 text-sm text-red-700">
+          <p id="passphrase-error" role="alert" className="mt-3 text-sm text-red-700">
             {message}
           </p>
         ) : null}
