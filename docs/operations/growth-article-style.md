@@ -57,3 +57,32 @@ THE PICKLE BANG THEORY の**グロースループで生成する集客記事**(�
 - microCMS に `displayMode=html` の**下書き**で保存。公開はしない
 - HTML タグ・属性・クラスの許可/禁止は [ai-news-prompt.md](./ai-news-prompt.md) §3 に従う(`h2`/`h3`/`p`/`ul`/`ol`/`li` 等。インライン style 禁止)
 - アイキャッチ必須(文字なし)、本文画像は文字入れ可([growth-weekly-runbook.md](./growth-weekly-runbook.md) の画像チーム方針)
+- **アイキャッチの画調は §9 のアートディレクションに必ず従う**(記事ごとに画風をバラつかせない)
+
+## 9. アイキャッチ画像 アートディレクション(正典・厳守)
+
+記事ごとに画風がバラつくと安っぽく見える。**全アイキャッチで以下の画調を固定**する。`openai-image-gen` に渡すプロンプトは必ず「固定スタイルブロック + 記事ごとの被写体1行」で組み立てる。即興でゼロから書かない。
+
+方向性は **明るいエアリーな実写 × ブランド配色のまま親しみやすく**。初心者〜検討層が読む集客記事に合う、軽やかで親しみのあるトーンにする(ダークなシネマティックには振らない)。
+
+### 画調(全記事共通・固定)
+- **明るくエアリーな実写写真**。自然光の順光、白〜ライト基調の室内、浅い被写界深度、クリーン。親しみやすく、少しだけ遊び心のある空気感。
+- 配色: **ライト/白基調の背景**に、ブランドのブルー(#306EC3 / #11317B)のコート・小物。差し色は**黄〜ライムのピックルボール**で楽しいポップを1点。明るさと抜け感で「かわいさ」を出す(パステル多色には振らない)。
+- 構図: 16:9 (1536x1024)。被写体は**片側に寄せ**、反対側にテキストを載せられる余白を残す。視線は水平。
+- 質感: 写実。イラスト/クリップアート/コラージュ/CG然とした作り込み絵は避ける。
+- **生成モード: `gpt-image-2` の `--quality high` 固定**(描き込み最高・枚あたり概算 $0.3前後/1536x1024)。
+
+### 禁止(ネガティブ・プロンプトに必ず明記)
+文字・ロゴ・ウォーターマーク、**ダークなローキー照明**、過度な彩度、雑然とした背景、変形したパドル/ボール、複数画風の混在、はめ込み合成、イラスト、人物の不自然な手指。
+
+### 被写体テンプレ(記事タイプ別・1行を選ぶ)
+- 初心者ガイド/ハウツー: 明るいコート手前のパドルとボール、または窓から光が差すコートのワンシーン
+- 業界トレンド: 明るいコートの俯瞰や幾何学を活かした構図
+- 用具・技術: 明るい背景でのパドル/ボールのマクロ、質感重視
+- 季節・地域: 大きな窓と自然光、時間帯/季節感を活かしたインドアコート
+
+### プロンプト雛形(英語で渡す。`{SUBJECT}` に上の1行を入れる)
+```
+Bright, airy editorial photograph, {SUBJECT}. Welcoming premium indoor pickleball facility, soft natural daylight through large windows, light and clean tones, friendly and cheerful mood, shallow depth of field, photorealistic, high detail. Color palette: light airy background with bright blue (#306EC3) and deep blue (#11317B) court accents; the yellow-green pickleball is a playful pop of color. 16:9 composition, subject offset to one side leaving clean negative space for a text overlay, eye-level.
+Negative: no text, no logos, no watermark, no dark moody low-key lighting, no oversaturation, no clutter, no distorted paddle or ball, no illustration, no unnatural hands.
+```
