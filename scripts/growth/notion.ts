@@ -118,6 +118,31 @@ export async function updatePageSelect(
   return json.id;
 }
 
+/**
+ * 指定 data source 配下にページを新規作成し、作成したページ ID を返す。
+ * data sources API では parent に data_source_id を指定する(2025-09-03)。
+ */
+export async function createPage(
+  dataSourceId: string,
+  properties: Record<string, unknown>,
+  options: NotionApiOptions
+): Promise<string> {
+  const json = (await notionRequest(
+    "POST",
+    `${NOTION_API_BASE}/pages`,
+    {
+      parent: { type: "data_source_id", data_source_id: dataSourceId },
+      properties,
+    },
+    options
+  )) as { id?: string };
+
+  if (!json.id) {
+    throw new Error("Notion 応答に id が含まれていません。");
+  }
+  return json.id;
+}
+
 /** 指定 data source の最新ページ(作成日降順の先頭)を返す。無ければ null。 */
 export async function getLatestReport(
   dataSourceId: string,
