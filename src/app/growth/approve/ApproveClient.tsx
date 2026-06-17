@@ -256,14 +256,19 @@ export function ApproveClient() {
                 <p className="text-sm text-gray-600">{item.subtitle}</p>
               ) : null}
               {item.details && item.details.length > 0 ? (
-                <dl className="mt-2 space-y-1 text-sm">
-                  {item.details.map((detail) => (
-                    <div key={detail.label} className="flex gap-2">
-                      <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
-                      <dd className="text-gray-800">{detail.value}</dd>
-                    </div>
-                  ))}
-                </dl>
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer font-medium text-gray-700">
+                    詳細を見る
+                  </summary>
+                  <dl className="mt-2 space-y-1">
+                    {item.details.map((detail) => (
+                      <div key={detail.label} className="flex gap-2">
+                        <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
+                        <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
               ) : null}
               {failure ? (
                 <div
