@@ -28,6 +28,7 @@ function idea(id: string, title: string, summary: string): NotionPage {
       "タイトル案": { type: "title", title: [{ plain_text: title }] },
       "概要": { type: "rich_text", rich_text: [{ plain_text: summary }] },
       "優先度": { type: "select", select: { name: "中" } },
+      "根拠": { type: "rich_text", rich_text: [{ plain_text: "関連検索が前月比2.1倍" }] },
     },
   };
 }
@@ -60,7 +61,23 @@ describe("toPendingItems", () => {
       title: "猛暑×屋内",
       subtitle: "夏向けの集客記事",
     });
-    expect(item.details).toEqual([{ label: "優先度", value: "中" }]);
+    expect(item.details).toEqual([
+      { label: "優先度", value: "中" },
+      { label: "根拠", value: "関連検索が前月比2.1倍" },
+    ]);
+  });
+
+  it("記事ネタ案の根拠が空なら details から除外する(#238)", () => {
+    const noRationale: NotionPage = {
+      id: "i2",
+      url: "",
+      properties: {
+        "タイトル案": { type: "title", title: [{ plain_text: "B" }] },
+        "優先度": { type: "select", select: { name: "高" } },
+      },
+    };
+    const [item] = toPendingItems([], [noRationale]);
+    expect(item.details).toEqual([{ label: "優先度", value: "高" }]);
   });
 
   it("欠落プロパティは空文字・空 details で埋める", () => {
