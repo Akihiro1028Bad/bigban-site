@@ -202,6 +202,20 @@ export function ApproveClient() {
     );
   }
 
+  if (items.length === 0) {
+    return (
+      <main className="mx-auto max-w-md p-6 text-center">
+        <p className="mt-10 text-3xl">🎉</p>
+        <h1 className="mt-2 text-lg font-bold text-gray-900">
+          今週の承認待ちはありません
+        </h1>
+        <p className="mt-2 text-sm text-gray-600">お疲れさまでした。</p>
+      </main>
+    );
+  }
+
+  const allDone = processed === items.length;
+
   return (
     <main className="mx-auto max-w-md p-4">
       <div className="flex items-baseline justify-between">
@@ -210,6 +224,11 @@ export function ApproveClient() {
           処理済み {processed} / {items.length}件
         </p>
       </div>
+      {allDone ? (
+        <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
+          🎉 すべて処理しました。お疲れさまでした。
+        </p>
+      ) : null}
       <ul className="mt-4 space-y-3">
         {items.map((item) => {
           const choice = decided[item.id];
