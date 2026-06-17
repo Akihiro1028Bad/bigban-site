@@ -85,8 +85,8 @@ describe("toPendingItems", () => {
   it("欠落プロパティは空文字・空 details で埋める", () => {
     const bare: NotionPage = { id: "x", url: "", properties: {} };
     expect(toPendingItems([bare], [bare])).toEqual([
-      { id: "x", kind: "proposal", title: "", subtitle: "", details: [] },
-      { id: "x", kind: "idea", title: "", subtitle: "", details: [] },
+      { id: "x", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
+      { id: "x", kind: "idea", title: "", subtitle: "", details: [], score: 0 },
     ]);
   });
 
@@ -113,9 +113,28 @@ describe("toPendingItems", () => {
       },
     };
     expect(toPendingItems([noPlain], [noPlain])).toEqual([
-      { id: "y", kind: "proposal", title: "", subtitle: "", details: [] },
-      { id: "y", kind: "idea", title: "", subtitle: "", details: [] },
+      { id: "y", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
+      { id: "y", kind: "idea", title: "", subtitle: "", details: [], score: 0 },
     ]);
+  });
+
+  it("施策は優先度スコア、記事は優先度ランクを score に持つ(#242)", () => {
+    const [p] = toPendingItems([proposal("p1", "A", "x")], []);
+    expect(p.score).toBe(8.5);
+
+    const [mid] = toPendingItems([], [idea("i1", "B", "y")]);
+    expect(mid.score).toBe(2); // 優先度=中 → 2
+
+    const lowPage: NotionPage = {
+      id: "i2",
+      url: "",
+      properties: {
+        "タイトル案": { type: "title", title: [{ plain_text: "C" }] },
+        "優先度": { type: "select", select: { name: "未知" } },
+      },
+    };
+    const [unknown] = toPendingItems([], [lowPage]);
+    expect(unknown.score).toBe(0); // 範囲外 → 0
   });
 });
 
