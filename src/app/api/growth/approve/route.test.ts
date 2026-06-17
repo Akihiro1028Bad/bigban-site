@@ -67,6 +67,7 @@ describe("GET", () => {
         title: "市川ページ",
         subtitle: "サイト表示内容",
         details: [{ label: "確度", value: "高" }],
+        score: 0,
       },
     ]);
     expect(queryDataSource).toHaveBeenCalledTimes(2);
