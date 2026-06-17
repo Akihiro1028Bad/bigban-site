@@ -397,6 +397,37 @@ describe("ApproveClient 即時保存(#235)", () => {
   });
 });
 
+describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
+  it("エラーは入力欄に aria-describedby/aria-invalid で関連付く", async () => {
+    mockFetchSequence({ ok: false, status: 401, json: { success: false, error: "認証に失敗しました" } });
+    render(<ApproveClient />);
+    const input = screen.getByLabelText("合言葉");
+    expect(input).not.toHaveAttribute("aria-invalid");
+
+    await login("ちがう");
+    await screen.findByRole("alert");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", "passphrase-error");
+    expect(screen.getByRole("alert")).toHaveAttribute("id", "passphrase-error");
+  });
+
+  it("エラー時に入力欄へフォーカスが戻る", async () => {
+    mockFetchSequence({ ok: false, status: 401, json: { success: false, error: "x" } });
+    render(<ApproveClient />);
+    const input = screen.getByLabelText("合言葉");
+    await login("ちがう");
+    await screen.findByRole("alert");
+    expect(input).toHaveFocus();
+  });
+
+  it("未入力エラーでも入力欄へフォーカスが戻る", async () => {
+    mockFetchSequence();
+    render(<ApproveClient />);
+    await userEvent.click(screen.getByRole("button", { name: "確認する" }));
+    expect(screen.getByLabelText("合言葉")).toHaveFocus();
+  });
+});
+
 describe("ApproveClient セクション分割/ソート(#242)", () => {
   it("施策/記事をセクション見出しで分け、優先度降順に並べる", async () => {
     mockFetchSequence({
