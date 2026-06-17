@@ -86,7 +86,11 @@ function proposalDetails(page: NotionPage): PendingDetail[] {
 }
 
 function ideaDetails(page: NotionPage): PendingDetail[] {
-  return buildDetails([{ label: "優先度", value: selectName(page, "優先度") }]);
+  return buildDetails([
+    { label: "優先度", value: selectName(page, "優先度") },
+    // #238: 記事も施策と同様に判断根拠を出す(空なら buildDetails が除外)。
+    { label: "根拠", value: richText(page, "根拠") },
+  ]);
 }
 
 /** 施策提案・記事ネタ案のページを承認UI向けの統一形式に整える。 */
