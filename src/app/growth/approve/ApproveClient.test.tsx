@@ -397,6 +397,45 @@ describe("ApproveClient 即時保存(#235)", () => {
   });
 });
 
+describe("ApproveClient 施策の手動追加(#255)", () => {
+  it("施策を追加すると一覧の先頭に承認待ちで増える", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      {
+        json: {
+          success: true,
+          item: {
+            id: "n1",
+            kind: "proposal",
+            title: "手動の施策",
+            subtitle: "MEO",
+            details: [],
+            score: 0,
+          },
+        },
+      }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("施策名"), "手動の施策");
+    await userEvent.click(screen.getByRole("button", { name: "追加する" }));
+
+    expect(await screen.findByText("手動の施策")).toBeInTheDocument();
+    expect(screen.getByText("処理済み 0 / 2件")).toBeInTheDocument();
+  });
+
+  it("0件の空状態からも施策を追加できる", async () => {
+    mockFetchSequence({ json: { success: true, items: [] } });
+    render(<ApproveClient />);
+    await login();
+    expect(await screen.findByText(/承認待ちはありません/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "追加する" })).toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient フォーカス管理(#240)", () => {
   it("承認後は取り消すボタンへフォーカスが移る", async () => {
     mockFetchSequence(
