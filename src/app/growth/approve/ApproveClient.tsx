@@ -5,6 +5,8 @@ import type { FormEvent } from "react";
 
 import { pendingStatus } from "@/lib/growth/approve";
 
+import { AddProposalForm } from "./AddProposalForm";
+
 interface PendingDetail {
   label: string;
   value: string;
@@ -160,6 +162,11 @@ export function ApproveClient() {
     }
   }
 
+  // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
+  function addProposal(item: PendingItem): void {
+    setItems((prev) => [item, ...prev]);
+  }
+
   async function undo(item: PendingItem): Promise<void> {
     setSavingId(item.id);
     setFailures((prev) => removeKey(prev, item.id));
@@ -239,6 +246,9 @@ export function ApproveClient() {
           今週の承認待ちはありません
         </h1>
         <p className="mt-2 text-sm text-gray-600">お疲れさまでした。</p>
+        <div className="mx-auto mt-6 max-w-md text-left">
+          <AddProposalForm token={token} onAdded={addProposal} />
+        </div>
       </main>
     );
   }
@@ -369,6 +379,7 @@ export function ApproveClient() {
           <ul className="mt-2 space-y-3">{ideas.map(renderItem)}</ul>
         </section>
       ) : null}
+      <AddProposalForm token={token} onAdded={addProposal} />
     </main>
   );
 }
