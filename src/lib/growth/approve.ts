@@ -22,9 +22,22 @@ export interface PendingItem {
   details: PendingDetail[];
 }
 
+/** 承認待ちステータス(種別ごとに名前が異なる)。取り消し時の復帰先。 */
+export type PendingStatus = "未処理" | "提案中";
+
+/** ステータス更新で指定できる値。承認/却下に加え、取り消し用の承認待ち復帰。 */
+export type DecisionValue = "承認" | "却下" | PendingStatus;
+
+const DECISION_VALUES: readonly DecisionValue[] = ["承認", "却下", "未処理", "提案中"];
+
 export interface Decision {
   id: string;
-  decision: "承認" | "却下";
+  decision: DecisionValue;
+}
+
+/** 種別から承認待ち(取り消し時の復帰先)ステータスを返す。 */
+export function pendingStatus(kind: PendingKind): PendingStatus {
+  return kind === "proposal" ? "未処理" : "提案中";
 }
 
 // Notion ページ ID(UUID。ダッシュ有り/無しの32桁16進)のみ許可
@@ -116,9 +129,9 @@ export function parseDecisions(body: unknown): Decision[] {
     if (typeof id !== "string" || !ID_RE.test(id)) {
       throw new Error("不正な id です。");
     }
-    if (decision !== "承認" && decision !== "却下") {
-      throw new Error("decision は承認/却下のみ指定できます。");
+    if (!DECISION_VALUES.includes(decision as DecisionValue)) {
+      throw new Error("decision は承認/却下/未処理/提案中のみ指定できます。");
     }
-    return { id, decision };
+    return { id, decision: decision as DecisionValue };
   });
 }
