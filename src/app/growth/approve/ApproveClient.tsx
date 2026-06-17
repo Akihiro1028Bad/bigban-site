@@ -224,9 +224,12 @@ export function ApproveClient() {
           処理済み {processed} / {items.length}件
         </p>
       </div>
+      <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
+        承認した提案は制作キューに追加されます。この場では公開されません。
+      </p>
       {allDone ? (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
-          🎉 すべて処理しました。お疲れさまでした。
+          🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
         </p>
       ) : null}
       <ul className="mt-4 space-y-3">
