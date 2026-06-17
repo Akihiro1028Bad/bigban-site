@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import {
+  createPage,
   DEFAULT_NOTION_VERSION,
   getLatestReport,
   queryDataSource,
@@ -117,6 +118,39 @@ describe("updatePageSelect", () => {
     await expect(
       updatePageSelect("p1", "ステータス", "承認", { token: TOKEN, fetchFn })
     ).rejects.toThrow(/404/);
+  });
+});
+
+describe("createPage", () => {
+  it("POST /v1/pages に data_source 親とプロパティを送り id を返す", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ object: "page", id: "new1" }));
+
+    const id = await createPage(
+      DS,
+      { "施策名": { title: [{ text: { content: "A" } }] } },
+      { token: TOKEN, fetchFn }
+    );
+
+    expect(id).toBe("new1");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/pages");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      parent: { type: "data_source_id", data_source_id: DS },
+      properties: { "施策名": { title: [{ text: { content: "A" } }] } },
+    });
+  });
+
+  it("応答に id が無ければ throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ object: "page" }));
+    await expect(
+      createPage(DS, {}, { token: TOKEN, fetchFn })
+    ).rejects.toThrow(/id が含まれていません/);
+  });
+
+  it("失敗時は throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(400, "bad request"));
+    await expect(createPage(DS, {}, { token: TOKEN, fetchFn })).rejects.toThrow(/400/);
   });
 });
 
