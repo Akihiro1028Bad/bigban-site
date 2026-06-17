@@ -397,6 +397,36 @@ describe("ApproveClient 即時保存(#235)", () => {
   });
 });
 
+describe("ApproveClient フォーカス管理(#240)", () => {
+  it("承認後は取り消すボタンへフォーカスが移る", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    expect(await screen.findByRole("button", { name: "取り消す: 市川ページ" })).toHaveFocus();
+  });
+
+  it("取り消し後は承認ボタンへフォーカスが戻る", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
+    expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toHaveFocus();
+  });
+});
+
 describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
   it("エラーは入力欄に aria-describedby/aria-invalid で関連付く", async () => {
     mockFetchSequence({ ok: false, status: 401, json: { success: false, error: "認証に失敗しました" } });
