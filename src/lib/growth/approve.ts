@@ -76,22 +76,24 @@ function buildDetails(
 
 function proposalDetails(page: NotionPage): PendingDetail[] {
   const score = numberValue(page, "優先度スコア");
+  // #241: 判断しやすい順「根拠 → 想定アクション → 数値(スコア/確度/インパクト)」。
   return buildDetails([
+    { label: "根拠", value: richText(page, "根拠") },
+    { label: "想定アクション", value: richText(page, "想定アクション") },
     { label: "優先度スコア", value: score === null ? "" : String(score) },
     { label: "確度", value: selectName(page, "確度") },
     { label: "インパクト", value: selectName(page, "インパクト") },
-    { label: "根拠", value: richText(page, "根拠") },
-    { label: "想定アクション", value: richText(page, "想定アクション") },
   ]);
 }
 
 function ideaDetails(page: NotionPage): PendingDetail[] {
+  // #241: 根拠 → 構成案 → 数値(優先度)の順に揃える。
   return buildDetails([
-    { label: "優先度", value: selectName(page, "優先度") },
     // #238: 記事も施策と同様に判断根拠を出す(空なら buildDetails が除外)。
     { label: "根拠", value: richText(page, "根拠") },
     // #245: 承認前に記事の中身を把握できるよう構成案(見出しアウトライン)を出す。
     { label: "構成案", value: richText(page, "構成案") },
+    { label: "優先度", value: selectName(page, "優先度") },
   ]);
 }
 
