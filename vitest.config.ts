@@ -51,6 +51,7 @@ export default defineConfig({
         "__mocks__/**",
         // 実行時の薄い入口(実データでの手動検証のためテスト対象外)
         "scripts/growth/cli.ts",
+        "scripts/growth/existing-cli.ts",
         "scripts/growth/setup-token.ts",
         "scripts/growth/upload-media.ts",
         "scripts/growth/draft-content.ts",
