@@ -86,3 +86,21 @@ THE PICKLE BANG THEORY の**グロースループで生成する集客記事**(�
 Bright, airy editorial photograph, {SUBJECT}. Welcoming premium indoor pickleball facility, soft natural daylight through large windows, light and clean tones, friendly and cheerful mood, shallow depth of field, photorealistic, high detail. Color palette: light airy background with bright blue (#306EC3) and deep blue (#11317B) court accents; the yellow-green pickleball is a playful pop of color. 16:9 composition, subject offset to one side leaving clean negative space for a text overlay, eye-level.
 Negative: no text, no logos, no watermark, no dark moody low-key lighting, no oversaturation, no clutter, no distorted paddle or ball, no illustration, no unnatural hands.
 ```
+
+## 10. 取材ソース(執筆前に必ず行う)
+
+執筆は「それっぽいが薄い一般論」に陥りやすい。**書く前に取材**し、具体(手順・数値・固有名詞・最新動向)で記事を厚くする。WebSearch / WebFetch を使い、用途ごとに信頼できる一次情報へ当たる。
+
+| 用途 | 参照先 |
+|---|---|
+| 競技ルール・基礎 | 日本ピックルボール連盟(japanpickleball.org)・千葉県協会 / USA Pickleball・IFP の公式ルール |
+| 市場トレンド・統計 | SFIA 等の競技人口レポート、官公庁・大手メディアの報道。**数字は一次資料のあるものだけ** |
+| 用具情報 | メーカー公式(JOOLA / Selkirk / 国内代理店 等) |
+| 地域・アクセス | 市川市公式・都営新宿線の路線情報(「始発」「都心◯分」等の裏取り) |
+| 検索意図の把握 | 狙うクエリで実際に検索し、上位記事を読んで「読者が知りたいこと」を地図化(**読むだけ・コピーしない**) |
+| 健康・怪我 | 効果は断定しない(§5)。一般的な準備運動程度に留め、必要なら「専門家に相談を」 |
+
+ルール:
+- 取材は**具体性を足すため**。**裏が取れない数字・固有名詞は書かない**(§5「創作・推測で数字を書かない」を厳守)。
+- 統計を出すときは「◯◯協会によると」程度の帰属を付ける。出典 URL の本文明記は不要。
+- 競合記事は**検索意図の把握のために読むだけ**。文章・構成のコピーはしない。
