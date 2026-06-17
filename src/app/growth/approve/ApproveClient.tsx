@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import { pendingStatus } from "@/lib/growth/approve";
@@ -78,9 +78,19 @@ export function ApproveClient() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // #240: 操作後に次の操作対象へフォーカスを移すための一時ターゲット(要素 id)。
+  const [focusId, setFocusId] = useState<string | null>(null);
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
+
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.getElementById(focusId);
+    /* istanbul ignore else -- 対象ボタンは保存成功直後に必ず描画される */
+    if (el) el.focus();
+    setFocusId(null);
+  }, [focusId]);
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -138,6 +148,7 @@ export function ApproveClient() {
     try {
       await postStatus(item.id, choice);
       setDecided((prev) => ({ ...prev, [item.id]: choice }));
+      setFocusId(`undo-${item.id}`);
     } catch (error) {
       const text = toMessage(error, "保存に失敗しました。");
       setFailures((prev) => ({
@@ -155,6 +166,7 @@ export function ApproveClient() {
     try {
       await postStatus(item.id, pendingStatus(item.kind));
       setDecided((prev) => removeKey(prev, item.id));
+      setFocusId(`approve-${item.id}`);
     } catch (error) {
       const text = toMessage(error, "取り消しに失敗しました。");
       setFailures((prev) => ({
@@ -291,6 +303,7 @@ export function ApproveClient() {
             <span className="text-xs text-gray-600">保存済み</span>
             <button
               type="button"
+              id={`undo-${item.id}`}
               aria-label={`取り消す: ${item.title}`}
               onClick={() => undo(item)}
               disabled={isBusy}
@@ -305,6 +318,7 @@ export function ApproveClient() {
           <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-3 flex gap-2">
             <button
               type="button"
+              id={`approve-${item.id}`}
               aria-label={`承認: ${item.title}`}
               onClick={() => decide(item, "承認")}
               disabled={isBusy}
