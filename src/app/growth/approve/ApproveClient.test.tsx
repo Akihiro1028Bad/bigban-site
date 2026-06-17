@@ -397,6 +397,57 @@ describe("ApproveClient 即時保存(#235)", () => {
   });
 });
 
+describe("ApproveClient セクション分割/ソート(#242)", () => {
+  it("施策/記事をセクション見出しで分け、優先度降順に並べる", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          { id: "p1", kind: "proposal", title: "低スコア施策", subtitle: "", details: [], score: 2 },
+          { id: "p2", kind: "proposal", title: "高スコア施策", subtitle: "", details: [], score: 9 },
+          { id: "i1", kind: "idea", title: "記事A", subtitle: "", details: [], score: 1 },
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("高スコア施策");
+
+    expect(screen.getByRole("heading", { name: "施策" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "記事" })).toBeInTheDocument();
+    const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
+    expect(titles).toEqual(["高スコア施策", "低スコア施策"]);
+  });
+
+  it("施策のみのときは記事セクションを出さない", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [{ id: "p1", kind: "proposal", title: "施策のみ", subtitle: "", details: [], score: 1 }],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策のみ");
+    expect(screen.getByRole("heading", { name: "施策" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "記事" })).not.toBeInTheDocument();
+  });
+
+  it("記事のみのときは施策セクションを出さない", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [{ id: "i1", kind: "idea", title: "記事のみ", subtitle: "", details: [], score: 1 }],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("記事のみ");
+    expect(screen.getByRole("heading", { name: "記事" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "施策" })).not.toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 公開タイミングの明示(#237)", () => {
   it("承認＝制作キュー追加・この場では非公開の補足を表示する", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
