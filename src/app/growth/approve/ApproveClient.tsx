@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { pendingStatus } from "@/lib/growth/approve";
+
 interface PendingDetail {
   label: string;
   value: string;
@@ -41,9 +43,8 @@ function cardClass(choice: Choice | undefined): string {
   return `${base} border-gray-200 bg-white`;
 }
 
-function choiceButtonClass(active: boolean, activeClass: string): string {
-  const inactive = "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50";
-  return `${TAP_TARGET} ${active ? activeClass : inactive}`;
+function choiceButtonClass(activeClass: string): string {
+  return `${TAP_TARGET} ${activeClass}`;
 }
 
 export function ApproveClient() {
@@ -54,11 +55,13 @@ export function ApproveClient() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [items, setItems] = useState<PendingItem[]>([]);
-  const [choices, setChoices] = useState<Record<string, Choice>>({});
+  // 即時保存モデル: カードごとに保存済みの選択(承認/却下)を持つ。確定ボタンは無い。
+  const [decided, setDecided] = useState<Record<string, Choice>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const selectedCount = Object.keys(choices).length;
+  const processed = Object.keys(decided).length;
 
   async function enter(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -89,30 +92,46 @@ export function ApproveClient() {
     }
   }
 
-  function choose(id: string, choice: Choice): void {
-    setChoices((prev) => ({ ...prev, [id]: choice }));
+  /** ステータスを 1 件だけ更新する(承認/却下/承認待ち復帰の共通処理)。 */
+  async function postStatus(id: string, decision: string): Promise<void> {
+    const res = await fetch(approveUrl(token), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decisions: [{ id, decision }] }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error ?? "保存に失敗しました。");
+    }
   }
 
-  async function save(): Promise<void> {
-    const decisions = Object.entries(choices).map(([id, decision]) => ({ id, decision }));
-    setBusy(true);
+  async function decide(item: PendingItem, choice: Choice): Promise<void> {
+    setSavingId(item.id);
+    setMessage("");
     try {
-      const res = await fetch(approveUrl(token), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decisions }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error ?? "保存に失敗しました。");
-      }
-      setItems((prev) => prev.filter((item) => !choices[item.id]));
-      setChoices({});
-      setMessage(`${json.updated}件を保存しました。`);
+      await postStatus(item.id, choice);
+      setDecided((prev) => ({ ...prev, [item.id]: choice }));
     } catch (error) {
       setMessage(toMessage(error, "保存に失敗しました。"));
     } finally {
-      setBusy(false);
+      setSavingId(null);
+    }
+  }
+
+  async function undo(item: PendingItem): Promise<void> {
+    setSavingId(item.id);
+    setMessage("");
+    try {
+      await postStatus(item.id, pendingStatus(item.kind));
+      setDecided((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    } catch (error) {
+      setMessage(toMessage(error, "取り消しに失敗しました。"));
+    } finally {
+      setSavingId(null);
     }
   }
 
@@ -168,15 +187,21 @@ export function ApproveClient() {
 
   return (
     <main className="mx-auto max-w-md p-4">
-      <h1 className="text-xl font-bold text-gray-900">承認待ち {items.length}件</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-xl font-bold text-gray-900">今週の提案</h1>
+        <p className="text-sm text-gray-600">
+          処理済み {processed} / {items.length}件
+        </p>
+      </div>
       {message ? (
-        <p role="status" className="mt-2 text-sm text-gray-700">
+        <p role="alert" className="mt-2 text-sm text-red-700">
           {message}
         </p>
       ) : null}
       <ul className="mt-4 space-y-3">
         {items.map((item) => {
-          const choice = choices[item.id];
+          const choice = decided[item.id];
+          const isBusy = savingId === item.id;
           return (
             <li key={item.id} className={cardClass(choice)} data-decision={choice ?? ""}>
               <div className="flex items-center gap-2">
@@ -184,7 +209,7 @@ export function ApproveClient() {
                   {KIND_BADGE[item.kind]}
                 </span>
                 {choice ? (
-                  <span className="text-xs font-semibold text-gray-700">選択中: {choice}</span>
+                  <span className="text-xs font-semibold text-gray-700">{choice}しました</span>
                 ) : null}
               </div>
               <p className="mt-2 font-semibold text-gray-900">{item.title}</p>
@@ -201,38 +226,51 @@ export function ApproveClient() {
                   ))}
                 </dl>
               ) : null}
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  aria-pressed={choice === "承認"}
-                  aria-label={`承認: ${item.title}`}
-                  onClick={() => choose(item.id, "承認")}
-                  className={choiceButtonClass(choice === "承認", "border border-blue-600 bg-blue-600 text-white")}
-                >
-                  承認
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={choice === "却下"}
-                  aria-label={`却下: ${item.title}`}
-                  onClick={() => choose(item.id, "却下")}
-                  className={choiceButtonClass(choice === "却下", "border border-gray-700 bg-gray-700 text-white")}
-                >
-                  却下
-                </button>
-              </div>
+              {choice ? (
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-gray-600">保存済み</span>
+                  <button
+                    type="button"
+                    aria-label={`取り消す: ${item.title}`}
+                    onClick={() => undo(item)}
+                    disabled={isBusy}
+                    className={`${choiceButtonClass(
+                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    )} disabled:opacity-50`}
+                  >
+                    取り消す
+                  </button>
+                </div>
+              ) : (
+                <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    aria-label={`承認: ${item.title}`}
+                    onClick={() => decide(item, "承認")}
+                    disabled={isBusy}
+                    className={`${choiceButtonClass(
+                      "border border-blue-600 bg-blue-600 text-white"
+                    )} disabled:opacity-50`}
+                  >
+                    承認
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`却下: ${item.title}`}
+                    onClick={() => decide(item, "却下")}
+                    disabled={isBusy}
+                    className={`${choiceButtonClass(
+                      "border border-gray-700 bg-gray-700 text-white"
+                    )} disabled:opacity-50`}
+                  >
+                    却下
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
-      <button
-        type="button"
-        onClick={save}
-        disabled={busy || selectedCount === 0}
-        className={`${TAP_TARGET} mt-4 w-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50`}
-      >
-        {selectedCount}件を確定する
-      </button>
     </main>
   );
 }
