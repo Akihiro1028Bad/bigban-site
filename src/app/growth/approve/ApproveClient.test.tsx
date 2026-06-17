@@ -387,3 +387,45 @@ describe("ApproveClient 即時保存(#235)", () => {
     );
   });
 });
+
+describe("ApproveClient 空状態/完了(#236)", () => {
+  it("承認待ち0件のとき空状態を表示し、操作ボタンを出さない", async () => {
+    mockFetchSequence({ json: { success: true, items: [] } });
+    render(<ApproveClient />);
+    await login();
+    expect(await screen.findByText(/承認待ちはありません/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
+  });
+
+  it("全件処理すると完了メッセージを表示する", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    expect(await screen.findByText(/すべて処理しました/)).toBeInTheDocument();
+  });
+
+  it("一部未処理なら完了メッセージは出ない", async () => {
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [proposalItem(), proposalItem({ id: "p2", title: "他カード" })],
+        },
+      },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await screen.findByText("承認しました");
+    expect(screen.queryByText(/すべて処理しました/)).not.toBeInTheDocument();
+  });
+});
