@@ -63,7 +63,7 @@ THE PICKLE BANG THEORY の**グロースループで生成する集客記事**(�
 
 ## 9. アイキャッチ画像 アートディレクション(正典・厳守)
 
-記事ごとに画風がバラつくと安っぽく見える。**全アイキャッチで以下の画調を固定**する。`openai-image-gen` に渡すプロンプトは必ず「固定スタイルブロック + 記事ごとの被写体1行」で組み立てる。即興でゼロから書かない。
+記事ごとに**画調**がバラつくと安っぽく見える一方、被写体まで固定すると**全記事が似た画像**になってしまう。そこで **固定するのはトリートメント(画調)だけ / 被写体は記事固有** にする。`openai-image-gen` に渡すプロンプトは「固定スタイルブロック + **記事ごとに作る被写体シーン**」で組み立て、即興でゼロから画調を変えない(被写体は毎回変える)。
 
 方向性は **明るいエアリーな実写 × ブランド配色のまま親しみやすく**。初心者〜検討層が読む集客記事に合う、軽やかで親しみのあるトーンにする(ダークなシネマティックには振らない)。
 
@@ -75,18 +75,40 @@ THE PICKLE BANG THEORY の**グロースループで生成する集客記事**(�
 - **生成モード: `gpt-image-2` の `--quality high` 固定**(描き込み最高・枚あたり概算 $0.3前後/1536x1024)。
 
 ### 禁止(ネガティブ・プロンプトに必ず明記)
-文字・ロゴ・ウォーターマーク、**ダークなローキー照明**、過度な彩度、雑然とした背景、変形したパドル/ボール、複数画風の混在、はめ込み合成、イラスト、人物の不自然な手指。
+文字・ロゴ・ウォーターマーク、**ダークなローキー照明**、過度な彩度、雑然とした背景、変形したパドル/ボール、複数画風の混在、はめ込み合成、(実写の)イラスト化、**人物の顔のクローズアップ**、不自然な顔・手指、ストックフォト然としたわざとらしい笑顔。
 
-### 被写体テンプレ(記事タイプ別・1行を選ぶ)
-- 初心者ガイド/ハウツー: 明るいコート手前のパドルとボール、または窓から光が差すコートのワンシーン
-- 業界トレンド: 明るいコートの俯瞰や幾何学を活かした構図
-- 用具・技術: 明るい背景でのパドル/ボールのマクロ、質感重視
-- 季節・地域: 大きな窓と自然光、時間帯/季節感を活かしたインドアコート
+### 一貫させるもの / 変えるもの(重要)
+全記事で**似た画像**になるのを避けるため、固定するのは画調だけにする。
+- **一貫＝トリートメント(画調)のみ**: 上の「画調」の光・ブランド配色・クリーンなトーン・余白構図。**ブランド統一はここで担保**する。背景を「同じ施設の同じ写真」に固定しない。
+- **可変＝被写体と背景シーン**: 記事の主題(誰が・何を・どんな状況で)に合わせてシーンを変える。
 
-### プロンプト雛形(英語で渡す。`{SUBJECT}` に上の1行を入れる)
+### 被写体は記事ごとに作る(記事タイプ別の固定テンプレは廃止)
+記事の見出し・狙うクエリ・読者像から、**その記事固有のシーンを1つ**描写して `{SUBJECT}` に入れる。手順:
+1. 主題が「人・行為・状況」か「モノ(用具/コート)」かを見極める。
+2. 人主題なら**人を部分・行為中心**で(手元/後ろ姿/プレー中の一場面)。**顔のクローズアップは避け、ボケ・引き**で破綻とストックフォト感を防ぐ。モノ主題(用具/コート選び)は人なしでよい。
+3. 背景は主題のシーンに合わせる(屋内コートに限定しない。ただし記事内容と矛盾させない)。
+
+**良い被写体の例**(そのままコピーせず、記事に合わせて作る):
+- シニアの健康: 笑顔のシニア2人がダブルスでハイタッチ(引き・顔はソフト)
+- 経験者の移行(テニス/卓球/バド→): テニスラケットとパドルを持ち比べる手元のクローズ
+- 一人参加の不安解消: コート脇で初対面の2人が挨拶し合う後ろ姿
+- コート選び/用具(モノ主題): 複数のコート面やパドルを見比べる視点(人なし可)
+- 継続・上達: ネット際でディンクするプレー中の一場面(手元〜上半身、顔は引き)
+
+### 実写 / 図解の出し分け
+- **既定＝実写**(雛形A)。
+- **ルール解説・手順・比較など「説明が主役」の記事は図解を許可**(雛形B)。図解も**ブランド配色・クリーン**に統一し、自由に乱立させない。アイキャッチ図解は**文字なし**、本文図解は文字入れ可(既存方針)。
+
+### プロンプト雛形(英語で渡す)
+**A. 実写(既定)** — `{SUBJECT}` に上で作った記事固有のシーン1行を入れる:
 ```
-Bright, airy editorial photograph, {SUBJECT}. Welcoming premium indoor pickleball facility, soft natural daylight through large windows, light and clean tones, friendly and cheerful mood, shallow depth of field, photorealistic, high detail. Color palette: light airy background with bright blue (#306EC3) and deep blue (#11317B) court accents; the yellow-green pickleball is a playful pop of color. 16:9 composition, subject offset to one side leaving clean negative space for a text overlay, eye-level.
-Negative: no text, no logos, no watermark, no dark moody low-key lighting, no oversaturation, no clutter, no distorted paddle or ball, no illustration, no unnatural hands.
+Bright, airy editorial photograph, {SUBJECT}. Welcoming premium indoor pickleball facility, soft natural daylight through large windows, light and clean tones, friendly and cheerful mood, shallow depth of field, photorealistic, high detail. People shown partially or in action (hands, over-the-shoulder, mid-play); faces soft, blurred or turned away — no face close-ups. Color palette: light airy background with bright blue (#306EC3) and deep blue (#11317B) court accents; the yellow-green pickleball is a playful pop of color. 16:9 composition, subject offset to one side leaving clean negative space for a text overlay, eye-level.
+Negative: no text, no logos, no watermark, no dark moody low-key lighting, no oversaturation, no clutter, no distorted paddle or ball, no illustration, no face close-up, no unnatural faces or hands, no stock-photo fake smiles.
+```
+**B. 図解(説明が主役の記事のみ)** — `{CONCEPT}` に図解したい概念を入れる:
+```
+Clean modern flat infographic-style illustration explaining {CONCEPT} for pickleball beginners. Bright airy background, brand palette: bright blue (#306EC3) and deep blue (#11317B) with a yellow-green (pickleball) accent. Simple geometric shapes, generous whitespace, friendly and clear, consistent line weight, photorealistic faces avoided. 16:9 composition with clean negative space on one side. Eyecatch version: no text labels.
+Negative: no photorealistic faces, no clutter, no oversaturation, no multiple conflicting styles, no dark background, (eyecatch) no text.
 ```
 
 ## 10. 取材ソース(執筆前に必ず行う)
