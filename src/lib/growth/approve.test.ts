@@ -29,6 +29,7 @@ function idea(id: string, title: string, summary: string): NotionPage {
       "概要": { type: "rich_text", rich_text: [{ plain_text: summary }] },
       "優先度": { type: "select", select: { name: "中" } },
       "根拠": { type: "rich_text", rich_text: [{ plain_text: "関連検索が前月比2.1倍" }] },
+      "構成案": { type: "rich_text", rich_text: [{ plain_text: "導入→H2基準3つ→CTA" }] },
     },
   };
 }
@@ -64,6 +65,7 @@ describe("toPendingItems", () => {
     expect(item.details).toEqual([
       { label: "優先度", value: "中" },
       { label: "根拠", value: "関連検索が前月比2.1倍" },
+      { label: "構成案", value: "導入→H2基準3つ→CTA" },
     ]);
   });
 

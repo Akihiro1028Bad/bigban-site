@@ -122,6 +122,15 @@ describe("ApproveClient 合言葉画面", () => {
     expect(screen.getByText("確度")).toBeInTheDocument();
   });
 
+  it("詳細は『詳細を見る』の折りたたみに入る(#245)", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.getByText("詳細を見る")).toBeInTheDocument();
+    expect(screen.getByText("優先度スコア")).toBeInTheDocument();
+  });
+
   it("details も subtitle も無い項目でも壊れない", async () => {
     mockFetchSequence({
       json: { success: true, items: [{ id: "p1", kind: "proposal", title: "A", subtitle: "" }] },
