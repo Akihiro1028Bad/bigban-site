@@ -55,6 +55,7 @@ export default defineConfig({
         "scripts/growth/setup-token.ts",
         "scripts/growth/upload-media.ts",
         "scripts/growth/draft-content.ts",
+        "scripts/growth/facility-context-cli.ts",
         "scripts/growth/notify-line.ts",
       ],
       thresholds: {
