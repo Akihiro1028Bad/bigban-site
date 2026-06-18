@@ -42,6 +42,13 @@ public/
 - Webhook URL (microCMS 管理画面で設定): `${SITE_URL}/api/revalidate`
 - プレビュー URL: `${SITE_URL}/api/draft/enable?secret=...&slug=...&draftKey=...&locale=ja|en`
 
+## グロースループ記事生成 (headless)
+
+- 文体・構成の正典: `docs/operations/growth-article-style.md`、運用手順: `docs/operations/growth-weekly-runbook.md`
+- 記事の前提（施設の現況=開業前/開業済み・確定事実・書いてはいけない未確定項目）は **`scripts/growth/facility-context.json` を唯一の単一ソース**とする。`npm run growth:facility-context` で出力し、下書きモード冒頭で正典として注入（style-guide §13）
+- 文体ルール: 翻訳調・AIっぽさを避ける（§14）／外部リンク濫用・未検証数値・タイトル盛りを避け内部リンクを検討（§15）
+- 実行は自宅 PC の headless `claude -p`（`scripts/growth/run.mjs`）。git push / commit・本番公開はしない
+
 ## Development Process — TDD
 
 Red -> Green -> Refactor cycle is mandatory for all development.
