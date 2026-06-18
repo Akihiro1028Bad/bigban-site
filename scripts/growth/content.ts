@@ -10,12 +10,42 @@
  * これにより 504 等のリトライ・再実行でも**重複下書きを作らない**(レジューム可能)。
  */
 
-import type { FetchFn } from "./http";
+import type { FetchFn, HttpResponse } from "./http";
+
+/** リトライ・タイムアウトの設定(すべて任意・既定あり)。 */
+export interface RetryConfig {
+  /** 最大試行回数(初回含む) */
+  maxAttempts: number;
+  /** 初回バックオフ(ms) */
+  baseDelayMs: number;
+  /** バックオフ上限(ms) */
+  maxDelayMs: number;
+  /** 1リクエストのタイムアウト(ms, AbortController) */
+  timeoutMs: number;
+}
+
+export const DEFAULT_RETRY: RetryConfig = {
+  maxAttempts: 4,
+  baseDelayMs: 500,
+  maxDelayMs: 8000,
+  timeoutMs: 15000,
+};
 
 export interface ContentApiOptions {
   serviceDomain: string;
   apiKey: string;
   fetchFn: FetchFn;
+  /** 部分指定可。未指定は DEFAULT_RETRY。 */
+  retry?: Partial<RetryConfig>;
+  /** バックオフ待機(テストで注入)。未指定は setTimeout ベース。 */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+function backoffMs(attempt: number, cfg: RetryConfig): number {
+  return Math.min(cfg.maxDelayMs, cfg.baseDelayMs * 2 ** (attempt - 1));
 }
 
 /** microCMS API の非 2xx 応答を表す。status / body を保持し、4xx/5xx の判別に使う。 */
@@ -54,31 +84,83 @@ export function slugToContentId(slug: string): string {
   return id;
 }
 
-async function send(
+/** 1リクエストを AbortController タイムアウト付きで送る。 */
+async function requestOnce(
   method: "PUT" | "PATCH",
   url: string,
   apiKey: string,
   body: unknown,
-  fetchFn: FetchFn
+  fetchFn: FetchFn,
+  timeoutMs: number
+): Promise<HttpResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchFn(url, {
+      method,
+      headers: {
+        "X-MICROCMS-API-KEY": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * microCMS へ書き込む。5xx / ネットワーク / タイムアウトは指数バックオフで再試行、
+ * 4xx は即失敗(リトライしない)。冪等化(#21)と併用すれば再試行しても重複しない。
+ */
+async function send(
+  method: "PUT" | "PATCH",
+  url: string,
+  body: unknown,
+  options: ContentApiOptions
 ): Promise<string> {
-  const res = await fetchFn(url, {
-    method,
-    headers: {
-      "X-MICROCMS-API-KEY": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const cfg: RetryConfig = { ...DEFAULT_RETRY, ...options.retry };
+  const sleep = options.sleep ?? defaultSleep;
+  let lastError: unknown;
 
-  if (!res.ok) {
-    throw new MicrocmsHttpError(res.status, await res.text());
+  for (let attempt = 1; attempt <= cfg.maxAttempts; attempt++) {
+    let res: HttpResponse;
+    try {
+      res = await requestOnce(
+        method,
+        url,
+        options.apiKey,
+        body,
+        options.fetchFn,
+        cfg.timeoutMs
+      );
+    } catch (error: unknown) {
+      // ネットワーク / タイムアウト(abort) → 再試行対象
+      lastError = error;
+      if (attempt >= cfg.maxAttempts) throw error;
+      await sleep(backoffMs(attempt, cfg));
+      continue;
+    }
+
+    if (!res.ok) {
+      const err = new MicrocmsHttpError(res.status, await res.text());
+      if (res.status < 500) throw err; // 4xx は即失敗
+      lastError = err;
+      if (attempt >= cfg.maxAttempts) throw err;
+      await sleep(backoffMs(attempt, cfg));
+      continue;
+    }
+
+    const json = (await res.json()) as { id?: string };
+    if (!json.id) {
+      throw new Error("microCMS 応答に id が含まれていません。");
+    }
+    return json.id;
   }
 
-  const json = (await res.json()) as { id?: string };
-  if (!json.id) {
-    throw new Error("microCMS 応答に id が含まれていません。");
-  }
-  return json.id;
+  /* istanbul ignore next -- @preserve ループは必ず return/throw で抜ける */
+  throw lastError;
 }
 
 function isAlreadyExists(error: MicrocmsHttpError): boolean {
@@ -103,11 +185,11 @@ export async function createDraft(
   const url = `${contentUrl(options.serviceDomain, endpoint, id)}?status=draft`;
 
   try {
-    return await send("PUT", url, options.apiKey, data, options.fetchFn);
+    return await send("PUT", url, data, options);
   } catch (error: unknown) {
     if (error instanceof MicrocmsHttpError && isAlreadyExists(error)) {
       // 既に同一IDの下書きが存在 = 前回の作成が成功済み。上書きしてレジューム。
-      return send("PATCH", url, options.apiKey, data, options.fetchFn);
+      return send("PATCH", url, data, options);
     }
     throw error;
   }
@@ -125,5 +207,5 @@ export function patchDraft(
     endpoint,
     contentId
   )}?status=draft`;
-  return send("PATCH", url, options.apiKey, data, options.fetchFn);
+  return send("PATCH", url, data, options);
 }
