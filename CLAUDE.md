@@ -177,6 +177,14 @@ Blank line between each group. No circular imports.
 
 ## Git Conventions
 
+### Push Account (MANDATORY)
+
+- **Always push using the dedicated AI account `ttmakhr1028ai-art`.** Never push with a human/owner account.
+- Before any `git push` (or `gh` write operation that pushes), verify the active account:
+  - `gh auth status` → active account must be `ttmakhr1028ai-art`.
+  - If not, switch first: `gh auth switch --user ttmakhr1028ai-art`.
+- If the AI account is unavailable or lacks access, STOP and report — do not silently fall back to another account.
+
 ### Branches
 
 - `feature/short-description`
