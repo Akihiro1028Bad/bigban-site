@@ -127,7 +127,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
 2. 各案を **コンテンツ作成チーム** で執筆
 3. **投入スペックをステージ**(エージェントはここまで): 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction(§9の宇宙人の行為), imagePath, notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。eyecatchAction は §9「宇宙人マスコット × コスミック」に沿う
-4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し終了コード1で終わる。同じ spec で再実行すれば冪等に再開。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
+4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。同じ spec で再実行すれば冪等に再開。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
 5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` にして `npm run growth:notify-drafts -- <json>` を実行。各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功時のみ**実行。`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
 
 **コンテンツ作成チームの工程**(サブエージェントは**2体**に分ける)

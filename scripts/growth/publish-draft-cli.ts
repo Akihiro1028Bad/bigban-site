@@ -23,8 +23,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createDraft, patchDraft } from "./content";
+import { buildDraftFailureMessage } from "./draft-notify";
 import { buildEyecatchPrompt, generateEyecatch } from "./eyecatch";
 import { defaultFetch } from "./http";
+import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
 import { updatePageSelect } from "./notion";
 import { runStages, type Stage } from "./pipeline";
@@ -124,11 +126,31 @@ async function main(): Promise<void> {
   const result = await runStages(stages, (m) => process.stdout.write(`${m}\n`));
 
   if (result.failedAt) {
-    process.stderr.write(
-      `投入に失敗しました(工程: ${result.failedAt.name}): ${result.failedAt.error}\n` +
-        `ステージ済みスペック: ${specPath}\n` +
-        `復旧後、同じ spec で再実行すれば冪等(#21)に再開できます: npm run growth:publish-draft -- ${specPath}\n`
-    );
+    const failureMessage = buildDraftFailureMessage({
+      failedStage: result.failedAt.name,
+      error: result.failedAt.error,
+      specPath,
+    });
+    process.stderr.write(`${failureMessage}\n`);
+    // 沈黙させない(#24): 失敗を LINE へ best-effort 通知。送信不可でも失敗終了は維持。
+    const lineGroupId = process.env.LINE_GROUP_ID;
+    const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (lineGroupId && lineToken) {
+      try {
+        await pushTextMessage(lineGroupId, failureMessage, {
+          channelAccessToken: lineToken,
+          fetchFn: defaultFetch,
+        });
+      } catch (notifyError: unknown) {
+        const m =
+          notifyError instanceof Error ? notifyError.message : String(notifyError);
+        process.stderr.write(`(失敗の LINE 通知も送れませんでした: ${m})\n`);
+      }
+    } else {
+      process.stderr.write(
+        "(LINE 未設定のため失敗通知は送れません: LINE_GROUP_ID / LINE_CHANNEL_ACCESS_TOKEN)\n"
+      );
+    }
     process.exitCode = 1;
     return;
   }
