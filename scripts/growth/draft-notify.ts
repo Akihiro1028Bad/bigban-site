@@ -64,6 +64,28 @@ function renderItem(item: DraftNotifyItem, index: number): string {
   return `${head}\n${detail}`;
 }
 
+export interface DraftFailureInput {
+  failedStage: string;
+  error: string;
+  specPath: string;
+}
+
+/**
+ * 下書き投入が失敗したときの LINE 通知本文(沈黙させない=#24)。
+ * 外部障害の可能性と、冪等(#21)に再開できる手順を伝える。
+ */
+export function buildDraftFailureMessage(input: DraftFailureInput): string {
+  return [
+    "下書きの投入に失敗しました(外部障害の可能性があります)。",
+    `失敗した工程: ${input.failedStage}`,
+    `理由: ${input.error}`,
+    `本文・設定はステージ済み: ${input.specPath}`,
+    "復旧後、同じ内容で再実行すれば重複なく再開できます:",
+    `  npm run growth:publish-draft -- ${input.specPath}`,
+    "  (または下書きモード全体の再実行: npm run growth:drafts)",
+  ].join("\n");
+}
+
 /** LINE へ送る下書き完了通知の本文を組み立てる。 */
 export function buildDraftNotifyMessage(
   items: readonly DraftNotifyItem[]
