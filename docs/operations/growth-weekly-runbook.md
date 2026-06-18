@@ -126,11 +126,9 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として全執筆エージェントに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
 1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
 2. 各案を **コンテンツ作成チーム** で執筆
-3. **画像チーム** で画像を用意(**アイキャッチ必須**、本文画像は任意)
-4. **下書き(draft)** 作成(**公開しない**)。本文 JSON(title / slug / locale=ja / category / excerpt / displayMode=html / bodyHtml、末尾に「AI生成の下書き。公開前に確認を」)を一時ファイルに書き、`npm run growth:draft-content -- create <json>` で作成 → 出力された contentId を控える。**microCMS MCP は使わない**(headless では未接続のため。スクリプトは管理APIを直接叩くので headless でも動く)。eyecatch は次の画像チームで添付
-5. 当該行の `ステータス` を `下書き作成済み` に更新し、ページ本文に microCMS 下書きのタイトル/ID を追記
-6. `却下` の行は無視する
-7. **LINE 通知(下書き完了)**: 作成した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON にして `npm run growth:notify-drafts -- <json>` を実行。スクリプトが各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知する(draftKey が取れない記事はURLなしでフォールバック)。**1件以上作成したときのみ**実行。`LINE_*` / `MICROCMS_DRAFT_SECRET` / `NEXT_PUBLIC_SITE_URL` 未設定で送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら、通知URLをその管理画面のURLに差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` の1箇所に集約済み)
+3. **投入スペックをステージ**(エージェントはここまで): 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction(§9の宇宙人の行為), imagePath, notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。eyecatchAction は §9「宇宙人マスコット × コスミック」に沿う
+4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し終了コード1で終わる。同じ spec で再実行すれば冪等に再開。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
+5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` にして `npm run growth:notify-drafts -- <json>` を実行。各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功時のみ**実行。`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
 
 **コンテンツ作成チームの工程**(サブエージェントは**2体**に分ける)
 
@@ -145,16 +143,11 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 
 > 方針: **アイキャッチは [growth-article-style.md](./growth-article-style.md) §9「宇宙人マスコット × コスミック」**。固定するのは**キャラ(同梱の参照画像 `scripts/growth/assets/mascot-alien.png`)と画調(フラット・宇宙・ブランド配色)**、記事ごとに変えるのは**宇宙人の行為(action)だけ**。実写ストックフォトは使わない。
 
-1. **アートディレクター** ― §9 の固定キャラ・画調を前提に、**記事内容から「宇宙人の行為(action)」を英語1フレーズで作る**(誰が何をしているか。例: 移行記事＝ラケットとパドルを持ち比べる)。記事内容と矛盾しない題材にする
-   - **アイキャッチ(必須)**: §9 の宇宙人マスコット・宇宙背景・ブランド配色で生成。記事ごとに必ず1枚・**文字入れは避ける**(記事カード/OGP で日本語が崩れて見えるのを防ぐ)
-   - **本文画像(任意)**: 説明を助ける箇所にのみ。無理に入れない。**文字入れOK**(図解等)
-   - レイアウトや配色の整えは**デザイナー**
-2. **画像生成** ― **参照画像方式**で生成: `npm run growth:gen-eyecatch -- --action "<英語の行為>" --out /tmp/growth-img/eyecatch.png`(内部で OpenAI `/v1/images/edits`・gpt-image-2・`quality high`・同梱の参照キャラを使用。プロンプト組み立ては `scripts/growth/eyecatch.ts`)。アイキャッチは横長(16:9・1536x1024)・文字なし。本文画像が要る場合のみ別途生成(文字入れ可)
-3. **画像選定/品質チェック** ― 生成物から「記事内容と合っているか」「プロ品質か(安っぽくない・破綻=不自然な手指/歪みが無い)」で選ぶ。**文字を入れた本文画像は、文字が正しく読めるか・日本語が崩れていないかを必ず確認**し、崩れていたら再生成(難しければ文字なしで生成し、デザイナーが後から正確な文字を載せる)。NG ならプロンプトを直して再生成
-4. **アップロード/添付** ― 採用画像を `npm run growth:upload-media -- <画像パス>` でアップロードし、出力された microCMS アセット URL を取得。`npm run growth:draft-content -- patch <contentId> <json>`(json に `{"eyecatch":"<URL>"}`)で下書きに eyecatch(必須)を設定。本文 img も同様に URL を使う
-   - microCMS MCP / base64 渡しは**使わない**(headless 非対応・大画像で不確実)。必ずスクリプト経由(管理APIを直接利用。`.env` の `MICROCMS_MANAGEMENT_API_KEY`、content書き込み権限が必要)
-   - 画像は 5MB 上限。生成画像が大きい場合は事前に縮小する
-   - `OPENAI_API_KEY` 未設定で画像生成できない場合は、その旨を報告し、アイキャッチ無しでは公開しないよう人間に促す(下書き自体は本文のみで作成)
+1. **アートディレクター** ― §9 の固定キャラ・画調を前提に、**記事内容から「宇宙人の行為(action)」を英語1フレーズで作る**(誰が何をしているか。例: 移行記事＝ラケットとパドルを持ち比べる)。記事内容と矛盾しない題材にする。**この `eyecatchAction` を手順3の投入スペックに入れる**(生成・upload・添付は手順4の `growth:publish-draft` が同期実行する)
+   - **アイキャッチ(必須)**: §9 の宇宙人マスコット・宇宙背景・ブランド配色。記事ごとに行為だけ変える・**文字なし**
+   - **本文画像(任意)**: 必要時のみ。`npm run growth:gen-eyecatch -- --action "<行為>" --out <path>` 単体でも生成可(プロンプト組み立ては `scripts/growth/eyecatch.ts`、参照画像方式・gpt-image-2・`quality high`)
+   - 投入(create/upload/patch)は `growth:publish-draft` が担うため、ここでは**行為(action)を決めるまで**。`OPENAI_API_KEY` 未設定なら投入時に当該工程で失敗・報告される(下書き本文は冪等に作成済み)
+   - microCMS MCP / base64 渡しは**使わない**(headless 非対応)。アイキャッチは横長(16:9・1536x1024)
 
 ### 完了報告(下書きモード)
 - 下書き化した記事のタイトル / microCMS 下書き ID / 使用画像枚数

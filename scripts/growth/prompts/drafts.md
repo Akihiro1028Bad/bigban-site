@@ -7,10 +7,19 @@
 0. **前提コンテキストの注入(最優先・必須)**: 最初に `npm run growth:facility-context` を実行し、その出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない項目)を**正典の前提**として全執筆エージェントに渡す。記事はこの前提と**絶対に矛盾させない**(例: 開業済みなら「開業を待つ/春を待つ」と書かない)。`書いてはいけない/断定してはいけない項目`(営業時間・料金・正確な所要時間 等)は推測で書かず、触れる必要があれば「最新情報をご確認ください」と促す。
 1. 「記事ネタ案」DB(data source `5adab8b1-f182-4123-b963-9463a2580d4a`)から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)。
 2. 各記事を**コンテンツ作成チーム(2体)**で執筆: ①執筆担当=**取材(WebSearchで事実・具体・数値・最新動向。style-guide §10 の取材ソース参照・裏が取れない数字は書かない)**→構成→執筆→ブランドボイス推敲(growth-article-style.md 準拠)→ 最終 HTML、②編集者=別エージェントで事実誤り・誇大・医療断定・誤字に加え、**手順0の前提コンテキストとの矛盾**(開業時期のズレ・未確定情報=営業時間/料金/正確な所要時間 等の断定)、**翻訳調・AI臭(§14: 英語直訳調・括弧書き直訳・AI定型の連発・抽象語の水増し・「ガイド」等の語の多発・地名の装飾詰め・空つなぎ文)**、および **リンク・数値・タイトル(§15: 外部リンク濫用/不完全URL、未検証・可変数値の断定、キーワード盛りタイトル、内部リンクの検討漏れ)** を必ずチェックし、**style-guide §11 の品質ルブリックで採点**(具体性/4段構成/独自視点/翻訳調なし/リンク・数値・タイトル等)→ 具体的な修正指示 → 執筆担当が修正(**最大2周**、未達なら下書き化を保留し報告)。**目標品質は `examples/` のお手本(`example-beginner-local.md` / `example-trend.md`)を参照**(構成・密度・文体を真似る。文章のコピーはしない)。
-3. 本文 JSON(title / slug / locale=["ja"] / category / excerpt / displayMode=["html"] / bodyHtml、末尾に「※この記事はAIが作成した下書きです。公開前に内容をご確認ください。」)を一時ファイルに書き、`npm run growth:draft-content -- create <json>` で**下書き**作成 → contentId を控える。
-4. **画像チーム**でアイキャッチ(必須・文字なし)を用意。**`growth-article-style.md` §9 の「宇宙人マスコット × コスミック」アートディレクションに必ず従う**。固定するのは**キャラ(同梱の参照画像 `scripts/growth/assets/mascot-alien.png`)と画調(フラット・宇宙・ブランド配色)**、記事ごとに変えるのは**宇宙人の行為(action)だけ**。記事の主題から行為を英語1フレーズで作り、**参照画像方式**で生成する: `npm run growth:gen-eyecatch -- --action "<英語の行為>" --out /tmp/growth-img/eyecatch.png`(内部で OpenAI `/v1/images/edits`・gpt-image-2・quality high・参照画像を使用)。→ `sips` 等で 1024px・JPEG に縮小 → `npm run growth:upload-media -- <画像>` でURL取得 → `npm run growth:draft-content -- patch <contentId> <json>`(json は `{"eyecatch":"<URL>"}`)で添付。`OPENAI_API_KEY` 必須。本文画像は必要に応じて。
-5. 「記事ネタ案」DB の当該行の `ステータス` を `下書き作成済み` に更新し、本文に microCMS 下書き ID を追記。`却下` は無視。
-6. **LINE 通知(下書き完了)**: この実行で作成した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON で一時ファイルに書き、`npm run growth:notify-drafts -- <json>` を実行して LINE グループへまとめて通知する。スクリプトが各 contentId の draftKey を管理APIで引き、プレビューURLを組み立てて送る(draftKey が取れない記事はURLなしでフォールバック)。**下書きを1件以上作成したときのみ実行**(0件なら通知しない)。`LINE_*` / `MICROCMS_DRAFT_SECRET` / `NEXT_PUBLIC_SITE_URL` 未設定で送れない場合は、その旨を報告する。
+3. **投入スペックをステージする**(エージェントはここまで)。記事ごとに次の JSON を一時ファイル(例 `.growth-tmp/<slug>.json`)に書く。**この時点では create も画像生成もしない**(投入は手順4のスクリプトに任せ、エージェントが重い処理を背景タスク化して待ちでストールするのを防ぐ=#23):
+   ```json
+   {
+     "payload": { "title": "...", "slug": "...", "locale": ["ja"], "category": ["..."],
+                  "excerpt": "...", "displayMode": ["html"], "bodyHtml": "...(末尾に『※この記事はAIが作成した下書きです。公開前に内容をご確認ください。』)" },
+     "eyecatchAction": "<§9の宇宙人の行為を英語1フレーズで>",
+     "imagePath": "/tmp/growth-eyecatch-<slug>.png",
+     "notion": { "pageId": "<記事ネタ案の該当ページID>", "property": "ステータス", "value": "下書き作成済み" }
+   }
+   ```
+   - `eyecatchAction` は **§9「宇宙人マスコット × コスミック」**(固定キャラ=`scripts/growth/assets/mascot-alien.png`・記事ごとに行為だけ変える)に沿って作る。
+4. **投入を同期実行する**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。このスクリプトが **create(冪等PUT)→ アイキャッチ生成(参照画像方式)→ upload → eyecatch添付 → 記事ネタ案DBのステータス更新** を**直列・同期**で行う(背景タスクにしない・完了を待たない運用にしない)。途中失敗時はどの工程で落ちたかと再開コマンドを出力し終了コード1で終わる。同じ spec で再実行すれば冪等(#21)に再開できる。`却下` の行は無視。
+5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON で一時ファイルに書き、`npm run growth:notify-drafts -- <json>` を実行して LINE グループへまとめて通知する(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功したときのみ実行**。`LINE_*` 等が無く送れない場合はその旨を報告する。
 
 ## やってはいけないこと
 - 記事の**公開**(下書きのまま)。microCMS MCP は使わない(headless 非接続。スクリプト経由のみ)。git push / git commit。本番コードの変更。

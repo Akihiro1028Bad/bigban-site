@@ -59,6 +59,7 @@ export default defineConfig({
         "scripts/growth/notify-drafts.ts",
         "scripts/growth/gen-eyecatch.ts",
         "scripts/growth/self-heal-cli.ts",
+        "scripts/growth/publish-draft-cli.ts",
         "scripts/growth/notify-line.ts",
       ],
       thresholds: {
