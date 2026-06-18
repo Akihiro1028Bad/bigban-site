@@ -17,6 +17,7 @@
     "growth:upload-media": "tsx scripts/growth/upload-media.ts",
     "growth:draft-content": "tsx scripts/growth/draft-content.ts",
     "growth:facility-context": "tsx scripts/growth/facility-context-cli.ts",
+    "growth:notify-drafts": "tsx scripts/growth/notify-drafts.ts",
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",

@@ -10,6 +10,7 @@
 3. 本文 JSON(title / slug / locale=["ja"] / category / excerpt / displayMode=["html"] / bodyHtml、末尾に「※この記事はAIが作成した下書きです。公開前に内容をご確認ください。」)を一時ファイルに書き、`npm run growth:draft-content -- create <json>` で**下書き**作成 → contentId を控える。
 4. **画像チーム**でアイキャッチ(必須・文字なし)を用意。**プロンプトは `growth-article-style.md` §9 のアートディレクション(固定スタイルブロック + 記事固有の被写体シーン)で必ず組み立てる**。**固定するのは画調(トリートメント)だけ・被写体は記事ごとに変える**(全記事で似た画像にしない)。人物は部分・行為中心にし、顔のクローズアップは避ける。既定は実写(§9雛形A)、ルール解説・手順・比較など説明が主役の記事は図解(§9雛形B・ブランド配色)も可。`openai-image-gen` スキル(`node ~/.claude/skills/openai-image-gen/generate.mjs --prompt "<§9で組み立てたプロンプト>" --out /tmp/growth-img --size 1536x1024 --quality high --n 1`)で生成 → `sips` 等で 1024px・JPEG に縮小 → `npm run growth:upload-media -- <画像>` でURL取得 → `npm run growth:draft-content -- patch <contentId> <json>`(json は `{"eyecatch":"<URL>"}`)で添付。本文画像は必要に応じて(文字入れ可・崩れ確認)。
 5. 「記事ネタ案」DB の当該行の `ステータス` を `下書き作成済み` に更新し、本文に microCMS 下書き ID を追記。`却下` は無視。
+6. **LINE 通知(下書き完了)**: この実行で作成した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON で一時ファイルに書き、`npm run growth:notify-drafts -- <json>` を実行して LINE グループへまとめて通知する。スクリプトが各 contentId の draftKey を管理APIで引き、プレビューURLを組み立てて送る(draftKey が取れない記事はURLなしでフォールバック)。**下書きを1件以上作成したときのみ実行**(0件なら通知しない)。`LINE_*` / `MICROCMS_DRAFT_SECRET` / `NEXT_PUBLIC_SITE_URL` 未設定で送れない場合は、その旨を報告する。
 
 ## やってはいけないこと
 - 記事の**公開**(下書きのまま)。microCMS MCP は使わない(headless 非接続。スクリプト経由のみ)。git push / git commit。本番コードの変更。
@@ -17,3 +18,4 @@
 
 ## 完了報告
 - 下書き化した記事のタイトル / microCMS 下書き ID / 使用画像枚数 / 画像不可ならその理由。
+- LINE 通知の結果(送信できたか / プレビューURL付きだったか / 送れない場合はその理由)。
