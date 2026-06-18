@@ -130,6 +130,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 4. **下書き(draft)** 作成(**公開しない**)。本文 JSON(title / slug / locale=ja / category / excerpt / displayMode=html / bodyHtml、末尾に「AI生成の下書き。公開前に確認を」)を一時ファイルに書き、`npm run growth:draft-content -- create <json>` で作成 → 出力された contentId を控える。**microCMS MCP は使わない**(headless では未接続のため。スクリプトは管理APIを直接叩くので headless でも動く)。eyecatch は次の画像チームで添付
 5. 当該行の `ステータス` を `下書き作成済み` に更新し、ページ本文に microCMS 下書きのタイトル/ID を追記
 6. `却下` の行は無視する
+7. **LINE 通知(下書き完了)**: 作成した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON にして `npm run growth:notify-drafts -- <json>` を実行。スクリプトが各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知する(draftKey が取れない記事はURLなしでフォールバック)。**1件以上作成したときのみ**実行。`LINE_*` / `MICROCMS_DRAFT_SECRET` / `NEXT_PUBLIC_SITE_URL` 未設定で送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら、通知URLをその管理画面のURLに差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` の1箇所に集約済み)
 
 **コンテンツ作成チームの工程**(サブエージェントは**2体**に分ける)
 
@@ -158,6 +159,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 ### 完了報告(下書きモード)
 - 下書き化した記事のタイトル / microCMS 下書き ID / 使用画像枚数
 - 画像生成できなかった場合はその理由
+- LINE 通知の結果(送信可否 / プレビューURL付きか / 送れない場合の理由)
 
 ---
 
