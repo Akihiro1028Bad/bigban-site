@@ -5,8 +5,34 @@ import {
   buildPreviewUrl,
   previewUrlOrNull,
   buildDraftNotifyMessage,
+  buildDraftFailureMessage,
   type DraftNotifyItem,
 } from "./draft-notify";
+
+describe("buildDraftFailureMessage", () => {
+  const msg = buildDraftFailureMessage({
+    failedStage: "create",
+    error: "504 gateway timeout",
+    specPath: ".growth-tmp/roadmap.json",
+  });
+
+  it("外部障害の可能性と再開可能であることを伝える", () => {
+    expect(msg).toContain("下書き");
+    expect(msg).toMatch(/外部障害|未作成|失敗/);
+    expect(msg).toContain("再開");
+  });
+
+  it("失敗した工程・理由・ステージ済みパスを含む", () => {
+    expect(msg).toContain("create");
+    expect(msg).toContain("504 gateway timeout");
+    expect(msg).toContain(".growth-tmp/roadmap.json");
+  });
+
+  it("再開手順（コマンド）を含む", () => {
+    expect(msg).toContain("npm run growth:publish-draft");
+    expect(msg).toContain("npm run growth:drafts");
+  });
+});
 
 describe("previewUrlOrNull", () => {
   const base = {
