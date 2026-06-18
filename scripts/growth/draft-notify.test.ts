@@ -3,9 +3,39 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildPreviewUrl,
+  previewUrlOrNull,
   buildDraftNotifyMessage,
   type DraftNotifyItem,
 } from "./draft-notify";
+
+describe("previewUrlOrNull", () => {
+  const base = {
+    siteUrl: "https://www.thepicklebang.com",
+    secret: "s3cret",
+    contentId: "abc123",
+    draftKey: "dk-xyz",
+  };
+
+  it("必要な値が揃っていればプレビューURLを返す", () => {
+    expect(previewUrlOrNull(base)).toBe(
+      "https://www.thepicklebang.com/api/draft/enable?secret=s3cret&draftKey=dk-xyz&contentId=abc123"
+    );
+  });
+
+  it("secret が無ければ null（通知は続行させるため）", () => {
+    expect(previewUrlOrNull({ ...base, secret: null })).toBeNull();
+    expect(previewUrlOrNull({ ...base, secret: undefined })).toBeNull();
+    expect(previewUrlOrNull({ ...base, secret: "" })).toBeNull();
+  });
+
+  it("siteUrl が無ければ null", () => {
+    expect(previewUrlOrNull({ ...base, siteUrl: null })).toBeNull();
+  });
+
+  it("draftKey が無ければ null", () => {
+    expect(previewUrlOrNull({ ...base, draftKey: null })).toBeNull();
+  });
+});
 
 describe("buildPreviewUrl", () => {
   it("プレビュー入口(Pattern A)の URL を secret/draftKey/contentId 付きで組み立てる", () => {

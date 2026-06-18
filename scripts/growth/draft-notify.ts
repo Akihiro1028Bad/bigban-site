@@ -25,6 +25,29 @@ export function buildPreviewUrl(params: DraftPreviewParams): string {
   return `${base}/api/draft/enable?${query.toString()}`;
 }
 
+export interface PreviewUrlInput {
+  siteUrl: string | null | undefined;
+  secret: string | null | undefined;
+  contentId: string;
+  draftKey: string | null | undefined;
+}
+
+/**
+ * プレビューURLを組み立てる。siteUrl / secret / draftKey のいずれかが欠けていれば null。
+ * (env や draftKey が無くても通知自体は続行させるため、ここで例外を投げない。)
+ */
+export function previewUrlOrNull(input: PreviewUrlInput): string | null {
+  if (!input.siteUrl || !input.secret || !input.draftKey) {
+    return null;
+  }
+  return buildPreviewUrl({
+    siteUrl: input.siteUrl,
+    secret: input.secret,
+    contentId: input.contentId,
+    draftKey: input.draftKey,
+  });
+}
+
 export interface DraftNotifyItem {
   title: string;
   contentId: string;
