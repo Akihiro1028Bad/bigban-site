@@ -31,6 +31,25 @@ describe("fetchDraftKey", () => {
     );
   });
 
+  it("contentId をパスセグメントとして URL エンコードする(パスインジェクション防御)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ draftKey: "dk" }),
+      text: async () => "",
+    });
+
+    await fetchDraftKey("news", "../secret/evil", {
+      serviceDomain: "thepicklebang",
+      apiKey: "mgmt-key",
+      fetchFn,
+    });
+    const [url] = fetchFn.mock.calls[0];
+    expect(url).toBe(
+      "https://thepicklebang.microcms-management.io/api/v1/contents/news/..%2Fsecret%2Fevil"
+    );
+  });
+
   it("draftKey が null(公開済み等)のときは null を返す", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: true,

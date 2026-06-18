@@ -26,7 +26,10 @@ export async function fetchDraftKey(
   contentId: string,
   options: DraftMetaOptions
 ): Promise<string | null> {
-  const url = `https://${options.serviceDomain}.microcms-management.io/api/v1/contents/${endpoint}/${contentId}`;
+  // contentId はパスセグメントなので必ずエンコードする(パスインジェクション防御)。
+  const url = `https://${options.serviceDomain}.microcms-management.io/api/v1/contents/${endpoint}/${encodeURIComponent(
+    contentId
+  )}`;
   const res = await options.fetchFn(url, {
     method: "GET",
     headers: { "X-MICROCMS-API-KEY": options.apiKey },
