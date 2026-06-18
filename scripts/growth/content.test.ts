@@ -10,9 +10,26 @@ import {
 } from "./content";
 import type { FetchFn } from "./http";
 
-function opts(fetchFn: FetchFn): ContentApiOptions {
-  return { serviceDomain: "thepicklebang", apiKey: "write-key", fetchFn };
+function opts(
+  fetchFn: FetchFn,
+  extra: Partial<ContentApiOptions> = {}
+): ContentApiOptions {
+  return {
+    serviceDomain: "thepicklebang",
+    apiKey: "write-key",
+    fetchFn,
+    sleep: async () => {},
+    ...extra,
+  };
 }
+
+const serverError = () =>
+  ({
+    ok: false,
+    status: 503,
+    json: async () => ({}),
+    text: async () => "service unavailable",
+  }) as Awaited<ReturnType<FetchFn>>;
 
 const PUT_URL =
   "https://thepicklebang.microcms.io/api/v1/news/my-slug?status=draft";
@@ -168,5 +185,112 @@ describe("patchDraft", () => {
       "https://thepicklebang.microcms.io/api/v1/news/abc123?status=draft"
     );
     expect(init.method).toBe("PATCH");
+  });
+});
+
+describe("リトライ＋指数バックオフ＋タイムアウト (#22)", () => {
+  it("5xx は指数バックオフで再試行し、成功すれば id を返す", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(serverError())
+      .mockResolvedValueOnce(serverError())
+      .mockResolvedValueOnce(okId("abc123"));
+    const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
+
+    const id = await patchDraft("news", "abc123", {}, opts(fetchFn, { sleep }));
+
+    expect(id).toBe("abc123");
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    // 指数バックオフ: 1回目 base, 2回目 base*2
+    expect(sleep.mock.calls[0][0]).toBeLessThan(sleep.mock.calls[1][0]);
+  });
+
+  it("ネットワークエラー（fetch が throw）も再試行する", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockRejectedValueOnce(new Error("ECONNRESET"))
+      .mockResolvedValueOnce(okId("abc123"));
+
+    const id = await patchDraft("news", "abc123", {}, opts(fetchFn));
+    expect(id).toBe("abc123");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("4xx は再試行せず即失敗する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({}),
+      text: async () => "unprocessable",
+    });
+    await expect(
+      patchDraft("news", "abc123", {}, opts(fetchFn))
+    ).rejects.toThrow(/422/);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("5xx が続けば上限回数で明確に失敗する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(serverError());
+    await expect(
+      patchDraft("news", "abc123", {}, opts(fetchFn, { retry: { maxAttempts: 3 } }))
+    ).rejects.toThrow(/503/);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("ネットワークエラーが続けば上限回数で失敗する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockRejectedValue(new Error("ETIMEDOUT"));
+    await expect(
+      patchDraft("news", "abc123", {}, opts(fetchFn, { retry: { maxAttempts: 2 } }))
+    ).rejects.toThrow(/ETIMEDOUT/);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("sleep 未注入時は既定の setTimeout ベースで待機して再試行する", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchFn = vi
+        .fn<FetchFn>()
+        .mockResolvedValueOnce(serverError())
+        .mockResolvedValueOnce(okId("abc123"));
+      // sleep を注入しない = defaultSleep(setTimeout) を使う
+      const p = patchDraft("news", "abc123", {}, {
+        serviceDomain: "thepicklebang",
+        apiKey: "write-key",
+        fetchFn,
+      });
+      // 初回バックオフ = baseDelayMs(500)
+      await vi.advanceTimersByTimeAsync(500);
+      await expect(p).resolves.toBe("abc123");
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("AbortController でタイムアウトすると abort され、再試行上限で失敗する", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchFn = vi.fn<FetchFn>().mockImplementation(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new Error("aborted"))
+            );
+          })
+      );
+      const p = patchDraft(
+        "news",
+        "abc123",
+        {},
+        opts(fetchFn, { retry: { maxAttempts: 1, timeoutMs: 1000 }, sleep: async () => {} })
+      );
+      const assertion = expect(p).rejects.toThrow(/aborted/);
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
