@@ -75,6 +75,9 @@ notepad .env
 最低限、手順0の値をすべて設定。文字コードは **UTF-8** で保存。
 `.env` は `.gitignore` 済みでコミットされません。
 
+- **値のクォート**: 空白・記号(`< > | ( ) &` 等)を含む値は必ずダブルクォートで囲む(例: `RESEND_FROM="THE PICKLE BANG THEORY <onboarding@resend.dev>"`)。未クォートだと `source .env` がエラーになる。
+- **疎通確認は source 非依存で**: アプリ/スクリプトは `dotenv`(各 npm スクリプトが自動読込)で `.env` を読むため、`source .env` は不要。シェルで個別の値を確認したいときは `source .env` せず、必要な変数だけ取り出す(例: `node -e "require('dotenv').config();console.log(!!process.env.RESEND_API_KEY)"`)。
+
 ---
 
 ## 5. 動作確認(本番実行の前に必ず)
