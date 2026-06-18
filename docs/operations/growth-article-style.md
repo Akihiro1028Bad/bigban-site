@@ -65,52 +65,49 @@ THE PICKLE BANG THEORY の**グロースループで生成する集客記事**(�
 
 ## 9. アイキャッチ画像 アートディレクション(正典・厳守)
 
-記事ごとに**画調**がバラつくと安っぽく見える一方、被写体まで固定すると**全記事が似た画像**になってしまう。そこで **固定するのはトリートメント(画調)だけ / 被写体は記事固有** にする。`openai-image-gen` に渡すプロンプトは「固定スタイルブロック + **記事ごとに作る被写体シーン**」で組み立て、即興でゼロから画調を変えない(被写体は毎回変える)。
+ブランド名 **THE PICKLE BANG THEORY は「Big Bang(宇宙のはじまり)」を掛けている**。そこでアイキャッチは **「宇宙人マスコット × コスミック(宇宙)」** を世界観の軸にする。実写ストックフォトは安っぽく没個性になりやすいため**使わない**。固定するのは**キャラクターと画調**、記事ごとに変えるのは**その宇宙人の行為**だけ。
 
-方向性は **明るいエアリーな実写 × ブランド配色のまま親しみやすく**。初心者〜検討層が読む集客記事に合う、軽やかで親しみのあるトーンにする(ダークなシネマティックには振らない)。
+### キャラクター(全記事共通・固定)
+- **同梱の参照画像のグレー型エイリアンを必ず使う**: [`scripts/growth/assets/mascot-alien.png`](../../scripts/growth/assets/mascot-alien.png)。
+  - 顔の特徴: なめらかなグレーの頭、大きな黒いアーモンド型の目に白いハイライト、小さな微笑み。
+- **キャラの顔・絵柄は固定**。記事ごとに**ポーズ・行為だけ**を変える(プレー中のスイング、ラケット持ち比べ、ネット際、用具を見る 等)。
 
 ### 画調(全記事共通・固定)
-- **明るくエアリーな実写写真**。自然光の順光、白〜ライト基調の室内、浅い被写界深度、クリーン。親しみやすく、少しだけ遊び心のある空気感。
-- 配色: **ライト/白基調の背景**に、ブランドのブルー(#306EC3 / #11317B)のコート・小物。差し色は**黄〜ライムのピックルボール**で楽しいポップを1点。明るさと抜け感で「かわいさ」を出す(パステル多色には振らない)。
-- 構図: 16:9 (1536x1024)。被写体は**片側に寄せ**、反対側にテキストを載せられる余白を残す。視線は水平。
-- 質感: 写実。イラスト/クリップアート/コラージュ/CG然とした作り込み絵は避ける。
-- **生成モード: `gpt-image-2` の `--quality high` 固定**(描き込み最高・枚あたり概算 $0.3前後/1536x1024)。
+- **フラットなイラスト**(ベクター調・クリーン)。参照キャラの絵柄に合わせ、量産しても崩れないデザインシステムにする。
+- 背景: **宇宙**。黒〜ディープブルー(#11317B)の星空・ネビュラ、ブライトブルー(#306EC3)のグロー、差し色に黄〜ライム(#F6FF54、ピックルボール/光跡)。
+- 構図: 16:9 (1536x1024)。キャラを**片側に寄せ**、反対側にテキストを載せられる**クリーンな余白**を残す。
+- **生成モード: `gpt-image-2` の `--quality high` 固定**(枚あたり概算 $0.3前後/1536x1024)。
+- ※3D寄りのリッチな質感は“ここぞの特別記事”だけ任意で可。**既定はフラット**。
+
+### 生成方式(重要・参照画像入力)
+- 画像は **OpenAI の編集エンドポイント(`/v1/images/edits`, gpt-image-2)に参照画像を渡して生成**する(text→image ではキャラを保てない)。
+- 実行は **`npm run growth:gen-eyecatch -- --action "<英語の行為>" --out <出力パス>`**。
+  - `--action` を渡すと、固定スタイル(下記雛形)と自動合成される(プロンプト組み立ては `scripts/growth/eyecatch.ts` に集約)。
+  - 既定の参照画像は `assets/mascot-alien.png`。`--prompt` で全文上書きも可。
+- `OPENAI_API_KEY` が必要(鍵はコードに書かない)。生成後は `sips` 等で 1024px・JPEG に縮小 → `npm run growth:upload-media` → `growth:draft-content -- patch` で添付(従来どおり)。
 
 ### 禁止(ネガティブ・プロンプトに必ず明記)
-文字・ロゴ・ウォーターマーク、**ダークなローキー照明**、過度な彩度、雑然とした背景、変形したパドル/ボール、複数画風の混在、はめ込み合成、(実写の)イラスト化、**人物の顔のクローズアップ**、不自然な顔・手指、ストックフォト然としたわざとらしい笑顔。
+文字・ロゴ・ウォーターマーク、実写ストックフォト感、雑然とした背景、変形したパドル/ボール、複数画風の混在、参照と異なる別キャラ化、不自然な手指。
 
-### 一貫させるもの / 変えるもの(重要)
-全記事で**似た画像**になるのを避けるため、固定するのは画調だけにする。
-- **一貫＝トリートメント(画調)のみ**: 上の「画調」の光・ブランド配色・クリーンなトーン・余白構図。**ブランド統一はここで担保**する。背景を「同じ施設の同じ写真」に固定しない。
-- **可変＝被写体と背景シーン**: 記事の主題(誰が・何を・どんな状況で)に合わせてシーンを変える。
+### 一貫させるもの / 変えるもの
+- **一貫＝キャラ(参照画像)＋画調(フラット・宇宙・ブランド配色・余白構図)**。ブランド統一はここで担保。
+- **可変＝宇宙人の行為(action)**。記事の主題(初心者/移行/用具 等)に合わせて1フレーズで描写する。
 
-### 被写体は記事ごとに作る(記事タイプ別の固定テンプレは廃止)
-記事の見出し・狙うクエリ・読者像から、**その記事固有のシーンを1つ**描写して `{SUBJECT}` に入れる。手順:
-1. 主題が「人・行為・状況」か「モノ(用具/コート)」かを見極める。
-2. 人主題なら**人を部分・行為中心**で(手元/後ろ姿/プレー中の一場面)。**顔のクローズアップは避け、ボケ・引き**で破綻とストックフォト感を防ぐ。モノ主題(用具/コート選び)は人なしでよい。
-3. 背景は主題のシーンに合わせる(屋内コートに限定しない。ただし記事内容と矛盾させない)。
+### action の例(`--action` に入れる英語フレーズ。記事に合わせて作る)
+- 初心者向け: `happily playing pickleball, swinging a glowing blue paddle at a yellow-green ball`
+- 経験者の移行: `holding a tennis racket in one hand and a pickleball paddle in the other, comparing them`
+- 用具・コート選び: `curiously looking at several glowing blue pickleball paddles floating around`
+- ネット際/上達: `at the net in a ready dink stance, holding a glowing blue paddle`
 
-**良い被写体の例**(そのままコピーせず、記事に合わせて作る):
-- シニアの健康: 笑顔のシニア2人がダブルスでハイタッチ(引き・顔はソフト)
-- 経験者の移行(テニス/卓球/バド→): テニスラケットとパドルを持ち比べる手元のクローズ
-- 一人参加の不安解消: コート脇で初対面の2人が挨拶し合う後ろ姿
-- コート選び/用具(モノ主題): 複数のコート面やパドルを見比べる視点(人なし可)
-- 継続・上達: ネット際でディンクするプレー中の一場面(手元〜上半身、顔は引き)
-
-### 実写 / 図解の出し分け
-- **既定＝実写**(雛形A)。
-- **ルール解説・手順・比較など「説明が主役」の記事は図解を許可**(雛形B)。図解も**ブランド配色・クリーン**に統一し、自由に乱立させない。アイキャッチ図解は**文字なし**、本文図解は文字入れ可(既存方針)。
-
-### プロンプト雛形(英語で渡す)
-**A. 実写(既定)** — `{SUBJECT}` に上で作った記事固有のシーン1行を入れる:
+### プロンプト雛形(参照画像とともに渡す英語)
+`buildEyecatchPrompt(action)` が以下を自動生成する(手で組む場合の参照):
 ```
-Bright, airy editorial photograph, {SUBJECT}. Welcoming premium indoor pickleball facility, soft natural daylight through large windows, light and clean tones, friendly and cheerful mood, shallow depth of field, photorealistic, high detail. People shown partially or in action (hands, over-the-shoulder, mid-play); faces soft, blurred or turned away — no face close-ups. Color palette: light airy background with bright blue (#306EC3) and deep blue (#11317B) court accents; the yellow-green pickleball is a playful pop of color. 16:9 composition, subject offset to one side leaving clean negative space for a text overlay, eye-level.
-Negative: no text, no logos, no watermark, no dark moody low-key lighting, no oversaturation, no clutter, no distorted paddle or ball, no illustration, no face close-up, no unnatural faces or hands, no stock-photo fake smiles.
-```
-**B. 図解(説明が主役の記事のみ)** — `{CONCEPT}` に図解したい概念を入れる:
-```
-Clean modern flat infographic-style illustration explaining {CONCEPT} for pickleball beginners. Bright airy background, brand palette: bright blue (#306EC3) and deep blue (#11317B) with a yellow-green (pickleball) accent. Simple geometric shapes, generous whitespace, friendly and clear, consistent line weight, photorealistic faces avoided. 16:9 composition with clean negative space on one side. Eyecatch version: no text labels.
-Negative: no photorealistic faces, no clutter, no oversaturation, no multiple conflicting styles, no dark background, (eyecatch) no text.
+Using the exact gray alien character from the reference image (smooth gray head, large black
+almond eyes with white highlights, small friendly smile), create a wide 16:9 flat illustration
+of this same alien {ACTION}. Cosmic starry deep-space background in deep blue (#11317B) and black
+with bright blue (#306EC3) glow and yellow-green (#F6FF54) accents. Keep the alien's face identical
+to the reference. Clean, characterful, premium flat illustration. Leave clean negative space on one
+side for text. No text, no logos.
 ```
 
 ## 10. 取材ソース(執筆前に必ず行う)
