@@ -17,7 +17,7 @@ import { readFile } from "node:fs/promises";
 import { fetchDraftKey } from "./draft-meta";
 import {
   buildDraftNotifyMessage,
-  buildPreviewUrl,
+  previewUrlOrNull,
   type DraftNotifyItem,
 } from "./draft-notify";
 import { defaultFetch } from "./http";
@@ -54,19 +54,32 @@ function parseItems(raw: unknown): InputItem[] {
   });
 }
 
-/** 1記事分のプレビューURLを解決する。draftKey が取れなければ null。 */
+interface PreviewCtx {
+  serviceDomain: string | null;
+  apiKey: string | null;
+  siteUrl: string | null;
+  secret: string | null;
+}
+
+/**
+ * 1記事分のプレビューURLを解決する。プレビューに必要な設定や draftKey が
+ * 欠けていても **例外を投げず null を返す**(通知自体は必ず送るため=#20)。
+ */
 async function resolvePreviewUrl(
   item: InputItem,
-  ctx: { serviceDomain: string; apiKey: string; siteUrl: string; secret: string }
+  ctx: PreviewCtx
 ): Promise<string | null> {
+  // プレビューに必要な設定が欠けていれば draftKey 取得もスキップ(URLなし通知)。
+  if (!ctx.serviceDomain || !ctx.apiKey || !ctx.siteUrl || !ctx.secret) {
+    return null;
+  }
   try {
     const draftKey = await fetchDraftKey(ENDPOINT, item.contentId, {
       serviceDomain: ctx.serviceDomain,
       apiKey: ctx.apiKey,
       fetchFn: defaultFetch,
     });
-    if (!draftKey) return null;
-    return buildPreviewUrl({
+    return previewUrlOrNull({
       siteUrl: ctx.siteUrl,
       secret: ctx.secret,
       contentId: item.contentId,
@@ -88,13 +101,15 @@ async function main(): Promise<void> {
   const raw = JSON.parse(await readFile(payloadPath, "utf-8")) as unknown;
   const inputs = parseItems(raw);
 
-  const ctx = {
-    serviceDomain: requireEnv("MICROCMS_SERVICE_DOMAIN"),
+  // プレビューURL用の設定はすべて任意。欠けていても通知は止めず URL なしで送る(#20)。
+  const ctx: PreviewCtx = {
+    serviceDomain: process.env.MICROCMS_SERVICE_DOMAIN ?? null,
     apiKey:
       process.env.MICROCMS_MANAGEMENT_API_KEY ??
-      requireEnv("MICROCMS_CONTENT_API_KEY"),
-    siteUrl: requireEnv("NEXT_PUBLIC_SITE_URL"),
-    secret: requireEnv("MICROCMS_DRAFT_SECRET"),
+      process.env.MICROCMS_CONTENT_API_KEY ??
+      null,
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
+    secret: process.env.MICROCMS_DRAFT_SECRET ?? null,
   };
 
   const items: DraftNotifyItem[] = [];
