@@ -20,6 +20,7 @@
     "growth:notify-drafts": "tsx scripts/growth/notify-drafts.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
     "growth:self-heal": "tsx scripts/growth/self-heal-cli.ts",
+    "growth:publish-draft": "tsx scripts/growth/publish-draft-cli.ts",
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
