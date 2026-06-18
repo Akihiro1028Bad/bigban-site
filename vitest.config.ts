@@ -57,6 +57,7 @@ export default defineConfig({
         "scripts/growth/draft-content.ts",
         "scripts/growth/facility-context-cli.ts",
         "scripts/growth/notify-drafts.ts",
+        "scripts/growth/gen-eyecatch.ts",
         "scripts/growth/notify-line.ts",
       ],
       thresholds: {
