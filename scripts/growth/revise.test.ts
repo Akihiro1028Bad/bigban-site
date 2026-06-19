@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
 import {
+  buildOutlineEditProps,
   buildReviseApplyProps,
   buildReviseDiscardProps,
   buildReviseFailMessage,
@@ -109,6 +110,14 @@ describe("buildReviseDiscardProps", () => {
       "修正ステータス": { select: { name: "なし" } },
       "修正指示": { rich_text: [] },
       "修正案": { rich_text: [] },
+    });
+  });
+});
+
+describe("buildOutlineEditProps", () => {
+  it("構成案だけを直接上書きする(修正状態は触らない)", () => {
+    expect(buildOutlineEditProps("## A\n説明")).toEqual({
+      "構成案": { rich_text: [{ text: { content: "## A\n説明" } }] },
     });
   });
 });

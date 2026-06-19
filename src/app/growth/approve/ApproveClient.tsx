@@ -8,7 +8,11 @@ import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
 
 import { AddProposalForm } from "./AddProposalForm";
-import { parseOutlineSections, type OutlineSection } from "./outline";
+import {
+  parseOutlineSections,
+  serializeOutlineSections,
+  type OutlineSection,
+} from "./outline";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
@@ -137,6 +141,10 @@ export function ApproveClient() {
   const [commentText, setCommentText] = useState("");
   // 既存コメントを編集中のときの index(null=新規追加)。
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  // #54: 手動編集中のセクション index と編集中の見出し/説明。
+  const [editingSection, setEditingSection] = useState<number | null>(null);
+  const [editHeading, setEditHeading] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
   const passphraseRef = useRef<HTMLInputElement>(null);
@@ -151,12 +159,15 @@ export function ApproveClient() {
     setFocusId(null);
   }, [focusId]);
 
-  // #42/#53: パネルを開閉/切替したら、前の記事のコメント下書き・入力状態・エラーをクリアする。
+  // #42/#53/#54: パネルを開閉/切替したら、前の記事のコメント下書き・編集状態・エラーをクリアする。
   useEffect(() => {
     setDraftComments({});
     setOpenCommentFor(null);
     setCommentText("");
     setEditingIdx(null);
+    setEditingSection(null);
+    setEditHeading("");
+    setEditDescription("");
     setReviseError("");
   }, [openId]);
 
@@ -371,6 +382,58 @@ export function ApproveClient() {
       const list = prev[section] ?? [];
       return { ...prev, [section]: list.filter((_, k) => k !== idx) };
     });
+  }
+
+  // #54: セクションの手動編集(見出し＋説明)→ 構成案を直接保存(AI不要)。
+  function startEditSection(i: number, section: OutlineSection): void {
+    setEditingSection(i);
+    setEditHeading(section.heading);
+    setEditDescription(section.description);
+    setOpenCommentFor(null); // コメント入力中なら閉じる
+  }
+
+  function cancelEditSection(): void {
+    setEditingSection(null);
+    setEditHeading("");
+    setEditDescription("");
+  }
+
+  async function saveSection(
+    item: PendingItem,
+    sections: OutlineSection[],
+    i: number
+  ): Promise<void> {
+    const heading = editHeading.trim();
+    if (!heading) {
+      setReviseError("見出しは空にできません。");
+      return;
+    }
+    const next = sections.map((s, k) =>
+      k === i ? { heading, description: editDescription.trim() } : s
+    );
+    setReviseBusy(true);
+    setReviseError("");
+    try {
+      const res = await fetch("/api/growth/revise/edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: item.id, outline: serializeOutlineSections(next) }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(
+          res.status === 409
+            ? "この記事はAI修正処理中です。完了後に編集してください。"
+            : json.error ?? "保存に失敗しました。"
+        );
+      }
+      cancelEditSection();
+      await refreshItems();
+    } catch (error) {
+      setReviseError(toMessage(error, "保存に失敗しました。"));
+    } finally {
+      setReviseBusy(false);
+    }
   }
 
   // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
@@ -590,109 +653,169 @@ export function ApproveClient() {
     );
   }
 
-  // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメントを描画。
-  function renderSection(item: PendingItem, section: OutlineSection, i: number) {
+  // #54: セクションの手動編集フォーム(見出し＋説明 → この行を保存)。
+  function renderSectionEditor(item: PendingItem, sections: OutlineSection[], i: number) {
+    const section = sections[i];
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <input
+          type="text"
+          aria-label={`見出しを編集: ${section.heading}`}
+          value={editHeading}
+          onChange={(event) => setEditHeading(event.target.value)}
+          className="w-full rounded-md border border-gray-300 p-2 text-sm font-medium text-gray-900"
+        />
+        <textarea
+          aria-label={`説明を編集: ${section.heading}`}
+          value={editDescription}
+          onChange={(event) => setEditDescription(event.target.value)}
+          placeholder="このセクションの内容(1行)"
+          className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-700"
+        />
+        <div className="mt-1 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={cancelEditSection}
+            className={choiceButtonClass(
+              "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            )}
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            onClick={() => saveSection(item, sections, i)}
+            disabled={reviseBusy}
+            className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+          >
+            この行を保存
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
+  function renderSection(item: PendingItem, sections: OutlineSection[], i: number) {
+    const section = sections[i];
     const comments = draftComments[i] ?? [];
     const open = openCommentFor === i;
+    const editing = editingSection === i;
     return (
       <li key={i} className="group rounded-md border border-gray-200 p-2 hover:border-gray-300">
-        <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{section.heading}</p>
-          {comments.length > 0 ? (
-            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-              コメント{comments.length}
-            </span>
-          ) : null}
-        </div>
-        {section.description ? (
-          <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
-        ) : null}
+        {editing ? (
+          renderSectionEditor(item, sections, i)
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{section.heading}</p>
+              {comments.length > 0 ? (
+                <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                  コメント{comments.length}
+                </span>
+              ) : null}
+            </div>
+            {section.description ? (
+              <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
+            ) : null}
 
-        {comments.length > 0 ? (
-          <ul className="mt-2 space-y-1">
-            {comments.map((comment, idx) => (
-              <li
-                key={idx}
-                className="flex items-start gap-2 border-l-2 border-blue-200 pl-2 text-sm text-gray-700"
+            {comments.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {comments.map((comment, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2 border-l-2 border-blue-200 pl-2 text-sm text-gray-700"
+                  >
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap">{comment}</span>
+                    <button
+                      type="button"
+                      aria-label={`コメントを編集: ${section.heading} ${idx + 1}`}
+                      onClick={() => startEditComment(i, idx, comment)}
+                      className="shrink-0 text-xs text-gray-500 hover:text-gray-800"
+                    >
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`コメントを削除: ${section.heading} ${idx + 1}`}
+                      onClick={() => deleteComment(i, idx)}
+                      className="shrink-0 text-xs text-gray-500 hover:text-red-700"
+                    >
+                      削除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {open ? (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-2 overflow-hidden"
               >
-                <span className="min-w-0 flex-1 whitespace-pre-wrap">{comment}</span>
+                <textarea
+                  aria-label={`コメント入力: ${section.heading}`}
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  placeholder="この見出しへの修正指示を書く…"
+                  className="h-16 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+                />
+                <div className="mt-1 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelComment}
+                    className={choiceButtonClass(
+                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveComment(i)}
+                    className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+                  >
+                    {editingIdx !== null ? "更新" : "コメントを追加"}
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <div className="mt-1 flex gap-3">
                 <button
                   type="button"
-                  aria-label={`コメントを編集: ${section.heading} ${idx + 1}`}
-                  onClick={() => startEditComment(i, idx, comment)}
-                  className="shrink-0 text-xs text-gray-500 hover:text-gray-800"
+                  aria-label={`コメントを追加: ${section.heading}`}
+                  onClick={() => startAddComment(i)}
+                  className="text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100"
+                >
+                  ＋ コメント
+                </button>
+                <button
+                  type="button"
+                  aria-label={`セクションを編集: ${section.heading}`}
+                  onClick={() => startEditSection(i, section)}
+                  className="text-xs text-gray-600 opacity-70 transition-opacity hover:opacity-100"
                 >
                   編集
                 </button>
-                <button
-                  type="button"
-                  aria-label={`コメントを削除: ${section.heading} ${idx + 1}`}
-                  onClick={() => deleteComment(i, idx)}
-                  className="shrink-0 text-xs text-gray-500 hover:text-red-700"
-                >
-                  削除
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="mt-2 overflow-hidden"
-          >
-            <textarea
-              aria-label={`コメント入力: ${section.heading}`}
-              value={commentText}
-              onChange={(event) => setCommentText(event.target.value)}
-              placeholder="この見出しへの修正指示を書く…"
-              className="h-16 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-            />
-            <div className="mt-1 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={cancelComment}
-                className={choiceButtonClass(
-                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => saveComment(i)}
-                className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-              >
-                {editingIdx !== null ? "更新" : "コメントを追加"}
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <button
-            type="button"
-            aria-label={`コメントを追加: ${section.heading}`}
-            onClick={() => startAddComment(i)}
-            className="mt-1 text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100"
-          >
-            ＋ コメント
-          </button>
+              </div>
+            )}
+          </>
         )}
       </li>
     );
   }
 
-  // #42/#43/#52/#53: 構成案の修正セクション(記事のみ)。GitHub風オンデマンド・コメント。
+  // #42/#43/#52/#53/#54: 構成案の修正セクション(記事のみ)。コメント＋手動編集。
   function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
     const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
     return (
       <MotionConfig reducedMotion="user">
         <p className="mt-1 text-xs text-gray-500">
-          見出しの「＋ コメント」から、直したい箇所に修正指示を書けます。
+          見出しの「＋ コメント」でAIに修正を依頼、「編集」で自分で直せます。
         </p>
         <ul className="mt-2 space-y-2">
-          {sections.map((section, i) => renderSection(item, section, i))}
+          {sections.map((_, i) => renderSection(item, sections, i))}
         </ul>
         <button
           type="button"
