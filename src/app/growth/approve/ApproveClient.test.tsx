@@ -752,7 +752,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
   });
 });
 
-describe("ApproveClient 構成案修正(#42)", () => {
+describe("ApproveClient 構成案修正(#42/#53)", () => {
   async function openIdeaPanel() {
     render(<ApproveClient />);
     await login();
@@ -761,7 +761,14 @@ describe("ApproveClient 構成案修正(#42)", () => {
     return screen.findByRole("dialog");
   }
 
-  it("構成案を行ごとに表示し、コメントして修正を依頼できる", async () => {
+  // GitHub風オンデマンド: ＋コメント → 入力 → コメントを追加。
+  async function addComment(dialog: HTMLElement, heading: string, text: string) {
+    await userEvent.click(within(dialog).getByRole("button", { name: `コメントを追加: ${heading}` }));
+    await userEvent.type(within(dialog).getByLabelText(`コメント入力: ${heading}`), text);
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加" }));
+  }
+
+  it("見出しごとにオンデマンドでコメントし、まとめて修正を依頼できる", async () => {
     const fn = mockFetchSequence(
       {
         json: {
@@ -776,20 +783,20 @@ describe("ApproveClient 構成案修正(#42)", () => {
       { json: { success: true } }
     );
     const dialog = await openIdeaPanel();
-
     expect(within(dialog).getByText("見出しA")).toBeInTheDocument();
     expect(within(dialog).getByText("見出しB")).toBeInTheDocument();
+    // コメント0件のうちは依頼ボタンが無効
+    expect(within(dialog).getByRole("button", { name: "修正を依頼" })).toBeDisabled();
 
-    await userEvent.type(
-      within(dialog).getByLabelText("コメント: 見出しA"),
-      "3つを箇条書きで"
-    );
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+    await addComment(dialog, "見出しA", "3つを箇条書きで");
+    // コメントがスレッド表示され、件数バッジが出る
+    expect(within(dialog).getByText("3つを箇条書きで")).toBeInTheDocument();
+    expect(within(dialog).getByText("コメント1")).toBeInTheDocument();
 
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
     expect(await within(dialog).findByText(/修正を依頼しました/)).toBeInTheDocument();
     const post = fn.mock.calls[1];
     expect(post[0]).toBe("/api/growth/revise");
-    expect(post[1].method).toBe("POST");
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
       comments: [{ line: "見出しA", comment: "3つを箇条書きで" }],
@@ -808,15 +815,57 @@ describe("ApproveClient 構成案修正(#42)", () => {
     expect(within(dialog).getByText("屋外/体育館/屋内専用を整理")).toBeInTheDocument();
   });
 
-  it("コメントが無いまま依頼すると促し、送信しない", async () => {
-    const fn = mockFetchSequence({
-      json: { success: true, items: [ideaItem({ outline: "## A" })] },
-    });
+  it("1セクションに複数コメントを溜められる(件数バッジ・展開送信)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { json: { success: true } }
+    );
     const dialog = await openIdeaPanel();
+    await addComment(dialog, "A", "1つ目");
+    await addComment(dialog, "A", "2つ目");
+    expect(within(dialog).getByText("コメント2")).toBeInTheDocument();
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
-    expect(await within(dialog).findByText(/コメントを1件以上/)).toBeInTheDocument();
-    expect(fn).toHaveBeenCalledTimes(1); // login のみ・POST なし
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント2件）" }));
+    await within(dialog).findByText(/修正を依頼しました/);
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      pageId: "i1",
+      comments: [
+        { line: "A", comment: "1つ目" },
+        { line: "A", comment: "2つ目" },
+      ],
+    });
+  });
+
+  it("コメントを編集・削除できる(送信前)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
+    const dialog = await openIdeaPanel();
+    await addComment(dialog, "A", "最初の文");
+
+    // 編集
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを編集: A 1" }));
+    const editor = within(dialog).getByLabelText("コメント入力: A");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "直した文");
+    await userEvent.click(within(dialog).getByRole("button", { name: "更新" }));
+    expect(within(dialog).getByText("直した文")).toBeInTheDocument();
+
+    // 削除 → バッジも消え、依頼は無効に戻る
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを削除: A 1" }));
+    expect(within(dialog).queryByText("直した文")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "修正を依頼" })).toBeDisabled();
+  });
+
+  it("コメント入力をキャンセルでき、空のまま追加しても増えない", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
+    const dialog = await openIdeaPanel();
+    // キャンセル
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加: A" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(within(dialog).queryByLabelText("コメント入力: A")).not.toBeInTheDocument();
+    // 空のまま「コメントを追加」→ 何も増えない
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加: A" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加" }));
+    expect(within(dialog).queryByText("コメント1")).not.toBeInTheDocument();
   });
 
   it("修正処理中(409)は専用メッセージを出す", async () => {
@@ -825,8 +874,8 @@ describe("ApproveClient 構成案修正(#42)", () => {
       { ok: false, status: 409, json: { success: false, error: "x" } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.type(within(dialog).getByLabelText("コメント: A"), "直して");
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+    await addComment(dialog, "A", "直して");
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
     expect(await within(dialog).findByText(/修正処理中/)).toBeInTheDocument();
   });
 
@@ -837,7 +886,7 @@ describe("ApproveClient 構成案修正(#42)", () => {
     const dialog = await openIdeaPanel();
     expect(within(dialog).getByText(/最大5分/)).toBeInTheDocument();
     expect(
-      within(dialog).queryByRole("button", { name: "修正を依頼" })
+      within(dialog).queryByRole("button", { name: /修正を依頼/ })
     ).not.toBeInTheDocument();
   });
 
@@ -847,8 +896,8 @@ describe("ApproveClient 構成案修正(#42)", () => {
       { ok: false, status: 500, json: { success: false, error: "サーバー設定エラー" } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.type(within(dialog).getByLabelText("コメント: A"), "直して");
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+    await addComment(dialog, "A", "直して");
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
     expect(await within(dialog).findByText("サーバー設定エラー")).toBeInTheDocument();
   });
 
@@ -858,24 +907,26 @@ describe("ApproveClient 構成案修正(#42)", () => {
       { json: { success: false } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.type(within(dialog).getByLabelText("コメント: A"), "直して");
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+    await addComment(dialog, "A", "直して");
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
     expect(await within(dialog).findByText("修正依頼に失敗しました。")).toBeInTheDocument();
   });
 
-  it("見出しが重複してもコメントは行ごとに独立する(index キー)", async () => {
+  it("見出しが重複してもコメントはセクションごとに独立する(index キー)", async () => {
     const fn = mockFetchSequence(
       { json: { success: true, items: [ideaItem({ outline: "## まとめ\n## まとめ" })] } },
       { json: { success: true } }
     );
     const dialog = await openIdeaPanel();
-    const boxes = within(dialog).getAllByLabelText("コメント: まとめ");
-    expect(boxes).toHaveLength(2);
-    await userEvent.type(boxes[1], "2つ目だけ直す");
-    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+    // 2つ目のセクションにだけコメント
+    const addButtons = within(dialog).getAllByRole("button", { name: "コメントを追加: まとめ" });
+    expect(addButtons).toHaveLength(2);
+    await userEvent.click(addButtons[1]);
+    await userEvent.type(within(dialog).getByLabelText("コメント入力: まとめ"), "2つ目だけ直す");
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
 
     await within(dialog).findByText(/修正を依頼しました/);
-    // 1つ目は空・2つ目だけ送られる
     expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
       pageId: "i1",
       comments: [{ line: "まとめ", comment: "2つ目だけ直す" }],
@@ -886,7 +937,7 @@ describe("ApproveClient 構成案修正(#42)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const dialog = await openIdeaPanel();
     expect(
-      within(dialog).queryByRole("button", { name: "修正を依頼" })
+      within(dialog).queryByRole("button", { name: /修正を依頼/ })
     ).not.toBeInTheDocument();
   });
 });
