@@ -6,6 +6,7 @@ import {
   isNotionPageId,
   parseDecisions,
   pendingStatus,
+  reviseProposalOf,
   reviseStatusOf,
   toPendingItems,
 } from "./approve";
@@ -261,5 +262,17 @@ describe("reviseStatusOf", () => {
   it("未設定・想定外は「なし」", () => {
     expect(reviseStatusOf(pageWithStatus())).toBe("なし");
     expect(reviseStatusOf(pageWithStatus("謎"))).toBe("なし");
+  });
+});
+
+describe("reviseProposalOf", () => {
+  it("修正案(rich_text)を読み、未設定は空文字", () => {
+    const withProposal: NotionPage = {
+      id: "i1",
+      url: "",
+      properties: { "修正案": { type: "rich_text", rich_text: [{ plain_text: "改訂版" }] } },
+    };
+    expect(reviseProposalOf(withProposal)).toBe("改訂版");
+    expect(reviseProposalOf({ id: "x", url: "", properties: {} })).toBe("");
   });
 });

@@ -106,3 +106,30 @@ export function buildReviseRequestProps(
     [REVISE_PROPS.requestedAt]: { date: { start: nowIso } },
   };
 }
+
+/** 修正指示・修正案をクリアし、修正ステータスを「なし」に戻すプロパティ群。 */
+function clearedReviseProps(): Record<string, unknown> {
+  const cleared: ReviseStatus = "なし";
+  return {
+    [REVISE_PROPS.status]: { select: { name: cleared } },
+    [REVISE_PROPS.instructions]: { rich_text: [] },
+    [REVISE_PROPS.proposal]: { rich_text: [] },
+  };
+}
+
+/**
+ * 「反映」: 修正案を構成案へ上書きし、修正状態をクリアする(1 PATCH 用)。
+ */
+export function buildReviseApplyProps(proposal: string): Record<string, unknown> {
+  return {
+    [OUTLINE_PROP]: { rich_text: chunkRichText(proposal) },
+    ...clearedReviseProps(),
+  };
+}
+
+/**
+ * 「やり直し/破棄」: 構成案は触らず、修正指示・修正案・ステータスだけをクリアする。
+ */
+export function buildReviseDiscardProps(): Record<string, unknown> {
+  return clearedReviseProps();
+}

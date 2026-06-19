@@ -46,6 +46,11 @@ export function reviseStatusOf(page: NotionPage): ReviseStatus {
     : "なし";
 }
 
+/** ページの `修正案`(rich_text)を読む。未設定は空文字。 */
+export function reviseProposalOf(page: NotionPage): string {
+  return richText(page, REVISE_PROPS.proposal);
+}
+
 // 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。
 const PRIORITY_RANK: Record<string, number> = { 高: 3, 中: 2, 低: 1 };
 
