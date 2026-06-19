@@ -8,6 +8,8 @@
 
 import type { DigestInput, MetricValue } from "./digest";
 
+type FlexSpacing = "xs" | "sm" | "md" | "lg" | "xl";
+
 export interface FlexText {
   type: "text";
   text: string;
@@ -17,6 +19,8 @@ export interface FlexText {
   wrap?: boolean;
   flex?: number;
   align?: "start" | "end" | "center";
+  /** 行数の上限(0=無制限)。タイトル/抜粋の省略表示に使う。 */
+  maxLines?: number;
 }
 
 export interface FlexButton {
@@ -26,22 +30,50 @@ export interface FlexButton {
   action: { type: "uri"; label: string; uri: string };
 }
 
+export interface FlexImage {
+  type: "image";
+  url: string;
+  size?: "full" | "md" | "sm";
+  /** 例: "16:9"。アスペクト比を固定して CLS を防ぐ。 */
+  aspectRatio?: string;
+  aspectMode?: "cover" | "fit";
+}
+
 export interface FlexBox {
   type: "box";
   layout: "vertical" | "horizontal" | "baseline";
   contents: FlexComponent[];
-  spacing?: "xs" | "sm" | "md" | "lg";
-  margin?: "xs" | "sm" | "md" | "lg";
+  spacing?: FlexSpacing;
+  margin?: FlexSpacing;
+  flex?: number;
+  // バッジ(ピル)表現用の任意スタイル。
+  backgroundColor?: string;
+  cornerRadius?: "none" | "xs" | "sm" | "md" | "lg" | "xl";
+  paddingAll?: FlexSpacing;
+  paddingStart?: FlexSpacing;
+  paddingEnd?: FlexSpacing;
+  paddingTop?: FlexSpacing;
+  paddingBottom?: FlexSpacing;
 }
 
-export type FlexComponent = FlexText | FlexButton | FlexBox;
+export type FlexComponent = FlexText | FlexButton | FlexImage | FlexBox;
 
 export interface FlexBubble {
   type: "bubble";
+  hero?: FlexImage;
   header?: FlexBox;
   body?: FlexBox;
   footer?: FlexBox;
 }
+
+/** 複数バブルを横並びにするカルーセル(最大12バブル)。 */
+export interface FlexCarousel {
+  type: "carousel";
+  contents: FlexBubble[];
+}
+
+/** push できる Flex のコンテナ(単一バブル or カルーセル)。 */
+export type FlexContainer = FlexBubble | FlexCarousel;
 
 const MAX_TOP_ACTIONS = 3;
 const COLOR_UP = "#16a34a"; // 緑(改善)

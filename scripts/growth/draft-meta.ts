@@ -45,3 +45,57 @@ export async function fetchDraftKey(
   const json = (await res.json()) as { draftKey?: string | null };
   return json.draftKey ?? null;
 }
+
+export interface ContentSummary {
+  title: string | null;
+  excerpt: string | null;
+  /** カテゴリ名(select の先頭)。 */
+  category: string | null;
+  /** アイキャッチ画像 URL。 */
+  eyecatchUrl: string | null;
+}
+
+/**
+ * 通知カード(#35)用に、コンテンツの表示情報(title/excerpt/category/eyecatch)を
+ * **コンテンツAPI**(`*.microcms.io`)から取得する。下書きは draftKey 必須。
+ * draftKey 用の管理API(fetchDraftKey)とはドメインが異なる点に注意。
+ */
+export async function fetchContentSummary(
+  endpoint: string,
+  contentId: string,
+  draftKey: string | null,
+  options: DraftMetaOptions
+): Promise<ContentSummary> {
+  const params = new URLSearchParams({ fields: "title,excerpt,category,eyecatch" });
+  if (draftKey) params.set("draftKey", draftKey);
+  // contentId はパスセグメントなので必ずエンコードする(パスインジェクション防御)。
+  const url = `https://${options.serviceDomain}.microcms.io/api/v1/${endpoint}/${encodeURIComponent(
+    contentId
+  )}?${params.toString()}`;
+  const res = await options.fetchFn(url, {
+    method: "GET",
+    headers: { "X-MICROCMS-API-KEY": options.apiKey },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `コンテンツ要約の取得に失敗しました (HTTP ${res.status}): ${await res.text()}`
+    );
+  }
+
+  const json = (await res.json()) as {
+    title?: string | null;
+    excerpt?: string | null;
+    category?: string[] | string | null;
+    eyecatch?: { url?: string | null } | null;
+  };
+  const category = Array.isArray(json.category)
+    ? json.category[0] ?? null
+    : json.category ?? null;
+  return {
+    title: json.title ?? null,
+    excerpt: json.excerpt ?? null,
+    category,
+    eyecatchUrl: json.eyecatch?.url ?? null,
+  };
+}
