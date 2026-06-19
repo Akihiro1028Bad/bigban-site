@@ -786,7 +786,8 @@ export function ApproveClient() {
                   type="button"
                   aria-label={`コメントを追加: ${section.heading}`}
                   onClick={() => startAddComment(i)}
-                  className="text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100"
+                  disabled={reviseBusy}
+                  className="text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
                 >
                   ＋ コメント
                 </button>
@@ -794,7 +795,8 @@ export function ApproveClient() {
                   type="button"
                   aria-label={`セクションを編集: ${section.heading}`}
                   onClick={() => startEditSection(i, section)}
-                  className="text-xs text-gray-600 opacity-70 transition-opacity hover:opacity-100"
+                  disabled={reviseBusy}
+                  className="text-xs text-gray-600 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
                 >
                   編集
                 </button>
