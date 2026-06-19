@@ -1016,6 +1016,155 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       within(dialog).queryByRole("button", { name: /修正を依頼/ })
     ).not.toBeInTheDocument();
   });
+
+  // #61: 画像指示エディタ(スタイル選択＋説明・チップ・追加/編集/削除)。
+  it("構成案の画像指示をスタイルバッジ＋説明のチップで表示する", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ outline: "## A\n説明\n[画像:詳しい図解: コート図]" })],
+      },
+    });
+    const dialog = await openIdeaPanel();
+    expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
+    expect(within(dialog).getByText("コート図")).toBeInTheDocument();
+    // 1枚あるので ＋画像 ボタンは「1 / 3」を表示
+    expect(
+      within(dialog).getByRole("button", { name: "画像を追加: A" })
+    ).toHaveTextContent("1 / 3");
+  });
+
+  it("＋画像でスタイルを選び説明を入力して追加する(他セクションは保持)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A\n説明\n\n## B\n別説明" })] } },
+      { json: { success: true } },
+      {
+        json: {
+          success: true,
+          items: [
+            ideaItem({ outline: "## A\n説明\n[画像:詳しい図解: コート図]\n\n## B\n別説明" }),
+          ],
+        },
+      }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("スタイル"), "diagram");
+    await userEvent.type(within(dialog).getByLabelText("画像の説明: A"), "コート図");
+    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+
+    expect(await within(dialog).findByText("コート図")).toBeInTheDocument();
+    expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
+    const post = fn.mock.calls[1];
+    expect(post[0]).toBe("/api/growth/revise/edit");
+    // 追加したセクション(A)だけにトークンが入り、他セクション(B)は保持される
+    expect(JSON.parse(post[1].body)).toEqual({
+      pageId: "i1",
+      outline: "## A\n説明\n[画像:詳しい図解: コート図]\n\n## B\n別説明",
+    });
+  });
+
+  it("複数画像のうち1枚だけ編集して更新できる(他画像は保持)", async () => {
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A\n[画像:ミニマル図解: 旧1]\n[画像:詳しい図解: 旧2]" })],
+        },
+      },
+      { json: { success: true } },
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A\n[画像:ミニマル図解: 新1]\n[画像:詳しい図解: 旧2]" })],
+        },
+      }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を編集: A 1" }));
+    const desc = within(dialog).getByLabelText("画像の説明: A");
+    await userEvent.clear(desc);
+    await userEvent.type(desc, "新1");
+    await userEvent.click(within(dialog).getByRole("button", { name: "更新" }));
+
+    expect(await within(dialog).findByText("新1")).toBeInTheDocument();
+    // 2枚目(旧2)は保持される
+    expect(JSON.parse(fn.mock.calls[1][1].body).outline).toBe(
+      "## A\n[画像:ミニマル図解: 新1]\n[画像:詳しい図解: 旧2]"
+    );
+  });
+
+  it("画像指示を削除できる(他セクションは保持)", async () => {
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A\n[画像:詳しい図解: 図]\n\n## B\n別" })],
+        },
+      },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A\n\n## B\n別" })] } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を削除: A 1" }));
+
+    // 反映後はチップが消える
+    await within(dialog).findByRole("button", { name: "画像を追加: A" });
+    expect(within(dialog).queryByText("図")).not.toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body).outline).toBe("## A\n\n## B\n別");
+  });
+
+  it("説明が空の画像は追加できない(POSTしない)", async () => {
+    const fn = mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A" })] },
+    });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+    expect(await within(dialog).findByText(/画像の説明を入力してください/)).toBeInTheDocument();
+    expect(fn).toHaveBeenCalledTimes(1); // login のみ
+  });
+
+  it("画像が3枚あると＋画像を無効化する(上限)", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          ideaItem({
+            outline:
+              "## A\n[画像:詳しい図解: 1]\n[画像:ミニマル図解: 2]\n[画像:マスコット・コスミック: 3]",
+          }),
+        ],
+      },
+    });
+    const dialog = await openIdeaPanel();
+    const addBtn = within(dialog).getByRole("button", { name: "画像を追加: A" });
+    expect(addBtn).toHaveTextContent("3 / 3");
+    expect(addBtn).toBeDisabled();
+  });
+
+  it("画像追加が409なら専用メッセージを出し、フォームは閉じない", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { ok: false, status: 409, json: { success: false, error: "x" } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.type(within(dialog).getByLabelText("画像の説明: A"), "図");
+    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
+    // 失敗時はフォームを閉じない(入力をやり直せる)
+    expect(within(dialog).getByLabelText("画像の説明: A")).toBeInTheDocument();
+  });
+
+  it("画像追加フォームをキャンセルできる", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
+    expect(within(dialog).getByLabelText("画像の説明: A")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(within(dialog).queryByLabelText("画像の説明: A")).not.toBeInTheDocument();
+  });
 });
 
 describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
