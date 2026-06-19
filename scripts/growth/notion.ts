@@ -95,20 +95,46 @@ export async function queryDataSource(
   };
 }
 
+/** Notion rich_text の書き込み 1 要素。content は最大 2000 文字。 */
+export interface NotionRichTextItem {
+  text: { content: string };
+}
+
+const RICH_TEXT_CHUNK = 2000; // 1 要素 content の上限
+const RICH_TEXT_MAX_ITEMS = 100; // 配列要素数の上限
+
 /**
- * ページの select プロパティ(「ステータス」等)を更新し、更新したページ ID を返す。
- * 対象DBの「ステータス」は status 型ではなく select 型のため select で更新する。
+ * 長文を Notion rich_text の書き込み配列に分割する(純関数)。
+ * - 空文字は [](プロパティを空にする)。
+ * - 2000 文字ごとに 1 要素。100 要素(=200,000 文字)超は throw(無言切り捨てを避ける)。
  */
-export async function updatePageSelect(
+export function chunkRichText(text: string): NotionRichTextItem[] {
+  if (text.length === 0) return [];
+  const items: NotionRichTextItem[] = [];
+  for (let i = 0; i < text.length; i += RICH_TEXT_CHUNK) {
+    items.push({ text: { content: text.slice(i, i + RICH_TEXT_CHUNK) } });
+  }
+  if (items.length > RICH_TEXT_MAX_ITEMS) {
+    throw new Error(
+      `テキストが長すぎます(${items.length} 要素 > ${RICH_TEXT_MAX_ITEMS})。`
+    );
+  }
+  return items;
+}
+
+/**
+ * ページの複数プロパティを 1 PATCH で原子的に更新し、更新したページ ID を返す。
+ * select / rich_text / date 等の Notion プロパティ値をそのまま渡す。
+ */
+export async function updatePageProps(
   pageId: string,
-  selectProperty: string,
-  selectValue: string,
+  properties: Record<string, unknown>,
   options: NotionApiOptions
 ): Promise<string> {
   const json = (await notionRequest(
     "PATCH",
     `${NOTION_API_BASE}/pages/${pageId}`,
-    { properties: { [selectProperty]: { select: { name: selectValue } } } },
+    { properties },
     options
   )) as { id?: string };
 
@@ -116,6 +142,23 @@ export async function updatePageSelect(
     throw new Error("Notion 応答に id が含まれていません。");
   }
   return json.id;
+}
+
+/**
+ * ページの select プロパティ(「ステータス」等)を更新し、更新したページ ID を返す。
+ * 対象DBの「ステータス」は status 型ではなく select 型のため select で更新する。
+ */
+export function updatePageSelect(
+  pageId: string,
+  selectProperty: string,
+  selectValue: string,
+  options: NotionApiOptions
+): Promise<string> {
+  return updatePageProps(
+    pageId,
+    { [selectProperty]: { select: { name: selectValue } } },
+    options
+  );
 }
 
 /**
