@@ -110,14 +110,15 @@ const RICH_TEXT_MAX_ITEMS = 100; // 配列要素数の上限
  */
 export function chunkRichText(text: string): NotionRichTextItem[] {
   if (text.length === 0) return [];
+  // 文字数で早期に上限チェック(巨大配列を確保する前に弾く)。
+  if (text.length > RICH_TEXT_CHUNK * RICH_TEXT_MAX_ITEMS) {
+    throw new Error(
+      `テキストが長すぎます(${text.length} 文字 > ${RICH_TEXT_CHUNK * RICH_TEXT_MAX_ITEMS})。`
+    );
+  }
   const items: NotionRichTextItem[] = [];
   for (let i = 0; i < text.length; i += RICH_TEXT_CHUNK) {
     items.push({ text: { content: text.slice(i, i + RICH_TEXT_CHUNK) } });
-  }
-  if (items.length > RICH_TEXT_MAX_ITEMS) {
-    throw new Error(
-      `テキストが長すぎます(${items.length} 要素 > ${RICH_TEXT_MAX_ITEMS})。`
-    );
   }
   return items;
 }
