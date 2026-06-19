@@ -47,6 +47,15 @@ function AnimatePresence({ children }: { children: React.ReactNode; mode?: strin
   return <>{children}</>;
 }
 
+function MotionConfig({
+  children,
+}: {
+  children: React.ReactNode;
+  reducedMotion?: string;
+}) {
+  return <>{children}</>;
+}
+
 function useScroll() {
   return { scrollY: { get: () => 0 } };
 }
@@ -73,4 +82,4 @@ function useMotionValue(initial: unknown) {
   };
 }
 
-export { motion, AnimatePresence, useScroll, useTransform, useInView, useMotionValue, setMockUseInView };
+export { motion, AnimatePresence, MotionConfig, useScroll, useTransform, useInView, useMotionValue, setMockUseInView };

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
@@ -129,9 +130,13 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
-  // #42/#43: 構成案の行コメント(開いているパネルの 行index→コメント文)・修正操作の状態。
-  // 重複見出し行でも衝突しないよう行テキストではなく index をキーにする。
-  const [reviseComments, setReviseComments] = useState<Record<number, string>>({});
+  // #53: 構成案セクション(index)ごとに溜めたコメント(複数可)。送信時に {見出し, comment} へ展開。
+  const [draftComments, setDraftComments] = useState<Record<number, string[]>>({});
+  // 現在コメント入力欄を開いているセクション index(null=どれも開いていない)。
+  const [openCommentFor, setOpenCommentFor] = useState<number | null>(null);
+  const [commentText, setCommentText] = useState("");
+  // 既存コメントを編集中のときの index(null=新規追加)。
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
   const passphraseRef = useRef<HTMLInputElement>(null);
@@ -146,9 +151,12 @@ export function ApproveClient() {
     setFocusId(null);
   }, [focusId]);
 
-  // #42: パネルを開閉/切替したら、前の記事の行コメント・エラーをクリアする。
+  // #42/#53: パネルを開閉/切替したら、前の記事のコメント下書き・入力状態・エラーをクリアする。
   useEffect(() => {
-    setReviseComments({});
+    setDraftComments({});
+    setOpenCommentFor(null);
+    setCommentText("");
+    setEditingIdx(null);
     setReviseError("");
   }, [openId]);
 
@@ -288,15 +296,13 @@ export function ApproveClient() {
     setOpenId(null);
   }
 
-  // #42/#52: 構成案セクションへのコメントを「修正指示」として送る(アンカー=見出し)。
+  // #53: セクションに溜めたコメントを {見出し, comment} へ展開して送る(アンカー=見出し)。
   async function requestRevise(item: PendingItem): Promise<void> {
-    const comments = outlineSections(item.outline)
-      .map((section, i) => ({ line: section.heading, comment: (reviseComments[i] ?? "").trim() }))
-      .filter((c) => c.comment.length > 0);
-    if (comments.length === 0) {
-      setReviseError("コメントを1件以上入力してください。");
-      return;
-    }
+    const sections = outlineSections(item.outline);
+    const comments = sections.flatMap((section, i) =>
+      (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
+    );
+    // コメント0件のときは「修正を依頼」ボタンが無効なので、ここへは到達しない。
     setReviseBusy(true);
     setReviseError("");
     try {
@@ -317,12 +323,54 @@ export function ApproveClient() {
       setItems((prev) =>
         prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
       );
-      setReviseComments({});
+      setDraftComments({});
     } catch (error) {
       setReviseError(toMessage(error, "修正依頼に失敗しました。"));
     } finally {
       setReviseBusy(false);
     }
+  }
+
+  // #53: セクションごとのコメント追加/編集/削除(送信前の下書き操作)。
+  function startAddComment(section: number): void {
+    setOpenCommentFor(section);
+    setEditingIdx(null);
+    setCommentText("");
+  }
+
+  function startEditComment(section: number, idx: number, text: string): void {
+    setOpenCommentFor(section);
+    setEditingIdx(idx);
+    setCommentText(text);
+  }
+
+  function cancelComment(): void {
+    setOpenCommentFor(null);
+    setEditingIdx(null);
+    setCommentText("");
+  }
+
+  function saveComment(section: number): void {
+    const text = commentText.trim();
+    if (!text) {
+      cancelComment();
+      return;
+    }
+    setDraftComments((prev) => {
+      const list = [...(prev[section] ?? [])];
+      if (editingIdx !== null) list[editingIdx] = text;
+      else list.push(text);
+      return { ...prev, [section]: list };
+    });
+    cancelComment();
+  }
+
+  function deleteComment(section: number, idx: number): void {
+    setDraftComments((prev) => {
+      /* istanbul ignore next -- @preserve 削除は描画済みコメントからのみ呼ばれ section は必ず存在 */
+      const list = prev[section] ?? [];
+      return { ...prev, [section]: list.filter((_, k) => k !== idx) };
+    });
   }
 
   // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
@@ -542,38 +590,119 @@ export function ApproveClient() {
     );
   }
 
-  // #42/#43/#52: 構成案の修正セクション(記事のみ)。セクション(見出し＋説明)ごとにコメント。
-  function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
+  // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメントを描画。
+  function renderSection(item: PendingItem, section: OutlineSection, i: number) {
+    const comments = draftComments[i] ?? [];
+    const open = openCommentFor === i;
     return (
-      <>
-        <ul className="mt-2 space-y-3">
-          {sections.map((section, i) => (
-            <li key={i} className="rounded-md border border-gray-200 p-2">
-              <p className="text-sm font-medium text-gray-900">{section.heading}</p>
-              {section.description ? (
-                <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
-              ) : null}
-              <textarea
-                aria-label={`コメント: ${section.heading}`}
-                value={reviseComments[i] ?? ""}
-                onChange={(event) =>
-                  setReviseComments((prev) => ({ ...prev, [i]: event.target.value }))
-                }
-                placeholder="この見出しへの修正指示（任意）"
-                className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-              />
-            </li>
-          ))}
+      <li key={i} className="group rounded-md border border-gray-200 p-2 hover:border-gray-300">
+        <div className="flex items-center gap-2">
+          <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{section.heading}</p>
+          {comments.length > 0 ? (
+            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+              コメント{comments.length}
+            </span>
+          ) : null}
+        </div>
+        {section.description ? (
+          <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
+        ) : null}
+
+        {comments.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {comments.map((comment, idx) => (
+              <li
+                key={idx}
+                className="flex items-start gap-2 border-l-2 border-blue-200 pl-2 text-sm text-gray-700"
+              >
+                <span className="min-w-0 flex-1 whitespace-pre-wrap">{comment}</span>
+                <button
+                  type="button"
+                  aria-label={`コメントを編集: ${section.heading} ${idx + 1}`}
+                  onClick={() => startEditComment(i, idx, comment)}
+                  className="shrink-0 text-xs text-gray-500 hover:text-gray-800"
+                >
+                  編集
+                </button>
+                <button
+                  type="button"
+                  aria-label={`コメントを削除: ${section.heading} ${idx + 1}`}
+                  onClick={() => deleteComment(i, idx)}
+                  className="shrink-0 text-xs text-gray-500 hover:text-red-700"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="mt-2 overflow-hidden"
+          >
+            <textarea
+              aria-label={`コメント入力: ${section.heading}`}
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              placeholder="この見出しへの修正指示を書く…"
+              className="h-16 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+            />
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelComment}
+                className={choiceButtonClass(
+                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => saveComment(i)}
+                className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+              >
+                {editingIdx !== null ? "更新" : "コメントを追加"}
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <button
+            type="button"
+            aria-label={`コメントを追加: ${section.heading}`}
+            onClick={() => startAddComment(i)}
+            className="mt-1 text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100"
+          >
+            ＋ コメント
+          </button>
+        )}
+      </li>
+    );
+  }
+
+  // #42/#43/#52/#53: 構成案の修正セクション(記事のみ)。GitHub風オンデマンド・コメント。
+  function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
+    const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
+    return (
+      <MotionConfig reducedMotion="user">
+        <p className="mt-1 text-xs text-gray-500">
+          見出しの「＋ コメント」から、直したい箇所に修正指示を書けます。
+        </p>
+        <ul className="mt-2 space-y-2">
+          {sections.map((section, i) => renderSection(item, section, i))}
         </ul>
         <button
           type="button"
           onClick={() => requestRevise(item)}
-          disabled={reviseBusy}
+          disabled={reviseBusy || total === 0}
           className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
         >
-          修正を依頼
+          修正を依頼{total > 0 ? `（コメント${total}件）` : ""}
         </button>
-      </>
+      </MotionConfig>
     );
   }
 
