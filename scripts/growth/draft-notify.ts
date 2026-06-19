@@ -75,19 +75,47 @@ function renderItem(item: DraftNotifyItem, index: number): string {
   return `${head}\n${detail}`;
 }
 
+/** 失敗原因の分類(#58)。一律「外部障害」と断定しないための区別。 */
+export type DraftFailureCategory = "timeout" | "external" | "client";
+
+/**
+ * 失敗理由(エラーメッセージ文字列)を timeout / client / external に分類する(#58)。
+ * - timeout: 自前 AbortController のタイムアウト、またはゲートウェイのタイムアウト
+ * - client: microCMS が 4xx を返した(送信内容の問題。再試行しても無駄)
+ * - external: 5xx / ネットワーク / 不明(外部障害の可能性)
+ *
+ * pipeline はエラーを文字列(message)で保持するため、型ではなく文字列で判定する。
+ */
+export function classifyDraftFailure(error: string): DraftFailureCategory {
+  if (/タイムアウト|timed?\s?out/i.test(error)) return "timeout";
+  if (/HTTP\s4\d\d/.test(error)) return "client";
+  return "external";
+}
+
+const FAILURE_HEAD: Record<DraftFailureCategory, string> = {
+  timeout:
+    "下書きの投入がタイムアウトしました(microCMS の書き込みに時間がかかっています)。",
+  external: "下書きの投入に失敗しました(外部障害の可能性があります)。",
+  client: "下書きの投入に失敗しました(送信内容に問題がある可能性があります)。",
+};
+
 export interface DraftFailureInput {
   failedStage: string;
   error: string;
   specPath: string;
+  /** 明示指定する場合の分類。未指定なら error から推定する。 */
+  category?: DraftFailureCategory;
 }
 
 /**
  * 下書き投入が失敗したときの LINE 通知本文(沈黙させない=#24)。
- * 外部障害の可能性と、冪等(#21)に再開できる手順を伝える。
+ * 失敗原因(timeout/external/client)を区別して文言を出し分け(#58)、
+ * 冪等(#21)に再開できる手順を伝える。
  */
 export function buildDraftFailureMessage(input: DraftFailureInput): string {
+  const category = input.category ?? classifyDraftFailure(input.error);
   return [
-    "下書きの投入に失敗しました(外部障害の可能性があります)。",
+    FAILURE_HEAD[category],
     `失敗した工程: ${input.failedStage}`,
     `理由: ${input.error}`,
     `本文・設定はステージ済み: ${input.specPath}`,

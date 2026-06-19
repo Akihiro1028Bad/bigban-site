@@ -5,6 +5,9 @@ import {
   createDraft,
   patchDraft,
   slugToContentId,
+  resolveRetryConfig,
+  ContentTimeoutError,
+  DEFAULT_RETRY,
   MicrocmsHttpError,
   type ContentApiOptions,
 } from "./content";
@@ -268,7 +271,7 @@ describe("リトライ＋指数バックオフ＋タイムアウト (#22)", () =
     }
   });
 
-  it("AbortController でタイムアウトすると abort され、再試行上限で失敗する", async () => {
+  it("AbortController でタイムアウトすると ContentTimeoutError として失敗する(自前abortを明示)", async () => {
     vi.useFakeTimers();
     try {
       const fetchFn = vi.fn<FetchFn>().mockImplementation(
@@ -285,12 +288,124 @@ describe("リトライ＋指数バックオフ＋タイムアウト (#22)", () =
         {},
         opts(fetchFn, { retry: { maxAttempts: 1, timeoutMs: 1000 }, sleep: async () => {} })
       );
-      const assertion = expect(p).rejects.toThrow(/aborted/);
+      const assertion = expect(p).rejects.toBeInstanceOf(ContentTimeoutError);
       await vi.advanceTimersByTimeAsync(1000);
       await assertion;
       expect(fetchFn).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("ContentTimeoutError のメッセージにタイムアウト時間(ms)を含む", () => {
+    const err = new ContentTimeoutError(45000);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("ContentTimeoutError");
+    expect(err.message).toMatch(/タイムアウト/);
+    expect(err.message).toContain("45000");
+  });
+});
+
+describe("DEFAULT_RETRY", () => {
+  it("1リクエストのタイムアウトは microCMS の重い書き込みに耐える 45 秒", () => {
+    // 15 秒では重い create を誤アボートしていた(#58)。
+    expect(DEFAULT_RETRY.timeoutMs).toBe(45000);
+  });
+});
+
+describe("resolveRetryConfig（env 上書き）", () => {
+  it("GROWTH_MICROCMS_TIMEOUT_MS / MAX_ATTEMPTS を正の整数として取り込む", () => {
+    expect(
+      resolveRetryConfig({
+        GROWTH_MICROCMS_TIMEOUT_MS: "60000",
+        GROWTH_MICROCMS_MAX_ATTEMPTS: "3",
+      })
+    ).toEqual({ timeoutMs: 60000, maxAttempts: 3 });
+  });
+
+  it("未設定なら何も上書きしない(空オブジェクト=既定を使う)", () => {
+    expect(resolveRetryConfig({})).toEqual({});
+  });
+
+  it("不正値(非数値・0・負)は無視する", () => {
+    expect(
+      resolveRetryConfig({
+        GROWTH_MICROCMS_TIMEOUT_MS: "abc",
+        GROWTH_MICROCMS_MAX_ATTEMPTS: "0",
+      })
+    ).toEqual({});
+    expect(resolveRetryConfig({ GROWTH_MICROCMS_TIMEOUT_MS: "-5" })).toEqual({});
+  });
+});
+
+describe("createDraft の着地確認（false-negative 回避 / #58）", () => {
+  const notFound = () =>
+    ({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+      text: async () => "not found",
+    }) as Awaited<ReturnType<FetchFn>>;
+
+  it("PUT が着地不明(ネットワーク失敗)でも、PATCH 照合で実在すれば成功扱い", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockRejectedValueOnce(new Error("ECONNRESET")) // PUT(着地したかは不明)
+      .mockResolvedValueOnce(okId("my-slug")); // 照合 PATCH → 実在＝成功
+    const id = await createDraft(
+      "news",
+      { slug: "my-slug", title: "T" },
+      opts(fetchFn, { retry: { maxAttempts: 1 } })
+    );
+    expect(id).toBe("my-slug");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn.mock.calls[0][1].method).toBe("PUT");
+    expect(fetchFn.mock.calls[1][1].method).toBe("PATCH");
+  });
+
+  it("5xx 枯渇後も PATCH 照合で実在すれば成功扱い", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(serverError()) // PUT 503
+      .mockResolvedValueOnce(okId("my-slug")); // 照合 PATCH
+    const id = await createDraft(
+      "news",
+      { slug: "my-slug", title: "T" },
+      opts(fetchFn, { retry: { maxAttempts: 1 } })
+    );
+    expect(id).toBe("my-slug");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("着地不明＋PATCH 照合も 404(未作成)なら、元のエラーを投げる", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockRejectedValueOnce(new Error("ECONNRESET")) // PUT
+      .mockResolvedValueOnce(notFound()); // 照合 PATCH → 未作成
+    await expect(
+      createDraft(
+        "news",
+        { slug: "my-slug", title: "T" },
+        opts(fetchFn, { retry: { maxAttempts: 1 } })
+      )
+    ).rejects.toThrow(/ECONNRESET/);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("4xx(422)は着地していないので PATCH 照合せず即失敗する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({}),
+      text: async () => "unprocessable",
+    });
+    await expect(
+      createDraft(
+        "news",
+        { slug: "my-slug", title: "T" },
+        opts(fetchFn, { retry: { maxAttempts: 1 } })
+      )
+    ).rejects.toThrow(/422/);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });

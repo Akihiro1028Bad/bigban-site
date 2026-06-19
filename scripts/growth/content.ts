@@ -28,8 +28,34 @@ export const DEFAULT_RETRY: RetryConfig = {
   maxAttempts: 4,
   baseDelayMs: 500,
   maxDelayMs: 8000,
-  timeoutMs: 15000,
+  // microCMS の重い書き込み(category 参照 + 本文HTML)は 15 秒を超えることがあり、
+  // 短いタイムアウトで自前 abort → リトライ嵐 → 冪等PUTの着地済みでも false-negative
+  // になっていた(#58)。「短く何度もアボート」より「長く1回待つ」を採る。
+  timeoutMs: 45000,
 };
+
+/** 正の整数なら返す。非数値 / 0 以下 / undefined は undefined。 */
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * 環境変数からリトライ設定の上書き(部分)を解決する(#58)。
+ * `GROWTH_MICROCMS_TIMEOUT_MS` / `GROWTH_MICROCMS_MAX_ATTEMPTS` を正の整数のみ採用。
+ * 不正値・未設定は無視し、既定(DEFAULT_RETRY)に委ねる。
+ */
+export function resolveRetryConfig(
+  env: Record<string, string | undefined>
+): Partial<RetryConfig> {
+  const out: Partial<RetryConfig> = {};
+  const timeoutMs = parsePositiveInt(env.GROWTH_MICROCMS_TIMEOUT_MS);
+  if (timeoutMs !== undefined) out.timeoutMs = timeoutMs;
+  const maxAttempts = parsePositiveInt(env.GROWTH_MICROCMS_MAX_ATTEMPTS);
+  if (maxAttempts !== undefined) out.maxAttempts = maxAttempts;
+  return out;
+}
 
 export interface ContentApiOptions {
   serviceDomain: string;
@@ -46,6 +72,20 @@ const defaultSleep = (ms: number): Promise<void> =>
 
 function backoffMs(attempt: number, cfg: RetryConfig): number {
   return Math.min(cfg.maxDelayMs, cfg.baseDelayMs * 2 ** (attempt - 1));
+}
+
+/**
+ * 自前の AbortController が時間切れで打ち切ったことを表す(#58)。
+ * 「microCMS 側の障害」ではなく「こちらのタイムアウト値」が原因であることを明示し、
+ * 失敗通知の誤誘導(一律「外部障害」)を防ぐ。
+ */
+export class ContentTimeoutError extends Error {
+  readonly timeoutMs: number;
+  constructor(timeoutMs: number) {
+    super(`リクエストがタイムアウトしました (${timeoutMs}ms)`);
+    this.name = "ContentTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
 }
 
 /** microCMS API の非 2xx 応答を表す。status / body を保持し、4xx/5xx の判別に使う。 */
@@ -94,7 +134,11 @@ async function requestOnce(
   timeoutMs: number
 ): Promise<HttpResponse> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
     return await fetchFn(url, {
       method,
@@ -105,6 +149,10 @@ async function requestOnce(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+  } catch (error: unknown) {
+    // 自前のタイムアウトで打ち切った場合は、外部障害と区別できる型で投げ直す。
+    if (timedOut) throw new ContentTimeoutError(timeoutMs);
+    throw error;
   } finally {
     clearTimeout(timer);
   }
@@ -168,6 +216,16 @@ function isAlreadyExists(error: MicrocmsHttpError): boolean {
 }
 
 /**
+ * 「PUT が着地したか不明」なエラーか(#58)。
+ * タイムアウト / ネットワーク / 5xx は、冪等PUTが microCMS 側で完了している可能性が
+ * あるため、PATCH 照合で実在確認する。4xx(送信内容拒否)は着地していないので対象外。
+ */
+function isLandingUncertain(error: unknown): boolean {
+  if (error instanceof MicrocmsHttpError) return error.status >= 500;
+  return true;
+}
+
+/**
  * 下書き(status=draft)を **slug 由来の決定的 ID** で冪等に作成する。
  * 同一slugの再実行では PUT が 400(already exists)になるため PATCH で上書きする。
  * data.slug(文字列)が必須。返すのは生成した contentId。
@@ -190,6 +248,20 @@ export async function createDraft(
     if (error instanceof MicrocmsHttpError && isAlreadyExists(error)) {
       // 既に同一IDの下書きが存在 = 前回の作成が成功済み。上書きしてレジューム。
       return send("PATCH", url, data, options);
+    }
+    if (isLandingUncertain(error)) {
+      // タイムアウト/ネットワーク/5xx: 冪等PUTが着地済みかもしれない。
+      // 決定的IDへ PATCH を試み、成功すれば「実在＝成功」として扱う(false-negative回避)。
+      // 未作成なら PATCH は 404 になるため、元のエラー(根本原因)を投げ直す。
+      // 照合は best-effort なので 1 回だけ(再試行でウォール時間を倍に膨らませない)。
+      try {
+        return await send("PATCH", url, data, {
+          ...options,
+          retry: { ...options.retry, maxAttempts: 1 },
+        });
+      } catch {
+        throw error;
+      }
     }
     throw error;
   }
