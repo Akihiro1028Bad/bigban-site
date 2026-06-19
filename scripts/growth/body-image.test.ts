@@ -3,12 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   BODY_IMAGE_MAX,
+  bodyImageFileStem,
   bodyImagePlaceholder,
   buildBodyImageAlt,
   buildBodyImageCaption,
+  buildBodyImageFailureMessage,
   buildBodyImagePrompt,
   buildBodyImageSpec,
+  capBodyImageSpecs,
   placeholderIndices,
+  resolveBodyImages,
+  substituteBodyImages,
+  type BodyImageSpec,
+  type ResolvedBodyImage,
 } from "./body-image";
 
 describe("buildBodyImagePrompt", () => {
@@ -87,5 +94,112 @@ describe("プレースホルダ", () => {
 describe("BODY_IMAGE_MAX", () => {
   it("上限は3枚(#61 と整合)", () => {
     expect(BODY_IMAGE_MAX).toBe(3);
+  });
+});
+
+const resolved = (index: number, over: Partial<ResolvedBodyImage> = {}): ResolvedBodyImage => ({
+  index,
+  url: `https://images.microcms-assets.io/img${index}.png`,
+  alt: `alt${index}`,
+  caption: `cap${index}`,
+  ...over,
+});
+
+describe("substituteBodyImages", () => {
+  it("{{IMG:n}} を <figure><img alt><figcaption> へ置換する", () => {
+    const html = substituteBodyImages("前 {{IMG:1}} 後", [resolved(1)]);
+    expect(html).toBe(
+      '前 <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"><figcaption>cap1</figcaption></figure> 後'
+    );
+  });
+
+  it("resolved に無い(失敗/欠番)プレースホルダは除去する", () => {
+    expect(substituteBodyImages("a {{IMG:1}} b {{IMG:2}} c", [resolved(1)])).toBe(
+      'a <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"><figcaption>cap1</figcaption></figure> b  c'
+    );
+  });
+
+  it("alt・caption・url の特殊文字をエスケープする", () => {
+    const html = substituteBodyImages("{{IMG:1}}", [
+      resolved(1, { alt: 'a<b>&"', caption: "x<y>", url: "https://images.microcms-assets.io/a&b.png" }),
+    ]);
+    expect(html).toContain('alt="a&lt;b&gt;&amp;&quot;"');
+    expect(html).toContain("<figcaption>x&lt;y&gt;</figcaption>");
+    expect(html).toContain('src="https://images.microcms-assets.io/a&amp;b.png"');
+  });
+});
+
+describe("resolveBodyImages", () => {
+  const specs: BodyImageSpec[] = [
+    buildBodyImageSpec(1, "mascot", "宇宙人"),
+    buildBodyImageSpec(2, "diagram", "コート図"),
+  ];
+
+  it("成功分は resolved、失敗分は failures に分け、1枚失敗でも続行する", async () => {
+    const { resolved: ok, failures } = await resolveBodyImages(specs, async (spec) => {
+      if (spec.index === 2) throw new Error("upload 502");
+      return "https://images.microcms-assets.io/ok.png";
+    });
+    expect(ok).toEqual([
+      {
+        index: 1,
+        url: "https://images.microcms-assets.io/ok.png",
+        alt: "宇宙人",
+        caption: "宇宙人",
+      },
+    ]);
+    expect(failures).toEqual([
+      { index: 2, description: "コート図", error: "upload 502" },
+    ]);
+  });
+
+  it("Error でない throw も文字列化して failures に入れる", async () => {
+    const { failures } = await resolveBodyImages([specs[0]], async () => {
+      throw "boom";
+    });
+    expect(failures[0].error).toBe("boom");
+  });
+});
+
+describe("capBodyImageSpecs", () => {
+  it("3枚までを kept、超過を dropped にする", () => {
+    const specs = [1, 2, 3, 4].map((i) => buildBodyImageSpec(i, "minimal", `d${i}`));
+    const { kept, dropped } = capBodyImageSpecs(specs);
+    expect(kept.map((s) => s.index)).toEqual([1, 2, 3]);
+    expect(dropped.map((s) => s.index)).toEqual([4]);
+  });
+});
+
+describe("buildBodyImageFailureMessage", () => {
+  it("タイトルと失敗した画像の説明・理由・再実行案内を含む", () => {
+    const msg = buildBodyImageFailureMessage("市川の記事", [
+      { index: 2, description: "コート図", error: "502" },
+    ]);
+    expect(msg).toContain("市川の記事");
+    expect(msg).toContain("コート図");
+    expect(msg).toContain("502");
+    expect(msg).toContain("再実行");
+  });
+});
+
+describe("bodyImageFileStem", () => {
+  it("同一(slug+style+説明)なら決定的に同じ stem(冪等キャッシュ)", () => {
+    const spec = buildBodyImageSpec(1, "diagram", "コート図");
+    expect(bodyImageFileStem("my-slug", spec)).toBe(bodyImageFileStem("my-slug", spec));
+  });
+
+  it("説明やスタイルが違えば stem も変わる", () => {
+    const a = buildBodyImageSpec(1, "diagram", "図A");
+    const b = buildBodyImageSpec(1, "diagram", "図B");
+    const c = buildBodyImageSpec(1, "minimal", "図A");
+    expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", b));
+    expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", c));
+  });
+
+  it("slug を英数字・ハイフンに正規化する(パス・トラバーサル防止)", () => {
+    const spec = buildBodyImageSpec(1, "mascot", "x");
+    const stem = bodyImageFileStem("../../etc/Passwd 注入", spec);
+    expect(stem).not.toMatch(/[./\\ ]/);
+    expect(stem).toContain("etc-passwd");
   });
 });
