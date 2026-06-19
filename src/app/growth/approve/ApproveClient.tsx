@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
+import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
 
 import { AddProposalForm } from "./AddProposalForm";
@@ -48,6 +49,20 @@ function approveUrl(token: string): string {
   return `/api/growth/approve?token=${encodeURIComponent(token)}`;
 }
 
+/** 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる。 */
+async function fetchPending(token: string): Promise<PendingItem[]> {
+  const res = await fetch(approveUrl(token));
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(
+      res.status === 401
+        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        : json.error ?? "取得に失敗しました。"
+    );
+  }
+  return json.items;
+}
+
 function removeKey<T>(obj: Record<string, T>, key: string): Record<string, T> {
   const next = { ...obj };
   delete next[key];
@@ -67,19 +82,24 @@ function choiceButtonClass(activeClass: string): string {
 }
 
 export function ApproveClient() {
+  // 合言葉認証が無効(一時措置)のときはゲートを出さず、未認証扱いにしない。
+  const authDisabled = !APPROVE_AUTH_ENABLED;
   const [passphrase, setPassphrase] = useState("");
   // 既定は表示(text)。type=password は日本語IMEを無効化するため、合言葉が日本語でも
   // 打てるよう text を既定にし、必要なときだけトグルで隠せるようにする。
   const [showPassphrase, setShowPassphrase] = useState(true);
   const [token, setToken] = useState("");
-  const [authed, setAuthed] = useState(false);
+  const [authed, setAuthed] = useState(authDisabled);
+  // 認証無効時はマウント時の自動取得が走るため、その間は読み込み中表示にする。
+  const [loadError, setLoadError] = useState("");
   const [items, setItems] = useState<PendingItem[]>([]);
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
+  const [busy, setBusy] = useState(authDisabled);
   // #240: 操作後に次の操作対象へフォーカスを移すための一時ターゲット(要素 id)。
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
@@ -114,16 +134,7 @@ export function ApproveClient() {
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(approveUrl(pass));
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(
-          res.status === 401
-            ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
-            : json.error ?? "取得に失敗しました。"
-        );
-      }
-      setItems(json.items);
+      setItems(await fetchPending(pass));
       setToken(pass);
       setAuthed(true);
     } catch (error) {
@@ -132,6 +143,24 @@ export function ApproveClient() {
       setBusy(false);
     }
   }
+
+  // 認証無効(一時措置)時は合言葉なしで承認待ちを取得する。失敗は握り潰さず再読込で復帰。
+  const loadPending = useCallback(async (): Promise<void> => {
+    setBusy(true);
+    setLoadError("");
+    try {
+      setItems(await fetchPending(""));
+    } catch (error) {
+      setLoadError(toMessage(error, "取得に失敗しました。"));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authDisabled) return;
+    void loadPending();
+  }, [authDisabled, loadPending]);
 
   /** ステータスを 1 件だけ更新する(承認/却下/承認待ち復帰の共通処理)。 */
   async function postStatus(id: string, decision: string): Promise<void> {
@@ -196,6 +225,33 @@ export function ApproveClient() {
   function undoFromPanel(item: PendingItem): void {
     void undo(item);
     setOpenId(null);
+  }
+
+  // 認証無効(一時措置): 自動取得の読み込み中・失敗をそれぞれ明示する(沈黙させない)。
+  if (authDisabled && busy) {
+    return (
+      <main className="mx-auto max-w-md p-6 text-center" aria-busy="true">
+        <p className="mt-10 text-sm text-gray-600">読み込み中…</p>
+      </main>
+    );
+  }
+
+  if (authDisabled && loadError) {
+    return (
+      <main className="mx-auto max-w-md p-6">
+        <h1 className="text-xl font-bold text-gray-900">承認ページ</h1>
+        <p role="alert" className="mt-3 text-sm text-red-700">
+          {loadError}
+        </p>
+        <button
+          type="button"
+          onClick={() => void loadPending()}
+          className={`${TAP_TARGET} mt-4 w-full bg-blue-600 text-white hover:bg-blue-700`}
+        >
+          再読み込み
+        </button>
+      </main>
+    );
   }
 
   if (!authed) {

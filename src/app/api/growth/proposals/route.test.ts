@@ -6,6 +6,14 @@ vi.mock("@/lib/growth/notion", () => ({
   defaultFetch: vi.fn(),
 }));
 
+// 合言葉認証フラグはテストごとに切り替える(既定は有効=現行の token 検証)。
+const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
+vi.mock("@/config/featureFlags", () => ({
+  get APPROVE_AUTH_ENABLED() {
+    return flags.authEnabled;
+  },
+}));
+
 import { createPage } from "@/lib/growth/notion";
 import { POST } from "./route";
 
@@ -18,6 +26,7 @@ function postRequest(token: string | null, body: unknown): Request {
 }
 
 beforeEach(() => {
+  flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(createPage).mockReset();
@@ -90,5 +99,25 @@ describe("POST /api/growth/proposals", () => {
     const res = await POST(postRequest(SECRET, { name: "A" }));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("作成中にエラーが発生しました");
+  });
+
+  describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {
+    beforeEach(() => {
+      flags.authEnabled = false;
+    });
+
+    it("token 無しでも施策を作成する(検証スキップ)", async () => {
+      vi.mocked(createPage).mockResolvedValue("38099efa-346b-8122-9681-f4d2cc321a31");
+      const res = await POST(postRequest(null, { name: "平日昼クーポン" }));
+      expect(res.status).toBe(200);
+      expect((await res.json()).success).toBe(true);
+      expect(createPage).toHaveBeenCalledTimes(1);
+    });
+
+    it("認証無効でも NOTION_TOKEN 未設定なら 500", async () => {
+      delete process.env.NOTION_TOKEN;
+      const res = await POST(postRequest(null, { name: "A" }));
+      expect(res.status).toBe(500);
+    });
   });
 });
