@@ -5,7 +5,7 @@
  * fetch は注入可能(テスト容易性)。チャネルアクセストークンが必要。
  */
 
-import type { FlexBubble } from "./digest-flex";
+import type { FlexContainer } from "./digest-flex";
 import type { FetchFn } from "./http";
 
 export const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
@@ -46,12 +46,13 @@ export async function pushTextMessage(
 }
 
 /**
- * Flex Message(カード型)を push する。Flex 非対応環境向けに altText を必ず付ける。
+ * Flex Message(単一バブル or カルーセル)を push する。
+ * Flex 非対応環境向けに altText を必ず付ける。
  */
 export async function pushFlexMessage(
   to: string,
   altText: string,
-  contents: FlexBubble,
+  contents: FlexContainer,
   options: LinePushOptions
 ): Promise<void> {
   await pushMessages(to, [{ type: "flex", altText, contents }], options);

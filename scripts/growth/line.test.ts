@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import { LINE_PUSH_URL, pushFlexMessage, pushTextMessage } from "./line";
-import type { FlexBubble } from "./digest-flex";
+import type { FlexBubble, FlexCarousel } from "./digest-flex";
 
 function res(ok: boolean, status: number, text = ""): HttpResponse {
   return { ok, status, json: async () => ({}), text: async () => text };
@@ -57,6 +57,22 @@ describe("pushFlexMessage", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       to: "Gabc",
       messages: [{ type: "flex", altText: "代替テキスト", contents: bubble }],
+    });
+  });
+
+  it("カルーセル(複数バブル)も push できる", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
+    const carousel: FlexCarousel = { type: "carousel", contents: [bubble, bubble] };
+
+    await pushFlexMessage("Gabc", "代替", carousel, {
+      channelAccessToken: TOKEN,
+      fetchFn,
+    });
+
+    const [, init] = fetchFn.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      to: "Gabc",
+      messages: [{ type: "flex", altText: "代替", contents: carousel }],
     });
   });
 
