@@ -154,6 +154,45 @@ call npm run growth:weekly >> "%USERPROFILE%\dev\bigban\data\weekly-cron.log" 2>
 
 ---
 
+## 6.5. 構成案の修正ループ(5分間隔・Epic #40)
+
+承認画面で記事の構成案にコメント→「修正を依頼」すると、Notion に「修正ステータス=依頼中」が立つ。
+これを**5分間隔のタスク**で拾い、`claude` が構成案を修正して「提示中」にする(プル型)。
+推論は `claude` サブスクを使うため **API 追加課金は無い**。
+
+> 前提: 「記事ネタ案」DB に修正用4プロパティを追加済みであること([運用ランブック](./growth-weekly-runbook.md)の
+> 「構成案の修正ループ」節の手順を参照)。未追加だと修正依頼の書き込みに失敗する。
+
+### 6.5-1. 起動バッチ
+
+`scripts\growth\run-revise.bat` を作成:
+
+```bat
+@echo off
+cd /d "%USERPROFILE%\dev\bigban"
+call npm run growth:revise-loop >> "%USERPROFILE%\dev\bigban\data\revise-cron.log" 2>&1
+```
+
+> `growth:revise-loop` が `run.mjs revise` を起動する。多重起動は `.growth-tmp\revise.lock` で防止し、
+> 1日の実行上限は `GROWTH_REVISE_DAILY_CAP`(既定50)。ログは `data\revise-cron.log`(gitignore 済み)。
+
+### 6.5-2. タスク登録
+
+1. 「タスク スケジューラ」→「タスクの作成」。名前=`growth-revise`。
+2. **トリガー**: 新規 →「1回」開始 → **詳細設定で「繰り返し間隔=5分」「継続時間=無期限」**。
+3. **操作**: `scripts\growth\run-revise.bat` のフルパス。
+4. **設定**: 「既に実行中の場合は新しいインスタンスを開始しない」を選ぶ(二重起動防止)。
+5. **条件**: ノートPCならスリープ解除の扱いを運用に合わせて調整。
+
+> 週次タスク(木7時)と併存して問題ない。修正ループは依頼が無ければ即終了する(空振り)。
+
+### 6.5-3. 動作テスト
+
+承認画面で構成案にコメント→「修正を依頼」した後、`growth-revise` を「実行する」。
+`data\revise-cron.log` を確認し、Notion の当該行が「提示中」になり、LINE に修正案の通知が届けば成功。
+
+---
+
 ## 7. 週次運用(設定後)
 
 - **木曜 朝**: 自動で週次レポート+施策提案が Notion に届く。
