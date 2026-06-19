@@ -218,8 +218,12 @@ function hashString(value: string): string {
   return (hash >>> 0).toString(16);
 }
 
-/** 生成画像の安定ファイル名 stem(拡張子なし)。同一 spec なら常に同じ。 */
+/**
+ * 生成画像の安定ファイル名 stem(拡張子なし)。同一 spec なら常に同じ。
+ * slug は英数字・ハイフンに正規化する(ファイルパスに使うためパス・トラバーサルを防ぐ)。
+ */
 export function bodyImageFileStem(slug: string, spec: BodyImageSpec): string {
+  const safeSlug = slug.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
   const key = hashString(`${spec.style}|${spec.description}`);
-  return `growth-bodyimg-${slug}-${spec.index}-${key}`;
+  return `growth-bodyimg-${safeSlug}-${spec.index}-${key}`;
 }

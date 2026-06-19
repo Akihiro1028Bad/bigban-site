@@ -195,4 +195,11 @@ describe("bodyImageFileStem", () => {
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", b));
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", c));
   });
+
+  it("slug を英数字・ハイフンに正規化する(パス・トラバーサル防止)", () => {
+    const spec = buildBodyImageSpec(1, "mascot", "x");
+    const stem = bodyImageFileStem("../../etc/Passwd 注入", spec);
+    expect(stem).not.toMatch(/[./\\ ]/);
+    expect(stem).toContain("etc-passwd");
+  });
 });

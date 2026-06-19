@@ -69,8 +69,10 @@ async function readImageResponse(
   res: Awaited<ReturnType<FetchFn>>
 ): Promise<Buffer> {
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`画像生成に失敗しました (HTTP ${res.status}): ${text}`);
+    // レスポンス本文(課金・キー情報を含むことがある)は読み捨て、ステータスのみを
+    // 例外に載せる。この message は失敗通知で LINE にも出るため秘匿情報を漏らさない。
+    await res.text();
+    throw new Error(`画像生成に失敗しました (HTTP ${res.status})`);
   }
   const json = (await res.json()) as EditsResponse;
   const b64 = json.data?.[0]?.b64_json;
@@ -99,6 +101,7 @@ export async function generateImage(
     form.append("quality", req.quality);
     form.append("n", "1");
     form.append(
+      // ファイル名は multipart のラベルに過ぎず、API はバイト内容のみを使う(意味なし)。
       "image",
       new Blob([Uint8Array.from(bytes)], { type: "image/png" }),
       "reference.png"
