@@ -49,6 +49,7 @@ public/
 - 文体ルール: 翻訳調・AIっぽさを避ける（§14）／外部リンク濫用・未検証数値・タイトル盛りを避け内部リンクを検討（§15）
 - 実行は自宅 PC の headless `claude -p`（`scripts/growth/run.mjs`）。git push / commit・本番公開はしない
 - 構成案の修正ループ（Epic #40）: 承認画面で構成案に行コメント→「修正を依頼」→ 常時稼働PCの `revise` モード（5分間隔・`npm run growth:revise-loop`）が `claude` で修正→提示中→ユーザーが反映。Notion「記事ネタ案」に4プロパティ（`修正指示`/`修正ステータス`/`修正案`/`修正依頼時刻`）の事前追加が必要。運用は `docs/operations/growth-weekly-runbook.md` の「構成案の修正ループ」節を参照
+- 本文画像（Epic #59）: 承認画面で構成案のセクションに画像指示（スタイル `mascot`/`minimal`/`diagram` ＋説明）を追加→下書き生成時に `growth:publish-draft` が生成→microCMSへupload→本文の `{{IMG:n}}` を `<figure>` へ置換。実写禁止・`diagram` は「イメージ図」明示・1記事上限3枚。正典は style-guide §9「本文画像」、純ロジックは `scripts/growth/body-image.ts`
 
 ## Development Process — TDD
 
