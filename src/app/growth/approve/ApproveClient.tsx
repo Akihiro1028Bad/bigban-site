@@ -473,12 +473,20 @@ export function ApproveClient() {
   }
 
   // #61: 画像指示の追加/編集/削除。構成案を直接上書き(AI不要・/revise/edit に相乗り)。
+  // 画像フォームを開くときは、コメント・手動編集フォームを閉じる(同時に複数フォームを開かない)。
+  function closeOtherForms(): void {
+    setOpenCommentFor(null);
+    setEditingSection(null);
+    setEditHeading("");
+    setEditDescription("");
+  }
+
   function startAddImage(i: number): void {
     setImageFormFor(i);
     setEditingImageIdx(null);
     setImageStyle("mascot");
     setImageDesc("");
-    setOpenCommentFor(null); // コメント入力中なら閉じる(同時に2フォームを開かない)
+    closeOtherForms();
   }
 
   function startEditImage(i: number, idx: number, image: OutlineImage): void {
@@ -486,7 +494,7 @@ export function ApproveClient() {
     setEditingImageIdx(idx);
     setImageStyle(image.style);
     setImageDesc(image.description);
-    setOpenCommentFor(null);
+    closeOtherForms();
   }
 
   function cancelImage(): void {
@@ -842,7 +850,6 @@ export function ApproveClient() {
             </label>
             <select
               id={`image-style-${i}`}
-              aria-label={`画像スタイル: ${section.heading}`}
               value={imageStyle}
               onChange={(event) => setImageStyle(event.target.value as ImageStyleKey)}
               className="mt-0.5 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"

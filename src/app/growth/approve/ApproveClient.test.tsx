@@ -1049,10 +1049,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     );
     const dialog = await openIdeaPanel();
     await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
-    await userEvent.selectOptions(
-      within(dialog).getByLabelText("画像スタイル: A"),
-      "diagram"
-    );
+    await userEvent.selectOptions(within(dialog).getByLabelText("スタイル"), "diagram");
     await userEvent.type(within(dialog).getByLabelText("画像の説明: A"), "コート図");
     await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
 
