@@ -18,7 +18,7 @@
  */
 
 import "dotenv/config";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -172,6 +172,8 @@ async function main(): Promise<void> {
     const signature = failureSignature(result.failedAt.name, category);
     const records = await readThrottleRecords();
     const decision = shouldSendFailureNotice(records, signature, Date.now(), windowMs);
+    // .growth-tmp/ が無いとスロットル状態を保存できず毎回送信になるため先に作る。
+    await mkdir(path.dirname(NOTIFY_THROTTLE_PATH), { recursive: true }).catch(() => {});
     await writeFile(NOTIFY_THROTTLE_PATH, JSON.stringify(decision.records), "utf-8").catch(
       () => {}
     );

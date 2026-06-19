@@ -253,8 +253,12 @@ export async function createDraft(
       // タイムアウト/ネットワーク/5xx: 冪等PUTが着地済みかもしれない。
       // 決定的IDへ PATCH を試み、成功すれば「実在＝成功」として扱う(false-negative回避)。
       // 未作成なら PATCH は 404 になるため、元のエラー(根本原因)を投げ直す。
+      // 照合は best-effort なので 1 回だけ(再試行でウォール時間を倍に膨らませない)。
       try {
-        return await send("PATCH", url, data, options);
+        return await send("PATCH", url, data, {
+          ...options,
+          retry: { ...options.retry, maxAttempts: 1 },
+        });
       } catch {
         throw error;
       }
