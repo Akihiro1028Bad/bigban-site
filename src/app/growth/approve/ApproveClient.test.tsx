@@ -763,7 +763,16 @@ describe("ApproveClient 構成案修正(#42)", () => {
 
   it("構成案を行ごとに表示し、コメントして修正を依頼できる", async () => {
     const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ outline: "## 見出しA\n## 見出しB" })] } },
+      {
+        json: {
+          success: true,
+          // 2件あっても依頼対象(i1)だけ楽観更新する。
+          items: [
+            ideaItem({ outline: "## 見出しA\n## 見出しB" }),
+            ideaItem({ id: "i2", title: "別の記事", outline: "## C" }),
+          ],
+        },
+      },
       { json: { success: true } }
     );
     const dialog = await openIdeaPanel();
@@ -867,6 +876,163 @@ describe("ApproveClient 構成案修正(#42)", () => {
     expect(
       within(dialog).queryByRole("button", { name: "修正を依頼" })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
+  async function openIdea() {
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    return screen.findByRole("dialog");
+  }
+
+  it("最新を確認で提示を取得し、反映で構成案を更新する", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "処理中" })] } },
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A", reviseStatus: "提示中", reviseProposal: "## A 改" })],
+        },
+      },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A 改" })] } }
+    );
+    const dialog = await openIdea();
+    expect(within(dialog).getByText(/最大5分/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "最新を確認" }));
+    expect(await within(dialog).findByText("## A 改")).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
+    expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply" });
+  });
+
+  it("やり直しで修正案を破棄し、再コメントできる", async () => {
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A", reviseStatus: "提示中", reviseProposal: "## A 改" })],
+        },
+      },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } }
+    );
+    const dialog = await openIdea();
+    await userEvent.click(within(dialog).getByRole("button", { name: "やり直し" }));
+    expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "discard" });
+  });
+
+  it("失敗時は理由を出し、やり直しで再コメントへ戻れる", async () => {
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A", reviseStatus: "失敗", reviseProposal: "タイムアウト" })],
+        },
+      },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } }
+    );
+    const dialog = await openIdea();
+    expect(within(dialog).getByText(/修正に失敗しました: タイムアウト/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "やり直し" }));
+    expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "discard" });
+  });
+
+  it("失敗で理由が空なら『理由不明』を出す", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "失敗" })] },
+    });
+    const dialog = await openIdea();
+    expect(within(dialog).getByText(/修正に失敗しました: 理由不明/)).toBeInTheDocument();
+  });
+
+  it("反映APIのエラーを表示する", async () => {
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A", reviseStatus: "提示中", reviseProposal: "## A 改" })],
+        },
+      },
+      { ok: false, status: 409, json: { success: false, error: "反映できるのは提示中のときだけです。" } }
+    );
+    const dialog = await openIdea();
+    await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
+    expect(
+      await within(dialog).findByText("反映できるのは提示中のときだけです。")
+    ).toBeInTheDocument();
+  });
+
+  it("反映APIの error なし失敗は既定メッセージ", async () => {
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ outline: "## A", reviseStatus: "提示中", reviseProposal: "## A 改" })],
+        },
+      },
+      { json: { success: false } }
+    );
+    const dialog = await openIdea();
+    await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
+    expect(await within(dialog).findByText("更新に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("最新取得の失敗(非Error)は既定メッセージ", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "処理中" })] } },
+      "boom"
+    );
+    const dialog = await openIdea();
+    await userEvent.click(within(dialog).getByRole("button", { name: "最新を確認" }));
+    expect(await within(dialog).findByText("最新の取得に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("修正中(処理中)は一覧・パネルの承認/却下を無効化する", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "処理中" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    // 一覧の承認ボタンが無効
+    expect(screen.getByRole("button", { name: "承認: 猛暑記事" })).toBeDisabled();
+    // パネルでも無効
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "承認" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "却下" })).toBeDisabled();
+  });
+
+  it("提示待ちの間は自動で再取得して提示へ移る(ポーリング)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "依頼中" })] } },
+        {
+          json: {
+            success: true,
+            items: [ideaItem({ outline: "## A", reviseStatus: "提示中", reviseProposal: "## A 改" })],
+          },
+        }
+      );
+      flags.authEnabled = false; // 自動取得(ログイン不要)
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(await screen.findByText("## A 改")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

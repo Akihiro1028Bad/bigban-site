@@ -7,6 +7,10 @@ import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
 
 import { AddProposalForm } from "./AddProposalForm";
+import { revisePhase } from "./revisePhase";
+
+// 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
+const REVISE_POLL_MS = 5000;
 
 interface PendingDetail {
   label: string;
@@ -127,12 +131,11 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
-  // #42: 構成案の行コメント(開いているパネルの 行index→コメント文)・依頼状態。
+  // #42/#43: 構成案の行コメント(開いているパネルの 行index→コメント文)・修正操作の状態。
   // 重複見出し行でも衝突しないよう行テキストではなく index をキーにする。
   const [reviseComments, setReviseComments] = useState<Record<number, string>>({});
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
-  const [reviseRequestedId, setReviseRequestedId] = useState<string | null>(null);
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -145,12 +148,30 @@ export function ApproveClient() {
     setFocusId(null);
   }, [focusId]);
 
-  // #42: パネルを開閉/切替したら、前の記事の行コメント・依頼状態をクリアする。
+  // #42: パネルを開閉/切替したら、前の記事の行コメント・エラーをクリアする。
   useEffect(() => {
     setReviseComments({});
     setReviseError("");
-    setReviseRequestedId(null);
   }, [openId]);
+
+  // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。失敗は明示する。
+  const refreshItems = useCallback(async (): Promise<void> => {
+    try {
+      setItems(await fetchPending(token));
+    } catch (error) {
+      setReviseError(toMessage(error, "最新の取得に失敗しました。"));
+    }
+  }, [token]);
+
+  // #43: 開いている記事が提示待ち(依頼中/処理中)の間だけ、一定間隔で再取得する。
+  useEffect(() => {
+    const item = openId ? items.find((it) => it.id === openId) : undefined;
+    if (!item || revisePhase(item.reviseStatus) !== "pending") return;
+    const timer = setInterval(() => {
+      void refreshItems();
+    }, REVISE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [openId, items, refreshItems]);
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -288,10 +309,35 @@ export function ApproveClient() {
             : json.error ?? "修正依頼に失敗しました。"
         );
       }
-      setReviseRequestedId(item.id);
+      // 楽観更新: 依頼中にして即ポーリング表示へ(以降は poll が提示を取りに行く)。
+      setItems((prev) =>
+        prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
+      );
       setReviseComments({});
     } catch (error) {
       setReviseError(toMessage(error, "修正依頼に失敗しました。"));
+    } finally {
+      setReviseBusy(false);
+    }
+  }
+
+  // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
+  async function applyRevise(item: PendingItem, action: "apply" | "discard"): Promise<void> {
+    setReviseBusy(true);
+    setReviseError("");
+    try {
+      const res = await fetch("/api/growth/revise/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: item.id, action }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "更新に失敗しました。");
+      }
+      await refreshItems();
+    } catch (error) {
+      setReviseError(toMessage(error, "更新に失敗しました。"));
     } finally {
       setReviseBusy(false);
     }
@@ -402,6 +448,8 @@ export function ApproveClient() {
   function renderItem(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
+    // #43: 修正依頼中/処理中/提示中は、古い構成案のまま承認させない(承認排他)。
+    const lockedForRevise = isReviseBusy(item.reviseStatus);
     const failure = failures[item.id];
     const detailButton = (
       <button
@@ -451,7 +499,7 @@ export function ApproveClient() {
                 id={`approve-${item.id}`}
                 aria-label={`承認: ${item.title}`}
                 onClick={() => decide(item, "承認")}
-                disabled={isBusy}
+                disabled={isBusy || lockedForRevise}
                 className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
               >
                 承認
@@ -460,7 +508,7 @@ export function ApproveClient() {
                 type="button"
                 aria-label={`却下: ${item.title}`}
                 onClick={() => decide(item, "却下")}
-                disabled={isBusy}
+                disabled={isBusy || lockedForRevise}
                 className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
               >
                 却下
@@ -490,51 +538,139 @@ export function ApproveClient() {
     );
   }
 
-  // #42: 構成案の行コメント→修正依頼セクション(記事のみ)。
+  // #42/#43: 構成案の修正セクション(記事のみ)。修正ステータスのフェーズで描画を分ける。
+  function renderReviseCommentForm(item: PendingItem, lines: string[]) {
+    return (
+      <>
+        <ul className="mt-2 space-y-3">
+          {lines.map((line, i) => (
+            <li key={i}>
+              <p className="text-sm text-gray-800">{line}</p>
+              <textarea
+                aria-label={`コメント: ${line}`}
+                value={reviseComments[i] ?? ""}
+                onChange={(event) =>
+                  setReviseComments((prev) => ({ ...prev, [i]: event.target.value }))
+                }
+                placeholder="この見出しへの修正指示（任意）"
+                className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+              />
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => requestRevise(item)}
+          disabled={reviseBusy}
+          className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
+        >
+          修正を依頼
+        </button>
+      </>
+    );
+  }
+
+  function renderRevisePending() {
+    return (
+      <div>
+        <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          修正を依頼しました。PCが処理して最大5分で修正案を提示します。
+        </p>
+        <button
+          type="button"
+          onClick={() => void refreshItems()}
+          disabled={reviseBusy}
+          className={choiceButtonClass(
+            "mt-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          )}
+        >
+          最新を確認
+        </button>
+      </div>
+    );
+  }
+
+  function renderReviseReady(item: PendingItem) {
+    return (
+      <div>
+        <p className="mt-2 text-xs text-gray-500">
+          修正案が届きました。元の構成案と見比べて反映してください。
+        </p>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div>
+            <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
+            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
+              {item.outline}
+            </pre>
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-blue-700">修正案</h4>
+            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
+              {item.reviseProposal}
+            </pre>
+          </div>
+        </div>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => applyRevise(item, "apply")}
+            disabled={reviseBusy}
+            className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+          >
+            反映する
+          </button>
+          <button
+            type="button"
+            onClick={() => applyRevise(item, "discard")}
+            disabled={reviseBusy}
+            className={choiceButtonClass(
+              "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            )}
+          >
+            やり直し
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderReviseFailed(item: PendingItem) {
+    return (
+      <div>
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          修正に失敗しました: {item.reviseProposal || "理由不明"}
+        </p>
+        <button
+          type="button"
+          onClick={() => applyRevise(item, "discard")}
+          disabled={reviseBusy}
+          className={choiceButtonClass("mt-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+        >
+          やり直し
+        </button>
+      </div>
+    );
+  }
+
   function renderReviseSection(item: PendingItem) {
     const lines = outlineLines(item.outline);
-    if (lines.length === 0) return null;
-    const requested = reviseRequestedId === item.id || isReviseBusy(item.reviseStatus);
+    const phase = revisePhase(item.reviseStatus);
+    if (phase === "idle" && lines.length === 0) return null;
     return (
       <section aria-label="構成案の修正" className="mt-4 border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-bold text-gray-700">構成案にコメントして修正を依頼</h3>
-        {requested ? (
-          <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
-            修正を依頼しました。PCが処理して最大5分で修正案を提示します。
+        <h3 className="text-sm font-bold text-gray-700">構成案の修正</h3>
+        {phase === "pending"
+          ? renderRevisePending()
+          : phase === "ready"
+            ? renderReviseReady(item)
+            : phase === "failed"
+              ? renderReviseFailed(item)
+              : renderReviseCommentForm(item, lines)}
+        {reviseError ? (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {reviseError}
           </p>
-        ) : (
-          <>
-            <ul className="mt-2 space-y-3">
-              {lines.map((line, i) => (
-                <li key={i}>
-                  <p className="text-sm text-gray-800">{line}</p>
-                  <textarea
-                    aria-label={`コメント: ${line}`}
-                    value={reviseComments[i] ?? ""}
-                    onChange={(event) =>
-                      setReviseComments((prev) => ({ ...prev, [i]: event.target.value }))
-                    }
-                    placeholder="この見出しへの修正指示（任意）"
-                    className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-                  />
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={() => requestRevise(item)}
-              disabled={reviseBusy}
-              className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
-            >
-              修正を依頼
-            </button>
-            {reviseError ? (
-              <p role="alert" className="mt-2 text-sm text-red-700">
-                {reviseError}
-              </p>
-            ) : null}
-          </>
-        )}
+        ) : null}
       </section>
     );
   }
@@ -544,6 +680,8 @@ export function ApproveClient() {
   function renderPanel(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
+    // #43: 修正中(依頼中/処理中/提示中)は承認/却下を無効化(古い構成案での承認を防ぐ)。
+    const lockedForRevise = isReviseBusy(item.reviseStatus);
     return (
       <div className="fixed inset-0 z-50 flex">
         <button
@@ -598,7 +736,7 @@ export function ApproveClient() {
                 <button
                   type="button"
                   onClick={() => decideFromPanel(item, "承認")}
-                  disabled={isBusy}
+                  disabled={isBusy || lockedForRevise}
                   className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
                 >
                   承認
@@ -606,7 +744,7 @@ export function ApproveClient() {
                 <button
                   type="button"
                   onClick={() => decideFromPanel(item, "却下")}
-                  disabled={isBusy}
+                  disabled={isBusy || lockedForRevise}
                   className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
                 >
                   却下

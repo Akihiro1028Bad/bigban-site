@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReviseApplyProps,
+  buildReviseDiscardProps,
   buildReviseRequestProps,
   parseReviseInstructions,
   REVISE_BUSY_STATUSES,
@@ -77,6 +79,27 @@ describe("buildReviseRequestProps", () => {
       "修正指示": { rich_text: [{ text: { content: json } }] },
       "修正ステータス": { select: { name: "依頼中" } },
       "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
+    });
+  });
+});
+
+describe("buildReviseApplyProps", () => {
+  it("構成案を上書きし、修正指示・修正案をクリア、ステータスをなしに戻す", () => {
+    expect(buildReviseApplyProps("新しいアウトライン")).toEqual({
+      "構成案": { rich_text: [{ text: { content: "新しいアウトライン" } }] },
+      "修正ステータス": { select: { name: "なし" } },
+      "修正指示": { rich_text: [] },
+      "修正案": { rich_text: [] },
+    });
+  });
+});
+
+describe("buildReviseDiscardProps", () => {
+  it("構成案は触らず、修正指示・修正案・ステータスをクリアする", () => {
+    expect(buildReviseDiscardProps()).toEqual({
+      "修正ステータス": { select: { name: "なし" } },
+      "修正指示": { rich_text: [] },
+      "修正案": { rich_text: [] },
     });
   });
 });
