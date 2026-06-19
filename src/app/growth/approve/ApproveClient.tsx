@@ -83,6 +83,9 @@ function choiceButtonClass(activeClass: string): string {
 
 export function ApproveClient() {
   // 合言葉認証が無効(一時措置)のときはゲートを出さず、未認証扱いにしない。
+  // APPROVE_AUTH_ENABLED はモジュール定数のため実行中に変化しないが、復元(true)時に
+  // 構造が読み取りやすいよう render 内で参照し、依存する effect にも明示する。
+  // 認証無効時は token を空("")のまま使い、サーバ側(verifyToken)が検証をスキップする。
   const authDisabled = !APPROVE_AUTH_ENABLED;
   const [passphrase, setPassphrase] = useState("");
   // 既定は表示(text)。type=password は日本語IMEを無効化するため、合言葉が日本語でも
