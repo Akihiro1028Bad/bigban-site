@@ -22,6 +22,8 @@
     "growth:self-heal": "tsx scripts/growth/self-heal-cli.ts",
     "growth:publish-draft": "tsx scripts/growth/publish-draft-cli.ts",
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",
+    "growth:revise": "tsx scripts/growth/revise-cli.ts",
+    "growth:revise-loop": "node scripts/growth/run.mjs revise",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"

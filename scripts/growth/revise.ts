@@ -8,7 +8,7 @@
  * I/O を持たないためテスト可能。Web(API ルート)・PC(poller) の双方が import する。
  */
 
-import { chunkRichText } from "./notion";
+import { chunkRichText, type NotionPage } from "./notion";
 
 /** Notion「記事ネタ案」に追加する修正ループ用プロパティ名(#45 でDBに作成)。 */
 export const REVISE_PROPS = {
@@ -132,4 +132,137 @@ export function buildReviseApplyProps(proposal: string): Record<string, unknown>
  */
 export function buildReviseDiscardProps(): Record<string, unknown> {
   return clearedReviseProps();
+}
+
+// ── PC poller(#44)用 ──────────────────────────────────────────────
+/** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
+export const REVISE_TIMEOUT_MS = 15 * 60 * 1000;
+
+/** ロック取得(依頼中 → 処理中)のプロパティ。 */
+export function buildReviseProcessingProps(): Record<string, unknown> {
+  const processing: ReviseStatus = "処理中";
+  return { [REVISE_PROPS.status]: { select: { name: processing } } };
+}
+
+/** 修正完了: 修正案を書き込み、提示中にする(1 PATCH)。 */
+export function buildReviseProposalProps(proposal: string): Record<string, unknown> {
+  const presented: ReviseStatus = "提示中";
+  return {
+    [REVISE_PROPS.proposal]: { rich_text: chunkRichText(proposal) },
+    [REVISE_PROPS.status]: { select: { name: presented } },
+  };
+}
+
+/** 失敗: 失敗にして理由を修正案へ入れる(沈黙させない・1 PATCH)。 */
+export function buildReviseFailProps(reason: string): Record<string, unknown> {
+  const failed: ReviseStatus = "失敗";
+  return {
+    [REVISE_PROPS.status]: { select: { name: failed } },
+    [REVISE_PROPS.proposal]: { rich_text: chunkRichText(reason) },
+  };
+}
+
+// Notion ページの読み取り(poller 用・src/lib の approve.ts とは別レイヤー)。
+function readSelectName(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
+  return value?.select?.name ?? "";
+}
+
+function readRichTextPlain(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as
+    | { rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("");
+}
+
+function readDateStartMs(page: NotionPage, prop: string): number | null {
+  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
+  const start = value?.date?.start;
+  if (!start) return null;
+  const ms = Date.parse(start);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function readTitlePlain(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as
+    | { title?: Array<{ plain_text?: string }> }
+    | undefined;
+  return (value?.title ?? []).map((t) => t.plain_text ?? "").join("");
+}
+
+/** 記事ネタ案のタイトルプロパティ名。 */
+export const IDEA_TITLE_PROP = "タイトル案";
+
+export interface ReviseRow {
+  id: string;
+  title: string;
+  status: ReviseStatus;
+  requestedAtMs: number | null;
+  outline: string;
+  /** 行コメント。空/不正なら []。 */
+  instructions: ReviseComment[];
+}
+
+/** Notion ページから poller 用の行情報を取り出す(壊れた修正指示は [] にして落とさない)。 */
+export function reviseRowFromPage(page: NotionPage): ReviseRow {
+  const statusName = readSelectName(page, REVISE_PROPS.status);
+  const status: ReviseStatus = (REVISE_STATUSES as readonly string[]).includes(statusName)
+    ? (statusName as ReviseStatus)
+    : "なし";
+  const rawInstructions = readRichTextPlain(page, REVISE_PROPS.instructions);
+  let instructions: ReviseComment[] = [];
+  if (rawInstructions) {
+    try {
+      instructions = parseReviseInstructions(rawInstructions);
+    } catch {
+      instructions = [];
+    }
+  }
+  return {
+    id: page.id,
+    title: readTitlePlain(page, IDEA_TITLE_PROP),
+    status,
+    requestedAtMs: readDateStartMs(page, REVISE_PROPS.requestedAt),
+    outline: readRichTextPlain(page, OUTLINE_PROP),
+    instructions,
+  };
+}
+
+/**
+ * 処理中のまま timeoutMs を超えた行(PCが落ちた等)の id を返す(reaper 対象)。
+ * 依頼時刻が無い行は対象にしない(誤回収を避ける)。
+ */
+export function selectStaleReviseIds(
+  rows: readonly ReviseRow[],
+  nowMs: number,
+  timeoutMs: number
+): string[] {
+  return rows
+    .filter(
+      (r) =>
+        r.status === "処理中" &&
+        r.requestedAtMs !== null &&
+        nowMs - r.requestedAtMs > timeoutMs
+    )
+    .map((r) => r.id);
+}
+
+/** 修正案提示の LINE 本文(承認画面URLへ誘導)。 */
+export function buildRevisePresentMessage(title: string, approveUrl: string): string {
+  return [
+    "記事構成案の修正案ができました。",
+    `タイトル: ${title}`,
+    "承認画面で元の構成案と見比べて、反映/やり直しを選んでください。",
+    approveUrl,
+  ].join("\n");
+}
+
+/** 修正失敗の LINE 本文(沈黙させない・#24整合)。 */
+export function buildReviseFailMessage(title: string, reason: string): string {
+  return [
+    "記事構成案の修正に失敗しました(外部障害の可能性があります)。",
+    `タイトル: ${title}`,
+    `理由: ${reason}`,
+    "承認画面から、やり直し(再コメント)で再依頼できます。",
+  ].join("\n");
 }

@@ -58,3 +58,6 @@ tsconfig.tsbuildinfo
 # growth loop: 生成画像(手動添付用・管理外)
 /data/growth-images/
 /data/*.log
+
+# growth loop: ステージ用一時ファイル・revise の lockfile / 実行カウント(管理外)
+/.growth-tmp/
