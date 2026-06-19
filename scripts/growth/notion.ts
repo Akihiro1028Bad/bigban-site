@@ -50,16 +50,17 @@ function notionHeaders(options: NotionApiOptions): Record<string, string> {
 }
 
 async function notionRequest(
-  method: "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH",
   url: string,
   body: unknown,
   options: NotionApiOptions
 ): Promise<unknown> {
-  const res = await options.fetchFn(url, {
+  const init: { method: string; headers: Record<string, string>; body?: string } = {
     method,
     headers: notionHeaders(options),
-    body: JSON.stringify(body),
-  });
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await options.fetchFn(url, init);
 
   if (!res.ok) {
     const text = await res.text();
@@ -67,6 +68,20 @@ async function notionRequest(
   }
 
   return res.json();
+}
+
+/** ページ単体を取得する(GET /v1/pages/{id})。修正ステータス等の確認に使う。 */
+export async function getPage(
+  pageId: string,
+  options: NotionApiOptions
+): Promise<NotionPage> {
+  const json = (await notionRequest(
+    "GET",
+    `${NOTION_API_BASE}/pages/${pageId}`,
+    undefined,
+    options
+  )) as NotionPage;
+  return json;
 }
 
 /** data source を照会して該当ページ一覧(と次カーソル)を返す。 */

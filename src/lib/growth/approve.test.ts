@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
-import { parseDecisions, pendingStatus, toPendingItems } from "./approve";
+import {
+  isNotionPageId,
+  parseDecisions,
+  pendingStatus,
+  reviseStatusOf,
+  toPendingItems,
+} from "./approve";
 
 function proposal(id: string, name: string, category: string): NotionPage {
   return {
@@ -53,7 +59,7 @@ describe("toPendingItems", () => {
     ]);
   });
 
-  it("記事ネタ案は優先度と概要を持つ", () => {
+  it("記事ネタ案は優先度と概要・構成案(outline)・修正状態を持つ", () => {
     const [item] = toPendingItems([], [idea("i1", "猛暑×屋内", "夏向けの集客記事")]);
 
     expect(item).toMatchObject({
@@ -61,12 +67,25 @@ describe("toPendingItems", () => {
       kind: "idea",
       title: "猛暑×屋内",
       subtitle: "夏向けの集客記事",
+      // #42: 構成案は details でなく outline(行コメント対象)に移動
+      outline: "導入→H2基準3つ→CTA",
+      reviseStatus: "なし",
+      reviseProposal: "",
+      reviseInstructions: "",
     });
     expect(item.details).toEqual([
       { label: "根拠", value: "関連検索が前月比2.1倍" },
-      { label: "構成案", value: "導入→H2基準3つ→CTA" },
       { label: "優先度", value: "中" },
     ]);
+  });
+
+  it("記事ネタ案の修正ステータスを反映する(#42)", () => {
+    const page = idea("i9", "T", "S");
+    page.properties["修正ステータス"] = { type: "select", select: { name: "提示中" } };
+    page.properties["修正案"] = { type: "rich_text", rich_text: [{ plain_text: "改訂版アウトライン" }] };
+    const [item] = toPendingItems([], [page]);
+    expect(item.reviseStatus).toBe("提示中");
+    expect(item.reviseProposal).toBe("改訂版アウトライン");
   });
 
   it("記事ネタ案の根拠が空なら details から除外する(#238)", () => {
@@ -86,7 +105,18 @@ describe("toPendingItems", () => {
     const bare: NotionPage = { id: "x", url: "", properties: {} };
     expect(toPendingItems([bare], [bare])).toEqual([
       { id: "x", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
-      { id: "x", kind: "idea", title: "", subtitle: "", details: [], score: 0 },
+      {
+        id: "x",
+        kind: "idea",
+        title: "",
+        subtitle: "",
+        details: [],
+        score: 0,
+        outline: "",
+        reviseStatus: "なし",
+        reviseProposal: "",
+        reviseInstructions: "",
+      },
     ]);
   });
 
@@ -114,7 +144,18 @@ describe("toPendingItems", () => {
     };
     expect(toPendingItems([noPlain], [noPlain])).toEqual([
       { id: "y", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
-      { id: "y", kind: "idea", title: "", subtitle: "", details: [], score: 0 },
+      {
+        id: "y",
+        kind: "idea",
+        title: "",
+        subtitle: "",
+        details: [],
+        score: 0,
+        outline: "",
+        reviseStatus: "なし",
+        reviseProposal: "",
+        reviseInstructions: "",
+      },
     ]);
   });
 
@@ -187,5 +228,38 @@ describe("pendingStatus", () => {
 
   it("記事ネタ案の承認待ちは提案中", () => {
     expect(pendingStatus("idea")).toBe("提案中");
+  });
+});
+
+describe("isNotionPageId", () => {
+  it("ダッシュ有/無の UUID を許可し、不正値・非文字列を弾く", () => {
+    expect(isNotionPageId("38099efa-346b-8122-9681-f4d2cc321a31")).toBe(true);
+    expect(isNotionPageId("5adab8b1f1824123b9639463a2580d4a")).toBe(true);
+    expect(isNotionPageId("../evil")).toBe(false);
+    expect(isNotionPageId("abc")).toBe(false);
+    expect(isNotionPageId(123)).toBe(false);
+    expect(isNotionPageId(null)).toBe(false);
+  });
+});
+
+describe("reviseStatusOf", () => {
+  function pageWithStatus(name?: string): NotionPage {
+    return {
+      id: "i1",
+      url: "",
+      properties: name
+        ? { "修正ステータス": { type: "select", select: { name } } }
+        : {},
+    };
+  }
+
+  it("有効な修正ステータスをそのまま返す", () => {
+    expect(reviseStatusOf(pageWithStatus("依頼中"))).toBe("依頼中");
+    expect(reviseStatusOf(pageWithStatus("提示中"))).toBe("提示中");
+  });
+
+  it("未設定・想定外は「なし」", () => {
+    expect(reviseStatusOf(pageWithStatus())).toBe("なし");
+    expect(reviseStatusOf(pageWithStatus("謎"))).toBe("なし");
   });
 });
