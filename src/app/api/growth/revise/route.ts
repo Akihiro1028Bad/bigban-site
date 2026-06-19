@@ -1,0 +1,108 @@
+/**
+ * 構成案の修正依頼 API(Epic #40 / #42)。
+ *
+ * POST : 記事ネタ案の構成案に対する行コメント(修正指示)を受け取り、Notion に
+ *        `修正指示`＋`修正ステータス=依頼中`＋`修正依頼時刻=now` を 1 PATCH で書き込む。
+ *        常時稼働PCの poller が `依頼中` を拾って修正する(プル型)。
+ *
+ * 暴走防止: 既に 依頼中/処理中/提示中 の行は 409(再依頼拒否)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ */
+
+import { timingSafeEqual } from "node:crypto";
+
+import { NextResponse } from "next/server";
+
+import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { isNotionPageId, reviseStatusOf } from "@/lib/growth/approve";
+import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import {
+  buildReviseRequestProps,
+  REVISE_BUSY_STATUSES,
+  serializeReviseInstructions,
+} from "@/lib/growth/revise";
+
+export const runtime = "nodejs";
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+function verifyToken(url: URL): boolean {
+  // 合言葉認証が無効(一時措置)のときは token 検証をスキップする。
+  if (!APPROVE_AUTH_ENABLED) return true;
+  const token = url.searchParams.get("token") ?? "";
+  const expected = process.env.APPROVE_SECRET ?? "";
+  return Boolean(expected) && safeEqual(token, expected);
+}
+
+function unauthorized(): Response {
+  return NextResponse.json({ success: false, error: "認証に失敗しました" }, { status: 401 });
+}
+
+function badRequest(message: string): Response {
+  return NextResponse.json({ success: false, error: message }, { status: 400 });
+}
+
+function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) return null;
+  return { token, fetchFn: defaultFetch };
+}
+
+export async function POST(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  if (!verifyToken(url)) return unauthorized();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return badRequest("不正なリクエストです。");
+  }
+  const pageId = (body as { pageId?: unknown })?.pageId;
+  if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
+
+  let instructionsJson: string;
+  try {
+    instructionsJson = serializeReviseInstructions(
+      (body as { comments?: unknown }).comments
+    );
+  } catch (error) {
+    /* istanbul ignore next -- @preserve throw 元は常に Error(serializeReviseInstructions) */
+    const message = error instanceof Error ? error.message : "不正なコメントです。";
+    return badRequest(message);
+  }
+
+  const options = notionOptions();
+  if (!options) {
+    return NextResponse.json(
+      { success: false, error: "サーバー設定エラー" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const page = await getPage(pageId, options);
+    if (REVISE_BUSY_STATUSES.includes(reviseStatusOf(page))) {
+      return NextResponse.json(
+        { success: false, error: "この記事は修正処理中です。完了までお待ちください。" },
+        { status: 409 }
+      );
+    }
+    await updatePageProps(
+      pageId,
+      buildReviseRequestProps(instructionsJson, new Date().toISOString()),
+      options
+    );
+  } catch {
+    // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)
+    return NextResponse.json(
+      { success: false, error: "修正依頼の登録に失敗しました" },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}

@@ -7,6 +7,7 @@ import {
   createPage,
   DEFAULT_NOTION_VERSION,
   getLatestReport,
+  getPage,
   queryDataSource,
   updatePageProps,
   updatePageSelect,
@@ -162,6 +163,26 @@ describe("updatePageProps", () => {
     await expect(
       updatePageProps("p1", {}, { token: TOKEN, fetchFn })
     ).rejects.toThrow(/400/);
+  });
+});
+
+describe("getPage", () => {
+  it("GET /v1/pages/{id} を body なしで送り、ページを返す", async () => {
+    const page = { id: "p1", url: "https://notion.so/p1", properties: { x: 1 } };
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok(page));
+
+    const result = await getPage("p1", { token: TOKEN, fetchFn });
+
+    expect(result).toEqual(page);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/pages/p1");
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("失敗時は throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(404, "no page"));
+    await expect(getPage("p1", { token: TOKEN, fetchFn })).rejects.toThrow(/404/);
   });
 });
 

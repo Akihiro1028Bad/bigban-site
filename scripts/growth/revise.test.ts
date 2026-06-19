@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReviseRequestProps,
   parseReviseInstructions,
   REVISE_BUSY_STATUSES,
   REVISE_PROPS,
@@ -65,5 +66,17 @@ describe("parseReviseInstructions", () => {
   it("要素の line / comment が不正なら弾く", () => {
     expect(() => parseReviseInstructions('[{"line":"a"}]')).toThrow(/不正/);
     expect(() => parseReviseInstructions('[{"line":"","comment":"c"}]')).toThrow(/不正/);
+  });
+});
+
+describe("buildReviseRequestProps", () => {
+  it("修正指示(分割rich_text)・依頼中・依頼時刻を1まとめにする", () => {
+    const json = serializeReviseInstructions([{ line: "見出し", comment: "短く" }]);
+    const props = buildReviseRequestProps(json, "2026-06-19T01:00:00.000Z");
+    expect(props).toEqual({
+      "修正指示": { rich_text: [{ text: { content: json } }] },
+      "修正ステータス": { select: { name: "依頼中" } },
+      "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
+    });
   });
 });

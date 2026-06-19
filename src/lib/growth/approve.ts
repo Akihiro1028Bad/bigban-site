@@ -4,6 +4,7 @@
  */
 
 import type { NotionPage } from "./notion";
+import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
 
 export type PendingKind = "proposal" | "idea";
 
@@ -22,6 +23,27 @@ export interface PendingItem {
   details: PendingDetail[];
   /** 並べ替え用の優先度スコア(施策=優先度スコア / 記事=優先度ランク)。降順表示。 */
   score: number;
+  /** 記事ネタ案の構成案(見出しアウトライン)。行コメント対象。記事のみ。 */
+  outline?: string;
+  /** 構成案修正ループの状態(記事のみ)。未設定は「なし」。 */
+  reviseStatus?: ReviseStatus;
+  /** PC が返した修正後の構成案(提示中/失敗時に表示)。記事のみ。 */
+  reviseProposal?: string;
+  /** 直近に送った修正指示(行コメントの JSON)。記事のみ。 */
+  reviseInstructions?: string;
+}
+
+/** Notion ページ ID として妥当か(パスインジェクション/不正入力の防御)。 */
+export function isNotionPageId(id: unknown): id is string {
+  return typeof id === "string" && ID_RE.test(id);
+}
+
+/** ページの `修正ステータス`(select)を読む。未設定/想定外は「なし」。 */
+export function reviseStatusOf(page: NotionPage): ReviseStatus {
+  const name = selectName(page, REVISE_PROPS.status);
+  return (REVISE_STATUSES as readonly string[]).includes(name)
+    ? (name as ReviseStatus)
+    : "なし";
 }
 
 // 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。
@@ -92,12 +114,10 @@ function proposalDetails(page: NotionPage): PendingDetail[] {
 }
 
 function ideaDetails(page: NotionPage): PendingDetail[] {
-  // #241: 根拠 → 構成案 → 数値(優先度)の順に揃える。
+  // #241: 根拠 → 数値(優先度)の順。構成案は #42 で行コメントUI(outline)に移したため details から外す。
   return buildDetails([
     // #238: 記事も施策と同様に判断根拠を出す(空なら buildDetails が除外)。
     { label: "根拠", value: richText(page, "根拠") },
-    // #245: 承認前に記事の中身を把握できるよう構成案(見出しアウトライン)を出す。
-    { label: "構成案", value: richText(page, "構成案") },
     { label: "優先度", value: selectName(page, "優先度") },
   ]);
 }
@@ -122,6 +142,11 @@ export function toPendingItems(
     subtitle: richText(page, "概要"),
     details: ideaDetails(page),
     score: PRIORITY_RANK[selectName(page, "優先度")] ?? 0,
+    // #42: 構成案修正ループ用。構成案は行コメント対象、修正状態はパネルのポーリングで使う。
+    outline: richText(page, OUTLINE_PROP),
+    reviseStatus: reviseStatusOf(page),
+    reviseProposal: richText(page, REVISE_PROPS.proposal),
+    reviseInstructions: richText(page, REVISE_PROPS.instructions),
   }));
   return [...proposalItems, ...ideaItems];
 }
