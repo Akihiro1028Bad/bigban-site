@@ -87,10 +87,24 @@ describe("POST /api/growth/revise/apply", () => {
     });
   });
 
-  it("discard: 修正中でない(なし)なら 409", async () => {
+  it("discard: 失敗からも破棄できる", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("失敗", "理由"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "discard" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("discard: なし(修正なし)なら 409", async () => {
     vi.mocked(getPage).mockResolvedValue(page());
     const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "discard" }));
     expect(res.status).toBe(409);
+  });
+
+  it("discard: 依頼中/処理中(PC作業中)は 409(競合回避)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("処理中"));
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "discard" }));
+    expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
   });
 
   it("不正な action は 400", async () => {

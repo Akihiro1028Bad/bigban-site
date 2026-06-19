@@ -86,7 +86,11 @@ export async function POST(request: Request): Promise<Response> {
       if (!proposal) return conflict("反映する修正案がありません。");
       await updatePageProps(pageId, buildReviseApplyProps(proposal), options);
     } else {
-      if (status === "なし") return conflict("やり直す修正依頼がありません。");
+      // discard は「提示中/失敗 → なし」だけ許可。依頼中/処理中(PC作業中)は
+      // 競合を避けるため拒否する(古い状態へ巻き戻さない)。
+      if (status !== "提示中" && status !== "失敗") {
+        return conflict("やり直せるのは提示中または失敗のときだけです。");
+      }
       await updatePageProps(pageId, buildReviseDiscardProps(), options);
     }
   } catch {

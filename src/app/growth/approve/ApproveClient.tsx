@@ -163,15 +163,21 @@ export function ApproveClient() {
     }
   }, [token]);
 
-  // #43: 開いている記事が提示待ち(依頼中/処理中)の間だけ、一定間隔で再取得する。
+  // #43: 開いている記事が提示待ち(依頼中/処理中)かどうか。
+  const polledItem = openId ? items.find((it) => it.id === openId) : undefined;
+  const isRevisePending = polledItem
+    ? revisePhase(polledItem.reviseStatus) === "pending"
+    : false;
+
+  // 提示待ちの間だけ一定間隔で再取得する。提示/失敗/なしへ移ったら interval を確実に止める
+  // (deps は boolean なので、poll で items が変わっても pending のままなら張り直さない)。
   useEffect(() => {
-    const item = openId ? items.find((it) => it.id === openId) : undefined;
-    if (!item || revisePhase(item.reviseStatus) !== "pending") return;
+    if (!isRevisePending) return;
     const timer = setInterval(() => {
       void refreshItems();
     }, REVISE_POLL_MS);
     return () => clearInterval(timer);
-  }, [openId, items, refreshItems]);
+  }, [isRevisePending, refreshItems]);
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
