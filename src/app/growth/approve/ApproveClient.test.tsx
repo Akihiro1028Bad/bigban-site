@@ -1,6 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
+// 無効(一時措置)の挙動は専用 describe で flags.authEnabled=false にして検証する。
+const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
+vi.mock("@/config/featureFlags", () => ({
+  get APPROVE_AUTH_ENABLED() {
+    return flags.authEnabled;
+  },
+  isCmsNewsEnabled: () => false,
+}));
 
 import { ApproveClient } from "./ApproveClient";
 
@@ -25,6 +35,10 @@ function mockFetchSequence(
 
 const PASS = "ビックマン";
 const TOKEN_URL = `/api/growth/approve?token=${encodeURIComponent(PASS)}`;
+
+beforeEach(() => {
+  flags.authEnabled = true;
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -735,5 +749,48 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     await screen.findByText("A");
     await userEvent.click(screen.getByRole("button", { name: "詳細: A" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
+  beforeEach(() => {
+    flags.authEnabled = false;
+  });
+
+  it("ゲートを出さず、合言葉なし(token空)で承認待ちを直接取得・表示する", async () => {
+    const fn = mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+
+    expect(await screen.findByText("市川ページ")).toBeInTheDocument();
+    // 合言葉入力欄(ゲート)は出さない
+    expect(screen.queryByLabelText("合言葉")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "確認する" })).not.toBeInTheDocument();
+    // token を付けずに取得する(空 token)
+    expect(fn.mock.calls[0][0]).toBe("/api/growth/approve?token=");
+  });
+
+  it("承認の保存も token なし(空)で送る", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(fn.mock.calls[1][0]).toBe("/api/growth/approve?token=");
+  });
+
+  it("自動取得が失敗したらエラーと再読み込みを出し、再取得で復帰する", async () => {
+    mockFetchSequence(
+      { ok: false, status: 500, json: { success: false, error: "サーバー設定エラー" } },
+      { json: { success: true, items: [proposalItem()] } }
+    );
+    render(<ApproveClient />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("サーバー設定エラー");
+    await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(await screen.findByText("市川ページ")).toBeInTheDocument();
   });
 });
