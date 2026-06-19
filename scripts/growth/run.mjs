@@ -13,12 +13,13 @@
  */
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
+const tmpDir = path.join(here, "..", "..", ".growth-tmp");
 
 // 共通の許可ツール。Notion は headless では mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
@@ -41,7 +42,53 @@ const MODES = {
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
   drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
+  // 構成案修正(#44)。決定的処理は growth:revise CLI、claude はテキスト修正のみ。
+  // 5分間隔の高頻度起動なので lockfile で多重起動を防ぎ、1日上限で暴走も止める。
+  revise: {
+    prompt: "revise-outline.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
+
+const REVISE_LOCK = path.join(tmpDir, "revise.lock");
+const REVISE_COUNT = path.join(tmpDir, "revise-count.json");
+const REVISE_DAILY_CAP = Number(process.env.GROWTH_REVISE_DAILY_CAP || "50");
+const LOCK_STALE_MS = 30 * 60 * 1000; // 30分超のロックは死んだプロセスとみなす
+
+/** 多重起動防止のロック取得。取れなければ false。stale(>30分)なロックは奪う。 */
+function acquireReviseLock() {
+  mkdirSync(tmpDir, { recursive: true });
+  if (existsSync(REVISE_LOCK)) {
+    const ageMs = Date.now() - statSync(REVISE_LOCK).mtimeMs;
+    if (ageMs < LOCK_STALE_MS) return false;
+    rmSync(REVISE_LOCK, { force: true }); // stale ロックを回収
+  }
+  writeFileSync(REVISE_LOCK, String(process.pid));
+  return true;
+}
+
+function releaseReviseLock() {
+  rmSync(REVISE_LOCK, { force: true });
+}
+
+/** 1日あたりの実行上限。超えていれば false。 */
+function underDailyCap() {
+  const today = new Date().toISOString().slice(0, 10);
+  let count = 0;
+  if (existsSync(REVISE_COUNT)) {
+    try {
+      const data = JSON.parse(readFileSync(REVISE_COUNT, "utf-8"));
+      if (data.date === today) count = Number(data.count) || 0;
+    } catch {
+      count = 0;
+    }
+  }
+  if (count >= REVISE_DAILY_CAP) return false;
+  writeFileSync(REVISE_COUNT, JSON.stringify({ date: today, count: count + 1 }));
+  return true;
+}
 
 // 無人でも誤って外部反映しないよう、危険操作は明示拒否
 const DISALLOW = ["Bash(git push:*)", "Bash(git commit:*)"];
@@ -50,7 +97,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise>\n`
   );
   process.exit(1);
 }
@@ -102,6 +149,19 @@ function runNpm(scriptName, env = {}) {
   });
 }
 
+// revise は高頻度起動。多重起動を lockfile で防ぎ、1日上限で暴走を止める(dry-run後・spawn前)。
+if (cfg.lock) {
+  if (!acquireReviseLock()) {
+    process.stdout.write("revise: 既に実行中のためスキップします。\n");
+    process.exit(0);
+  }
+  if (!underDailyCap()) {
+    releaseReviseLock();
+    process.stdout.write(`revise: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
+    process.exit(0);
+  }
+}
+
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
 const child = spawn("claude", args, {
   stdio: ["pipe", "inherit", "inherit"],
@@ -110,6 +170,7 @@ const child = spawn("claude", args, {
 child.stdin.write(prompt);
 child.stdin.end();
 child.on("exit", async (code) => {
+  if (cfg.lock) releaseReviseLock();
   const exitCode = code ?? 0;
   // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
   // claude の出力には依存せず、スナップショット + Notion から通知を組み立てる。
@@ -126,6 +187,7 @@ child.on("exit", async (code) => {
   process.exit(exitCode);
 });
 child.on("error", (err) => {
+  if (cfg.lock) releaseReviseLock();
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
   process.exit(1);
 });
