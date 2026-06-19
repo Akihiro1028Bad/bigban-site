@@ -126,8 +126,8 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として全執筆エージェントに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
 1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
 2. 各案を **コンテンツ作成チーム** で執筆
-3. **投入スペックをステージ**(エージェントはここまで): 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction(§9の宇宙人の行為), imagePath, notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。eyecatchAction は §9「宇宙人マスコット × コスミック」に沿う
-4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。同じ spec で再実行すれば冪等に再開。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
+3. **投入スペックをステージ**(エージェントはここまで): 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction(§9の宇宙人の行為), imagePath, images[], notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。eyecatchAction は §9「宇宙人マスコット × コスミック」に沿う。**構成案に画像指示 `[画像:<スタイル>: <説明>]` があれば**、本文HTMLの該当箇所に `{{IMG:1}}`(以降連番)を置き、`images:[{index,style,description}]` を入れる(上限3枚・超過はスキップ報告)
+4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
 5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` にして `npm run growth:notify-drafts -- <json>` を実行。各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功時のみ**実行。`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
 
 **コンテンツ作成チームの工程**(サブエージェントは**2体**に分ける)
@@ -145,7 +145,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 
 1. **アートディレクター** ― §9 の固定キャラ・画調を前提に、**記事内容から「宇宙人の行為(action)」を英語1フレーズで作る**(誰が何をしているか。例: 移行記事＝ラケットとパドルを持ち比べる)。記事内容と矛盾しない題材にする。**この `eyecatchAction` を手順3の投入スペックに入れる**(生成・upload・添付は手順4の `growth:publish-draft` が同期実行する)
    - **アイキャッチ(必須)**: §9 の宇宙人マスコット・宇宙背景・ブランド配色。記事ごとに行為だけ変える・**文字なし**
-   - **本文画像(任意)**: 必要時のみ。`npm run growth:gen-eyecatch -- --action "<行為>" --out <path>` 単体でも生成可(プロンプト組み立ては `scripts/growth/eyecatch.ts`、参照画像方式・gpt-image-2・`quality high`)
+   - **本文画像(任意・Epic #59)**: 承認画面で構成案に書かれた画像指示 `[画像:<スタイル>: <説明>]` から生成する。スタイルは `mascot`(参照画像方式)/ `minimal` / `diagram`(text-to-image)の3種・すべてAI生成・**実写禁止**。`diagram` は不正確になりうるため alt/キャプションに「イメージ図」を自動付与し参考扱い(正典は [growth-article-style.md](./growth-article-style.md) §9「本文画像」)。**1記事上限3枚**・超過/失敗はスキップ＋LINE通知。投入時に `growth:publish-draft` が生成→upload→`{{IMG:n}}`置換を行う(プロンプト・置換は `scripts/growth/body-image.ts`、生成は `eyecatch.ts` の `generateImage`)。単体生成は `npm run growth:gen-eyecatch` も可
    - 投入(create/upload/patch)は `growth:publish-draft` が担うため、ここでは**行為(action)を決めるまで**。`OPENAI_API_KEY` 未設定なら投入時に当該工程で失敗・報告される(下書き本文は冪等に作成済み)
    - microCMS MCP / base64 渡しは**使わない**(headless 非対応)。アイキャッチは横長(16:9・1536x1024)
 
