@@ -7,6 +7,7 @@ import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
 
 import { AddProposalForm } from "./AddProposalForm";
+import { parseOutlineSections, type OutlineSection } from "./outline";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
@@ -38,12 +39,9 @@ function isReviseBusy(status: string | undefined): boolean {
   return REVISE_BUSY_STATUSES.includes(status ?? "なし");
 }
 
-/** 構成案を行(見出し)単位に分割する。空行は除く。 */
-function outlineLines(outline: string | undefined): string[] {
-  return (outline ?? "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+/** 構成案をセクション(見出し＋1行説明)に分割する。 */
+function outlineSections(outline: string | undefined): OutlineSection[] {
+  return parseOutlineSections(outline ?? "");
 }
 
 function byScoreDesc(a: PendingItem, b: PendingItem): number {
@@ -290,10 +288,10 @@ export function ApproveClient() {
     setOpenId(null);
   }
 
-  // #42: 構成案の行コメントを「修正指示」として送る(プル型・常時稼働PCが拾う)。
+  // #42/#52: 構成案セクションへのコメントを「修正指示」として送る(アンカー=見出し)。
   async function requestRevise(item: PendingItem): Promise<void> {
-    const comments = outlineLines(item.outline)
-      .map((line, i) => ({ line, comment: (reviseComments[i] ?? "").trim() }))
+    const comments = outlineSections(item.outline)
+      .map((section, i) => ({ line: section.heading, comment: (reviseComments[i] ?? "").trim() }))
       .filter((c) => c.comment.length > 0);
     if (comments.length === 0) {
       setReviseError("コメントを1件以上入力してください。");
@@ -544,16 +542,19 @@ export function ApproveClient() {
     );
   }
 
-  // #42/#43: 構成案の修正セクション(記事のみ)。修正ステータスのフェーズで描画を分ける。
-  function renderReviseCommentForm(item: PendingItem, lines: string[]) {
+  // #42/#43/#52: 構成案の修正セクション(記事のみ)。セクション(見出し＋説明)ごとにコメント。
+  function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
     return (
       <>
         <ul className="mt-2 space-y-3">
-          {lines.map((line, i) => (
-            <li key={i}>
-              <p className="text-sm text-gray-800">{line}</p>
+          {sections.map((section, i) => (
+            <li key={i} className="rounded-md border border-gray-200 p-2">
+              <p className="text-sm font-medium text-gray-900">{section.heading}</p>
+              {section.description ? (
+                <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
+              ) : null}
               <textarea
-                aria-label={`コメント: ${line}`}
+                aria-label={`コメント: ${section.heading}`}
                 value={reviseComments[i] ?? ""}
                 onChange={(event) =>
                   setReviseComments((prev) => ({ ...prev, [i]: event.target.value }))
@@ -659,9 +660,9 @@ export function ApproveClient() {
   }
 
   function renderReviseSection(item: PendingItem) {
-    const lines = outlineLines(item.outline);
+    const sections = outlineSections(item.outline);
     const phase = revisePhase(item.reviseStatus);
-    if (phase === "idle" && lines.length === 0) return null;
+    if (phase === "idle" && sections.length === 0) return null;
     return (
       <section aria-label="構成案の修正" className="mt-4 border-t border-gray-200 pt-4">
         <h3 className="text-sm font-bold text-gray-700">構成案の修正</h3>
@@ -671,7 +672,7 @@ export function ApproveClient() {
             ? renderReviseReady(item)
             : phase === "failed"
               ? renderReviseFailed(item)
-              : renderReviseCommentForm(item, lines)}
+              : renderReviseCommentForm(item, sections)}
         {reviseError ? (
           <p role="alert" className="mt-2 text-sm text-red-700">
             {reviseError}
