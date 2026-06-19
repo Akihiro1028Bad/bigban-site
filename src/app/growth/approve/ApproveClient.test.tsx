@@ -933,6 +933,82 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     });
   });
 
+  it("セクションを手動編集して直接保存できる(他セクションは保持)(#54)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A\n旧説明\n\n## B\n別説明" })] } },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A改\n新説明\n\n## B\n別説明" })] } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
+    const heading = within(dialog).getByLabelText("見出しを編集: A");
+    await userEvent.clear(heading);
+    await userEvent.type(heading, "A改");
+    const desc = within(dialog).getByLabelText("説明を編集: A");
+    await userEvent.clear(desc);
+    await userEvent.type(desc, "新説明");
+    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+
+    expect(await within(dialog).findByText("A改")).toBeInTheDocument();
+    expect(within(dialog).getByText("新説明")).toBeInTheDocument();
+    // 他セクション(B)は保持される
+    expect(within(dialog).getByText("B")).toBeInTheDocument();
+    const post = fn.mock.calls[1];
+    expect(post[0]).toBe("/api/growth/revise/edit");
+    expect(JSON.parse(post[1].body)).toEqual({
+      pageId: "i1",
+      outline: "## A改\n新説明\n\n## B\n別説明",
+    });
+  });
+
+  it("見出しを空にすると保存できない(#54)", async () => {
+    const fn = mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A" })] },
+    });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.clear(within(dialog).getByLabelText("見出しを編集: A"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+    expect(await within(dialog).findByText(/見出しは空にできません/)).toBeInTheDocument();
+    expect(fn).toHaveBeenCalledTimes(1); // login のみ・POST なし
+  });
+
+  it("AI修正処理中は手動保存できない(409)(#54)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { ok: false, status: 409, json: { success: false, error: "x" } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
+  });
+
+  it("手動保存の失敗(error付き/なし)を表示する(#54)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { ok: false, status: 502, json: { success: false, error: "保存中にエラーが発生しました" } },
+      { json: { success: false } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+    expect(await within(dialog).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
+    // 2回目: error なし → 既定メッセージ
+    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+    expect(await within(dialog).findByText("保存に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("手動編集をキャンセルできる(#54)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
+    expect(within(dialog).getByLabelText("見出しを編集: A")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(within(dialog).queryByLabelText("見出しを編集: A")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("A")).toBeInTheDocument();
+  });
+
   it("構成案が無い記事では修正セクションを出さない", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const dialog = await openIdeaPanel();

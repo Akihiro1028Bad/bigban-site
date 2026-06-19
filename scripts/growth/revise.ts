@@ -134,6 +134,13 @@ export function buildReviseDiscardProps(): Record<string, unknown> {
   return clearedReviseProps();
 }
 
+/**
+ * 手動編集(#54): 構成案を直接上書きする(AIを介さない)。修正状態は触らない。
+ */
+export function buildOutlineEditProps(outline: string): Record<string, unknown> {
+  return { [OUTLINE_PROP]: { rich_text: chunkRichText(outline) } };
+}
+
 // ── PC poller(#44)用 ──────────────────────────────────────────────
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const REVISE_TIMEOUT_MS = 15 * 60 * 1000;
