@@ -18,16 +18,29 @@
  */
 
 import "dotenv/config";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  bodyImageFileStem,
+  buildBodyImageFailureMessage,
+  buildBodyImageSpec,
+  capBodyImageSpecs,
+  resolveBodyImages,
+  substituteBodyImages,
+  type BodyImageFailure,
+  type BodyImageSpec,
+  type BodyImageStyle,
+} from "./body-image";
 import { createDraft, patchDraft, resolveRetryConfig } from "./content";
 import {
   buildDraftFailureMessage,
   classifyDraftFailure,
 } from "./draft-notify";
-import { buildEyecatchPrompt, generateEyecatch } from "./eyecatch";
+import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
@@ -57,11 +70,34 @@ async function readThrottleRecords(): Promise<NotifyThrottleRecord[]> {
   }
 }
 
+interface DraftImageInput {
+  index: number;
+  style: BodyImageStyle;
+  description: string;
+}
+
 interface DraftSpec {
   payload: Record<string, unknown>;
   eyecatchAction?: string;
   imagePath?: string;
+  /** 本文画像(#63)。構成案の画像指示から下書きモードがステージする。 */
+  images?: DraftImageInput[];
   notion?: { pageId: string; property: string; value: string };
+}
+
+/** best-effort で LINE に通知する(送れなくても失敗にしない=沈黙させない補助)。 */
+async function notifyLineBestEffort(message: string): Promise<void> {
+  const lineGroupId = process.env.LINE_GROUP_ID;
+  const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!lineGroupId || !lineToken) return;
+  try {
+    await pushTextMessage(lineGroupId, message, {
+      channelAccessToken: lineToken,
+      fetchFn: defaultFetch,
+    });
+  } catch {
+    /* 通知失敗は致命ではない(本処理は継続) */
+  }
 }
 
 function requireEnv(name: string): string {
@@ -91,14 +127,70 @@ async function main(): Promise<void> {
   let contentId = "";
   let eyecatchUrl = "";
 
-  const stages: Stage[] = [
-    {
-      name: "create",
+  // 本文画像1枚を「生成(キャッシュ)→microCMSへupload」して URL を返す(#63)。
+  // 生成済みファイルがあれば再生成しない(冪等=#21・OpenAI の再課金防止)。mascot のみ参照画像。
+  async function resolveBodyImageUrl(imgSpec: BodyImageSpec): Promise<string> {
+    const filePath = path.join(os.tmpdir(), `${bodyImageFileStem(String(spec.payload.slug ?? ""), imgSpec)}.png`);
+    if (!existsSync(filePath)) {
+      const buf = await generateImage(
+        {
+          apiKey: requireEnv("OPENAI_API_KEY"),
+          prompt: imgSpec.prompt,
+          size: "1536x1024",
+          quality: "high",
+          refPath: imgSpec.style === "mascot" ? DEFAULT_REF : undefined,
+        },
+        { fetchFn: defaultFetch, readFile }
+      );
+      await writeFile(filePath, buf);
+    }
+    return uploadMedia(filePath, {
+      serviceDomain,
+      apiKey: requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+      fetchFn: defaultFetch,
+      readFile,
+    });
+  }
+
+  const stages: Stage[] = [];
+
+  // 本文画像(#63): create より前に、生成→upload→{{IMG:n}} 置換で bodyHtml を確定させる。
+  // 1枚失敗しても全体は止めず、そのプレースホルダは除去・スキップを LINE 通知する。
+  if (spec.images && spec.images.length > 0) {
+    const inputs = spec.images;
+    stages.push({
+      name: "body-images",
       run: async () => {
-        contentId = await createDraft(ENDPOINT, spec.payload, microOpts);
+        const allSpecs = inputs.map((im) =>
+          buildBodyImageSpec(im.index, im.style, im.description)
+        );
+        const { kept, dropped } = capBodyImageSpecs(allSpecs);
+        const { resolved, failures } = await resolveBodyImages(kept, resolveBodyImageUrl);
+        spec.payload.bodyHtml = substituteBodyImages(
+          String(spec.payload.bodyHtml ?? ""),
+          resolved
+        );
+        const droppedFailures: BodyImageFailure[] = dropped.map((d) => ({
+          index: d.index,
+          description: d.description,
+          error: "1記事の上限(3枚)を超えたためスキップ",
+        }));
+        const allFailures = [...failures, ...droppedFailures];
+        if (allFailures.length > 0) {
+          const msg = buildBodyImageFailureMessage(String(spec.payload.title ?? ""), allFailures);
+          process.stderr.write(`${msg}\n`);
+          await notifyLineBestEffort(msg);
+        }
       },
+    });
+  }
+
+  stages.push({
+    name: "create",
+    run: async () => {
+      contentId = await createDraft(ENDPOINT, spec.payload, microOpts);
     },
-  ];
+  });
 
   if (spec.eyecatchAction) {
     stages.push(

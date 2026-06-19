@@ -4,7 +4,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   buildEyecatchPrompt,
   generateEyecatch,
+  generateImage,
   EYECATCH_EDITS_URL,
+  IMAGE_GENERATIONS_URL,
 } from "./eyecatch";
 import type { FetchFn } from "./http";
 
@@ -106,5 +108,67 @@ describe("generateEyecatch", () => {
         deps(fetchFn)
       )
     ).rejects.toThrow();
+  });
+});
+
+describe("generateImage（参照なし=text-to-image / #63）", () => {
+  const okResponse = (b64: string) =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ b64_json: b64 }] }),
+      text: async () => "",
+    }) as Awaited<ReturnType<FetchFn>>;
+
+  it("refPath 未指定なら generations へ JSON POST し、readFile を呼ばない", async () => {
+    const b64 = Buffer.from("gen").toString("base64");
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okResponse(b64));
+    const readFile = vi.fn(async () => Buffer.from("x"));
+
+    const buf = await generateImage(
+      { apiKey: "sk", prompt: "minimal art", size: "1536x1024", quality: "high" },
+      { fetchFn, readFile }
+    );
+
+    expect(buf.toString()).toBe("gen");
+    expect(readFile).not.toHaveBeenCalled();
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe(IMAGE_GENERATIONS_URL);
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/json"
+    );
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      model: "gpt-image-2",
+      prompt: "minimal art",
+      n: 1,
+    });
+  });
+
+  it("refPath 指定なら edits(参照画像)へ送る", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okResponse("YQ=="));
+    const readFile = vi.fn(async () => Buffer.from("ref"));
+    await generateImage(
+      { apiKey: "sk", prompt: "p", size: "1536x1024", quality: "high", refPath: "/r.png" },
+      { fetchFn, readFile }
+    );
+    expect(readFile).toHaveBeenCalledWith("/r.png");
+    expect(fetchFn.mock.calls[0][0]).toBe(EYECATCH_EDITS_URL);
+    expect(fetchFn.mock.calls[0][1].body).toBeInstanceOf(FormData);
+  });
+
+  it("generations の HTTP エラーは内容付きで例外", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+      text: async () => "server error",
+    });
+    await expect(
+      generateImage(
+        { apiKey: "k", prompt: "p", size: "1536x1024", quality: "high" },
+        { fetchFn, readFile: vi.fn(async () => Buffer.from("x")) }
+      )
+    ).rejects.toThrow("500");
   });
 });
