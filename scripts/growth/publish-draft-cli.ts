@@ -22,18 +22,40 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createDraft, patchDraft } from "./content";
-import { buildDraftFailureMessage } from "./draft-notify";
+import { createDraft, patchDraft, resolveRetryConfig } from "./content";
+import {
+  buildDraftFailureMessage,
+  classifyDraftFailure,
+} from "./draft-notify";
 import { buildEyecatchPrompt, generateEyecatch } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
 import { updatePageSelect } from "./notion";
+import {
+  failureSignature,
+  shouldSendFailureNotice,
+  type NotifyThrottleRecord,
+} from "./notify-throttle";
 import { runStages, type Stage } from "./pipeline";
 
 const ENDPOINT = "news";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REF = path.join(here, "assets", "mascot-alien.png");
+
+const NOTIFY_THROTTLE_PATH = ".growth-tmp/notify-throttle.json";
+const DEFAULT_NOTIFY_WINDOW_MS = 10 * 60 * 1000;
+
+// 状態ファイルは fail-open: 読めない/壊れていれば「空＝必ず送信」に倒す(沈黙を避ける)。
+async function readThrottleRecords(): Promise<NotifyThrottleRecord[]> {
+  try {
+    const raw = await readFile(NOTIFY_THROTTLE_PATH, "utf-8");
+    const data: unknown = JSON.parse(raw);
+    return Array.isArray(data) ? (data as NotifyThrottleRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 interface DraftSpec {
   payload: Record<string, unknown>;
@@ -57,7 +79,13 @@ async function main(): Promise<void> {
   const contentKey =
     process.env.MICROCMS_CONTENT_API_KEY ??
     requireEnv("MICROCMS_MANAGEMENT_API_KEY");
-  const microOpts = { serviceDomain, apiKey: contentKey, fetchFn: defaultFetch };
+  const microOpts = {
+    serviceDomain,
+    apiKey: contentKey,
+    fetchFn: defaultFetch,
+    // #58: タイムアウト/試行回数を env で上書き可能(既定は DEFAULT_RETRY)。
+    retry: resolveRetryConfig(process.env),
+  };
 
   const imagePath = spec.imagePath ?? "/tmp/growth-eyecatch.png";
   let contentId = "";
@@ -126,16 +154,36 @@ async function main(): Promise<void> {
   const result = await runStages(stages, (m) => process.stdout.write(`${m}\n`));
 
   if (result.failedAt) {
+    const category = classifyDraftFailure(result.failedAt.error);
     const failureMessage = buildDraftFailureMessage({
       failedStage: result.failedAt.name,
       error: result.failedAt.error,
       specPath,
+      category,
     });
     process.stderr.write(`${failureMessage}\n`);
+
+    // #58: 同種失敗(工程+分類)の連続通知を一定ウィンドウ内で1通に集約する。
+    const windowEnv = Number(process.env.GROWTH_NOTIFY_WINDOW_MS);
+    const windowMs =
+      Number.isInteger(windowEnv) && windowEnv > 0
+        ? windowEnv
+        : DEFAULT_NOTIFY_WINDOW_MS;
+    const signature = failureSignature(result.failedAt.name, category);
+    const records = await readThrottleRecords();
+    const decision = shouldSendFailureNotice(records, signature, Date.now(), windowMs);
+    await writeFile(NOTIFY_THROTTLE_PATH, JSON.stringify(decision.records), "utf-8").catch(
+      () => {}
+    );
+
     // 沈黙させない(#24): 失敗を LINE へ best-effort 通知。送信不可でも失敗終了は維持。
     const lineGroupId = process.env.LINE_GROUP_ID;
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    if (lineGroupId && lineToken) {
+    if (!decision.send) {
+      process.stderr.write(
+        `(同種の失敗を直近に通知済みのため LINE 通知を集約しました: ${signature})\n`
+      );
+    } else if (lineGroupId && lineToken) {
       try {
         await pushTextMessage(lineGroupId, failureMessage, {
           channelAccessToken: lineToken,

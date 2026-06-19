@@ -6,6 +6,7 @@ import {
   previewUrlOrNull,
   buildDraftNotifyMessage,
   buildDraftFailureMessage,
+  classifyDraftFailure,
   buildDraftFlex,
   type DraftNotifyItem,
   type DraftFlexItem,
@@ -33,6 +34,75 @@ describe("buildDraftFailureMessage", () => {
   it("再開手順（コマンド）を含む", () => {
     expect(msg).toContain("npm run growth:publish-draft");
     expect(msg).toContain("npm run growth:drafts");
+  });
+});
+
+describe("classifyDraftFailure（失敗原因の分類 / #58）", () => {
+  it("自前タイムアウトは timeout", () => {
+    expect(classifyDraftFailure("リクエストがタイムアウトしました (45000ms)")).toBe(
+      "timeout"
+    );
+    expect(classifyDraftFailure("504 gateway timeout")).toBe("timeout");
+  });
+
+  it("4xx は client（送信内容の問題）", () => {
+    expect(
+      classifyDraftFailure(
+        "microCMS コンテンツ API に失敗しました (HTTP 422): unprocessable"
+      )
+    ).toBe("client");
+  });
+
+  it("5xx は external（外部障害）", () => {
+    expect(
+      classifyDraftFailure(
+        "microCMS コンテンツ API に失敗しました (HTTP 503): service unavailable"
+      )
+    ).toBe("external");
+  });
+
+  it("ネットワーク等の不明なエラーは external にフォールバック", () => {
+    expect(classifyDraftFailure("ECONNRESET")).toBe("external");
+  });
+});
+
+describe("buildDraftFailureMessage の原因別文言（#58）", () => {
+  const base = { failedStage: "create", specPath: ".growth-tmp/x.json" };
+
+  it("timeout は『外部障害』と断定せずタイムアウトと伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "リクエストがタイムアウトしました (45000ms)",
+    });
+    expect(msg).toMatch(/タイムアウト/);
+    expect(msg).not.toContain("外部障害");
+    expect(msg).toContain("再開");
+  });
+
+  it("client(4xx) は送信内容の問題と伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "microCMS コンテンツ API に失敗しました (HTTP 422): bad",
+    });
+    expect(msg).toMatch(/送信内容/);
+    expect(msg).not.toContain("外部障害");
+  });
+
+  it("external(5xx) は従来どおり外部障害の可能性を伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "microCMS コンテンツ API に失敗しました (HTTP 503): down",
+    });
+    expect(msg).toContain("外部障害");
+  });
+
+  it("category を明示指定すれば error 文字列に依らずその分類で出す", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "なんらかのエラー",
+      category: "timeout",
+    });
+    expect(msg).toMatch(/タイムアウト/);
   });
 });
 
