@@ -40,6 +40,16 @@ describe("parseOutlineSections", () => {
     ]);
   });
 
+  it("旧フォーマットで見出し前に複数の#なし行が並ぶと、各行が独立セクションになる", () => {
+    // 新フォーマットは各セクションが `## 見出し` で始まるため説明は迷子にならない。
+    // 旧/混在データでは #なし行はそれぞれ見出しのみセクションになる(表示と index は一致)。
+    expect(parseOutlineSections("前文\n補足\n## A\n説明")).toEqual([
+      { heading: "前文", description: "" },
+      { heading: "補足", description: "" },
+      { heading: "A", description: "説明" },
+    ]);
+  });
+
   it("### など深い見出しもマーカーを外す。空行は無視・空文字は []", () => {
     expect(parseOutlineSections("###  深い見出し")).toEqual([
       { heading: "深い見出し", description: "" },

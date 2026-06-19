@@ -39,6 +39,10 @@ export function parseOutlineSections(outline: string): OutlineSection[] {
 /**
  * セクション配列を構成案テキストへ戻す(#54 手動編集の保存で使用)。
  * 各セクションを `## 見出し` ＋(説明があれば)説明行にし、空行で区切る。
+ *
+ * 注意(正規化の副作用): 旧フォーマット(`#` 無しの見出し行)由来のセクションも
+ * `## 見出し` 形式へ正規化されて出力される。手動編集の保存(#54)で旧データを
+ * 編集すると、構成案が新フォーマットへ書き換わる(意図的な移行・破壊ではない)。
  */
 export function serializeOutlineSections(sections: readonly OutlineSection[]): string {
   return sections
