@@ -12,6 +12,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { parseDecisions, toPendingItems } from "@/lib/growth/approve";
 import { defaultFetch, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
 
@@ -38,6 +39,8 @@ function serverError(): Response {
 }
 
 function verifyToken(url: URL): boolean {
+  // 合言葉認証が無効(一時措置)のときは token 検証をスキップする。
+  if (!APPROVE_AUTH_ENABLED) return true;
   const token = url.searchParams.get("token") ?? "";
   const expected = process.env.APPROVE_SECRET ?? "";
   return Boolean(expected) && safeEqual(token, expected);

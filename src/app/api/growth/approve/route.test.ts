@@ -7,6 +7,14 @@ vi.mock("@/lib/growth/notion", () => ({
   defaultFetch: vi.fn(),
 }));
 
+// 合言葉認証フラグはテストごとに切り替える(既定は有効=現行の token 検証)。
+const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
+vi.mock("@/config/featureFlags", () => ({
+  get APPROVE_AUTH_ENABLED() {
+    return flags.authEnabled;
+  },
+}));
+
 import { queryDataSource, updatePageSelect } from "@/lib/growth/notion";
 import { GET, POST } from "./route";
 
@@ -25,6 +33,7 @@ function postRequest(token: string | null, body: unknown): Request {
 }
 
 beforeEach(() => {
+  flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(queryDataSource).mockReset();
@@ -150,5 +159,37 @@ describe("POST", () => {
     const json = await res.json();
     expect(json.error).toBe("更新中にエラーが発生しました");
     expect(json.error).not.toMatch(/secret detail/);
+  });
+});
+
+describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {
+  beforeEach(() => {
+    flags.authEnabled = false;
+  });
+
+  it("GET は token 無しでも 200(検証スキップ)", async () => {
+    vi.mocked(queryDataSource)
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    const res = await GET(getRequest(null));
+    expect(res.status).toBe(200);
+    expect((await res.json()).success).toBe(true);
+  });
+
+  it("POST は token 無しでも反映する(検証スキップ)", async () => {
+    vi.mocked(updatePageSelect).mockResolvedValue("ok");
+    const res = await POST(
+      postRequest(null, {
+        decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" }],
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(updatePageSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("認証無効でも NOTION_TOKEN 未設定なら 500", async () => {
+    delete process.env.NOTION_TOKEN;
+    const res = await GET(getRequest(null));
+    expect(res.status).toBe(500);
   });
 });

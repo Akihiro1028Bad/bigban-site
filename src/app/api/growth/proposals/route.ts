@@ -11,6 +11,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import {
   parseProposalInput,
   proposalProperties,
@@ -36,6 +37,8 @@ function serverError(): Response {
 }
 
 function verifyToken(url: URL): boolean {
+  // 合言葉認証が無効(一時措置)のときは token 検証をスキップする。
+  if (!APPROVE_AUTH_ENABLED) return true;
   const token = url.searchParams.get("token") ?? "";
   const expected = process.env.APPROVE_SECRET ?? "";
   return Boolean(expected) && safeEqual(token, expected);
