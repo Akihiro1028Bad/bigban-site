@@ -14,10 +14,16 @@
                   "excerpt": "...", "displayMode": ["html"], "bodyHtml": "...(末尾に『※この記事はAIが作成した下書きです。公開前に内容をご確認ください。』)" },
      "eyecatchAction": "<§9の宇宙人の行為を英語1フレーズで>",
      "imagePath": "/tmp/growth-eyecatch-<slug>.png",
+     "images": [
+       { "index": 1, "style": "mascot|minimal|diagram", "description": "<構成案の画像指示の説明>" }
+     ],
      "notion": { "pageId": "<記事ネタ案の該当ページID>", "property": "ステータス", "value": "下書き作成済み" }
    }
    ```
    - `eyecatchAction` は **§9「宇宙人マスコット × コスミック」**(固定キャラ=`scripts/growth/assets/mascot-alien.png`・記事ごとに行為だけ変える)に沿って作る。
+   - **本文画像(#62)**: 構成案に画像指示 `[画像:<スタイル表示名>: <説明>]` があれば、本文HTMLの**該当セクションの自然な位置**にプレースホルダ `{{IMG:1}}`(以降 `{{IMG:2}}`…)を置き、`images[]` に対応する `{ index, style, description }` を入れる。スタイル表示名→キーは `マスコット・コスミック→mascot` / `ミニマル図解→minimal` / `詳しい図解→diagram`。指示が無ければ `images` は省略(または空配列)で、本文に `{{IMG:n}}` を入れない。
+   - **上限3枚**。指示が4件以上あっても **先頭3件まで**を `images[]`・`{{IMG:n}}` にし、超過分は本文に入れず**スキップした旨を報告**(沈黙させない=#24)。
+   - 画像の生成・アップロード・本文への埋め込み(`{{IMG:n}}`→`<figure>`)は手順4のスクリプトが行う。alt・キャプションはスクリプト側が `description`・`style` から補完するので本文に書かない。
 4. **投入を同期実行する**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。このスクリプトが **create(冪等PUT)→ アイキャッチ生成(参照画像方式)→ upload → eyecatch添付 → 記事ネタ案DBのステータス更新** を**直列・同期**で行う(背景タスクにしない・完了を待たない運用にしない)。途中失敗時はどの工程で落ちたかと再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。同じ spec で再実行すれば冪等(#21)に再開できる。`却下` の行は無視。
 5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` の JSON で一時ファイルに書き、`npm run growth:notify-drafts -- <json>` を実行して LINE グループへまとめて通知する(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功したときのみ実行**。`LINE_*` 等が無く送れない場合はその旨を報告する。
 
