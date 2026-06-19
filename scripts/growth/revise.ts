@@ -8,6 +8,8 @@
  * I/O を持たないためテスト可能。Web(API ルート)・PC(poller) の双方が import する。
  */
 
+import { chunkRichText } from "./notion";
+
 /** Notion「記事ネタ案」に追加する修正ループ用プロパティ名(#45 でDBに作成)。 */
 export const REVISE_PROPS = {
   /** 行アンカー付きコメントの JSON。 */
@@ -50,17 +52,17 @@ function isNonEmptyString(value: unknown): value is string {
  * 行コメント配列を JSON 文字列にする。
  * 空配列・line/comment が空の要素は不正として弾く(沈黙させない)。
  */
-export function serializeReviseInstructions(
-  comments: readonly ReviseComment[]
-): string {
+export function serializeReviseInstructions(comments: unknown): string {
   if (!Array.isArray(comments) || comments.length === 0) {
     throw new Error("修正コメントが空です。1件以上のコメントを付けてください。");
   }
   const normalized = comments.map((c, i) => {
-    if (!isNonEmptyString(c?.line) || !isNonEmptyString(c?.comment)) {
+    const line = (c as { line?: unknown })?.line;
+    const comment = (c as { comment?: unknown })?.comment;
+    if (!isNonEmptyString(line) || !isNonEmptyString(comment)) {
       throw new Error(`修正コメント[${i}]の line / comment が不正です。`);
     }
-    return { line: c.line.trim(), comment: c.comment.trim() };
+    return { line: line.trim(), comment: comment.trim() };
   });
   return JSON.stringify(normalized);
 }
@@ -87,4 +89,20 @@ export function parseReviseInstructions(raw: string): ReviseComment[] {
     }
     return { line: line.trim(), comment: comment.trim() };
   });
+}
+
+/**
+ * 修正依頼を Notion に書き込むためのプロパティ群(1 PATCH 用)を組み立てる。
+ * `修正指示`=コメントJSON、`修正ステータス`=依頼中、`修正依頼時刻`=nowIso。
+ */
+export function buildReviseRequestProps(
+  instructionsJson: string,
+  nowIso: string
+): Record<string, unknown> {
+  const requested: ReviseStatus = "依頼中";
+  return {
+    [REVISE_PROPS.instructions]: { rich_text: chunkRichText(instructionsJson) },
+    [REVISE_PROPS.status]: { select: { name: requested } },
+    [REVISE_PROPS.requestedAt]: { date: { start: nowIso } },
+  };
 }

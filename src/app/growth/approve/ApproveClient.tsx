@@ -20,6 +20,26 @@ interface PendingItem {
   subtitle: string;
   details?: PendingDetail[];
   score?: number;
+  // #42: 記事ネタ案の構成案修正ループ。
+  outline?: string;
+  reviseStatus?: string;
+  reviseProposal?: string;
+  reviseInstructions?: string;
+}
+
+// 修正処理中(再依頼不可・承認排他の対象)の状態。
+const REVISE_BUSY_STATUSES = ["依頼中", "処理中", "提示中"];
+
+function isReviseBusy(status: string | undefined): boolean {
+  return REVISE_BUSY_STATUSES.includes(status ?? "なし");
+}
+
+/** 構成案を行(見出し)単位に分割する。空行は除く。 */
+function outlineLines(outline: string | undefined): string[] {
+  return (outline ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 function byScoreDesc(a: PendingItem, b: PendingItem): number {
@@ -107,6 +127,11 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
+  // #42: 構成案の行コメント(開いているパネルの line→コメント文)・依頼状態。
+  const [reviseComments, setReviseComments] = useState<Record<string, string>>({});
+  const [reviseBusy, setReviseBusy] = useState(false);
+  const [reviseError, setReviseError] = useState("");
+  const [reviseRequestedId, setReviseRequestedId] = useState<string | null>(null);
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -118,6 +143,13 @@ export function ApproveClient() {
     if (el) el.focus();
     setFocusId(null);
   }, [focusId]);
+
+  // #42: パネルを開閉/切替したら、前の記事の行コメント・依頼状態をクリアする。
+  useEffect(() => {
+    setReviseComments({});
+    setReviseError("");
+    setReviseRequestedId(null);
+  }, [openId]);
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -228,6 +260,40 @@ export function ApproveClient() {
   function undoFromPanel(item: PendingItem): void {
     void undo(item);
     setOpenId(null);
+  }
+
+  // #42: 構成案の行コメントを「修正指示」として送る(プル型・常時稼働PCが拾う)。
+  async function requestRevise(item: PendingItem): Promise<void> {
+    const comments = Object.entries(reviseComments)
+      .map(([line, comment]) => ({ line, comment: comment.trim() }))
+      .filter((c) => c.comment.length > 0);
+    if (comments.length === 0) {
+      setReviseError("コメントを1件以上入力してください。");
+      return;
+    }
+    setReviseBusy(true);
+    setReviseError("");
+    try {
+      const res = await fetch("/api/growth/revise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: item.id, comments }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(
+          res.status === 409
+            ? "この記事は修正処理中です。完了までお待ちください。"
+            : json.error ?? "修正依頼に失敗しました。"
+        );
+      }
+      setReviseRequestedId(item.id);
+      setReviseComments({});
+    } catch (error) {
+      setReviseError(toMessage(error, "修正依頼に失敗しました。"));
+    } finally {
+      setReviseBusy(false);
+    }
   }
 
   // 認証無効(一時措置): 自動取得の読み込み中・失敗をそれぞれ明示する(沈黙させない)。
@@ -423,6 +489,55 @@ export function ApproveClient() {
     );
   }
 
+  // #42: 構成案の行コメント→修正依頼セクション(記事のみ)。
+  function renderReviseSection(item: PendingItem) {
+    const lines = outlineLines(item.outline);
+    if (lines.length === 0) return null;
+    const requested = reviseRequestedId === item.id || isReviseBusy(item.reviseStatus);
+    return (
+      <section aria-label="構成案の修正" className="mt-4 border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-bold text-gray-700">構成案にコメントして修正を依頼</h3>
+        {requested ? (
+          <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            修正を依頼しました。PCが処理して最大5分で修正案を提示します。
+          </p>
+        ) : (
+          <>
+            <ul className="mt-2 space-y-3">
+              {lines.map((line, i) => (
+                <li key={`${i}-${line}`}>
+                  <p className="text-sm text-gray-800">{line}</p>
+                  <textarea
+                    aria-label={`コメント: ${line}`}
+                    value={reviseComments[line] ?? ""}
+                    onChange={(event) =>
+                      setReviseComments((prev) => ({ ...prev, [line]: event.target.value }))
+                    }
+                    placeholder="この見出しへの修正指示（任意）"
+                    className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+                  />
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => requestRevise(item)}
+              disabled={reviseBusy}
+              className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
+            >
+              修正を依頼
+            </button>
+            {reviseError ? (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {reviseError}
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
+    );
+  }
+
   // #275: 詳細パネル(master-detail)。スマホ=全画面シート / PC=右サイドパネル。
   // 将来の AI 壁打ち・下書き生成は下部の拡張スロットに差し込む(今回は枠のみ)。
   function renderPanel(item: PendingItem) {
@@ -498,6 +613,8 @@ export function ApproveClient() {
               </>
             )}
           </div>
+
+          {item.kind === "idea" ? renderReviseSection(item) : null}
 
           {/* #276/#277 の拡張スロット(今回は枠のみ・機能は後続issue) */}
           <section aria-label="AI壁打ち" className="mt-6 border-t border-gray-200 pt-4">
