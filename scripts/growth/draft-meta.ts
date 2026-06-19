@@ -78,9 +78,9 @@ export async function fetchContentSummary(
   });
 
   if (!res.ok) {
-    throw new Error(
-      `コンテンツ要約の取得に失敗しました (HTTP ${res.status}): ${await res.text()}`
-    );
+    // エラーボディは固定長に制限(機微情報の不用意な露出・ログ肥大を避ける)。
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`コンテンツ要約の取得に失敗しました (HTTP ${res.status}): ${body}`);
   }
 
   const json = (await res.json()) as {
@@ -92,10 +92,13 @@ export async function fetchContentSummary(
   const category = Array.isArray(json.category)
     ? json.category[0] ?? null
     : json.category ?? null;
+  // 画像は LINE Flex に渡すため HTTPS のみ許可(javascript:/data: 等の混入を防ぐ)。
+  const rawEyecatch = json.eyecatch?.url ?? null;
+  const eyecatchUrl = rawEyecatch && /^https:\/\//i.test(rawEyecatch) ? rawEyecatch : null;
   return {
     title: json.title ?? null,
     excerpt: json.excerpt ?? null,
     category,
-    eyecatchUrl: json.eyecatch?.url ?? null,
+    eyecatchUrl,
   };
 }

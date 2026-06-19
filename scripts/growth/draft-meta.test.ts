@@ -205,12 +205,28 @@ describe("fetchContentSummary", () => {
     expect(summary.eyecatchUrl).toBeNull();
   });
 
-  it("HTTP エラー時は内容付きで例外を投げる", async () => {
+  it("HTTPS でない eyecatch URL は null にする(javascript:/http: 等を弾く)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", eyecatch: { url: "javascript:alert(1)" } }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("news", "id", null, {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.eyecatchUrl).toBeNull();
+  });
+
+  it("HTTP エラー時は内容付きで例外を投げる(本文は固定長に制限)", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 500,
       json: async () => ({}),
-      text: async () => "boom",
+      text: async () => "boom".repeat(100),
     });
 
     await expect(

@@ -58,18 +58,21 @@ function parseItems(raw: unknown): InputItem[] {
 
 interface PreviewCtx {
   serviceDomain: string | null;
-  apiKey: string | null;
+  /** draftKey 取得(管理API)用キー。 */
+  managementApiKey: string | null;
+  /** 要約取得(コンテンツAPI)用キー。 */
+  contentApiKey: string | null;
   siteUrl: string | null;
   secret: string | null;
 }
 
 /** draftKey を取得する。設定欠落・障害時は例外を投げず null(通知は必ず送る=#20)。 */
 async function resolveDraftKey(item: InputItem, ctx: PreviewCtx): Promise<string | null> {
-  if (!ctx.serviceDomain || !ctx.apiKey) return null;
+  if (!ctx.serviceDomain || !ctx.managementApiKey) return null;
   try {
     return await fetchDraftKey(ENDPOINT, item.contentId, {
       serviceDomain: ctx.serviceDomain,
-      apiKey: ctx.apiKey,
+      apiKey: ctx.managementApiKey,
       fetchFn: defaultFetch,
     });
   } catch (error: unknown) {
@@ -87,11 +90,11 @@ async function resolveSummary(
   draftKey: string | null,
   ctx: PreviewCtx
 ): Promise<ContentSummary | null> {
-  if (!ctx.serviceDomain || !ctx.apiKey) return null;
+  if (!ctx.serviceDomain || !ctx.contentApiKey) return null;
   try {
     return await fetchContentSummary(ENDPOINT, item.contentId, draftKey, {
       serviceDomain: ctx.serviceDomain,
-      apiKey: ctx.apiKey,
+      apiKey: ctx.contentApiKey,
       fetchFn: defaultFetch,
     });
   } catch (error: unknown) {
@@ -113,9 +116,14 @@ async function main(): Promise<void> {
   // プレビューURL/要約用の設定はすべて任意。欠けていても通知は止めずフォールバックする(#20)。
   const ctx: PreviewCtx = {
     serviceDomain: process.env.MICROCMS_SERVICE_DOMAIN ?? null,
-    apiKey:
+    // 管理API・コンテンツAPIはキーが別物。それぞれ適切なキーを優先し、無ければ相互フォールバック。
+    managementApiKey:
       process.env.MICROCMS_MANAGEMENT_API_KEY ??
       process.env.MICROCMS_CONTENT_API_KEY ??
+      null,
+    contentApiKey:
+      process.env.MICROCMS_CONTENT_API_KEY ??
+      process.env.MICROCMS_MANAGEMENT_API_KEY ??
       null,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
     secret: process.env.MICROCMS_DRAFT_SECRET ?? null,
