@@ -127,8 +127,9 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
-  // #42: 構成案の行コメント(開いているパネルの line→コメント文)・依頼状態。
-  const [reviseComments, setReviseComments] = useState<Record<string, string>>({});
+  // #42: 構成案の行コメント(開いているパネルの 行index→コメント文)・依頼状態。
+  // 重複見出し行でも衝突しないよう行テキストではなく index をキーにする。
+  const [reviseComments, setReviseComments] = useState<Record<number, string>>({});
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
   const [reviseRequestedId, setReviseRequestedId] = useState<string | null>(null);
@@ -264,8 +265,8 @@ export function ApproveClient() {
 
   // #42: 構成案の行コメントを「修正指示」として送る(プル型・常時稼働PCが拾う)。
   async function requestRevise(item: PendingItem): Promise<void> {
-    const comments = Object.entries(reviseComments)
-      .map(([line, comment]) => ({ line, comment: comment.trim() }))
+    const comments = outlineLines(item.outline)
+      .map((line, i) => ({ line, comment: (reviseComments[i] ?? "").trim() }))
       .filter((c) => c.comment.length > 0);
     if (comments.length === 0) {
       setReviseError("コメントを1件以上入力してください。");
@@ -505,13 +506,13 @@ export function ApproveClient() {
           <>
             <ul className="mt-2 space-y-3">
               {lines.map((line, i) => (
-                <li key={`${i}-${line}`}>
+                <li key={i}>
                   <p className="text-sm text-gray-800">{line}</p>
                   <textarea
                     aria-label={`コメント: ${line}`}
-                    value={reviseComments[line] ?? ""}
+                    value={reviseComments[i] ?? ""}
                     onChange={(event) =>
-                      setReviseComments((prev) => ({ ...prev, [line]: event.target.value }))
+                      setReviseComments((prev) => ({ ...prev, [i]: event.target.value }))
                     }
                     placeholder="この見出しへの修正指示（任意）"
                     className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"

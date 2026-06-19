@@ -842,6 +842,25 @@ describe("ApproveClient 構成案修正(#42)", () => {
     expect(await within(dialog).findByText("修正依頼に失敗しました。")).toBeInTheDocument();
   });
 
+  it("見出しが重複してもコメントは行ごとに独立する(index キー)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## まとめ\n## まとめ" })] } },
+      { json: { success: true } }
+    );
+    const dialog = await openIdeaPanel();
+    const boxes = within(dialog).getAllByLabelText("コメント: ## まとめ");
+    expect(boxes).toHaveLength(2);
+    await userEvent.type(boxes[1], "2つ目だけ直す");
+    await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼" }));
+
+    await within(dialog).findByText(/修正を依頼しました/);
+    // 1つ目は空・2つ目だけ送られる
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      pageId: "i1",
+      comments: [{ line: "## まとめ", comment: "2つ目だけ直す" }],
+    });
+  });
+
   it("構成案が無い記事では修正セクションを出さない", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const dialog = await openIdeaPanel();

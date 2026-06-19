@@ -69,8 +69,8 @@ describe("POST /api/growth/revise", () => {
     expect(p["修正依頼時刻"].date?.start).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
   });
 
-  it("既に処理中/提示中なら 409(再依頼拒否)", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithStatus("処理中"));
+  it.each(["依頼中", "処理中", "提示中"])("既に %s なら 409(再依頼拒否)", async (status) => {
+    vi.mocked(getPage).mockResolvedValue(pageWithStatus(status));
     const res = await POST(postRequest(null, { pageId: PAGE_ID, comments: COMMENTS }));
     expect(res.status).toBe(409);
     expect(updatePageProps).not.toHaveBeenCalled();
