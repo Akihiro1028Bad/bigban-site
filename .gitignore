@@ -60,3 +60,6 @@ secrets/
 
 # local data artifacts (growth images, snapshots)
 data/
+
+# growth loop: ステージ用一時ファイル・revise の lockfile / 実行カウント(管理外)
+/.growth-tmp/

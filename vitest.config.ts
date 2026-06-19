@@ -61,6 +61,7 @@ export default defineConfig({
         "scripts/growth/self-heal-cli.ts",
         "scripts/growth/publish-draft-cli.ts",
         "scripts/growth/notify-line.ts",
+        "scripts/growth/revise-cli.ts",
       ],
       thresholds: {
         statements: 100,

@@ -77,7 +77,7 @@ export async function getPage(
 ): Promise<NotionPage> {
   const json = (await notionRequest(
     "GET",
-    `${NOTION_API_BASE}/pages/${pageId}`,
+    `${NOTION_API_BASE}/pages/${encodeURIComponent(pageId)}`,
     undefined,
     options
   )) as NotionPage;
@@ -149,7 +149,7 @@ export async function updatePageProps(
 ): Promise<string> {
   const json = (await notionRequest(
     "PATCH",
-    `${NOTION_API_BASE}/pages/${pageId}`,
+    `${NOTION_API_BASE}/pages/${encodeURIComponent(pageId)}`,
     { properties },
     options
   )) as { id?: string };
