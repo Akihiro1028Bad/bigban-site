@@ -48,6 +48,7 @@ public/
 - 記事の前提（施設の現況=開業前/開業済み・確定事実・書いてはいけない未確定項目）は **`scripts/growth/facility-context.json` を唯一の単一ソース**とする。`npm run growth:facility-context` で出力し、下書きモード冒頭で正典として注入（style-guide §13）
 - 文体ルール: 翻訳調・AIっぽさを避ける（§14）／外部リンク濫用・未検証数値・タイトル盛りを避け内部リンクを検討（§15）
 - 実行は自宅 PC の headless `claude -p`（`scripts/growth/run.mjs`）。git push / commit・本番公開はしない
+- 構成案の修正ループ（Epic #40）: 承認画面で構成案に行コメント→「修正を依頼」→ 常時稼働PCの `revise` モード（5分間隔・`npm run growth:revise-loop`）が `claude` で修正→提示中→ユーザーが反映。Notion「記事ネタ案」に4プロパティ（`修正指示`/`修正ステータス`/`修正案`/`修正依頼時刻`）の事前追加が必要。運用は `docs/operations/growth-weekly-runbook.md` の「構成案の修正ループ」節を参照
 
 ## Development Process — TDD
 
