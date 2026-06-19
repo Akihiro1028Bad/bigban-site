@@ -37,8 +37,8 @@ export interface OutlineImage {
 export interface OutlineSection {
   heading: string;
   description: string;
-  /** 画像指示(任意)。parse は常に配列を設定する。 */
-  images?: OutlineImage[];
+  /** 画像指示。parse は常に配列を設定する(空でも []). */
+  images: OutlineImage[];
 }
 
 const HEADING_RE = /^#{1,6}\s+/;
@@ -76,10 +76,8 @@ export function serializeImageDirective(image: OutlineImage): string {
  * - 空行は区切りとして無視。空文字は []。
  */
 export function parseOutlineSections(outline: string): OutlineSection[] {
-  // 内部では images を必須に扱う(non-null assertion を避ける)。
-  type Section = OutlineSection & { images: OutlineImage[] };
-  const sections: Section[] = [];
-  let current: Section | null = null;
+  const sections: OutlineSection[] = [];
+  let current: OutlineSection | null = null;
   for (const raw of outline.split("\n")) {
     const line = raw.trim();
     if (line === "") continue;
@@ -128,7 +126,7 @@ export function serializeOutlineSections(sections: readonly OutlineSection[]): s
       const parts = [`## ${s.heading.trim()}`];
       const description = s.description.trim();
       if (description) parts.push(description);
-      for (const image of s.images ?? []) parts.push(serializeImageDirective(image));
+      for (const image of s.images) parts.push(serializeImageDirective(image));
       return parts.join("\n");
     })
     .join("\n\n");

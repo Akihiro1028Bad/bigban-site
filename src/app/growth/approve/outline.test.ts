@@ -151,8 +151,8 @@ describe("serializeOutlineSections", () => {
   it("見出し＋説明を `## 見出し` ＋説明行・空行区切りに戻す", () => {
     expect(
       serializeOutlineSections([
-        { heading: "A", description: "説明A" },
-        { heading: "B", description: "" },
+        { heading: "A", description: "説明A", images: [] },
+        { heading: "B", description: "", images: [] },
       ])
     ).toBe("## A\n説明A\n\n## B");
   });
