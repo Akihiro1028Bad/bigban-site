@@ -13,7 +13,17 @@
  */
 
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  statSync,
+  rmSync,
+  openSync,
+  writeSync,
+  closeSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -55,18 +65,31 @@ const MODES = {
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
 const REVISE_COUNT = path.join(tmpDir, "revise-count.json");
 const REVISE_DAILY_CAP = Number(process.env.GROWTH_REVISE_DAILY_CAP || "50");
+// lockfile は claude 実行1回ぶん(数分)を覆う。revise.ts の REVISE_TIMEOUT_MS(行の処理中=15分)
+// より長くして、claude 実行中に reaper が起きても次の起動が割り込まないようにしている。
 const LOCK_STALE_MS = 30 * 60 * 1000; // 30分超のロックは死んだプロセスとみなす
 
-/** 多重起動防止のロック取得。取れなければ false。stale(>30分)なロックは奪う。 */
+/** O_EXCL で排他的にロックファイルを作る。既存なら false。成功で true。 */
+function createLockExclusive() {
+  try {
+    const fd = openSync(REVISE_LOCK, "wx"); // 既存なら EEXIST で例外
+    writeSync(fd, String(process.pid));
+    closeSync(fd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 多重起動防止のロック取得。取れなければ false。stale(>30分)なロックは奪って再取得。 */
 function acquireReviseLock() {
   mkdirSync(tmpDir, { recursive: true });
-  if (existsSync(REVISE_LOCK)) {
-    const ageMs = Date.now() - statSync(REVISE_LOCK).mtimeMs;
-    if (ageMs < LOCK_STALE_MS) return false;
-    rmSync(REVISE_LOCK, { force: true }); // stale ロックを回収
-  }
-  writeFileSync(REVISE_LOCK, String(process.pid));
-  return true;
+  if (createLockExclusive()) return true;
+  // 既存ロックあり。stale(>30分)なら奪って再取得(競合に負ければ false)。
+  const ageMs = Date.now() - statSync(REVISE_LOCK).mtimeMs;
+  if (ageMs < LOCK_STALE_MS) return false;
+  rmSync(REVISE_LOCK, { force: true });
+  return createLockExclusive();
 }
 
 function releaseReviseLock() {

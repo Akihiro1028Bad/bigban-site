@@ -28,8 +28,9 @@
 4. **提示する**: `npm run growth:revise -- present <pageId> .growth-tmp/revise-proposal.txt` を実行する
    (修正案を Notion に書き込み「提示中」にし、承認画面URL付きで LINE 通知する)。
 
-5. **失敗時**: 途中で問題が起きてやり直せない場合は
+5. **失敗時**: 修正できない・`present` が失敗した・途中で問題が起きた場合は、必ず
    `npm run growth:revise -- fail <pageId> "<簡潔な理由>"` を実行して**沈黙させない**(失敗＋通知)。
+   `next` でロック(処理中)した行を、提示も失敗もしないまま放置しないこと。
 
 ## 禁止
 - 本文(bodyHtml)の生成・microCMS への書き込み・記事の公開は**しない**。

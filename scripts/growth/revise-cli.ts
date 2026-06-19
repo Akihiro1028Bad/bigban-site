@@ -14,6 +14,7 @@
 
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
@@ -39,11 +40,29 @@ import {
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。やり直しで再依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
+const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+// 修正案ステージの許可ディレクトリ(claude 由来パスのトラバーサル防御)。
+const STAGE_DIR = path.resolve(process.cwd(), ".growth-tmp");
 
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} が未設定です。`);
   return value;
+}
+
+/** claude 由来の pageId を UUID 形式に限定する(Notion URL への注入防御)。 */
+function assertPageId(id: string): string {
+  if (!PAGE_ID_RE.test(id)) throw new Error(`不正な pageId: ${id}`);
+  return id;
+}
+
+/** ステージファイルは .growth-tmp 配下に限定する(パストラバーサル防御)。 */
+function assertStagePath(file: string): string {
+  const resolved = path.resolve(file);
+  if (resolved !== STAGE_DIR && !resolved.startsWith(STAGE_DIR + path.sep)) {
+    throw new Error(`修正案ファイルは .growth-tmp 配下のみ許可です: ${file}`);
+  }
+  return resolved;
 }
 
 function notionOptions(): NotionApiOptions {
@@ -119,7 +138,8 @@ async function next(options: NotionApiOptions): Promise<void> {
 }
 
 async function present(pageId: string, file: string, options: NotionApiOptions): Promise<void> {
-  const proposal = (await readFile(file, "utf-8")).trim();
+  assertPageId(pageId);
+  const proposal = (await readFile(assertStagePath(file), "utf-8")).trim();
   if (!proposal) throw new Error("修正案ファイルが空です。");
   const title = reviseRowFromPage(await getPage(pageId, options)).title;
   await write(pageId, buildReviseProposalProps(proposal), options);
@@ -127,6 +147,7 @@ async function present(pageId: string, file: string, options: NotionApiOptions):
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {
+  assertPageId(pageId);
   const title = reviseRowFromPage(await getPage(pageId, options)).title;
   await write(pageId, buildReviseFailProps(reason), options);
   await notify(buildReviseFailMessage(title, reason));
