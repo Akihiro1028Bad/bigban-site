@@ -9,14 +9,25 @@ import { pendingStatus } from "@/lib/growth/approve";
 
 import { AddProposalForm } from "./AddProposalForm";
 import {
+  IMAGE_STYLES,
   parseOutlineSections,
   serializeOutlineSections,
+  type ImageStyleKey,
+  type OutlineImage,
   type OutlineSection,
 } from "./outline";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
 const REVISE_POLL_MS = 5000;
+
+// 1 セクションに付けられる本文画像の上限(#61)。超過は下書き生成側(#63)でスキップ＋通知。
+const MAX_SECTION_IMAGES = 3;
+
+// スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
+const STYLE_LABEL = Object.fromEntries(
+  IMAGE_STYLES.map((s) => [s.key, s.label])
+) as Record<ImageStyleKey, string>;
 
 interface PendingDetail {
   label: string;
@@ -145,6 +156,12 @@ export function ApproveClient() {
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editHeading, setEditHeading] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  // #61: 画像指示エディタ。フォームを開いているセクション index と入力値(スタイル/説明)、
+  // 既存画像を編集中のときの index(null=新規追加)。
+  const [imageFormFor, setImageFormFor] = useState<number | null>(null);
+  const [editingImageIdx, setEditingImageIdx] = useState<number | null>(null);
+  const [imageStyle, setImageStyle] = useState<ImageStyleKey>("mascot");
+  const [imageDesc, setImageDesc] = useState("");
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
   const passphraseRef = useRef<HTMLInputElement>(null);
@@ -168,6 +185,9 @@ export function ApproveClient() {
     setEditingSection(null);
     setEditHeading("");
     setEditDescription("");
+    setImageFormFor(null);
+    setEditingImageIdx(null);
+    setImageDesc("");
     setReviseError("");
   }, [openId]);
 
@@ -347,12 +367,14 @@ export function ApproveClient() {
     setOpenCommentFor(section);
     setEditingIdx(null);
     setCommentText("");
+    setImageFormFor(null); // 画像フォームが開いていれば閉じる
   }
 
   function startEditComment(section: number, idx: number, text: string): void {
     setOpenCommentFor(section);
     setEditingIdx(idx);
     setCommentText(text);
+    setImageFormFor(null);
   }
 
   function cancelComment(): void {
@@ -390,12 +412,47 @@ export function ApproveClient() {
     setEditHeading(section.heading);
     setEditDescription(section.description);
     setOpenCommentFor(null); // コメント入力中なら閉じる
+    setImageFormFor(null);
   }
 
   function cancelEditSection(): void {
     setEditingSection(null);
     setEditHeading("");
     setEditDescription("");
+  }
+
+  // #54/#61: 構成案を直接上書き保存する共通処理(手動編集・画像指示で共用)。成否を返す。
+  async function persistOutline(
+    item: PendingItem,
+    nextSections: OutlineSection[]
+  ): Promise<boolean> {
+    setReviseBusy(true);
+    setReviseError("");
+    try {
+      const res = await fetch("/api/growth/revise/edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageId: item.id,
+          outline: serializeOutlineSections(nextSections),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(
+          res.status === 409
+            ? "この記事はAI修正処理中です。完了後に編集してください。"
+            : json.error ?? "保存に失敗しました。"
+        );
+      }
+      await refreshItems();
+      return true;
+    } catch (error) {
+      setReviseError(toMessage(error, "保存に失敗しました。"));
+      return false;
+    } finally {
+      setReviseBusy(false);
+    }
   }
 
   async function saveSection(
@@ -408,32 +465,66 @@ export function ApproveClient() {
       setReviseError("見出しは空にできません。");
       return;
     }
+    // 既存の画像指示(images)は保持したまま見出し・説明だけ差し替える。
     const next = sections.map((s, k) =>
-      k === i ? { heading, description: editDescription.trim() } : s
+      k === i ? { ...s, heading, description: editDescription.trim() } : s
     );
-    setReviseBusy(true);
-    setReviseError("");
-    try {
-      const res = await fetch("/api/growth/revise/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageId: item.id, outline: serializeOutlineSections(next) }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(
-          res.status === 409
-            ? "この記事はAI修正処理中です。完了後に編集してください。"
-            : json.error ?? "保存に失敗しました。"
-        );
-      }
-      cancelEditSection();
-      await refreshItems();
-    } catch (error) {
-      setReviseError(toMessage(error, "保存に失敗しました。"));
-    } finally {
-      setReviseBusy(false);
+    if (await persistOutline(item, next)) cancelEditSection();
+  }
+
+  // #61: 画像指示の追加/編集/削除。構成案を直接上書き(AI不要・/revise/edit に相乗り)。
+  function startAddImage(i: number): void {
+    setImageFormFor(i);
+    setEditingImageIdx(null);
+    setImageStyle("mascot");
+    setImageDesc("");
+    setOpenCommentFor(null); // コメント入力中なら閉じる(同時に2フォームを開かない)
+  }
+
+  function startEditImage(i: number, idx: number, image: OutlineImage): void {
+    setImageFormFor(i);
+    setEditingImageIdx(idx);
+    setImageStyle(image.style);
+    setImageDesc(image.description);
+    setOpenCommentFor(null);
+  }
+
+  function cancelImage(): void {
+    setImageFormFor(null);
+    setEditingImageIdx(null);
+    setImageDesc("");
+  }
+
+  async function saveImage(
+    item: PendingItem,
+    sections: OutlineSection[],
+    i: number
+  ): Promise<void> {
+    const description = imageDesc.trim();
+    if (!description) {
+      setReviseError("画像の説明を入力してください。");
+      return;
     }
+    const currentImages = sections[i].images;
+    const nextImages =
+      editingImageIdx !== null
+        ? currentImages.map((img, k) =>
+            k === editingImageIdx ? { style: imageStyle, description } : img
+          )
+        : [...currentImages, { style: imageStyle, description }];
+    const next = sections.map((s, k) => (k === i ? { ...s, images: nextImages } : s));
+    if (await persistOutline(item, next)) cancelImage();
+  }
+
+  async function deleteImage(
+    item: PendingItem,
+    sections: OutlineSection[],
+    i: number,
+    idx: number
+  ): Promise<void> {
+    const nextImages = sections[i].images.filter((_, k) => k !== idx);
+    const next = sections.map((s, k) => (k === i ? { ...s, images: nextImages } : s));
+    await persistOutline(item, next);
   }
 
   // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
@@ -695,6 +786,118 @@ export function ApproveClient() {
     );
   }
 
+  // #61: 1セクション分の画像指示(チップ＋スタイル選択フォーム)を描画。
+  function renderSectionImages(item: PendingItem, sections: OutlineSection[], i: number) {
+    const section = sections[i];
+    const images = section.images;
+    const open = imageFormFor === i;
+    return (
+      <div className="mt-2 border-t border-gray-100 pt-2">
+        {images.length > 0 ? (
+          <ul className="space-y-1">
+            {images.map((image, idx) => (
+              <li
+                key={idx}
+                className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1"
+              >
+                <span className="shrink-0 rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                  {STYLE_LABEL[image.style]}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
+                  {image.description}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`画像を編集: ${section.heading} ${idx + 1}`}
+                  onClick={() => startEditImage(i, idx, image)}
+                  disabled={reviseBusy}
+                  className="shrink-0 text-xs text-gray-500 hover:text-gray-800 disabled:opacity-40"
+                >
+                  編集
+                </button>
+                <button
+                  type="button"
+                  aria-label={`画像を削除: ${section.heading} ${idx + 1}`}
+                  onClick={() => deleteImage(item, sections, i, idx)}
+                  disabled={reviseBusy}
+                  className="shrink-0 text-xs text-gray-500 hover:text-red-700 disabled:opacity-40"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="mt-2 overflow-hidden"
+          >
+            <label
+              htmlFor={`image-style-${i}`}
+              className="block text-xs font-medium text-gray-600"
+            >
+              スタイル
+            </label>
+            <select
+              id={`image-style-${i}`}
+              aria-label={`画像スタイル: ${section.heading}`}
+              value={imageStyle}
+              onChange={(event) => setImageStyle(event.target.value as ImageStyleKey)}
+              className="mt-0.5 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+            >
+              {IMAGE_STYLES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <textarea
+              aria-label={`画像の説明: ${section.heading}`}
+              value={imageDesc}
+              onChange={(event) => setImageDesc(event.target.value)}
+              placeholder="何を描くか（例: 宇宙人がパドルを構える）"
+              className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              alt・キャプションは執筆AIが補完します。図解は「イメージ図」として下書きに入り、公開前に確認できます。
+            </p>
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelImage}
+                className={choiceButtonClass(
+                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => saveImage(item, sections, i)}
+                disabled={reviseBusy}
+                className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+              >
+                {editingImageIdx !== null ? "更新" : "追加"}
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <button
+            type="button"
+            aria-label={`画像を追加: ${section.heading}`}
+            onClick={() => startAddImage(i)}
+            disabled={reviseBusy || images.length >= MAX_SECTION_IMAGES}
+            className="text-xs text-indigo-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
+          >
+            ＋画像（{images.length} / {MAX_SECTION_IMAGES}）
+          </button>
+        )}
+      </div>
+    );
+  }
+
   // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
   function renderSection(item: PendingItem, sections: OutlineSection[], i: number) {
     const section = sections[i];
@@ -802,6 +1005,8 @@ export function ApproveClient() {
                 </button>
               </div>
             )}
+
+            {renderSectionImages(item, sections, i)}
           </>
         )}
       </li>
