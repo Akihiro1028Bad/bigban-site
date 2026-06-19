@@ -4,7 +4,18 @@
  * プレビューURLは既存のプレビュー入口(`/api/draft/enable`, Pattern A)を使う。
  * 将来、管理画面で下書きを閲覧できるようになったら、ここの URL 組み立てだけを
  * 差し替えれば通知側は変更不要(URL生成を1箇所に集約している)。
+ *
+ * リッチ通知(#35)は buildDraftFlex で Flex カルーセル(記事ごとにカード)を組み立てる。
+ * テキスト版は Flex 非対応環境の altText フォールバックとして引き続き使う。
  */
+
+import type {
+  FlexBox,
+  FlexBubble,
+  FlexCarousel,
+  FlexComponent,
+  FlexImage,
+} from "./digest-flex";
 
 export interface DraftPreviewParams {
   /** 例: https://www.thepicklebang.com (末尾スラッシュは正規化する) */
@@ -96,4 +107,126 @@ export function buildDraftNotifyMessage(
   const header = `下書きを${items.length}件作成しました。`;
   const body = items.map(renderItem).join("\n\n");
   return `${header}\n\n${body}`;
+}
+
+// ── #35: Flex カルーセル(記事ごとにカード) ──────────────────────────────
+const MAX_BUBBLES = 12; // LINE carousel は最大12バブル
+const HEADING_COLOR = "#111827";
+const EXCERPT_COLOR = "#6b7280";
+const BADGE_BG = "#306EC3"; // ブランドの Bright Blue
+const BADGE_TEXT = "#ffffff";
+
+export interface DraftFlexItem {
+  title: string;
+  /** 抜粋。空文字なら省略する。 */
+  excerpt: string;
+  /** カテゴリ名(例: お知らせ)。空文字ならバッジを省略する。 */
+  category: string;
+  /** アイキャッチ画像 URL(HTTPS)。null なら hero を省略する。 */
+  eyecatchUrl: string | null;
+  /** プレビューURL。null ならボタンの代わりに下書きIDを案内する。 */
+  previewUrl: string | null;
+  contentId: string;
+}
+
+function heroImage(url: string): FlexImage {
+  return { type: "image", url, size: "full", aspectRatio: "16:9", aspectMode: "cover" };
+}
+
+/** カテゴリのピル型バッジ(内容幅・左寄せ)。 */
+function categoryBadge(category: string): FlexBox {
+  return {
+    type: "box",
+    layout: "horizontal",
+    contents: [
+      {
+        type: "box",
+        layout: "vertical",
+        flex: 0,
+        backgroundColor: BADGE_BG,
+        cornerRadius: "md",
+        paddingStart: "sm",
+        paddingEnd: "sm",
+        paddingTop: "xs",
+        paddingBottom: "xs",
+        contents: [{ type: "text", text: category, size: "xs", color: BADGE_TEXT }],
+      },
+      // 右側のフィラーでピルを左に寄せる(横幅いっぱいに広げない)。
+      { type: "text", text: " ", flex: 1 },
+    ],
+  };
+}
+
+/** フッター: プレビューボタン、無ければ下書きIDのフォールバック(沈黙させない)。 */
+function draftFooter(item: DraftFlexItem): FlexBox {
+  if (item.previewUrl) {
+    return {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          height: "sm",
+          action: { type: "uri", label: "プレビューを開く", uri: item.previewUrl },
+        },
+      ],
+    };
+  }
+  return {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      {
+        type: "text",
+        text: `下書きID: ${item.contentId}（プレビューURLは取得できませんでした）`,
+        size: "xs",
+        color: EXCERPT_COLOR,
+        wrap: true,
+      },
+    ],
+  };
+}
+
+function draftBubble(item: DraftFlexItem): FlexBubble {
+  const bodyContents: FlexComponent[] = [];
+  if (item.category) bodyContents.push(categoryBadge(item.category));
+  bodyContents.push({
+    type: "text",
+    text: item.title,
+    weight: "bold",
+    size: "md",
+    color: HEADING_COLOR,
+    wrap: true,
+    maxLines: 2,
+  });
+  if (item.excerpt) {
+    bodyContents.push({
+      type: "text",
+      text: item.excerpt,
+      size: "sm",
+      color: EXCERPT_COLOR,
+      wrap: true,
+      maxLines: 3,
+    });
+  }
+
+  const bubble: FlexBubble = {
+    type: "bubble",
+    body: { type: "box", layout: "vertical", spacing: "sm", contents: bodyContents },
+    footer: draftFooter(item),
+  };
+  if (item.eyecatchUrl) bubble.hero = heroImage(item.eyecatchUrl);
+  return bubble;
+}
+
+/**
+ * 下書き完了通知を Flex カルーセルにする(記事ごとに1バブル・最大12)。
+ * 画像/プレビューURL/カテゴリ/抜粋が欠けてもフォールバックして必ずカードを作る。
+ */
+export function buildDraftFlex(items: readonly DraftFlexItem[]): FlexCarousel {
+  return {
+    type: "carousel",
+    contents: items.slice(0, MAX_BUBBLES).map(draftBubble),
+  };
 }

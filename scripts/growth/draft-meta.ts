@@ -45,3 +45,60 @@ export async function fetchDraftKey(
   const json = (await res.json()) as { draftKey?: string | null };
   return json.draftKey ?? null;
 }
+
+export interface ContentSummary {
+  title: string | null;
+  excerpt: string | null;
+  /** カテゴリ名(select の先頭)。 */
+  category: string | null;
+  /** アイキャッチ画像 URL。 */
+  eyecatchUrl: string | null;
+}
+
+/**
+ * 通知カード(#35)用に、コンテンツの表示情報(title/excerpt/category/eyecatch)を
+ * **コンテンツAPI**(`*.microcms.io`)から取得する。下書きは draftKey 必須。
+ * draftKey 用の管理API(fetchDraftKey)とはドメインが異なる点に注意。
+ */
+export async function fetchContentSummary(
+  endpoint: string,
+  contentId: string,
+  draftKey: string | null,
+  options: DraftMetaOptions
+): Promise<ContentSummary> {
+  const params = new URLSearchParams({ fields: "title,excerpt,category,eyecatch" });
+  if (draftKey) params.set("draftKey", draftKey);
+  // contentId はパスセグメントなので必ずエンコードする(パスインジェクション防御)。
+  const url = `https://${options.serviceDomain}.microcms.io/api/v1/${endpoint}/${encodeURIComponent(
+    contentId
+  )}?${params.toString()}`;
+  const res = await options.fetchFn(url, {
+    method: "GET",
+    headers: { "X-MICROCMS-API-KEY": options.apiKey },
+  });
+
+  if (!res.ok) {
+    // エラーボディは固定長に制限(機微情報の不用意な露出・ログ肥大を避ける)。
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`コンテンツ要約の取得に失敗しました (HTTP ${res.status}): ${body}`);
+  }
+
+  const json = (await res.json()) as {
+    title?: string | null;
+    excerpt?: string | null;
+    category?: string[] | string | null;
+    eyecatch?: { url?: string | null } | null;
+  };
+  const category = Array.isArray(json.category)
+    ? json.category[0] ?? null
+    : json.category ?? null;
+  // 画像は LINE Flex に渡すため HTTPS のみ許可(javascript:/data: 等の混入を防ぐ)。
+  const rawEyecatch = json.eyecatch?.url ?? null;
+  const eyecatchUrl = rawEyecatch && /^https:\/\//i.test(rawEyecatch) ? rawEyecatch : null;
+  return {
+    title: json.title ?? null,
+    excerpt: json.excerpt ?? null,
+    category,
+    eyecatchUrl,
+  };
+}

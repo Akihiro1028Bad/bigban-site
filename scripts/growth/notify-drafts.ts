@@ -14,14 +14,16 @@
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
 
-import { fetchDraftKey } from "./draft-meta";
+import { fetchContentSummary, fetchDraftKey, type ContentSummary } from "./draft-meta";
 import {
+  buildDraftFlex,
   buildDraftNotifyMessage,
   previewUrlOrNull,
+  type DraftFlexItem,
   type DraftNotifyItem,
 } from "./draft-notify";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage, pushTextMessage } from "./line";
 
 const ENDPOINT = "news";
 
@@ -56,39 +58,49 @@ function parseItems(raw: unknown): InputItem[] {
 
 interface PreviewCtx {
   serviceDomain: string | null;
-  apiKey: string | null;
+  /** draftKey 取得(管理API)用キー。 */
+  managementApiKey: string | null;
+  /** 要約取得(コンテンツAPI)用キー。 */
+  contentApiKey: string | null;
   siteUrl: string | null;
   secret: string | null;
 }
 
-/**
- * 1記事分のプレビューURLを解決する。プレビューに必要な設定や draftKey が
- * 欠けていても **例外を投げず null を返す**(通知自体は必ず送るため=#20)。
- */
-async function resolvePreviewUrl(
-  item: InputItem,
-  ctx: PreviewCtx
-): Promise<string | null> {
-  // プレビューに必要な設定が欠けていれば draftKey 取得もスキップ(URLなし通知)。
-  if (!ctx.serviceDomain || !ctx.apiKey || !ctx.siteUrl || !ctx.secret) {
-    return null;
-  }
+/** draftKey を取得する。設定欠落・障害時は例外を投げず null(通知は必ず送る=#20)。 */
+async function resolveDraftKey(item: InputItem, ctx: PreviewCtx): Promise<string | null> {
+  if (!ctx.serviceDomain || !ctx.managementApiKey) return null;
   try {
-    const draftKey = await fetchDraftKey(ENDPOINT, item.contentId, {
+    return await fetchDraftKey(ENDPOINT, item.contentId, {
       serviceDomain: ctx.serviceDomain,
-      apiKey: ctx.apiKey,
+      apiKey: ctx.managementApiKey,
       fetchFn: defaultFetch,
-    });
-    return previewUrlOrNull({
-      siteUrl: ctx.siteUrl,
-      secret: ctx.secret,
-      contentId: item.contentId,
-      draftKey,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(
       `${item.contentId} の draftKey 取得に失敗(URLなしで通知): ${message}\n`
+    );
+    return null;
+  }
+}
+
+/** 表示用の要約(title/excerpt/category/eyecatch)を取得する。障害時は null(沈黙させない)。 */
+async function resolveSummary(
+  item: InputItem,
+  draftKey: string | null,
+  ctx: PreviewCtx
+): Promise<ContentSummary | null> {
+  if (!ctx.serviceDomain || !ctx.contentApiKey) return null;
+  try {
+    return await fetchContentSummary(ENDPOINT, item.contentId, draftKey, {
+      serviceDomain: ctx.serviceDomain,
+      apiKey: ctx.contentApiKey,
+      fetchFn: defaultFetch,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(
+      `${item.contentId} の要約取得に失敗(簡易表示で通知): ${message}\n`
     );
     return null;
   }
@@ -101,35 +113,71 @@ async function main(): Promise<void> {
   const raw = JSON.parse(await readFile(payloadPath, "utf-8")) as unknown;
   const inputs = parseItems(raw);
 
-  // プレビューURL用の設定はすべて任意。欠けていても通知は止めず URL なしで送る(#20)。
+  // プレビューURL/要約用の設定はすべて任意。欠けていても通知は止めずフォールバックする(#20)。
   const ctx: PreviewCtx = {
     serviceDomain: process.env.MICROCMS_SERVICE_DOMAIN ?? null,
-    apiKey:
+    // 管理API・コンテンツAPIはキーが別物。それぞれ適切なキーを優先し、無ければ相互フォールバック。
+    managementApiKey:
       process.env.MICROCMS_MANAGEMENT_API_KEY ??
       process.env.MICROCMS_CONTENT_API_KEY ??
+      null,
+    contentApiKey:
+      process.env.MICROCMS_CONTENT_API_KEY ??
+      process.env.MICROCMS_MANAGEMENT_API_KEY ??
       null,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
     secret: process.env.MICROCMS_DRAFT_SECRET ?? null,
   };
 
-  const items: DraftNotifyItem[] = [];
+  const flexItems: DraftFlexItem[] = [];
+  const notifyItems: DraftNotifyItem[] = [];
   for (const input of inputs) {
-    const previewUrl = await resolvePreviewUrl(input, ctx);
-    items.push({ title: input.title, contentId: input.contentId, previewUrl });
+    const draftKey = await resolveDraftKey(input, ctx);
+    const previewUrl = previewUrlOrNull({
+      siteUrl: ctx.siteUrl,
+      secret: ctx.secret,
+      contentId: input.contentId,
+      draftKey,
+    });
+    const summary = await resolveSummary(input, draftKey, ctx);
+    const title = summary?.title ?? input.title;
+    flexItems.push({
+      title,
+      excerpt: summary?.excerpt ?? "",
+      category: summary?.category ?? "",
+      eyecatchUrl: summary?.eyecatchUrl ?? null,
+      previewUrl,
+      contentId: input.contentId,
+    });
+    notifyItems.push({ title, contentId: input.contentId, previewUrl });
   }
 
-  const message = buildDraftNotifyMessage(items);
+  // altText は Flex 非対応環境のフォールバック。0件はテキストのみ送る(空カルーセルは送れない)。
+  const altText = buildDraftNotifyMessage(notifyItems);
+  const lineOptions = {
+    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+    fetchFn: defaultFetch,
+  };
 
-  if (process.env.GROWTH_DRYRUN) {
-    process.stdout.write(`${message}\n`);
+  if (flexItems.length === 0) {
+    if (process.env.GROWTH_DRYRUN) {
+      process.stdout.write(`${altText}\n`);
+      return;
+    }
+    await pushTextMessage(requireEnv("LINE_GROUP_ID"), altText, lineOptions);
+    process.stderr.write("LINE グループへ下書き完了を通知しました。\n");
     return;
   }
 
-  await pushTextMessage(requireEnv("LINE_GROUP_ID"), message, {
-    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
-    fetchFn: defaultFetch,
-  });
-  process.stderr.write("LINE グループへ下書き完了を通知しました。\n");
+  const carousel = buildDraftFlex(flexItems);
+
+  if (process.env.GROWTH_DRYRUN) {
+    process.stdout.write(`${altText}\n\n[Flex]\n${JSON.stringify(carousel, null, 2)}\n`);
+    return;
+  }
+
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, carousel, lineOptions);
+  process.stderr.write("LINE グループへ下書き完了を通知しました(Flex)。\n");
 }
 
 main().catch((error: unknown) => {
