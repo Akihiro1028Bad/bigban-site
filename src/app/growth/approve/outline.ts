@@ -14,17 +14,14 @@ export const IMAGE_STYLES: readonly { key: ImageStyleKey; label: string }[] = [
   { key: "diagram", label: "詳しい図解" },
 ];
 
-const LABEL_BY_KEY: Record<ImageStyleKey, string> = {
-  mascot: "マスコット・コスミック",
-  minimal: "ミニマル図解",
-  diagram: "詳しい図解",
-};
+// マッピングは IMAGE_STYLES を単一ソースに導出する(追加・変更を1箇所に)。
+const LABEL_BY_KEY = Object.fromEntries(
+  IMAGE_STYLES.map((s) => [s.key, s.label])
+) as Record<ImageStyleKey, string>;
 
-const KEY_BY_LABEL: Record<string, ImageStyleKey> = {
-  "マスコット・コスミック": "mascot",
-  "ミニマル図解": "minimal",
-  "詳しい図解": "diagram",
-};
+const KEY_BY_LABEL = Object.fromEntries(
+  IMAGE_STYLES.map((s) => [s.label, s.key])
+) as Record<string, ImageStyleKey>;
 
 /** 表示名 → スタイルキー。未知の表示名は null(画像として採用しない)。 */
 export function imageStyleKeyFromLabel(label: string): ImageStyleKey | null {
@@ -48,6 +45,8 @@ const HEADING_RE = /^#{1,6}\s+/;
 
 // 画像指示トークン: [画像:<表示名>: <説明>]。コロンは半角/全角どちらも許容。
 // 1 行に複数トークンも可(global)。表示名・説明はそれぞれ閉じ括弧/コロンを含まない。
+// 注: この定数は matchAll(内部でコピーを作る)と replace(lastIndex をリセット)からのみ使う。
+//     exec での共有はしないこと(lastIndex 汚染を避けるため)。
 const IMAGE_DIRECTIVE_RE = /\[画像[:：]\s*([^:：\]]+?)\s*[:：]\s*([^\]]+?)\s*\]/g;
 
 /**
@@ -77,8 +76,10 @@ export function serializeImageDirective(image: OutlineImage): string {
  * - 空行は区切りとして無視。空文字は []。
  */
 export function parseOutlineSections(outline: string): OutlineSection[] {
-  const sections: OutlineSection[] = [];
-  let current: OutlineSection | null = null;
+  // 内部では images を必須に扱う(non-null assertion を避ける)。
+  type Section = OutlineSection & { images: OutlineImage[] };
+  const sections: Section[] = [];
+  let current: Section | null = null;
   for (const raw of outline.split("\n")) {
     const line = raw.trim();
     if (line === "") continue;
@@ -91,11 +92,13 @@ export function parseOutlineSections(outline: string): OutlineSection[] {
       sections.push(current);
       continue;
     }
-    // 画像指示だけの行(他のテキストを含まない)なら、現在の見出しの画像にする。
+    // 画像指示「だけ」の行(他のテキストを含まない)なら、現在の見出しの画像にする。
+    // テキストと画像トークンが同一行に混在する場合は、行全体を説明として残す
+    // (トークンは画像化せずリテラルのまま。UI は画像指示を単独行で書く=#61)。
     const images = parseImageDirectives(line);
     const withoutImages = line.replace(IMAGE_DIRECTIVE_RE, "").trim();
     if (current && images.length > 0 && withoutImages === "") {
-      current.images!.push(...images);
+      current.images.push(...images);
       continue;
     }
     if (current) {

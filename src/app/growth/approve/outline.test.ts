@@ -109,6 +109,16 @@ describe("parseOutlineSections", () => {
       { heading: "[画像:詳しい図解: 図]", description: "", images: [] },
     ]);
   });
+
+  it("テキストと画像トークンが同一行に混在する場合は行全体を説明として残す(画像化しない)", () => {
+    const outline = "## A\n補足 [画像:詳しい図解: 図]";
+    const sections = parseOutlineSections(outline);
+    expect(sections).toEqual([
+      { heading: "A", description: "補足 [画像:詳しい図解: 図]", images: [] },
+    ]);
+    // 混在行は serialize→parse でも安定(往復で崩れない)。
+    expect(parseOutlineSections(serializeOutlineSections(sections))).toEqual(sections);
+  });
 });
 
 describe("parseImageDirectives / serializeImageDirective", () => {
