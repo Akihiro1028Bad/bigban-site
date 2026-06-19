@@ -59,6 +59,15 @@ describe("buildBodyImageSpec", () => {
       caption: "ゾーン図（イメージ図）",
     });
   });
+
+  it("説明の改行・連続空白を1行に正規化する(プロンプト混入の防御)", () => {
+    const spec = buildBodyImageSpec(1, "mascot", "宇宙人が\n\n  サーブ");
+    expect(spec.description).toBe("宇宙人が サーブ");
+  });
+
+  it("index が1未満は例外(無音の不正プレースホルダを防ぐ)", () => {
+    expect(() => buildBodyImageSpec(0, "mascot", "x")).toThrow(/1 以上/);
+  });
 });
 
 describe("プレースホルダ", () => {

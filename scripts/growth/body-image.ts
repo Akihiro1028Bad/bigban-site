@@ -8,7 +8,7 @@
  * 文体・配色の正典は growth-article-style.md §9(宇宙人マスコット × コスミック)。
  */
 
-/** 本文画像のスタイル(承認画面 outline.ts の ImageStyleKey と一致)。 */
+/** 本文画像のスタイル(承認画面 src/app/growth/approve/outline.ts の ImageStyleKey とキー一致)。 */
 export type BodyImageStyle = "mascot" | "minimal" | "diagram";
 
 /** 1記事あたりの本文画像の上限(#61 と整合)。超過は投入側(#63)でスキップ＋通知。 */
@@ -69,13 +69,20 @@ export interface BodyImageSpec {
   caption: string;
 }
 
-/** 画像指示(スタイル＋説明)から BodyImageSpec を組み立てる。 */
+/**
+ * 画像指示(スタイル＋説明)から BodyImageSpec を組み立てる。
+ * index は 1 始まり(本文の {{IMG:n}} と対応)。説明は1行に正規化する
+ * (改行・連続空白を1つの空白に畳み、画像生成プロンプトへの混入や崩れを防ぐ)。
+ */
 export function buildBodyImageSpec(
   index: number,
   style: BodyImageStyle,
   description: string
 ): BodyImageSpec {
-  const d = description.trim();
+  if (index < 1) {
+    throw new Error(`本文画像の index は 1 以上にしてください: ${index}`);
+  }
+  const d = description.trim().replace(/\s+/g, " ");
   return {
     index,
     style,
