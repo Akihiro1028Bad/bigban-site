@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import {
+  chunkRichText,
   createPage,
   DEFAULT_NOTION_VERSION,
   getLatestReport,
   queryDataSource,
+  updatePageProps,
   updatePageSelect,
 } from "./notion";
 
@@ -118,6 +120,72 @@ describe("updatePageSelect", () => {
     await expect(
       updatePageSelect("p1", "ステータス", "承認", { token: TOKEN, fetchFn })
     ).rejects.toThrow(/404/);
+  });
+});
+
+describe("updatePageProps", () => {
+  it("複数プロパティを 1 PATCH で送り id を返す", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ object: "page", id: "p9" }));
+
+    const id = await updatePageProps(
+      "p9",
+      {
+        "修正ステータス": { select: { name: "依頼中" } },
+        "修正指示": { rich_text: [{ text: { content: "[]" } }] },
+        "修正依頼時刻": { date: { start: "2026-06-19T00:00:00.000Z" } },
+      },
+      { token: TOKEN, fetchFn }
+    );
+
+    expect(id).toBe("p9");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/pages/p9");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({
+      properties: {
+        "修正ステータス": { select: { name: "依頼中" } },
+        "修正指示": { rich_text: [{ text: { content: "[]" } }] },
+        "修正依頼時刻": { date: { start: "2026-06-19T00:00:00.000Z" } },
+      },
+    });
+  });
+
+  it("応答に id が無ければ throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ object: "page" }));
+    await expect(
+      updatePageProps("p1", { "修正ステータス": { select: { name: "なし" } } }, { token: TOKEN, fetchFn })
+    ).rejects.toThrow(/id が含まれていません/);
+  });
+
+  it("失敗時は throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(400, "bad"));
+    await expect(
+      updatePageProps("p1", {}, { token: TOKEN, fetchFn })
+    ).rejects.toThrow(/400/);
+  });
+});
+
+describe("chunkRichText", () => {
+  it("空文字は空配列(プロパティを空にする)", () => {
+    expect(chunkRichText("")).toEqual([]);
+  });
+
+  it("2000文字以内は 1 要素", () => {
+    expect(chunkRichText("あいう")).toEqual([{ text: { content: "あいう" } }]);
+    const exact = "x".repeat(2000);
+    expect(chunkRichText(exact)).toEqual([{ text: { content: exact } }]);
+  });
+
+  it("2000文字を超えると 2000 文字ごとに分割", () => {
+    const text = "x".repeat(2001);
+    const items = chunkRichText(text);
+    expect(items).toHaveLength(2);
+    expect(items[0].text.content).toHaveLength(2000);
+    expect(items[1].text.content).toBe("x");
+  });
+
+  it("100要素(20万字)を超えると throw する", () => {
+    expect(() => chunkRichText("x".repeat(2000 * 100 + 1))).toThrow(/長すぎます/);
   });
 });
 
