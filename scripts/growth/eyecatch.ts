@@ -12,6 +12,8 @@
 import type { FetchFn } from "./http";
 
 export const EYECATCH_EDITS_URL = "https://api.openai.com/v1/images/edits";
+// 参照画像なし(text-to-image)の生成エンドポイント。minimal/diagram の本文画像(#63)で使う。
+export const IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
 
 /** 参照画像のキャラを保持させる固定の前置き。 */
 const CHARACTER_PREFIX =
@@ -53,45 +55,86 @@ interface EditsResponse {
   data?: Array<{ b64_json?: string }>;
 }
 
-/**
- * 参照画像を渡して gpt-image-2 の編集APIで画像を生成し、PNG バイト列を返す。
- * 失敗(HTTPエラー / b64欠落)時は例外。
- */
-export async function generateEyecatch(
-  req: EyecatchRequest,
-  deps: EyecatchDeps
+/** 画像生成リクエスト。refPath があれば編集API(参照画像でキャラ固定)、無ければ text-to-image。 */
+export interface ImageGenRequest {
+  apiKey: string;
+  prompt: string;
+  size: string;
+  quality: string;
+  /** 参照画像パス。指定時は edits(キャラ固定)、未指定時は generations(text-to-image)。 */
+  refPath?: string;
+}
+
+async function readImageResponse(
+  res: Awaited<ReturnType<FetchFn>>
 ): Promise<Buffer> {
-  const bytes = await deps.readFile(req.refPath);
-
-  const form = new FormData();
-  form.append("model", "gpt-image-2");
-  form.append("prompt", req.prompt);
-  form.append("size", req.size);
-  form.append("quality", req.quality);
-  form.append("n", "1");
-  form.append(
-    "image",
-    new Blob([Uint8Array.from(bytes)], { type: "image/png" }),
-    "mascot-alien.png"
-  );
-
-  const res = await deps.fetchFn(EYECATCH_EDITS_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${req.apiKey}` },
-    body: form,
-  });
-
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(
-      `アイキャッチ生成に失敗しました (HTTP ${res.status}): ${text}`
-    );
+    throw new Error(`画像生成に失敗しました (HTTP ${res.status}): ${text}`);
   }
-
   const json = (await res.json()) as EditsResponse;
   const b64 = json.data?.[0]?.b64_json;
   if (!b64) {
     throw new Error("画像生成の応答に b64_json が含まれていません。");
   }
   return Buffer.from(b64, "base64");
+}
+
+/**
+ * gpt-image-2 で画像を生成し PNG バイト列を返す。
+ * - refPath あり: `/v1/images/edits` に参照画像を渡してキャラを固定(マスコット)。
+ * - refPath なし: `/v1/images/generations` の text-to-image(ミニマル/図解)。
+ * 失敗(HTTPエラー / b64欠落)時は例外。fetch / readFile は注入可能。
+ */
+export async function generateImage(
+  req: ImageGenRequest,
+  deps: EyecatchDeps
+): Promise<Buffer> {
+  if (req.refPath !== undefined) {
+    const bytes = await deps.readFile(req.refPath);
+    const form = new FormData();
+    form.append("model", "gpt-image-2");
+    form.append("prompt", req.prompt);
+    form.append("size", req.size);
+    form.append("quality", req.quality);
+    form.append("n", "1");
+    form.append(
+      "image",
+      new Blob([Uint8Array.from(bytes)], { type: "image/png" }),
+      "reference.png"
+    );
+    const res = await deps.fetchFn(EYECATCH_EDITS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${req.apiKey}` },
+      body: form,
+    });
+    return readImageResponse(res);
+  }
+
+  const res = await deps.fetchFn(IMAGE_GENERATIONS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${req.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-image-2",
+      prompt: req.prompt,
+      size: req.size,
+      quality: req.quality,
+      n: 1,
+    }),
+  });
+  return readImageResponse(res);
+}
+
+/**
+ * 参照画像を渡して gpt-image-2 の編集APIでアイキャッチを生成し、PNG バイト列を返す。
+ * generateImage(refPath 指定)へ委譲する。
+ */
+export function generateEyecatch(
+  req: EyecatchRequest,
+  deps: EyecatchDeps
+): Promise<Buffer> {
+  return generateImage(req, deps);
 }

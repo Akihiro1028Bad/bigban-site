@@ -94,6 +94,7 @@ export function buildBodyImageSpec(
 }
 
 // 本文HTMLに置くプレースホルダ。投入時に <figure><img><figcaption> へ置換する(#63)。
+// 注: matchAll(内部コピー)と replace(lastIndex リセット)からのみ使う(exec で共有しない)。
 const PLACEHOLDER_RE = /\{\{IMG:(\d+)\}\}/g;
 
 /** 指定 index のプレースホルダ文字列を返す。 */
@@ -104,4 +105,121 @@ export function bodyImagePlaceholder(index: number): string {
 /** 本文HTML中に含まれるプレースホルダの index 一覧を返す(出現順)。 */
 export function placeholderIndices(html: string): number[] {
   return [...html.matchAll(PLACEHOLDER_RE)].map((match) => Number(match[1]));
+}
+
+// ── 投入パイプライン(#63)用 ──────────────────────────────────────────
+
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
+
+/** 属性値・テキストノードに入れる文字列を最小限エスケープする。 */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"]/g, (ch) => HTML_ESCAPES[ch]);
+}
+
+/** アップロード済みの本文画像(microCMS のアセットURL確定)。 */
+export interface ResolvedBodyImage {
+  index: number;
+  url: string;
+  alt: string;
+  caption: string;
+}
+
+/** 生成/アップロードに失敗した本文画像(スキップ対象・通知用)。 */
+export interface BodyImageFailure {
+  index: number;
+  description: string;
+  error: string;
+}
+
+function figureHtml(image: ResolvedBodyImage): string {
+  const img = `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}">`;
+  return `<figure>${img}<figcaption>${escapeHtml(image.caption)}</figcaption></figure>`;
+}
+
+/**
+ * 本文HTMLの {{IMG:n}} を、アップロード済み画像の <figure> へ置換する。
+ * resolved に無い index(生成/アップロード失敗・欠番)のプレースホルダは**除去**する
+ * (壊れた <img> を残さない)。
+ */
+export function substituteBodyImages(
+  bodyHtml: string,
+  resolved: readonly ResolvedBodyImage[]
+): string {
+  const byIndex = new Map(resolved.map((r) => [r.index, r]));
+  return bodyHtml.replace(PLACEHOLDER_RE, (_match, n: string) => {
+    const image = byIndex.get(Number(n));
+    return image ? figureHtml(image) : "";
+  });
+}
+
+/**
+ * 各 spec を resolveOne(生成→アップロード)で解決する。1枚が失敗しても他は続行し、
+ * 成功分(resolved)と失敗分(failures)を分けて返す(#24: 沈黙させない・全体を止めない)。
+ */
+export async function resolveBodyImages(
+  specs: readonly BodyImageSpec[],
+  resolveOne: (spec: BodyImageSpec) => Promise<string>
+): Promise<{ resolved: ResolvedBodyImage[]; failures: BodyImageFailure[] }> {
+  const resolved: ResolvedBodyImage[] = [];
+  const failures: BodyImageFailure[] = [];
+  for (const spec of specs) {
+    try {
+      const url = await resolveOne(spec);
+      resolved.push({ index: spec.index, url, alt: spec.alt, caption: spec.caption });
+    } catch (error: unknown) {
+      failures.push({
+        index: spec.index,
+        description: spec.description,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { resolved, failures };
+}
+
+/** 上限(BODY_IMAGE_MAX)を超える spec を切り落とす。kept と dropped を返す。 */
+export function capBodyImageSpecs(specs: readonly BodyImageSpec[]): {
+  kept: BodyImageSpec[];
+  dropped: BodyImageSpec[];
+} {
+  return {
+    kept: specs.slice(0, BODY_IMAGE_MAX),
+    dropped: specs.slice(BODY_IMAGE_MAX),
+  };
+}
+
+/** 本文画像の一部スキップを LINE 通知する本文(沈黙させない=#24)。 */
+export function buildBodyImageFailureMessage(
+  title: string,
+  failures: readonly BodyImageFailure[]
+): string {
+  const lines = failures.map((f) => `・${f.description}（理由: ${f.error}）`);
+  return [
+    "本文画像の一部を生成できず、その画像を除いて下書きを作成しました。",
+    `タイトル: ${title}`,
+    ...lines,
+    "下書きは公開前に確認できます。再実行すれば未生成分の生成を再試行します。",
+  ].join("\n");
+}
+
+// 生成画像の安定ファイル名 stem(冪等キャッシュ #21)。
+// (slug + style + description) から決定的に作り、再実行で同じファイルを使い回す
+// → OpenAI 生成の再課金を防ぐ。暗号強度は不要なので軽量な決定的ハッシュを使う。
+function hashString(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 33) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/** 生成画像の安定ファイル名 stem(拡張子なし)。同一 spec なら常に同じ。 */
+export function bodyImageFileStem(slug: string, spec: BodyImageSpec): string {
+  const key = hashString(`${spec.style}|${spec.description}`);
+  return `growth-bodyimg-${slug}-${spec.index}-${key}`;
 }
