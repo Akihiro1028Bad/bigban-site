@@ -42,6 +42,28 @@ describe("buildBodyImagePrompt", () => {
   });
 });
 
+describe("ピックルボール固定（#89: 卓球バイアス対策）", () => {
+  it("mascot はピックルボール視覚アンカーと卓球ネガティブを含む", () => {
+    const p = buildBodyImagePrompt("mascot", "宇宙人がプレー");
+    expect(p).toMatch(/pickleball/i);
+    expect(p).toMatch(/whiffle ball with holes/i);
+    expect(p.toLowerCase()).toContain("not table tennis");
+    expect(p.toLowerCase()).toContain("not ping pong");
+  });
+
+  it("minimal もピックルボール視覚アンカーと卓球ネガティブを含む", () => {
+    const p = buildBodyImagePrompt("minimal", "パドルの握り方");
+    expect(p).toMatch(/pickleball/i);
+    expect(p.toLowerCase()).toContain("not table tennis");
+  });
+
+  it("diagram には適用しない（概念図はスポーツシーンとは限らない）", () => {
+    const p = buildBodyImagePrompt("diagram", "コートの寸法");
+    expect(p.toLowerCase()).not.toContain("not table tennis");
+    expect(p).not.toMatch(/whiffle ball with holes/i);
+  });
+});
+
 describe("buildBodyImageAlt / buildBodyImageCaption", () => {
   it("diagram は alt・caption に「イメージ図」を明示する", () => {
     expect(buildBodyImageAlt("diagram", " コート図 ")).toBe("イメージ図: コート図");

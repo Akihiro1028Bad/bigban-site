@@ -106,9 +106,14 @@ Using the exact gray alien character from the reference image (smooth gray head,
 almond eyes with white highlights, small friendly smile), create a wide 16:9 flat illustration
 of this same alien {ACTION}. Cosmic starry deep-space background in deep blue (#11317B) and black
 with bright blue (#306EC3) glow and yellow-green (#F6FF54) accents. Keep the alien's face identical
-to the reference. Clean, characterful, premium flat illustration. Leave clean negative space on one
-side for text. No text, no logos.
+to the reference. Clean, characterful, premium flat illustration. If a paddle, ball, or racket-sport
+scene appears, it must be pickleball: a large solid pickleball paddle and a perforated plastic
+pickleball (a whiffle ball with holes), on an indoor pickleball court with a low net, players
+standing on the court. Not table tennis, not ping pong: no table, no tiny ping-pong paddle, no small
+bat. Leave clean negative space on one side for text. No text, no logos.
 ```
+
+> #89: 画像生成モデルの卓球(table tennis)バイアス対策として、競技をピックルボールに固定し卓球を明示除外する一文を `STYLE_SUFFIX` に自動付与している(本文画像 mascot/minimal も同句を共用。`diagram` は概念図のため付与しない)。正典は `PICKLEBALL_ANCHOR`/`NO_TABLE_TENNIS`（`scripts/growth/body-image.ts`）。
 
 ### 本文画像(任意・構成案からの指示で生成 / Epic #59)
 
