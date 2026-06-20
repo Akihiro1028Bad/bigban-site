@@ -99,6 +99,13 @@ describe("POST /api/growth/draft/edit", () => {
     expect(res.status).toBe(400);
   });
 
+  it("本文が大きすぎる(上限超過)は 400(patch しない)", async () => {
+    const huge = "<p>" + "あ".repeat(500_001) + "</p>";
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: huge }));
+    expect(res.status).toBe(400);
+    expect(vi.mocked(patchDraft)).not.toHaveBeenCalled();
+  });
+
   it("不正な pageId は 400", async () => {
     const res = await POST(postRequest(null, { pageId: "nope", bodyHtml: "<p>x</p>" }));
     expect(res.status).toBe(400);

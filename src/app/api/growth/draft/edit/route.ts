@@ -24,6 +24,8 @@ export const runtime = "nodejs";
 const ENDPOINT = "news";
 // microCMS contentId の許可文字(slugToContentId と同じ)。不正値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
+// 本文HTMLの上限(記事本文として十分・過大入力を境界で弾く)。
+const MAX_BODY_HTML = 500_000;
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -78,6 +80,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
   if (typeof bodyHtml !== "string" || bodyHtml.trim() === "") {
     return badRequest("本文が空です。");
+  }
+  if (bodyHtml.length > MAX_BODY_HTML) {
+    return badRequest("本文が大きすぎます。");
   }
 
   const notionOpts = notionOptions();
