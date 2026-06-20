@@ -9,6 +9,7 @@
  * 文体・配色の正典は growth-article-style.md §9。fetch / readFile は注入可能。
  */
 
+import { NO_TABLE_TENNIS, PICKLEBALL_ANCHOR } from "./body-image";
 import type { FetchFn } from "./http";
 
 export const EYECATCH_EDITS_URL = "https://api.openai.com/v1/images/edits";
@@ -21,12 +22,17 @@ const CHARACTER_PREFIX =
   "(smooth gray head, large black almond eyes with white highlights, small friendly smile), " +
   "create a wide 16:9 flat illustration of this same alien";
 
-/** 記事に依らない固定スタイル(宇宙・ブランド配色・余白・文字なし)。 */
+/**
+ * 記事に依らない固定スタイル(宇宙・ブランド配色・余白・文字なし)。
+ * #89: 画像モデルの卓球バイアス対策として、競技をピックルボールに固定し卓球を除外する
+ * (PICKLEBALL_ANCHOR / NO_TABLE_TENNIS は本文画像と共用)。
+ */
 const STYLE_SUFFIX =
   "Cosmic starry deep-space background in deep blue (#11317B) and black " +
   "with bright blue (#306EC3) glow and yellow-green (#F6FF54) accents. " +
   "Keep the alien's face identical to the reference. " +
   "Clean, characterful, premium flat illustration. " +
+  `${PICKLEBALL_ANCHOR} ${NO_TABLE_TENNIS} ` +
   "Leave clean negative space on one side for text. No text, no logos.";
 
 /**

@@ -24,14 +24,27 @@ const BRAND_PALETTE =
   "brand palette: deep blue (#11317B) and black base, bright blue (#306EC3) glow, " +
   "yellow-green (#F6FF54) accents";
 
+// #89: 画像生成モデルの卓球(table tennis)バイアス対策。パドル＋ボールのシーンを
+// ピックルボールに固定し、卓球を明示的に除外する。アイキャッチ(eyecatch.ts)とも共用。
+export const PICKLEBALL_ANCHOR =
+  "If a paddle, ball, or racket-sport scene appears, it must be pickleball: " +
+  "a large solid pickleball paddle and a perforated plastic pickleball (a whiffle ball with holes), " +
+  "on an indoor pickleball court with a low net, players standing on the court.";
+export const NO_TABLE_TENNIS =
+  "Not table tennis, not ping pong: no table, no tiny ping-pong paddle, no small bat.";
+
+// mascot / minimal(スポーツシーンを描き得る)に付与する競技固定句。
+// diagram(概念図)はスポーツシーンとは限らないため付与しない。
+const PICKLEBALL_GUARD = `${PICKLEBALL_ANCHOR} ${NO_TABLE_TENNIS}`;
+
 const PROMPT_BUILDERS: Record<BodyImageStyle, (description: string) => string> = {
   mascot: (d) =>
     `Using ${ALIEN_CHARACTER}, create a flat illustration of this same alien: ${d}. ` +
-    `Cosmic deep-space scene, ${BRAND_PALETTE}. ` +
+    `Cosmic deep-space scene, ${BRAND_PALETTE}. ${PICKLEBALL_GUARD} ` +
     `Keep the alien's face identical to the reference. Clean premium flat illustration. No text, no logos.`,
   minimal: (d) =>
     `Minimal flat vector-style illustration of: ${d}. ` +
-    `Simple shapes with generous negative space, ${BRAND_PALETTE} on a clean background. ` +
+    `Simple shapes with generous negative space, ${BRAND_PALETTE} on a clean background. ${PICKLEBALL_GUARD} ` +
     `No text, no labels, no logos.`,
   diagram: (d) =>
     `Clean conceptual diagram illustrating: ${d}. ` +

@@ -35,6 +35,17 @@ describe("buildEyecatchPrompt", () => {
     expect(prompt).not.toContain("..");
     expect(prompt).not.toContain("  ");
   });
+
+  it("ピックルボール視覚アンカーと卓球ネガティブを含む（#89: 卓球バイアス対策）", () => {
+    const prompt = buildEyecatchPrompt("playing pickleball with a paddle");
+    expect(prompt).toMatch(/pickleball/i);
+    expect(prompt).toMatch(/whiffle ball with holes/i);
+    expect(prompt.toLowerCase()).toContain("not table tennis");
+    expect(prompt.toLowerCase()).toContain("not ping pong");
+    // 区切りが壊れない（二重ピリオド・二重空白を作らない）
+    expect(prompt).not.toContain("..");
+    expect(prompt).not.toContain("  ");
+  });
 });
 
 describe("generateEyecatch", () => {
