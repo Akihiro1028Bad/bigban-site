@@ -160,6 +160,32 @@ export async function updatePageProps(
   return json.id;
 }
 
+/** 下書きプレビュー連携用プロパティ名(#73)。承認画面が microCMS 下書きを特定するのに使う。 */
+export const DRAFT_LINK_PROPS = {
+  /** microCMS の contentId(= slugToContentId(slug))。 */
+  contentId: "下書きID",
+  /** microCMS の draftKey(下書き読取に必要)。 */
+  draftKey: "下書きプレビューキー",
+} as const;
+
+/**
+ * 下書きリンク(contentId / draftKey)を Notion プロパティへ書き込む形に組み立てる(#73)。
+ * contentId は常に書き込む。draftKey は取得できた時(非空)だけ書き込む
+ * (取得失敗でも contentId 保存・ステータス更新は止めない方針=沈黙させない)。
+ */
+export function buildDraftLinkProps(
+  contentId: string,
+  draftKey: string | null
+): Record<string, unknown> {
+  const props: Record<string, unknown> = {
+    [DRAFT_LINK_PROPS.contentId]: { rich_text: chunkRichText(contentId) },
+  };
+  if (draftKey) {
+    props[DRAFT_LINK_PROPS.draftKey] = { rich_text: chunkRichText(draftKey) };
+  }
+  return props;
+}
+
 /**
  * ページの select プロパティ(「ステータス」等)を更新し、更新したページ ID を返す。
  * 対象DBの「ステータス」は status 型ではなく select 型のため select で更新する。
