@@ -6,6 +6,7 @@ import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
+import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 
 import { AddProposalForm } from "./AddProposalForm";
 import {
@@ -46,7 +47,24 @@ interface PendingItem {
   reviseStatus?: string;
   reviseProposal?: string;
   reviseInstructions?: string;
+  // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
+  contentId?: string;
 }
+
+// #75: 下書きプレビューの取得状態。
+interface DraftPreview {
+  title: string;
+  displayMode: "html" | "rich";
+  bodyHtml: string;
+  body: string;
+}
+
+type DraftState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "empty" }
+  | { status: "error"; error: string }
+  | { status: "ready"; draft: DraftPreview };
 
 // 修正処理中(再依頼不可・承認排他の対象)の状態。
 const REVISE_BUSY_STATUSES = ["依頼中", "処理中", "提示中"];
@@ -215,6 +233,42 @@ export function ApproveClient() {
     }, REVISE_POLL_MS);
     return () => clearInterval(timer);
   }, [isRevisePending, refreshItems]);
+
+  // #75: 下書きプレビュー。開いている記事が下書き作成済み(contentId あり)のときだけ取得する。
+  const [draftState, setDraftState] = useState<DraftState>({ status: "idle" });
+  const openHasDraft = polledItem?.kind === "idea" && Boolean(polledItem.contentId);
+
+  const loadDraft = useCallback(
+    async (pageId: string): Promise<void> => {
+      setDraftState({ status: "loading" });
+      try {
+        const res = await fetch(
+          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(token)}`
+        );
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error ?? "下書きの取得に失敗しました。");
+        }
+        if (!json.exists) {
+          setDraftState({ status: "empty" });
+          return;
+        }
+        setDraftState({ status: "ready", draft: json.draft as DraftPreview });
+      } catch (error) {
+        setDraftState({ status: "error", error: toMessage(error, "下書きの取得に失敗しました。") });
+      }
+    },
+    [token]
+  );
+
+  // パネルを開いたら(下書きありの記事のみ)取得。閉じる/対象外は idle に戻す。
+  useEffect(() => {
+    if (openId && openHasDraft) {
+      void loadDraft(openId);
+    } else {
+      setDraftState({ status: "idle" });
+    }
+  }, [openId, openHasDraft, loadDraft]);
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -1125,6 +1179,50 @@ export function ApproveClient() {
     );
   }
 
+  // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。
+  function renderDraftPreview(item: PendingItem) {
+    return (
+      <section aria-label="下書きプレビュー" className="mt-4 border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-bold text-gray-700">下書きプレビュー</h3>
+        {draftState.status === "loading" ? (
+          <p className="mt-2 text-sm text-gray-500" aria-busy="true">
+            読み込み中…
+          </p>
+        ) : draftState.status === "error" ? (
+          <div role="alert" className="mt-2 text-sm text-red-700">
+            <span>{draftState.error}</span>
+            <button
+              type="button"
+              onClick={() => void loadDraft(item.id)}
+              className={choiceButtonClass(
+                "ml-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              )}
+            >
+              再読み込み
+            </button>
+          </div>
+        ) : draftState.status === "empty" ? (
+          <p className="mt-2 text-sm text-gray-500">下書きが見つかりませんでした。</p>
+        ) : draftState.status === "ready" ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-2 max-h-96 overflow-y-auto rounded-md border border-gray-200 bg-white p-3"
+          >
+            <NewsBodyRenderer
+              displayMode={draftState.draft.displayMode}
+              bodyHtml={draftState.draft.bodyHtml}
+              body={draftState.draft.body}
+              locale="ja"
+            />
+          </motion.div>
+        ) : (
+          <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
+        )}
+      </section>
+    );
+  }
+
   function renderReviseSection(item: PendingItem) {
     const sections = outlineSections(item.outline);
     const phase = revisePhase(item.reviseStatus);
@@ -1225,6 +1323,8 @@ export function ApproveClient() {
               </>
             )}
           </div>
+
+          {item.kind === "idea" ? renderDraftPreview(item) : null}
 
           {item.kind === "idea" ? renderReviseSection(item) : null}
 

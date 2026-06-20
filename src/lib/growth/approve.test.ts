@@ -81,6 +81,13 @@ describe("toPendingItems", () => {
     ]);
   });
 
+  it("記事ネタ案の下書きID(contentId)を反映する(#75)", () => {
+    const page = idea("i7", "T", "S");
+    page.properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: "g-xyz" }] };
+    const [item] = toPendingItems([], [page]);
+    expect(item.contentId).toBe("g-xyz");
+  });
+
   it("記事ネタ案の修正ステータスを反映する(#42)", () => {
     const page = idea("i9", "T", "S");
     page.properties["修正ステータス"] = { type: "select", select: { name: "提示中" } };
@@ -118,6 +125,7 @@ describe("toPendingItems", () => {
         reviseStatus: "なし",
         reviseProposal: "",
         reviseInstructions: "",
+        contentId: "",
       },
     ]);
   });
@@ -157,6 +165,7 @@ describe("toPendingItems", () => {
         reviseStatus: "なし",
         reviseProposal: "",
         reviseInstructions: "",
+        contentId: "",
       },
     ]);
   });
