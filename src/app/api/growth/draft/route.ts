@@ -20,6 +20,10 @@ import { getNewsByContentId } from "@/lib/microcms/queries";
 
 export const runtime = "nodejs";
 
+// microCMS contentId の許可文字(slugToContentId と同じ)。Notion 由来の値を
+// そのまま URL パスに載せる前に検証し、パス分離(`/`)等の不正値を弾く(防御的)。
+const CONTENT_ID_RE = /^[a-z0-9-]+$/;
+
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -68,6 +72,13 @@ export async function GET(request: Request): Promise<Response> {
       // まだ下書きが作成されていない(下書きモード未実行)。
       return NextResponse.json({ success: true, exists: false, draft: null });
     }
+    if (!CONTENT_ID_RE.test(contentId)) {
+      // Notion 側の値が壊れている等。不正値を microCMS の URL に載せない。
+      return NextResponse.json(
+        { success: false, error: "下書きの取得に失敗しました" },
+        { status: 502 }
+      );
+    }
     const news = await getNewsByContentId({
       id: contentId,
       draftKey: draftKey || undefined,
@@ -78,6 +89,8 @@ export async function GET(request: Request): Promise<Response> {
         { status: 502 }
       );
     }
+    // displayMode/bodyHtml/body は NewsBodyRenderer(#75)がそのまま使う最小セット
+    // (html モードは bodyHtml、空なら body へフォールバックするため body も渡す)。
     return NextResponse.json({
       success: true,
       exists: true,

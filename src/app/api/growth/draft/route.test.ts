@@ -106,6 +106,13 @@ describe("GET /api/growth/draft", () => {
     expect((await res.json()).error).toMatch(/取得に失敗/);
   });
 
+  it("contentId が不正な形式(スラッシュ等)なら microCMS を叩かず 502", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithLink("bad/../id", "dk-1"));
+    const res = await GET(getRequest(null, PAGE_ID));
+    expect(res.status).toBe(502);
+    expect(vi.mocked(getNewsByContentId)).not.toHaveBeenCalled();
+  });
+
   it("getPage が throw したら 502", async () => {
     vi.mocked(getPage).mockRejectedValue(new Error("notion down"));
     const res = await GET(getRequest(null, PAGE_ID));
