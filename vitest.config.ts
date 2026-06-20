@@ -62,6 +62,8 @@ export default defineConfig({
         "scripts/growth/publish-draft-cli.ts",
         "scripts/growth/notify-line.ts",
         "scripts/growth/revise-cli.ts",
+        // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
+        "src/app/growth/approve/DraftEditor.tsx",
       ],
       thresholds: {
         statements: 100,
