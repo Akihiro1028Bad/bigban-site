@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import {
+  buildDraftLinkProps,
   chunkRichText,
   createPage,
   DEFAULT_NOTION_VERSION,
+  DRAFT_LINK_PROPS,
   getLatestReport,
   getPage,
   queryDataSource,
@@ -183,6 +185,27 @@ describe("getPage", () => {
   it("失敗時は throw する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(404, "no page"));
     await expect(getPage("p1", { token: TOKEN, fetchFn })).rejects.toThrow(/404/);
+  });
+});
+
+describe("buildDraftLinkProps（下書きリンク #73）", () => {
+  it("contentId と draftKey の両方を rich_text プロパティにする", () => {
+    expect(buildDraftLinkProps("g-abc", "dk-1")).toEqual({
+      [DRAFT_LINK_PROPS.contentId]: { rich_text: [{ text: { content: "g-abc" } }] },
+      [DRAFT_LINK_PROPS.draftKey]: { rich_text: [{ text: { content: "dk-1" } }] },
+    });
+  });
+
+  it("draftKey が null なら contentId だけ書き込む(取得失敗でも止めない)", () => {
+    expect(buildDraftLinkProps("g-abc", null)).toEqual({
+      [DRAFT_LINK_PROPS.contentId]: { rich_text: [{ text: { content: "g-abc" } }] },
+    });
+  });
+
+  it("draftKey が空文字でも書き込まない", () => {
+    expect(buildDraftLinkProps("g-abc", "")).toEqual({
+      [DRAFT_LINK_PROPS.contentId]: { rich_text: [{ text: { content: "g-abc" } }] },
+    });
   });
 });
 
