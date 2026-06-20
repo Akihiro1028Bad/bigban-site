@@ -33,7 +33,13 @@ export interface PendingItem {
   reviseInstructions?: string;
   /** 生成済み下書きの microCMS contentId(空=未作成)。下書きプレビュー(#75)の有無判定に使う。記事のみ。 */
   contentId?: string;
+  /** 下書き作成済み(=承認後に下書き生成が完了)。下書きタブ(#87)の振り分けに使う。記事のみ。 */
+  isDraftReady?: boolean;
 }
+
+/** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
+export const STATUS_PROP = "ステータス";
+export const DRAFT_READY_STATUS = "下書き作成済み";
 
 /** Notion ページ ID として妥当か(パスインジェクション/不正入力の防御)。 */
 export function isNotionPageId(id: unknown): id is string {
@@ -169,6 +175,7 @@ export function toPendingItems(
     reviseProposal: richText(page, REVISE_PROPS.proposal),
     reviseInstructions: richText(page, REVISE_PROPS.instructions),
     contentId: richText(page, DRAFT_LINK_PROPS.contentId),
+    isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,
   }));
   return [...proposalItems, ...ideaItems];
 }

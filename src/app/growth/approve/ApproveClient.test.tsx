@@ -882,6 +882,50 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
   });
 });
 
+describe("ApproveClient 下書きタブ(#87)", () => {
+  function draftIdea(over: Partial<Record<string, unknown>> = {}) {
+    return ideaItem({ id: "d1", title: "下書き記事", isDraftReady: true, contentId: "g-1", ...over });
+  }
+
+  it("下書き作成済みは「下書き」タブに入り、記事タブには出さない", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem(), draftIdea()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    // 既定(記事タブ)では下書き記事は出ない
+    expect(screen.queryByText("下書き記事")).not.toBeInTheDocument();
+    // 下書きタブへ切り替えると見える（記事は隠れる）
+    await selectTab(/下書き/);
+    expect(screen.getByText("下書き記事")).toBeInTheDocument();
+    expect(screen.queryByText("猛暑記事")).not.toBeInTheDocument();
+  });
+
+  it("下書き行は承認/却下を出さず、詳細のみ表示する", async () => {
+    mockFetchSequence({ json: { success: true, items: [draftIdea()] } });
+    render(<ApproveClient />);
+    await login();
+    // 下書きのみ → 既定タブが無く下書きタブへフォールバック
+    await screen.findByText("下書き記事");
+    expect(screen.queryByRole("button", { name: "承認: 下書き記事" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "却下: 下書き記事" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "詳細: 下書き記事" })).toBeInTheDocument();
+  });
+
+  it("下書きの詳細パネルには承認/却下を出さない", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [draftIdea()] } },
+      { json: { success: true, exists: false } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("下書き記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 下書き記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("button", { name: "承認" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "却下" })).not.toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 構成案修正(#42/#53)", () => {
   async function openIdeaPanel() {
     render(<ApproveClient />);

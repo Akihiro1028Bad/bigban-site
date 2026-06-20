@@ -51,7 +51,12 @@ interface PendingItem {
   reviseInstructions?: string;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
   contentId?: string;
+  // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
+  isDraftReady?: boolean;
 }
+
+// #87: タブの種別。施策/記事に加え、下書き作成済みの記事を集める「下書き」タブを持つ。
+type TabKey = "proposal" | "idea" | "draft";
 
 // #75: 下書きプレビューの取得状態。
 interface DraftPreview {
@@ -182,7 +187,7 @@ export function ApproveClient() {
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
   // #90: トリアージ型UI。表示中のカテゴリタブ・未処理のみ表示・処理済みアコーディオンの開閉。
-  const [activeTab, setActiveTab] = useState<PendingItem["kind"]>("proposal");
+  const [activeTab, setActiveTab] = useState<TabKey>("proposal");
   const [unprocessedOnly, setUnprocessedOnly] = useState(true);
   const [showProcessed, setShowProcessed] = useState(false);
   // #53: 構成案セクション(index)ごとに溜めたコメント(複数可)。送信時に {見出し, comment} へ展開。
@@ -797,10 +802,15 @@ export function ApproveClient() {
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
   const openItem = openId ? items.find((item) => item.id === openId) : undefined;
 
-  // #90: 存在するカテゴリだけをタブにする(施策/記事)。下書きタブは #87 で追加予定。
+  // #87: 記事を「提案中(承認待ち)」と「下書き作成済み」に分け、後者は専用タブへ。
+  const pendingIdeas = ideas.filter((item) => !item.isDraftReady);
+  const draftIdeas = ideas.filter((item) => item.isDraftReady);
+
+  // #90/#87: 存在するカテゴリだけをタブにする(施策/記事/下書き)。
   const tabDefs = [
     { key: "proposal" as const, label: "施策", items: proposals },
-    { key: "idea" as const, label: "記事", items: ideas },
+    { key: "idea" as const, label: "記事", items: pendingIdeas },
+    { key: "draft" as const, label: "下書き", items: draftIdeas },
   ].filter((tab) => tab.items.length > 0);
   // activeTab が現在の一覧に無ければ先頭タブにフォールバック(取得直後/カテゴリ消滅時)。
   const effectiveDef = tabDefs.find((tab) => tab.key === activeTab) ?? tabDefs[0];
@@ -811,7 +821,7 @@ export function ApproveClient() {
   const mainList = unprocessedOnly ? undecidedItems : activeItems;
 
   // #90: カテゴリを切り替える。処理済みアコーディオンは畳んだ状態から始める。
-  function selectTab(key: PendingItem["kind"]): void {
+  function selectTab(key: TabKey): void {
     setActiveTab(key);
     setShowProcessed(false);
   }
@@ -854,6 +864,17 @@ export function ApproveClient() {
             >
               取り消す
             </button>
+          </div>
+        ) : item.isDraftReady ? (
+          // #87: 下書き作成済みは承認/却下を出さず、詳細(プレビュー＋編集)のみ。
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
+              📝 下書き
+            </span>
+            <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
+              {item.title}
+            </span>
+            {detailButton}
           </div>
         ) : (
           <>
@@ -1464,39 +1485,42 @@ export function ApproveClient() {
             </dl>
           ) : null}
 
-          <div className="mt-4 flex gap-2">
-            {choice ? (
-              <button
-                type="button"
-                onClick={() => undoFromPanel(item)}
-                disabled={isBusy}
-                className={choiceButtonClass(
-                  "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                承認待ちに戻す
-              </button>
-            ) : (
-              <>
+          {/* #87: 下書き作成済みは承認/却下を出さない(プレビュー＋編集のみ)。 */}
+          {item.isDraftReady ? null : (
+            <div className="mt-4 flex gap-2">
+              {choice ? (
                 <button
                   type="button"
-                  onClick={() => decideFromPanel(item, "承認")}
-                  disabled={isBusy || lockedForRevise}
-                  className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+                  onClick={() => undoFromPanel(item)}
+                  disabled={isBusy}
+                  className={choiceButtonClass(
+                    "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  )}
                 >
-                  承認
+                  承認待ちに戻す
                 </button>
-                <button
-                  type="button"
-                  onClick={() => decideFromPanel(item, "却下")}
-                  disabled={isBusy || lockedForRevise}
-                  className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
-                >
-                  却下
-                </button>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => decideFromPanel(item, "承認")}
+                    disabled={isBusy || lockedForRevise}
+                    className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+                  >
+                    承認
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideFromPanel(item, "却下")}
+                    disabled={isBusy || lockedForRevise}
+                    className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+                  >
+                    却下
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {item.kind === "idea" ? renderDraftPreview(item) : null}
 
@@ -1552,6 +1576,8 @@ export function ApproveClient() {
         {tabDefs.map((tab) => {
           const selected = tab.key === effectiveDef.key;
           const remaining = tab.items.filter((item) => !decided[item.id]).length;
+          // 下書きタブは承認待ちではないため「未処理」ではなく総数を出す。
+          const badge = tab.key === "draft" ? `${tab.items.length}件` : `未処理${remaining}件`;
           return (
             <button
               key={tab.key}
@@ -1563,7 +1589,7 @@ export function ApproveClient() {
               onClick={() => selectTab(tab.key)}
               className={tabClass(selected)}
             >
-              {tab.label}（未処理{remaining}件）
+              {tab.label}（{badge}）
             </button>
           );
         })}
