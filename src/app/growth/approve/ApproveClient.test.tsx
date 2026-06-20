@@ -67,6 +67,17 @@ async function login(pass: string = PASS): Promise<void> {
   await userEvent.click(screen.getByRole("button", { name: "確認する" }));
 }
 
+// #90: 「未処理のみ」(既定ON)を解除し、処理済みも一覧にインライン表示させる。
+// 承認/却下後の行をその場で操作する機構テストで使う(処理済みアコーディオンへ退避させない)。
+async function showAll(): Promise<void> {
+  await userEvent.click(screen.getByRole("switch", { name: "未処理のみ" }));
+}
+
+// #90: 指定カテゴリのタブへ切り替える(施策/記事)。
+async function selectTab(name: RegExp): Promise<void> {
+  await userEvent.click(screen.getByRole("tab", { name }));
+}
+
 function proposalItem(over: Partial<Record<string, unknown>> = {}) {
   return {
     id: "p1",
@@ -136,6 +147,8 @@ describe("ApproveClient 合言葉画面", () => {
     render(<ApproveClient />);
     await login();
     expect(await screen.findByText("市川ページ")).toBeInTheDocument();
+    // #90: 既定は施策タブ。記事は記事タブへ切り替えると見える。
+    await selectTab(/記事/);
     expect(screen.getByText("猛暑記事")).toBeInTheDocument();
     expect(fn.mock.calls[0][0]).toBe(TOKEN_URL);
   });
@@ -147,9 +160,11 @@ describe("ApproveClient 合言葉画面", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
-    // バッジは一覧の各行に出る
+    // バッジは一覧の各行に出る(#90: タブごとに該当カテゴリの行のみ表示)
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
+    await selectTab(/記事/);
     expect(screen.getByText("📝 記事")).toBeInTheDocument();
+    await selectTab(/施策/);
     // 数値根拠は一覧には出さず、詳細パネルに入れる(#275 高密度化)
     expect(screen.queryByText("優先度スコア")).not.toBeInTheDocument();
 
@@ -219,6 +234,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
 
@@ -241,6 +257,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "却下: 市川ページ" }));
 
@@ -259,6 +276,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
@@ -279,6 +297,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 猛暑記事" }));
@@ -341,6 +360,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "再試行: 市川ページ" }));
@@ -366,6 +386,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await screen.findByText("保存エラー");
@@ -385,6 +406,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
@@ -403,6 +425,7 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
@@ -474,6 +497,7 @@ describe("ApproveClient フォーカス管理(#240)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     expect(await screen.findByRole("button", { name: "取り消す: 市川ページ" })).toHaveFocus();
@@ -488,6 +512,7 @@ describe("ApproveClient フォーカス管理(#240)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
@@ -526,8 +551,8 @@ describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
   });
 });
 
-describe("ApproveClient セクション分割/ソート(#242)", () => {
-  it("施策/記事をセクション見出しで分け、優先度降順に並べる", async () => {
+describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
+  it("施策/記事をタブで分け、各タブ内を優先度降順に並べる", async () => {
     mockFetchSequence({
       json: {
         success: true,
@@ -542,13 +567,14 @@ describe("ApproveClient セクション分割/ソート(#242)", () => {
     await login();
     await screen.findByText("高スコア施策");
 
-    expect(screen.getByRole("heading", { name: "施策" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "記事" })).toBeInTheDocument();
+    // #90: セクション見出しではなくタブで分ける
+    expect(screen.getByRole("tab", { name: /施策/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /記事/ })).toBeInTheDocument();
     const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
     expect(titles).toEqual(["高スコア施策", "低スコア施策"]);
   });
 
-  it("施策のみのときは記事セクションを出さない", async () => {
+  it("施策のみのときは記事タブを出さない", async () => {
     mockFetchSequence({
       json: {
         success: true,
@@ -558,11 +584,11 @@ describe("ApproveClient セクション分割/ソート(#242)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策のみ");
-    expect(screen.getByRole("heading", { name: "施策" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "記事" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /施策/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /記事/ })).not.toBeInTheDocument();
   });
 
-  it("記事のみのときは施策セクションを出さない", async () => {
+  it("記事のみのときは施策タブを出さない(既定タブが無くてもフォールバック表示)", async () => {
     mockFetchSequence({
       json: {
         success: true,
@@ -572,8 +598,90 @@ describe("ApproveClient セクション分割/ソート(#242)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("記事のみ");
-    expect(screen.getByRole("heading", { name: "記事" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "施策" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /記事/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /施策/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient トリアージ表示(#90)", () => {
+  it("タブを切り替えると表示カテゴリが入れ替わる", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [proposalItem(), ideaItem()] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    // 既定は施策タブ。記事は隠れている。
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("猛暑記事")).not.toBeInTheDocument();
+
+    await selectTab(/記事/);
+    expect(screen.getByText("猛暑記事")).toBeInTheDocument();
+    expect(screen.queryByText("市川ページ")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("タブのバッジに未処理件数を表示する", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [proposalItem(), proposalItem({ id: "p2", title: "他カード" })],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.getByRole("tab", { name: /施策（未処理2件）/ })).toBeInTheDocument();
+  });
+
+  it("既定は未処理のみON。承認した行は処理済みアコーディオンへ退避する", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    expect(screen.getByRole("switch", { name: "未処理のみ" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+
+    // 退避: 処理済みは折りたたまれ、未処理一覧は空メッセージになる。
+    const accordion = await screen.findByRole("button", { name: /処理済み（1）/ });
+    expect(screen.getByText("未処理の施策はありません。")).toBeInTheDocument();
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+
+    // 展開すると取り消し導線が出る。
+    await userEvent.click(accordion);
+    expect(screen.getByText("承認しました")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "取り消す: 市川ページ" })
+    ).toBeInTheDocument();
+  });
+
+  it("未処理のみをOFFにすると処理済みも一覧にインライン表示する", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await showAll();
+    expect(screen.getByRole("switch", { name: "未処理のみ" })).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+
+    // インライン表示: アコーディオンは出さず、その場で承認済み表示。
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /処理済み（/ })).not.toBeInTheDocument();
   });
 });
 
@@ -635,6 +743,7 @@ describe("ApproveClient 空状態/完了(#236)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await screen.findByText("承認しました");
@@ -684,6 +793,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "承認" }));
@@ -703,6 +813,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "却下" }));
@@ -722,6 +833,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    await showAll();
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     await screen.findByText("承認しました");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
@@ -1366,6 +1478,7 @@ describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
     );
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
+    await showAll();
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     expect(await screen.findByText("承認しました")).toBeInTheDocument();
