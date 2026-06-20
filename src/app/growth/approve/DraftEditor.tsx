@@ -130,7 +130,13 @@ export function DraftEditor({ initialHtml, onChange }: DraftEditorProps) {
   function addLink(): void {
     const url = window.prompt("リンク先 URL (https://...)");
     if (!url) return;
-    editor!.chain().focus().setLink({ href: url }).run();
+    const trimmed = url.trim();
+    // 保存時にサーバ/クライアントの両サニタイザが弾くが、エディタ内にも危険スキームを入れない。
+    if (!/^(?:https:|mailto:|tel:|#)/.test(trimmed)) {
+      window.alert("https:// などの安全なリンクのみ使えます。");
+      return;
+    }
+    editor!.chain().focus().setLink({ href: trimmed }).run();
   }
 
   return (

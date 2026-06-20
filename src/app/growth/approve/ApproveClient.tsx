@@ -212,6 +212,9 @@ export function ApproveClient() {
     setEditingDraft(false);
     setConfirmDiscard(false);
     setDraftSaveError("");
+    setDraftSaving(false);
+    setEditedHtml("");
+    setDraftOriginalHtml("");
   }, [openId]);
 
   // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。失敗は明示する。
