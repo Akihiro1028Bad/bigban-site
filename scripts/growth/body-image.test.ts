@@ -6,7 +6,6 @@ import {
   bodyImageFileStem,
   bodyImagePlaceholder,
   buildBodyImageAlt,
-  buildBodyImageCaption,
   buildBodyImageFailureMessage,
   buildBodyImagePrompt,
   buildBodyImageSpec,
@@ -42,20 +41,18 @@ describe("buildBodyImagePrompt", () => {
   });
 });
 
-describe("buildBodyImageAlt / buildBodyImageCaption", () => {
-  it("diagram は alt・caption に「イメージ図」を明示する", () => {
+describe("buildBodyImageAlt", () => {
+  it("diagram は alt に「イメージ図」を明示する(#88: 視覚キャプションは廃止・alt のみ)", () => {
     expect(buildBodyImageAlt("diagram", " コート図 ")).toBe("イメージ図: コート図");
-    expect(buildBodyImageCaption("diagram", "コート図")).toBe("コート図（イメージ図）");
   });
 
   it("mascot / minimal は説明をそのまま使う", () => {
     expect(buildBodyImageAlt("mascot", "宇宙人")).toBe("宇宙人");
-    expect(buildBodyImageCaption("minimal", "握り方")).toBe("握り方");
   });
 });
 
 describe("buildBodyImageSpec", () => {
-  it("index・スタイル・正規化した説明・prompt/alt/caption を揃える", () => {
+  it("index・スタイル・正規化した説明・prompt/alt を揃える(#88: caption なし)", () => {
     const spec = buildBodyImageSpec(2, "diagram", "  ゾーン図  ");
     expect(spec).toEqual({
       index: 2,
@@ -63,7 +60,6 @@ describe("buildBodyImageSpec", () => {
       description: "ゾーン図",
       prompt: buildBodyImagePrompt("diagram", "ゾーン図"),
       alt: "イメージ図: ゾーン図",
-      caption: "ゾーン図（イメージ図）",
     });
   });
 
@@ -101,31 +97,30 @@ const resolved = (index: number, over: Partial<ResolvedBodyImage> = {}): Resolve
   index,
   url: `https://images.microcms-assets.io/img${index}.png`,
   alt: `alt${index}`,
-  caption: `cap${index}`,
   ...over,
 });
 
 describe("substituteBodyImages", () => {
-  it("{{IMG:n}} を <figure><img alt><figcaption> へ置換する", () => {
+  it("{{IMG:n}} を <figure><img alt> へ置換する(#88: figcaption なし)", () => {
     const html = substituteBodyImages("前 {{IMG:1}} 後", [resolved(1)]);
     expect(html).toBe(
-      '前 <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"><figcaption>cap1</figcaption></figure> 後'
+      '前 <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"></figure> 後'
     );
   });
 
   it("resolved に無い(失敗/欠番)プレースホルダは除去する", () => {
     expect(substituteBodyImages("a {{IMG:1}} b {{IMG:2}} c", [resolved(1)])).toBe(
-      'a <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"><figcaption>cap1</figcaption></figure> b  c'
+      'a <figure><img src="https://images.microcms-assets.io/img1.png" alt="alt1"></figure> b  c'
     );
   });
 
-  it("alt・caption・url の特殊文字をエスケープする", () => {
+  it("alt・url の特殊文字をエスケープする", () => {
     const html = substituteBodyImages("{{IMG:1}}", [
-      resolved(1, { alt: 'a<b>&"', caption: "x<y>", url: "https://images.microcms-assets.io/a&b.png" }),
+      resolved(1, { alt: 'a<b>&"', url: "https://images.microcms-assets.io/a&b.png" }),
     ]);
     expect(html).toContain('alt="a&lt;b&gt;&amp;&quot;"');
-    expect(html).toContain("<figcaption>x&lt;y&gt;</figcaption>");
     expect(html).toContain('src="https://images.microcms-assets.io/a&amp;b.png"');
+    expect(html).not.toContain("<figcaption>");
   });
 });
 
@@ -145,7 +140,6 @@ describe("resolveBodyImages", () => {
         index: 1,
         url: "https://images.microcms-assets.io/ok.png",
         alt: "宇宙人",
-        caption: "宇宙人",
       },
     ]);
     expect(failures).toEqual([

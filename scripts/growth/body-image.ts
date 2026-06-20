@@ -1,5 +1,5 @@
 /**
- * 本文画像(#62)の純ロジック: スタイル別プロンプト・alt/caption・プレースホルダ。
+ * 本文画像(#62)の純ロジック: スタイル別プロンプト・alt・プレースホルダ。
  *
  * 承認画面で構成案に書かれた画像指示(`[画像:<スタイル>: <説明>]`)を、下書き生成時に
  * 本文へ埋め込むための仕様(BodyImageSpec)へ変換する。実際の画像生成・アップロード・
@@ -53,12 +53,6 @@ export function buildBodyImageAlt(style: BodyImageStyle, description: string): s
   return style === "diagram" ? `イメージ図: ${d}` : d;
 }
 
-/** figcaption。図解は「(イメージ図)」を付けて参考扱いであることを示す。 */
-export function buildBodyImageCaption(style: BodyImageStyle, description: string): string {
-  const d = description.trim();
-  return style === "diagram" ? `${d}（イメージ図）` : d;
-}
-
 /** 本文に埋め込む画像1枚分の仕様。投入パイプライン(#63)が生成・置換に使う。 */
 export interface BodyImageSpec {
   index: number;
@@ -66,7 +60,6 @@ export interface BodyImageSpec {
   description: string;
   prompt: string;
   alt: string;
-  caption: string;
 }
 
 /**
@@ -89,11 +82,10 @@ export function buildBodyImageSpec(
     description: d,
     prompt: buildBodyImagePrompt(style, d),
     alt: buildBodyImageAlt(style, d),
-    caption: buildBodyImageCaption(style, d),
   };
 }
 
-// 本文HTMLに置くプレースホルダ。投入時に <figure><img><figcaption> へ置換する(#63)。
+// 本文HTMLに置くプレースホルダ。投入時に <figure><img> へ置換する(#63/#88)。
 // 注: matchAll(内部コピー)と replace(lastIndex リセット)からのみ使う(exec で共有しない)。
 const PLACEHOLDER_RE = /\{\{IMG:(\d+)\}\}/g;
 
@@ -126,7 +118,6 @@ export interface ResolvedBodyImage {
   index: number;
   url: string;
   alt: string;
-  caption: string;
 }
 
 /** 生成/アップロードに失敗した本文画像(スキップ対象・通知用)。 */
@@ -136,9 +127,10 @@ export interface BodyImageFailure {
   error: string;
 }
 
+// #88: 視覚キャプション(figcaption)は廃止。図解の「イメージ図」明示は alt 側で担保する。
 function figureHtml(image: ResolvedBodyImage): string {
   const img = `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}">`;
-  return `<figure>${img}<figcaption>${escapeHtml(image.caption)}</figcaption></figure>`;
+  return `<figure>${img}</figure>`;
 }
 
 /**
@@ -170,7 +162,7 @@ export async function resolveBodyImages(
   for (const spec of specs) {
     try {
       const url = await resolveOne(spec);
-      resolved.push({ index: spec.index, url, alt: spec.alt, caption: spec.caption });
+      resolved.push({ index: spec.index, url, alt: spec.alt });
     } catch (error: unknown) {
       failures.push({
         index: spec.index,
