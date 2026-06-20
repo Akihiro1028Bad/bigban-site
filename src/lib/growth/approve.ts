@@ -3,7 +3,7 @@
  * I/O を含まないためテスト可能。Route Handler はこれらを使う薄い配線にする。
  */
 
-import type { NotionPage } from "./notion";
+import { DRAFT_LINK_PROPS, type NotionPage } from "./notion";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
 
 export type PendingKind = "proposal" | "idea";
@@ -49,6 +49,20 @@ export function reviseStatusOf(page: NotionPage): ReviseStatus {
 /** ページの `修正案`(rich_text)を読む。未設定は空文字。 */
 export function reviseProposalOf(page: NotionPage): string {
   return richText(page, REVISE_PROPS.proposal);
+}
+
+/** 下書きプレビューの連携先(microCMS の contentId / draftKey)。 */
+export interface DraftLink {
+  contentId: string;
+  draftKey: string;
+}
+
+/** ページの下書きリンク(`下書きID`/`下書きプレビューキー`)を読む(#74)。未設定は空文字。 */
+export function draftLinkOf(page: NotionPage): DraftLink {
+  return {
+    contentId: richText(page, DRAFT_LINK_PROPS.contentId),
+    draftKey: richText(page, DRAFT_LINK_PROPS.draftKey),
+  };
 }
 
 // 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。
