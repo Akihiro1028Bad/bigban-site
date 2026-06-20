@@ -82,6 +82,20 @@ describe("GET", () => {
     expect(queryDataSource).toHaveBeenCalledTimes(2);
   });
 
+  it("記事は提案中＋下書き作成済みの両方を取得する(#87)", async () => {
+    vi.mocked(queryDataSource)
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    await GET(getRequest(SECRET));
+    const ideasArgs = vi.mocked(queryDataSource).mock.calls[1];
+    expect(ideasArgs[1].filter).toEqual({
+      or: [
+        { property: "ステータス", select: { equals: "提案中" } },
+        { property: "ステータス", select: { equals: "下書き作成済み" } },
+      ],
+    });
+  });
+
   it("token 不一致は 401", async () => {
     const res = await GET(getRequest("wrong"));
     expect(res.status).toBe(401);

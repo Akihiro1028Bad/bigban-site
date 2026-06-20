@@ -88,6 +88,20 @@ describe("toPendingItems", () => {
     expect(item.contentId).toBe("g-xyz");
   });
 
+  it("ステータス=下書き作成済み なら isDraftReady=true(#87)", () => {
+    const page = idea("i8", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "下書き作成済み" } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.isDraftReady).toBe(true);
+  });
+
+  it("ステータスが下書き作成済み以外なら isDraftReady=false(#87)", () => {
+    const page = idea("i8b", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "提案中" } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.isDraftReady).toBe(false);
+  });
+
   it("記事ネタ案の修正ステータスを反映する(#42)", () => {
     const page = idea("i9", "T", "S");
     page.properties["修正ステータス"] = { type: "select", select: { name: "提示中" } };
@@ -126,6 +140,7 @@ describe("toPendingItems", () => {
         reviseProposal: "",
         reviseInstructions: "",
         contentId: "",
+        isDraftReady: false,
       },
     ]);
   });
@@ -166,6 +181,7 @@ describe("toPendingItems", () => {
         reviseProposal: "",
         reviseInstructions: "",
         contentId: "",
+        isDraftReady: false,
       },
     ]);
   });
