@@ -40,11 +40,12 @@ import {
   buildDraftFailureMessage,
   classifyDraftFailure,
 } from "./draft-notify";
+import { fetchDraftKey } from "./draft-meta";
 import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
-import { updatePageSelect } from "./notion";
+import { buildDraftLinkProps, updatePageProps } from "./notion";
 import {
   failureSignature,
   shouldSendFailureNotice,
@@ -235,10 +236,27 @@ async function main(): Promise<void> {
     stages.push({
       name: "notion:update",
       run: async () => {
-        await updatePageSelect(notion.pageId, notion.property, notion.value, {
-          token: requireEnv("NOTION_TOKEN"),
-          fetchFn: defaultFetch,
-        });
+        // #73: 承認画面が下書きを特定できるよう contentId + draftKey も保存する。
+        // draftKey は管理APIから best-effort で取得(失敗しても contentId とステータスは保存)。
+        let draftKey: string | null = null;
+        try {
+          draftKey = await fetchDraftKey(ENDPOINT, contentId, {
+            serviceDomain,
+            apiKey: requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+            fetchFn: defaultFetch,
+          });
+        } catch (error: unknown) {
+          const m = error instanceof Error ? error.message : String(error);
+          process.stderr.write(`(draftKey 取得に失敗・プレビューキーなしで継続: ${m})\n`);
+        }
+        await updatePageProps(
+          notion.pageId,
+          {
+            [notion.property]: { select: { name: notion.value } },
+            ...buildDraftLinkProps(contentId, draftKey),
+          },
+          { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch }
+        );
       },
     });
   }
