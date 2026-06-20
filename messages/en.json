@@ -510,7 +510,11 @@
       "title": "HYROX",
       "titleJa": "",
       "cta": "Book a trial",
-      "imageAlt": "An athlete competing in a HYROX race"
+      "imageAlts": [
+        "Athletes running through the HYROX start gate",
+        "HYROX arena with athletes taking on wall balls",
+        "Athlete taking on the sled pull"
+      ]
     },
     "concept": {
       "words": [
@@ -523,16 +527,54 @@
     "facility": {
       "title": "FACILITY",
       "titleJa": "Equipment & Layout",
-      "preparing": "COMING SOON",
-      "preparingSub": "準備中",
       "lead": "Fully equipped for all 8 official HYROX stations. Train along the same flow as the real race, moving station to station.",
-      "diagramTitle": "Circuit Layout",
-      "diagramAria": "Layout diagram of the HYROX circuit running through 8 stations",
-      "circuitName": "HYROX CIRCUIT",
-      "circuitNameJa": "ハイロックス・サーキット",
-      "circuitMeta": "8 STATIONS · 8KM RUN",
       "equipmentTitle": "Equipment",
-      "note": "Supporting gear such as dumbbells, plates and training mats is also available."
+      "note": "Dumbbells, plates and training mats are also fully equipped.",
+      "equipment": {
+        "skierg": {
+          "name": "SkiErg",
+          "nameJa": "スキーエルゴ",
+          "spec": "Concept2 SkiErg"
+        },
+        "rowing": {
+          "name": "Rowing Machine",
+          "nameJa": "ローイングマシン",
+          "spec": "Concept2 RowErg"
+        },
+        "sled": {
+          "name": "Weight Sled",
+          "nameJa": "スレッド",
+          "spec": "Plate-loaded"
+        },
+        "kettlebell": {
+          "name": "Kettlebell",
+          "nameJa": "ケトルベル",
+          "spec": "8–32kg (multiple weights)"
+        },
+        "wallball": {
+          "name": "Wall Ball",
+          "nameJa": "ウォールボール",
+          "spec": "Medicine ball, 4 / 6 / 9kg"
+        },
+        "sandbag": {
+          "name": "Sandbag",
+          "nameJa": "サンドバッグ",
+          "spec": "10–30kg"
+        }
+      },
+      "carousel": {
+        "regionLabel": "Facility photo carousel",
+        "prev": "Previous photo",
+        "next": "Next photo",
+        "showPhoto": "Show facility photo {index}"
+      },
+      "photos": [
+        "HYROX training area lined with weight sleds",
+        "Training area lined with rowing machines",
+        "Wide view of a HYROX venue with equipment",
+        "HYROX venue with rigs and equipment"
+      ],
+      "fullSet": "Full set"
     },
     "services": {
       "title": "SERVICES",
@@ -568,6 +610,9 @@
       "title": "WHAT IS HYROX",
       "titleJa": "About HYROX",
       "lead": "HYROX is a fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
+    },
+    "film": {
+      "kicker": "OFFICIAL FILM"
     },
     "stations": {
       "station01": {
@@ -688,6 +733,6 @@
     "tagline": "Run. Train. Challenge.",
     "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area arrives at THE PICKLE BANG THEORY.",
     "cta": "DISCOVER HYROX",
-    "imageAlt": "An athlete competing in a HYROX race"
+    "imageAlt": "Female athlete carrying a HYROX sandbag"
   }
 }

@@ -23,7 +23,7 @@ export default function HomeHyroxPromo() {
         >
           {/* 背景画像（モバイルは中央、PCは右寄りに被写体を配置） */}
           <Image
-            src="/images/hyrox/hero.jpg"
+            src="/images/hyrox/promo-card.jpg"
             alt={t("imageAlt")}
             fill
             sizes="(min-width: 1280px) 1216px, 100vw"

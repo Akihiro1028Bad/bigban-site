@@ -1,18 +1,173 @@
-import { describe, it, expect } from "vitest";
-import { screen } from "@testing-library/react";
-import { renderWithIntl } from "@/test-utils/intl-wrapper";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import { setMockUseInView } from "../../../__mocks__/framer-motion";
+import jaMessages from "../../../messages/ja.json";
 import HyroxFacility from "./HyroxFacility";
 
+const { mockAutoplay } = vi.hoisted(() => ({ mockAutoplay: vi.fn() }));
+
+const mockScrollTo = vi.fn();
+const mockScrollPrev = vi.fn();
+const mockScrollNext = vi.fn();
+const mockSelectedScrollSnap = vi.fn(() => 0);
+const mockOn = vi.fn();
+const mockOff = vi.fn();
+const mockPlay = vi.fn();
+const mockStop = vi.fn();
+
+const mockEmblaApi = {
+  scrollTo: mockScrollTo,
+  scrollPrev: mockScrollPrev,
+  scrollNext: mockScrollNext,
+  selectedScrollSnap: mockSelectedScrollSnap,
+  on: mockOn,
+  off: mockOff,
+  plugins: () => ({ autoplay: { play: mockPlay, stop: mockStop } }),
+};
+
+let returnApi: typeof mockEmblaApi | null = mockEmblaApi;
+
+vi.mock("embla-carousel-react", () => ({
+  default: () => [vi.fn(), returnApi],
+}));
+
+vi.mock("embla-carousel-autoplay", () => ({
+  default: (opts: unknown) => {
+    mockAutoplay(opts);
+    return { name: "autoplay" };
+  },
+}));
+
+function renderFacility() {
+  return render(
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      <HyroxFacility />
+    </NextIntlClientProvider>
+  );
+}
+
 describe("HyroxFacility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSelectedScrollSnap.mockReturnValue(0);
+    returnApi = mockEmblaApi;
+    setMockUseInView(false);
+  });
+
   it("FACILITY 見出しを表示する", () => {
-    renderWithIntl(<HyroxFacility />);
+    renderFacility();
     expect(
       screen.getByRole("heading", { name: "FACILITY" })
     ).toBeInTheDocument();
   });
 
-  it("準備中の表示をする", () => {
-    renderWithIntl(<HyroxFacility />);
-    expect(screen.getByText("準備中")).toBeInTheDocument();
+  it("施設写真4枚とドット4つを表示する", () => {
+    renderFacility();
+    const dots = screen.getAllByRole("button", { name: /施設写真を表示/ });
+    expect(dots).toHaveLength(4);
+    expect(
+      screen.getByAltText("ソリ（スレッド）が並ぶHYROXトレーニングエリア")
+    ).toBeInTheDocument();
+  });
+
+  it("設置器具6点の名称・仕様・台数を一覧表示する", () => {
+    renderFacility();
+    expect(
+      screen.getByRole("heading", { name: "設置器具" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("スキーエルゴ")).toBeInTheDocument();
+    expect(screen.getByText("ローイングマシン")).toBeInTheDocument();
+    expect(screen.getByText("スレッド")).toBeInTheDocument();
+    expect(screen.getByText("ケトルベル")).toBeInTheDocument();
+    expect(screen.getByText("ウォールボール")).toBeInTheDocument();
+    expect(screen.getByText("サンドバッグ")).toBeInTheDocument();
+    // 仕様（メーカー/重量）
+    expect(screen.getByText("Concept2 SkiErg")).toBeInTheDocument();
+    expect(screen.getByText("8–32kg（複数重量）")).toBeInTheDocument();
+    // 台数: ×2 が3点、一式が3点
+    expect(screen.getAllByText("× 2")).toHaveLength(3);
+    expect(screen.getAllByText("一式")).toHaveLength(3);
+  });
+
+  it("ドットクリックで scrollTo が呼ばれる", () => {
+    renderFacility();
+    const dots = screen.getAllByRole("button", { name: /施設写真を表示/ });
+    fireEvent.click(dots[2]);
+    expect(mockScrollTo).toHaveBeenCalledWith(2);
+  });
+
+  it("前へ/次へボタンで scrollPrev/scrollNext が呼ばれる", () => {
+    renderFacility();
+    fireEvent.click(screen.getByRole("button", { name: "前の写真" }));
+    fireEvent.click(screen.getByRole("button", { name: "次の写真" }));
+    expect(mockScrollPrev).toHaveBeenCalled();
+    expect(mockScrollNext).toHaveBeenCalled();
+  });
+
+  it("select イベントを登録し、コールバックで selectedScrollSnap を呼ぶ", () => {
+    renderFacility();
+    expect(mockOn).toHaveBeenCalledWith("select", expect.any(Function));
+    const cb = mockOn.mock.calls.find((c) => c[0] === "select")?.[1] as
+      | (() => void)
+      | undefined;
+    expect(cb).toBeDefined();
+    mockSelectedScrollSnap.mockReturnValue(1);
+    act(() => cb!());
+    expect(mockSelectedScrollSnap).toHaveBeenCalled();
+  });
+
+  it("Autoplay に playOnInit: false を渡す", () => {
+    renderFacility();
+    expect(mockAutoplay).toHaveBeenCalledWith(
+      expect.objectContaining({ playOnInit: false })
+    );
+  });
+
+  it("ビューポート内で autoplay.play、外で autoplay.stop を呼ぶ", () => {
+    setMockUseInView(false);
+    const { rerender } = renderFacility();
+    expect(mockPlay).not.toHaveBeenCalled();
+
+    setMockUseInView(true);
+    rerender(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HyroxFacility />
+      </NextIntlClientProvider>
+    );
+    expect(mockPlay).toHaveBeenCalled();
+
+    setMockUseInView(false);
+    rerender(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HyroxFacility />
+      </NextIntlClientProvider>
+    );
+    expect(mockStop).toHaveBeenCalled();
+  });
+
+  it("emblaApi が null の時は各操作・登録を行わない", () => {
+    returnApi = null;
+    setMockUseInView(false);
+    const { rerender } = renderFacility();
+
+    const dots = screen.getAllByRole("button", { name: /施設写真を表示/ });
+    fireEvent.click(dots[1]);
+    fireEvent.click(screen.getByRole("button", { name: "前の写真" }));
+    fireEvent.click(screen.getByRole("button", { name: "次の写真" }));
+
+    setMockUseInView(true);
+    rerender(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HyroxFacility />
+      </NextIntlClientProvider>
+    );
+
+    expect(mockScrollTo).not.toHaveBeenCalled();
+    expect(mockScrollPrev).not.toHaveBeenCalled();
+    expect(mockScrollNext).not.toHaveBeenCalled();
+    expect(mockOn).not.toHaveBeenCalled();
+    expect(mockPlay).not.toHaveBeenCalled();
+    expect(mockStop).not.toHaveBeenCalled();
   });
 });

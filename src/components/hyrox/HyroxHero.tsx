@@ -1,31 +1,57 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
+// ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
+const HERO_IMAGES = [
+  "/images/hyrox/hero-venue.jpg",
+  "/images/hyrox/hero-arena.jpg",
+  "/images/hyrox/hero-rope.jpg",
+];
+const ROTATE_MS = 5500;
 
 export default function HyroxHero() {
   const t = useTranslations("HyroxPage.hero");
   const tc = useTranslations("HyroxPage.concept");
   const words = tc.raw("words") as string[];
+  const alts = t.raw("imageAlts") as string[];
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    // モーション抑制時は自動切替せず1枚目で固定
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+    const id = setInterval(() => {
+      setIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, ROTATE_MS);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <section className="relative flex min-h-screen items-center overflow-hidden bg-deep-black">
-      <Image
-        src="/images/hyrox/hero.jpg"
-        alt={t("imageAlt")}
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-center opacity-70"
-      />
-      {/* 下→上の暗幕 */}
-      <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/55 to-deep-black/25" />
-      {/* 左→右の暗幕（テキスト可読性。モバイルは強め） */}
-      <div className="absolute inset-0 bg-gradient-to-r from-deep-black/85 via-deep-black/35 to-transparent sm:from-deep-black/70 sm:via-deep-black/10" />
+      {HERO_IMAGES.map((src, i) => (
+        <Image
+          key={src}
+          src={src}
+          alt={alts[i]}
+          fill
+          priority={i === 0}
+          sizes="100vw"
+          className={`object-cover object-center transition-opacity duration-1000 ${
+            i === index ? "opacity-90" : "opacity-0"
+          }`}
+        />
+      ))}
+      {/* 下→上の暗幕（下部のテキスト/CTAの可読性のみ確保し、上部は画像を見せる） */}
+      <div className="absolute inset-0 bg-gradient-to-t from-deep-black/85 via-deep-black/30 to-transparent" />
+      {/* 左→右の暗幕（タイトル可読性。モバイルは少し強め） */}
+      <div className="absolute inset-0 bg-gradient-to-r from-deep-black/65 via-deep-black/15 to-transparent sm:from-deep-black/55 sm:via-deep-black/5" />
 
       <div className="relative mx-auto w-full max-w-6xl px-6 py-28 sm:py-32 lg:px-12">
         {/* タイトル */}

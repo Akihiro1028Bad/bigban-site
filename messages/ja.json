@@ -523,7 +523,11 @@
       "title": "HYROX",
       "titleJa": "ハイロックス",
       "cta": "体験予約",
-      "imageAlt": "HYROXレースに挑むアスリート"
+      "imageAlts": [
+        "HYROXのスタートゲートを駆け抜けるアスリート",
+        "HYROX大会会場とウォールボールに挑む選手たち",
+        "スレッドプルに挑むアスリート"
+      ]
     },
     "concept": {
       "words": [
@@ -536,16 +540,54 @@
     "facility": {
       "title": "FACILITY",
       "titleJa": "設備・配置",
-      "preparing": "準備中",
-      "preparingSub": "COMING SOON",
       "lead": "HYROX公式8種目に対応した本格器具を完備。実際のレースと同じ動線で、8つのステーションを巡るようにトレーニングできます。",
-      "diagramTitle": "サーキット配置図",
-      "diagramAria": "8つのステーションを巡るHYROXサーキットの配置図",
-      "circuitName": "HYROX CIRCUIT",
-      "circuitNameJa": "ハイロックス・サーキット",
-      "circuitMeta": "8 STATIONS · 8KM RUN",
       "equipmentTitle": "設置器具",
-      "note": "ダンベル・プレート・トレーニングマットなどの補助器具も完備しています。"
+      "note": "ダンベル・プレート・トレーニングマットなどの補助器具も完備しています。",
+      "equipment": {
+        "skierg": {
+          "name": "SkiErg",
+          "nameJa": "スキーエルゴ",
+          "spec": "Concept2 SkiErg"
+        },
+        "rowing": {
+          "name": "Rowing Machine",
+          "nameJa": "ローイングマシン",
+          "spec": "Concept2 RowErg"
+        },
+        "sled": {
+          "name": "Weight Sled",
+          "nameJa": "スレッド",
+          "spec": "プレート負荷調整式"
+        },
+        "kettlebell": {
+          "name": "Kettlebell",
+          "nameJa": "ケトルベル",
+          "spec": "8–32kg（複数重量）"
+        },
+        "wallball": {
+          "name": "Wall Ball",
+          "nameJa": "ウォールボール",
+          "spec": "メディシンボール 4 / 6 / 9kg"
+        },
+        "sandbag": {
+          "name": "Sandbag",
+          "nameJa": "サンドバッグ",
+          "spec": "10–30kg"
+        }
+      },
+      "carousel": {
+        "regionLabel": "施設写真カルーセル",
+        "prev": "前の写真",
+        "next": "次の写真",
+        "showPhoto": "{index}枚目の施設写真を表示"
+      },
+      "photos": [
+        "ソリ（スレッド）が並ぶHYROXトレーニングエリア",
+        "ローイングマシンが並ぶトレーニングエリア",
+        "器具が並ぶHYROX会場の全景",
+        "リグと器具が設置されたHYROX会場"
+      ],
+      "fullSet": "一式"
     },
     "services": {
       "title": "SERVICES",
@@ -581,6 +623,9 @@
       "title": "WHAT IS HYROX",
       "titleJa": "ハイロックスとは",
       "lead": "HYROX（ハイロックス）は、1kmのランニングと1種目のワークアウトを交互に8セット行うフィットネスレースです。合計8kmを走り抜きながら8つのワークアウトをこなす持久力勝負。初心者からトップアスリートまで、誰もが同じ条件でタイムに挑戦できます。"
+    },
+    "film": {
+      "kicker": "OFFICIAL FILM"
     },
     "stations": {
       "station01": {
@@ -701,6 +746,6 @@
     "tagline": "走る。鍛える。挑戦する。",
     "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY に登場。",
     "cta": "詳しく見る",
-    "imageAlt": "HYROXレースに挑むアスリート"
+    "imageAlt": "HYROXのサンドバッグを担ぐ女性アスリート"
   }
 }

@@ -10,9 +10,9 @@ import { EASE } from "@/constants/motion";
 // サービス key と写真を 1:1 で明示的に紐づける。
 // 翻訳ファイル側の items 並び順に依存しないため、順序変更で取り違えない。
 const SERVICE_IMAGE_BY_KEY: Record<string, string> = {
-  rental: "/images/hyrox/service-rental.jpg",
-  trial: "/images/hyrox/service-trial.jpg",
-  group: "/images/hyrox/service-group.jpg",
+  rental: "/images/hyrox/service-rental-race.jpg",
+  trial: "/images/hyrox/service-trial-race.jpg",
+  group: "/images/hyrox/service-group-race.jpg",
 };
 
 interface ServiceItem {

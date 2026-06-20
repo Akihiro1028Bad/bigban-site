@@ -4,6 +4,7 @@ import HyroxHero from "@/components/hyrox/HyroxHero";
 import HyroxFacility from "@/components/hyrox/HyroxFacility";
 import HyroxServices from "@/components/hyrox/HyroxServices";
 import HyroxIntro from "@/components/hyrox/HyroxIntro";
+import HyroxFilm from "@/components/hyrox/HyroxFilm";
 import HyroxCoach from "@/components/hyrox/HyroxCoach";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
@@ -17,6 +18,7 @@ export default function HyroxContent() {
         <HyroxFacility />
         <HyroxServices />
         <HyroxIntro />
+        <HyroxFilm />
         <HyroxCoach />
         <HyroxProgram />
         <HyroxPicklePromo />
