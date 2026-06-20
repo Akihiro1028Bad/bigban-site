@@ -13,7 +13,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { parseDecisions, toPendingItems } from "@/lib/growth/approve";
+import { DRAFT_READY_STATUS, parseDecisions, toPendingItems } from "@/lib/growth/approve";
 import { defaultFetch, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -56,6 +56,12 @@ function statusFilter(value: string): unknown {
   return { property: STATUS_PROP, select: { equals: value } };
 }
 
+// #87: 記事は「提案中」に加え「下書き作成済み」も取得する(承認後に下書きを
+// プレビュー/編集できるよう、承認画面の下書きタブへ流す)。
+function ideaStatusFilter(): unknown {
+  return { or: [statusFilter("提案中"), statusFilter(DRAFT_READY_STATUS)] };
+}
+
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   if (!verifyToken(url)) return unauthorized();
@@ -70,7 +76,7 @@ export async function GET(request: Request): Promise<Response> {
   );
   const ideas = await queryDataSource(
     IDEA_DS,
-    { filter: statusFilter("提案中"), pageSize: 100 },
+    { filter: ideaStatusFilter(), pageSize: 100 },
     options
   );
 
