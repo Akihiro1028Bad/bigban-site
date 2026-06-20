@@ -31,6 +31,8 @@ export interface PendingItem {
   reviseProposal?: string;
   /** 直近に送った修正指示(行コメントの JSON)。記事のみ。 */
   reviseInstructions?: string;
+  /** 生成済み下書きの microCMS contentId(空=未作成)。下書きプレビュー(#75)の有無判定に使う。記事のみ。 */
+  contentId?: string;
 }
 
 /** Notion ページ ID として妥当か(パスインジェクション/不正入力の防御)。 */
@@ -166,6 +168,7 @@ export function toPendingItems(
     reviseStatus: reviseStatusOf(page),
     reviseProposal: richText(page, REVISE_PROPS.proposal),
     reviseInstructions: richText(page, REVISE_PROPS.instructions),
+    contentId: richText(page, DRAFT_LINK_PROPS.contentId),
   }));
   return [...proposalItems, ...ideaItems];
 }

@@ -1366,3 +1366,100 @@ describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
     expect(await screen.findByText("市川ページ")).toBeInTheDocument();
   });
 });
+
+describe("ApproveClient 下書きプレビュー(#75)", () => {
+  async function openIdeaPanel() {
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    return screen.findByRole("dialog");
+  }
+
+  const draftReady = (bodyHtml: string) => ({
+    json: {
+      success: true,
+      exists: true,
+      draft: { title: "T", displayMode: "html", bodyHtml, body: "" },
+    },
+  });
+
+  it("contentId のある記事はパネルを開くと実プレビューを表示する", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      draftReady("<p>下書き本文です</p>")
+    );
+    const dialog = await openIdeaPanel();
+    expect(await within(dialog).findByText("下書き本文です")).toBeInTheDocument();
+    // 取得APIに pageId+token 付きで GET している
+    expect(String(fn.mock.calls[1][0])).toContain("/api/growth/draft?pageId=i1");
+  });
+
+  it("contentId が無い記事は取得せず『未作成』を表示する", async () => {
+    const fn = mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    const dialog = await openIdeaPanel();
+    expect(within(dialog).getByText(/まだ下書きは生成されていません/)).toBeInTheDocument();
+    expect(fn).toHaveBeenCalledTimes(1); // login のみ・下書き取得は呼ばない
+  });
+
+  it("下書きが取れない(exists:false)は『見つかりませんでした』", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: { success: true, exists: false, draft: null } }
+    );
+    const dialog = await openIdeaPanel();
+    expect(await within(dialog).findByText(/見つかりませんでした/)).toBeInTheDocument();
+  });
+
+  it("取得失敗はエラー表示し、再読み込みで再取得できる", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { ok: false, status: 502, json: { success: false, error: "下書きの取得に失敗しました" } },
+      draftReady("<p>復活しました</p>")
+    );
+    const dialog = await openIdeaPanel();
+    expect(await within(dialog).findByText("下書きの取得に失敗しました")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "再読み込み" }));
+    expect(await within(dialog).findByText("復活しました")).toBeInTheDocument();
+  });
+
+  it("success:false で error が無いときは既定メッセージ", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: { success: false } }
+    );
+    const dialog = await openIdeaPanel();
+    expect(await within(dialog).findByText("下書きの取得に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("取得中はローディングを表示する", async () => {
+    let release!: (v: unknown) => void;
+    const pending = new Promise((r) => {
+      release = r;
+    });
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
+      })
+      .mockReturnValueOnce(pending);
+    vi.stubGlobal("fetch", fn);
+
+    const dialog = await openIdeaPanel();
+    expect(await within(dialog).findByText("読み込み中…")).toBeInTheDocument();
+    release({ ok: true, status: 200, json: async () => ({ success: true, exists: false, draft: null }) });
+    expect(await within(dialog).findByText(/見つかりませんでした/)).toBeInTheDocument();
+  });
+
+  it("施策(proposal)では下書きプレビューを出さない", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("下書きプレビュー")).not.toBeInTheDocument();
+  });
+});
