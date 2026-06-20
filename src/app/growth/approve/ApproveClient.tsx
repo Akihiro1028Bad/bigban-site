@@ -9,6 +9,8 @@ import { pendingStatus } from "@/lib/growth/approve";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 
 import { AddProposalForm } from "./AddProposalForm";
+import { DraftEditor } from "./DraftEditor";
+import { buildDraftEditPayload } from "./draftEditorContent";
 import {
   IMAGE_STYLES,
   parseOutlineSections,
@@ -207,6 +209,12 @@ export function ApproveClient() {
     setEditingImageIdx(null);
     setImageDesc("");
     setReviseError("");
+    setEditingDraft(false);
+    setConfirmDiscard(false);
+    setDraftSaveError("");
+    setDraftSaving(false);
+    setEditedHtml("");
+    setDraftOriginalHtml("");
   }, [openId]);
 
   // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。失敗は明示する。
@@ -269,6 +277,63 @@ export function ApproveClient() {
       setDraftState({ status: "idle" });
     }
   }, [openId, openHasDraft, loadDraft]);
+
+  // #77: 下書きの手動リッチ編集モード。
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [editedHtml, setEditedHtml] = useState("");
+  const [draftOriginalHtml, setDraftOriginalHtml] = useState("");
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSaveError, setDraftSaveError] = useState("");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  function startEditDraft(html: string): void {
+    setEditingDraft(true);
+    setDraftOriginalHtml(html);
+    setEditedHtml(html);
+    setDraftSaveError("");
+    setConfirmDiscard(false);
+  }
+
+  function exitEditDraft(): void {
+    setEditingDraft(false);
+    setConfirmDiscard(false);
+    setDraftSaveError("");
+  }
+
+  // 未保存の変更があれば破棄確認を挟む。
+  function cancelEditDraft(): void {
+    if (editedHtml !== draftOriginalHtml) {
+      setConfirmDiscard(true);
+      return;
+    }
+    exitEditDraft();
+  }
+
+  async function saveDraft(item: PendingItem): Promise<void> {
+    setDraftSaving(true);
+    setDraftSaveError("");
+    try {
+      const res = await fetch(
+        `/api/growth/draft/edit?token=${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildDraftEditPayload(item.id, editedHtml)),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "保存に失敗しました。");
+      }
+      setEditingDraft(false);
+      setConfirmDiscard(false);
+      await loadDraft(item.id); // 保存後にプレビューを最新化
+    } catch (error) {
+      setDraftSaveError(toMessage(error, "保存に失敗しました。"));
+    } finally {
+      setDraftSaving(false);
+    }
+  }
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -1204,18 +1269,88 @@ export function ApproveClient() {
         ) : draftState.status === "empty" ? (
           <p className="mt-2 text-sm text-gray-500">下書きが見つかりませんでした。</p>
         ) : draftState.status === "ready" ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-2 max-h-96 overflow-y-auto rounded-md border border-gray-200 bg-white p-3"
-          >
-            <NewsBodyRenderer
-              displayMode={draftState.draft.displayMode}
-              bodyHtml={draftState.draft.bodyHtml}
-              body={draftState.draft.body}
-              locale="ja"
-            />
-          </motion.div>
+          editingDraft ? (
+            <div className="mt-2">
+              <DraftEditor initialHtml={draftOriginalHtml} onChange={setEditedHtml} />
+              {draftSaveError ? (
+                <p role="alert" className="mt-2 text-sm text-red-700">
+                  {draftSaveError}
+                </p>
+              ) : null}
+              {confirmDiscard ? (
+                <div
+                  role="alert"
+                  className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                >
+                  <span className="flex-1">未保存の変更を破棄しますか？</span>
+                  <button
+                    type="button"
+                    onClick={exitEditDraft}
+                    className={choiceButtonClass("border border-red-600 bg-red-600 text-white")}
+                  >
+                    破棄する
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDiscard(false)}
+                    className={choiceButtonClass(
+                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    編集に戻る
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => saveDraft(item)}
+                    disabled={draftSaving}
+                    className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+                  >
+                    {draftSaving ? "保存中…" : "保存"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditDraft}
+                    disabled={draftSaving}
+                    className={choiceButtonClass(
+                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-2"
+            >
+              <div className="max-h-96 overflow-y-auto rounded-md border border-gray-200 bg-white p-3">
+                <NewsBodyRenderer
+                  displayMode={draftState.draft.displayMode}
+                  bodyHtml={draftState.draft.bodyHtml}
+                  body={draftState.draft.body}
+                  locale="ja"
+                />
+              </div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  aria-label="下書きを編集"
+                  onClick={() => startEditDraft(draftState.draft.bodyHtml)}
+                  className={choiceButtonClass(
+                    "border border-blue-600 bg-blue-600 text-white"
+                  )}
+                >
+                  編集
+                </button>
+              </div>
+            </motion.div>
+          )
         ) : (
           <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
         )}

@@ -12,6 +12,24 @@ vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: () => false,
 }));
 
+// TipTap 本体(DraftEditor)はカバレッジ除外・jsdom で重いため、テストでは
+// initialHtml/onChange だけ持つ textarea スタブに差し替える(#77 の結線ロジックを検証)。
+vi.mock("./DraftEditor", () => ({
+  DraftEditor: ({
+    initialHtml,
+    onChange,
+  }: {
+    initialHtml: string;
+    onChange: (html: string) => void;
+  }) => (
+    <textarea
+      aria-label="本文エディタ"
+      defaultValue={initialHtml}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 import { ApproveClient } from "./ApproveClient";
 
 function mockFetchSequence(
@@ -1461,5 +1479,155 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).queryByText("下書きプレビュー")).not.toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient 下書き手動編集(#77)", () => {
+  async function openReadyDraft(bodyHtml: string, ...rest: Array<unknown>) {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml, body: "" },
+        },
+      },
+      ...(rest as Parameters<typeof mockFetchSequence>)
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("button", { name: "下書きを編集" });
+    return dialog;
+  }
+
+  it("「編集」でリッチエディタに切り替わり、本文を読み込む", async () => {
+    const dialog = await openReadyDraft("<p>元の本文</p>");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    const editor = within(dialog).getByLabelText("本文エディタ");
+    expect(editor).toHaveValue("<p>元の本文</p>");
+  });
+
+  it("編集して保存すると /draft/edit に送り、プレビューを更新する", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>保存後の本文</p>", body: "" },
+        },
+      }
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    const editor = within(dialog).getByLabelText("本文エディタ");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "編集しました");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    // 保存後に再取得したプレビューが出る
+    expect(await within(dialog).findByText("保存後の本文")).toBeInTheDocument();
+    // 編集モードは閉じる
+    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+    const editPost = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/draft/edit"));
+    expect(editPost).toBeTruthy();
+    expect(JSON.parse((editPost![1] as RequestInit).body as string).pageId).toBe("i1");
+  });
+
+  it("保存失敗はエラーを表示し、編集モードを維持する", async () => {
+    const dialog = await openReadyDraft(
+      "<p>元</p>",
+      { ok: false, status: 502, json: { success: false, error: "保存中にエラーが発生しました" } }
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    expect(await within(dialog).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("本文エディタ")).toBeInTheDocument();
+  });
+
+  it("error の無い保存失敗は既定メッセージ", async () => {
+    const dialog = await openReadyDraft("<p>元</p>", { json: { success: false } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    expect(await within(dialog).findByText("保存に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("変更がなければキャンセルで即座に編集を終える", async () => {
+    const dialog = await openReadyDraft("<p>元</p>");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "下書きを編集" })).toBeInTheDocument();
+  });
+
+  it("未保存の変更があるとキャンセルで破棄確認を出し、破棄/編集に戻るを選べる", async () => {
+    const dialog = await openReadyDraft("<p>元</p>");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    await userEvent.type(within(dialog).getByLabelText("本文エディタ"), "変更");
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(within(dialog).getByText(/破棄しますか/)).toBeInTheDocument();
+
+    // 「編集に戻る」→ 確認が消えエディタは残る
+    await userEvent.click(within(dialog).getByRole("button", { name: "編集に戻る" }));
+    expect(within(dialog).queryByText(/破棄しますか/)).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("本文エディタ")).toBeInTheDocument();
+
+    // 再度キャンセル→破棄する→編集終了
+    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "破棄する" }));
+    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+  });
+
+  it("保存中はボタンを無効化し『保存中…』を出す", async () => {
+    let release!: (v: unknown) => void;
+    const pending = new Promise((r) => {
+      release = r;
+    });
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        }),
+      })
+      .mockReturnValueOnce(pending);
+    vi.stubGlobal("fetch", fn);
+
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(await within(dialog).findByRole("button", { name: "保存中…" })).toBeDisabled();
+    release({ ok: true, status: 200, json: async () => ({ success: true }) });
   });
 });
