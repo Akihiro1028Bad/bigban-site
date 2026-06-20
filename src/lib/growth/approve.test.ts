@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
 import {
+  draftLinkOf,
   isNotionPageId,
   parseDecisions,
   pendingStatus,
@@ -274,5 +275,26 @@ describe("reviseProposalOf", () => {
     };
     expect(reviseProposalOf(withProposal)).toBe("改訂版");
     expect(reviseProposalOf({ id: "x", url: "", properties: {} })).toBe("");
+  });
+});
+
+describe("draftLinkOf", () => {
+  it("下書きID/下書きプレビューキー(rich_text)を読む", () => {
+    const page: NotionPage = {
+      id: "i1",
+      url: "",
+      properties: {
+        "下書きID": { type: "rich_text", rich_text: [{ plain_text: "g-abc" }] },
+        "下書きプレビューキー": { type: "rich_text", rich_text: [{ plain_text: "dk-1" }] },
+      },
+    };
+    expect(draftLinkOf(page)).toEqual({ contentId: "g-abc", draftKey: "dk-1" });
+  });
+
+  it("未設定は空文字(下書き未作成の判定に使う)", () => {
+    expect(draftLinkOf({ id: "x", url: "", properties: {} })).toEqual({
+      contentId: "",
+      draftKey: "",
+    });
   });
 });
