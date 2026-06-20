@@ -139,6 +139,22 @@ function choiceButtonClass(activeClass: string): string {
   return `${TAP_TARGET} ${activeClass} disabled:opacity-50`;
 }
 
+// #90: カテゴリタブのスタイル。選択中は枠＋淡色背景で明示する(AAコントラスト)。
+function tabClass(selected: boolean): string {
+  const base = `${TAP_TARGET} flex-1 border text-center`;
+  return selected
+    ? `${base} border-blue-600 bg-blue-50 text-blue-700 font-medium`
+    : `${base} border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
+}
+
+// #90: 「未処理のみ」トグル(role=switch)のスタイル。ON は淡青で状態を示す。
+function filterToggleClass(active: boolean): string {
+  const base = `${TAP_TARGET} border`;
+  return active
+    ? `${base} border-blue-600 bg-blue-50 text-blue-700`
+    : `${base} border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
+}
+
 export function ApproveClient() {
   // 合言葉認証が無効(一時措置)のときはゲートを出さず、未認証扱いにしない。
   // APPROVE_AUTH_ENABLED はモジュール定数のため実行中に変化しないが、復元(true)時に
@@ -165,6 +181,10 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
+  // #90: トリアージ型UI。表示中のカテゴリタブ・未処理のみ表示・処理済みアコーディオンの開閉。
+  const [activeTab, setActiveTab] = useState<PendingItem["kind"]>("proposal");
+  const [unprocessedOnly, setUnprocessedOnly] = useState(true);
+  const [showProcessed, setShowProcessed] = useState(false);
   // #53: 構成案セクション(index)ごとに溜めたコメント(複数可)。送信時に {見出し, comment} へ展開。
   const [draftComments, setDraftComments] = useState<Record<number, string[]>>({});
   // 現在コメント入力欄を開いているセクション index(null=どれも開いていない)。
@@ -776,6 +796,25 @@ export function ApproveClient() {
   const proposals = items.filter((item) => item.kind === "proposal").sort(byScoreDesc);
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
   const openItem = openId ? items.find((item) => item.id === openId) : undefined;
+
+  // #90: 存在するカテゴリだけをタブにする(施策/記事)。下書きタブは #87 で追加予定。
+  const tabDefs = [
+    { key: "proposal" as const, label: "施策", items: proposals },
+    { key: "idea" as const, label: "記事", items: ideas },
+  ].filter((tab) => tab.items.length > 0);
+  // activeTab が現在の一覧に無ければ先頭タブにフォールバック(取得直後/カテゴリ消滅時)。
+  const effectiveDef = tabDefs.find((tab) => tab.key === activeTab) ?? tabDefs[0];
+  const activeItems = effectiveDef.items;
+  // 未処理のみ表示のとき、処理済みは下部のアコーディオンへ退避する(トリアージ最適化)。
+  const decidedItems = activeItems.filter((item) => decided[item.id]);
+  const undecidedItems = activeItems.filter((item) => !decided[item.id]);
+  const mainList = unprocessedOnly ? undecidedItems : activeItems;
+
+  // #90: カテゴリを切り替える。処理済みアコーディオンは畳んだ状態から始める。
+  function selectTab(key: PendingItem["kind"]): void {
+    setActiveTab(key);
+    setShowProcessed(false);
+  }
 
   // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
   function renderItem(item: PendingItem) {
@@ -1509,18 +1548,66 @@ export function ApproveClient() {
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
         </p>
       ) : null}
-      {proposals.length > 0 ? (
-        <section className="mt-4">
-          <h2 className="text-sm font-bold text-gray-700">施策</h2>
-          <ul className="mt-2 space-y-2">{proposals.map(renderItem)}</ul>
-        </section>
-      ) : null}
-      {ideas.length > 0 ? (
-        <section className="mt-4">
-          <h2 className="text-sm font-bold text-gray-700">記事</h2>
-          <ul className="mt-2 space-y-2">{ideas.map(renderItem)}</ul>
-        </section>
-      ) : null}
+      <div role="tablist" aria-label="提案カテゴリ" className="mt-4 flex gap-2">
+        {tabDefs.map((tab) => {
+          const selected = tab.key === effectiveDef.key;
+          const remaining = tab.items.filter((item) => !decided[item.id]).length;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              id={`tab-${tab.key}`}
+              aria-selected={selected}
+              aria-controls={`panel-${tab.key}`}
+              onClick={() => selectTab(tab.key)}
+              className={tabClass(selected)}
+            >
+              {tab.label}（未処理{remaining}件）
+            </button>
+          );
+        })}
+      </div>
+      <section
+        role="tabpanel"
+        id={`panel-${effectiveDef.key}`}
+        aria-labelledby={`tab-${effectiveDef.key}`}
+        className="mt-3"
+      >
+        <div className="flex justify-end">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={unprocessedOnly}
+            onClick={() => setUnprocessedOnly((prev) => !prev)}
+            className={filterToggleClass(unprocessedOnly)}
+          >
+            未処理のみ
+          </button>
+        </div>
+        {mainList.length > 0 ? (
+          <ul className="mt-2 space-y-2">{mainList.map(renderItem)}</ul>
+        ) : (
+          <p className="mt-3 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            未処理の{effectiveDef.label}はありません。
+          </p>
+        )}
+        {unprocessedOnly && decidedItems.length > 0 ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              aria-expanded={showProcessed}
+              onClick={() => setShowProcessed((prev) => !prev)}
+              className={`${TAP_TARGET} w-full border border-gray-300 bg-white text-left text-gray-700 hover:bg-gray-50`}
+            >
+              処理済み（{decidedItems.length}）
+            </button>
+            {showProcessed ? (
+              <ul className="mt-2 space-y-2">{decidedItems.map(renderItem)}</ul>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
       <AddProposalForm token={token} onAdded={addProposal} />
       {openItem ? renderPanel(openItem) : null}
     </main>
