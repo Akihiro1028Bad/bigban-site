@@ -3,7 +3,7 @@
  * I/O を含まないためテスト可能。Route Handler はこれらを使う薄い配線にする。
  */
 
-import { DRAFT_LINK_PROPS, type NotionPage } from "./notion";
+import { BODY_MIRROR_PROP, DRAFT_LINK_PROPS, type NotionPage } from "./notion";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
 
 export type PendingKind = "proposal" | "idea";
@@ -71,6 +71,22 @@ export function draftLinkOf(page: NotionPage): DraftLink {
     contentId: richText(page, DRAFT_LINK_PROPS.contentId),
     draftKey: richText(page, DRAFT_LINK_PROPS.draftKey),
   };
+}
+
+/**
+ * ページの本文HTMLミラー(`下書き本文HTML`)を読む(#95)。未保存は空文字。
+ * HTML を厳密に保つため trim せず、分割された rich_text 要素を連結する。
+ */
+export function draftBodyOf(page: NotionPage): string {
+  const value = page.properties[BODY_MIRROR_PROP] as
+    | { rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("");
+}
+
+/** ページのタイトル案(`タイトル案`)を読む(#95: 下書きプレビューの見出し)。未設定は空文字。 */
+export function ideaTitleOf(page: NotionPage): string {
+  return titleText(page, "タイトル案");
 }
 
 // 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。

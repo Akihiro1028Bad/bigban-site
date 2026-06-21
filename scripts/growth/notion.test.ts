@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import {
+  BODY_MIRROR_PROP,
+  buildBodyMirrorProps,
   buildDraftLinkProps,
   chunkRichText,
   createPage,
@@ -205,6 +207,29 @@ describe("buildDraftLinkProps（下書きリンク #73）", () => {
   it("draftKey が空文字でも書き込まない", () => {
     expect(buildDraftLinkProps("g-abc", "")).toEqual({
       [DRAFT_LINK_PROPS.contentId]: { rich_text: [{ text: { content: "g-abc" } }] },
+    });
+  });
+});
+
+describe("buildBodyMirrorProps（本文ミラー #95）", () => {
+  it("本文HTMLを下書き本文HTMLプロパティへ rich_text で書き込む", () => {
+    expect(buildBodyMirrorProps("<p>本文</p>")).toEqual({
+      [BODY_MIRROR_PROP]: { rich_text: [{ text: { content: "<p>本文</p>" } }] },
+    });
+  });
+
+  it("2000字超は分割される", () => {
+    const long = "x".repeat(2500);
+    const props = buildBodyMirrorProps(long) as Record<
+      string,
+      { rich_text: Array<{ text: { content: string } }> }
+    >;
+    expect(props[BODY_MIRROR_PROP].rich_text).toHaveLength(2);
+  });
+
+  it("空文字は空配列(プロパティを空にする)", () => {
+    expect(buildBodyMirrorProps("")).toEqual({
+      [BODY_MIRROR_PROP]: { rich_text: [] },
     });
   });
 });
