@@ -15,7 +15,9 @@ export default function HyroxFacility() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(carouselRef);
-  const photoAlts = t.raw("photos") as string[];
+  // t.raw は unknown を返すため、システム境界として配列であることを検証する。
+  const rawPhotos = t.raw("photos");
+  const photoAlts = Array.isArray(rawPhotos) ? (rawPhotos as string[]) : [];
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
     Autoplay({
       playOnInit: false,

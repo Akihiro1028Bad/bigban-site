@@ -39,6 +39,7 @@ export default function ReserveCalendar() {
             src={LABOLA_CALENDAR_SRC}
             title={t("iframeTitle")}
             loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
             className="w-full h-[600px] md:h-[500px] border-0"
           />

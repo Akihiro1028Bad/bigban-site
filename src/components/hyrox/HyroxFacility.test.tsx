@@ -62,6 +62,21 @@ describe("HyroxFacility", () => {
     ).toBeInTheDocument();
   });
 
+  it("photos が配列でない場合も見出しを描画する（alt フォールバック）", () => {
+    const brokenMessages = structuredClone(jaMessages);
+    (
+      brokenMessages.HyroxPage.facility as unknown as { photos: unknown }
+    ).photos = "not-an-array";
+    render(
+      <NextIntlClientProvider locale="ja" messages={brokenMessages}>
+        <HyroxFacility />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByRole("heading", { name: "FACILITY" })
+    ).toBeInTheDocument();
+  });
+
   it("施設写真4枚とドット4つを表示する", () => {
     renderFacility();
     const dots = screen.getAllByRole("button", { name: /施設写真を表示/ });
