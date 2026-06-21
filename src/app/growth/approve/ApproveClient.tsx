@@ -7,6 +7,7 @@ import { motion, MotionConfig } from "framer-motion";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { AddProposalForm } from "./AddProposalForm";
 import { DraftEditor } from "./DraftEditor";
@@ -26,6 +27,13 @@ const REVISE_POLL_MS = 5000;
 
 // 1 セクションに付けられる本文画像の上限(#61)。超過は下書き生成側(#63)でスキップ＋通知。
 const MAX_SECTION_IMAGES = 3;
+
+// #98: 編集中ライブプレビューのデバウンス間隔(ミリ秒)。入力追従とコストの折衷。
+const LIVE_PREVIEW_DEBOUNCE_MS = 250;
+
+// #75/#98: 本番プレビューの背景。NewsBodyRenderer は prose-invert(明色テキスト)前提のため
+// 本番に合わせたダーク背景で包み、編集中ライブ/閲覧で見た目を揃える。
+const PREVIEW_SURFACE = "rounded-md border border-gray-800 bg-[#0A0A0A] p-3";
 
 // スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
 const STYLE_LABEL = Object.fromEntries(
@@ -310,6 +318,8 @@ export function ApproveClient() {
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaveError, setDraftSaveError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // #98: 編集中の本番ライブプレビュー。高頻度更新を間引くため editedHtml をデバウンスする。
+  const livePreviewHtml = useDebouncedValue(editedHtml, LIVE_PREVIEW_DEBOUNCE_MS);
 
   function startEditDraft(html: string): void {
     setEditingDraft(true);
@@ -1332,6 +1342,18 @@ export function ApproveClient() {
           editingDraft ? (
             <div className="mt-2">
               <DraftEditor initialHtml={draftOriginalHtml} onChange={setEditedHtml} />
+              {/* #98: 入力に追従する本番ライブプレビュー(本番と同じ NewsBodyRenderer)。 */}
+              <section aria-label="本番プレビュー" className="mt-3">
+                <p className="mb-1 text-xs text-gray-500">本番プレビュー（入力に追従）</p>
+                <div className={`max-h-96 overflow-y-auto ${PREVIEW_SURFACE}`}>
+                  <NewsBodyRenderer
+                    displayMode="html"
+                    bodyHtml={livePreviewHtml}
+                    body=""
+                    locale="ja"
+                  />
+                </div>
+              </section>
               {draftSaveError ? (
                 <p role="alert" className="mt-2 text-sm text-red-700">
                   {draftSaveError}
@@ -1389,7 +1411,7 @@ export function ApproveClient() {
               animate={{ opacity: 1 }}
               className="mt-2"
             >
-              <div className="max-h-96 overflow-y-auto rounded-md border border-gray-200 bg-white p-3">
+              <div className={`max-h-96 overflow-y-auto ${PREVIEW_SURFACE}`}>
                 <NewsBodyRenderer
                   displayMode={draftState.draft.displayMode}
                   bodyHtml={draftState.draft.bodyHtml}
