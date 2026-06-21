@@ -3,6 +3,16 @@ import { screen, act } from "@testing-library/react";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxHero from "./HyroxHero";
 
+import type React from "react";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}));
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -14,9 +24,11 @@ describe("HyroxHero", () => {
     expect(screen.getByText("ハイロックス")).toBeInTheDocument();
   });
 
-  it("予約 CTA を表示する", () => {
+  it("予約ページ(/reserve)への CTA を表示する", () => {
     renderWithIntl(<HyroxHero />);
-    expect(screen.getByRole("link", { name: "体験予約" })).toBeInTheDocument();
+    const cta = screen.getByRole("link", { name: "体験予約" });
+    expect(cta).toBeInTheDocument();
+    expect(cta).toHaveAttribute("href", "/reserve");
   });
 
   it("3枚のヒーロー画像をフェード表示する", () => {

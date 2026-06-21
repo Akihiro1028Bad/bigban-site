@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { Link } from "@/i18n/navigation";
+import { RESERVE_PATH } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
@@ -106,16 +107,19 @@ export default function HyroxHero() {
         </motion.div>
 
         {/* CTA */}
-        <motion.a
-          href={RESERVE_URL}
-          {...EXTERNAL_LINK_PROPS}
-          className="mt-10 inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
+        <motion.div
+          className="mt-10 inline-block"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.0, delay: 1.15, ease: EASE }}
         >
-          {t("cta")}
-        </motion.a>
+          <Link
+            href={RESERVE_PATH}
+            className="inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
+          >
+            {t("cta")}
+          </Link>
+        </motion.div>
       </div>
     </section>
   );

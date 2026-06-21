@@ -164,12 +164,11 @@ describe("MobileMenu", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("RESERVE 外部リンクを表示する", () => {
+  it("RESERVE 内部リンク(/reserve)を表示する", () => {
     renderMenu();
     const reserve = screen.getByRole("link", { name: /RESERVE/ });
-    expect(reserve).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(reserve).toHaveAttribute("target", "_blank");
-    expect(reserve).toHaveAttribute("rel", "noopener noreferrer");
+    expect(reserve).toHaveAttribute("href", "/reserve");
+    expect(reserve).not.toHaveAttribute("target");
   });
 
   it("Instagram リンクとアクセス情報を表示する", () => {

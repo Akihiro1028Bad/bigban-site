@@ -145,7 +145,7 @@ describe("buildSportsActivityLocation", () => {
 
     expect(schema.potentialAction).toEqual({
       "@type": "ReserveAction",
-      target: "https://reserva.be/tpbt",
+      target: `${PROD_URL}/reserve`,
     });
   });
 

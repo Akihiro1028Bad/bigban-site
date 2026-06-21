@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { RESERVE_URL, INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { RESERVE_PATH, INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
 import { NAV_ITEMS } from "@/constants/navigation";
@@ -254,16 +254,16 @@ export default function MobileMenu({
             </div>
 
             <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3">
-              <a
-                href={RESERVE_URL}
-                {...EXTERNAL_LINK_PROPS}
+              <Link
+                href={RESERVE_PATH}
+                onClick={onLinkClick}
                 className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-sm font-bold uppercase tracking-[0.2em] text-deep-black transition-all hover:gap-3"
               >
                 {t("reserve")}
                 <span aria-hidden className="text-base leading-none">
                   →
                 </span>
-              </a>
+              </Link>
             </div>
           </motion.div>
         </motion.div>

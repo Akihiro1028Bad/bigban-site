@@ -1,7 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxServices from "./HyroxServices";
+
+import type React from "react";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}));
 
 describe("HyroxServices", () => {
   it("SERVICES 見出しを表示する", () => {
@@ -21,11 +31,11 @@ describe("HyroxServices", () => {
     expect(screen.getByText("グループセッション")).toBeInTheDocument();
   });
 
-  it("各サービスに予約への外部リンクを表示する", () => {
+  it("各サービスに予約ページ(/reserve)への内部リンクを表示する", () => {
     renderWithIntl(<HyroxServices />);
     const links = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(links).toHaveLength(3);
-    expect(links[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(links[0]).toHaveAttribute("href", "/reserve");
+    expect(links[0]).not.toHaveAttribute("target");
   });
 });

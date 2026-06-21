@@ -68,6 +68,10 @@
         "teaser"
       ]
     },
+    "reserve": {
+      "title": "Reservation · THE PICKLE BANG THEORY",
+      "description": "Book a court at THE PICKLE BANG THEORY. Pick your time and reserve online in seconds. 1 min from Motoyawata Station, open 6:00–23:00."
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -117,6 +121,44 @@
     "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
     "ariaLabel": "30% off court campaign. Go to reservation page"
+  },
+  "Reserve": {
+    "hero": {
+      "eyebrow": "RESERVATION",
+      "title": "RESERVE",
+      "subtitle": "Book a Court",
+      "lead": "Pick your preferred date and time and book a court online in just a few taps."
+    },
+    "steps": {
+      "heading": "How to Book",
+      "headingEn": "HOW TO BOOK",
+      "step01": { "title": "Pick a date & time", "description": "Choose an open slot from the calendar.", "imageAlt": "Selecting a date and time on the booking calendar" },
+      "step02": { "title": "Enter booking details", "description": "Follow the booking form to enter your reservation and contact details.", "imageAlt": "Booking details confirmation screen" },
+      "step03": { "title": "Confirm & pay", "description": "Enter payment details to confirm your booking.", "imageAlt": "Booking complete screen" }
+    },
+    "calendar": {
+      "title": "BOOK A COURT",
+      "subtitle": "Reserve from the calendar",
+      "iframeTitle": "Reservation calendar",
+      "scrollHint": "Scroll to see all hours"
+    },
+    "info": {
+      "heading": "INFORMATION",
+      "hoursLabel": "Hours",
+      "hoursValue": "6:00 – 23:00 (irregular holidays)",
+      "accessLabel": "Access",
+      "accessStation": "1 min from Motoyawata Station",
+      "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
+    },
+    "notes": {
+      "heading": "Before You Visit",
+      "headingEn": "NOTES",
+      "items": [
+        "Reservations follow the booking system's accepted time window.",
+        "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
+        "Late arrivals are accommodated only within the reserved time slot."
+      ]
+    }
   },
   "HomeHero": {
     "headline1": "The Big Bang",

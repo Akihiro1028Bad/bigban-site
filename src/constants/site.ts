@@ -12,7 +12,13 @@ export const OG_IMAGE = {
   alt: "THE PICKLE BANG THEORY",
 } as const;
 
-export const RESERVE_URL = "https://reserva.be/tpbt";
+// 内部予約ページのパス（next-intl Link 用）
+export const RESERVE_PATH = "/reserve";
+
+// labola 予約カレンダー (shop 3473, 一日表示) の埋め込み URL。
+// tab_name=すべて は非ASCIIのため URL エンコード済み。
+export const LABOLA_CALENDAR_SRC =
+  "https://yoyaku.labola.jp/r/shop/3473/calendar/?embed=normal&tab_name=%E3%81%99%E3%81%B9%E3%81%A6";
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
