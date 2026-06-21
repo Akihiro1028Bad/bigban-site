@@ -97,7 +97,7 @@ export default function ReserveCalendar({ initialTab }: ReserveCalendarProps) {
                   tabIndex={selected ? 0 : -1}
                   onClick={() => setActiveKey(tab.key)}
                   onKeyDown={(event) => handleKeyDown(event, i)}
-                  className={`flex-1 px-4 py-3 text-xs sm:text-sm font-bold tracking-[0.15em] transition-colors motion-safe:transition-colors ${
+                  className={`flex-1 px-4 py-3 text-xs sm:text-sm font-bold tracking-[0.15em] motion-safe:transition-colors ${
                     selected
                       ? "bg-accent text-deep-black"
                       : "bg-deep-black text-text-gray border border-accent/20 hover:text-text-light"
@@ -109,7 +109,9 @@ export default function ReserveCalendar({ initialTab }: ReserveCalendarProps) {
             })}
           </div>
 
-          {/* カレンダー本体 */}
+          {/* カレンダー本体。単一パネルをタブ切替で使い回す構成のため、
+              全タブの aria-controls は同一 PANEL_ID を参照し、パネルの
+              aria-labelledby はアクティブタブを指す（意図的）。 */}
           <div
             id={PANEL_ID}
             role="tabpanel"
