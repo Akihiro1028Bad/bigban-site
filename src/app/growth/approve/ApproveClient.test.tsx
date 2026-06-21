@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
@@ -1565,9 +1565,27 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
       draftReady("<p>下書き本文です</p>")
     );
     const dialog = await openIdeaPanel();
-    expect(await within(dialog).findByText("下書き本文です")).toBeInTheDocument();
+    // #100: 本文は iframe(本番テーマ)内で描画されるため、観測点 data-preview-html を検証する。
+    const frame = await within(dialog).findByTitle("本番プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>下書き本文です</p>");
     // 取得APIに pageId+token 付きで GET している
     expect(String(fn.mock.calls[1][0])).toContain("/api/growth/draft?pageId=i1");
+  });
+
+  it("bodyHtml が空でも body にフォールバックしてプレビューへ渡す(#100)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "", body: "<p>リッチ本文</p>" },
+        },
+      }
+    );
+    const dialog = await openIdeaPanel();
+    const frame = await within(dialog).findByTitle("本番プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>リッチ本文</p>");
   });
 
   it("contentId が無い記事は取得せず『未作成』を表示する", async () => {
@@ -1595,7 +1613,8 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     const dialog = await openIdeaPanel();
     expect(await within(dialog).findByText("下書きの取得に失敗しました")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "再読み込み" }));
-    expect(await within(dialog).findByText("復活しました")).toBeInTheDocument();
+    const frame = await within(dialog).findByTitle("本番プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>復活しました</p>");
   });
 
   it("success:false で error が無いときは既定メッセージ", async () => {
@@ -1668,17 +1687,20 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     expect(editor).toHaveValue("<p>元の本文</p>");
   });
 
-  it("編集中はライブ本番プレビューが入力に追従する(#98)", async () => {
+  it("編集中はライブ本番プレビュー(iframe)が入力に追従する(#98/#100)", async () => {
     const dialog = await openReadyDraft("<p>元の本文</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    const preview = within(dialog).getByRole("region", { name: "本番プレビュー" });
-    // 初期は編集前の本文(デバウンス後に反映)
-    expect(await within(preview).findByText("元の本文")).toBeInTheDocument();
-    // 入力に追従(デバウンス後)
+    // #100: プレビューは iframe。観測点 data-preview-html がデバウンス後に追従する。
+    const frame = within(dialog).getByTitle("本番ライブプレビュー");
+    await waitFor(() =>
+      expect(frame).toHaveAttribute("data-preview-html", "<p>元の本文</p>"),
+    );
     const editor = within(dialog).getByLabelText("本文エディタ");
     await userEvent.clear(editor);
     await userEvent.type(editor, "ライブ反映テキスト");
-    expect(await within(preview).findByText("ライブ反映テキスト")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(frame.getAttribute("data-preview-html")).toContain("ライブ反映テキスト"),
+    );
   });
 
   it("編集して保存すると /draft/edit に送り、プレビューを更新する", async () => {
@@ -1712,8 +1734,9 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.type(editor, "編集しました");
     await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
 
-    // 保存後に再取得したプレビューが出る
-    expect(await within(dialog).findByText("保存後の本文")).toBeInTheDocument();
+    // 保存後に再取得したプレビュー(iframe)が出る
+    const frame = await within(dialog).findByTitle("本番プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>保存後の本文</p>");
     // 編集モードは閉じる
     expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
     const editPost = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/draft/edit"));

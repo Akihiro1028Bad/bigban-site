@@ -64,6 +64,9 @@ export default defineConfig({
         "scripts/growth/revise-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
+        // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
+        // 受信側描画は DraftFrameClient.test.tsx でテスト済み。
+        "src/app/growth/approve/DraftPreviewFrame.tsx",
       ],
       thresholds: {
         statements: 100,
