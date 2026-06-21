@@ -1668,6 +1668,19 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     expect(editor).toHaveValue("<p>元の本文</p>");
   });
 
+  it("編集中はライブ本番プレビューが入力に追従する(#98)", async () => {
+    const dialog = await openReadyDraft("<p>元の本文</p>");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    const preview = within(dialog).getByRole("region", { name: "本番プレビュー" });
+    // 初期は編集前の本文(デバウンス後に反映)
+    expect(await within(preview).findByText("元の本文")).toBeInTheDocument();
+    // 入力に追従(デバウンス後)
+    const editor = within(dialog).getByLabelText("本文エディタ");
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "ライブ反映テキスト");
+    expect(await within(preview).findByText("ライブ反映テキスト")).toBeInTheDocument();
+  });
+
   it("編集して保存すると /draft/edit に送り、プレビューを更新する", async () => {
     const fn = mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
