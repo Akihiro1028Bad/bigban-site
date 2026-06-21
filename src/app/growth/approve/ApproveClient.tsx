@@ -6,11 +6,11 @@ import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
-import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { AddProposalForm } from "./AddProposalForm";
 import { DraftEditor } from "./DraftEditor";
+import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
   IMAGE_STYLES,
@@ -31,9 +31,10 @@ const MAX_SECTION_IMAGES = 3;
 // #98: 編集中ライブプレビューのデバウンス間隔(ミリ秒)。入力追従とコストの折衷。
 const LIVE_PREVIEW_DEBOUNCE_MS = 250;
 
-// #75/#98: 本番プレビューの背景。NewsBodyRenderer は prose-invert(明色テキスト)前提のため
-// 本番に合わせたダーク背景で包み、編集中ライブ/閲覧で見た目を揃える。
-const PREVIEW_SURFACE = "rounded-md border border-gray-800 bg-[#0A0A0A] p-3";
+// #100: 本番プレビュー iframe の見た目。中身(globals.css 暗テーマ)は iframe 内で
+// 描画されるため、枠は本番に寄せた暗背景＋丸角。高さは閲覧/編集で共通。
+const PREVIEW_FRAME_CLASS =
+  "w-full h-96 rounded-md border border-gray-800 bg-[#0A0A0A]";
 
 // スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
 const STYLE_LABEL = Object.fromEntries(
@@ -1342,17 +1343,14 @@ export function ApproveClient() {
           editingDraft ? (
             <div className="mt-2">
               <DraftEditor initialHtml={draftOriginalHtml} onChange={setEditedHtml} />
-              {/* #98: 入力に追従する本番ライブプレビュー(本番と同じ NewsBodyRenderer)。 */}
+              {/* #100: 入力に追従する本番ライブプレビュー(iframe 内で globals.css 適用)。 */}
               <section aria-label="本番プレビュー" className="mt-3">
                 <p className="mb-1 text-xs text-gray-500">本番プレビュー（入力に追従）</p>
-                <div className={`max-h-96 overflow-y-auto ${PREVIEW_SURFACE}`}>
-                  <NewsBodyRenderer
-                    displayMode="html"
-                    bodyHtml={livePreviewHtml}
-                    body=""
-                    locale="ja"
-                  />
-                </div>
+                <DraftPreviewFrame
+                  title="本番ライブプレビュー"
+                  html={livePreviewHtml}
+                  className={PREVIEW_FRAME_CLASS}
+                />
               </section>
               {draftSaveError ? (
                 <p role="alert" className="mt-2 text-sm text-red-700">
@@ -1411,14 +1409,11 @@ export function ApproveClient() {
               animate={{ opacity: 1 }}
               className="mt-2"
             >
-              <div className={`max-h-96 overflow-y-auto ${PREVIEW_SURFACE}`}>
-                <NewsBodyRenderer
-                  displayMode={draftState.draft.displayMode}
-                  bodyHtml={draftState.draft.bodyHtml}
-                  body={draftState.draft.body}
-                  locale="ja"
-                />
-              </div>
+              <DraftPreviewFrame
+                title="本番プレビュー"
+                html={draftState.draft.bodyHtml || draftState.draft.body}
+                className={PREVIEW_FRAME_CLASS}
+              />
               <div className="mt-2">
                 <button
                   type="button"
