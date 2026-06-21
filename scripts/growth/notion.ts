@@ -169,6 +169,21 @@ export const DRAFT_LINK_PROPS = {
 } as const;
 
 /**
+ * 下書き本文HTMLのミラー保存先プロパティ名(#95)。
+ * 公開キーで microCMS 下書きを読まない方針のため、本文HTMLを Notion 側にミラーし、
+ * 承認画面のプレビューは NOTION_TOKEN でこの値を読む(microCMS は読まない)。
+ */
+export const BODY_MIRROR_PROP = "下書き本文HTML";
+
+/**
+ * 本文HTMLミラーを Notion プロパティへ書き込む形に組み立てる(#95)。
+ * 2000 文字ごとに分割(chunkRichText)。空文字は [] でプロパティを空にする。
+ */
+export function buildBodyMirrorProps(bodyHtml: string): Record<string, unknown> {
+  return { [BODY_MIRROR_PROP]: { rich_text: chunkRichText(bodyHtml) } };
+}
+
+/**
  * 下書きリンク(contentId / draftKey)を Notion プロパティへ書き込む形に組み立てる(#73)。
  * contentId は常に書き込む。draftKey は取得できた時(非空)だけ書き込む
  * (取得失敗でも contentId 保存・ステータス更新は止めない方針=沈黙させない)。

@@ -45,7 +45,7 @@ import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
-import { buildDraftLinkProps, updatePageProps } from "./notion";
+import { buildBodyMirrorProps, buildDraftLinkProps, updatePageProps } from "./notion";
 import {
   failureSignature,
   shouldSendFailureNotice,
@@ -254,6 +254,9 @@ async function main(): Promise<void> {
           {
             [notion.property]: { select: { name: notion.value } },
             ...buildDraftLinkProps(contentId, draftKey),
+            // #95: 公開キーで下書きを読まない方針のため、確定本文HTML(画像置換後)を
+            // Notion にミラーし、承認画面のプレビューはこの値を読む。
+            ...buildBodyMirrorProps(String(spec.payload.bodyHtml ?? "")),
           },
           { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch }
         );

@@ -16,7 +16,12 @@ import { NextResponse } from "next/server";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
-import { defaultFetch, getPage } from "@/lib/growth/notion";
+import {
+  buildBodyMirrorProps,
+  defaultFetch,
+  getPage,
+  updatePageProps,
+} from "@/lib/growth/notion";
 import { sanitizeNewsHtml, STRICT_HTML_CONFIG } from "@/lib/news/sanitize";
 
 export const runtime = "nodejs";
@@ -89,21 +94,40 @@ export async function POST(request: Request): Promise<Response> {
   const microOpts = microcmsOptions();
   if (!notionOpts || !microOpts) return serverError();
 
+  let contentId: string;
   try {
-    const page = await getPage(pageId, notionOpts);
-    const { contentId } = draftLinkOf(page);
-    if (!contentId || !CONTENT_ID_RE.test(contentId)) {
-      return NextResponse.json(
-        { success: false, error: "編集対象の下書きが見つかりません。" },
-        { status: 404 }
-      );
-    }
-    // サーバ側で再サニタイズ(許可外タグ/属性を除去)してから書き込む。
-    const sanitized = sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG);
-    await patchDraft(ENDPOINT, contentId, { bodyHtml: sanitized }, microOpts);
+    contentId = draftLinkOf(await getPage(pageId, notionOpts)).contentId;
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
+      { status: 502 }
+    );
+  }
+  if (!contentId || !CONTENT_ID_RE.test(contentId)) {
+    return NextResponse.json(
+      { success: false, error: "編集対象の下書きが見つかりません。" },
+      { status: 404 }
+    );
+  }
+
+  // サーバ側で再サニタイズ(許可外タグ/属性を除去)してから書き込む(XSS 最終段)。
+  const sanitized = sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG);
+
+  // #95: (1)プレビュー正本=Notion ミラーを先に更新 → (2)公開ターゲット=microCMS 下書きへ同期。
+  // どちらが失敗したかを明示し(再保存で両者を冪等に上書きできる)、沈黙させない。
+  try {
+    await updatePageProps(pageId, buildBodyMirrorProps(sanitized), notionOpts);
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "プレビューへの反映(Notion)に失敗しました。再保存してください。" },
+      { status: 502 }
+    );
+  }
+  try {
+    await patchDraft(ENDPOINT, contentId, { bodyHtml: sanitized }, microOpts);
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。再保存してください。" },
       { status: 502 }
     );
   }
