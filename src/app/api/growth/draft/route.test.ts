@@ -1,14 +1,10 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// getPage だけを差し替え、DRAFT_LINK_PROPS 等は実物を使う(approve.draftLinkOf が参照するため)。
+// getPage だけを差し替え、draftBodyOf/ideaTitleOf 等は実物を使う(#95)。
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
   getPage: vi.fn(),
-}));
-
-vi.mock("@/lib/microcms/queries", () => ({
-  getNewsByContentId: vi.fn(),
 }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
@@ -19,7 +15,6 @@ vi.mock("@/config/featureFlags", () => ({
 }));
 
 import { getPage } from "@/lib/growth/notion";
-import { getNewsByContentId } from "@/lib/microcms/queries";
 import { GET } from "./route";
 
 const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
@@ -31,32 +26,24 @@ function getRequest(token: string | null, pageId: string | null): Request {
   return new Request(url, { method: "GET" });
 }
 
-function pageWithLink(contentId?: string, draftKey?: string) {
-  const properties: Record<string, unknown> = {};
-  if (contentId !== undefined) {
-    properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
-  }
-  if (draftKey !== undefined) {
-    properties["下書きプレビューキー"] = {
+// #95: 本文ミラー(下書き本文HTML)＋タイトル案を持つ Notion ページ。
+function pageWithMirror(bodyHtml?: string, title = "夜のピックル") {
+  const properties: Record<string, unknown> = {
+    "タイトル案": { type: "title", title: [{ plain_text: title }] },
+  };
+  if (bodyHtml !== undefined) {
+    properties["下書き本文HTML"] = {
       type: "rich_text",
-      rich_text: [{ plain_text: draftKey }],
+      rich_text: [{ plain_text: bodyHtml }],
     };
   }
   return { id: PAGE_ID, url: "", properties };
 }
 
-const newsItem = {
-  title: "市川で始める",
-  displayMode: "html",
-  bodyHtml: "<p>本文</p>",
-  body: "",
-};
-
 beforeEach(() => {
   flags.authEnabled = false;
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(getPage).mockReset();
-  vi.mocked(getNewsByContentId).mockReset();
 });
 
 afterEach(() => {
@@ -65,52 +52,24 @@ afterEach(() => {
 });
 
 describe("GET /api/growth/draft", () => {
-  it("contentId+draftKey から下書き本文を返す", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithLink("g-abc", "dk-1"));
-    vi.mocked(getNewsByContentId).mockResolvedValue(newsItem as never);
+  it("Notion 本文ミラーから下書き本文を返す(#95: microCMS を読まない)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
 
     const res = await GET(getRequest(null, PAGE_ID));
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json).toEqual({
+    expect(await res.json()).toEqual({
       success: true,
       exists: true,
-      draft: { title: "市川で始める", displayMode: "html", bodyHtml: "<p>本文</p>", body: "" },
+      draft: { title: "夜のピックル", displayMode: "html", bodyHtml: "<p>本文</p>", body: "" },
     });
-    expect(vi.mocked(getNewsByContentId)).toHaveBeenCalledWith({ id: "g-abc", draftKey: "dk-1" });
   });
 
-  it("draftKey 空なら undefined で取得する", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithLink("g-abc", ""));
-    vi.mocked(getNewsByContentId).mockResolvedValue(newsItem as never);
-
-    await GET(getRequest(null, PAGE_ID));
-    expect(vi.mocked(getNewsByContentId)).toHaveBeenCalledWith({ id: "g-abc", draftKey: undefined });
-  });
-
-  it("下書き未作成(contentId 無し)は exists:false(エラーにしない)", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithLink());
+  it("本文ミラー未保存は exists:false(エラーにしない)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror());
 
     const res = await GET(getRequest(null, PAGE_ID));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, exists: false, draft: null });
-    expect(vi.mocked(getNewsByContentId)).not.toHaveBeenCalled();
-  });
-
-  it("microCMS 取得失敗(null)は 502", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithLink("g-abc", "dk-1"));
-    vi.mocked(getNewsByContentId).mockResolvedValue(null);
-
-    const res = await GET(getRequest(null, PAGE_ID));
-    expect(res.status).toBe(502);
-    expect((await res.json()).error).toMatch(/取得に失敗/);
-  });
-
-  it("contentId が不正な形式(スラッシュ等)なら microCMS を叩かず 502", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithLink("bad/../id", "dk-1"));
-    const res = await GET(getRequest(null, PAGE_ID));
-    expect(res.status).toBe(502);
-    expect(vi.mocked(getNewsByContentId)).not.toHaveBeenCalled();
   });
 
   it("getPage が throw したら 502", async () => {
@@ -159,8 +118,7 @@ describe("GET /api/growth/draft", () => {
   it("認可ON+正しいトークンは通る", async () => {
     flags.authEnabled = true;
     process.env.APPROVE_SECRET = "right";
-    vi.mocked(getPage).mockResolvedValue(pageWithLink("g-abc", "dk-1"));
-    vi.mocked(getNewsByContentId).mockResolvedValue(newsItem as never);
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
     const res = await GET(getRequest("right", PAGE_ID));
     expect(res.status).toBe(200);
   });

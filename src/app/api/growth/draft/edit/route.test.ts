@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// getPage だけ差し替え、DRAFT_LINK_PROPS 等は実物(approve.draftLinkOf が参照)。
+// getPage / updatePageProps を差し替え、buildBodyMirrorProps 等の純関数は実物を使う(#95)。
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
   getPage: vi.fn(),
+  updatePageProps: vi.fn(),
 }));
 
 vi.mock("@/lib/growth/content", () => ({
@@ -18,7 +19,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { getPage } from "@/lib/growth/notion";
+import { BODY_MIRROR_PROP, getPage, updatePageProps } from "@/lib/growth/notion";
 import { patchDraft } from "@/lib/growth/content";
 import { POST } from "./route";
 
@@ -44,6 +45,8 @@ beforeEach(() => {
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
   process.env.MICROCMS_CONTENT_API_KEY = "content-key";
   vi.mocked(getPage).mockReset();
+  vi.mocked(updatePageProps).mockReset();
+  vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
   vi.mocked(patchDraft).mockReset();
   vi.mocked(patchDraft).mockResolvedValue("g-abc");
 });
@@ -73,6 +76,23 @@ describe("POST /api/growth/draft/edit", () => {
     expect(saved).not.toContain("<script");
     expect(saved).not.toContain("alert");
     expect((opts as { apiKey: string }).apiKey).toBe("content-key");
+
+    // #95: Notion 本文ミラーも同じサニタイズ済みHTMLで更新される。
+    const [mirrorPageId, mirrorProps] = vi.mocked(updatePageProps).mock.calls[0];
+    expect(mirrorPageId).toBe(PAGE_ID);
+    const mirror = (mirrorProps as Record<string, { rich_text: Array<{ text: { content: string } }> }>)[
+      BODY_MIRROR_PROP
+    ];
+    expect(mirror.rich_text.map((r) => r.text.content).join("")).toBe(saved);
+  });
+
+  it("Notion ミラー更新が失敗したら 502(microCMS を叩かない / #95)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc"));
+    vi.mocked(updatePageProps).mockRejectedValue(new Error("notion write down"));
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatch(/Notion/);
+    expect(vi.mocked(patchDraft)).not.toHaveBeenCalled();
   });
 
   it("下書き未作成(contentId 無し)は 404", async () => {

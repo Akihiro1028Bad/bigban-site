@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
 import {
+  draftBodyOf,
   draftLinkOf,
+  ideaTitleOf,
   isNotionPageId,
   parseDecisions,
   pendingStatus,
@@ -321,5 +323,39 @@ describe("draftLinkOf", () => {
       contentId: "",
       draftKey: "",
     });
+  });
+});
+
+describe("draftBodyOf / ideaTitleOf（本文ミラー #95）", () => {
+  it("下書き本文HTML(分割 rich_text)を trim せず連結して読む", () => {
+    const page: NotionPage = {
+      id: "i1",
+      url: "",
+      properties: {
+        "下書き本文HTML": {
+          type: "rich_text",
+          rich_text: [{ plain_text: "<p>前半</p>" }, { plain_text: "<p>後半</p>" }],
+        },
+        "タイトル案": { type: "title", title: [{ plain_text: "夜のピックル" }] },
+      },
+    };
+    expect(draftBodyOf(page)).toBe("<p>前半</p><p>後半</p>");
+    expect(ideaTitleOf(page)).toBe("夜のピックル");
+  });
+
+  it("未保存は空文字(プレビューの exists:false 判定に使う)", () => {
+    expect(draftBodyOf({ id: "x", url: "", properties: {} })).toBe("");
+    expect(ideaTitleOf({ id: "x", url: "", properties: {} })).toBe("");
+  });
+
+  it("plain_text 欠落の rich_text 要素は空文字に落とす", () => {
+    const page: NotionPage = {
+      id: "i2",
+      url: "",
+      properties: {
+        "下書き本文HTML": { type: "rich_text", rich_text: [{}, { plain_text: "<p>後</p>" }] },
+      },
+    };
+    expect(draftBodyOf(page)).toBe("<p>後</p>");
   });
 });
