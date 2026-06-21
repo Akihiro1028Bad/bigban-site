@@ -15,10 +15,38 @@ export const OG_IMAGE = {
 // 内部予約ページのパス（next-intl Link 用）
 export const RESERVE_PATH = "/reserve";
 
-// labola 予約カレンダー (shop 3473, 一日表示) の埋め込み URL。
-// tab_name=すべて は非ASCIIのため URL エンコード済み。
-export const LABOLA_CALENDAR_SRC =
-  "https://yoyaku.labola.jp/r/shop/3473/calendar/?embed=normal&tab_name=%E3%81%99%E3%81%B9%E3%81%A6";
+// labola 予約カレンダー (shop 3473, 一日表示) の埋め込みベース URL。
+export const LABOLA_CALENDAR_BASE =
+  "https://yoyaku.labola.jp/r/shop/3473/calendar/?embed=normal";
+
+// 予約カテゴリのタブ。tabName は labola 管理画面の登録カテゴリ名と完全一致が必須。
+// HYROX は半角スペース入り ("H Y R O X") が登録名。
+export const LABOLA_CALENDAR_TABS = [
+  { key: "pickleball", tabName: "ピックルボールコート" },
+  { key: "hyrox", tabName: "H Y R O X" },
+] as const;
+
+export type LabolaCalendarTabKey = (typeof LABOLA_CALENDAR_TABS)[number]["key"];
+
+// カテゴリ名を URL エンコードして埋め込み URL を組み立てる。
+// 例: "H Y R O X" → ...&tab_name=H%20Y%20R%20O%20X
+export function buildLabolaCalendarSrc(tabName: string): string {
+  return `${LABOLA_CALENDAR_BASE}&tab_name=${encodeURIComponent(tabName)}`;
+}
+
+// 予約ページへのリンク（初期タブ指定つき）。例: /reserve?tab=hyrox
+export function reserveHref(tab: LabolaCalendarTabKey): string {
+  return `${RESERVE_PATH}?tab=${tab}`;
+}
+
+// クエリ等の外部入力を検証し、有効なタブキーへ正規化する。
+// 不正値・未指定・配列は先頭タブ（ピックルボールコート）にフォールバック。
+export function resolveCalendarTabKey(
+  value: string | string[] | undefined,
+): LabolaCalendarTabKey {
+  return LABOLA_CALENDAR_TABS.find((tab) => tab.key === value)?.key
+    ?? LABOLA_CALENDAR_TABS[0].key;
+}
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 

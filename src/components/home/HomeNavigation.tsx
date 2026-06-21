@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { NAV_ITEMS, SECTION_IDS } from "@/constants/navigation";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
@@ -75,6 +75,8 @@ export default function HomeNavigation() {
 
   const isJa = locale === "ja";
   const isHyrox = pathname === "/hyrox";
+  // 予約導線は「いるページ」に連動: /hyrox なら HYROX タブ、それ以外はピックル。
+  const reserveTo = reserveHref(isHyrox ? "hyrox" : "pickleball");
 
   return (
     <>
@@ -141,7 +143,7 @@ export default function HomeNavigation() {
           {/* Mobile: 予約ボタン（常時表示・主要コンバージョン導線）。
               右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
           <Link
-            href={RESERVE_PATH}
+            href={reserveTo}
             className="mr-12 bg-accent px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-deep-black md:hidden"
           >
             {t("reserve")}
@@ -154,7 +156,7 @@ export default function HomeNavigation() {
               onSwitch={handleSwitchLocale}
             />
             <Link
-              href={RESERVE_PATH}
+              href={reserveTo}
               className="bg-accent text-deep-black px-5 py-2 text-xs font-bold uppercase tracking-widest"
             >
               {t("reserve")}
@@ -185,6 +187,7 @@ export default function HomeNavigation() {
       activeSection={activeSection}
       isJa={isJa}
       onSwitchLocale={handleSwitchLocale}
+      reserveHref={reserveTo}
     />
 
     <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />

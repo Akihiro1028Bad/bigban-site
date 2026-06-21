@@ -28,7 +28,7 @@ describe("HyroxHero", () => {
     renderWithIntl(<HyroxHero />);
     const cta = screen.getByRole("link", { name: "体験予約" });
     expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).toHaveAttribute("href", "/reserve?tab=hyrox");
   });
 
   it("3枚のヒーロー画像をフェード表示する", () => {

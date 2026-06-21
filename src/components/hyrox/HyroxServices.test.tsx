@@ -35,7 +35,7 @@ describe("HyroxServices", () => {
     renderWithIntl(<HyroxServices />);
     const links = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(links).toHaveLength(3);
-    expect(links[0]).toHaveAttribute("href", "/reserve");
+    expect(links[0]).toHaveAttribute("href", "/reserve?tab=hyrox");
     expect(links[0]).not.toHaveAttribute("target");
   });
 });

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { useMagneticButton } from "@/hooks/useMagneticButton";
 import { EASE } from "@/constants/motion";
 
@@ -87,7 +87,7 @@ export default function HomeHero() {
             >
               <Link
                 ref={ref as React.RefObject<HTMLAnchorElement>}
-                href={RESERVE_PATH}
+                href={reserveHref("pickleball")}
                 className="inline-block bg-accent px-8 py-3 text-sm font-bold tracking-widest text-deep-black transition-transform"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}

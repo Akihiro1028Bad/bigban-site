@@ -59,7 +59,7 @@ describe("HomeHero", () => {
     renderWithProvider(<HomeHero />);
     const cta = screen.getByRole("link", { name: /RESERVE A COURT/ });
     expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).toHaveAttribute("href", "/reserve?tab=pickleball");
   });
 
   it("スクロールインジケーター（SCROLL）を表示する", () => {

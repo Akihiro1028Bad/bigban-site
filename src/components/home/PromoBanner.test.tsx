@@ -69,12 +69,12 @@ describe("PromoBanner", () => {
     expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
   });
 
-  it("内部の予約ページ /reserve にリンクする", () => {
+  it("内部の予約ページ(ピックル)にリンクする", () => {
     vi.useFakeTimers();
     vi.setSystemTime(MAY_JST);
     renderWithIntl(<PromoBanner />, "ja");
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/reserve");
+    expect(link).toHaveAttribute("href", "/reserve?tab=pickleball");
   });
 
   it("exposes an accessible label describing the link destination", () => {

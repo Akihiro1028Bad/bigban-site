@@ -14,11 +14,20 @@ vi.mock("next/navigation", () => ({
 }));
 
 // 子コンポーネントはモックして page.tsx 自身の分岐のみを検証する。
+const reserveCalendarSpy = vi.hoisted(() => ({
+  initialTab: undefined as string | undefined,
+}));
+
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
-vi.mock("@/components/reserve/ReserveCalendar", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveCalendar", () => ({
+  default: ({ initialTab }: { initialTab?: string }) => {
+    reserveCalendarSpy.initialTab = initialTab;
+    return null;
+  },
+}));
 vi.mock("@/components/reserve/ReserveInfo", () => ({ default: () => null }));
 
 function buildMockT() {
@@ -80,19 +89,34 @@ describe("ReservePage generateMetadata", () => {
 });
 
 describe("ReservePage", () => {
-  it("locale を設定し予約ページを描画する", async () => {
+  it("locale を設定し予約ページを描画する（tab 未指定はピックル）", async () => {
     const { default: ReservePage } = await import("./page");
     const element = await ReservePage({
       params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
     });
     const { container } = render(element);
     expect(container).toBeTruthy();
+    expect(reserveCalendarSpy.initialTab).toBe("pickleball");
+  });
+
+  it("?tab=hyrox のとき ReserveCalendar に initialTab=hyrox を渡す", async () => {
+    const { default: ReservePage } = await import("./page");
+    const element = await ReservePage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({ tab: "hyrox" }),
+    });
+    render(element);
+    expect(reserveCalendarSpy.initialTab).toBe("hyrox");
   });
 
   it("不正な locale で notFound により描画されない（throw する）", async () => {
     const { default: ReservePage } = await import("./page");
     await expect(
-      ReservePage({ params: Promise.resolve({ locale: "xx" }) })
+      ReservePage({
+        params: Promise.resolve({ locale: "xx" }),
+        searchParams: Promise.resolve({}),
+      })
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 });

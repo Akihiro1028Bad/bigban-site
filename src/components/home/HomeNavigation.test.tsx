@@ -187,7 +187,15 @@ describe("HomeNavigation", () => {
     renderWithIntl(<HomeNavigation />);
     const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(1);
-    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve");
+    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve?tab=pickleball");
+  });
+
+  it("/hyrox では RESERVE が HYROX タブ付きリンクになる", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve?tab=hyrox");
+    mockPathname = "/";
   });
 
   it("モバイルヘッダーに常時表示の予約ボタンがある（メニュー未展開時）", () => {
@@ -199,7 +207,7 @@ describe("HomeNavigation", () => {
       link.className.includes("md:hidden")
     );
     expect(mobileReserve).toBeDefined();
-    expect(mobileReserve).toHaveAttribute("href", "/reserve");
+    expect(mobileReserve).toHaveAttribute("href", "/reserve?tab=pickleball");
   });
 
   it("ハンバーガーメニューの開閉", () => {
@@ -336,7 +344,9 @@ describe("HomeNavigation", () => {
     renderWithIntl(<HomeNavigation />);
     fireEvent.click(screen.getByLabelText("メニューを開く"));
     const dialog = screen.getByRole("dialog");
-    const reserveInDialog = dialog.querySelector("a[href='/reserve']");
+    const reserveInDialog = dialog.querySelector(
+      "a[href='/reserve?tab=pickleball']",
+    );
     expect(reserveInDialog).toBeInTheDocument();
     expect(reserveInDialog?.textContent).toContain("RESERVE");
   });

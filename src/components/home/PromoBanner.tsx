@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { isJunePromoActive } from "@/lib/promoSchedule";
 
 export default function PromoBanner() {
@@ -9,7 +9,7 @@ export default function PromoBanner() {
 
   return (
     <Link
-      href={RESERVE_PATH}
+      href={reserveHref("pickleball")}
       aria-label={t("ariaLabel")}
       className="fixed top-0 left-0 w-full z-[55] bg-accent text-deep-black h-[var(--promo-banner-h)] flex items-center justify-center px-4 hover:brightness-95 transition-[filter] duration-200"
     >

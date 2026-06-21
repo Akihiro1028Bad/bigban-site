@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { SITE_URL } from "@/constants/site";
+import { SITE_URL, resolveCalendarTabKey } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
@@ -12,13 +12,17 @@ import ReserveInfo from "@/components/reserve/ReserveInfo";
 
 import type { Metadata } from "next";
 
-interface ReservePageProps {
+interface ReserveMetadataProps {
   params: Promise<{ locale: string }>;
+}
+
+interface ReservePageProps extends ReserveMetadataProps {
+  searchParams: Promise<{ tab?: string | string[] }>;
 }
 
 export async function generateMetadata({
   params,
-}: ReservePageProps): Promise<Metadata> {
+}: ReserveMetadataProps): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale = parseLocale(rawLocale);
   if (!locale) return {};
@@ -46,18 +50,24 @@ export async function generateMetadata({
   };
 }
 
-export default async function ReservePage({ params }: ReservePageProps) {
+export default async function ReservePage({
+  params,
+  searchParams,
+}: ReservePageProps) {
   const { locale: rawLocale } = await params;
   const locale = parseLocale(rawLocale);
   if (!locale) notFound();
   setRequestLocale(locale);
+
+  const { tab } = await searchParams;
+  const initialTab = resolveCalendarTabKey(tab);
 
   return (
     <main className="bg-deep-black min-h-screen">
       <HomeNavigation />
       <ReserveHero />
       <ReserveSteps />
-      <ReserveCalendar />
+      <ReserveCalendar initialTab={initialTab} />
       <ReserveInfo />
       <HomeFooter />
     </main>

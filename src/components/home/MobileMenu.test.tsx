@@ -73,6 +73,7 @@ interface Options {
   onSwitchLocale?: (locale: "ja" | "en") => void;
   isJa?: boolean;
   locale?: "ja" | "en";
+  reserveHref?: string;
 }
 
 function renderMenu(opts: Options = {}) {
@@ -84,6 +85,7 @@ function renderMenu(opts: Options = {}) {
     onSwitchLocale = vi.fn(),
     isJa = true,
     locale = "ja",
+    reserveHref = "/reserve?tab=pickleball",
   } = opts;
   const messages = locale === "ja" ? jaMessages : enMessages;
   const ui: ReactElement = (
@@ -94,6 +96,7 @@ function renderMenu(opts: Options = {}) {
       activeSection={activeSection}
       isJa={isJa}
       onSwitchLocale={onSwitchLocale}
+      reserveHref={reserveHref}
     />
   );
   const utils = render(
@@ -164,10 +167,10 @@ describe("MobileMenu", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("RESERVE 内部リンク(/reserve)を表示する", () => {
-    renderMenu();
+  it("RESERVE 内部リンクに渡された reserveHref を使う", () => {
+    renderMenu({ reserveHref: "/reserve?tab=hyrox" });
     const reserve = screen.getByRole("link", { name: /RESERVE/ });
-    expect(reserve).toHaveAttribute("href", "/reserve");
+    expect(reserve).toHaveAttribute("href", "/reserve?tab=hyrox");
     expect(reserve).not.toHaveAttribute("target");
   });
 
@@ -217,6 +220,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
+          reserveHref="/reserve?tab=pickleball"
         />
       </NextIntlClientProvider>
     );
@@ -321,6 +325,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
+          reserveHref="/reserve?tab=pickleball"
         />
       </NextIntlClientProvider>
     );

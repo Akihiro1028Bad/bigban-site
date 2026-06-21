@@ -153,7 +153,12 @@
       "title": "BOOK A COURT",
       "subtitle": "カレンダーから予約",
       "iframeTitle": "予約カレンダー",
-      "scrollHint": "上下にスクロールして全時間帯を表示"
+      "scrollHint": "上下にスクロールして全時間帯を表示",
+      "tablistLabel": "予約カテゴリ",
+      "tabs": {
+        "pickleball": "ピックルボールコート",
+        "hyrox": "H Y R O X"
+      }
     },
     "info": {
       "heading": "INFORMATION",

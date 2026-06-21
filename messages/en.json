@@ -83,7 +83,6 @@
         "HYROX Japan",
         "HYROX Chiba",
         "HYROX Motoyawata",
-        "HYROX gym",
         "HYROX training",
         "functional fitness",
         "fitness racing"
@@ -140,7 +139,12 @@
       "title": "BOOK A COURT",
       "subtitle": "Reserve from the calendar",
       "iframeTitle": "Reservation calendar",
-      "scrollHint": "Scroll to see all hours"
+      "scrollHint": "Scroll to see all hours",
+      "tablistLabel": "Reservation category",
+      "tabs": {
+        "pickleball": "ピックルボールコート",
+        "hyrox": "H Y R O X"
+      }
     },
     "info": {
       "heading": "INFORMATION",

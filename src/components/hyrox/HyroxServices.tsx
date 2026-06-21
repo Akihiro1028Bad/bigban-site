@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 
@@ -89,7 +89,7 @@ export default function HyroxServices() {
                   {item.description}
                 </p>
                 <Link
-                  href={RESERVE_PATH}
+                  href={reserveHref("hyrox")}
                   className="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-accent transition-all hover:gap-3 hover:text-accent/80"
                 >
                   {t("cta")}

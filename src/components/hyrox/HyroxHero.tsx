@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
@@ -114,7 +114,7 @@ export default function HyroxHero() {
           transition={{ duration: 1.0, delay: 1.15, ease: EASE }}
         >
           <Link
-            href={RESERVE_PATH}
+            href={reserveHref("hyrox")}
             className="inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
           >
             {t("cta")}
