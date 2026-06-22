@@ -24,8 +24,18 @@ import {
   newlyDraftedIds,
   STUCK_THRESHOLD_MS,
 } from "./generating";
+import { isEditableTag, moveIndex, resolveShortcut } from "./shortcuts";
+import {
+  type Density,
+  densityListClass,
+  nextDensity,
+  parseDensity,
+  pruneSelection,
+  toggleId,
+} from "./boardPrefs";
 
 import { AddProposalForm } from "./AddProposalForm";
+import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { buildDraftEditPayload } from "./draftEditorContent";
@@ -41,6 +51,9 @@ import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
 const REVISE_POLL_MS = 5000;
+
+// #109: 表示密度の保存キー(localStorage)。
+const DENSITY_KEY = "growth-approve-density";
 
 // 1 セクションに付けられる本文画像の上限(#61)。超過は下書き生成側(#63)でスキップ＋通知。
 const MAX_SECTION_IMAGES = 3;
@@ -195,6 +208,11 @@ export function ApproveClient() {
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const itemsRef = useRef<PendingItem[]>([]);
   const firstSeenRef = useRef<Map<string, number>>(new Map());
+  // #109: 操作性。フォーカス中カード/コマンドパレット/一括選択/表示密度。
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [density, setDensity] = useState<Density>("comfortable");
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
@@ -323,6 +341,48 @@ export function ApproveClient() {
 
   function dismissToast(id: string): void {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }
+
+  // #109: キーボード操作の最新ハンドラを ref に保持(早期 return より前で document に結線するため)。
+  const dispatchRef = useRef<(action: ReturnType<typeof resolveShortcut>) => void>(
+    /* istanbul ignore next -- @preserve 初期値はレンダリングで即上書きされるため未実行 */
+    () => {}
+  );
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      const action = resolveShortcut(event.key, event.metaKey, event.ctrlKey);
+      if (!action) return;
+      const tag = (event.target as HTMLElement | null)?.tagName ?? "";
+      // 入力欄での単一キーは抑止(検索/編集の妨げにしない)。palette/escape は許可。
+      if (isEditableTag(tag) && action !== "palette" && action !== "escape") return;
+      event.preventDefault();
+      dispatchRef.current(action);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // #109: 表示密度を localStorage から復元する(初回)。
+  useEffect(() => {
+    setDensity(parseDensity(window.localStorage.getItem(DENSITY_KEY)));
+  }, []);
+
+  function toggleDensity(): void {
+    setDensity((prev) => {
+      const next = nextDensity(prev);
+      window.localStorage.setItem(DENSITY_KEY, next);
+      return next;
+    });
+  }
+
+  // #109: 取得更新で消えた選択を掃除する。
+  useEffect(() => {
+    setSelected((prev) => pruneSelection(prev, items.map((item) => item.id)));
+  }, [items]);
+
+  function toggleSelect(id: string): void {
+    setSelected((prev) => toggleId(prev, id));
   }
 
   // #43: 開いている記事が提示待ち(依頼中/処理中)かどうか。
@@ -883,6 +943,45 @@ export function ApproveClient() {
   // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
   const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
+  // #109: キーボード操作対象のカード並び(施策→各列)。j/k フォーカス、a/r/e の対象。
+  const navItems = [...proposals, ...articleColumns.flatMap((col) => col.items)];
+  const focusedItem = focusedIndex >= 0 ? navItems[focusedIndex] : undefined;
+  const focusedId = focusedItem?.id;
+  const densityClass = densityListClass(density);
+
+  // 承認/却下できる(=提案中/未処理で未決定)か。一括・キー操作の対象判定。
+  function isBulkActionable(item: PendingItem): boolean {
+    return !decided[item.id] && !item.isDraftReady && !isAwaitingDownstream(item.stage);
+  }
+
+  function bulkDecide(value: Choice): void {
+    navItems
+      .filter((item) => selected.has(item.id) && isBulkActionable(item))
+      .forEach((item) => void decide(item, value));
+    setSelected(new Set());
+  }
+
+  // #109: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
+  dispatchRef.current = (action) => {
+    if (action === "next") {
+      setFocusedIndex(moveIndex(focusedIndex, 1, navItems.length));
+    } else if (action === "prev") {
+      setFocusedIndex(moveIndex(focusedIndex, -1, navItems.length));
+    } else if (action === "approve") {
+      if (focusedItem && isBulkActionable(focusedItem)) void decide(focusedItem, "承認");
+    } else if (action === "reject") {
+      if (focusedItem && isBulkActionable(focusedItem)) void decide(focusedItem, "却下");
+    } else if (action === "edit") {
+      if (focusedItem) setOpenId(focusedItem.id);
+    } else if (action === "search" || action === "palette") {
+      setPaletteOpen(true);
+    } else {
+      // escape
+      setPaletteOpen(false);
+      setFocusedIndex(-1);
+    }
+  };
+
   // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
   function renderItem(item: PendingItem) {
     const choice = decided[item.id];
@@ -929,7 +1028,22 @@ export function ApproveClient() {
       </div>
     ) : null;
     return (
-      <li key={item.id} className={rowClass(choice, Boolean(failure))} data-decision={choice ?? ""}>
+      <li
+        key={item.id}
+        className={`${rowClass(choice, Boolean(failure))} ${item.id === focusedId ? "ring-2 ring-blue-500" : ""}`}
+        data-decision={choice ?? ""}
+      >
+        {isBulkActionable(item) ? (
+          <label className="mb-1 flex items-center gap-2 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              aria-label={`一括選択: ${item.title}`}
+              checked={selected.has(item.id)}
+              onChange={() => toggleSelect(item.id)}
+            />
+            選択
+          </label>
+        ) : null}
         {ideaHeader}
         {choice ? (
           <div className="flex items-center gap-2">
@@ -1643,6 +1757,60 @@ export function ApproveClient() {
       <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
         承認した提案は制作キューに追加されます。この場では公開されません。
       </p>
+
+      {/* #109: 操作ツールバー。コマンドパレット起動と表示密度トグル(キーボード非依存の可視UI)。 */}
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className={`${TAP_TARGET} flex-1 border border-gray-300 bg-white text-left text-sm text-gray-600 hover:bg-gray-50`}
+        >
+          🔍 検索・ジャンプ（⌘K / /）
+        </button>
+        <button
+          type="button"
+          aria-pressed={density === "compact"}
+          onClick={toggleDensity}
+          className={`${TAP_TARGET} border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50`}
+        >
+          {density === "compact" ? "コンパクト" : "標準"}
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-gray-400">
+        キーボード: j/k 移動・a 承認・r 却下・e 詳細・/ 検索・Esc 解除
+      </p>
+
+      {/* #109: 一括選択バー(選択がある時のみ)。一括承認/却下は各カードと同じ即時保存＋取り消し。 */}
+      {selected.size > 0 ? (
+        <div
+          role="group"
+          aria-label="一括操作"
+          className="mt-2 flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm"
+        >
+          <span className="flex-1 text-gray-700">{selected.size}件 選択中</span>
+          <button
+            type="button"
+            onClick={() => bulkDecide("承認")}
+            className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+          >
+            一括承認
+          </button>
+          <button
+            type="button"
+            onClick={() => bulkDecide("却下")}
+            className={choiceButtonClass("border border-gray-700 bg-gray-700 text-white")}
+          >
+            一括却下
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className={choiceButtonClass("border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+          >
+            解除
+          </button>
+        </div>
+      ) : null}
       {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
       {toasts.length > 0 ? (
         <div aria-label="お知らせ" className="mt-2 space-y-1">
@@ -1677,7 +1845,7 @@ export function ApproveClient() {
             <span>施策</span>
             <span className="text-xs text-gray-500">{proposals.length}件</span>
           </div>
-          <ul className="mt-2 space-y-2">{proposals.map(renderItem)}</ul>
+          <ul className={`mt-2 ${densityClass}`}>{proposals.map(renderItem)}</ul>
         </section>
       ) : null}
 
@@ -1693,7 +1861,7 @@ export function ApproveClient() {
               <span className="text-xs text-gray-500">{columnItems.length}件</span>
             </div>
             {columnItems.length > 0 ? (
-              <ul className="mt-2 space-y-2">{columnItems.map(renderItem)}</ul>
+              <ul className={`mt-2 ${densityClass}`}>{columnItems.map(renderItem)}</ul>
             ) : (
               <p className="mt-2 rounded-md bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">
                 なし
@@ -1704,6 +1872,21 @@ export function ApproveClient() {
       </section>
       <AddProposalForm token={token} onAdded={addProposal} />
       {openItem ? renderPanel(openItem) : null}
+      {/* #109: コマンドパレット(⌘K / /)。タイトル検索→詳細へジャンプ。 */}
+      {paletteOpen ? (
+        <CommandPalette
+          items={navItems.map((item) => ({
+            id: item.id,
+            title: item.title,
+            subtitle: item.subtitle,
+          }))}
+          onJump={(id) => {
+            setOpenId(id);
+            setPaletteOpen(false);
+          }}
+          onClose={() => setPaletteOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }
