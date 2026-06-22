@@ -135,6 +135,17 @@ describe("GET", () => {
     const res = await GET(getRequest(SECRET));
     expect(res.status).toBe(500);
   });
+
+  it("Notion 取得が失敗したら 502(空ボディではなく JSON で詳細を返さない)", async () => {
+    vi.mocked(queryDataSource).mockRejectedValue(new Error("Notion 400: secret detail"));
+    const res = await GET(getRequest(SECRET));
+    expect(res.status).toBe(502);
+    // 本文が空でない JSON であること(クライアントの res.json() が壊れない)
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toBe("取得中にエラーが発生しました");
+    expect(json.error).not.toMatch(/secret detail/);
+  });
 });
 
 describe("POST", () => {
