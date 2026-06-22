@@ -17,6 +17,13 @@ import {
   STAGE_STEPS,
   stageStepIndex,
 } from "./board";
+import {
+  GENERATING_STEPS,
+  isInFlight,
+  isStuck,
+  newlyDraftedIds,
+  STUCK_THRESHOLD_MS,
+} from "./generating";
 
 import { AddProposalForm } from "./AddProposalForm";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
@@ -182,6 +189,12 @@ export function ApproveClient() {
   // 認証無効時はマウント時の自動取得が走るため、その間は読み込み中表示にする。
   const [loadError, setLoadError] = useState("");
   const [items, setItems] = useState<PendingItem[]>([]);
+  // #108: 完了トースト/滞留検知用。itemsRef は poll で前回値を参照、nowTick は滞留経過の基準時刻、
+  // firstSeenRef は記事が生成待ち/生成中に入った時刻。
+  const [toasts, setToasts] = useState<{ id: string; message: string }[]>([]);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  const itemsRef = useRef<PendingItem[]>([]);
+  const firstSeenRef = useRef<Map<string, number>>(new Map());
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
@@ -254,6 +267,63 @@ export function ApproveClient() {
       setReviseError(toMessage(error, "最新の取得に失敗しました。"));
     }
   }, [token]);
+
+  // #108: poll で前回 items を参照できるよう itemsRef を最新化する。
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // #108: 記事が生成待ち/生成中に入った時刻を記録し、抜けたら破棄する(滞留検知の基準)。
+  useEffect(() => {
+    const now = Date.now();
+    const seen = firstSeenRef.current;
+    items.forEach((item) => {
+      if (isInFlight(item.stage)) {
+        if (!seen.has(item.id)) seen.set(item.id, now);
+      } else {
+        seen.delete(item.id);
+      }
+    });
+  }, [items]);
+
+  // #108: 盤の最新化ポーリング。生成完了(→drafted)を検知してトースト、滞留経過の基準時刻も更新。
+  const pollBoard = useCallback(async (): Promise<void> => {
+    let next: PendingItem[];
+    try {
+      next = await fetchPending(token);
+    } catch {
+      return; // 失敗は次の poll で回復(沈黙させるが盤は前回値を維持)。
+    }
+    const doneIds = newlyDraftedIds(itemsRef.current, next);
+    if (doneIds.length > 0) {
+      const done = new Set(doneIds);
+      setToasts((prev) => [
+        ...prev,
+        ...next
+          .filter((item) => done.has(item.id))
+          .map((item) => ({
+            id: `done-${item.id}`,
+            message: `「${item.title}」の下書きが完成しました`,
+          })),
+      ]);
+    }
+    setItems(next);
+    setNowTick(Date.now());
+  }, [token]);
+
+  // 生成待ち/生成中がある間だけポーリングする(完了検知＋滞留経過の更新)。
+  const hasInFlight = items.some((item) => isInFlight(item.stage));
+  useEffect(() => {
+    if (!hasInFlight) return;
+    const timer = setInterval(() => {
+      void pollBoard();
+    }, REVISE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [hasInFlight, pollBoard]);
+
+  function dismissToast(id: string): void {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }
 
   // #43: 開いている記事が提示待ち(依頼中/処理中)かどうか。
   const polledItem = openId ? items.find((it) => it.id === openId) : undefined;
@@ -833,6 +903,11 @@ export function ApproveClient() {
     // #107: 記事カードは段階インジケータ(提案→…→公開)とスコアバーを上部に出す。
     const isIdea = item.kind === "idea";
     const step = isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1;
+    // #108: 生成待ち/生成中が閾値を超えて滞留しているか(自宅PC停止の疑い)。
+    const stuck =
+      isIdea &&
+      isInFlight(item.stage) &&
+      isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS);
     const ideaHeader = isIdea ? (
       <div className="mb-2">
         <div aria-label="進捗" className="flex items-center gap-1">
@@ -888,19 +963,37 @@ export function ApproveClient() {
             {detailButton}
           </div>
         ) : isAwaitingDownstream(item.stage) ? (
-          // #107: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細のみ。
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">
-              {item.kind === "proposal"
-                ? "承認済み"
-                : item.stage === "generating"
-                  ? "生成中"
-                  : "生成待ち"}
-            </span>
-            <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
-              {item.title}
-            </span>
-            {detailButton}
+          // #107/#108: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細。
+          // 生成中は脈動＋進捗ステップで「執筆中」を可視化、滞留時は優しい警告を出す。
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white ${
+                  item.stage === "generating" ? "motion-safe:animate-pulse" : ""
+                }`}
+              >
+                {item.kind === "proposal"
+                  ? "承認済み"
+                  : item.stage === "generating"
+                    ? "生成中"
+                    : "生成待ち"}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
+                {item.title}
+              </span>
+              {detailButton}
+            </div>
+            {item.stage === "generating" ? (
+              <div className="mt-2 text-xs text-gray-500">
+                <span className="motion-safe:animate-pulse">🖊 自宅PCで執筆中…</span>
+                <span className="ml-2">{GENERATING_STEPS.join(" → ")}</span>
+              </div>
+            ) : null}
+            {stuck ? (
+              <p role="status" className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                時間がかかっています。自宅PCの巡回が動いているか確認してください。
+              </p>
+            ) : null}
           </div>
         ) : (
           <>
@@ -1550,6 +1643,28 @@ export function ApproveClient() {
       <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
         承認した提案は制作キューに追加されます。この場では公開されません。
       </p>
+      {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
+      {toasts.length > 0 ? (
+        <div aria-label="お知らせ" className="mt-2 space-y-1">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              role="status"
+              className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+            >
+              <span className="flex-1">🎉 {toast.message}</span>
+              <button
+                type="button"
+                aria-label={`通知を閉じる: ${toast.message}`}
+                onClick={() => dismissToast(toast.id)}
+                className="shrink-0 rounded border border-green-300 bg-white px-2 py-0.5 text-xs text-green-700"
+              >
+                閉じる
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {allDone ? (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。

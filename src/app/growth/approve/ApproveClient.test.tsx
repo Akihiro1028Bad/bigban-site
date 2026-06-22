@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
@@ -31,6 +31,7 @@ vi.mock("./DraftEditor", () => ({
 }));
 
 import { ApproveClient } from "./ApproveClient";
+import { STUCK_THRESHOLD_MS } from "./generating";
 
 function mockFetchSequence(
   ...responses: Array<{ ok?: boolean; status?: number; json: unknown } | Error | string>
@@ -1848,5 +1849,98 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
 
     expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
     release({ ok: true, status: 200, json: async () => ({ success: true }) });
+  });
+});
+
+describe("ApproveClient 生成中の可視化(#108)", () => {
+  it("生成中カードは『自宅PCで執筆中…』と進捗ステップを出す", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "執筆中記事", stage: "generating" })] },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("執筆中記事");
+    expect(screen.getByText("🖊 自宅PCで執筆中…")).toBeInTheDocument();
+    expect(screen.getByText(/取材 → 構成 → 推敲/)).toBeInTheDocument();
+  });
+
+  it("生成が完了(下書き作成済み)するとトーストを出し、閉じられる", async () => {
+    flags.authEnabled = false;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "完成待ち", stage: "generating" })] } },
+        {
+          json: {
+            success: true,
+            items: [ideaItem({ id: "i1", title: "完成待ち", stage: "drafted", isDraftReady: true })],
+          },
+        }
+      );
+      render(<ApproveClient />);
+      await screen.findByText("完成待ち");
+      await vi.advanceTimersByTimeAsync(5100); // 1回ポーリング
+      // トースト span は「🎉 …」を含むため部分一致で照合する。
+      const toast = await screen.findByText(/「完成待ち」の下書きが完成しました/);
+      expect(toast).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "通知を閉じる: 「完成待ち」の下書きが完成しました" })
+      );
+      expect(
+        screen.queryByText("「完成待ち」の下書きが完成しました")
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("生成中が長引くと滞留警告を出す", async () => {
+    flags.authEnabled = false;
+    // Date は実物のまま spy で制御し、タイマだけ偽装する(setSystemTime の catch-up を避ける)。
+    vi.useFakeTimers({
+      toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"],
+    });
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "長期記事", stage: "generating" })] } },
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "長期記事", stage: "generating" })] } }
+      );
+      render(<ApproveClient />);
+      // マウント取得を flush(firstSeen=0 で記録される)。
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByText("長期記事")).toBeInTheDocument();
+      // 以降の Date.now を閾値超に。1回ポーリングで nowTick が更新され滞留判定が立つ。
+      nowSpy.mockReturnValue(STUCK_THRESHOLD_MS + 1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
+      expect(screen.getByText(/時間がかかっています/)).toBeInTheDocument();
+    } finally {
+      nowSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("ポーリングの取得失敗は握りつぶし、盤は前回値を保つ", async () => {
+    flags.authEnabled = false;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "継続記事", stage: "generating" })] } },
+        { ok: false, status: 500, json: { success: false, error: "一時エラー" } }
+      );
+      render(<ApproveClient />);
+      await screen.findByText("継続記事");
+      await vi.advanceTimersByTimeAsync(5100); // poll 失敗
+      // 盤は前回値を保ち、トーストは出ない。
+      expect(screen.getByText("継続記事")).toBeInTheDocument();
+      expect(screen.queryByText(/下書きが完成しました/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
