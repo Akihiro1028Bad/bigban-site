@@ -56,10 +56,22 @@ function statusFilter(value: string): unknown {
   return { property: STATUS_PROP, select: { equals: value } };
 }
 
-// #87: 記事は「提案中」に加え「下書き作成済み」も取得する(承認後に下書きを
-// プレビュー/編集できるよう、承認画面の下書きタブへ流す)。
+// #106: パイプライン盤のため、記事は全段階(提案中/承認=生成待ち/生成中/下書き作成済み)を
+// 横断取得する(却下はアーカイブ扱いで除外)。承認後に消えず盤に残せるようにする。
 function ideaStatusFilter(): unknown {
-  return { or: [statusFilter("提案中"), statusFilter(DRAFT_READY_STATUS)] };
+  return {
+    or: [
+      statusFilter("提案中"),
+      statusFilter("承認"),
+      statusFilter("生成中"),
+      statusFilter(DRAFT_READY_STATUS),
+    ],
+  };
+}
+
+// #106: 施策も未処理に加え承認を取得し、盤の施策レーンで段階表示できるようにする。
+function proposalStatusFilter(): unknown {
+  return { or: [statusFilter("未処理"), statusFilter("承認")] };
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -71,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const proposals = await queryDataSource(
     PROPOSAL_DS,
-    { filter: statusFilter("未処理"), pageSize: 100 },
+    { filter: proposalStatusFilter(), pageSize: 100 },
     options
   );
   const ideas = await queryDataSource(

@@ -72,6 +72,7 @@ describe("proposalToItem", () => {
       subtitle: "MEO",
       details: [{ label: "想定アクション", value: "GBP更新" }],
       score: 0,
+      stage: "untouched",
     });
   });
 

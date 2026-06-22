@@ -77,12 +77,13 @@ describe("GET", () => {
         subtitle: "サイト表示内容",
         details: [{ label: "確度", value: "高" }],
         score: 0,
+        stage: "untouched",
       },
     ]);
     expect(queryDataSource).toHaveBeenCalledTimes(2);
   });
 
-  it("記事は提案中＋下書き作成済みの両方を取得する(#87)", async () => {
+  it("記事は全段階(提案中/承認/生成中/下書き作成済み)を横断取得する(#106)", async () => {
     vi.mocked(queryDataSource)
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
@@ -91,7 +92,23 @@ describe("GET", () => {
     expect(ideasArgs[1].filter).toEqual({
       or: [
         { property: "ステータス", select: { equals: "提案中" } },
+        { property: "ステータス", select: { equals: "承認" } },
+        { property: "ステータス", select: { equals: "生成中" } },
         { property: "ステータス", select: { equals: "下書き作成済み" } },
+      ],
+    });
+  });
+
+  it("施策は未処理＋承認を取得する(#106)", async () => {
+    vi.mocked(queryDataSource)
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
+      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    await GET(getRequest(SECRET));
+    const proposalArgs = vi.mocked(queryDataSource).mock.calls[0];
+    expect(proposalArgs[1].filter).toEqual({
+      or: [
+        { property: "ステータス", select: { equals: "未処理" } },
+        { property: "ステータス", select: { equals: "承認" } },
       ],
     });
   });
