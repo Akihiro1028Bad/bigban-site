@@ -67,6 +67,9 @@ export default defineConfig({
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
         // 受信側描画は DraftFrameClient.test.tsx でテスト済み。
         "src/app/growth/approve/DraftPreviewFrame.tsx",
+        // 全画面モーダル/フォーカストラップ/iframe への薄い DOM 結線(#104)。
+        // 純ロジックは draftWorkspace.ts でテスト済み。
+        "src/app/growth/approve/DraftEditWorkspace.tsx",
       ],
       thresholds: {
         statements: 100,

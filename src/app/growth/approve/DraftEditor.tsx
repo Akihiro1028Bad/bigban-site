@@ -141,7 +141,7 @@ export function DraftEditor({ initialHtml, onChange }: DraftEditorProps) {
 
   return (
     <div>
-      <div role="toolbar" aria-label="装飾ツールバー" className="mb-2 flex flex-wrap gap-1">
+      <div role="toolbar" aria-label="装飾ツールバー" className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-white">
         {TOOLBAR_HEADINGS.map((h) => (
           <button
             key={h.level}
