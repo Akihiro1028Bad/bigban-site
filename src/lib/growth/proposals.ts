@@ -4,6 +4,7 @@
  */
 
 import type { PendingItem } from "./approve";
+import { deriveProposalStage } from "./stage";
 
 /** 施策提案 DB のカテゴリ選択肢(週次モードと共通)。 */
 export const PROPOSAL_CATEGORIES = [
@@ -81,5 +82,6 @@ export function proposalToItem(id: string, input: ProposalInput): PendingItem {
     subtitle: input.category,
     details,
     score: 0,
+    stage: deriveProposalStage(STATUS_PENDING),
   };
 }
