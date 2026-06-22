@@ -6,7 +6,17 @@ import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
+import type { Stage } from "@/lib/growth/stage";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+
+import {
+  effectiveStage,
+  groupArticlesByStage,
+  isAwaitingDownstream,
+  scoreBarPct,
+  STAGE_STEPS,
+  stageStepIndex,
+} from "./board";
 
 import { AddProposalForm } from "./AddProposalForm";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
@@ -62,10 +72,9 @@ interface PendingItem {
   contentId?: string;
   // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
   isDraftReady?: boolean;
+  // #106/#107: パイプライン段階。盤の列分け・段階インジケータに使う。
+  stage: Stage;
 }
-
-// #87: タブの種別。施策/記事に加え、下書き作成済みの記事を集める「下書き」タブを持つ。
-type TabKey = "proposal" | "idea" | "draft";
 
 // #75: 下書きプレビューの取得状態。
 interface DraftPreview {
@@ -153,20 +162,9 @@ function choiceButtonClass(activeClass: string): string {
   return `${TAP_TARGET} ${activeClass} disabled:opacity-50`;
 }
 
-// #90: カテゴリタブのスタイル。選択中は枠＋淡色背景で明示する(AAコントラスト)。
-function tabClass(selected: boolean): string {
-  const base = `${TAP_TARGET} flex-1 border text-center`;
-  return selected
-    ? `${base} border-blue-600 bg-blue-50 text-blue-700 font-medium`
-    : `${base} border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
-}
-
-// #90: 「未処理のみ」トグル(role=switch)のスタイル。ON は淡青で状態を示す。
-function filterToggleClass(active: boolean): string {
-  const base = `${TAP_TARGET} border`;
-  return active
-    ? `${base} border-blue-600 bg-blue-50 text-blue-700`
-    : `${base} border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
+// #107: 盤の列ヘッダ用スタイル。件数バッジ付きの淡色ヘッダ。
+function columnHeaderClass(): string {
+  return "flex items-center justify-between rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700";
 }
 
 export function ApproveClient() {
@@ -196,9 +194,6 @@ export function ApproveClient() {
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
   // #90: トリアージ型UI。表示中のカテゴリタブ・未処理のみ表示・処理済みアコーディオンの開閉。
-  const [activeTab, setActiveTab] = useState<TabKey>("proposal");
-  const [unprocessedOnly, setUnprocessedOnly] = useState(true);
-  const [showProcessed, setShowProcessed] = useState(false);
   // #53: 構成案セクション(index)ごとに溜めたコメント(複数可)。送信時に {見出し, comment} へ展開。
   const [draftComments, setDraftComments] = useState<Record<number, string[]>>({});
   // 現在コメント入力欄を開いているセクション index(null=どれも開いていない)。
@@ -813,29 +808,10 @@ export function ApproveClient() {
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
   const openItem = openId ? items.find((item) => item.id === openId) : undefined;
 
-  // #87: 記事を「提案中(承認待ち)」と「下書き作成済み」に分け、後者は専用タブへ。
-  const pendingIdeas = ideas.filter((item) => !item.isDraftReady);
-  const draftIdeas = ideas.filter((item) => item.isDraftReady);
-
-  // #90/#87: 存在するカテゴリだけをタブにする(施策/記事/下書き)。
-  const tabDefs = [
-    { key: "proposal" as const, label: "施策", items: proposals },
-    { key: "idea" as const, label: "記事", items: pendingIdeas },
-    { key: "draft" as const, label: "下書き", items: draftIdeas },
-  ].filter((tab) => tab.items.length > 0);
-  // activeTab が現在の一覧に無ければ先頭タブにフォールバック(取得直後/カテゴリ消滅時)。
-  const effectiveDef = tabDefs.find((tab) => tab.key === activeTab) ?? tabDefs[0];
-  const activeItems = effectiveDef.items;
-  // 未処理のみ表示のとき、処理済みは下部のアコーディオンへ退避する(トリアージ最適化)。
-  const decidedItems = activeItems.filter((item) => decided[item.id]);
-  const undecidedItems = activeItems.filter((item) => !decided[item.id]);
-  const mainList = unprocessedOnly ? undecidedItems : activeItems;
-
-  // #90: カテゴリを切り替える。処理済みアコーディオンは畳んだ状態から始める。
-  function selectTab(key: TabKey): void {
-    setActiveTab(key);
-    setShowProcessed(false);
-  }
+  // #107: 記事をパイプライン段階(#106)ごとの列に振り分ける。承認は生成待ち列へ前進。
+  const articleColumns = groupArticlesByStage(ideas, decided);
+  // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
+  const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
   // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
   function renderItem(item: PendingItem) {
@@ -854,8 +830,32 @@ export function ApproveClient() {
         詳細
       </button>
     );
+    // #107: 記事カードは段階インジケータ(提案→…→公開)とスコアバーを上部に出す。
+    const isIdea = item.kind === "idea";
+    const step = isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1;
+    const ideaHeader = isIdea ? (
+      <div className="mb-2">
+        <div aria-label="進捗" className="flex items-center gap-1">
+          {STAGE_STEPS.map((label, i) => (
+            <span
+              key={label}
+              aria-current={i === step ? "step" : undefined}
+              className={`h-1.5 w-1.5 rounded-full ${i <= step ? "bg-blue-600" : "bg-gray-300"}`}
+            />
+          ))}
+          <span className="ml-1 text-xs text-gray-500">{STAGE_STEPS[step]}</span>
+        </div>
+        <div className="mt-1 h-1 w-full rounded-full bg-gray-200">
+          <div
+            className="h-1 rounded-full bg-blue-500"
+            style={{ width: `${scoreBarPct(item.score ?? 0, ideaMaxScore)}%` }}
+          />
+        </div>
+      </div>
+    ) : null;
     return (
       <li key={item.id} className={rowClass(choice, Boolean(failure))} data-decision={choice ?? ""}>
+        {ideaHeader}
         {choice ? (
           <div className="flex items-center gap-2">
             <span className="shrink-0 text-sm text-gray-700">
@@ -881,6 +881,21 @@ export function ApproveClient() {
           <div className="flex items-center gap-2">
             <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
               📝 下書き
+            </span>
+            <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
+              {item.title}
+            </span>
+            {detailButton}
+          </div>
+        ) : isAwaitingDownstream(item.stage) ? (
+          // #107: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細のみ。
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">
+              {item.kind === "proposal"
+                ? "承認済み"
+                : item.stage === "generating"
+                  ? "生成中"
+                  : "生成待ち"}
             </span>
             <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
               {item.title}
@@ -1540,67 +1555,37 @@ export function ApproveClient() {
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
         </p>
       ) : null}
-      <div role="tablist" aria-label="提案カテゴリ" className="mt-4 flex gap-2">
-        {tabDefs.map((tab) => {
-          const selected = tab.key === effectiveDef.key;
-          const remaining = tab.items.filter((item) => !decided[item.id]).length;
-          // 下書きタブは承認待ちではないため「未処理」ではなく総数を出す。
-          const badge = tab.key === "draft" ? `${tab.items.length}件` : `未処理${remaining}件`;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              id={`tab-${tab.key}`}
-              aria-selected={selected}
-              aria-controls={`panel-${tab.key}`}
-              onClick={() => selectTab(tab.key)}
-              className={tabClass(selected)}
-            >
-              {tab.label}（{badge}）
-            </button>
-          );
-        })}
-      </div>
-      <section
-        role="tabpanel"
-        id={`panel-${effectiveDef.key}`}
-        aria-labelledby={`tab-${effectiveDef.key}`}
-        className="mt-3"
-      >
-        <div className="flex justify-end">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={unprocessedOnly}
-            onClick={() => setUnprocessedOnly((prev) => !prev)}
-            className={filterToggleClass(unprocessedOnly)}
-          >
-            未処理のみ
-          </button>
-        </div>
-        {mainList.length > 0 ? (
-          <ul className="mt-2 space-y-2">{mainList.map(renderItem)}</ul>
-        ) : (
-          <p className="mt-3 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            未処理の{effectiveDef.label}はありません。
-          </p>
-        )}
-        {unprocessedOnly && decidedItems.length > 0 ? (
-          <div className="mt-3">
-            <button
-              type="button"
-              aria-expanded={showProcessed}
-              onClick={() => setShowProcessed((prev) => !prev)}
-              className={`${TAP_TARGET} w-full border border-gray-300 bg-white text-left text-gray-700 hover:bg-gray-50`}
-            >
-              処理済み（{decidedItems.length}）
-            </button>
-            {showProcessed ? (
-              <ul className="mt-2 space-y-2">{decidedItems.map(renderItem)}</ul>
-            ) : null}
+      {/* #107: 施策レーン(記事とは出力先が違うため別枠でラベル分離)。 */}
+      {proposals.length > 0 ? (
+        <section aria-label="施策レーン" className="mt-4">
+          <div className={columnHeaderClass()}>
+            <span>施策</span>
+            <span className="text-xs text-gray-500">{proposals.length}件</span>
           </div>
-        ) : null}
+          <ul className="mt-2 space-y-2">{proposals.map(renderItem)}</ul>
+        </section>
+      ) : null}
+
+      {/* #107: 記事パイプライン盤。提案中→生成待ち→生成中→下書き を左→右へ。 */}
+      <section
+        aria-label="記事パイプライン"
+        className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4"
+      >
+        {articleColumns.map(({ column, items: columnItems }) => (
+          <section key={column.stage} aria-label={`列: ${column.label}`}>
+            <div className={columnHeaderClass()}>
+              <span>{column.label}</span>
+              <span className="text-xs text-gray-500">{columnItems.length}件</span>
+            </div>
+            {columnItems.length > 0 ? (
+              <ul className="mt-2 space-y-2">{columnItems.map(renderItem)}</ul>
+            ) : (
+              <p className="mt-2 rounded-md bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">
+                なし
+              </p>
+            )}
+          </section>
+        ))}
       </section>
       <AddProposalForm token={token} onAdded={addProposal} />
       {openItem ? renderPanel(openItem) : null}

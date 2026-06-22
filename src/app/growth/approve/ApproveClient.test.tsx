@@ -67,15 +67,15 @@ async function login(pass: string = PASS): Promise<void> {
   await userEvent.click(screen.getByRole("button", { name: "確認する" }));
 }
 
-// #90: 「未処理のみ」(既定ON)を解除し、処理済みも一覧にインライン表示させる。
-// 承認/却下後の行をその場で操作する機構テストで使う(処理済みアコーディオンへ退避させない)。
+// #107: 盤では決定済みカードも各列に残り続けるため「未処理のみ」トグルは廃止。
+// 旧テストの呼び出し互換のため no-op として残す(決定済みは常に列に表示される)。
 async function showAll(): Promise<void> {
-  await userEvent.click(screen.getByRole("switch", { name: "未処理のみ" }));
+  // 盤レイアウトでは決定済みカードが常時表示されるため何もしない。
 }
 
-// #90: 指定カテゴリのタブへ切り替える(施策/記事)。
-async function selectTab(name: RegExp): Promise<void> {
-  await userEvent.click(screen.getByRole("tab", { name }));
+// #107: 盤では施策レーン・記事列が同時表示されタブ切替が不要。互換のため no-op。
+async function selectTab(_name: RegExp): Promise<void> {
+  // 盤レイアウトでは全カテゴリが同時に見えるため切替不要。
 }
 
 function proposalItem(over: Partial<Record<string, unknown>> = {}) {
@@ -88,6 +88,7 @@ function proposalItem(over: Partial<Record<string, unknown>> = {}) {
       { label: "優先度スコア", value: "8.5" },
       { label: "確度", value: "高" },
     ],
+    stage: "untouched",
     ...over,
   };
 }
@@ -99,6 +100,7 @@ function ideaItem(over: Partial<Record<string, unknown>> = {}) {
     title: "猛暑記事",
     subtitle: "夏の集客",
     details: [{ label: "優先度", value: "中" }],
+    stage: "proposed",
     ...over,
   };
 }
@@ -552,14 +554,14 @@ describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
 });
 
 describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
-  it("施策/記事をタブで分け、各タブ内を優先度降順に並べる", async () => {
+  it("施策はレーン、記事は段階列に分け、各内を優先度降順に並べる(#107)", async () => {
     mockFetchSequence({
       json: {
         success: true,
         items: [
-          { id: "p1", kind: "proposal", title: "低スコア施策", subtitle: "", details: [], score: 2 },
-          { id: "p2", kind: "proposal", title: "高スコア施策", subtitle: "", details: [], score: 9 },
-          { id: "i1", kind: "idea", title: "記事A", subtitle: "", details: [], score: 1 },
+          { id: "p1", kind: "proposal", title: "低スコア施策", subtitle: "", details: [], score: 2, stage: "untouched" },
+          { id: "p2", kind: "proposal", title: "高スコア施策", subtitle: "", details: [], score: 9, stage: "untouched" },
+          { id: "i1", kind: "idea", title: "記事A", subtitle: "", details: [], score: 1, stage: "proposed" },
         ],
       },
     });
@@ -567,121 +569,136 @@ describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
     await login();
     await screen.findByText("高スコア施策");
 
-    // #90: セクション見出しではなくタブで分ける
-    expect(screen.getByRole("tab", { name: /施策/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /記事/ })).toBeInTheDocument();
+    // #107: タブではなく 施策レーン＋記事パイプライン盤
+    expect(screen.getByRole("region", { name: "施策レーン" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
+    expect(screen.getByText("記事A")).toBeInTheDocument();
     const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
     expect(titles).toEqual(["高スコア施策", "低スコア施策"]);
   });
 
-  it("施策のみのときは記事タブを出さない", async () => {
+  it("施策のみのときは施策レーンに出る(#107)", async () => {
     mockFetchSequence({
       json: {
         success: true,
-        items: [{ id: "p1", kind: "proposal", title: "施策のみ", subtitle: "", details: [], score: 1 }],
+        items: [{ id: "p1", kind: "proposal", title: "施策のみ", subtitle: "", details: [], score: 1, stage: "untouched" }],
       },
     });
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策のみ");
-    expect(screen.getByRole("tab", { name: /施策/ })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /記事/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "施策レーン" })).toBeInTheDocument();
   });
 
-  it("記事のみのときは施策タブを出さない(既定タブが無くてもフォールバック表示)", async () => {
+  it("記事のみのときは施策レーンを出さない(#107)", async () => {
     mockFetchSequence({
       json: {
         success: true,
-        items: [{ id: "i1", kind: "idea", title: "記事のみ", subtitle: "", details: [], score: 1 }],
+        items: [{ id: "i1", kind: "idea", title: "記事のみ", subtitle: "", details: [], score: 1, stage: "proposed" }],
       },
     });
     render(<ApproveClient />);
     await login();
     await screen.findByText("記事のみ");
-    expect(screen.getByRole("tab", { name: /記事/ })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /施策/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "施策レーン" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
   });
 });
 
-describe("ApproveClient トリアージ表示(#90)", () => {
-  it("タブを切り替えると表示カテゴリが入れ替わる", async () => {
-    mockFetchSequence({
-      json: { success: true, items: [proposalItem(), ideaItem()] },
-    });
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("市川ページ");
-
-    // 既定は施策タブ。記事は隠れている。
-    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("猛暑記事")).not.toBeInTheDocument();
-
-    await selectTab(/記事/);
-    expect(screen.getByText("猛暑記事")).toBeInTheDocument();
-    expect(screen.queryByText("市川ページ")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("タブのバッジに未処理件数を表示する", async () => {
+describe("ApproveClient パイプライン盤(#107)", () => {
+  it("記事は段階ごとの列に並ぶ(提案中/下書き)", async () => {
     mockFetchSequence({
       json: {
         success: true,
-        items: [proposalItem(), proposalItem({ id: "p2", title: "他カード" })],
+        items: [
+          ideaItem({ id: "i1", title: "提案中記事", stage: "proposed" }),
+          ideaItem({ id: "i2", title: "下書き記事", stage: "drafted", isDraftReady: true }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("提案中記事");
+
+    const proposed = screen.getByRole("region", { name: "列: 提案中" });
+    const drafted = screen.getByRole("region", { name: "列: 下書き" });
+    expect(within(proposed).getByText("提案中記事")).toBeInTheDocument();
+    expect(within(drafted).getByText("下書き記事")).toBeInTheDocument();
+  });
+
+  it("列ヘッダに件数バッジを表示する(#107)", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem(),
+          proposalItem({ id: "p2", title: "他カード" }),
+        ],
       },
     });
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
-    expect(screen.getByRole("tab", { name: /施策（未処理2件）/ })).toBeInTheDocument();
+    const lane = screen.getByRole("region", { name: "施策レーン" });
+    expect(within(lane).getByText("2件")).toBeInTheDocument();
   });
 
-  it("既定は未処理のみON。承認した行は処理済みアコーディオンへ退避する", async () => {
+  it("生成待ち列の記事は承認/却下を出さず生成待ち表示にする(#107)", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "承認済み記事", stage: "queued" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("承認済み記事");
+    const queued = screen.getByRole("region", { name: "列: 生成待ち" });
+    // 列ヘッダ＋カードバッジの両方に「生成待ち」が出る(=カードが状態表示になっている)。
+    expect(within(queued).getAllByText("生成待ち").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole("button", { name: "承認: 承認済み記事" })).not.toBeInTheDocument();
+  });
+
+  it("生成中の記事は『生成中』バッジを出す(#107)", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "執筆中記事", stage: "generating" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("執筆中記事");
+    const generating = screen.getByRole("region", { name: "列: 生成中" });
+    expect(within(generating).getAllByText("生成中").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("承認済みの施策はレーンで『承認済み』表示にする(#107)", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [proposalItem({ id: "p9", title: "承認済み施策", stage: "approved" })],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("承認済み施策");
+    const lane = screen.getByRole("region", { name: "施策レーン" });
+    expect(within(lane).getByText("承認済み")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "承認: 承認済み施策" })).not.toBeInTheDocument();
+  });
+
+  it("承認するとカードが生成待ち列へ移動し、取り消せる(#107)", async () => {
     mockFetchSequence(
-      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, items: [ideaItem({ id: "i1", title: "前進記事", stage: "proposed" })] } },
       { json: { success: true, updated: 1 } }
     );
     render(<ApproveClient />);
     await login();
-    await screen.findByText("市川ページ");
-    expect(screen.getByRole("switch", { name: "未処理のみ" })).toHaveAttribute(
-      "aria-checked",
-      "true"
-    );
+    await screen.findByText("前進記事");
 
-    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await userEvent.click(screen.getByRole("button", { name: "承認: 前進記事" }));
 
-    // 退避: 処理済みは折りたたまれ、未処理一覧は空メッセージになる。
-    const accordion = await screen.findByRole("button", { name: /処理済み（1）/ });
-    expect(screen.getByText("未処理の施策はありません。")).toBeInTheDocument();
-    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
-
-    // 展開すると取り消し導線が出る。
-    await userEvent.click(accordion);
-    expect(screen.getByText("承認しました")).toBeInTheDocument();
+    // 生成待ち列へ移り、決定済みカード(取り消し導線)が出る。消えない。
+    const queued = screen.getByRole("region", { name: "列: 生成待ち" });
+    expect(await within(queued).findByText("承認しました")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "取り消す: 市川ページ" })
+      within(queued).getByRole("button", { name: "取り消す: 前進記事" })
     ).toBeInTheDocument();
-  });
-
-  it("未処理のみをOFFにすると処理済みも一覧にインライン表示する", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [proposalItem()] } },
-      { json: { success: true, updated: 1 } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("市川ページ");
-    await showAll();
-    expect(screen.getByRole("switch", { name: "未処理のみ" })).toHaveAttribute(
-      "aria-checked",
-      "false"
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
-
-    // インライン表示: アコーディオンは出さず、その場で承認済み表示。
-    expect(await screen.findByText("承認しました")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /処理済み（/ })).not.toBeInTheDocument();
   });
 });
 
@@ -884,20 +901,26 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
 
 describe("ApproveClient 下書きタブ(#87)", () => {
   function draftIdea(over: Partial<Record<string, unknown>> = {}) {
-    return ideaItem({ id: "d1", title: "下書き記事", isDraftReady: true, contentId: "g-1", ...over });
+    return ideaItem({
+      id: "d1",
+      title: "下書き記事",
+      isDraftReady: true,
+      contentId: "g-1",
+      stage: "drafted",
+      ...over,
+    });
   }
 
-  it("下書き作成済みは「下書き」タブに入り、記事タブには出さない", async () => {
+  it("下書き作成済みは「下書き」列に入る(#107)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem(), draftIdea()] } });
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    // 既定(記事タブ)では下書き記事は出ない
-    expect(screen.queryByText("下書き記事")).not.toBeInTheDocument();
-    // 下書きタブへ切り替えると見える（記事は隠れる）
-    await selectTab(/下書き/);
-    expect(screen.getByText("下書き記事")).toBeInTheDocument();
-    expect(screen.queryByText("猛暑記事")).not.toBeInTheDocument();
+    // 提案中記事は提案中列、下書き記事は下書き列。
+    const proposed = screen.getByRole("region", { name: "列: 提案中" });
+    const drafted = screen.getByRole("region", { name: "列: 下書き" });
+    expect(within(proposed).getByText("猛暑記事")).toBeInTheDocument();
+    expect(within(drafted).getByText("下書き記事")).toBeInTheDocument();
   });
 
   it("下書き行は承認/却下を出さず、詳細のみ表示する", async () => {
