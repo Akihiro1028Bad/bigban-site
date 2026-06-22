@@ -444,6 +444,9 @@ export function ApproveClient() {
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaveError, setDraftSaveError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // #110: 盤の下書きカードから直接編集を開く際、ドロワーの下書き取得完了を待って
+  // ワークスペースを自動オープンするための保留 id(対象ページ)。
+  const [pendingEditId, setPendingEditId] = useState<string | null>(null);
   // #98: 編集中の本番ライブプレビュー。高頻度更新を間引くため editedHtml をデバウンスする。
   const livePreviewHtml = useDebouncedValue(editedHtml, LIVE_PREVIEW_DEBOUNCE_MS);
 
@@ -454,6 +457,31 @@ export function ApproveClient() {
     setDraftSaveError("");
     setConfirmDiscard(false);
   }
+
+  // #110: 盤カードの「編集」: ドロワーを開いて下書きを取得し、準備でき次第ワークスペースを開く。
+  function openCardEditor(id: string): void {
+    setOpenId(id);
+    setPendingEditId(id);
+  }
+
+  // #110: 盤カードから編集を開いた時、下書き取得が完了したらワークスペースを自動オープンする。
+  // ドロワーを別の対象/閉じる に切り替えたら保留を破棄する。
+  useEffect(() => {
+    if (!pendingEditId) return;
+    if (pendingEditId !== openId) {
+      setPendingEditId(null);
+      return;
+    }
+    if (draftState.status === "ready") {
+      const html = draftState.draft.bodyHtml;
+      setEditingDraft(true);
+      setDraftOriginalHtml(html);
+      setEditedHtml(html);
+      setDraftSaveError("");
+      setConfirmDiscard(false);
+      setPendingEditId(null);
+    }
+  }, [pendingEditId, openId, draftState]);
 
   function exitEditDraft(): void {
     setEditingDraft(false);
@@ -1066,7 +1094,7 @@ export function ApproveClient() {
             </button>
           </div>
         ) : item.isDraftReady ? (
-          // #87: 下書き作成済みは承認/却下を出さず、詳細(プレビュー＋編集)のみ。
+          // #87/#110: 下書き作成済みは承認/却下を出さず、詳細(プレビュー)と編集(全画面)へ。
           <div className="flex items-center gap-2">
             <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
               📝 下書き
@@ -1075,6 +1103,15 @@ export function ApproveClient() {
               {item.title}
             </span>
             {detailButton}
+            <button
+              type="button"
+              id={`card-edit-${item.id}`}
+              aria-label={`編集: ${item.title}`}
+              onClick={() => openCardEditor(item.id)}
+              className={`${TAP_TARGET} border border-blue-600 bg-blue-600 text-white`}
+            >
+              編集
+            </button>
           </div>
         ) : isAwaitingDownstream(item.stage) ? (
           // #107/#108: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細。
