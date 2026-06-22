@@ -70,6 +70,9 @@ export default defineConfig({
         // 全画面モーダル/フォーカストラップ/iframe への薄い DOM 結線(#104)。
         // 純ロジックは draftWorkspace.ts でテスト済み。
         "src/app/growth/approve/DraftEditWorkspace.tsx",
+        // コマンドパレットの dialog/フォーカストラップ薄結線(#109)。
+        // 絞り込みの純ロジックは boardPrefs.ts でテスト済み。
+        "src/app/growth/approve/CommandPalette.tsx",
       ],
       thresholds: {
         statements: 100,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
@@ -1942,5 +1942,202 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("ApproveClient 操作性(#109)", () => {
+  it("表示密度トグルが効き、localStorage に保存される", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    const toggle = screen.getByRole("button", { name: "標準" });
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "コンパクト" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("growth-approve-density")).toBe("compact");
+  });
+
+  it("密度は localStorage から復元する", async () => {
+    flags.authEnabled = false;
+    window.localStorage.setItem("growth-approve-density", "compact");
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    expect(screen.getByRole("button", { name: "コンパクト" })).toBeInTheDocument();
+    window.localStorage.clear();
+  });
+
+  it("キーボード j で先頭にフォーカスし a で承認する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "j" }); // 先頭へフォーカス
+    fireEvent.keyDown(document.body, { key: "a" }); // 承認
+    expect(await screen.findByText("承認しました")).toBeInTheDocument();
+  });
+
+  it("キーボード r で却下、e で詳細、Esc でパレットを閉じる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    // e: フォーカス先頭→詳細を開く
+    fireEvent.keyDown(document.body, { key: "j" });
+    fireEvent.keyDown(document.body, { key: "e" });
+    expect(await screen.findByRole("dialog", { name: "詳細: 市川ページ" })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+  });
+
+  it("/ でコマンドパレットが開き、検索してジャンプできる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: { success: true, items: [proposalItem(), ideaItem({ title: "猛暑記事" })] },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "/" });
+    const palette = await screen.findByRole("dialog", { name: "コマンドパレット" });
+    await userEvent.type(within(palette).getByLabelText("コマンド検索"), "猛暑");
+    await userEvent.click(within(palette).getByRole("button", { name: /猛暑記事/ }));
+    expect(await screen.findByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+  });
+
+  it("ツールバーの検索ボタンで開き、背景クリックで閉じられる(キーボード非依存)", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: /検索・ジャンプ/ }));
+    expect(await screen.findByRole("dialog", { name: "コマンドパレット" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "コマンドパレットを閉じる" }));
+    expect(screen.queryByRole("dialog", { name: "コマンドパレット" })).not.toBeInTheDocument();
+  });
+
+  it("一括選択して一括承認できる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [proposalItem(), proposalItem({ id: "p2", title: "他施策" })],
+        },
+      },
+      { json: { success: true, updated: 1 } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 他施策" }));
+    expect(screen.getByText("2件 選択中")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "一括承認" }));
+    expect(await screen.findAllByText("承認しました")).toHaveLength(2);
+  });
+
+  it("一括選択を『解除』ボタンでクリアできる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
+    expect(screen.getByText("1件 選択中")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "解除" }));
+    expect(screen.queryByText(/件 選択中/)).not.toBeInTheDocument();
+  });
+
+  it("一括却下もできる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
+    await userEvent.click(screen.getByRole("button", { name: "一括却下" }));
+    expect(await screen.findByText("却下しました")).toBeInTheDocument();
+  });
+
+  it("キーボード r で却下する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "j" });
+    fireEvent.keyDown(document.body, { key: "r" });
+    expect(await screen.findByText("却下しました")).toBeInTheDocument();
+  });
+
+  it("フォーカスが無いと a / e は何もしない", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "a" }); // フォーカス無し
+    fireEvent.keyDown(document.body, { key: "e" }); // フォーカス無し
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "詳細: 市川ページ" })).not.toBeInTheDocument();
+  });
+
+  it("決定済みのカードはキー操作の承認対象にならない", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    // まず承認(決定済みに)。
+    fireEvent.keyDown(document.body, { key: "j" });
+    fireEvent.keyDown(document.body, { key: "a" });
+    await screen.findByText("承認しました");
+    // もう一度 a を押しても二重決定しない(isBulkActionable=false)。
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(screen.getAllByText("承認しました")).toHaveLength(1);
+  });
+
+  it("未対応キーは無視する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "x" }); // 未対応
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+  });
+
+  it("入力欄にフォーカス中の単一キーは抑止する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    const checkbox = screen.getByRole("checkbox", { name: "一括選択: 市川ページ" });
+    fireEvent.keyDown(checkbox, { key: "a" }); // input 上の a は抑止
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+  });
+
+  it("フォーカス無しの r は何もしない(document 直送)", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document, { key: "r" }); // target=document(tagName無)・フォーカス無し
+    expect(screen.queryByText("却下しました")).not.toBeInTheDocument();
+  });
+
+  it("k で上方向、⌘K でパレットを開ける", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "k" }); // prev(先頭で頭打ち)
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true }); // パレット
+    expect(await screen.findByRole("dialog", { name: "コマンドパレット" })).toBeInTheDocument();
   });
 });
