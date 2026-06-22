@@ -2141,3 +2141,87 @@ describe("ApproveClient 操作性(#109)", () => {
     expect(await screen.findByRole("dialog", { name: "コマンドパレット" })).toBeInTheDocument();
   });
 });
+
+describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
+  const draftReady110 = (bodyHtml: string) => ({
+    json: {
+      success: true,
+      exists: true,
+      draft: { title: "T", displayMode: "html", bodyHtml, body: "" },
+    },
+  });
+
+  it("盤の下書きカードの『編集』から全画面ワークスペースが直接開く", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
+        },
+      },
+      draftReady110("<p>本文A</p>")
+    );
+    render(<ApproveClient />);
+    await screen.findByText("下書きA");
+    await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
+    // 下書き取得後にワークスペース(別dialog)が自動で開く。
+    const ws = await screen.findByRole("dialog", { name: "記事を編集" });
+    expect(within(ws).getByLabelText("本文エディタ")).toHaveValue("<p>本文A</p>");
+  });
+
+  it("編集→保存でワークスペースが閉じ、プレビューが最新化する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
+        },
+      },
+      draftReady110("<p>元</p>"),
+      { json: { success: true } },
+      draftReady110("<p>保存後</p>")
+    );
+    render(<ApproveClient />);
+    await screen.findByText("下書きA");
+    await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
+    const ws = await screen.findByRole("dialog", { name: "記事を編集" });
+    await userEvent.click(within(ws).getByRole("button", { name: "保存" }));
+    // ワークスペースが閉じ、ドロワーのプレビュー(iframe)が最新化。
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
+    );
+    const frame = await screen.findByTitle("本番プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>保存後</p>");
+  });
+
+  it("取得前にドロワーを閉じると保留が破棄され、ワークスペースは開かない", async () => {
+    flags.authEnabled = false;
+    let release!: (v: unknown) => void;
+    const pending = new Promise((r) => { release = r; });
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
+        }),
+      })
+      .mockReturnValueOnce(pending); // 下書き取得は保留のまま
+    vi.stubGlobal("fetch", fn);
+
+    render(<ApproveClient />);
+    await screen.findByText("下書きA");
+    await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
+    // 取得中にドロワーを閉じる。
+    await userEvent.click(await screen.findByRole("button", { name: "オーバーレイを閉じる" }));
+    release({ ok: true, status: 200, json: async () => draftReady110("<p>A</p>").json });
+    // ワークスペースは開かない。
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
+    );
+  });
+});
