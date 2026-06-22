@@ -5,6 +5,7 @@
 
 import { BODY_MIRROR_PROP, DRAFT_LINK_PROPS, type NotionPage } from "./notion";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
+import { deriveArticleStage, deriveProposalStage, type Stage } from "./stage";
 
 export type PendingKind = "proposal" | "idea";
 
@@ -35,6 +36,8 @@ export interface PendingItem {
   contentId?: string;
   /** 下書き作成済み(=承認後に下書き生成が完了)。下書きタブ(#87)の振り分けに使う。記事のみ。 */
   isDraftReady?: boolean;
+  /** パイプライン段階(#106)。盤の列分けに使う。記事=ArticleStage / 施策=ProposalStage。 */
+  stage: Stage;
 }
 
 /** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
@@ -177,22 +180,27 @@ export function toPendingItems(
     subtitle: selectName(page, "カテゴリ"),
     details: proposalDetails(page),
     score: numberValue(page, "優先度スコア") ?? 0,
+    stage: deriveProposalStage(selectName(page, STATUS_PROP)),
   }));
-  const ideaItems: PendingItem[] = ideas.map((page) => ({
-    id: page.id,
-    kind: "idea",
-    title: titleText(page, "タイトル案"),
-    subtitle: richText(page, "概要"),
-    details: ideaDetails(page),
-    score: PRIORITY_RANK[selectName(page, "優先度")] ?? 0,
-    // #42: 構成案修正ループ用。構成案は行コメント対象、修正状態はパネルのポーリングで使う。
-    outline: richText(page, OUTLINE_PROP),
-    reviseStatus: reviseStatusOf(page),
-    reviseProposal: richText(page, REVISE_PROPS.proposal),
-    reviseInstructions: richText(page, REVISE_PROPS.instructions),
-    contentId: richText(page, DRAFT_LINK_PROPS.contentId),
-    isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,
-  }));
+  const ideaItems: PendingItem[] = ideas.map((page) => {
+    const contentId = richText(page, DRAFT_LINK_PROPS.contentId);
+    return {
+      id: page.id,
+      kind: "idea",
+      title: titleText(page, "タイトル案"),
+      subtitle: richText(page, "概要"),
+      details: ideaDetails(page),
+      score: PRIORITY_RANK[selectName(page, "優先度")] ?? 0,
+      // #42: 構成案修正ループ用。構成案は行コメント対象、修正状態はパネルのポーリングで使う。
+      outline: richText(page, OUTLINE_PROP),
+      reviseStatus: reviseStatusOf(page),
+      reviseProposal: richText(page, REVISE_PROPS.proposal),
+      reviseInstructions: richText(page, REVISE_PROPS.instructions),
+      contentId,
+      isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,
+      stage: deriveArticleStage(selectName(page, STATUS_PROP), contentId !== ""),
+    };
+  });
   return [...proposalItems, ...ideaItems];
 }
 

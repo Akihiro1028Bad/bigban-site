@@ -55,6 +55,7 @@ describe("POST /api/growth/proposals", () => {
         subtitle: "MEO",
         details: [{ label: "想定アクション", value: "LINE配布" }],
         score: 0,
+        stage: "untouched",
       },
     });
     expect(createPage).toHaveBeenCalledWith(

@@ -104,6 +104,25 @@ describe("toPendingItems", () => {
     expect(item.isDraftReady).toBe(false);
   });
 
+  it("記事の段階(stage)を導出する: 承認かつ下書きID無し→queued(#106)", () => {
+    const page = idea("i9", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "承認" } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.stage).toBe("queued");
+  });
+
+  it("記事の段階(stage)を導出する: 下書き作成済み→drafted(#106)", () => {
+    const page = idea("i10", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "下書き作成済み" } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.stage).toBe("drafted");
+  });
+
+  it("施策の段階(stage)を導出する: 未処理→untouched(#106)", () => {
+    const [item] = toPendingItems([proposal("p2", "T", "C")], []);
+    expect(item.stage).toBe("untouched");
+  });
+
   it("記事ネタ案の修正ステータスを反映する(#42)", () => {
     const page = idea("i9", "T", "S");
     page.properties["修正ステータス"] = { type: "select", select: { name: "提示中" } };
@@ -129,7 +148,15 @@ describe("toPendingItems", () => {
   it("欠落プロパティは空文字・空 details で埋める", () => {
     const bare: NotionPage = { id: "x", url: "", properties: {} };
     expect(toPendingItems([bare], [bare])).toEqual([
-      { id: "x", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
+      {
+        id: "x",
+        kind: "proposal",
+        title: "",
+        subtitle: "",
+        details: [],
+        score: 0,
+        stage: "untouched",
+      },
       {
         id: "x",
         kind: "idea",
@@ -143,6 +170,7 @@ describe("toPendingItems", () => {
         reviseInstructions: "",
         contentId: "",
         isDraftReady: false,
+        stage: "proposed",
       },
     ]);
   });
@@ -170,7 +198,15 @@ describe("toPendingItems", () => {
       },
     };
     expect(toPendingItems([noPlain], [noPlain])).toEqual([
-      { id: "y", kind: "proposal", title: "", subtitle: "", details: [], score: 0 },
+      {
+        id: "y",
+        kind: "proposal",
+        title: "",
+        subtitle: "",
+        details: [],
+        score: 0,
+        stage: "untouched",
+      },
       {
         id: "y",
         kind: "idea",
@@ -184,6 +220,7 @@ describe("toPendingItems", () => {
         reviseInstructions: "",
         contentId: "",
         isDraftReady: false,
+        stage: "proposed",
       },
     ]);
   });
