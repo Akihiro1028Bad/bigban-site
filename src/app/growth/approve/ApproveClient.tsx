@@ -9,8 +9,8 @@ import { pendingStatus } from "@/lib/growth/approve";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 import { AddProposalForm } from "./AddProposalForm";
-import { DraftEditor } from "./DraftEditor";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
+import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
   IMAGE_STYLES,
@@ -1340,94 +1340,45 @@ export function ApproveClient() {
         ) : draftState.status === "empty" ? (
           <p className="mt-2 text-sm text-gray-500">下書きが見つかりませんでした。</p>
         ) : draftState.status === "ready" ? (
-          editingDraft ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-2"
+          >
+            <DraftPreviewFrame
+              title="本番プレビュー"
+              html={draftState.draft.bodyHtml || draftState.draft.body}
+              className={PREVIEW_FRAME_CLASS}
+            />
             <div className="mt-2">
-              <DraftEditor initialHtml={draftOriginalHtml} onChange={setEditedHtml} />
-              {/* #100: 入力に追従する本番ライブプレビュー(iframe 内で globals.css 適用)。 */}
-              <section aria-label="本番プレビュー" className="mt-3">
-                <p className="mb-1 text-xs text-gray-500">本番プレビュー（入力に追従）</p>
-                <DraftPreviewFrame
-                  title="本番ライブプレビュー"
-                  html={livePreviewHtml}
-                  className={PREVIEW_FRAME_CLASS}
-                />
-              </section>
-              {draftSaveError ? (
-                <p role="alert" className="mt-2 text-sm text-red-700">
-                  {draftSaveError}
-                </p>
-              ) : null}
-              {confirmDiscard ? (
-                <div
-                  role="alert"
-                  className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
-                >
-                  <span className="flex-1">未保存の変更を破棄しますか？</span>
-                  <button
-                    type="button"
-                    onClick={exitEditDraft}
-                    className={choiceButtonClass("border border-red-600 bg-red-600 text-white")}
-                  >
-                    破棄する
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDiscard(false)}
-                    className={choiceButtonClass(
-                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    編集に戻る
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => saveDraft(item)}
-                    disabled={draftSaving}
-                    className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-                  >
-                    {draftSaving ? "保存中…" : "保存"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEditDraft}
-                    disabled={draftSaving}
-                    className={choiceButtonClass(
-                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                aria-label="下書きを編集"
+                onClick={() => startEditDraft(draftState.draft.bodyHtml)}
+                className={choiceButtonClass(
+                  "border border-blue-600 bg-blue-600 text-white"
+                )}
+              >
+                編集
+              </button>
             </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-2"
-            >
-              <DraftPreviewFrame
-                title="本番プレビュー"
-                html={draftState.draft.bodyHtml || draftState.draft.body}
-                className={PREVIEW_FRAME_CLASS}
+            {/* #104: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。 */}
+            {editingDraft ? (
+              <DraftEditWorkspace
+                title={draftState.draft.title}
+                initialHtml={draftOriginalHtml}
+                livePreviewHtml={livePreviewHtml}
+                onChange={setEditedHtml}
+                onSave={() => saveDraft(item)}
+                onCancel={cancelEditDraft}
+                saving={draftSaving}
+                saveError={draftSaveError}
+                confirmDiscard={confirmDiscard}
+                onConfirmDiscard={exitEditDraft}
+                onCancelDiscard={() => setConfirmDiscard(false)}
               />
-              <div className="mt-2">
-                <button
-                  type="button"
-                  aria-label="下書きを編集"
-                  onClick={() => startEditDraft(draftState.draft.bodyHtml)}
-                  className={choiceButtonClass(
-                    "border border-blue-600 bg-blue-600 text-white"
-                  )}
-                >
-                  編集
-                </button>
-              </div>
-            </motion.div>
-          )
+            ) : null}
+          </motion.div>
         ) : (
           <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
         )}

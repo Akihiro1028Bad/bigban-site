@@ -1680,22 +1680,25 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     return dialog;
   }
 
-  it("「編集」でリッチエディタに切り替わり、本文を読み込む", async () => {
+  // #104: 編集は全画面ワークスペース(別 dialog)で行う。エディタ/保存等はこちらに入る。
+  const getWorkspace = () => screen.getByRole("dialog", { name: "記事を編集" });
+
+  it("「編集」で全画面ワークスペースが開き、本文を読み込む", async () => {
     const dialog = await openReadyDraft("<p>元の本文</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    const editor = within(dialog).getByLabelText("本文エディタ");
+    const editor = within(getWorkspace()).getByLabelText("本文エディタ");
     expect(editor).toHaveValue("<p>元の本文</p>");
   });
 
   it("編集中はライブ本番プレビュー(iframe)が入力に追従する(#98/#100)", async () => {
     const dialog = await openReadyDraft("<p>元の本文</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    // #100: プレビューは iframe。観測点 data-preview-html がデバウンス後に追従する。
-    const frame = within(dialog).getByTitle("本番ライブプレビュー");
+    // #100/#104: プレビューは ワークスペース内の iframe。観測点 data-preview-html が追従する。
+    const frame = within(getWorkspace()).getByTitle("本番ライブプレビュー");
     await waitFor(() =>
       expect(frame).toHaveAttribute("data-preview-html", "<p>元の本文</p>"),
     );
-    const editor = within(dialog).getByLabelText("本文エディタ");
+    const editor = within(getWorkspace()).getByLabelText("本文エディタ");
     await userEvent.clear(editor);
     await userEvent.type(editor, "ライブ反映テキスト");
     await waitFor(() =>
@@ -1729,16 +1732,16 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-    const editor = within(dialog).getByLabelText("本文エディタ");
+    const editor = within(getWorkspace()).getByLabelText("本文エディタ");
     await userEvent.clear(editor);
     await userEvent.type(editor, "編集しました");
-    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
     // 保存後に再取得したプレビュー(iframe)が出る
     const frame = await within(dialog).findByTitle("本番プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>保存後の本文</p>");
-    // 編集モードは閉じる
-    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+    // 編集モード(ワークスペース)は閉じる
+    expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
     const editPost = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/draft/edit"));
     expect(editPost).toBeTruthy();
     expect(JSON.parse((editPost![1] as RequestInit).body as string).pageId).toBe("i1");
@@ -1750,42 +1753,42 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
       { ok: false, status: 502, json: { success: false, error: "保存中にエラーが発生しました" } }
     );
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
-    expect(await within(dialog).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("本文エディタ")).toBeInTheDocument();
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
+    expect(await within(getWorkspace()).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
+    expect(within(getWorkspace()).getByLabelText("本文エディタ")).toBeInTheDocument();
   });
 
   it("error の無い保存失敗は既定メッセージ", async () => {
     const dialog = await openReadyDraft("<p>元</p>", { json: { success: false } });
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
-    expect(await within(dialog).findByText("保存に失敗しました。")).toBeInTheDocument();
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
+    expect(await within(getWorkspace()).findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
   it("変更がなければキャンセルで即座に編集を終える", async () => {
     const dialog = await openReadyDraft("<p>元</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
-    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "下書きを編集" })).toBeInTheDocument();
   });
 
   it("未保存の変更があるとキャンセルで破棄確認を出し、破棄/編集に戻るを選べる", async () => {
     const dialog = await openReadyDraft("<p>元</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
-    await userEvent.type(within(dialog).getByLabelText("本文エディタ"), "変更");
-    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
-    expect(within(dialog).getByText(/破棄しますか/)).toBeInTheDocument();
+    await userEvent.type(within(getWorkspace()).getByLabelText("本文エディタ"), "変更");
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "キャンセル" }));
+    expect(within(getWorkspace()).getByText(/破棄しますか/)).toBeInTheDocument();
 
     // 「編集に戻る」→ 確認が消えエディタは残る
-    await userEvent.click(within(dialog).getByRole("button", { name: "編集に戻る" }));
-    expect(within(dialog).queryByText(/破棄しますか/)).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("本文エディタ")).toBeInTheDocument();
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "編集に戻る" }));
+    expect(within(getWorkspace()).queryByText(/破棄しますか/)).not.toBeInTheDocument();
+    expect(within(getWorkspace()).getByLabelText("本文エディタ")).toBeInTheDocument();
 
     // 再度キャンセル→破棄する→編集終了
-    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "破棄する" }));
-    expect(within(dialog).queryByLabelText("本文エディタ")).not.toBeInTheDocument();
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "キャンセル" }));
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "破棄する" }));
+    expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
   });
 
   it("保存中はボタンを無効化し『保存中…』を出す", async () => {
@@ -1818,9 +1821,9 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
-    expect(await within(dialog).findByRole("button", { name: "保存中…" })).toBeDisabled();
+    expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
     release({ ok: true, status: 200, json: async () => ({ success: true }) });
   });
 });
