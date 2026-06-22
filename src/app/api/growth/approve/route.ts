@@ -81,21 +81,30 @@ export async function GET(request: Request): Promise<Response> {
   const options = notionOptions();
   if (!options) return serverError();
 
-  const proposals = await queryDataSource(
-    PROPOSAL_DS,
-    { filter: proposalStatusFilter(), pageSize: 100 },
-    options
-  );
-  const ideas = await queryDataSource(
-    IDEA_DS,
-    { filter: ideaStatusFilter(), pageSize: 100 },
-    options
-  );
+  try {
+    const proposals = await queryDataSource(
+      PROPOSAL_DS,
+      { filter: proposalStatusFilter(), pageSize: 100 },
+      options
+    );
+    const ideas = await queryDataSource(
+      IDEA_DS,
+      { filter: ideaStatusFilter(), pageSize: 100 },
+      options
+    );
 
-  return NextResponse.json({
-    success: true,
-    items: toPendingItems(proposals.pages, ideas.pages),
-  });
+    return NextResponse.json({
+      success: true,
+      items: toPendingItems(proposals.pages, ideas.pages),
+    });
+  } catch {
+    // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)。
+    // 本文ゼロの 500 を返すと client の res.json() が壊れるため、必ず JSON で返す。
+    return NextResponse.json(
+      { success: false, error: "取得中にエラーが発生しました" },
+      { status: 502 }
+    );
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {

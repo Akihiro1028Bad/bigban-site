@@ -6,6 +6,7 @@ import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { pendingStatus } from "@/lib/growth/approve";
+import { readJsonObject } from "@/lib/growth/safeJson";
 import type { Stage } from "@/lib/growth/stage";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -153,7 +154,7 @@ function approveUrl(token: string): string {
 /** 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる。 */
 async function fetchPending(token: string): Promise<PendingItem[]> {
   const res = await fetch(approveUrl(token));
-  const json = await res.json();
+  const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(
       res.status === 401
@@ -161,7 +162,7 @@ async function fetchPending(token: string): Promise<PendingItem[]> {
         : json.error ?? "取得に失敗しました。"
     );
   }
-  return json.items;
+  return json.items as PendingItem[];
 }
 
 function removeKey<T>(obj: Record<string, T>, key: string): Record<string, T> {
@@ -412,7 +413,7 @@ export function ApproveClient() {
         const res = await fetch(
           `/api/growth/draft?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(token)}`
         );
-        const json = await res.json();
+        const json = await readJsonObject(res);
         if (!res.ok || !json.success) {
           throw new Error(json.error ?? "下書きの取得に失敗しました。");
         }
@@ -510,7 +511,7 @@ export function ApproveClient() {
           body: JSON.stringify(buildDraftEditPayload(item.id, editedHtml)),
         }
       );
-      const json = await res.json();
+      const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
         throw new Error(json.error ?? "保存に失敗しました。");
       }
@@ -577,7 +578,7 @@ export function ApproveClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decisions: [{ id, decision }] }),
     });
-    const json = await res.json();
+    const json = await readJsonObject(res);
     if (!res.ok || !json.success) {
       throw new Error(json.error ?? "保存に失敗しました。");
     }
@@ -650,7 +651,7 @@ export function ApproveClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pageId: item.id, comments }),
       });
-      const json = await res.json();
+      const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
         throw new Error(
           res.status === 409
@@ -745,7 +746,7 @@ export function ApproveClient() {
           outline: serializeOutlineSections(nextSections),
         }),
       });
-      const json = await res.json();
+      const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
         throw new Error(
           res.status === 409
@@ -853,7 +854,7 @@ export function ApproveClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pageId: item.id, action }),
       });
-      const json = await res.json();
+      const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
         throw new Error(json.error ?? "更新に失敗しました。");
       }

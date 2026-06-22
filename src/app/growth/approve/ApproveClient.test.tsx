@@ -34,22 +34,38 @@ import { ApproveClient } from "./ApproveClient";
 import { STUCK_THRESHOLD_MS } from "./generating";
 
 function mockFetchSequence(
-  ...responses: Array<{ ok?: boolean; status?: number; json: unknown } | Error | string>
+  ...responses: Array<
+    { ok?: boolean; status?: number; json?: unknown; text?: string } | Error | string
+  >
 ) {
   const fn = vi.fn();
   responses.forEach((r) => {
     if (r instanceof Error || typeof r === "string") {
       fn.mockRejectedValueOnce(r);
     } else {
+      // 本番は readJsonObject 経由で res.text() を読むため text を必ず供給する。
+      // text 明示時はそれを優先(空ボディ/非 JSON のケース表現用)。
+      const body = r.text ?? JSON.stringify(r.json);
       fn.mockResolvedValueOnce({
         ok: r.ok ?? true,
         status: r.status ?? 200,
         json: async () => r.json,
+        text: async () => body,
       });
     }
   });
   vi.stubGlobal("fetch", fn);
   return fn;
+}
+
+// 遅延制御(release)用の手組みモックで使う、json/text 両対応の擬似 Response。
+function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+  return {
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
 }
 
 const PASS = "ビックマン";
@@ -213,6 +229,24 @@ describe("ApproveClient 合言葉画面", () => {
 
   it("ネットワーク例外(非Error)は既定メッセージ", async () => {
     mockFetchSequence("boom");
+    render(<ApproveClient />);
+    await login();
+    expect(await screen.findByRole("alert")).toHaveTextContent("取得に失敗しました。");
+  });
+
+  it("本文ゼロの500(空ボディ)でも JSON 例外を出さず既定メッセージにフォールバックする(#117)", async () => {
+    // route の try/catch 不在や Notion 障害で本文が空の 500 が返るケース。
+    // 旧実装は res.json() が「Unexpected end of JSON input」を投げて画面が壊れていた。
+    mockFetchSequence({ ok: false, status: 500, text: "" });
+    render(<ApproveClient />);
+    await login();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("取得に失敗しました。");
+    expect(alert).not.toHaveTextContent("Unexpected end of JSON input");
+  });
+
+  it("非JSON(HTMLエラーページ)の500でも既定メッセージにフォールバックする(#117)", async () => {
+    mockFetchSequence({ ok: false, status: 500, text: "<html>500</html>" });
     render(<ApproveClient />);
     await login();
     expect(await screen.findByRole("alert")).toHaveTextContent("取得に失敗しました。");
@@ -1657,17 +1691,15 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     });
     const fn = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
-      })
+      .mockResolvedValueOnce(
+        jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] })
+      )
       .mockReturnValueOnce(pending);
     vi.stubGlobal("fetch", fn);
 
     const dialog = await openIdeaPanel();
     expect(await within(dialog).findByText("読み込み中…")).toBeInTheDocument();
-    release({ ok: true, status: 200, json: async () => ({ success: true, exists: false, draft: null }) });
+    release(jsonResponse({ success: true, exists: false, draft: null }));
     expect(await within(dialog).findByText(/見つかりませんでした/)).toBeInTheDocument();
   });
 
@@ -1822,20 +1854,16 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     });
     const fn = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
           success: true,
           exists: true,
           draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
-        }),
-      })
+        })
+      )
       .mockReturnValueOnce(pending);
     vi.stubGlobal("fetch", fn);
 
@@ -1848,7 +1876,7 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
     expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
-    release({ ok: true, status: 200, json: async () => ({ success: true }) });
+    release(jsonResponse({ success: true }));
   });
 });
 
@@ -2202,14 +2230,12 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
     const pending = new Promise((r) => { release = r; });
     const fn = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse({
           success: true,
           items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
-        }),
-      })
+        })
+      )
       .mockReturnValueOnce(pending); // 下書き取得は保留のまま
     vi.stubGlobal("fetch", fn);
 
@@ -2218,7 +2244,7 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
     await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
     // 取得中にドロワーを閉じる。
     await userEvent.click(await screen.findByRole("button", { name: "オーバーレイを閉じる" }));
-    release({ ok: true, status: 200, json: async () => draftReady110("<p>A</p>").json });
+    release(jsonResponse(draftReady110("<p>A</p>").json));
     // ワークスペースは開かない。
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
