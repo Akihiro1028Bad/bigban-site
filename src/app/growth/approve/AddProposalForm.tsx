@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { PROPOSAL_CATEGORIES } from "@/lib/growth/proposals";
+import type { Stage } from "@/lib/growth/stage";
 
 interface AddedDetail {
   label: string;
@@ -17,6 +18,8 @@ export interface AddedProposal {
   subtitle: string;
   details?: AddedDetail[];
   score?: number;
+  // #106/#107: API が返すパイプライン段階。盤の列分けに使う。
+  stage: Stage;
 }
 
 interface AddProposalFormProps {
