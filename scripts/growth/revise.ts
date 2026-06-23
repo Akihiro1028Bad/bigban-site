@@ -141,6 +141,14 @@ export function buildOutlineEditProps(outline: string): Record<string, unknown> 
   return { [OUTLINE_PROP]: { rich_text: chunkRichText(outline) } };
 }
 
+/**
+ * 手動編集(#139 A): 記事タイトル(タイトル案・title型)を直接上書きする(AIを介さない)。
+ * 修正状態は触らない。空文字は title:[] でクリアされる(空は呼び出し側で弾く)。
+ */
+export function buildTitleEditProps(title: string): Record<string, unknown> {
+  return { [IDEA_TITLE_PROP]: { title: chunkRichText(title) } };
+}
+
 // ── PC poller(#44)用 ──────────────────────────────────────────────
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const REVISE_TIMEOUT_MS = 15 * 60 * 1000;

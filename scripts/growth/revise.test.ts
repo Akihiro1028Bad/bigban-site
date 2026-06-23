@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { NotionPage } from "./notion";
 import {
   buildOutlineEditProps,
+  buildTitleEditProps,
   buildReviseApplyProps,
   buildReviseDiscardProps,
   buildReviseFailMessage,
@@ -119,6 +120,18 @@ describe("buildOutlineEditProps", () => {
     expect(buildOutlineEditProps("## A\n説明")).toEqual({
       "構成案": { rich_text: [{ text: { content: "## A\n説明" } }] },
     });
+  });
+});
+
+describe("buildTitleEditProps（#139 A: タイトル直接編集）", () => {
+  it("タイトル案(title型)を直接上書きする", () => {
+    expect(buildTitleEditProps("梅雨でも打てる屋内の選び方")).toEqual({
+      "タイトル案": { title: [{ text: { content: "梅雨でも打てる屋内の選び方" } }] },
+    });
+  });
+
+  it("空文字は title:[] (空)", () => {
+    expect(buildTitleEditProps("")).toEqual({ "タイトル案": { title: [] } });
   });
 });
 
