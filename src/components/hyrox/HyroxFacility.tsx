@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { FACILITY_PHOTOS, HYROX_EQUIPMENT } from "./equipment";
@@ -15,6 +15,7 @@ export default function HyroxFacility() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(carouselRef);
+  const prefersReducedMotion = useReducedMotion();
   // t.raw は unknown を返すため、システム境界として配列であることを検証する。
   const rawPhotos = t.raw("photos");
   const photoAlts = Array.isArray(rawPhotos) ? (rawPhotos as string[]) : [];
@@ -43,12 +44,13 @@ export default function HyroxFacility() {
   useEffect(() => {
     if (!emblaApi) return;
     const autoplay = emblaApi.plugins().autoplay;
-    if (isInView) {
+    // モーション抑制設定では自動送りしない（WCAG 2.2.2）。
+    if (isInView && !prefersReducedMotion) {
       autoplay.play();
     } else {
       autoplay.stop();
     }
-  }, [isInView, emblaApi]);
+  }, [isInView, emblaApi, prefersReducedMotion]);
 
   const handleScrollTo = useCallback(
     (index: number) => {

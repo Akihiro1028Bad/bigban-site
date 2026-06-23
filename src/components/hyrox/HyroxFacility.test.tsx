@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { setMockUseInView } from "../../../__mocks__/framer-motion";
+import {
+  setMockUseInView,
+  setMockReducedMotion,
+} from "../../../__mocks__/framer-motion";
 import jaMessages from "../../../messages/ja.json";
 import HyroxFacility from "./HyroxFacility";
 
@@ -53,6 +56,7 @@ describe("HyroxFacility", () => {
     mockSelectedScrollSnap.mockReturnValue(0);
     returnApi = mockEmblaApi;
     setMockUseInView(false);
+    setMockReducedMotion(false);
   });
 
   it("FACILITY 見出しを表示する", () => {
@@ -158,6 +162,14 @@ describe("HyroxFacility", () => {
         <HyroxFacility />
       </NextIntlClientProvider>
     );
+    expect(mockStop).toHaveBeenCalled();
+  });
+
+  it("prefers-reduced-motion ではビューポート内でも自動送りしない", () => {
+    setMockReducedMotion(true);
+    setMockUseInView(true);
+    renderFacility();
+    expect(mockPlay).not.toHaveBeenCalled();
     expect(mockStop).toHaveBeenCalled();
   });
 

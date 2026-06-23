@@ -26,7 +26,11 @@ interface ServiceItem {
 
 export default function HyroxServices() {
   const t = useTranslations("HyroxPage.services");
-  const items = t.raw("items") as ServiceItem[];
+  // t.raw は unknown を返すため、システム境界として配列であることを検証する。
+  const rawItems = t.raw("items");
+  const items: ServiceItem[] = Array.isArray(rawItems)
+    ? (rawItems as ServiceItem[])
+    : [];
 
   return (
     <section className="bg-deep-black py-12 lg:py-16">

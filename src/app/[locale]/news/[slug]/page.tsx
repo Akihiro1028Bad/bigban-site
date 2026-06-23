@@ -116,14 +116,17 @@ export async function generateMetadata({
   if (!previewItem) {
     const otherLocale: Locale = locale === "ja" ? "en" : "ja";
     const other = await getNewsDetail({ locale: otherLocale, slug });
-    if (other) {
-      meta.alternates = {
-        languages: {
-          ja: buildNewsUrl("ja", slug),
-          en: buildNewsUrl("en", slug),
-        },
-      };
-    }
+    meta.alternates = {
+      canonical: buildNewsUrl(locale, slug),
+      ...(other
+        ? {
+            languages: {
+              ja: buildNewsUrl("ja", slug),
+              en: buildNewsUrl("en", slug),
+            },
+          }
+        : {}),
+    };
   }
 
   return meta;

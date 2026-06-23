@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxServices from "./HyroxServices";
+import jaMessages from "../../../messages/ja.json";
 
 import type React from "react";
 
@@ -37,5 +39,21 @@ describe("HyroxServices", () => {
     expect(links).toHaveLength(3);
     expect(links[0]).toHaveAttribute("href", "/reserve?tab=hyrox");
     expect(links[0]).not.toHaveAttribute("target");
+  });
+
+  it("items が配列でない場合も見出しを描画する（フォールバック）", () => {
+    const broken = structuredClone(jaMessages);
+    (
+      broken.HyroxPage.services as unknown as { items: unknown }
+    ).items = "not-an-array";
+    render(
+      <NextIntlClientProvider locale="ja" messages={broken}>
+        <HyroxServices />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      screen.getByRole("heading", { name: "SERVICES" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("AREA RENTAL")).not.toBeInTheDocument();
   });
 });

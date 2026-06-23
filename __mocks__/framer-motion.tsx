@@ -80,8 +80,14 @@ function useMotionValue(initial: unknown) {
   };
 }
 
-function useReducedMotion() {
-  return false;
+let mockReducedMotion = false;
+
+function setMockReducedMotion(value: boolean) {
+  mockReducedMotion = value;
 }
 
-export { motion, AnimatePresence, useScroll, useTransform, useInView, useMotionValue, useReducedMotion, setMockUseInView };
+function useReducedMotion() {
+  return mockReducedMotion;
+}
+
+export { motion, AnimatePresence, useScroll, useTransform, useInView, useMotionValue, useReducedMotion, setMockUseInView, setMockReducedMotion };
