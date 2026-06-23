@@ -92,6 +92,14 @@ describe("POST /api/growth/revise", () => {
     expect(res.status).toBe(400);
   });
 
+  it("タイトル指示が長すぎる(500文字超)なら 400(#139 B)", async () => {
+    const res = await POST(
+      postRequest(null, { pageId: PAGE_ID, titleInstruction: "あ".repeat(501) })
+    );
+    expect(res.status).toBe(400);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("コメントが非空だが要素が不正なら 400(#139 B)", async () => {
     const res = await POST(postRequest(null, { pageId: PAGE_ID, comments: [{ line: "a" }] }));
     expect(res.status).toBe(400);
