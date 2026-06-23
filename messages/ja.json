@@ -34,7 +34,7 @@
       ]
     },
     "about": {
-      "title": "ABOUT US|THE PICKLE BANG THEORY",
+      "title": "ABOUT US",
       "description": "THE PICKLE BANG THEORYを運営するRST Agency株式会社の会社概要、代表挨拶、選手・スタッフ紹介。",
       "keywords": [
         "西村昭彦",
@@ -58,7 +58,7 @@
       ]
     },
     "tokushoho": {
-      "title": "特定商取引法に基づく表記|THE PICKLE BANG THEORY",
+      "title": "特定商取引法に基づく表記",
       "description": "THE PICKLE BANG THEORYの特定商取引法に基づく表記ページです。",
       "keywords": [
         "特定商取引法",
@@ -80,15 +80,15 @@
       ]
     },
     "reserve": {
-      "title": "予約|THE PICKLE BANG THEORY",
+      "title": "予約",
       "description": "THE PICKLE BANG THEORY のコート予約ページ。ご希望の日時を選んでオンラインでかんたんに予約できます。本八幡駅徒歩1分、6:00–23:00営業。"
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
     "hyrox": {
-      "title": "HYROX トレーニングエリア | THE PICKLE BANG THEORY",
-      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアが登場予定。",
+      "title": "HYROX トレーニングエリア",
+      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアがオープン。",
       "keywords": [
         "HYROX",
         "ハイロックス",
@@ -112,6 +112,7 @@
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
+    "reserveJa": "予約",
     "contact": "CONTACT",
     "hyrox": "HYROX",
     "conceptJa": "コンセプト",
@@ -137,7 +138,6 @@
   },
   "Reserve": {
     "hero": {
-      "eyebrow": "RESERVATION",
       "title": "RESERVE",
       "subtitle": "コート予約",
       "lead": "ご希望の日時を選んで、オンラインでかんたんにコートを予約できます。"
@@ -145,6 +145,8 @@
     "steps": {
       "heading": "予約の流れ",
       "headingEn": "HOW TO BOOK",
+      "swipeHint": "← スワイプで確認 →",
+      "goToStep": "ステップ{num}へ",
       "step01": { "title": "日時を選ぶ", "description": "カレンダーから空き枠を選択します。", "imageAlt": "予約カレンダーで日時を選ぶ操作画面" },
       "step02": { "title": "予約内容を入力", "description": "予約フォームに従って、予約情報、予約者情報を入力してください。", "imageAlt": "ご予約内容の確認画面" },
       "step03": { "title": "予約完了（決済）", "description": "お支払い情報を入力して予約を確定します。", "imageAlt": "予約完了の画面" }
@@ -175,6 +177,39 @@
         "ご予約は予約システム上の受付時間に従います。",
         "キャンセル・変更は予約システムの規定に従います。詳細は予約時にご確認ください。",
         "開始時刻に遅れた場合も、ご予約枠の時間内でのご利用となります。"
+      ]
+    },
+    "faq": {
+      "heading": "よくある質問",
+      "items": [
+        {
+          "question": "営業時間は？",
+          "answer": "早朝6:00から深夜23:00まで営業しています。"
+        },
+        {
+          "question": "予約方法を教えてください",
+          "answer": "予約ページからご希望の日時を選び、オンラインでコート・HYROXエリアを予約できます。"
+        },
+        {
+          "question": "コートレンタルの料金は？",
+          "answer": "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。"
+        },
+        {
+          "question": "HYROXエリアは利用できますか？料金は？",
+          "answer": "ご利用いただけます。エリア利用料は1時間 ¥3,000 です。"
+        },
+        {
+          "question": "最寄り駅・アクセスは？",
+          "answer": "本八幡駅から徒歩1分です。"
+        },
+        {
+          "question": "初心者でも大丈夫ですか？",
+          "answer": "はい。初めての方向けの体験・トライアルや少人数制レッスンをご用意し、コーチが基礎から丁寧にご案内します。"
+        },
+        {
+          "question": "支払い方法は？",
+          "answer": "現金・クレジットカードがご利用いただけます。"
+        }
       ]
     }
   },
@@ -569,7 +604,7 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "ハイロックス",
-      "cta": "体験予約",
+      "cta": "今すぐ予約",
       "imageAlts": [
         "HYROXのスタートゲートを駆け抜けるアスリート",
         "HYROX大会会場とウォールボールに挑む選手たち",
@@ -718,7 +753,11 @@
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "プログラム・料金"
+      "titleJa": "プログラム・料金",
+      "rateLabel": "エリア利用料",
+      "price": "¥3,000",
+      "unit": "／ 1時間",
+      "note": "HYROX公式8種目に対応したトレーニングエリアを時間制でご利用いただけます。"
     },
     "coach": {
       "sectionTitle": "CREW",
@@ -786,12 +825,12 @@
     }
   },
   "HomeHyroxPromo": {
-    "kicker": "NEW TRAINING AREA",
-    "kickerJa": "新設トレーニングエリア",
+    "kicker": "TRAINING AREA",
+    "kickerJa": "トレーニングエリア",
     "title": "HYROX",
     "titleJa": "ハイロックス",
     "tagline": "走る。鍛える。挑戦する。",
-    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY に登場。",
+    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY にオープン。",
     "cta": "詳しく見る",
     "imageAlt": "HYROXのサンドバッグを担ぐ女性アスリート"
   }

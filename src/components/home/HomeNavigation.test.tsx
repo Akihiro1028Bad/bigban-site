@@ -185,7 +185,7 @@ describe("HomeNavigation", () => {
 
   it("RESERVEボタンを表示する", () => {
     renderWithIntl(<HomeNavigation />);
-    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(1);
     expect(reserveLinks[0]).toHaveAttribute("href", "/reserve?tab=pickleball");
   });
@@ -193,7 +193,7 @@ describe("HomeNavigation", () => {
   it("/hyrox では RESERVE が HYROX タブ付きリンクになる", () => {
     mockPathname = "/hyrox";
     renderWithIntl(<HomeNavigation />);
-    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks[0]).toHaveAttribute("href", "/reserve?tab=hyrox");
     mockPathname = "/";
   });
@@ -201,7 +201,7 @@ describe("HomeNavigation", () => {
   it("モバイルヘッダーに常時表示の予約ボタンがある（メニュー未展開時）", () => {
     renderWithIntl(<HomeNavigation />);
     // メニュー未展開でもデスクトップ／モバイル両方の予約導線が存在する
-    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(2);
     const mobileReserve = reserveLinks.find((link) =>
       link.className.includes("md:hidden")

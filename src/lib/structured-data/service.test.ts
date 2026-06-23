@@ -75,6 +75,36 @@ describe("buildServices", () => {
     expect(rental?.serviceType).toBe("コートレンタル");
   });
 
+  it("コートレンタルに価格帯(¥4,980〜¥7,980)の Offer を付与する", async () => {
+    const { buildServices } = await import("./service");
+    const rental = buildServices().find((s) => s.name === "コートレンタル");
+    expect(rental?.offers?.priceSpecification).toMatchObject({
+      "@type": "PriceSpecification",
+      priceCurrency: "JPY",
+      minPrice: 4980,
+      maxPrice: 7980,
+    });
+  });
+
+  it("HYROXトレーニングに単価(¥3,000/時)の Offer を付与する", async () => {
+    const { buildServices } = await import("./service");
+    const hyrox = buildServices().find(
+      (s) => s.serviceType === "HYROXトレーニング",
+    );
+    expect(hyrox?.offers?.priceSpecification).toMatchObject({
+      "@type": "UnitPriceSpecification",
+      priceCurrency: "JPY",
+      price: 3000,
+      unitCode: "HUR",
+    });
+  });
+
+  it("価格未設定のサービスには offers を付けない", async () => {
+    const { buildServices } = await import("./service");
+    const lesson = buildServices().find((s) => s.name.includes("レッスン"));
+    expect(lesson?.offers).toBeUndefined();
+  });
+
   it("レッスンサービスを含む", async () => {
     const { buildServices } = await import("./service");
     const services = buildServices();

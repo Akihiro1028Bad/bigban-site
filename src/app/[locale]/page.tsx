@@ -42,7 +42,7 @@ export async function generateMetadata({
     locale === "ja" ? SITE_URL : `${SITE_URL}/${locale}`;
 
   return {
-    title: t("home.title"),
+    title: { absolute: t("home.title") },
     description: t("home.description"),
     keywords,
     openGraph: {

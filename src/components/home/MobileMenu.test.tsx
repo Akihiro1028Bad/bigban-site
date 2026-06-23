@@ -163,7 +163,7 @@ describe("MobileMenu", () => {
 
   it("パネル内クリックは onClose を呼ばない（伝播停止）", () => {
     const { onClose } = renderMenu();
-    fireEvent.click(screen.getByRole("link", { name: "RESERVE" }));
+    fireEvent.click(screen.getByRole("link", { name: /RESERVE/ }));
     expect(onClose).not.toHaveBeenCalled();
   });
 

@@ -17,9 +17,6 @@ export default function ReserveHero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE }}
         >
-          <p className="text-xs tracking-[0.4em] text-accent mb-4">
-            {t("eyebrow")}
-          </p>
           <h1 className="font-serif text-5xl sm:text-7xl lg:text-8xl font-black tracking-[0.08em] sm:tracking-[0.15em] text-text-light">
             {t("title")}
           </h1>

@@ -28,7 +28,7 @@
       ]
     },
     "about": {
-      "title": "ABOUT US · PICKLE BANG THEORY",
+      "title": "ABOUT US",
       "description": "About RST Agency Inc., the team behind THE PICKLE BANG THEORY. Company overview, founder message, players and crew.",
       "keywords": [
         "Akihiko Nishimura",
@@ -48,7 +48,7 @@
       ]
     },
     "tokushoho": {
-      "title": "Specified Commercial Transactions Act · PICKLE BANG THEORY",
+      "title": "Specified Commercial Transactions Act",
       "description": "Disclosure under the Specified Commercial Transactions Act for THE PICKLE BANG THEORY.",
       "keywords": [
         "Specified Commercial Transactions Act",
@@ -69,15 +69,15 @@
       ]
     },
     "reserve": {
-      "title": "Reservation · THE PICKLE BANG THEORY",
+      "title": "Reservation",
       "description": "Book a court at THE PICKLE BANG THEORY. Pick your time and reserve online in seconds. 1 min from Motoyawata Station, open 6:00–23:00."
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
     "hyrox": {
-      "title": "HYROX Training Area | THE PICKLE BANG THEORY",
-      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is coming to THE PICKLE BANG THEORY in Motoyawata.",
+      "title": "HYROX Training Area",
+      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is now open at THE PICKLE BANG THEORY in Motoyawata.",
       "keywords": [
         "HYROX",
         "HYROX Japan",
@@ -98,6 +98,7 @@
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
+    "reserveJa": "予約",
     "contact": "CONTACT",
     "hyrox": "HYROX",
     "conceptJa": "",
@@ -123,7 +124,6 @@
   },
   "Reserve": {
     "hero": {
-      "eyebrow": "RESERVATION",
       "title": "RESERVE",
       "subtitle": "Book a Court",
       "lead": "Pick your preferred date and time and book a court online in just a few taps."
@@ -131,6 +131,8 @@
     "steps": {
       "heading": "How to Book",
       "headingEn": "HOW TO BOOK",
+      "swipeHint": "← Swipe to view →",
+      "goToStep": "Go to step {num}",
       "step01": { "title": "Pick a date & time", "description": "Choose an open slot from the calendar.", "imageAlt": "Selecting a date and time on the booking calendar" },
       "step02": { "title": "Enter booking details", "description": "Follow the booking form to enter your reservation and contact details.", "imageAlt": "Booking details confirmation screen" },
       "step03": { "title": "Confirm & pay", "description": "Enter payment details to confirm your booking.", "imageAlt": "Booking complete screen" }
@@ -161,6 +163,39 @@
         "Reservations follow the booking system's accepted time window.",
         "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
         "Late arrivals are accommodated only within the reserved time slot."
+      ]
+    },
+    "faq": {
+      "heading": "FAQ",
+      "items": [
+        {
+          "question": "What are your opening hours?",
+          "answer": "We're open from 6:00 in the morning until 23:00 at night."
+        },
+        {
+          "question": "How do I make a reservation?",
+          "answer": "Choose your preferred date and time on the reservation page to book a court or the HYROX area online."
+        },
+        {
+          "question": "How much is court rental?",
+          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week."
+        },
+        {
+          "question": "Can I use the HYROX area, and how much is it?",
+          "answer": "Yes. The HYROX area rental is ¥3,000 per hour."
+        },
+        {
+          "question": "Where are you located?",
+          "answer": "We're a 1-minute walk from Motoyawata Station."
+        },
+        {
+          "question": "I'm a beginner — is that okay?",
+          "answer": "Absolutely. We offer trial sessions and small-group lessons, and our coaches guide you from the basics."
+        },
+        {
+          "question": "What payment methods do you accept?",
+          "answer": "Cash and credit cards are accepted."
+        }
       ]
     }
   },
@@ -555,7 +590,7 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "",
-      "cta": "Book a trial",
+      "cta": "Reserve now",
       "imageAlts": [
         "Athletes running through the HYROX start gate",
         "HYROX arena with athletes taking on wall balls",
@@ -704,7 +739,11 @@
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "Program & Pricing"
+      "titleJa": "Program & Pricing",
+      "rateLabel": "Area Rental",
+      "price": "¥3,000",
+      "unit": "/ hour",
+      "note": "Use the training area equipped for all 8 official HYROX stations, by the hour."
     },
     "coach": {
       "sectionTitle": "CREW",
@@ -772,12 +811,12 @@
     }
   },
   "HomeHyroxPromo": {
-    "kicker": "NEW TRAINING AREA",
+    "kicker": "TRAINING AREA",
     "kickerJa": "",
     "title": "HYROX",
     "titleJa": "The World Series of Fitness Racing",
     "tagline": "Run. Train. Challenge.",
-    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area arrives at THE PICKLE BANG THEORY.",
+    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area is now open at THE PICKLE BANG THEORY.",
     "cta": "DISCOVER HYROX",
     "imageAlt": "Female athlete carrying a HYROX sandbag"
   }

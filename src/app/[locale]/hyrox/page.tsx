@@ -32,6 +32,18 @@ export async function generateMetadata({
       description: t("hyrox.description"),
       url: canonicalUrl,
       locale: locale === "ja" ? "ja_JP" : "en_US",
+      images: [
+        {
+          url: `${SITE_URL}/images/hyrox/promo-card.jpg`,
+          width: 2200,
+          height: 1467,
+          alt: t("hyrox.title"),
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [`${SITE_URL}/images/hyrox/promo-card.jpg`],
     },
     alternates: {
       canonical: canonicalUrl,

@@ -182,22 +182,22 @@ export default function HyroxFacility() {
           <h3 className="mb-6 text-center text-xs uppercase tracking-[0.3em] text-text-gray">
             {t("equipmentTitle")}
           </h3>
-          <ul className="mx-auto max-w-3xl divide-y divide-white/10 border-y border-white/10">
+          <ul className="mx-auto grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-3">
             {HYROX_EQUIPMENT.map((item) => (
               <li
                 key={item.key}
-                className="flex items-center justify-between gap-4 py-4"
+                className="flex flex-col gap-1 rounded-sm border border-white/10 bg-white/[0.02] p-4"
               >
-                <div>
-                  <span className="block text-sm font-bold text-text-light sm:text-base">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-bold text-text-light">
                     {t(`equipment.${item.key}.nameJa`)}
                   </span>
-                  <span className="block text-xs text-text-gray">
-                    {t(`equipment.${item.key}.spec`)}
+                  <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent">
+                    {item.quantity ? `× ${item.quantity}` : t("fullSet")}
                   </span>
                 </div>
-                <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent sm:text-base">
-                  {item.quantity ? `× ${item.quantity}` : t("fullSet")}
+                <span className="text-xs text-text-gray">
+                  {t(`equipment.${item.key}.spec`)}
                 </span>
               </li>
             ))}

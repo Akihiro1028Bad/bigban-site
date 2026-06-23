@@ -259,9 +259,14 @@ export default function MobileMenu({
               <Link
                 href={reserveHref}
                 onClick={onLinkClick}
-                className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-sm font-bold uppercase tracking-[0.2em] text-deep-black transition-all hover:gap-3"
+                className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-deep-black hover:gap-3 motion-safe:transition-all"
               >
-                {t("reserve")}
+                <span className="text-sm font-bold tracking-[0.2em]">
+                  {t("reserveJa")}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-deep-black/60">
+                  {t("reserve")}
+                </span>
                 <span aria-hidden className="text-base leading-none">
                   →
                 </span>

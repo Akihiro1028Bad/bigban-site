@@ -144,9 +144,14 @@ export default function HomeNavigation() {
               右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
           <Link
             href={reserveTo}
-            className="mr-12 bg-accent px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-deep-black md:hidden"
+            className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black md:hidden"
           >
-            {t("reserve")}
+            <span className="text-[11px] font-bold tracking-widest">
+              {t("reserveJa")}
+            </span>
+            <span className="text-[8px] font-bold uppercase tracking-widest text-deep-black/60">
+              {t("reserve")}
+            </span>
           </Link>
 
           {/* Desktop: Right side */}
@@ -157,9 +162,14 @@ export default function HomeNavigation() {
             />
             <Link
               href={reserveTo}
-              className="bg-accent text-deep-black px-5 py-2 text-xs font-bold uppercase tracking-widest"
+              className="inline-flex items-center gap-1.5 bg-accent text-deep-black px-5 py-2"
             >
-              {t("reserve")}
+              <span className="text-xs font-bold tracking-widest">
+                {t("reserveJa")}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-deep-black/60">
+                {t("reserve")}
+              </span>
             </Link>
           </div>
 

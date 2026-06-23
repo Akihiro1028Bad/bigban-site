@@ -26,7 +26,7 @@ describe("HyroxHero", () => {
 
   it("予約ページ(/reserve)への CTA を表示する", () => {
     renderWithIntl(<HyroxHero />);
-    const cta = screen.getByRole("link", { name: "体験予約" });
+    const cta = screen.getByRole("link", { name: "今すぐ予約" });
     expect(cta).toBeInTheDocument();
     expect(cta).toHaveAttribute("href", "/reserve?tab=hyrox");
   });

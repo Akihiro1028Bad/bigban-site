@@ -1,5 +1,21 @@
 import { SITE_URL } from "@/constants/site";
 
+interface PriceSpecificationSchema {
+  "@type": "PriceSpecification" | "UnitPriceSpecification";
+  priceCurrency: string;
+  price?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  unitCode?: string;
+  unitText?: string;
+}
+
+interface OfferSchema {
+  "@type": "Offer";
+  priceCurrency: string;
+  priceSpecification: PriceSpecificationSchema;
+}
+
 export interface ServiceSchema {
   "@context": "https://schema.org";
   "@type": "Service";
@@ -11,13 +27,39 @@ export interface ServiceSchema {
     "@type": "AdministrativeArea";
     name: string;
   };
+  offers?: OfferSchema;
 }
 
 interface ServiceDefinition {
   name: string;
   description: string;
   serviceType: string;
+  offers?: OfferSchema;
 }
+
+// 料金は constants/pricing.ts（コート）と HyroxPage.program（HYROX ¥3,000/時）に一致させること。
+const COURT_RENTAL_OFFER: OfferSchema = {
+  "@type": "Offer",
+  priceCurrency: "JPY",
+  priceSpecification: {
+    "@type": "PriceSpecification",
+    priceCurrency: "JPY",
+    minPrice: 4980,
+    maxPrice: 7980,
+  },
+};
+
+const HYROX_OFFER: OfferSchema = {
+  "@type": "Offer",
+  priceCurrency: "JPY",
+  priceSpecification: {
+    "@type": "UnitPriceSpecification",
+    priceCurrency: "JPY",
+    price: 3000,
+    unitCode: "HUR",
+    unitText: "1時間",
+  },
+};
 
 const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
   {
@@ -25,6 +67,7 @@ const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
     description:
       "時間貸しのレンタルコート。無人チェックインで手軽に予約・利用可能。早朝6:00から深夜23:00まで。",
     serviceType: "コートレンタル",
+    offers: COURT_RENTAL_OFFER,
   },
   {
     name: "レッスン & クリニック",
@@ -53,8 +96,9 @@ const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
   {
     name: "HYROXトレーニング",
     description:
-      "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本格的なトレーニングエリアを併設予定。",
+      "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本格的なトレーニングエリアを併設。エリア利用料 1時間 ¥3,000。",
     serviceType: "HYROXトレーニング",
+    offers: HYROX_OFFER,
   },
 ] as const;
 
@@ -72,5 +116,6 @@ export function buildServices(): ServiceSchema[] {
     serviceType: def.serviceType,
     provider: { "@id": `${SITE_URL}/#facility` },
     areaServed: AREA_SERVED,
+    ...(def.offers ? { offers: def.offers } : {}),
   }));
 }

@@ -9,10 +9,15 @@ describe("HyroxProgram", () => {
     expect(screen.getByRole("heading", { name: "PROGRAM" })).toBeInTheDocument();
   });
 
-  it("料金テーブル（コートレンタル）を表示する", () => {
+  it("HYROX エリア利用料（1時間 ¥3,000）を表示する", () => {
     renderWithIntl(<HyroxProgram />);
-    expect(screen.getByText("COURT RENTAL")).toBeInTheDocument();
-    expect(screen.getByText("6:00-9:00")).toBeInTheDocument();
-    expect(screen.getByText("¥4,980")).toBeInTheDocument();
+    expect(screen.getByText("エリア利用料")).toBeInTheDocument();
+    expect(screen.getByText("¥3,000")).toBeInTheDocument();
+    expect(screen.getByText("／ 1時間")).toBeInTheDocument();
+  });
+
+  it("ピックルのコートレンタル料金表は表示しない", () => {
+    renderWithIntl(<HyroxProgram />);
+    expect(screen.queryByText("¥4,980")).not.toBeInTheDocument();
   });
 });

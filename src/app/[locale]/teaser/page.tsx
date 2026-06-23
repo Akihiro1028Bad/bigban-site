@@ -21,7 +21,7 @@ export async function generateMetadata({
     locale === "ja" ? `${SITE_URL}/teaser` : `${SITE_URL}/${locale}/teaser`;
 
   return {
-    title: t("home.title"),
+    title: { absolute: t("home.title") },
     description: t("home.description"),
     keywords,
     robots: { index: false, follow: false },

@@ -8,6 +8,8 @@ import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import { NewsArticleJsonLd } from "@/components/news/NewsArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
+import StructuredData from "@/components/StructuredData";
+import { buildBreadcrumb } from "@/lib/structured-data";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { EXTERNAL_LINK_PROPS, SITE_URL } from "@/constants/site";
@@ -98,7 +100,7 @@ export async function generateMetadata({
   if (!item) return {};
 
   const meta: Metadata = {
-    title: `${item.title} | THE PICKLE BANG THEORY`,
+    title: item.title,
     description: item.excerpt,
   };
 
@@ -159,6 +161,13 @@ export default async function NewsDetailPage({
       {previewItem && <PreviewBanner locale={locale} />}
       <HomeNavigation />
       <NewsArticleJsonLd item={item} locale={locale} />
+      <StructuredData
+        data={buildBreadcrumb(locale, [
+          { name: "News", path: "/news" },
+          { name: item.title, path: `/news/${item.slug}` },
+        ])}
+      />
+
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
         <Link

@@ -1,8 +1,10 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import { useTranslations } from "next-intl";
+import useEmblaCarousel from "embla-carousel-react";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -54,6 +56,32 @@ const STEPS: Step[] = [
 export default function ReserveSteps() {
   const t = useTranslations("Reserve.steps");
   const prefersReducedMotion = useReducedMotion();
+  // モバイルは横スワイプのカルーセル。640px 以上では active:false にして
+  // CSS グリッド（3カラム）表示へ切り替える。
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: "center",
+    containScroll: "trimSnaps",
+    breakpoints: { "(min-width: 640px)": { active: false } },
+  });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelectedIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi]);
+
+  const handleScrollTo = useCallback(
+    (index: number) => {
+      if (!emblaApi) return;
+      emblaApi.scrollTo(index);
+    },
+    [emblaApi],
+  );
 
   return (
     <section className="bg-deep-black pb-16 lg:pb-24">
@@ -73,28 +101,27 @@ export default function ReserveSteps() {
           </h2>
         </motion.div>
 
-        <motion.ol
-          aria-label={t("heading")}
-          className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-8"
-          initial="hidden"
-          whileInView="visible"
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          variants={{ visible: { transition: { staggerChildren: 0.16 } } }}
+          transition={{ duration: 0.8, ease: EASE }}
         >
-          {STEPS.map((step) => (
-            <motion.li
-              key={step.key}
-              className="group"
-              variants={{
-                hidden: { opacity: 0, y: 24 },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  transition: { duration: 0.7, ease: EASE },
-                },
-              }}
+          {/* モバイル: 横スワイプ（peek つき） / PC: 3カラムグリッド */}
+          <div
+            className="overflow-hidden sm:overflow-visible"
+            ref={emblaRef}
+          >
+            <ol
+              aria-label={t("heading")}
+              className="flex gap-4 sm:grid sm:grid-cols-3 sm:gap-6 lg:gap-8"
             >
-              <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg bg-[#0c0c0c] p-2.5 ring-1 ring-white/10">
+              {STEPS.map((step) => (
+                <li
+                  key={step.key}
+                  className="group min-w-0 flex-[0_0_82%] sm:flex-none"
+                >
+                  <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg bg-[#0c0c0c] p-2.5 ring-1 ring-white/10">
                 {step.media.type === "video" ? (
                   <video
                     aria-label={t(`${step.key}.imageAlt`)}
@@ -133,9 +160,32 @@ export default function ReserveSteps() {
               <p className="mt-2 text-xs leading-relaxed text-text-light/60">
                 {t(`${step.key}.description`)}
               </p>
-            </motion.li>
-          ))}
-        </motion.ol>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {/* モバイル: ドット & スワイプ誘導（PC は非表示） */}
+          <div className="mt-5 flex items-center justify-center gap-2 sm:hidden">
+            {STEPS.map((step, i) => (
+              <button
+                key={step.key}
+                type="button"
+                onClick={() => handleScrollTo(i)}
+                aria-label={t("goToStep", { num: step.num })}
+                aria-current={i === selectedIndex}
+                className={`h-2 w-2 rounded-full transition-all duration-300 ${
+                  i === selectedIndex
+                    ? "scale-125 bg-accent"
+                    : "bg-text-gray/30 hover:bg-text-gray/60"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="mt-3 text-center text-[10px] tracking-[0.25em] text-text-gray sm:hidden">
+            {t("swipeHint")}
+          </p>
+        </motion.div>
       </div>
     </section>
   );

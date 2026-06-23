@@ -206,9 +206,9 @@ describe("queries", () => {
       const { getNewsSlugs } = await import("./queries");
       const r = await getNewsSlugs();
       expect(r).toEqual([
-        { locale: "ja", slug: "a" },
-        { locale: "ja", slug: "b" },
-        { locale: "en", slug: "c" },
+        { locale: "ja", slug: "a", updatedAt: "2026-04-01T00:00:00.000Z" },
+        { locale: "ja", slug: "b", updatedAt: "2026-04-01T00:00:00.000Z" },
+        { locale: "en", slug: "c", updatedAt: "2026-04-01T00:00:00.000Z" },
       ]);
     });
   });

@@ -59,7 +59,7 @@ export default function ReserveCalendar({ initialTab }: ReserveCalendarProps) {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.0, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.12em] text-text-light">
+          <h2 className="font-serif text-3xl sm:text-4xl font-black tracking-[0.12em] text-text-light">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">

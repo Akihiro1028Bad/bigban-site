@@ -90,11 +90,13 @@ export default function HyroxServices() {
                 </p>
                 <Link
                   href={reserveHref("hyrox")}
-                  className="mt-6 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-accent transition-all hover:gap-3 hover:text-accent/80"
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-accent px-5 py-3 text-deep-black hover:bg-accent/90 motion-safe:transition-all"
                 >
-                  {t("cta")}
-                  <span className="normal-case tracking-normal text-text-gray">
+                  <span className="text-sm font-bold tracking-[0.15em]">
                     {t("ctaJa")}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-deep-black/60">
+                    {t("cta")}
                   </span>
                   <span aria-hidden className="text-base leading-none">
                     →

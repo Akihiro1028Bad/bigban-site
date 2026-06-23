@@ -29,6 +29,7 @@ vi.mock("@/components/reserve/ReserveCalendar", () => ({
   },
 }));
 vi.mock("@/components/reserve/ReserveInfo", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveFaq", () => ({ default: () => null }));
 
 function buildMockT() {
   return ((key: string) => `translated:${key}`) as unknown as (
