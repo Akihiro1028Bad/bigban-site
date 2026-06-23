@@ -56,6 +56,14 @@ export function isAwaitingDownstream(stage: Stage): boolean {
   return stage === "queued" || stage === "generating" || stage === "approved";
 }
 
+/** 承認/却下できる(=未決定・未生成・下流待ちでない)カードか。一括/キー操作/件数バッジ共通。 */
+export function isActionable(
+  item: { id: string; stage: Stage; isDraftReady?: boolean },
+  decided: Record<string, string | undefined>,
+): boolean {
+  return !decided[item.id] && !item.isDraftReady && !isAwaitingDownstream(item.stage);
+}
+
 /** スコア → 進捗バーの幅(%)。max<=0 は 0。 */
 export function scoreBarPct(score: number, max: number): number {
   if (max <= 0) return 0;
