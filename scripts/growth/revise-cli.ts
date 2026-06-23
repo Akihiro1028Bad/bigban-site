@@ -16,8 +16,9 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage } from "./line";
 import {
   getPage,
   queryDataSource,
@@ -36,6 +37,11 @@ import {
   selectStaleReviseIds,
   type ReviseRow,
 } from "./revise";
+import {
+  buildReviseFailFlex,
+  buildRevisePresentFlex,
+  excerptLines,
+} from "./revise-flex";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。やり直しで再依頼できます。";
@@ -87,12 +93,13 @@ async function rowsByStatus(value: string, options: NotionApiOptions): Promise<R
   return pages.map(reviseRowFromPage);
 }
 
-async function notify(text: string): Promise<void> {
+// #138: Flex(リッチカード)で送る。altText は Flex 非対応環境向けのフォールバック文。
+async function notifyFlex(altText: string, contents: FlexContainer): Promise<void> {
   if (DRYRUN) {
-    process.stdout.write(`[dry-run] LINE:\n${text}\n`);
+    process.stdout.write(`[dry-run] LINE(flex):\n${altText}\n`);
     return;
   }
-  await pushTextMessage(requireEnv("LINE_GROUP_ID"), text, {
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, contents, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
   });
@@ -113,7 +120,10 @@ async function reap(options: NotionApiOptions): Promise<void> {
   for (const row of rows) {
     if (!staleIds.has(row.id)) continue;
     await write(row.id, buildReviseFailProps(REAP_REASON), options);
-    await notify(buildReviseFailMessage(row.title, REAP_REASON));
+    await notifyFlex(
+      buildReviseFailMessage(row.title, REAP_REASON),
+      buildReviseFailFlex({ title: row.title, approveUrl: approveUrl(), reason: REAP_REASON })
+    );
     process.stderr.write(`reaped(失敗化): ${row.id}\n`);
   }
 }
@@ -141,16 +151,28 @@ async function present(pageId: string, file: string, options: NotionApiOptions):
   assertPageId(pageId);
   const proposal = (await readFile(assertStagePath(file), "utf-8")).trim();
   if (!proposal) throw new Error("修正案ファイルが空です。");
-  const title = reviseRowFromPage(await getPage(pageId, options)).title;
+  const row = reviseRowFromPage(await getPage(pageId, options));
   await write(pageId, buildReviseProposalProps(proposal), options);
-  await notify(buildRevisePresentMessage(title, approveUrl()));
+  // #138: リッチカードで提示(タイトル＋反映件数＋冒頭抜粋＋承認画面ボタン)。altText は従来テキスト。
+  await notifyFlex(
+    buildRevisePresentMessage(row.title, approveUrl()),
+    buildRevisePresentFlex({
+      title: row.title,
+      approveUrl: approveUrl(),
+      instructionCount: row.instructions.length,
+      proposalExcerpt: excerptLines(proposal, 4),
+    })
+  );
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
   const title = reviseRowFromPage(await getPage(pageId, options)).title;
   await write(pageId, buildReviseFailProps(reason), options);
-  await notify(buildReviseFailMessage(title, reason));
+  await notifyFlex(
+    buildReviseFailMessage(title, reason),
+    buildReviseFailFlex({ title, approveUrl: approveUrl(), reason })
+  );
 }
 
 async function main(): Promise<void> {
