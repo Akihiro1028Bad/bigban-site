@@ -35,6 +35,8 @@ export interface PendingItem {
   reviseStatus?: ReviseStatus;
   /** PC が返した修正後の構成案(提示中/失敗時に表示)。記事のみ。 */
   reviseProposal?: string;
+  /** #139 B: PC が返した修正後のタイトル(提示中に新旧比較で表示)。空=タイトル提案なし。記事のみ。 */
+  reviseTitleProposal?: string;
   /** 直近に送った修正指示(行コメントの JSON)。記事のみ。 */
   reviseInstructions?: string;
   /** 生成済み下書きの microCMS contentId(空=未作成)。下書きプレビュー(#75)の有無判定に使う。記事のみ。 */
@@ -65,6 +67,11 @@ export function reviseStatusOf(page: NotionPage): ReviseStatus {
 /** ページの `修正案`(rich_text)を読む。未設定は空文字。 */
 export function reviseProposalOf(page: NotionPage): string {
   return richText(page, REVISE_PROPS.proposal);
+}
+
+/** #139 B: ページの `修正タイトル案`(rich_text)を読む。未設定は空文字。 */
+export function reviseTitleProposalOf(page: NotionPage): string {
+  return richText(page, REVISE_PROPS.titleProposal);
 }
 
 /** 下書きプレビューの連携先(microCMS の contentId / draftKey)。 */
@@ -212,6 +219,7 @@ export function toPendingItems(
       outline: richText(page, OUTLINE_PROP),
       reviseStatus: reviseStatusOf(page),
       reviseProposal: richText(page, REVISE_PROPS.proposal),
+      reviseTitleProposal: richText(page, REVISE_PROPS.titleProposal),
       reviseInstructions: richText(page, REVISE_PROPS.instructions),
       contentId,
       isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,

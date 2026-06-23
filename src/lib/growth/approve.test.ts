@@ -11,6 +11,7 @@ import {
   parseDecisions,
   pendingStatus,
   reviseProposalOf,
+  reviseTitleProposalOf,
   reviseStatusOf,
   toPendingItems,
 } from "./approve";
@@ -133,6 +134,16 @@ describe("toPendingItems", () => {
     expect(item.reviseProposal).toBe("改訂版アウトライン");
   });
 
+  it("記事ネタ案の修正タイトル案を反映する(#139 B)", () => {
+    const page = idea("i10", "T", "S");
+    page.properties["修正タイトル案"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "新しいタイトル案" }],
+    };
+    const [item] = toPendingItems([], [page]);
+    expect(item.reviseTitleProposal).toBe("新しいタイトル案");
+  });
+
   it("記事ネタ案の根拠が空なら details から除外する(#238)", () => {
     const noRationale: NotionPage = {
       id: "i2",
@@ -168,6 +179,7 @@ describe("toPendingItems", () => {
         outline: "",
         reviseStatus: "なし",
         reviseProposal: "",
+        reviseTitleProposal: "",
         reviseInstructions: "",
         contentId: "",
         isDraftReady: false,
@@ -218,6 +230,7 @@ describe("toPendingItems", () => {
         outline: "",
         reviseStatus: "なし",
         reviseProposal: "",
+        reviseTitleProposal: "",
         reviseInstructions: "",
         contentId: "",
         isDraftReady: false,
@@ -340,6 +353,20 @@ describe("reviseProposalOf", () => {
     };
     expect(reviseProposalOf(withProposal)).toBe("改訂版");
     expect(reviseProposalOf({ id: "x", url: "", properties: {} })).toBe("");
+  });
+});
+
+describe("reviseTitleProposalOf（#139 B）", () => {
+  it("修正タイトル案(rich_text)を読み、未設定は空文字", () => {
+    const withTitle: NotionPage = {
+      id: "i1",
+      url: "",
+      properties: {
+        "修正タイトル案": { type: "rich_text", rich_text: [{ plain_text: "短い新タイトル" }] },
+      },
+    };
+    expect(reviseTitleProposalOf(withTitle)).toBe("短い新タイトル");
+    expect(reviseTitleProposalOf({ id: "x", url: "", properties: {} })).toBe("");
   });
 });
 

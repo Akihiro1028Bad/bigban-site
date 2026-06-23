@@ -1624,6 +1624,95 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
   });
 });
 
+describe("ApproveClient タイトルのAI修正(#139 B)", () => {
+  async function openIdea(over: Record<string, unknown> = {}) {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A", ...over })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    return screen.findByRole("dialog");
+  }
+
+  it("タイトル指示だけでも『修正を依頼』でき、titleInstruction を送る", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A", reviseStatus: "依頼中" })] } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // 構成案コメントが無くてもタイトル指示があれば依頼ボタンが有効になる。
+    expect(within(dialog).getByRole("button", { name: "修正を依頼" })).toBeDisabled();
+    await userEvent.type(
+      within(dialog).getByLabelText("タイトルについて（AIに修正を依頼）"),
+      "市川を入れて短く"
+    );
+    const submit = within(dialog).getByRole("button", { name: "修正を依頼" });
+    expect(submit).toBeEnabled();
+    await userEvent.click(submit);
+
+    expect(await within(dialog).findByText(/修正を依頼しました/)).toBeInTheDocument();
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
+      pageId: "i1",
+      comments: [],
+      titleInstruction: "市川を入れて短く",
+    });
+  });
+
+  it("提示中はタイトルの新旧比較を表示し、反映できる", async () => {
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [
+            ideaItem({
+              outline: "## A",
+              title: "元タイトル",
+              reviseStatus: "提示中",
+              reviseTitleProposal: "短い新タイトル",
+            }),
+          ],
+        },
+      },
+      { json: { success: true } },
+      { json: { success: true, items: [ideaItem({ outline: "## A", title: "短い新タイトル" })] } }
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 元タイトル" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText("タイトル案")).toBeInTheDocument();
+    expect(within(dialog).getByText("短い新タイトル")).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "apply" });
+  });
+
+  it("タイトルのみの提示では構成案の新旧比較を出さない", async () => {
+    const dialog = await openIdea({
+      reviseStatus: "提示中",
+      reviseTitleProposal: "新タイトル案",
+    });
+    expect(within(dialog).getByText("タイトル案")).toBeInTheDocument();
+    expect(within(dialog).queryByText("元の構成案")).not.toBeInTheDocument();
+  });
+
+  it("構成案のみの提示ではタイトルの新旧比較を出さない", async () => {
+    const dialog = await openIdea({
+      reviseStatus: "提示中",
+      reviseProposal: "## A 改",
+    });
+    expect(within(dialog).getByText("元の構成案")).toBeInTheDocument();
+    expect(within(dialog).queryByText("タイトル案")).not.toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
   beforeEach(() => {
     flags.authEnabled = false;

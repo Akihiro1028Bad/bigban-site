@@ -13,7 +13,12 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { isNotionPageId, reviseProposalOf, reviseStatusOf } from "@/lib/growth/approve";
+import {
+  isNotionPageId,
+  reviseProposalOf,
+  reviseStatusOf,
+  reviseTitleProposalOf,
+} from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
 import { buildReviseApplyProps, buildReviseDiscardProps } from "@/lib/growth/revise";
 
@@ -82,9 +87,15 @@ export async function POST(request: Request): Promise<Response> {
 
     if ((action as ReviseAction) === "apply") {
       if (status !== "提示中") return conflict("反映できるのは提示中のときだけです。");
+      // #139 B: 構成案・タイトルのうち提案がある方だけ反映する(部分提案を許容)。
       const proposal = reviseProposalOf(page);
-      if (!proposal) return conflict("反映する修正案がありません。");
-      await updatePageProps(pageId, buildReviseApplyProps(proposal), options);
+      const titleProposal = reviseTitleProposalOf(page);
+      if (!proposal && !titleProposal) return conflict("反映する修正案がありません。");
+      await updatePageProps(
+        pageId,
+        buildReviseApplyProps(proposal || null, titleProposal || null),
+        options
+      );
     } else {
       // discard は「提示中/失敗 → なし」だけ許可。依頼中/処理中(PC作業中)は
       // 競合を避けるため拒否する(古い状態へ巻き戻さない)。

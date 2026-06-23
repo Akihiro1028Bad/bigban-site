@@ -20,6 +20,10 @@ export const REVISE_PROPS = {
   proposal: "修正案",
   /** stale-lock 回収・タイムアウト通知用。 */
   requestedAt: "修正依頼時刻",
+  /** #139 B: タイトルへの修正指示(自由文)。行アンカーを持たないので独立プロパティ。 */
+  titleInstruction: "修正タイトル指示",
+  /** #139 B: PC が返した修正後のタイトル。反映まで `タイトル案` には触らない。 */
+  titleProposal: "修正タイトル案",
 } as const;
 
 /** 既存の構成案(本文)プロパティ名。反映時のみ上書きする。 */
@@ -93,36 +97,51 @@ export function parseReviseInstructions(raw: string): ReviseComment[] {
 
 /**
  * 修正依頼を Notion に書き込むためのプロパティ群(1 PATCH 用)を組み立てる。
- * `修正指示`=コメントJSON、`修正ステータス`=依頼中、`修正依頼時刻`=nowIso。
+ * #139 B: 構成案コメント(`修正指示`)・タイトル指示(`修正タイトル指示`)を並走させる。
+ * 依頼が無い方は空(`rich_text: []`)で書き、前回の指示が残らないようにする。
+ * 「少なくとも一方が非空」の検証は呼び出し側(API ルート)が行う。
  */
 export function buildReviseRequestProps(
-  instructionsJson: string,
+  instructionsJson: string | null,
+  titleInstruction: string | null,
   nowIso: string
 ): Record<string, unknown> {
   const requested: ReviseStatus = "依頼中";
   return {
-    [REVISE_PROPS.instructions]: { rich_text: chunkRichText(instructionsJson) },
+    [REVISE_PROPS.instructions]: {
+      rich_text: instructionsJson ? chunkRichText(instructionsJson) : [],
+    },
+    [REVISE_PROPS.titleInstruction]: {
+      rich_text: titleInstruction ? chunkRichText(titleInstruction) : [],
+    },
     [REVISE_PROPS.status]: { select: { name: requested } },
     [REVISE_PROPS.requestedAt]: { date: { start: nowIso } },
   };
 }
 
-/** 修正指示・修正案をクリアし、修正ステータスを「なし」に戻すプロパティ群。 */
+/** 修正指示・修正案(構成案/タイトル両レーン)をクリアし、ステータスを「なし」に戻すプロパティ群。 */
 function clearedReviseProps(): Record<string, unknown> {
   const cleared: ReviseStatus = "なし";
   return {
     [REVISE_PROPS.status]: { select: { name: cleared } },
     [REVISE_PROPS.instructions]: { rich_text: [] },
     [REVISE_PROPS.proposal]: { rich_text: [] },
+    [REVISE_PROPS.titleInstruction]: { rich_text: [] },
+    [REVISE_PROPS.titleProposal]: { rich_text: [] },
   };
 }
 
 /**
- * 「反映」: 修正案を構成案へ上書きし、修正状態をクリアする(1 PATCH 用)。
+ * 「反映」: 提案がある方だけ(構成案=`修正案`→`構成案` / タイトル=`修正タイトル案`→`タイトル案`)を
+ * 上書きし、修正状態を全クリアする(1 PATCH 用)。両方 null は呼び出し側でガードする。
  */
-export function buildReviseApplyProps(proposal: string): Record<string, unknown> {
+export function buildReviseApplyProps(
+  proposal: string | null,
+  titleProposal: string | null
+): Record<string, unknown> {
   return {
-    [OUTLINE_PROP]: { rich_text: chunkRichText(proposal) },
+    ...(proposal ? { [OUTLINE_PROP]: { rich_text: chunkRichText(proposal) } } : {}),
+    ...(titleProposal ? { [IDEA_TITLE_PROP]: { title: chunkRichText(titleProposal) } } : {}),
     ...clearedReviseProps(),
   };
 }
@@ -159,11 +178,20 @@ export function buildReviseProcessingProps(): Record<string, unknown> {
   return { [REVISE_PROPS.status]: { select: { name: processing } } };
 }
 
-/** 修正完了: 修正案を書き込み、提示中にする(1 PATCH)。 */
-export function buildReviseProposalProps(proposal: string): Record<string, unknown> {
+/**
+ * 修正完了: 提案を書き込み、提示中にする(1 PATCH)。
+ * #139 B: 構成案・タイトルのうち提案がある方を書き、無い方は空にして残骸を残さない。
+ */
+export function buildReviseProposalProps(
+  proposal: string | null,
+  titleProposal: string | null
+): Record<string, unknown> {
   const presented: ReviseStatus = "提示中";
   return {
-    [REVISE_PROPS.proposal]: { rich_text: chunkRichText(proposal) },
+    [REVISE_PROPS.proposal]: { rich_text: proposal ? chunkRichText(proposal) : [] },
+    [REVISE_PROPS.titleProposal]: {
+      rich_text: titleProposal ? chunkRichText(titleProposal) : [],
+    },
     [REVISE_PROPS.status]: { select: { name: presented } },
   };
 }
@@ -216,6 +244,10 @@ export interface ReviseRow {
   outline: string;
   /** 行コメント。空/不正なら []。 */
   instructions: ReviseComment[];
+  /** #139 B: タイトルへの修正指示(自由文)。無ければ ""。 */
+  titleInstruction: string;
+  /** #139 B: PC が返した修正後タイトル。未提示なら ""。 */
+  titleProposal: string;
 }
 
 /** Notion ページから poller 用の行情報を取り出す(壊れた修正指示は [] にして落とさない)。 */
@@ -240,6 +272,8 @@ export function reviseRowFromPage(page: NotionPage): ReviseRow {
     requestedAtMs: readDateStartMs(page, REVISE_PROPS.requestedAt),
     outline: readRichTextPlain(page, OUTLINE_PROP),
     instructions,
+    titleInstruction: readRichTextPlain(page, REVISE_PROPS.titleInstruction),
+    titleProposal: readRichTextPlain(page, REVISE_PROPS.titleProposal),
   };
 }
 

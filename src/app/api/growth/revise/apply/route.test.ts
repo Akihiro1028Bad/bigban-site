@@ -25,10 +25,11 @@ function postRequest(token: string | null, body: unknown): Request {
   return new Request(url, { method: "POST", body: JSON.stringify(body) });
 }
 
-function page(status?: string, proposal?: string) {
+function page(status?: string, proposal?: string, titleProposal?: string) {
   const properties: Record<string, unknown> = {};
   if (status) properties["修正ステータス"] = { select: { name: status } };
   if (proposal) properties["修正案"] = { rich_text: [{ plain_text: proposal }] };
+  if (titleProposal) properties["修正タイトル案"] = { rich_text: [{ plain_text: titleProposal }] };
   return { id: PAGE_ID, url: "", properties };
 }
 
@@ -68,10 +69,33 @@ describe("POST /api/growth/revise/apply", () => {
     expect(updatePageProps).not.toHaveBeenCalled();
   });
 
-  it("apply: 修正案が空なら 409", async () => {
+  it("apply: 構成案・タイトル案ともに空なら 409(#139 B)", async () => {
     vi.mocked(getPage).mockResolvedValue(page("提示中"));
     const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "apply" }));
     expect(res.status).toBe(409);
+  });
+
+  it("apply: タイトル案だけでも反映できる(構成案は触らない・#139 B)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("提示中", undefined, "短い新タイトル"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "apply" }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, unknown>;
+    expect(p["構成案"]).toBeUndefined();
+    expect(p["タイトル案"]).toEqual({ title: [{ text: { content: "短い新タイトル" } }] });
+    expect(p["修正ステータス"]).toEqual({ select: { name: "なし" } });
+  });
+
+  it("apply: 構成案とタイトル案の両方を反映できる(#139 B)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("提示中", "## 改訂", "新タイトル"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "apply" }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, unknown>;
+    expect(p["構成案"]).toEqual({ rich_text: [{ text: { content: "## 改訂" } }] });
+    expect(p["タイトル案"]).toEqual({ title: [{ text: { content: "新タイトル" } }] });
   });
 
   it("discard: 構成案は触らず修正状態だけクリアする", async () => {

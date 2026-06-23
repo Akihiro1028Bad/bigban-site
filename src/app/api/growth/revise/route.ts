@@ -24,6 +24,9 @@ import {
 
 export const runtime = "nodejs";
 
+/** タイトルへの修正指示(自由文)の上限長。濫用・巨大ペイロード防止(#139 B)。 */
+const MAX_TITLE_INSTRUCTION_LEN = 500;
+
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -64,15 +67,29 @@ export async function POST(request: Request): Promise<Response> {
   const pageId = (body as { pageId?: unknown })?.pageId;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
 
-  let instructionsJson: string;
-  try {
-    instructionsJson = serializeReviseInstructions(
-      (body as { comments?: unknown }).comments
-    );
-  } catch (error) {
-    /* istanbul ignore next -- @preserve throw 元は常に Error(serializeReviseInstructions) */
-    const message = error instanceof Error ? error.message : "不正なコメントです。";
-    return badRequest(message);
+  // #139 B: 構成案コメント・タイトル指示は片方だけでも可。少なくとも一方が非空なら受け付ける。
+  const rawComments = (body as { comments?: unknown }).comments;
+  const hasComments = Array.isArray(rawComments) && rawComments.length > 0;
+  const rawTitleInstruction = (body as { titleInstruction?: unknown }).titleInstruction;
+  const titleInstruction =
+    typeof rawTitleInstruction === "string" ? rawTitleInstruction.trim() : "";
+  // 上限長: 自由文の濫用(巨大ペイロードによる Notion API 浪費)を防ぐ。
+  if (titleInstruction.length > MAX_TITLE_INSTRUCTION_LEN) {
+    return badRequest(`タイトルへの指示は${MAX_TITLE_INSTRUCTION_LEN}文字以内にしてください。`);
+  }
+
+  let instructionsJson: string | null = null;
+  if (hasComments) {
+    try {
+      instructionsJson = serializeReviseInstructions(rawComments);
+    } catch (error) {
+      /* istanbul ignore next -- @preserve throw 元は常に Error(serializeReviseInstructions) */
+      const message = error instanceof Error ? error.message : "不正なコメントです。";
+      return badRequest(message);
+    }
+  }
+  if (!instructionsJson && !titleInstruction) {
+    return badRequest("構成案コメントまたはタイトルへの指示を入力してください。");
   }
 
   const options = notionOptions();
@@ -93,7 +110,11 @@ export async function POST(request: Request): Promise<Response> {
     }
     await updatePageProps(
       pageId,
-      buildReviseRequestProps(instructionsJson, new Date().toISOString()),
+      buildReviseRequestProps(
+        instructionsJson,
+        titleInstruction || null,
+        new Date().toISOString()
+      ),
       options
     );
   } catch {
