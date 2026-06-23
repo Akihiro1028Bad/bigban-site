@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import Image from "next/image";
 import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
@@ -124,6 +125,8 @@ interface DraftPreview {
   displayMode: "html" | "rich";
   bodyHtml: string;
   body: string;
+  // #141: アイキャッチURLミラー(未設定は空文字)。プレビュー上部の画像表示に使う。
+  eyecatch?: string;
 }
 
 type DraftState =
@@ -1749,6 +1752,16 @@ export function ApproveClient() {
             animate={{ opacity: 1 }}
             className="mt-2"
           >
+            {/* #141: アイキャッチ(あれば)をプレビュー上部に表示。microCMS Media は next.config 許可済み。 */}
+            {draftState.draft.eyecatch ? (
+              <Image
+                src={draftState.draft.eyecatch}
+                alt={`アイキャッチ: ${draftState.draft.title}`}
+                width={800}
+                height={420}
+                className="mb-3 h-auto w-full rounded-md border border-gray-200"
+              />
+            ) : null}
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
               {PREVIEW_DEVICES.map((device) => {

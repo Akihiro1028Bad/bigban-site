@@ -6,10 +6,12 @@ import {
   BODY_MIRROR_PROP,
   buildBodyMirrorProps,
   buildDraftLinkProps,
+  buildEyecatchMirrorProps,
   chunkRichText,
   createPage,
   DEFAULT_NOTION_VERSION,
   DRAFT_LINK_PROPS,
+  EYECATCH_MIRROR_PROP,
   getLatestReport,
   getPage,
   queryDataSource,
@@ -230,6 +232,22 @@ describe("buildBodyMirrorProps（本文ミラー #95）", () => {
   it("空文字は空配列(プロパティを空にする)", () => {
     expect(buildBodyMirrorProps("")).toEqual({
       [BODY_MIRROR_PROP]: { rich_text: [] },
+    });
+  });
+});
+
+describe("buildEyecatchMirrorProps（アイキャッチミラー #141）", () => {
+  it("URL を アイキャッチURL プロパティへ url で書き込む", () => {
+    expect(
+      buildEyecatchMirrorProps("https://images.microcms-assets.io/x.png"),
+    ).toEqual({
+      [EYECATCH_MIRROR_PROP]: { url: "https://images.microcms-assets.io/x.png" },
+    });
+  });
+
+  it("空文字は url:null(プロパティを空にする)", () => {
+    expect(buildEyecatchMirrorProps("")).toEqual({
+      [EYECATCH_MIRROR_PROP]: { url: null },
     });
   });
 });

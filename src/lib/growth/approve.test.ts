@@ -5,6 +5,7 @@ import type { NotionPage } from "./notion";
 import {
   draftBodyOf,
   draftLinkOf,
+  eyecatchUrlOf,
   ideaTitleOf,
   isNotionPageId,
   parseDecisions,
@@ -394,5 +395,40 @@ describe("draftBodyOf / ideaTitleOf（本文ミラー #95）", () => {
       },
     };
     expect(draftBodyOf(page)).toBe("<p>後</p>");
+  });
+});
+
+describe("eyecatchUrlOf（アイキャッチミラー #141）", () => {
+  it("URLプロパティから読む", () => {
+    const page: NotionPage = {
+      id: "x",
+      url: "",
+      properties: { "アイキャッチURL": { url: "https://images.microcms-assets.io/a.png" } },
+    };
+    expect(eyecatchUrlOf(page)).toBe("https://images.microcms-assets.io/a.png");
+  });
+
+  it("テキスト(rich_text)プロパティからも読む", () => {
+    const page: NotionPage = {
+      id: "x",
+      url: "",
+      properties: {
+        "アイキャッチURL": { rich_text: [{ plain_text: "https://images.microcms-assets.io/b.png" }] },
+      },
+    };
+    expect(eyecatchUrlOf(page)).toBe("https://images.microcms-assets.io/b.png");
+  });
+
+  it("未設定は空文字", () => {
+    expect(eyecatchUrlOf({ id: "x", url: "", properties: {} })).toBe("");
+  });
+
+  it("rich_text の plain_text 欠落要素は空文字に落とす", () => {
+    const page: NotionPage = {
+      id: "x",
+      url: "",
+      properties: { "アイキャッチURL": { rich_text: [{}] } },
+    };
+    expect(eyecatchUrlOf(page)).toBe("");
   });
 });

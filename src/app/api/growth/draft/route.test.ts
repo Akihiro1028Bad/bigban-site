@@ -27,7 +27,8 @@ function getRequest(token: string | null, pageId: string | null): Request {
 }
 
 // #95: 本文ミラー(下書き本文HTML)＋タイトル案を持つ Notion ページ。
-function pageWithMirror(bodyHtml?: string, title = "夜のピックル") {
+// #141: アイキャッチURL(任意)も持てる。
+function pageWithMirror(bodyHtml?: string, title = "夜のピックル", eyecatch?: string) {
   const properties: Record<string, unknown> = {
     "タイトル案": { type: "title", title: [{ plain_text: title }] },
   };
@@ -36,6 +37,9 @@ function pageWithMirror(bodyHtml?: string, title = "夜のピックル") {
       type: "rich_text",
       rich_text: [{ plain_text: bodyHtml }],
     };
+  }
+  if (eyecatch !== undefined) {
+    properties["アイキャッチURL"] = { type: "url", url: eyecatch };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -60,8 +64,23 @@ describe("GET /api/growth/draft", () => {
     expect(await res.json()).toEqual({
       success: true,
       exists: true,
-      draft: { title: "夜のピックル", displayMode: "html", bodyHtml: "<p>本文</p>", body: "" },
+      draft: {
+        title: "夜のピックル",
+        displayMode: "html",
+        bodyHtml: "<p>本文</p>",
+        body: "",
+        eyecatch: "",
+      },
     });
+  });
+
+  it("アイキャッチURL があれば draft.eyecatch に含める(#141)", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithMirror("<p>本文</p>", "夜のピックル", "https://images.microcms-assets.io/x.png"),
+    );
+    const res = await GET(getRequest(null, PAGE_ID));
+    const json = await res.json();
+    expect(json.draft.eyecatch).toBe("https://images.microcms-assets.io/x.png");
   });
 
   it("本文ミラー未保存は exists:false(エラーにしない)", async () => {
