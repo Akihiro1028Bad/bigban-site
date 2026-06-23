@@ -2561,3 +2561,40 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 });
+
+describe("ApproveClient 公開前チェックリスト(#128)", () => {
+  it("下書き取得済みのパネルに公開前チェックを出す", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: "<h2>A</h2><p>本文</p>",
+            body: "本文テキスト",
+          },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    const checklist = await within(dialog).findByRole("region", { name: "公開前チェック" });
+    expect(within(checklist).getByText("文字数")).toBeInTheDocument();
+    expect(within(checklist).getByText("見出し")).toBeInTheDocument();
+    expect(within(checklist).getByText("画像")).toBeInTheDocument();
+  });
+
+  it("下書き未生成の記事ではチェックリストを出さない", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(within(dialog).queryByRole("region", { name: "公開前チェック" })).not.toBeInTheDocument();
+  });
+});

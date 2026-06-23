@@ -41,6 +41,8 @@ import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
 import { DetailHeader } from "./DetailHeader";
 import { detailBadge } from "./detailBadge";
+import { DraftChecklist } from "./DraftChecklist";
+import { draftQuality } from "./draftQuality";
 import { MetricChips } from "./MetricChips";
 import { ProposalsView } from "./ProposalsView";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
@@ -1875,7 +1877,21 @@ export function ApproveClient() {
             <div className="shrink-0 border-b border-gray-200 bg-white px-4 pb-2">{header}</div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="lg:flex lg:items-start lg:gap-6">
-                <div className="lg:w-[20rem] lg:shrink-0">{insight}</div>
+                <div className="lg:w-[20rem] lg:shrink-0">
+                  {insight}
+                  {/* #128: 下書きが取得できたら公開前チェックリストを出す。 */}
+                  {draftState.status === "ready" ? (
+                    <div className="mt-4">
+                      <DraftChecklist
+                        checks={draftQuality({
+                          bodyHtml: draftState.draft.bodyHtml,
+                          body: draftState.draft.body,
+                          title: item.title,
+                        })}
+                      />
+                    </div>
+                  ) : null}
+                </div>
                 <div className="lg:sticky lg:top-0 lg:min-w-0 lg:flex-1">
                   {renderDraftPreview(item)}
                 </div>
