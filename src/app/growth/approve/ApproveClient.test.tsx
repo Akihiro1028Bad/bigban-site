@@ -2774,3 +2774,48 @@ describe("ApproveClient スマホ操作性(#137)", () => {
     expect(screen.getByText(/カードをタップ/)).toBeInTheDocument();
   });
 });
+
+describe("ApproveClient アイキャッチ表示(#141)", () => {
+  it("下書きにアイキャッチがあればプレビューに画像を表示する", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: "<p>本文</p>",
+            body: "",
+            eyecatch: "https://images.microcms-assets.io/x.png",
+          },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByAltText(/アイキャッチ/)).toBeInTheDocument();
+  });
+
+  it("アイキャッチが無ければ画像は出さない", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "", eyecatch: "" },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("button", { name: "本文をコピー" });
+    expect(within(dialog).queryByAltText(/アイキャッチ/)).not.toBeInTheDocument();
+  });
+});
