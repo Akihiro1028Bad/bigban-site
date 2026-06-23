@@ -2635,3 +2635,109 @@ describe("ApproveClient プレビューPC/モバイル切替(#129)", () => {
     expect(frame).not.toHaveClass("max-w-[390px]");
   });
 });
+
+describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
+  function mockTwoIdeas() {
+    return mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [
+            ideaItem({ id: "i1", title: "記事1", score: 9 }),
+            ideaItem({ id: "i2", title: "記事2", score: 1 }),
+          ],
+        },
+      },
+      { json: { success: true, updated: 1 } }, // 承認/却下 POST 用(消費されないテストもある)
+    );
+  }
+  async function openFirst() {
+    mockTwoIdeas();
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 記事1" }));
+    return screen.findByRole("dialog", { name: "詳細: 記事1" });
+  }
+
+  it("「次へ」で閉じずに次の未処理記事へ移動、末尾では無効", async () => {
+    const dialog = await openFirst();
+    await userEvent.click(within(dialog).getByRole("button", { name: "次へ →" }));
+    expect(await screen.findByRole("dialog", { name: "詳細: 記事2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "次へ →" })).toBeDisabled();
+  });
+
+  it("キーボード j/k でレビュー対象を移動", async () => {
+    await openFirst();
+    fireEvent.keyDown(document.body, { key: "j" });
+    expect(await screen.findByRole("dialog", { name: "詳細: 記事2" })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "k" });
+    expect(await screen.findByRole("dialog", { name: "詳細: 記事1" })).toBeInTheDocument();
+  });
+
+  it("先頭で k・末尾で j は何もしない", async () => {
+    await openFirst(); // 記事1=先頭
+    fireEvent.keyDown(document.body, { key: "k" });
+    expect(screen.getByRole("dialog", { name: "詳細: 記事1" })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "j" });
+    await screen.findByRole("dialog", { name: "詳細: 記事2" }); // 末尾
+    fireEvent.keyDown(document.body, { key: "j" });
+    expect(screen.getByRole("dialog", { name: "詳細: 記事2" })).toBeInTheDocument();
+  });
+
+  it("キーボード a で開いている記事を承認する(段階が生成待ちへ)", async () => {
+    const dialog = await openFirst();
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(await within(dialog).findByText("生成待ち")).toBeInTheDocument();
+  });
+
+  it("キーボード r で開いている記事を却下する", async () => {
+    const dialog = await openFirst();
+    fireEvent.keyDown(document.body, { key: "r" });
+    expect(
+      await within(dialog).findByRole("button", { name: "承認待ちに戻す" }),
+    ).toBeInTheDocument();
+  });
+
+  it("未処理でない記事(生成待ち)では a/r は無効", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "生成待ち記事", stage: "queued" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 生成待ち記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 生成待ち記事" });
+    fireEvent.keyDown(document.body, { key: "a" });
+    fireEvent.keyDown(document.body, { key: "r" });
+    expect(within(dialog).getByText("生成待ち")).toBeInTheDocument();
+  });
+
+  it("キーボード e で下書きがあれば編集ワークスペースを開く", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    await within(dialog).findByRole("button", { name: "本文をコピー" }); // draft ready の目印
+    fireEvent.keyDown(document.body, { key: "e" });
+    expect(await screen.findByRole("dialog", { name: "記事を編集" })).toBeInTheDocument();
+  });
+
+  it("下書きが無い記事では e は何もしない", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    fireEvent.keyDown(document.body, { key: "e" });
+    expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
+  });
+});
