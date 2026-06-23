@@ -2384,3 +2384,31 @@ describe("ApproveClient タブのキーボード/a11y(#119)", () => {
     expect(propTab).toHaveAttribute("aria-controls", "approve-tabpanel");
   });
 });
+
+describe("ApproveClient カードのタイトル視認性(#119 follow-up)", () => {
+  const LONG = "とても長い記事タイトルがここに入って盤の狭い列でも全文を読みたい";
+
+  async function titleOf(over: Record<string, unknown>) {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ title: LONG, ...over })] } });
+    render(<ApproveClient />);
+    await login();
+    return screen.findByText(LONG);
+  }
+
+  it("未処理カードのタイトルは2行クランプで主役表示する(truncateしない)", async () => {
+    const title = await titleOf({ stage: "proposed" });
+    expect(title).toHaveClass("line-clamp-2");
+    expect(title).not.toHaveClass("truncate");
+  });
+
+  it("下書きカードのタイトルも2行クランプで表示する", async () => {
+    const title = await titleOf({ stage: "drafted", isDraftReady: true, contentId: "g-1" });
+    expect(title).toHaveClass("line-clamp-2");
+    expect(title).not.toHaveClass("truncate");
+  });
+
+  it("生成待ち/生成中カードのタイトルも2行クランプで表示する", async () => {
+    const title = await titleOf({ stage: "generating" });
+    expect(title).toHaveClass("line-clamp-2");
+  });
+});
