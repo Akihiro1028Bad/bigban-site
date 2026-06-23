@@ -110,6 +110,8 @@ interface PendingItem {
   outline?: string;
   reviseStatus?: string;
   reviseProposal?: string;
+  // #139 B: AI が提案した新タイトル(提示中に新旧比較で表示)。空=タイトル提案なし。
+  reviseTitleProposal?: string;
   reviseInstructions?: string;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
   contentId?: string;
@@ -293,6 +295,8 @@ export function ApproveClient() {
   // #139 A: 記事タイトルの直接編集(構成案修正パネル内のインライン編集)。
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
+  // #139 B: タイトルへの AI 修正指示(構成案コメントとは別レーン)。
+  const [titleRevisePrompt, setTitleRevisePrompt] = useState("");
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -320,6 +324,7 @@ export function ApproveClient() {
     setReviseError("");
     setEditingTitle(false);
     setTitleInput("");
+    setTitleRevisePrompt("");
     setEditingDraft(false);
     setConfirmDiscard(false);
     setDraftSaveError("");
@@ -715,20 +720,25 @@ export function ApproveClient() {
     setOpenId(null);
   }
 
-  // #53: セクションに溜めたコメントを {見出し, comment} へ展開して送る(アンカー=見出し)。
+  // #53/#139 B: セクションに溜めたコメントを {見出し, comment} へ展開し、タイトル指示と一緒に送る。
   async function requestRevise(item: PendingItem): Promise<void> {
     const sections = outlineSections(item.outline);
     const comments = sections.flatMap((section, i) =>
       (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
     );
-    // コメント0件のときは「修正を依頼」ボタンが無効なので、ここへは到達しない。
+    const titleInstruction = titleRevisePrompt.trim();
+    // 構成案コメント0件かつタイトル指示なしのときは「修正を依頼」ボタンが無効なので到達しない。
     setReviseBusy(true);
     setReviseError("");
     try {
       const res = await fetch("/api/growth/revise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageId: item.id, comments }),
+        body: JSON.stringify({
+          pageId: item.id,
+          comments,
+          ...(titleInstruction ? { titleInstruction } : {}),
+        }),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
@@ -743,6 +753,7 @@ export function ApproveClient() {
         prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
       );
       setDraftComments({});
+      setTitleRevisePrompt("");
     } catch (error) {
       setReviseError(toMessage(error, "修正依頼に失敗しました。"));
     } finally {
@@ -1638,21 +1649,40 @@ export function ApproveClient() {
     );
   }
 
-  // #42/#43/#52/#53/#54: 構成案の修正セクション(記事のみ)。コメント＋手動編集。
+  // #42/#43/#52/#53/#54/#139 B: 構成案の修正セクション(記事のみ)。コメント＋タイトル指示＋手動編集。
   function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
     const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
+    const hasTitlePrompt = titleRevisePrompt.trim() !== "";
     return (
       <MotionConfig reducedMotion="user">
         <p className="mt-1 text-xs text-gray-500">
           見出しの「＋ コメント」でAIに修正を依頼、「編集」で自分で直せます。
         </p>
+        {/* #139 B: タイトルへの AI 修正指示(専用枠)。書いたときだけタイトルも直す。 */}
+        <div className="mt-2">
+          <label
+            htmlFor={`title-revise-${item.id}`}
+            className="block text-xs font-medium text-gray-500"
+          >
+            タイトルについて（AIに修正を依頼）
+          </label>
+          <textarea
+            id={`title-revise-${item.id}`}
+            value={titleRevisePrompt}
+            onChange={(event) => setTitleRevisePrompt(event.target.value)}
+            disabled={reviseBusy}
+            rows={2}
+            placeholder="例: 市川という地名を入れて、もっと具体的に"
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+          />
+        </div>
         <ul className="mt-2 space-y-2">
           {sections.map((_, i) => renderSection(item, sections, i))}
         </ul>
         <button
           type="button"
           onClick={() => requestRevise(item)}
-          disabled={reviseBusy || total === 0}
+          disabled={reviseBusy || (total === 0 && !hasTitlePrompt)}
           className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
         >
           修正を依頼{total > 0 ? `（コメント${total}件）` : ""}
@@ -1682,25 +1712,44 @@ export function ApproveClient() {
   }
 
   function renderReviseReady(item: PendingItem) {
+    // #139 B: 構成案・タイトルのうち提案がある方だけ新旧比較を出す(部分提案を許容)。
+    const hasOutlineProposal = (item.reviseProposal ?? "") !== "";
+    const hasTitleProposal = (item.reviseTitleProposal ?? "") !== "";
     return (
       <div>
         <p className="mt-2 text-xs text-gray-500">
-          修正案が届きました。元の構成案と見比べて反映してください。
+          修正案が届きました。元と見比べて反映してください。
         </p>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div>
-            <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
-            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
-              {item.outline}
-            </pre>
+        {hasTitleProposal ? (
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <h4 className="text-xs font-bold text-gray-500">元のタイトル</h4>
+              <p className="mt-1 rounded-md bg-gray-50 p-2 text-xs text-gray-700">{item.title}</p>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-blue-700">タイトル案</h4>
+              <p className="mt-1 rounded-md bg-blue-50 p-2 text-xs font-medium text-gray-900">
+                {item.reviseTitleProposal}
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-blue-700">修正案</h4>
-            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
-              {item.reviseProposal}
-            </pre>
+        ) : null}
+        {hasOutlineProposal ? (
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
+              <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
+                {item.outline}
+              </pre>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-blue-700">修正案</h4>
+              <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
+                {item.reviseProposal}
+              </pre>
+            </div>
           </div>
-        </div>
+        ) : null}
         <div className="mt-2 flex gap-2">
           <button
             type="button"

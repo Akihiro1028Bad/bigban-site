@@ -31,6 +31,8 @@ describe("REVISE 定数", () => {
       status: "修正ステータス",
       proposal: "修正案",
       requestedAt: "修正依頼時刻",
+      titleInstruction: "修正タイトル指示",
+      titleProposal: "修正タイトル案",
     });
     expect(REVISE_STATUSES).toContain("提示中");
     expect(REVISE_BUSY_STATUSES).toEqual(["依頼中", "処理中", "提示中"]);
@@ -82,35 +84,80 @@ describe("parseReviseInstructions", () => {
   });
 });
 
-describe("buildReviseRequestProps", () => {
-  it("修正指示(分割rich_text)・依頼中・依頼時刻を1まとめにする", () => {
+describe("buildReviseRequestProps（#139 B: 構成案/タイトルの並走）", () => {
+  const CLEARED_TITLE = { "修正タイトル指示": { rich_text: [] } };
+
+  it("構成案コメントのみ: 修正指示を入れ、タイトル指示は空・依頼中・依頼時刻", () => {
     const json = serializeReviseInstructions([{ line: "見出し", comment: "短く" }]);
-    const props = buildReviseRequestProps(json, "2026-06-19T01:00:00.000Z");
+    const props = buildReviseRequestProps(json, null, "2026-06-19T01:00:00.000Z");
     expect(props).toEqual({
       "修正指示": { rich_text: [{ text: { content: json } }] },
+      ...CLEARED_TITLE,
       "修正ステータス": { select: { name: "依頼中" } },
       "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
     });
   });
+
+  it("タイトル指示のみ: 修正指示は空・タイトル指示を入れる", () => {
+    const props = buildReviseRequestProps(null, "もっと短く具体的に", "2026-06-19T01:00:00.000Z");
+    expect(props).toEqual({
+      "修正指示": { rich_text: [] },
+      "修正タイトル指示": { rich_text: [{ text: { content: "もっと短く具体的に" } }] },
+      "修正ステータス": { select: { name: "依頼中" } },
+      "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
+    });
+  });
+
+  it("両方: 構成案コメントとタイトル指示の両方を入れる", () => {
+    const json = serializeReviseInstructions([{ line: "見出し", comment: "短く" }]);
+    const props = buildReviseRequestProps(json, "タイトルも短く", "2026-06-19T01:00:00.000Z");
+    expect(props).toMatchObject({
+      "修正指示": { rich_text: [{ text: { content: json } }] },
+      "修正タイトル指示": { rich_text: [{ text: { content: "タイトルも短く" } }] },
+    });
+  });
 });
 
-describe("buildReviseApplyProps", () => {
-  it("構成案を上書きし、修正指示・修正案をクリア、ステータスをなしに戻す", () => {
-    expect(buildReviseApplyProps("新しいアウトライン")).toEqual({
+describe("buildReviseApplyProps（#139 B: ある方だけ反映）", () => {
+  const CLEARED = {
+    "修正ステータス": { select: { name: "なし" } },
+    "修正指示": { rich_text: [] },
+    "修正案": { rich_text: [] },
+    "修正タイトル指示": { rich_text: [] },
+    "修正タイトル案": { rich_text: [] },
+  };
+
+  it("構成案のみ: 構成案を上書きし、修正状態を全クリア(タイトル案は触らない)", () => {
+    expect(buildReviseApplyProps("新しいアウトライン", null)).toEqual({
       "構成案": { rich_text: [{ text: { content: "新しいアウトライン" } }] },
-      "修正ステータス": { select: { name: "なし" } },
-      "修正指示": { rich_text: [] },
-      "修正案": { rich_text: [] },
+      ...CLEARED,
+    });
+  });
+
+  it("タイトルのみ: タイトル案(title型)を上書きし、修正状態を全クリア(構成案は触らない)", () => {
+    expect(buildReviseApplyProps(null, "梅雨でも打てる")).toEqual({
+      "タイトル案": { title: [{ text: { content: "梅雨でも打てる" } }] },
+      ...CLEARED,
+    });
+  });
+
+  it("両方: 構成案とタイトル案の両方を上書きする", () => {
+    expect(buildReviseApplyProps("## A", "新タイトル")).toEqual({
+      "構成案": { rich_text: [{ text: { content: "## A" } }] },
+      "タイトル案": { title: [{ text: { content: "新タイトル" } }] },
+      ...CLEARED,
     });
   });
 });
 
 describe("buildReviseDiscardProps", () => {
-  it("構成案は触らず、修正指示・修正案・ステータスをクリアする", () => {
+  it("構成案・タイトル案は触らず、指示・提案・ステータスを全クリアする", () => {
     expect(buildReviseDiscardProps()).toEqual({
       "修正ステータス": { select: { name: "なし" } },
       "修正指示": { rich_text: [] },
       "修正案": { rich_text: [] },
+      "修正タイトル指示": { rich_text: [] },
+      "修正タイトル案": { rich_text: [] },
     });
   });
 });
@@ -142,9 +189,18 @@ describe("PC poller のプロパティ組み立て", () => {
     });
   });
 
-  it("buildReviseProposalProps は修正案を入れ提示中にする", () => {
-    expect(buildReviseProposalProps("## 改訂")).toEqual({
+  it("buildReviseProposalProps 構成案のみ: 修正案を入れタイトル案は空・提示中", () => {
+    expect(buildReviseProposalProps("## 改訂", null)).toEqual({
       "修正案": { rich_text: [{ text: { content: "## 改訂" } }] },
+      "修正タイトル案": { rich_text: [] },
+      "修正ステータス": { select: { name: "提示中" } },
+    });
+  });
+
+  it("buildReviseProposalProps タイトルのみ: 修正案は空・修正タイトル案を入れる", () => {
+    expect(buildReviseProposalProps(null, "新タイトル案")).toEqual({
+      "修正案": { rich_text: [] },
+      "修正タイトル案": { rich_text: [{ text: { content: "新タイトル案" } }] },
       "修正ステータス": { select: { name: "提示中" } },
     });
   });
@@ -162,7 +218,7 @@ describe("reviseRowFromPage", () => {
     return { id: "i1", url: "", properties: props };
   }
 
-  it("ステータス/依頼時刻/構成案/修正指示を取り出す", () => {
+  it("ステータス/依頼時刻/構成案/修正指示/タイトル指示/タイトル案を取り出す", () => {
     const json = serializeReviseInstructions([{ line: "## A", comment: "短く" }]);
     const row = reviseRowFromPage(
       page({
@@ -171,6 +227,8 @@ describe("reviseRowFromPage", () => {
         "修正依頼時刻": { date: { start: "2026-06-19T00:00:00.000Z" } },
         "構成案": { rich_text: [{ plain_text: "## A\n## B" }] },
         "修正指示": { rich_text: [{ plain_text: json }] },
+        "修正タイトル指示": { rich_text: [{ plain_text: "もっと短く" }] },
+        "修正タイトル案": { rich_text: [{ plain_text: "短い新タイトル" }] },
       })
     );
     expect(row).toEqual({
@@ -180,6 +238,8 @@ describe("reviseRowFromPage", () => {
       requestedAtMs: Date.parse("2026-06-19T00:00:00.000Z"),
       outline: "## A\n## B",
       instructions: [{ line: "## A", comment: "短く" }],
+      titleInstruction: "もっと短く",
+      titleProposal: "短い新タイトル",
     });
   });
 
@@ -191,6 +251,8 @@ describe("reviseRowFromPage", () => {
     expect(row.requestedAtMs).toBeNull();
     expect(row.outline).toBe("");
     expect(row.instructions).toEqual([]);
+    expect(row.titleInstruction).toBe("");
+    expect(row.titleProposal).toBe("");
   });
 
   it("不正な日付は null", () => {
@@ -211,7 +273,13 @@ describe("reviseRowFromPage", () => {
 });
 
 describe("selectStaleReviseIds", () => {
-  const base = { title: "", outline: "", instructions: [] as ReviseComment[] };
+  const base = {
+    title: "",
+    outline: "",
+    instructions: [] as ReviseComment[],
+    titleInstruction: "",
+    titleProposal: "",
+  };
   const now = 1_000_000_000_000;
   const rows: ReviseRow[] = [
     { id: "stale", status: "処理中", requestedAtMs: now - 16 * 60 * 1000, ...base },
