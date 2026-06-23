@@ -29,9 +29,11 @@ export interface RevisePresentFlexInput {
   approveUrl: string;
   instructionCount: number;
   proposalExcerpt: string;
+  /** #139 B: AI が提案した新タイトル。空=タイトル提案なし。 */
+  titleProposal?: string;
 }
 
-/** 修正案提示(成功)のリッチカード(#138)。承認画面 URI ボタン付き。 */
+/** 修正案提示(成功)のリッチカード(#138 / #139 B)。承認画面 URI ボタン付き。 */
 export function buildRevisePresentFlex(input: RevisePresentFlexInput): FlexBubble {
   const header: FlexBox = {
     type: "box",
@@ -54,12 +56,29 @@ export function buildRevisePresentFlex(input: RevisePresentFlexInput): FlexBubbl
     spacing: "sm",
     contents: [
       { type: "text", text: input.title, weight: "bold", size: "sm", color: COLOR_HEADING, wrap: true },
-      {
-        type: "text",
-        text: `${input.instructionCount}件の修正指示を反映`,
-        size: "sm",
-        color: COLOR_ACCENT,
-      },
+      // 構成案コメントを反映した件数(タイトルのみ修正のときは 0 なので出さない)。
+      ...(input.instructionCount > 0
+        ? [
+            {
+              type: "text" as const,
+              text: `${input.instructionCount}件の修正指示を反映`,
+              size: "sm" as const,
+              color: COLOR_ACCENT,
+            },
+          ]
+        : []),
+      // #139 B: 新タイトルの提案があれば見せる。
+      ...(input.titleProposal
+        ? [
+            {
+              type: "text" as const,
+              text: `🆕 新タイトル: ${input.titleProposal}`,
+              size: "sm" as const,
+              color: COLOR_ACCENT,
+              wrap: true,
+            },
+          ]
+        : []),
       ...(input.proposalExcerpt
         ? [
             {

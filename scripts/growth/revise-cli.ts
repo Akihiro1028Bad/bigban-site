@@ -3,8 +3,11 @@
  *
  *   npm run growth:revise -- reap                       # 処理中のstale(>15分)を失敗に回収＋通知
  *   npm run growth:revise -- next                       # 依頼中を1件ロック(処理中)し JSON を標準出力
- *   npm run growth:revise -- present <pageId> <file>    # 修正案を書き込み提示中＋通知
+ *   npm run growth:revise -- present <pageId>           # 修正案(構成案/タイトル)を書き込み提示中＋通知
  *   npm run growth:revise -- fail <pageId> <reason>     # 失敗にして理由＋通知
+ *
+ * #139 B: present は規約パス2本(.growth-tmp/revise-proposal.txt=構成案 / revise-title.txt=タイトル)
+ *         から、存在する方だけ提示する(片方だけの提案を許容)。
  *
  * claude(revise-outline.md)は「テキストの修正」だけを担い、Notion 書き込み・通知・
  * reaper・ロックはこの CLI が決定的に行う(stdout 不信・純ロジックは revise.ts でテスト済み)。
@@ -13,7 +16,7 @@
  */
 
 import "dotenv/config";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import type { FlexContainer } from "./digest-flex";
@@ -47,8 +50,11 @@ const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。やり直しで再依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
-// 修正案ステージの許可ディレクトリ(claude 由来パスのトラバーサル防御)。
+// 修正案ステージの許可ディレクトリ。present は固定ファイル名のみ読むためトラバーサルは起きない。
 const STAGE_DIR = path.resolve(process.cwd(), ".growth-tmp");
+// #139 B: 構成案・タイトルの修正案ステージ(規約パス)。claude はこの2ファイルに書き出す。
+const OUTLINE_STAGE = path.join(STAGE_DIR, "revise-proposal.txt");
+const TITLE_STAGE = path.join(STAGE_DIR, "revise-title.txt");
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -62,13 +68,23 @@ function assertPageId(id: string): string {
   return id;
 }
 
-/** ステージファイルは .growth-tmp 配下に限定する(パストラバーサル防御)。 */
-function assertStagePath(file: string): string {
-  const resolved = path.resolve(file);
-  if (resolved !== STAGE_DIR && !resolved.startsWith(STAGE_DIR + path.sep)) {
-    throw new Error(`修正案ファイルは .growth-tmp 配下のみ許可です: ${file}`);
+/**
+ * #139 B: 前回実行の修正案ステージ(構成案/タイトル)を消す。present は「存在する方」を提示するため、
+ * 別記事の残骸が混入しないよう、新しい行をロックする next の冒頭で必ずクリアする。
+ */
+async function clearStages(): Promise<void> {
+  await rm(OUTLINE_STAGE, { force: true });
+  await rm(TITLE_STAGE, { force: true });
+}
+
+/** ステージファイルを読む。存在しない/空なら null(片方だけの提案を許容)。 */
+async function readStage(file: string): Promise<string | null> {
+  try {
+    const text = (await readFile(file, "utf-8")).trim();
+    return text || null;
+  } catch {
+    return null;
   }
-  return resolved;
 }
 
 function notionOptions(): NotionApiOptions {
@@ -136,6 +152,8 @@ async function next(options: NotionApiOptions): Promise<void> {
     process.stdout.write("{}\n");
     return;
   }
+  // 別記事の残骸を提示しないよう、claude が書き出す前にステージを掃除する。
+  await clearStages();
   await write(row.id, buildReviseProcessingProps(), options);
   process.stdout.write(
     `${JSON.stringify({
@@ -143,24 +161,31 @@ async function next(options: NotionApiOptions): Promise<void> {
       title: row.title,
       outline: row.outline,
       instructions: row.instructions,
+      // #139 B: タイトル修正の文脈(現在タイトル=title、タイトルへの指示=titleInstruction)。
+      titleInstruction: row.titleInstruction,
     })}\n`
   );
 }
 
-async function present(pageId: string, file: string, options: NotionApiOptions): Promise<void> {
+async function present(pageId: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
-  const proposal = (await readFile(assertStagePath(file), "utf-8")).trim();
-  if (!proposal) throw new Error("修正案ファイルが空です。");
+  // #139 B: 構成案・タイトルの2ステージから、存在する方だけ提示する。
+  const proposal = await readStage(OUTLINE_STAGE);
+  const titleProposal = await readStage(TITLE_STAGE);
+  if (!proposal && !titleProposal) {
+    throw new Error("修正案ファイルが空です(構成案・タイトルとも無し)。");
+  }
   const row = reviseRowFromPage(await getPage(pageId, options));
-  await write(pageId, buildReviseProposalProps(proposal), options);
-  // #138: リッチカードで提示(タイトル＋反映件数＋冒頭抜粋＋承認画面ボタン)。altText は従来テキスト。
+  await write(pageId, buildReviseProposalProps(proposal, titleProposal), options);
+  // #138/#139 B: リッチカードで提示(タイトル＋反映件数＋新タイトル＋冒頭抜粋＋承認画面ボタン)。
   await notifyFlex(
     buildRevisePresentMessage(row.title, approveUrl()),
     buildRevisePresentFlex({
       title: row.title,
       approveUrl: approveUrl(),
       instructionCount: row.instructions.length,
-      proposalExcerpt: excerptLines(proposal, 4),
+      proposalExcerpt: proposal ? excerptLines(proposal, 4) : "",
+      titleProposal: titleProposal ?? "",
     })
   );
 }
@@ -184,8 +209,8 @@ async function main(): Promise<void> {
     case "next":
       return next(options);
     case "present":
-      if (!a || !b) throw new Error("使い方: present <pageId> <proposalFile>");
-      return present(a, b, options);
+      if (!a) throw new Error("使い方: present <pageId>");
+      return present(a, options);
     case "fail":
       if (!a || !b) throw new Error("使い方: fail <pageId> <reason>");
       return fail(a, b, options);

@@ -81,9 +81,48 @@ describe("POST /api/growth/revise", () => {
     expect(res.status).toBe(400);
   });
 
-  it("コメントが空配列なら 400", async () => {
+  it("コメントが空配列かつタイトル指示も無いなら 400(#139 B)", async () => {
     const res = await POST(postRequest(null, { pageId: PAGE_ID, comments: [] }));
     expect(res.status).toBe(400);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
+  it("コメントもタイトル指示も無いなら 400(#139 B)", async () => {
+    const res = await POST(postRequest(null, { pageId: PAGE_ID }));
+    expect(res.status).toBe(400);
+  });
+
+  it("コメントが非空だが要素が不正なら 400(#139 B)", async () => {
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, comments: [{ line: "a" }] }));
+    expect(res.status).toBe(400);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
+  it("タイトル指示だけでも依頼できる(構成案コメントは空・#139 B)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithStatus());
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(
+      postRequest(null, { pageId: PAGE_ID, titleInstruction: "  もっと短く  " })
+    );
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, { rich_text?: unknown; select?: { name: string } }>;
+    expect(p["修正指示"].rich_text).toEqual([]);
+    expect(p["修正タイトル指示"].rich_text).toEqual([{ text: { content: "もっと短く" } }]);
+    expect(p["修正ステータス"]).toEqual({ select: { name: "依頼中" } });
+  });
+
+  it("構成案コメントとタイトル指示の両方を1 PATCHで書き込む(#139 B)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithStatus());
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(
+      postRequest(null, { pageId: PAGE_ID, comments: COMMENTS, titleInstruction: "タイトルも短く" })
+    );
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, { rich_text?: unknown }>;
+    expect(p["修正指示"].rich_text).toEqual([{ text: { content: JSON.stringify(COMMENTS) } }]);
+    expect(p["修正タイトル指示"].rich_text).toEqual([{ text: { content: "タイトルも短く" } }]);
   });
 
   it("不正な JSON ボディは 400", async () => {

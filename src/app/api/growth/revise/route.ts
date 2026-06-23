@@ -64,15 +64,25 @@ export async function POST(request: Request): Promise<Response> {
   const pageId = (body as { pageId?: unknown })?.pageId;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
 
-  let instructionsJson: string;
-  try {
-    instructionsJson = serializeReviseInstructions(
-      (body as { comments?: unknown }).comments
-    );
-  } catch (error) {
-    /* istanbul ignore next -- @preserve throw 元は常に Error(serializeReviseInstructions) */
-    const message = error instanceof Error ? error.message : "不正なコメントです。";
-    return badRequest(message);
+  // #139 B: 構成案コメント・タイトル指示は片方だけでも可。少なくとも一方が非空なら受け付ける。
+  const rawComments = (body as { comments?: unknown }).comments;
+  const hasComments = Array.isArray(rawComments) && rawComments.length > 0;
+  const rawTitleInstruction = (body as { titleInstruction?: unknown }).titleInstruction;
+  const titleInstruction =
+    typeof rawTitleInstruction === "string" ? rawTitleInstruction.trim() : "";
+
+  let instructionsJson: string | null = null;
+  if (hasComments) {
+    try {
+      instructionsJson = serializeReviseInstructions(rawComments);
+    } catch (error) {
+      /* istanbul ignore next -- @preserve throw 元は常に Error(serializeReviseInstructions) */
+      const message = error instanceof Error ? error.message : "不正なコメントです。";
+      return badRequest(message);
+    }
+  }
+  if (!instructionsJson && !titleInstruction) {
+    return badRequest("構成案コメントまたはタイトルへの指示を入力してください。");
   }
 
   const options = notionOptions();
@@ -93,7 +103,11 @@ export async function POST(request: Request): Promise<Response> {
     }
     await updatePageProps(
       pageId,
-      buildReviseRequestProps(instructionsJson, new Date().toISOString()),
+      buildReviseRequestProps(
+        instructionsJson,
+        titleInstruction || null,
+        new Date().toISOString()
+      ),
       options
     );
   } catch {
