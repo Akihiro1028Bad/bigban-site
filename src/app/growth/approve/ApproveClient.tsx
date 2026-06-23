@@ -1081,9 +1081,11 @@ export function ApproveClient() {
     } else if (action === "search" || action === "palette") {
       setPaletteOpen(true);
     } else {
-      // escape
+      // escape: パレット→フォーカス解除に加え、詳細パネルが開いていれば閉じる(#127)。
+      // ただし下書き編集ワークスペース表示中は、そちらの操作を優先して閉じない。
       setPaletteOpen(false);
       setFocusedIndex(-1);
+      if (openId && !editingDraft) setOpenId(null);
     }
   };
 
@@ -1657,6 +1659,12 @@ export function ApproveClient() {
     );
   }
 
+  // #127: クリップボードへコピー(本文など)。clipboard 非対応環境では何もしない。
+  function copyText(text: string): void {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard.writeText(text);
+  }
+
   // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。
   function renderDraftPreview(item: PendingItem) {
     return (
@@ -1705,7 +1713,7 @@ export function ApproveClient() {
                 className={PREVIEW_FRAME_CLASS}
               />
             </div>
-            <div className="mt-2">
+            <div className="mt-2 flex gap-2">
               <button
                 type="button"
                 aria-label="下書きを編集"
@@ -1715,6 +1723,17 @@ export function ApproveClient() {
                 )}
               >
                 編集
+              </button>
+              {/* #127: 本文(プレーン)をクリップボードへコピー。 */}
+              <button
+                type="button"
+                aria-label="本文をコピー"
+                onClick={() => copyText(draftState.draft.body)}
+                className={choiceButtonClass(
+                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                コピー
               </button>
             </div>
             {/* #104: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。 */}
@@ -1764,16 +1783,108 @@ export function ApproveClient() {
     );
   }
 
-  // #275: 詳細パネル(master-detail)。スマホ=全画面シート / PC=右サイドパネル。
-  // 将来の AI 壁打ち・下書き生成は下部の拡張スロットに差し込む(今回は枠のみ)。
+  // #127: 記事=全画面の中央モーダル(レビュー・ワークスペース) / 施策=コンパクトな右ドロワー。
   function renderPanel(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
     // #43: 修正中(依頼中/処理中/提示中)は承認/却下を無効化(古い構成案での承認を防ぐ)。
     const lockedForRevise = isReviseBusy(item.reviseStatus);
-    // #119 follow-up: 記事は本番プレビュー等が重いため PC では左右2ペインに広げる。
-    // 施策はプレビューが無いので従来の右ドロワー幅のまま。
-    const twoPane = item.kind === "idea";
+    const isIdea = item.kind === "idea";
+
+    // 主操作(承認/却下/承認待ちに戻す)。下書き作成済みは出さない。コマンドバー/ドロワー共用。
+    const decisionActions = item.isDraftReady ? null : choice ? (
+      <button
+        type="button"
+        onClick={() => undoFromPanel(item)}
+        disabled={isBusy}
+        className={choiceButtonClass(
+          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+        )}
+      >
+        承認待ちに戻す
+      </button>
+    ) : (
+      <>
+        <button
+          type="button"
+          onClick={() => decideFromPanel(item, "承認")}
+          disabled={isBusy || lockedForRevise}
+          className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+        >
+          承認
+        </button>
+        <button
+          type="button"
+          onClick={() => decideFromPanel(item, "却下")}
+          disabled={isBusy || lockedForRevise}
+          className={choiceButtonClass(
+            "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          )}
+        >
+          却下
+        </button>
+      </>
+    );
+
+    // インサイト: 「なぜこの記事か」(SEO機会=subtitle を整形 callout)＋根拠メトリクス。
+    const insight = (
+      <>
+        {item.subtitle ? (
+          <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+            <p className="mb-1 text-xs font-bold text-blue-800">なぜこの記事か</p>
+            <p className="text-sm leading-relaxed text-gray-700">{item.subtitle}</p>
+          </div>
+        ) : null}
+        <div className="mt-3">
+          <MetricChips details={item.details} />
+        </div>
+      </>
+    );
+
+    // ヘッダー(記事はコマンドバーとして主操作スロットを持つ)。
+    const header = (
+      <DetailHeader
+        title={item.title}
+        kindLabel={KIND_BADGE[item.kind]}
+        badge={detailBadge(item, choice)}
+        onClose={() => setOpenId(null)}
+        actions={isIdea ? decisionActions : undefined}
+      />
+    );
+
+    if (isIdea) {
+      // 全画面・中央フローティングモーダルのレビュー・ワークスペース。
+      // 上=コマンドバー(固定) / 下=3ゾーン(左:インサイト / 中央:プレビュー追従 / 右:構成案)。
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-[2.5vw]">
+          <button
+            type="button"
+            aria-label="オーバーレイを閉じる"
+            onClick={() => setOpenId(null)}
+            className="absolute inset-0 bg-black/50"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`詳細: ${item.title}`}
+            className="relative flex h-[94vh] w-[95vw] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+          >
+            <div className="shrink-0 border-b border-gray-200 bg-white px-4 pb-2">{header}</div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="lg:flex lg:items-start lg:gap-6">
+                <div className="lg:w-[20rem] lg:shrink-0">{insight}</div>
+                <div className="lg:sticky lg:top-0 lg:min-w-0 lg:flex-1">
+                  {renderDraftPreview(item)}
+                </div>
+                <div className="lg:w-[24rem] lg:shrink-0">{renderReviseSection(item)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 施策: コンパクトな右ドロワー(プレビュー/構成案は無い)。
     return (
       <div className="fixed inset-0 z-50 flex">
         <button
@@ -1786,85 +1897,13 @@ export function ApproveClient() {
           role="dialog"
           aria-modal="true"
           aria-label={`詳細: ${item.title}`}
-          className={`ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem] ${
-            twoPane ? "lg:w-[60rem] lg:max-w-[92vw]" : ""
-          }`}
+          className="ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem]"
         >
-          {/* #124: 段階色アクセント＋段階チップ＋種別＋タイトルの強いヘッダーバンド。 */}
-          <DetailHeader
-            title={item.title}
-            kindLabel={KIND_BADGE[item.kind]}
-            badge={detailBadge(item, choice)}
-            onClose={() => setOpenId(null)}
-          />
-          {/* #119 follow-up: PC は左(メタ＋操作＋構成案)／右(本番プレビュー)の2ペイン。
-              モバイルは grid を効かせず DOM 順で縦積み(従来の見え方を維持)。 */}
-          <div
-            className={
-              twoPane
-                ? "lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-6"
-                : ""
-            }
-          >
-          <div className="mt-3 lg:col-start-1">
-          {item.subtitle ? <p className="text-sm text-gray-600">{item.subtitle}</p> : null}
-
-          {/* #124: 根拠は素の dl ではなくメトリクスチップで見せる。 */}
+          {header}
           <div className="mt-3">
-            <MetricChips details={item.details} />
-          </div>
-
-          {/* #87: 下書き作成済みは承認/却下を出さない(プレビュー＋編集のみ)。 */}
-          {item.isDraftReady ? null : (
-            <div className="mt-4 flex gap-2">
-              {choice ? (
-                <button
-                  type="button"
-                  onClick={() => undoFromPanel(item)}
-                  disabled={isBusy}
-                  className={choiceButtonClass(
-                    "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                  )}
-                >
-                  承認待ちに戻す
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => decideFromPanel(item, "承認")}
-                    disabled={isBusy || lockedForRevise}
-                    className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
-                  >
-                    承認
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => decideFromPanel(item, "却下")}
-                    disabled={isBusy || lockedForRevise}
-                    className={choiceButtonClass(
-                      "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    却下
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          </div>
-
-          {/* 右ペイン: 本番プレビュー(記事のみ)。PC では右カラムを全高で占有して読み幅を確保。 */}
-          {item.kind === "idea" ? (
-            <div className="lg:col-start-2 lg:row-span-full lg:min-w-0">
-              {renderDraftPreview(item)}
-            </div>
-          ) : null}
-
-          {item.kind === "idea" ? (
-            <div className="lg:col-start-1">{renderReviseSection(item)}</div>
-          ) : null}
-          {/* #124: 未実装の「AI壁打ち」「下書き生成」プレースホルダは削除(将来issueで復活)。 */}
+            {insight}
+            {/* 施策は決定可能(下書き作成済みにならない)ため常に主操作を出す。 */}
+            <div className="mt-4 flex gap-2">{decisionActions}</div>
           </div>
         </div>
       </div>

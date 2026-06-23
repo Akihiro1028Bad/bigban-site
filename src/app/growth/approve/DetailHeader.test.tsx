@@ -22,4 +22,18 @@ describe("DetailHeader", () => {
     await userEvent.click(screen.getByRole("button", { name: "閉じる" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it("actions スロットを閉じるの隣に出す(#127 コマンドバー)", () => {
+    render(
+      <DetailHeader
+        title="猛暑記事"
+        kindLabel="📝 記事"
+        badge={detailBadge({ id: "i", kind: "idea", stage: "proposed" })}
+        onClose={() => {}}
+        actions={<button type="button">承認</button>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "承認" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "閉じる" })).toBeInTheDocument();
+  });
 });
