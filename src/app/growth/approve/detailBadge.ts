@@ -30,7 +30,7 @@ interface BadgeItem {
   stage: Stage;
 }
 
-export function detailBadge(item: BadgeItem, choice?: string): DetailBadge {
+export function detailBadge(item: BadgeItem, choice?: "承認" | "却下"): DetailBadge {
   if (item.kind === "idea") {
     const stage = effectiveStage(item, choice);
     return { label: ARTICLE_STAGE_LABEL[stage], theme: stageTheme(stage) };
