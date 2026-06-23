@@ -1910,7 +1910,10 @@ export function ApproveClient() {
       <button
         type="button"
         disabled={!nextReviewableId}
-        onClick={() => setOpenId(nextReviewableId)}
+        onClick={() => {
+          /* istanbul ignore else -- @preserve disabled 時は押せないため null は到達不可 */
+          if (nextReviewableId) setOpenId(nextReviewableId);
+        }}
         className={choiceButtonClass(
           "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
         )}
