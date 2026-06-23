@@ -2751,3 +2751,26 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
   });
 });
+
+describe("ApproveClient スマホ操作性(#137)", () => {
+  it("カードのタイトルをタップすると詳細が開く", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    expect(
+      await screen.findByRole("dialog", { name: "詳細: 猛暑記事" }),
+    ).toBeInTheDocument();
+  });
+
+  it("キーボードヒントはデスクトップ限定で、モバイルにはタッチ向け案内を出す", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByRole("button", { name: "猛暑記事" });
+    const kbd = screen.getByText(/キーボード:/);
+    expect(kbd).toHaveClass("hidden");
+    expect(kbd).toHaveClass("lg:block");
+    expect(screen.getByText(/カードをタップ/)).toBeInTheDocument();
+  });
+});

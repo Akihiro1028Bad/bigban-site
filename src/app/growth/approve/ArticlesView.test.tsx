@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import type { PendingItem } from "@/lib/growth/approve";
 
@@ -46,5 +46,31 @@ describe("ArticlesView", () => {
     expect(container.querySelector(".bg-amber-50")).toBeTruthy();
     expect(container.querySelector(".bg-purple-50")).toBeTruthy();
     expect(container.querySelector(".bg-teal-50")).toBeTruthy();
+  });
+
+  // #137: モバイルの操作発見性 ― スワイプ説明＋列位置ドット。
+  it("モバイル向けのスワイプ説明と、列数ぶんの位置ドットを出す", () => {
+    const columns = groupArticlesByStage([], {});
+    render(<ArticlesView columns={columns} renderItem={renderItem} densityClass="space-y-2" />);
+    expect(screen.getByText(/スワイプ/)).toBeInTheDocument();
+    const dots = screen.getByRole("group", { name: "段階の位置" });
+    // 4列 → ドット4つ。初期は先頭(0番目)がハイライト。
+    expect(within(dots).getAllByTestId("stage-dot")).toHaveLength(4);
+    expect(within(dots).getAllByTestId("stage-dot")[0]).toHaveAttribute("aria-current", "true");
+  });
+
+  it("横スクロールすると現在位置のドットがハイライトされる", () => {
+    const columns = groupArticlesByStage([], {});
+    render(<ArticlesView columns={columns} renderItem={renderItem} densityClass="space-y-2" />);
+    const scroller = screen.getByTestId("article-kanban-scroll");
+    Object.defineProperty(scroller, "scrollWidth", { value: 1000, configurable: true });
+    Object.defineProperty(scroller, "scrollLeft", { value: 500, configurable: true, writable: true });
+    fireEvent.scroll(scroller);
+    // stride=250 → round(500/250)=2 → 3番目(index2)がハイライト
+    const dots = within(screen.getByRole("group", { name: "段階の位置" })).getAllByTestId(
+      "stage-dot",
+    );
+    expect(dots[2]).toHaveAttribute("aria-current", "true");
+    expect(dots[0]).not.toHaveAttribute("aria-current");
   });
 });
