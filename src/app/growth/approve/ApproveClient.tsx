@@ -1830,7 +1830,6 @@ export function ApproveClient() {
     );
   }
 
-  // #127: 記事=全画面の中央モーダル(レビュー・ワークスペース) / 施策=コンパクトな右ドロワー。
   // #104/#136: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。
   // 詳細パネル(Framer の transform・sticky を持つ)の内側にネストすると position:fixed が
   // 祖先に閉じ込められ全画面オーバーレイが崩れるため、トップレベルで描画する。
@@ -1853,6 +1852,7 @@ export function ApproveClient() {
     );
   }
 
+  // #127: 記事=全画面の中央モーダル(レビュー・ワークスペース) / 施策=コンパクトな右ドロワー。
   function renderPanel(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
