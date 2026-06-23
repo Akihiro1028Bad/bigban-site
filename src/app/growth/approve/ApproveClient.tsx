@@ -1799,22 +1799,6 @@ export function ApproveClient() {
                 コピー
               </button>
             </div>
-            {/* #104: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。 */}
-            {editingDraft ? (
-              <DraftEditWorkspace
-                title={draftState.draft.title}
-                initialHtml={draftOriginalHtml}
-                livePreviewHtml={livePreviewHtml}
-                onChange={setEditedHtml}
-                onSave={() => saveDraft(item)}
-                onCancel={cancelEditDraft}
-                saving={draftSaving}
-                saveError={draftSaveError}
-                confirmDiscard={confirmDiscard}
-                onConfirmDiscard={exitEditDraft}
-                onCancelDiscard={() => setConfirmDiscard(false)}
-              />
-            ) : null}
           </motion.div>
         ) : (
           <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
@@ -1847,6 +1831,28 @@ export function ApproveClient() {
   }
 
   // #127: 記事=全画面の中央モーダル(レビュー・ワークスペース) / 施策=コンパクトな右ドロワー。
+  // #104/#136: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。
+  // 詳細パネル(Framer の transform・sticky を持つ)の内側にネストすると position:fixed が
+  // 祖先に閉じ込められ全画面オーバーレイが崩れるため、トップレベルで描画する。
+  function renderEditWorkspace() {
+    if (!editingDraft || !openItem || draftState.status !== "ready") return null;
+    return (
+      <DraftEditWorkspace
+        title={draftState.draft.title}
+        initialHtml={draftOriginalHtml}
+        livePreviewHtml={livePreviewHtml}
+        onChange={setEditedHtml}
+        onSave={() => saveDraft(openItem)}
+        onCancel={cancelEditDraft}
+        saving={draftSaving}
+        saveError={draftSaveError}
+        confirmDiscard={confirmDiscard}
+        onConfirmDiscard={exitEditDraft}
+        onCancelDiscard={() => setConfirmDiscard(false)}
+      />
+    );
+  }
+
   function renderPanel(item: PendingItem) {
     const choice = decided[item.id];
     const isBusy = savingId === item.id;
@@ -2176,6 +2182,7 @@ export function ApproveClient() {
         )}
       </div>
       {openItem ? renderPanel(openItem) : null}
+      {renderEditWorkspace()}
       {/* #109/#119: コマンドパレット(⌘K / /)。両ストリーム横断検索→タブ切替＋詳細へジャンプ。 */}
       {paletteOpen ? (
         <CommandPalette
