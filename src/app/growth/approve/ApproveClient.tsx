@@ -1148,51 +1148,59 @@ export function ApproveClient() {
           </label>
         ) : null}
         {ideaHeader}
+        {/* #119 follow-up: タイトルを最上段・全幅・2行クランプで主役化(列幅が狭い盤でも読める)。 */}
+        <p
+          className={`line-clamp-2 text-[15px] font-semibold leading-snug ${
+            choice ? "text-gray-600" : "text-gray-900"
+          }`}
+        >
+          {item.title}
+        </p>
         {choice ? (
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-sm text-gray-700">
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-sm text-gray-700">
               ✓ <span className="font-semibold">{choice}しました</span>
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-gray-800">{item.title}</span>
-            {detailButton}
-            <button
-              type="button"
-              id={`undo-${item.id}`}
-              aria-label={`取り消す: ${item.title}`}
-              onClick={() => undo(item)}
-              disabled={isBusy}
-              className={choiceButtonClass(
-                "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              )}
-            >
-              取り消す
-            </button>
+            <div className="ml-auto flex gap-2">
+              {detailButton}
+              <button
+                type="button"
+                id={`undo-${item.id}`}
+                aria-label={`取り消す: ${item.title}`}
+                onClick={() => undo(item)}
+                disabled={isBusy}
+                className={choiceButtonClass(
+                  "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                取り消す
+              </button>
+            </div>
           </div>
         ) : item.isDraftReady ? (
           // #87/#110: 下書き作成済みは承認/却下を出さず、詳細(プレビュー)と編集(全画面)へ。
-          <div className="flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2">
             <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
               📝 下書き
             </span>
-            <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
-              {item.title}
-            </span>
-            {detailButton}
-            <button
-              type="button"
-              id={`card-edit-${item.id}`}
-              aria-label={`編集: ${item.title}`}
-              onClick={() => openCardEditor(item.id)}
-              className={`${TAP_TARGET} border border-blue-600 bg-blue-600 text-white`}
-            >
-              編集
-            </button>
+            <div className="ml-auto flex gap-2">
+              {detailButton}
+              <button
+                type="button"
+                id={`card-edit-${item.id}`}
+                aria-label={`編集: ${item.title}`}
+                onClick={() => openCardEditor(item.id)}
+                className={`${TAP_TARGET} border border-blue-600 bg-blue-600 text-white`}
+              >
+                編集
+              </button>
+            </div>
           </div>
         ) : isAwaitingDownstream(item.stage) ? (
           // #107/#108: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細。
           // 生成中は脈動＋進捗ステップで「執筆中」を可視化、滞留時は優しい警告を出す。
           <div>
-            <div className="flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
               <span
                 className={`shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white ${
                   item.stage === "generating" ? "motion-safe:animate-pulse" : ""
@@ -1204,10 +1212,7 @@ export function ApproveClient() {
                     ? "生成中"
                     : "生成待ち"}
               </span>
-              <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
-                {item.title}
-              </span>
-              {detailButton}
+              <div className="ml-auto">{detailButton}</div>
             </div>
             {item.stage === "generating" ? (
               <div className="mt-2 text-xs text-gray-500">
@@ -1223,12 +1228,9 @@ export function ApproveClient() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
               <span className="shrink-0 rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
                 {KIND_BADGE[item.kind]}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-semibold text-gray-900">
-                {item.title}
               </span>
             </div>
             <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-2 flex gap-2">
