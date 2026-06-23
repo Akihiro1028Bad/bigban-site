@@ -1258,6 +1258,65 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     ).not.toBeInTheDocument();
   });
 
+  // #139 A: 記事タイトルの直接編集。
+  it("タイトルを直接編集して保存できる(#139 A)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { json: { success: true } }, // POST /revise/edit
+      { json: { success: true, items: [ideaItem({ outline: "## A", title: "新タイトル" })] } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
+    const input = within(dialog).getByLabelText("タイトルを編集");
+    await userEvent.clear(input);
+    await userEvent.type(input, "新タイトル");
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
+
+    // 反映: ヘッダー・タイトル行とも新タイトルに更新され、編集フォームは閉じる。
+    expect((await within(dialog).findAllByText("新タイトル")).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
+    const post = fn.mock.calls[1];
+    expect(post[0]).toBe("/api/growth/revise/edit");
+    expect(JSON.parse(post[1].body)).toEqual({ pageId: "i1", title: "新タイトル" });
+  });
+
+  it("タイトルを空にすると保存できない(#139 A)", async () => {
+    const fn = mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## A" })] },
+    });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
+    await userEvent.clear(within(dialog).getByLabelText("タイトルを編集"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
+    expect(await within(dialog).findByText(/タイトルは空にできません/)).toBeInTheDocument();
+    expect(fn).toHaveBeenCalledTimes(1); // login のみ・POST なし
+  });
+
+  it("タイトル編集をキャンセルできる(#139 A)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
+    expect(within(dialog).getByLabelText("タイトルを編集")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトル編集をキャンセル" }));
+    expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
+  });
+
+  it("タイトル保存が失敗(AI修正処理中=409)なら編集フォームを保持する(#139 A)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
+      { ok: false, status: 409, json: { success: false, error: "x" } }
+    );
+    const dialog = await openIdeaPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
+    const input = within(dialog).getByLabelText("タイトルを編集");
+    await userEvent.clear(input);
+    await userEvent.type(input, "新T");
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
+    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
+    // false 分岐: 保存失敗時は編集フォームを閉じない。
+    expect(within(dialog).getByLabelText("タイトルを編集")).toBeInTheDocument();
+  });
+
   // #61: 画像指示エディタ(スタイル選択＋説明・チップ・追加/編集/削除)。
   it("構成案の画像指示をスタイルバッジ＋説明のチップで表示する", async () => {
     mockFetchSequence({
