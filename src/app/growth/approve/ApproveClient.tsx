@@ -1768,7 +1768,7 @@ export function ApproveClient() {
           aria-modal="true"
           aria-label={`詳細: ${item.title}`}
           className={`ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem] ${
-            twoPane ? "lg:max-w-5xl" : ""
+            twoPane ? "lg:w-[60rem] lg:max-w-[92vw]" : ""
           }`}
         >
           <div className="flex items-start justify-between gap-2">
