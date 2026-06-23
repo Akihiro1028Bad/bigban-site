@@ -20,6 +20,7 @@ import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import {
   fetchMediaList,
   parseMediaListParams,
+  sanitizeFileName,
   uploadMediaBlob,
   validateUpload,
   type ManagementOptions,
@@ -101,7 +102,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!check.ok) return badRequest(check.error);
 
   try {
-    const { url: assetUrl } = await uploadMediaBlob({ blob: file, fileName: file.name }, options);
+    const { url: assetUrl } = await uploadMediaBlob(
+      { blob: file, fileName: sanitizeFileName(file.name) },
+      options
+    );
     return NextResponse.json({ success: true, url: assetUrl });
   } catch {
     return NextResponse.json(

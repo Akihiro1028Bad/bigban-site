@@ -50,6 +50,21 @@ export function validateUpload(
   return { ok: true };
 }
 
+/**
+ * アップロードのファイル名を無害化する(#142 security M-1)。
+ * パス区切りを除いて basename 化し、英数・`._-` 以外を `_` に、先頭ドットを除去、
+ * 200 文字に切り詰める。空になれば `upload`。multipart の Content-Disposition への
+ * 任意文字列混入(トラバーサル/制御文字)を防ぐ。
+ */
+export function sanitizeFileName(name: string): string {
+  const cleaned = name
+    .replace(/^.*[\\/]/, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/^\.+/, "")
+    .slice(0, 200);
+  return cleaned || "upload";
+}
+
 export interface MediaListParams {
   limit: number;
   offset: number;
