@@ -2337,3 +2337,50 @@ describe("ApproveClient タブ初期化の同期(#119)", () => {
     expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
   });
 });
+
+describe("ApproveClient タブのキーボード/a11y(#119)", () => {
+  function mockMixed2() {
+    return mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem({ id: "p1", title: "施策X" }),
+          ideaItem({ id: "i1", title: "記事Y", stage: "proposed" }),
+        ],
+      },
+    });
+  }
+
+  it("← → でタブを移動でき、その他キーは無視する", async () => {
+    mockMixed2();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    const tablist = screen.getByRole("tablist", { name: "表示切替" });
+
+    // 既定は施策。→ で記事へ。
+    fireEvent.keyDown(tablist, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("記事Y")).toBeInTheDocument();
+
+    // ← で施策へ戻る。
+    fireEvent.keyDown(tablist, { key: "ArrowLeft" });
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+
+    // 対象外キーは何もしない(施策のまま)。
+    fireEvent.keyDown(tablist, { key: "Enter" });
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("tab と tabpanel が aria-controls/labelledby で紐付く", async () => {
+    mockMixed2();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveAttribute("id", "approve-tabpanel");
+    expect(panel).toHaveAttribute("aria-labelledby", "approve-tab-proposals");
+    const propTab = screen.getByRole("tab", { name: /施策/ });
+    expect(propTab).toHaveAttribute("aria-controls", "approve-tabpanel");
+  });
+});

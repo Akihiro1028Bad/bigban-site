@@ -237,7 +237,8 @@ export function ApproveClient() {
   // #119: 表示タブ(施策/記事)。URL 指定があれば同期確定、無ければ null(読込後に自動選択)。
   const [view, setView] = useState<ApproveView | null>(initialViewFromUrl);
   // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
-  const [viewPinned, setViewPinned] = useState<boolean>(() => initialViewFromUrl() !== null);
+  // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
+  const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
@@ -332,9 +333,11 @@ export function ApproveClient() {
   }, [items, decided, viewPinned]);
 
   // #119: タブを切り替える(URL にも反映し、以降の自動切替を止める)。
+  // タブ間でカード件数が異なるため、キーボードフォーカスは未選択(-1)に戻す。
   const changeView = useCallback((next: ApproveView): void => {
     setView(next);
     setViewPinned(true);
+    setFocusedIndex(-1);
     writeViewParam(next);
   }, []);
 
@@ -1866,7 +1869,19 @@ export function ApproveClient() {
       </p>
 
       {/* #119: 施策/記事のタブ切替。各タブに未処理件数バッジを出し残件を可視化する。 */}
-      <div role="tablist" aria-label="表示切替" className="mt-3 inline-flex gap-1 rounded-md bg-gray-100 p-1">
+      <div
+        role="tablist"
+        aria-label="表示切替"
+        onKeyDown={(event) => {
+          // WAI-ARIA tabs: ←→ でタブ移動。それ以外のキーは既定動作を維持する。
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const idx = APPROVE_VIEWS.indexOf(activeView);
+          const delta = event.key === "ArrowRight" ? 1 : -1;
+          changeView(APPROVE_VIEWS[(idx + delta + APPROVE_VIEWS.length) % APPROVE_VIEWS.length]);
+        }}
+        className="mt-3 inline-flex gap-1 rounded-md bg-gray-100 p-1"
+      >
         {APPROVE_VIEWS.map((v) => {
           const selectedTab = activeView === v;
           const label = v === "proposals" ? "施策" : "記事";
@@ -1876,7 +1891,10 @@ export function ApproveClient() {
               key={v}
               type="button"
               role="tab"
+              id={`approve-tab-${v}`}
+              aria-controls="approve-tabpanel"
               aria-selected={selectedTab}
+              tabIndex={selectedTab ? 0 : -1}
               onClick={() => changeView(v)}
               className={`min-h-11 flex items-center gap-2 rounded px-4 text-sm font-medium transition-colors ${
                 selectedTab ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
@@ -1977,7 +1995,12 @@ export function ApproveClient() {
         </p>
       ) : null}
       {/* #119: タブで施策/記事を完全分離。施策=トリアージ用リスト、記事=全幅カンバン。 */}
-      <div role="tabpanel" aria-label={activeView === "proposals" ? "施策" : "記事"}>
+      <div
+        role="tabpanel"
+        id="approve-tabpanel"
+        aria-labelledby={`approve-tab-${activeView}`}
+        aria-label={activeView === "proposals" ? "施策" : "記事"}
+      >
         {activeView === "proposals" ? (
           <>
             <ProposalsView
