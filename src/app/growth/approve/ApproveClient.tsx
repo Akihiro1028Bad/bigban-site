@@ -202,6 +202,8 @@ function initialViewFromUrl(): ApproveView | null {
   return parseView(new URLSearchParams(window.location.search).get("view"));
 }
 
+// タブ切替は履歴を汚さないよう replaceState で現在エントリを置換する(pushState にしない)。
+// 戻る/進むで ?view が変わるのは別ページ遷移時のみで、その際は再マウントで同期される。
 function writeViewParam(view: ApproveView): void {
   const params = new URLSearchParams(window.location.search);
   params.set("view", view);
