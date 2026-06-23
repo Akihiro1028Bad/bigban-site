@@ -51,6 +51,7 @@ import {
   type PreviewDevice,
 } from "./previewDevice";
 import { ProposalsView } from "./ProposalsView";
+import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { CommandPalette } from "./CommandPalette";
@@ -1064,6 +1065,12 @@ export function ApproveClient() {
     return isActionable(item, decided);
   }
 
+  // #130: 連続レビューの並び(記事を盤の並び順で)。次/前の未処理記事の決定に使う。
+  const reviewOrder = articleNavItems.map((item) => ({
+    id: item.id,
+    actionable: isBulkActionable(item),
+  }));
+
   // #119: パレットから記事/施策どちらへもジャンプ。対象タブへ自動切替してから詳細を開く。
   function jumpTo(id: string): void {
     const isIdea = ideas.some((item) => item.id === id);
@@ -1079,8 +1086,39 @@ export function ApproveClient() {
     setSelected(new Set());
   }
 
-  // #109: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
+  // #109/#130: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
   dispatchRef.current = (action, editable) => {
+    if (action === "search" || action === "palette") {
+      setPaletteOpen(true);
+      return;
+    }
+    if (action === "escape") {
+      // パレット→フォーカス解除に加え、詳細パネルが開いていれば閉じる(#127)。
+      // ただし下書き編集中・入力欄(コメント等)での Esc は、そちらの操作を優先して閉じない。
+      setPaletteOpen(false);
+      setFocusedIndex(-1);
+      if (openId && !editingDraft && !editable) setOpenId(null);
+      return;
+    }
+    // #130: 詳細パネル表示中はパネル操作を優先(連続レビュー)。a承認/r却下/e編集/j次・k前。
+    if (openItem) {
+      if (action === "approve") {
+        if (isBulkActionable(openItem)) void decide(openItem, "承認");
+      } else if (action === "reject") {
+        if (isBulkActionable(openItem)) void decide(openItem, "却下");
+      } else if (action === "edit") {
+        if (draftState.status === "ready") startEditDraft(draftState.draft.bodyHtml);
+      } else if (action === "next") {
+        const id = nextReviewId(reviewOrder, openItem.id, 1);
+        if (id) setOpenId(id);
+      } else {
+        // prev
+        const id = nextReviewId(reviewOrder, openItem.id, -1);
+        if (id) setOpenId(id);
+      }
+      return;
+    }
+    // 盤の操作(従来)。
     if (action === "next") {
       setFocusedIndex(moveIndex(focusedIndex, 1, navItems.length));
     } else if (action === "prev") {
@@ -1089,16 +1127,9 @@ export function ApproveClient() {
       if (focusedItem && isBulkActionable(focusedItem)) void decide(focusedItem, "承認");
     } else if (action === "reject") {
       if (focusedItem && isBulkActionable(focusedItem)) void decide(focusedItem, "却下");
-    } else if (action === "edit") {
-      if (focusedItem) setOpenId(focusedItem.id);
-    } else if (action === "search" || action === "palette") {
-      setPaletteOpen(true);
     } else {
-      // escape: パレット→フォーカス解除に加え、詳細パネルが開いていれば閉じる(#127)。
-      // ただし下書き編集中・入力欄(コメント等)での Esc は、そちらの操作を優先して閉じない。
-      setPaletteOpen(false);
-      setFocusedIndex(-1);
-      if (openId && !editingDraft && !editable) setOpenId(null);
+      // edit
+      if (focusedItem) setOpenId(focusedItem.id);
     }
   };
 
@@ -1873,14 +1904,39 @@ export function ApproveClient() {
       </>
     );
 
-    // ヘッダー(記事はコマンドバーとして主操作スロットを持つ)。
+    // #130: 「次の記事へ」= 並び順上の次の未処理記事へ(閉じずに連続レビュー)。末尾は無効。
+    const nextReviewableId = isIdea ? nextReviewId(reviewOrder, item.id, 1) : null;
+    const nextButton = isIdea ? (
+      <button
+        type="button"
+        disabled={!nextReviewableId}
+        onClick={() => {
+          /* istanbul ignore else -- @preserve disabled 時は押せないため null は到達不可 */
+          if (nextReviewableId) setOpenId(nextReviewableId);
+        }}
+        className={choiceButtonClass(
+          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+        )}
+      >
+        次へ →
+      </button>
+    ) : null;
+
+    // ヘッダー(記事はコマンドバーとして主操作スロット＋「次へ」を持つ)。
     const header = (
       <DetailHeader
         title={item.title}
         kindLabel={KIND_BADGE[item.kind]}
         badge={detailBadge(item, choice)}
         onClose={() => setOpenId(null)}
-        actions={isIdea ? decisionActions : undefined}
+        actions={
+          isIdea ? (
+            <>
+              {decisionActions}
+              {nextButton}
+            </>
+          ) : undefined
+        }
       />
     );
 
