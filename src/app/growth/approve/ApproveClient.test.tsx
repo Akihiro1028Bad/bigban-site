@@ -2598,3 +2598,40 @@ describe("ApproveClient 公開前チェックリスト(#128)", () => {
     expect(within(dialog).queryByRole("region", { name: "公開前チェック" })).not.toBeInTheDocument();
   });
 });
+
+describe("ApproveClient プレビューPC/モバイル切替(#129)", () => {
+  async function openReadyPreview() {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    return screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+  }
+
+  it("モバイルに切替えるとプレビュー枠が〜390pxに、PCで全幅に戻る", async () => {
+    const dialog = await openReadyPreview();
+    const group = await within(dialog).findByRole("group", { name: "プレビュー幅" });
+    // 既定は PC(全幅)。
+    const frame = within(dialog).getByTitle("本番プレビュー").parentElement as HTMLElement;
+    expect(frame).not.toHaveClass("max-w-[390px]");
+    // モバイルへ。
+    await userEvent.click(within(group).getByRole("button", { name: "モバイル" }));
+    expect(frame).toHaveClass("max-w-[390px]");
+    expect(within(group).getByRole("button", { name: "モバイル" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // PC へ戻す。
+    await userEvent.click(within(group).getByRole("button", { name: "PC" }));
+    expect(frame).not.toHaveClass("max-w-[390px]");
+  });
+});

@@ -44,6 +44,12 @@ import { detailBadge } from "./detailBadge";
 import { DraftChecklist } from "./DraftChecklist";
 import { draftQuality } from "./draftQuality";
 import { MetricChips } from "./MetricChips";
+import {
+  PREVIEW_DEVICES,
+  previewDeviceLabel,
+  previewWidthClass,
+  type PreviewDevice,
+} from "./previewDevice";
 import { ProposalsView } from "./ProposalsView";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
@@ -512,6 +518,8 @@ export function ApproveClient() {
   const [pendingEditId, setPendingEditId] = useState<string | null>(null);
   // #98: 編集中の本番ライブプレビュー。高頻度更新を間引くため editedHtml をデバウンスする。
   const livePreviewHtml = useDebouncedValue(editedHtml, LIVE_PREVIEW_DEBOUNCE_MS);
+  // #129: 本番プレビューの表示デバイス(PC全幅 / モバイル幅)。
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("pc");
 
   function startEditDraft(html: string): void {
     setEditingDraft(true);
@@ -1702,8 +1710,27 @@ export function ApproveClient() {
             animate={{ opacity: 1 }}
             className="mt-2"
           >
-            {/* #124: ブラウザ風 chrome の額装で「本番イメージ」感を出す。 */}
-            <div className="overflow-hidden rounded-md border border-gray-800">
+            {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
+            <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
+              {PREVIEW_DEVICES.map((device) => {
+                const selected = previewDevice === device;
+                return (
+                  <button
+                    key={device}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setPreviewDevice(device)}
+                    className={`rounded px-3 py-1 font-medium transition-colors ${
+                      selected ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {previewDeviceLabel(device)}
+                  </button>
+                );
+              })}
+            </div>
+            {/* #124: ブラウザ風 chrome の額装で「本番イメージ」感を出す。#129: 幅をデバイスで切替。 */}
+            <div className={`overflow-hidden rounded-md border border-gray-800 ${previewWidthClass(previewDevice)}`}>
               <div className="flex items-center gap-1.5 bg-gray-900 px-3 py-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
                 <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
