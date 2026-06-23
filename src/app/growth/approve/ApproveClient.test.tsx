@@ -1755,6 +1755,16 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     expect(editor).toHaveValue("<p>元の本文</p>");
   });
 
+  // 回帰(#136): 編集ワークスペースは詳細パネル(アニメ/sticky な祖先)の内側に
+  // ネストすると position:fixed が祖先に閉じ込められ、全画面オーバーレイが崩れて
+  // 背後の詳細パネルが透けて重なる。トップレベルに描画して fixed をビューポート基準にする。
+  it("編集ワークスペースは詳細パネルの外(トップレベル)に描画される", async () => {
+    const dialog = await openReadyDraft("<p>元の本文</p>");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    const detail = screen.getByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(detail.contains(getWorkspace())).toBe(false);
+  });
+
   it("編集中はライブ本番プレビュー(iframe)が入力に追従する(#98/#100)", async () => {
     const dialog = await openReadyDraft("<p>元の本文</p>");
     await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
