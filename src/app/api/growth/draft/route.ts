@@ -17,7 +17,12 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { draftBodyOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
+import {
+  draftBodyOf,
+  eyecatchUrlOf,
+  ideaTitleOf,
+  isNotionPageId,
+} from "@/lib/growth/approve";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -79,6 +84,8 @@ export async function GET(request: Request): Promise<Response> {
         displayMode: "html",
         bodyHtml,
         body: "",
+        // #141: アイキャッチURLミラー(未設定は空文字)。プレビューが画像表示に使う。
+        eyecatch: eyecatchUrlOf(page),
       },
     });
   } catch {

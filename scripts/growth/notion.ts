@@ -184,6 +184,23 @@ export function buildBodyMirrorProps(bodyHtml: string): Record<string, unknown> 
 }
 
 /**
+ * アイキャッチURLのミラー保存先プロパティ名(#141)。
+ * 本文ミラー(#95)と同方針で、アイキャッチURLも Notion 側へミラーし、
+ * 承認画面のプレビューはこの値を読む(microCMS の下書きは読まない)。URL 型プロパティ。
+ */
+export const EYECATCH_MIRROR_PROP = "アイキャッチURL";
+
+/**
+ * アイキャッチURLのミラーを Notion の URL プロパティへ書き込む形に組み立てる(#141)。
+ * 空文字は url:null でプロパティを空にする。
+ */
+export function buildEyecatchMirrorProps(
+  eyecatchUrl: string
+): Record<string, unknown> {
+  return { [EYECATCH_MIRROR_PROP]: { url: eyecatchUrl || null } };
+}
+
+/**
  * 下書きリンク(contentId / draftKey)を Notion プロパティへ書き込む形に組み立てる(#73)。
  * contentId は常に書き込む。draftKey は取得できた時(非空)だけ書き込む
  * (取得失敗でも contentId 保存・ステータス更新は止めない方針=沈黙させない)。

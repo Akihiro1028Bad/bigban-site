@@ -3,7 +3,12 @@
  * I/O を含まないためテスト可能。Route Handler はこれらを使う薄い配線にする。
  */
 
-import { BODY_MIRROR_PROP, DRAFT_LINK_PROPS, type NotionPage } from "./notion";
+import {
+  BODY_MIRROR_PROP,
+  DRAFT_LINK_PROPS,
+  EYECATCH_MIRROR_PROP,
+  type NotionPage,
+} from "./notion";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
 import { deriveArticleStage, deriveProposalStage, type Stage } from "./stage";
 
@@ -90,6 +95,18 @@ export function draftBodyOf(page: NotionPage): string {
 /** ページのタイトル案(`タイトル案`)を読む(#95: 下書きプレビューの見出し)。未設定は空文字。 */
 export function ideaTitleOf(page: NotionPage): string {
   return titleText(page, "タイトル案");
+}
+
+/**
+ * ページのアイキャッチURLミラー(`アイキャッチURL`)を読む(#141)。未設定は空文字。
+ * URL 型(`url`)を優先し、テキスト型(`rich_text`)でも読めるようにする(プロパティ型の差異に強く)。
+ */
+export function eyecatchUrlOf(page: NotionPage): string {
+  const value = page.properties[EYECATCH_MIRROR_PROP] as
+    | { url?: string | null; rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  if (value?.url) return value.url.trim();
+  return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("").trim();
 }
 
 // 記事の優先度(select)を数値ランクに変換し、施策の優先度スコアと同じ軸で並べる。
