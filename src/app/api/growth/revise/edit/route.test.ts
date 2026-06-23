@@ -74,6 +74,32 @@ describe("POST /api/growth/revise/edit", () => {
     expect((await POST(postRequest(null, { pageId: PAGE_ID, outline: 123 }))).status).toBe(400);
   });
 
+  it("タイトルだけを直接上書きできる(#139 A)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page());
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, title: "新しいタイトル" }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    expect(props).toEqual({ "タイトル案": { title: [{ text: { content: "新しいタイトル" } }] } });
+  });
+
+  it("outline と title を同時に上書きできる(#139 A)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page());
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, outline: "## A", title: "T" }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    expect(props).toEqual({
+      "構成案": { rich_text: [{ text: { content: "## A" } }] },
+      "タイトル案": { title: [{ text: { content: "T" } }] },
+    });
+  });
+
+  it("outline も title も無い/空は 400(#139 A)", async () => {
+    expect((await POST(postRequest(null, { pageId: PAGE_ID }))).status).toBe(400);
+    expect((await POST(postRequest(null, { pageId: PAGE_ID, title: "  " }))).status).toBe(400);
+  });
+
   it("不正な JSON ボディは 400", async () => {
     const url = new URL("http://localhost/api/growth/revise/edit");
     const res = await POST(new Request(url, { method: "POST", body: "x" }));

@@ -290,6 +290,9 @@ export function ApproveClient() {
   const [imageDesc, setImageDesc] = useState("");
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
+  // #139 A: 記事タイトルの直接編集(構成案修正パネル内のインライン編集)。
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState("");
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -315,6 +318,8 @@ export function ApproveClient() {
     setEditingImageIdx(null);
     setImageDesc("");
     setReviseError("");
+    setEditingTitle(false);
+    setTitleInput("");
     setEditingDraft(false);
     setConfirmDiscard(false);
     setDraftSaveError("");
@@ -804,10 +809,11 @@ export function ApproveClient() {
     setEditDescription("");
   }
 
-  // #54/#61: 構成案を直接上書き保存する共通処理(手動編集・画像指示で共用)。成否を返す。
-  async function persistOutline(
+  // #54/#61/#139: /revise/edit へ直接上書き(AI不要)を送る共通処理。成否を返す。
+  // payload は構成案(outline)・タイトル(title)のいずれか/両方。
+  async function postReviseEdit(
     item: PendingItem,
-    nextSections: OutlineSection[]
+    payload: { outline?: string; title?: string }
   ): Promise<boolean> {
     setReviseBusy(true);
     setReviseError("");
@@ -815,10 +821,7 @@ export function ApproveClient() {
       const res = await fetch("/api/growth/revise/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pageId: item.id,
-          outline: serializeOutlineSections(nextSections),
-        }),
+        body: JSON.stringify({ pageId: item.id, ...payload }),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
@@ -836,6 +839,32 @@ export function ApproveClient() {
     } finally {
       setReviseBusy(false);
     }
+  }
+
+  // #54/#61: 構成案を直接上書き保存する(手動編集・画像指示で共用)。成否を返す。
+  async function persistOutline(
+    item: PendingItem,
+    nextSections: OutlineSection[]
+  ): Promise<boolean> {
+    return postReviseEdit(item, { outline: serializeOutlineSections(nextSections) });
+  }
+
+  // #139 A: 記事タイトルを直接上書き保存する(AI不要)。空は弾く。
+  function startEditTitle(title: string): void {
+    setEditingTitle(true);
+    setTitleInput(title);
+  }
+  function cancelEditTitle(): void {
+    setEditingTitle(false);
+    setTitleInput("");
+  }
+  async function saveTitle(item: PendingItem): Promise<void> {
+    const title = titleInput.trim();
+    if (!title) {
+      setReviseError("タイトルは空にできません。");
+      return;
+    }
+    if (await postReviseEdit(item, { title })) cancelEditTitle();
   }
 
   async function saveSection(
@@ -1835,6 +1864,63 @@ export function ApproveClient() {
     return (
       <section aria-label="構成案の修正" className={`mt-4 ${SECTION_CARD}`}>
         <h3 className={SECTION_HEAD}>構成案の修正</h3>
+        {/* #139 A: 記事タイトルの直接編集(AI不要)。 */}
+        <div className="mb-3">
+          {editingTitle ? (
+            <div>
+              <label
+                htmlFor={`title-edit-${item.id}`}
+                className="block text-xs font-medium text-gray-500"
+              >
+                記事タイトル
+              </label>
+              <input
+                id={`title-edit-${item.id}`}
+                type="text"
+                aria-label="タイトルを編集"
+                value={titleInput}
+                onChange={(event) => setTitleInput(event.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm font-medium text-gray-900"
+              />
+              <div className="mt-1 flex justify-end gap-2">
+                <button
+                  type="button"
+                  aria-label="タイトル編集をキャンセル"
+                  onClick={cancelEditTitle}
+                  className={choiceButtonClass(
+                    "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  aria-label="タイトルを保存"
+                  onClick={() => saveTitle(item)}
+                  disabled={reviseBusy}
+                  className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">タイトル</span>
+              <span className="flex-1 text-sm font-medium text-gray-900">{item.title}</span>
+              <button
+                type="button"
+                aria-label={`タイトルを編集: ${item.title}`}
+                onClick={() => startEditTitle(item.title)}
+                className={choiceButtonClass(
+                  "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                編集
+              </button>
+            </div>
+          )}
+        </div>
         {phase === "pending"
           ? renderRevisePending()
           : phase === "ready"

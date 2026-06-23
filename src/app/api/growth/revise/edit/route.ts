@@ -1,7 +1,8 @@
 /**
  * 構成案の手動編集 API(Epic #51 / #54)。
  *
- * POST { pageId, outline }: 構成案を**直接上書き**する(AIを介さない手動修正)。
+ * POST { pageId, outline?, title? }: 構成案/タイトルを**直接上書き**する(AIを介さない手動修正)。
+ * outline / title はどちらも任意だが、少なくとも一方は非空文字が必須(#139 A)。
  * 修正状態(修正指示/修正案/修正ステータス)は触らない。
  *
  * 競合ガード: AI処理中(依頼中/処理中/提示中)は 409(古い状態へ巻き戻さない)。
@@ -15,7 +16,11 @@ import { NextResponse } from "next/server";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { isNotionPageId, reviseStatusOf } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
-import { buildOutlineEditProps, REVISE_BUSY_STATUSES } from "@/lib/growth/revise";
+import {
+  buildOutlineEditProps,
+  buildTitleEditProps,
+  REVISE_BUSY_STATUSES,
+} from "@/lib/growth/revise";
 
 export const runtime = "nodejs";
 
@@ -57,9 +62,15 @@ export async function POST(request: Request): Promise<Response> {
   }
   const pageId = (body as { pageId?: unknown })?.pageId;
   const outline = (body as { outline?: unknown })?.outline;
+  const title = (body as { title?: unknown })?.title;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
-  if (typeof outline !== "string" || outline.trim() === "") {
-    return badRequest("構成案が空です。");
+  // #139 A: outline / title はどちらも任意。少なくとも一方が非空文字なら受け付ける(後方互換)。
+  const outlineStr = typeof outline === "string" ? outline : "";
+  const titleStr = typeof title === "string" ? title : "";
+  const hasOutline = outlineStr.trim() !== "";
+  const hasTitle = titleStr.trim() !== "";
+  if (!hasOutline && !hasTitle) {
+    return badRequest("構成案またはタイトルを入力してください。");
   }
 
   const options = notionOptions();
@@ -78,7 +89,14 @@ export async function POST(request: Request): Promise<Response> {
         { status: 409 }
       );
     }
-    await updatePageProps(pageId, buildOutlineEditProps(outline), options);
+    await updatePageProps(
+      pageId,
+      {
+        ...(hasOutline ? buildOutlineEditProps(outlineStr) : {}),
+        ...(hasTitle ? buildTitleEditProps(titleStr) : {}),
+      },
+      options
+    );
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
