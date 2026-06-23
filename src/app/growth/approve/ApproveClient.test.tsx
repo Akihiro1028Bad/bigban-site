@@ -2412,3 +2412,26 @@ describe("ApproveClient カードのタイトル視認性(#119 follow-up)", () =
     expect(title).toHaveClass("line-clamp-2");
   });
 });
+
+describe("ApproveClient 詳細パネルのPCワイド2ペイン(#119 follow-up)", () => {
+  it("記事の詳細はPCでワイド(lg:max-w-5xl)＋2ペイングリッドにする", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(dialog).toHaveClass("lg:max-w-5xl");
+    // 本番プレビューは右カラム(lg:col-start-2)に配置される。
+    const preview = within(dialog).getByRole("region", { name: "下書きプレビュー" });
+    expect(preview.parentElement).toHaveClass("lg:col-start-2");
+  });
+
+  it("施策の詳細はワイド化しない(従来の右ドロワー)", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 市川ページ" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 市川ページ" });
+    expect(dialog).not.toHaveClass("lg:max-w-5xl");
+  });
+});

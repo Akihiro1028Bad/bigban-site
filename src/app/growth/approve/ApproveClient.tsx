@@ -1752,6 +1752,9 @@ export function ApproveClient() {
     const isBusy = savingId === item.id;
     // #43: 修正中(依頼中/処理中/提示中)は承認/却下を無効化(古い構成案での承認を防ぐ)。
     const lockedForRevise = isReviseBusy(item.reviseStatus);
+    // #119 follow-up: 記事は本番プレビュー等が重いため PC では左右2ペインに広げる。
+    // 施策はプレビューが無いので従来の右ドロワー幅のまま。
+    const twoPane = item.kind === "idea";
     return (
       <div className="fixed inset-0 z-50 flex">
         <button
@@ -1764,7 +1767,9 @@ export function ApproveClient() {
           role="dialog"
           aria-modal="true"
           aria-label={`詳細: ${item.title}`}
-          className="ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem]"
+          className={`ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem] ${
+            twoPane ? "lg:max-w-5xl" : ""
+          }`}
         >
           <div className="flex items-start justify-between gap-2">
             <h2 className="font-bold text-gray-900">{item.title}</h2>
@@ -1776,6 +1781,16 @@ export function ApproveClient() {
               閉じる
             </button>
           </div>
+          {/* #119 follow-up: PC は左(メタ＋操作＋構成案)／右(本番プレビュー)の2ペイン。
+              モバイルは grid を効かせず DOM 順で縦積み(従来の見え方を維持)。 */}
+          <div
+            className={
+              twoPane
+                ? "lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+                : ""
+            }
+          >
+          <div className="lg:col-start-1">
           {item.subtitle ? <p className="mt-1 text-sm text-gray-600">{item.subtitle}</p> : null}
 
           {item.details && item.details.length > 0 ? (
@@ -1825,13 +1840,24 @@ export function ApproveClient() {
               )}
             </div>
           )}
+          </div>
 
-          {item.kind === "idea" ? renderDraftPreview(item) : null}
+          {/* 右ペイン: 本番プレビュー(記事のみ)。PC では右カラムを全高で占有して読み幅を確保。 */}
+          {item.kind === "idea" ? (
+            <div className="lg:col-start-2 lg:row-span-full lg:min-w-0">
+              {renderDraftPreview(item)}
+            </div>
+          ) : null}
 
-          {item.kind === "idea" ? renderReviseSection(item) : null}
+          {item.kind === "idea" ? (
+            <div className="lg:col-start-1">{renderReviseSection(item)}</div>
+          ) : null}
 
           {/* #276/#277 の拡張スロット(今回は枠のみ・機能は後続issue) */}
-          <section aria-label="AI壁打ち" className="mt-6 border-t border-gray-200 pt-4">
+          <section
+            aria-label="AI壁打ち"
+            className="mt-6 border-t border-gray-200 pt-4 lg:col-start-1"
+          >
             <h3 className="text-sm font-bold text-gray-700">AIと壁打ち</h3>
             <textarea
               aria-label="AI壁打ち（準備中）"
@@ -1843,7 +1869,10 @@ export function ApproveClient() {
           </section>
 
           {item.kind === "idea" ? (
-            <section aria-label="下書き生成" className="mt-4 border-t border-gray-200 pt-4">
+            <section
+              aria-label="下書き生成"
+              className="mt-4 border-t border-gray-200 pt-4 lg:col-start-1"
+            >
               <h3 className="text-sm font-bold text-gray-700">記事の下書きを生成</h3>
               <button
                 type="button"
@@ -1855,6 +1884,7 @@ export function ApproveClient() {
               <p className="mt-1 text-xs text-gray-400">準備中（後続のアップデートで利用可能になります）。</p>
             </section>
           ) : null}
+          </div>
         </div>
       </div>
     );
