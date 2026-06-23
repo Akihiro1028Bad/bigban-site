@@ -73,6 +73,8 @@ const TOKEN_URL = `/api/growth/approve?token=${encodeURIComponent(PASS)}`;
 
 beforeEach(() => {
   flags.authEnabled = true;
+  // #119: ?view はタブ切替で URL に書かれる。テスト間で漏れないよう毎回リセットする。
+  window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
@@ -90,9 +92,9 @@ async function showAll(): Promise<void> {
   // 盤レイアウトでは決定済みカードが常時表示されるため何もしない。
 }
 
-// #107: 盤では施策レーン・記事列が同時表示されタブ切替が不要。互換のため no-op。
-async function selectTab(_name: RegExp): Promise<void> {
-  // 盤レイアウトでは全カテゴリが同時に見えるため切替不要。
+// #119: 施策/記事はタブで分離。指定タブをクリックして切り替える。
+async function selectTab(name: RegExp): Promise<void> {
+  await userEvent.click(screen.getByRole("tab", { name }));
 }
 
 function proposalItem(over: Partial<Record<string, unknown>> = {}) {
@@ -589,7 +591,7 @@ describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
 });
 
 describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
-  it("施策はレーン、記事は段階列に分け、各内を優先度降順に並べる(#107)", async () => {
+  it("施策タブはレーン降順、記事タブは段階列に分離して表示する(#107/#119)", async () => {
     mockFetchSequence({
       json: {
         success: true,
@@ -604,12 +606,17 @@ describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
     await login();
     await screen.findByText("高スコア施策");
 
-    // #107: タブではなく 施策レーン＋記事パイプライン盤
+    // #119: 施策と記事はタブで分離。既定(未処理がある施策)タブでは施策レーンのみ。
     expect(screen.getByRole("region", { name: "施策レーン" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "記事パイプライン" })).not.toBeInTheDocument();
+    const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
+    expect(titles).toEqual(["高スコア施策", "低スコア施策"]); // 優先度降順
+
+    // 記事タブへ切替えると記事パイプラインが出て、施策レーンは消える。
+    await selectTab(/記事/);
     expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
     expect(screen.getByText("記事A")).toBeInTheDocument();
-    const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
-    expect(titles).toEqual(["高スコア施策", "低スコア施策"]);
+    expect(screen.queryByRole("region", { name: "施策レーン" })).not.toBeInTheDocument();
   });
 
   it("施策のみのときは施策レーンに出る(#107)", async () => {
@@ -2249,5 +2256,131 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
     );
+  });
+});
+
+describe("ApproveClient タブ分離/ルーティング(#119)", () => {
+  function mockMixed() {
+    return mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem({ id: "p1", title: "施策X" }),
+          ideaItem({ id: "i1", title: "記事Y", stage: "proposed" }),
+        ],
+      },
+    });
+  }
+
+  it("施策/記事タブを表示し、未処理件数バッジを出す", async () => {
+    mockMixed();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    // 未処理がある施策が既定タブ
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+    const propTab = screen.getByRole("tab", { name: /施策/ });
+    expect(within(propTab).getByText("1")).toBeInTheDocument(); // 施策の未処理1件バッジ
+    // 既定では記事パイプラインは出ない
+    expect(screen.queryByRole("region", { name: "記事パイプライン" })).not.toBeInTheDocument();
+  });
+
+  it("タブ切替で記事タブへ移り、URL に ?view=articles を書く", async () => {
+    mockMixed();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    await selectTab(/記事/);
+    expect(screen.getByText("記事Y")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
+    expect(window.location.search).toContain("view=articles");
+  });
+
+  it("URL に ?view=articles があれば記事タブを初期表示する", async () => {
+    window.history.replaceState(null, "", "/?view=articles");
+    mockMixed();
+    render(<ApproveClient />);
+    await login();
+    // 未処理は施策側だが、URL 指定で記事タブが開く
+    expect(await screen.findByText("記事Y")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("パレットから施策へジャンプすると施策タブへ自動切替して詳細を開く", async () => {
+    window.history.replaceState(null, "", "/?view=articles");
+    mockMixed();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("記事Y"); // 記事タブから開始
+    fireEvent.keyDown(document.body, { key: "/" });
+    const palette = await screen.findByRole("dialog", { name: "コマンドパレット" });
+    await userEvent.type(within(palette).getByLabelText("コマンド検索"), "施策X");
+    await userEvent.click(within(palette).getByRole("button", { name: /施策X/ }));
+    expect(await screen.findByRole("dialog", { name: "詳細: 施策X" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+describe("ApproveClient タブ初期化の同期(#119)", () => {
+  it("URL=記事タブの初回描画で生成中カードを表示する(滞留基準が未記録の経路)", async () => {
+    window.history.replaceState(null, "", "/?view=articles");
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ id: "g1", title: "生成中の記事", stage: "generating", isDraftReady: false })],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    // 初回描画時点では firstSeen 未記録 → 滞留扱いにならず通常表示される。
+    expect(await screen.findByText("生成中の記事")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+describe("ApproveClient タブのキーボード/a11y(#119)", () => {
+  function mockMixed2() {
+    return mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem({ id: "p1", title: "施策X" }),
+          ideaItem({ id: "i1", title: "記事Y", stage: "proposed" }),
+        ],
+      },
+    });
+  }
+
+  it("← → でタブを移動でき、その他キーは無視する", async () => {
+    mockMixed2();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    const tablist = screen.getByRole("tablist", { name: "表示切替" });
+
+    // 既定は施策。→ で記事へ。
+    fireEvent.keyDown(tablist, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("記事Y")).toBeInTheDocument();
+
+    // ← で施策へ戻る。
+    fireEvent.keyDown(tablist, { key: "ArrowLeft" });
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+
+    // 対象外キーは何もしない(施策のまま)。
+    fireEvent.keyDown(tablist, { key: "Enter" });
+    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("tab と tabpanel が aria-controls/labelledby で紐付く", async () => {
+    mockMixed2();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X");
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveAttribute("id", "approve-tabpanel");
+    expect(panel).toHaveAttribute("aria-labelledby", "approve-tab-proposals");
+    const propTab = screen.getByRole("tab", { name: /施策/ });
+    expect(propTab).toHaveAttribute("aria-controls", "approve-tabpanel");
   });
 });

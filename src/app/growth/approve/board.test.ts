@@ -6,6 +6,7 @@ import {
   ARTICLE_COLUMNS,
   effectiveStage,
   groupArticlesByStage,
+  isActionable,
   isAwaitingDownstream,
   scoreBarPct,
   stageStepIndex,
@@ -103,5 +104,22 @@ describe("groupArticlesByStage", () => {
     const grouped = groupArticlesByStage(ideas, { a: "承認", b: "却下" });
     expect(grouped[0].items.map((i) => i.id)).toEqual(["b"]); // 却下は proposed に残る
     expect(grouped[1].items.map((i) => i.id)).toEqual(["a"]); // 承認は queued へ
+  });
+});
+
+describe("isActionable", () => {
+  it("未決定・未生成・下流待ちでない提案中は承認/却下できる", () => {
+    expect(isActionable(idea("a", "proposed"), {})).toBe(true);
+  });
+  it("既に決定済みは対象外", () => {
+    expect(isActionable(idea("a", "proposed"), { a: "承認" })).toBe(false);
+  });
+  it("下書き作成済み(isDraftReady)は対象外", () => {
+    const item = { ...idea("a", "drafted"), isDraftReady: true };
+    expect(isActionable(item, {})).toBe(false);
+  });
+  it("生成待ち/生成中(下流待ち)は対象外", () => {
+    expect(isActionable(idea("a", "queued"), {})).toBe(false);
+    expect(isActionable(idea("a", "generating"), {})).toBe(false);
   });
 });

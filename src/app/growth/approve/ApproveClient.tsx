@@ -13,11 +13,13 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   effectiveStage,
   groupArticlesByStage,
+  isActionable,
   isAwaitingDownstream,
   scoreBarPct,
   STAGE_STEPS,
   stageStepIndex,
 } from "./board";
+import { stageTheme } from "./boardColors";
 import {
   GENERATING_STEPS,
   isInFlight,
@@ -36,6 +38,10 @@ import {
 } from "./boardPrefs";
 
 import { AddProposalForm } from "./AddProposalForm";
+import { ArticlesView } from "./ArticlesView";
+import { ProposalsView } from "./ProposalsView";
+import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
+import type { ApproveView } from "./viewRouting";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
@@ -188,6 +194,22 @@ function columnHeaderClass(): string {
   return "flex items-center justify-between rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700";
 }
 
+// #119: マウント時の初期タブ(SSR では URL を読めないため null)。同期初期化で proposals の
+// チラ見えを防ぎ、URL 指定時はその段階のカードを初回描画から表示する。
+function initialViewFromUrl(): ApproveView | null {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
+  if (typeof window === "undefined") return null;
+  return parseView(new URLSearchParams(window.location.search).get("view"));
+}
+
+// タブ切替は履歴を汚さないよう replaceState で現在エントリを置換する(pushState にしない)。
+// 戻る/進むで ?view が変わるのは別ページ遷移時のみで、その際は再マウントで同期される。
+function writeViewParam(view: ApproveView): void {
+  const params = new URLSearchParams(window.location.search);
+  params.set("view", view);
+  window.history.replaceState(null, "", `?${params.toString()}`);
+}
+
 export function ApproveClient() {
   // 合言葉認証が無効(一時措置)のときはゲートを出さず、未認証扱いにしない。
   // APPROVE_AUTH_ENABLED はモジュール定数のため実行中に変化しないが、復元(true)時に
@@ -214,6 +236,11 @@ export function ApproveClient() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [density, setDensity] = useState<Density>("comfortable");
+  // #119: 表示タブ(施策/記事)。URL 指定があれば同期確定、無ければ null(読込後に自動選択)。
+  const [view, setView] = useState<ApproveView | null>(initialViewFromUrl);
+  // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
+  // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
+  const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
@@ -291,6 +318,30 @@ export function ApproveClient() {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  // #119: 初期表示タブの確定。URL の ?view 指定はマウント時に同期確定済み。ここでは未確定時に
+  // 一覧読込後、未処理がある方(両方あれば施策)を自動選択する。確定後は自動上書きしない。
+  useEffect(() => {
+    if (viewPinned) return;
+    if (items.length === 0) return;
+    // 施策は「未処理(承認/却下できる)」があるか、記事は「パイプラインに記事があるか」で判定。
+    // 施策に未処理が無くても記事が動いていれば記事を初期表示する(両方あれば施策優先)。
+    const counts = {
+      proposals: items.filter((i) => i.kind === "proposal" && isActionable(i, decided)).length,
+      articles: items.filter((i) => i.kind === "idea").length,
+    };
+    setView(decideInitialView(null, counts));
+    setViewPinned(true);
+  }, [items, decided, viewPinned]);
+
+  // #119: タブを切り替える(URL にも反映し、以降の自動切替を止める)。
+  // タブ間でカード件数が異なるため、キーボードフォーカスは未選択(-1)に戻す。
+  const changeView = useCallback((next: ApproveView): void => {
+    setView(next);
+    setViewPinned(true);
+    setFocusedIndex(-1);
+    writeViewParam(next);
+  }, []);
 
   // #108: 記事が生成待ち/生成中に入った時刻を記録し、抜けたら破棄する(滞留検知の基準)。
   useEffect(() => {
@@ -972,15 +1023,34 @@ export function ApproveClient() {
   // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
   const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
-  // #109: キーボード操作対象のカード並び(施策→各列)。j/k フォーカス、a/r/e の対象。
-  const navItems = [...proposals, ...articleColumns.flatMap((col) => col.items)];
+  // #119: 表示中タブ(未確定時は施策を既定描画)。タブの未処理件数バッジも算出。
+  const activeView: ApproveView = view ?? "proposals";
+  const proposalPending = proposals.filter((item) => isActionable(item, decided)).length;
+  const articlePending = ideas.filter((item) => isActionable(item, decided)).length;
+  const pendingByView: Record<ApproveView, number> = {
+    proposals: proposalPending,
+    articles: articlePending,
+  };
+
+  // #109/#119: キーボード操作対象はアクティブタブのカードに限定。パレットは両ストリーム横断。
+  const articleNavItems = articleColumns.flatMap((col) => col.items);
+  const navItems = activeView === "proposals" ? proposals : articleNavItems;
+  const paletteSource = [...proposals, ...articleNavItems];
   const focusedItem = focusedIndex >= 0 ? navItems[focusedIndex] : undefined;
   const focusedId = focusedItem?.id;
   const densityClass = densityListClass(density);
 
-  // 承認/却下できる(=提案中/未処理で未決定)か。一括・キー操作の対象判定。
+  // 承認/却下できる(=提案中/未処理で未決定)か。一括・キー操作の対象判定(純関数を再利用)。
   function isBulkActionable(item: PendingItem): boolean {
-    return !decided[item.id] && !item.isDraftReady && !isAwaitingDownstream(item.stage);
+    return isActionable(item, decided);
+  }
+
+  // #119: パレットから記事/施策どちらへもジャンプ。対象タブへ自動切替してから詳細を開く。
+  function jumpTo(id: string): void {
+    const isIdea = ideas.some((item) => item.id === id);
+    changeView(isIdea ? "articles" : "proposals");
+    setOpenId(id);
+    setPaletteOpen(false);
   }
 
   function bulkDecide(value: Choice): void {
@@ -1031,6 +1101,10 @@ export function ApproveClient() {
     // #107: 記事カードは段階インジケータ(提案→…→公開)とスコアバーを上部に出す。
     const isIdea = item.kind === "idea";
     const step = isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1;
+    // #119: 記事カードは段階で左ボーダーを色分け(列ヘッダの色と揃え、流れを視覚化)。
+    const stageAccent = isIdea
+      ? `border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}`
+      : "";
     // #108: 生成待ち/生成中が閾値を超えて滞留しているか(自宅PC停止の疑い)。
     const stuck =
       isIdea &&
@@ -1059,7 +1133,7 @@ export function ApproveClient() {
     return (
       <li
         key={item.id}
-        className={`${rowClass(choice, Boolean(failure))} ${item.id === focusedId ? "ring-2 ring-blue-500" : ""}`}
+        className={`${rowClass(choice, Boolean(failure))} ${stageAccent} ${item.id === focusedId ? "ring-2 ring-blue-500" : ""}`}
         data-decision={choice ?? ""}
       >
         {isBulkActionable(item) ? (
@@ -1785,7 +1859,7 @@ export function ApproveClient() {
   }
 
   return (
-    <main className="mx-auto max-w-md p-4">
+    <main className="mx-auto max-w-md p-4 lg:max-w-7xl lg:px-8">
       <div className="flex items-baseline justify-between">
         <h1 className="text-xl font-bold text-gray-900">今週の提案</h1>
         <p className="text-sm text-gray-600">
@@ -1795,6 +1869,52 @@ export function ApproveClient() {
       <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
         承認した提案は制作キューに追加されます。この場では公開されません。
       </p>
+
+      {/* #119: 施策/記事のタブ切替。各タブに未処理件数バッジを出し残件を可視化する。 */}
+      <div
+        role="tablist"
+        aria-label="表示切替"
+        onKeyDown={(event) => {
+          // WAI-ARIA tabs: ←→ でタブ移動。それ以外のキーは既定動作を維持する。
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const idx = APPROVE_VIEWS.indexOf(activeView);
+          const delta = event.key === "ArrowRight" ? 1 : -1;
+          changeView(APPROVE_VIEWS[(idx + delta + APPROVE_VIEWS.length) % APPROVE_VIEWS.length]);
+        }}
+        className="mt-3 inline-flex gap-1 rounded-md bg-gray-100 p-1"
+      >
+        {APPROVE_VIEWS.map((v) => {
+          const selectedTab = activeView === v;
+          const label = v === "proposals" ? "施策" : "記事";
+          const count = pendingByView[v];
+          return (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              id={`approve-tab-${v}`}
+              aria-controls="approve-tabpanel"
+              aria-selected={selectedTab}
+              tabIndex={selectedTab ? 0 : -1}
+              onClick={() => changeView(v)}
+              className={`min-h-11 flex items-center gap-2 rounded px-4 text-sm font-medium transition-colors ${
+                selectedTab ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {label}
+              {count > 0 ? (
+                <span
+                  aria-label={`未処理 ${count} 件`}
+                  className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700"
+                >
+                  {count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
 
       {/* #109: 操作ツールバー。コマンドパレット起動と表示密度トグル(キーボード非依存の可視UI)。 */}
       <div className="mt-3 flex items-center gap-2">
@@ -1876,52 +1996,41 @@ export function ApproveClient() {
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
         </p>
       ) : null}
-      {/* #107: 施策レーン(記事とは出力先が違うため別枠でラベル分離)。 */}
-      {proposals.length > 0 ? (
-        <section aria-label="施策レーン" className="mt-4">
-          <div className={columnHeaderClass()}>
-            <span>施策</span>
-            <span className="text-xs text-gray-500">{proposals.length}件</span>
-          </div>
-          <ul className={`mt-2 ${densityClass}`}>{proposals.map(renderItem)}</ul>
-        </section>
-      ) : null}
-
-      {/* #107: 記事パイプライン盤。提案中→生成待ち→生成中→下書き を左→右へ。 */}
-      <section
-        aria-label="記事パイプライン"
-        className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4"
+      {/* #119: タブで施策/記事を完全分離。施策=トリアージ用リスト、記事=全幅カンバン。 */}
+      <div
+        role="tabpanel"
+        id="approve-tabpanel"
+        aria-labelledby={`approve-tab-${activeView}`}
+        aria-label={activeView === "proposals" ? "施策" : "記事"}
       >
-        {articleColumns.map(({ column, items: columnItems }) => (
-          <section key={column.stage} aria-label={`列: ${column.label}`}>
-            <div className={columnHeaderClass()}>
-              <span>{column.label}</span>
-              <span className="text-xs text-gray-500">{columnItems.length}件</span>
-            </div>
-            {columnItems.length > 0 ? (
-              <ul className={`mt-2 ${densityClass}`}>{columnItems.map(renderItem)}</ul>
-            ) : (
-              <p className="mt-2 rounded-md bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">
-                なし
-              </p>
-            )}
-          </section>
-        ))}
-      </section>
-      <AddProposalForm token={token} onAdded={addProposal} />
+        {activeView === "proposals" ? (
+          <>
+            <ProposalsView
+              proposals={proposals}
+              renderItem={renderItem}
+              densityClass={densityClass}
+              headerClass={columnHeaderClass()}
+            />
+            <AddProposalForm token={token} onAdded={addProposal} />
+          </>
+        ) : (
+          <ArticlesView
+            columns={articleColumns}
+            renderItem={renderItem}
+            densityClass={densityClass}
+          />
+        )}
+      </div>
       {openItem ? renderPanel(openItem) : null}
-      {/* #109: コマンドパレット(⌘K / /)。タイトル検索→詳細へジャンプ。 */}
+      {/* #109/#119: コマンドパレット(⌘K / /)。両ストリーム横断検索→タブ切替＋詳細へジャンプ。 */}
       {paletteOpen ? (
         <CommandPalette
-          items={navItems.map((item) => ({
+          items={paletteSource.map((item) => ({
             id: item.id,
             title: item.title,
             subtitle: item.subtitle,
           }))}
-          onJump={(id) => {
-            setOpenId(id);
-            setPaletteOpen(false);
-          }}
+          onJump={jumpTo}
           onClose={() => setPaletteOpen(false)}
         />
       ) : null}
