@@ -2415,26 +2415,28 @@ describe("ApproveClient カードのタイトル視認性(#119 follow-up)", () =
   });
 });
 
-describe("ApproveClient 詳細パネルのPCワイド2ペイン(#119 follow-up)", () => {
-  it("記事の詳細はPCで実幅ワイド(lg:w-[60rem])＋2ペイングリッドにする", async () => {
+describe("ApproveClient 詳細パネルのレイアウト(#127)", () => {
+  it("記事の詳細は全画面の中央モーダル(95vw×94vh)＋プレビューは中央ゾーン追従", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
-    expect(dialog).toHaveClass("lg:w-[60rem]");
-    // 本番プレビューは右カラム(lg:col-start-2)に配置される。
+    expect(dialog).toHaveClass("w-[95vw]");
+    expect(dialog).toHaveClass("h-[94vh]");
+    // 本番プレビューは中央ゾーン(sticky 追従)に配置される。
     const preview = within(dialog).getByRole("region", { name: "下書きプレビュー" });
-    expect(preview.parentElement).toHaveClass("lg:col-start-2");
+    expect(preview.parentElement).toHaveClass("lg:sticky");
   });
 
-  it("施策の詳細はワイド化しない(従来の右ドロワー)", async () => {
+  it("施策の詳細はモーダル化せずコンパクトな右ドロワーのまま", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog", { name: "詳細: 市川ページ" });
-    expect(dialog).not.toHaveClass("lg:w-[60rem]");
+    expect(dialog).not.toHaveClass("w-[95vw]");
+    expect(dialog).toHaveClass("max-w-md");
   });
 });
 
@@ -2468,5 +2470,94 @@ describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const reopened = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
     expect(within(reopened).getByText("生成待ち")).toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient レビューワークスペース土台(#127)", () => {
+  async function openIdeaWithDraft(body: string) {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    return screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+  }
+
+  it("「なぜこの記事か」カードに根拠(subtitle)を出す", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ subtitle: "SEO機会あり" })] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(within(dialog).getByText("なぜこの記事か")).toBeInTheDocument();
+    expect(within(dialog).getByText("SEO機会あり")).toBeInTheDocument();
+  });
+
+  it("本文コピーでクリップボードに body を書き込む", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const dialog = await openIdeaWithDraft("コピー対象の本文");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
+    expect(writeText).toHaveBeenCalledWith("コピー対象の本文");
+  });
+
+  it("コピーが拒否(reject)されても握り込んで壊れない", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const dialog = await openIdeaWithDraft("本文");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it("クリップボード非対応でもコピーで壊れない", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    const dialog = await openIdeaWithDraft("本文");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
+    // 例外で落ちずパネルは開いたまま。
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it("Esc で詳細パネルを閉じる", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "詳細: 猛暑記事" })).not.toBeInTheDocument()
+    );
+  });
+
+  it("下書き編集中は Esc で閉じない(編集を優先)", async () => {
+    const dialog = await openIdeaWithDraft("本文");
+    await userEvent.click(within(dialog).getByRole("button", { name: "下書きを編集" }));
+    await screen.findByRole("dialog", { name: "記事を編集" }); // 編集ワークスペース
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    // 詳細パネルは残る。
+    expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+  });
+
+  it("コメント入力中(textarea)の Esc では閉じない", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加: 見出しA" }));
+    const textarea = within(dialog).getByLabelText("コメント入力: 見出しA");
+    // textarea にフォーカスがある状態の Esc はパネルを閉じない(入力中断のみ)。
+    fireEvent.keyDown(textarea, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 });
