@@ -905,18 +905,20 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     });
   });
 
-  it("記事の詳細パネルには下書き生成スロット(準備中)とAI壁打ち枠がある", async () => {
+  it("詳細パネルから『準備中』の下書き生成・AI壁打ちプレースホルダを削除した(#124)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: "下書きを生成" })).toBeDisabled();
-    expect(within(dialog).getByLabelText("AI壁打ち（準備中）")).toBeDisabled();
+    expect(
+      within(dialog).queryByRole("button", { name: "下書きを生成" })
+    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("AI壁打ち（準備中）")).not.toBeInTheDocument();
   });
 
-  it("施策の詳細パネルには下書き生成スロットを出さない(AI壁打ち枠は出す)", async () => {
+  it("施策の詳細パネルにも準備中プレースホルダは無い(#124)", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await login();
@@ -926,7 +928,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     expect(
       within(dialog).queryByRole("button", { name: "下書きを生成" })
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("AI壁打ち（準備中）")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("AI壁打ち（準備中）")).not.toBeInTheDocument();
   });
 
   it("details も subtitle も無い項目でも詳細パネルを開ける", async () => {
@@ -2433,5 +2435,38 @@ describe("ApproveClient 詳細パネルのPCワイド2ペイン(#119 follow-up)"
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog", { name: "詳細: 市川ページ" });
     expect(dialog).not.toHaveClass("lg:w-[60rem]");
+  });
+});
+
+describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
+  it("ヘッダーに段階チップ＋種別、根拠はメトリクスチップで出る", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    // 段階チップ(提案中)＋種別バッジ
+    expect(within(dialog).getByText("提案中")).toBeInTheDocument();
+    expect(within(dialog).getByText("📝 記事")).toBeInTheDocument();
+    // 根拠(details)はメトリクスチップ(ラベル＋値)
+    expect(within(dialog).getByText("優先度")).toBeInTheDocument();
+    expect(within(dialog).getByText("中")).toBeInTheDocument();
+  });
+
+  it("承認済みの記事はヘッダー段階が『生成待ち』へ前進する", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem()] } },
+      { json: { success: true, updated: 1 } },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "承認" }));
+    // パネルは閉じるので、盤側の段階前進は別テスト。ここではヘッダーの楽観反映を
+    // 開き直して確認する。
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const reopened = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(within(reopened).getByText("生成待ち")).toBeInTheDocument();
   });
 });
