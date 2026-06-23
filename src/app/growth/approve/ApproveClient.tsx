@@ -1200,14 +1200,18 @@ export function ApproveClient() {
           </label>
         ) : null}
         {ideaHeader}
-        {/* #119 follow-up: タイトルを最上段・全幅・2行クランプで主役化(列幅が狭い盤でも読める)。 */}
-        <p
-          className={`line-clamp-2 text-[15px] font-semibold leading-snug ${
+        {/* #119 follow-up: タイトルを最上段・全幅・2行クランプで主役化(列幅が狭い盤でも読める)。
+            #137: タイトル自体を詳細を開くボタンにし、スマホでも大きなタップ領域を確保する。
+            アクセシブル名はタイトル文字列(小さい「詳細: …」ボタンとは別名)。 */}
+        <button
+          type="button"
+          onClick={() => setOpenId(item.id)}
+          className={`w-full text-left line-clamp-2 text-[15px] font-semibold leading-snug ${
             choice ? "text-gray-600" : "text-gray-900"
           }`}
         >
           {item.title}
-        </p>
+        </button>
         {choice ? (
           <div className="mt-2 flex items-center gap-2">
             <span className="text-sm text-gray-700">
@@ -1285,7 +1289,11 @@ export function ApproveClient() {
                 {KIND_BADGE[item.kind]}
               </span>
             </div>
-            <div role="group" aria-label={`承認または却下: ${item.title}`} className="mt-2 flex gap-2">
+            <div
+              role="group"
+              aria-label={`承認または却下: ${item.title}`}
+              className="mt-2 flex flex-col gap-2 sm:flex-row"
+            >
               <button
                 type="button"
                 id={`approve-${item.id}`}
@@ -2094,8 +2102,12 @@ export function ApproveClient() {
           {density === "compact" ? "コンパクト" : "標準"}
         </button>
       </div>
-      <p className="mt-1 text-xs text-gray-400">
+      {/* #137: キーボードヒントはPCのみ。スマホにはタッチ向けの一言を出す。 */}
+      <p className="mt-1 hidden text-xs text-gray-400 lg:block">
         キーボード: j/k 移動・a 承認・r 却下・e 詳細・/ 検索・Esc 解除
+      </p>
+      <p className="mt-1 text-xs text-gray-400 lg:hidden">
+        カードをタップで詳細・承認/却下はカード内のボタンから
       </p>
 
       {/* #109: 一括選択バー(選択がある時のみ)。一括承認/却下は各カードと同じ即時保存＋取り消し。 */}
