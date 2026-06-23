@@ -402,7 +402,9 @@ export function ApproveClient() {
   }
 
   // #109: キーボード操作の最新ハンドラを ref に保持(早期 return より前で document に結線するため)。
-  const dispatchRef = useRef<(action: ReturnType<typeof resolveShortcut>) => void>(
+  const dispatchRef = useRef<
+    (action: ReturnType<typeof resolveShortcut>, editable: boolean) => void
+  >(
     /* istanbul ignore next -- @preserve 初期値はレンダリングで即上書きされるため未実行 */
     () => {}
   );
@@ -412,10 +414,11 @@ export function ApproveClient() {
       const action = resolveShortcut(event.key, event.metaKey, event.ctrlKey);
       if (!action) return;
       const tag = (event.target as HTMLElement | null)?.tagName ?? "";
+      const editable = isEditableTag(tag);
       // 入力欄での単一キーは抑止(検索/編集の妨げにしない)。palette/escape は許可。
-      if (isEditableTag(tag) && action !== "palette" && action !== "escape") return;
+      if (editable && action !== "palette" && action !== "escape") return;
       event.preventDefault();
-      dispatchRef.current(action);
+      dispatchRef.current(action, editable);
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -1067,7 +1070,7 @@ export function ApproveClient() {
   }
 
   // #109: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
-  dispatchRef.current = (action) => {
+  dispatchRef.current = (action, editable) => {
     if (action === "next") {
       setFocusedIndex(moveIndex(focusedIndex, 1, navItems.length));
     } else if (action === "prev") {
@@ -1082,10 +1085,10 @@ export function ApproveClient() {
       setPaletteOpen(true);
     } else {
       // escape: パレット→フォーカス解除に加え、詳細パネルが開いていれば閉じる(#127)。
-      // ただし下書き編集ワークスペース表示中は、そちらの操作を優先して閉じない。
+      // ただし下書き編集中・入力欄(コメント等)での Esc は、そちらの操作を優先して閉じない。
       setPaletteOpen(false);
       setFocusedIndex(-1);
-      if (openId && !editingDraft) setOpenId(null);
+      if (openId && !editingDraft && !editable) setOpenId(null);
     }
   };
 
@@ -1659,10 +1662,10 @@ export function ApproveClient() {
     );
   }
 
-  // #127: クリップボードへコピー(本文など)。clipboard 非対応環境では何もしない。
+  // #127: クリップボードへコピー(本文など)。非対応環境や権限拒否で落ちないよう握り込む。
   function copyText(text: string): void {
     if (!navigator.clipboard) return;
-    void navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text).catch(() => {});
   }
 
   // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。

@@ -2502,11 +2502,19 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
   });
 
   it("本文コピーでクリップボードに body を書き込む", async () => {
-    const writeText = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     const dialog = await openIdeaWithDraft("コピー対象の本文");
     await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
     expect(writeText).toHaveBeenCalledWith("コピー対象の本文");
+  });
+
+  it("コピーが拒否(reject)されても握り込んで壊れない", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const dialog = await openIdeaWithDraft("本文");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
+    expect(dialog).toBeInTheDocument();
   });
 
   it("クリップボード非対応でもコピーで壊れない", async () => {
@@ -2535,6 +2543,21 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     await screen.findByRole("dialog", { name: "記事を編集" }); // 編集ワークスペース
     fireEvent.keyDown(document.body, { key: "Escape" });
     // 詳細パネルは残る。
+    expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+  });
+
+  it("コメント入力中(textarea)の Esc では閉じない", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加: 見出しA" }));
+    const textarea = within(dialog).getByLabelText("コメント入力: 見出しA");
+    // textarea にフォーカスがある状態の Esc はパネルを閉じない(入力中断のみ)。
+    fireEvent.keyDown(textarea, { key: "Escape" });
     expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 });
