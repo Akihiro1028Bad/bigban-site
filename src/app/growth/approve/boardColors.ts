@@ -15,6 +15,8 @@ export interface StageTheme {
   accent: string;
   /** 件数バッジの淡色 pill。 */
   count: string;
+  /** アクセントバーの背景色(詳細ヘッダーの上部バー等・#124)。 */
+  bar: string;
 }
 
 const THEME: Record<ArticleStage, StageTheme> = {
@@ -22,26 +24,31 @@ const THEME: Record<ArticleStage, StageTheme> = {
     header: "bg-blue-50 text-blue-800",
     accent: "border-l-blue-400",
     count: "bg-blue-100 text-blue-700",
+    bar: "bg-blue-400",
   },
   queued: {
     header: "bg-amber-50 text-amber-800",
     accent: "border-l-amber-400",
     count: "bg-amber-100 text-amber-700",
+    bar: "bg-amber-400",
   },
   generating: {
     header: "bg-purple-50 text-purple-800",
     accent: "border-l-purple-400",
     count: "bg-purple-100 text-purple-700",
+    bar: "bg-purple-400",
   },
   drafted: {
     header: "bg-teal-50 text-teal-800",
     accent: "border-l-teal-400",
     count: "bg-teal-100 text-teal-700",
+    bar: "bg-teal-400",
   },
   rejected: {
     header: "bg-gray-100 text-gray-700",
     accent: "border-l-gray-300",
     count: "bg-gray-200 text-gray-700",
+    bar: "bg-gray-300",
   },
 };
 

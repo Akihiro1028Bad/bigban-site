@@ -39,6 +39,9 @@ import {
 
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
+import { DetailHeader } from "./DetailHeader";
+import { detailBadge } from "./detailBadge";
+import { MetricChips } from "./MetricChips";
 import { ProposalsView } from "./ProposalsView";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
@@ -68,10 +71,13 @@ const MAX_SECTION_IMAGES = 3;
 // #98: 編集中ライブプレビューのデバウンス間隔(ミリ秒)。入力追従とコストの折衷。
 const LIVE_PREVIEW_DEBOUNCE_MS = 250;
 
-// #100: 本番プレビュー iframe の見た目。中身(globals.css 暗テーマ)は iframe 内で
-// 描画されるため、枠は本番に寄せた暗背景＋丸角。高さは閲覧/編集で共通。
-const PREVIEW_FRAME_CLASS =
-  "w-full h-96 rounded-md border border-gray-800 bg-[#0A0A0A]";
+// #100/#124: 本番プレビュー iframe の見た目。外側のブラウザ風chromeカードが枠/角丸を
+// 担うため、iframe 自体は枠なし・暗背景のみ。中身は iframe 内で本番テーマ描画される。
+const PREVIEW_FRAME_CLASS = "block h-96 w-full bg-[#0A0A0A]";
+
+// #124: 詳細パネルのセクションカード共通スタイル(淡色サーフェスでグルーピング)。
+const SECTION_CARD = "rounded-lg border border-gray-200 bg-white p-3";
+const SECTION_HEAD = "text-sm font-bold text-gray-700";
 
 // スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
 const STYLE_LABEL = Object.fromEntries(
@@ -1654,14 +1660,14 @@ export function ApproveClient() {
   // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。
   function renderDraftPreview(item: PendingItem) {
     return (
-      <section aria-label="下書きプレビュー" className="mt-4 border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-bold text-gray-700">下書きプレビュー</h3>
+      <section aria-label="下書きプレビュー" className={`mt-4 ${SECTION_CARD}`}>
+        <h3 className={SECTION_HEAD}>下書きプレビュー</h3>
         {draftState.status === "loading" ? (
           <p className="mt-2 text-sm text-gray-500" aria-busy="true">
             読み込み中…
           </p>
         ) : draftState.status === "error" ? (
-          <div role="alert" className="mt-2 text-sm text-red-700">
+          <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             <span>{draftState.error}</span>
             <button
               type="button"
@@ -1674,18 +1680,31 @@ export function ApproveClient() {
             </button>
           </div>
         ) : draftState.status === "empty" ? (
-          <p className="mt-2 text-sm text-gray-500">下書きが見つかりませんでした。</p>
+          <p className="mt-2 rounded-md bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
+            下書きが見つかりませんでした。
+          </p>
         ) : draftState.status === "ready" ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="mt-2"
           >
-            <DraftPreviewFrame
-              title="本番プレビュー"
-              html={draftState.draft.bodyHtml || draftState.draft.body}
-              className={PREVIEW_FRAME_CLASS}
-            />
+            {/* #124: ブラウザ風 chrome の額装で「本番イメージ」感を出す。 */}
+            <div className="overflow-hidden rounded-md border border-gray-800">
+              <div className="flex items-center gap-1.5 bg-gray-900 px-3 py-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
+                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
+                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
+                <span className="ml-2 truncate text-[10px] text-gray-400">
+                  thepicklebang.com / news
+                </span>
+              </div>
+              <DraftPreviewFrame
+                title="本番プレビュー"
+                html={draftState.draft.bodyHtml || draftState.draft.body}
+                className={PREVIEW_FRAME_CLASS}
+              />
+            </div>
             <div className="mt-2">
               <button
                 type="button"
@@ -1727,8 +1746,8 @@ export function ApproveClient() {
     const phase = revisePhase(item.reviseStatus);
     if (phase === "idle" && sections.length === 0) return null;
     return (
-      <section aria-label="構成案の修正" className="mt-4 border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-bold text-gray-700">構成案の修正</h3>
+      <section aria-label="構成案の修正" className={`mt-4 ${SECTION_CARD}`}>
+        <h3 className={SECTION_HEAD}>構成案の修正</h3>
         {phase === "pending"
           ? renderRevisePending()
           : phase === "ready"
@@ -1771,16 +1790,13 @@ export function ApproveClient() {
             twoPane ? "lg:w-[60rem] lg:max-w-[92vw]" : ""
           }`}
         >
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="font-bold text-gray-900">{item.title}</h2>
-            <button
-              type="button"
-              onClick={() => setOpenId(null)}
-              className={`${TAP_TARGET} shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
-            >
-              閉じる
-            </button>
-          </div>
+          {/* #124: 段階色アクセント＋段階チップ＋種別＋タイトルの強いヘッダーバンド。 */}
+          <DetailHeader
+            title={item.title}
+            kindLabel={KIND_BADGE[item.kind]}
+            badge={detailBadge(item, choice)}
+            onClose={() => setOpenId(null)}
+          />
           {/* #119 follow-up: PC は左(メタ＋操作＋構成案)／右(本番プレビュー)の2ペイン。
               モバイルは grid を効かせず DOM 順で縦積み(従来の見え方を維持)。 */}
           <div
@@ -1790,19 +1806,13 @@ export function ApproveClient() {
                 : ""
             }
           >
-          <div className="lg:col-start-1">
-          {item.subtitle ? <p className="mt-1 text-sm text-gray-600">{item.subtitle}</p> : null}
+          <div className="mt-3 lg:col-start-1">
+          {item.subtitle ? <p className="text-sm text-gray-600">{item.subtitle}</p> : null}
 
-          {item.details && item.details.length > 0 ? (
-            <dl className="mt-3 space-y-1 text-sm">
-              {item.details.map((detail) => (
-                <div key={detail.label} className="flex gap-2">
-                  <dt className="shrink-0 font-medium text-gray-700">{detail.label}</dt>
-                  <dd className="whitespace-pre-wrap text-gray-800">{detail.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
+          {/* #124: 根拠は素の dl ではなくメトリクスチップで見せる。 */}
+          <div className="mt-3">
+            <MetricChips details={item.details} />
+          </div>
 
           {/* #87: 下書き作成済みは承認/却下を出さない(プレビュー＋編集のみ)。 */}
           {item.isDraftReady ? null : (
@@ -1832,7 +1842,9 @@ export function ApproveClient() {
                     type="button"
                     onClick={() => decideFromPanel(item, "却下")}
                     disabled={isBusy || lockedForRevise}
-                    className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+                    className={choiceButtonClass(
+                      "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
                   >
                     却下
                   </button>
@@ -1852,38 +1864,7 @@ export function ApproveClient() {
           {item.kind === "idea" ? (
             <div className="lg:col-start-1">{renderReviseSection(item)}</div>
           ) : null}
-
-          {/* #276/#277 の拡張スロット(今回は枠のみ・機能は後続issue) */}
-          <section
-            aria-label="AI壁打ち"
-            className="mt-6 border-t border-gray-200 pt-4 lg:col-start-1"
-          >
-            <h3 className="text-sm font-bold text-gray-700">AIと壁打ち</h3>
-            <textarea
-              aria-label="AI壁打ち（準備中）"
-              disabled
-              placeholder="（準備中）この提案について相談できます"
-              className="mt-2 h-20 w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-sm text-gray-500"
-            />
-            <p className="mt-1 text-xs text-gray-400">準備中（後続のアップデートで利用可能になります）。</p>
-          </section>
-
-          {item.kind === "idea" ? (
-            <section
-              aria-label="下書き生成"
-              className="mt-4 border-t border-gray-200 pt-4 lg:col-start-1"
-            >
-              <h3 className="text-sm font-bold text-gray-700">記事の下書きを生成</h3>
-              <button
-                type="button"
-                disabled
-                className={`${TAP_TARGET} mt-2 border border-gray-300 bg-gray-100 text-gray-500`}
-              >
-                下書きを生成
-              </button>
-              <p className="mt-1 text-xs text-gray-400">準備中（後続のアップデートで利用可能になります）。</p>
-            </section>
-          ) : null}
+          {/* #124: 未実装の「AI壁打ち」「下書き生成」プレースホルダは削除(将来issueで復活)。 */}
           </div>
         </div>
       </div>

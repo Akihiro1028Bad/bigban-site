@@ -14,15 +14,17 @@ describe("stageTheme", () => {
     expect(stageTheme("rejected").header).toContain("gray");
   });
 
-  it("header/accent/count の3クラスを返す", () => {
+  it("header/accent/count/bar のクラスを返す", () => {
     const theme = stageTheme("proposed");
     expect(theme.header.length).toBeGreaterThan(0);
     expect(theme.accent.length).toBeGreaterThan(0);
     expect(theme.count.length).toBeGreaterThan(0);
+    expect(theme.bar.length).toBeGreaterThan(0);
   });
 
-  it("accent は左ボーダーaccent、count は淡色バッジ", () => {
+  it("accent は左ボーダーaccent、count は淡色バッジ、bar はアクセント背景", () => {
     expect(stageTheme("drafted").accent).toContain("border-l");
     expect(stageTheme("drafted").count).toContain("teal");
+    expect(stageTheme("drafted").bar).toContain("bg-teal");
   });
 });
