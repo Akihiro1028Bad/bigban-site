@@ -24,6 +24,8 @@
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",
     "growth:revise": "tsx scripts/growth/revise-cli.ts",
     "growth:revise-loop": "node scripts/growth/run.mjs revise",
+    "growth:eyecatch-regen": "tsx scripts/growth/eyecatch-regen-cli.ts",
+    "growth:regen-loop": "node scripts/growth/run.mjs regen",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"

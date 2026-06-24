@@ -22,6 +22,8 @@ type ListPhase =
   | { status: "ready"; media: MediaItem[] }
   | { status: "error" };
 
+type Mode = "closed" | "pick" | "regen";
+
 function withToken(path: string, token: string): string {
   return `${path}?token=${encodeURIComponent(token)}`;
 }
@@ -31,15 +33,17 @@ function errMsg(error: unknown, fallback: string): string {
 }
 
 /**
- * アイキャッチ差し替え UI(Epic #140 / #143)。
- * microCMS メディアの一覧から選択、または新規アップロードして、その URL を
- * 下書きのアイキャッチへ差し替える(/api/growth/draft/eyecatch)。
+ * アイキャッチの差し替え / AI 再生成 UI(Epic #140 / #143 / #144)。
+ * - 差し替え(#143): microCMS メディアの一覧から選択 or 新規アップロードして即差し替え。
+ * - AI 再生成(#144): 指示を添えて PC の画像ループへ再生成を依頼する(プル型・非同期)。
  */
 export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("closed");
   const [list, setList] = useState<ListPhase>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [regenText, setRegenText] = useState("");
 
   async function loadMedia(): Promise<void> {
     setList({ status: "loading" });
@@ -55,13 +59,21 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
     }
   }
 
-  function openPicker(): void {
-    setOpen(true);
+  function openPick(): void {
+    setMode("pick");
+    setNotice("");
     void loadMedia();
   }
 
-  function closePicker(): void {
-    setOpen(false);
+  function openRegen(): void {
+    setMode("regen");
+    setNotice("");
+    setActionError("");
+    setRegenText("");
+  }
+
+  function close(): void {
+    setMode("closed");
     setActionError("");
   }
 
@@ -77,7 +89,7 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) throw new Error(json.error ?? "差し替えに失敗しました。");
       onReplaced();
-      setOpen(false);
+      setMode("closed");
     } catch (error) {
       setActionError(errMsg(error, "差し替えに失敗しました。"));
     } finally {
@@ -111,16 +123,96 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
     if (file) void uploadAndApply(file);
   }
 
-  if (!open) {
+  async function requestRegen(): Promise<void> {
+    setBusy(true);
+    setActionError("");
+    try {
+      const res = await fetch(withToken("/api/growth/eyecatch/regen", token), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId, instruction: regenText.trim() }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) throw new Error(json.error ?? "再生成の依頼に失敗しました。");
+      setNotice("再生成を依頼しました。PCが処理して数分で反映されます。");
+      setMode("closed");
+    } catch (error) {
+      setActionError(errMsg(error, "再生成の依頼に失敗しました。"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mode === "closed") {
     return (
-      <button
-        type="button"
-        aria-label="アイキャッチを差し替え"
-        onClick={openPicker}
-        className="mt-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+      <div className="mt-2">
+        {notice ? (
+          <p className="mb-2 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-800">{notice}</p>
+        ) : null}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-label="アイキャッチを差し替え"
+            onClick={openPick}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            アイキャッチを差し替え
+          </button>
+          <button
+            type="button"
+            aria-label="アイキャッチをAIで再生成"
+            onClick={openRegen}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            AIで再生成
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === "regen") {
+    return (
+      <div
+        role="group"
+        aria-label="アイキャッチをAIで再生成"
+        className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3"
       >
-        アイキャッチを差し替え
-      </button>
+        <label htmlFor={`regen-${pageId}`} className="block text-xs font-medium text-gray-600">
+          再生成の指示（任意・空ならおまかせ）
+        </label>
+        <textarea
+          id={`regen-${pageId}`}
+          value={regenText}
+          onChange={(event) => setRegenText(event.target.value)}
+          disabled={busy}
+          rows={2}
+          placeholder="例: 梅雨の屋内で打つ宇宙人。青系で明るく。"
+          className="mt-1 w-full rounded-md border border-gray-300 p-2 text-xs text-gray-900"
+        />
+        {actionError ? (
+          <p role="alert" className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
+            {actionError}
+          </p>
+        ) : null}
+        <div className="mt-2 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            onClick={() => void requestRegen()}
+            disabled={busy}
+            className="rounded-md border border-blue-600 bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            再生成を依頼
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -190,7 +282,7 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          onClick={closePicker}
+          onClick={close}
           className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
         >
           キャンセル

@@ -29,4 +29,10 @@ describe("run.mjs dry-run の --model(#247)", () => {
   it("weekly には --model を付けない", () => {
     expect(dryRun("weekly")).not.toContain("--model");
   });
+
+  it("regen は再生成プロンプトと --model を付ける(#144)", () => {
+    const out = dryRun("regen");
+    expect(out).toContain("regen-eyecatch.md");
+    expect(out).toContain("--model claude-opus-4-8");
+  });
 });
