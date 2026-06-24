@@ -214,3 +214,94 @@ describe("BodyImagePicker", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("差し替えの保存に失敗しました。");
   });
 });
+
+describe("BodyImagePicker AI再生成(#156)", () => {
+  it("各画像にAI再生成ボタンを出す", () => {
+    setup();
+    expect(screen.getByRole("button", { name: "本文画像1をAIで再生成" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "本文画像2をAIで再生成" })).toBeInTheDocument();
+  });
+
+  it("再生成を依頼すると対象src・指示(trim)で POST し、依頼メッセージを出す", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像2をAIで再生成" }));
+    await userEvent.type(screen.getByLabelText(/再生成の指示/), "  図解で  ");
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("AI再生成を依頼しました。");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toContain("/api/growth/body-image/regen");
+    const sent = JSON.parse(init.body);
+    expect(sent.pageId).toBe(PAGE_ID);
+    expect(sent.targetSrc).toBe(IMG2); // 2枚目を対象
+    expect(sent.instruction).toBe("図解で"); // trim される
+    // 依頼後はパネルが閉じ、再生成ボタンが戻る
+    expect(screen.getByRole("button", { name: "本文画像2をAIで再生成" })).toBeInTheDocument();
+  });
+
+  it("指示が空でも依頼できる", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+    await screen.findByRole("status");
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body).instruction).toBe("");
+  });
+
+  it("依頼失敗(error あり)はその文言を出す", async () => {
+    mockFetch(jsonResponse({ success: false, error: "処理中です" }, false, 409));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("処理中です");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("依頼失敗(error なし)はフォールバック文言", async () => {
+    mockFetch(jsonResponse({ success: false })); // ok:true・error 無し
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("再生成の依頼に失敗しました。");
+  });
+
+  it("fetch が非Errorでrejectしてもフォールバック文言", async () => {
+    const fn = vi.fn();
+    fn.mockRejectedValueOnce("boom");
+    vi.stubGlobal("fetch", fn);
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("再生成の依頼に失敗しました。");
+  });
+
+  it("キャンセルで再生成パネルを閉じる", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    expect(screen.getByRole("group", { name: "AIで再生成" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("group", { name: "AIで再生成" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "本文画像1をAIで再生成" })).toBeInTheDocument();
+  });
+
+  it("差し替えと再生成は排他(再生成を開くと差し替えグリッドは出ない)", async () => {
+    mockFetch(jsonResponse({ success: true, media: [{ url: MEDIA }] }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1を差し替え" }));
+    expect(await screen.findByRole("group", { name: "メディアから選択" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像2をAIで再生成" }));
+    expect(screen.getByRole("group", { name: "AIで再生成" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "メディアから選択" })).not.toBeInTheDocument();
+  });
+
+  it("再生成を開くと差し替えは閉じ、差し替えを開くと再生成は閉じる", async () => {
+    mockFetch(jsonResponse({ success: true, media: [{ url: MEDIA }] }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1をAIで再生成" }));
+    expect(screen.getByRole("group", { name: "AIで再生成" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像2を差し替え" }));
+    expect(await screen.findByRole("group", { name: "メディアから選択" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "AIで再生成" })).not.toBeInTheDocument();
+  });
+});

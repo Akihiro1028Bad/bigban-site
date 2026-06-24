@@ -68,6 +68,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // 本文画像 AI 再生成(#156)。決定的処理は growth:body-image-regen CLI、claude は
+  // 指示→スタイル/説明を決めて画像生成・アップロードを回す。revise/regen と lock/上限を共有。
+  "regen-body": {
+    prompt: "regen-body-image.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
@@ -128,7 +136,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body>\n`
   );
   process.exit(1);
 }

@@ -19,6 +19,7 @@
     "growth:facility-context": "tsx scripts/growth/facility-context-cli.ts",
     "growth:notify-drafts": "tsx scripts/growth/notify-drafts.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
+    "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
     "growth:self-heal": "tsx scripts/growth/self-heal-cli.ts",
     "growth:publish-draft": "tsx scripts/growth/publish-draft-cli.ts",
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",
@@ -26,6 +27,8 @@
     "growth:revise-loop": "node scripts/growth/run.mjs revise",
     "growth:eyecatch-regen": "tsx scripts/growth/eyecatch-regen-cli.ts",
     "growth:regen-loop": "node scripts/growth/run.mjs regen",
+    "growth:body-image-regen": "tsx scripts/growth/body-image-regen-cli.ts",
+    "growth:regen-body-loop": "node scripts/growth/run.mjs regen-body",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"
