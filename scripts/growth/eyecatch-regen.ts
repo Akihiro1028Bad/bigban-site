@@ -7,6 +7,8 @@
  * 通知・ロック・回収は CLI(`eyecatch-regen-cli.ts`)が行い、ここは I/O を持たない純ロジック。
  */
 
+import type { FlexBubble } from "./digest-flex";
+import { buildNoticeFlex } from "./notice-flex";
 import { chunkRichText, type NotionPage } from "./notion";
 
 /** Notion「記事ネタ案」に追加する再生成ループ用プロパティ名(手動追加)。 */
@@ -165,6 +167,16 @@ export function buildRegenDoneMessage(title: string, approveUrl: string): string
     "承認画面のプレビューで確認してください。",
     approveUrl,
   ].join("\n");
+}
+
+/** 再生成完了の Flex カード(#162)。altText は buildRegenDoneMessage を流用する。 */
+export function buildRegenDoneFlex(title: string, approveUrl: string): FlexBubble {
+  return buildNoticeFlex({
+    heading: "🎨 アイキャッチを再生成しました",
+    title,
+    lines: ["承認画面のプレビューで確認してください。"],
+    approveUrl,
+  });
 }
 
 /** 再生成失敗の LINE 本文(沈黙させない・#24整合)。 */

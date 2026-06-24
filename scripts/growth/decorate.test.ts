@@ -10,6 +10,7 @@ import {
   buildDecorateFailMessage,
   buildDecorateFailProps,
   buildDecoratePresentMessage,
+  buildDecoratePresentFlex,
   buildDecoratePresentProps,
   buildDecorateProcessingProps,
   buildDecorateRequestProps,
@@ -402,5 +403,14 @@ describe("通知本文", () => {
     const fail = buildDecorateFailMessage("記事", "OpenAI 503");
     expect(fail).toMatch(/失敗/);
     expect(fail).toContain("OpenAI 503");
+  });
+
+  it("buildDecoratePresentFlex はタイトルと承認URIボタンを持つカードを返す(#162)", () => {
+    const bubble = buildDecoratePresentFlex("記事", "https://x/growth/approve");
+    expect(bubble.type).toBe("bubble");
+    expect(bubble.body?.contents[0]).toMatchObject({ text: "記事", weight: "bold" });
+    expect(bubble.footer?.contents[0]).toMatchObject({
+      action: { type: "uri", uri: "https://x/growth/approve" },
+    });
   });
 });

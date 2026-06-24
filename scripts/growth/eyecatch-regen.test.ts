@@ -14,6 +14,7 @@ import {
   regenViewOf,
   selectStaleRegenIds,
   buildRegenDoneMessage,
+  buildRegenDoneFlex,
   buildRegenFailMessage,
   type RegenRow,
 } from "./eyecatch-regen";
@@ -156,6 +157,15 @@ describe("通知本文", () => {
     expect(msg).toContain("アイキャッチ");
     expect(msg).toContain("市川の記事");
     expect(msg).toContain("https://x/growth/approve");
+  });
+
+  it("buildRegenDoneFlex はタイトルと承認URIボタンを持つカードを返す(#162)", () => {
+    const bubble = buildRegenDoneFlex("市川の記事", "https://x/growth/approve");
+    expect(bubble.type).toBe("bubble");
+    expect(bubble.body?.contents[0]).toMatchObject({ text: "市川の記事", weight: "bold" });
+    expect(bubble.footer?.contents[0]).toMatchObject({
+      action: { type: "uri", uri: "https://x/growth/approve" },
+    });
   });
 
   it("buildRegenFailMessage は理由と再依頼導線を含む", () => {
