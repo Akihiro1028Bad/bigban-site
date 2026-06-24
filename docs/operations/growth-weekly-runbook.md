@@ -254,7 +254,7 @@ Notion 管理画面で「記事ネタ案」DB(`5adab8b1-f182-4123-b963-9463a2580
 
 > プロパティ名は完全一致で作ること。**未追加でも構成案修正/差し替え等の既存機能は壊れない**（読み出しは欠落耐性）。
 > 再生成は **OpenAI 画像生成**を使うため PC に `OPENAI_API_KEY`、アップロードに `MICROCMS_MANAGEMENT_API_KEY`、
-> 差し替えに `MICROCMS_CONTENT_API_KEY`(無ければ MANAGEMENT で代替) が必要（いずれも PC 側）。
+> 差し替えに `MICROCMS_CONTENT_API_KEY`（最小権限。**MANAGEMENT へはフォールバックしない**・security H-1）が必要（いずれも PC 側）。
 
 ### 運用の流れ
 

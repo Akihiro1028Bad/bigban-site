@@ -185,6 +185,7 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
           id={`regen-${pageId}`}
           value={regenText}
           onChange={(event) => setRegenText(event.target.value)}
+          maxLength={500}
           disabled={busy}
           rows={2}
           placeholder="例: 梅雨の屋内で打つ宇宙人。青系で明るく。"

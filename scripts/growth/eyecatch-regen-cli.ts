@@ -63,8 +63,9 @@ function notionOptions(): NotionApiOptions {
 function contentOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } {
   return {
     serviceDomain: requireEnv("MICROCMS_SERVICE_DOMAIN"),
-    // 書き込みは content API キー(管理キーは使わない)。未設定なら管理キーで代替。
-    apiKey: process.env.MICROCMS_CONTENT_API_KEY ?? requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+    // 下書きへの書き込みは content API キーに限定する(security H-1)。
+    // 削除も可能な MANAGEMENT キーへはフォールバックしない(最小権限)。
+    apiKey: requireEnv("MICROCMS_CONTENT_API_KEY"),
     fetchFn: defaultFetch,
   };
 }
@@ -185,7 +186,8 @@ async function main(): Promise<void> {
       return done(a, b, options);
     case "fail":
       if (!a || !b) throw new Error("使い方: fail <pageId> <reason>");
-      return fail(a, b, options);
+      // 異常に長い通知本文を防ぐ(security M-3)。
+      return fail(a, b.slice(0, 200), options);
     default:
       throw new Error("使い方: eyecatch-regen-cli <reap|next|done|fail> ...");
   }
