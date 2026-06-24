@@ -29,6 +29,8 @@
     "growth:regen-loop": "node scripts/growth/run.mjs regen",
     "growth:body-image-regen": "tsx scripts/growth/body-image-regen-cli.ts",
     "growth:regen-body-loop": "node scripts/growth/run.mjs regen-body",
+    "growth:advise": "tsx scripts/growth/advise-cli.ts",
+    "growth:advise-loop": "node scripts/growth/run.mjs advise",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import type { AdviceView } from "@/lib/growth/advise";
 import { pendingStatus } from "@/lib/growth/approve";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import type { Stage } from "@/lib/growth/stage";
@@ -55,6 +56,7 @@ import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
+import { AdviceCard } from "./AdviceCard";
 import { BodyImagePicker } from "./BodyImagePicker";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
@@ -131,6 +133,8 @@ interface DraftPreview {
   body: string;
   // #141: アイキャッチURLミラー(未設定は空文字)。プレビュー上部の画像表示に使う。
   eyecatch?: string;
+  // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済み)。
+  advice?: AdviceView;
 }
 
 type DraftState =
@@ -1854,6 +1858,13 @@ export function ApproveClient() {
               token={token}
               bodyHtml={draftState.draft.bodyHtml}
               onSaved={() => void loadDraft(item.id)}
+            />
+            {/* #146: スタイリング・アドバイザー(read-only)。依頼/閉じる後に下書きを再取得。 */}
+            <AdviceCard
+              pageId={item.id}
+              token={token}
+              advice={draftState.draft.advice}
+              onChanged={() => void loadDraft(item.id)}
             />
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
