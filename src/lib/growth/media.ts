@@ -51,8 +51,15 @@ export function validateUpload(
 }
 
 /**
- * 値が microCMS のアセット URL(https・`*.microcms-assets.io`)か判定する(#143)。
+ * microCMS のメディア配信ホスト(next.config の remotePatterns と一致)。
+ * バリデータと画像描画(next/image)で同じ許可ホストを使い、不整合を防ぐ(#143)。
+ */
+export const MICROCMS_ASSET_HOST = "images.microcms-assets.io";
+
+/**
+ * 値が microCMS のアセット URL(https・`images.microcms-assets.io`)か判定する(#143)。
  * アイキャッチ差し替えで、任意 URL(SSRF・外部画像)を下書きへ書き込ませないための境界検証。
+ * ホストは next.config が描画を許可する単一ホストに厳密一致させる。
  */
 export function isMicrocmsAssetUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -62,7 +69,7 @@ export function isMicrocmsAssetUrl(value: unknown): value is string {
   } catch {
     return false;
   }
-  return parsed.protocol === "https:" && parsed.hostname.endsWith(".microcms-assets.io");
+  return parsed.protocol === "https:" && parsed.hostname === MICROCMS_ASSET_HOST;
 }
 
 /**

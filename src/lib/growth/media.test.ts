@@ -60,8 +60,9 @@ describe("isMicrocmsAssetUrl", () => {
     expect(isMicrocmsAssetUrl("https://evil.com/x.png")).toBe(false);
   });
 
-  it("サフィックス偽装ホストは false", () => {
+  it("サフィックス偽装ホスト・別サブドメインは false(厳密ホスト一致)", () => {
     expect(isMicrocmsAssetUrl("https://images.microcms-assets.io.evil.com/x.png")).toBe(false);
+    expect(isMicrocmsAssetUrl("https://other.microcms-assets.io/x.png")).toBe(false);
   });
 });
 

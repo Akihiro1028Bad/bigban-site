@@ -28,7 +28,8 @@ import {
 export const runtime = "nodejs";
 
 const ENDPOINT = "news";
-const CONTENT_ID_RE = /^[a-z0-9-]+$/;
+// contentId は Notion 由来(攻撃者制御外)だが、異常値のフェイルセーフとして上限長も課す。
+const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
