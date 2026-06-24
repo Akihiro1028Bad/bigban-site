@@ -92,6 +92,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // アドバイス採用→本文反映(#165)。決定的処理は growth:advise-apply CLI、claude は採用された
+  // fix の passage だけを書き換え before/after 案(メタ)を作る。反映は承認画面側。lock/上限を共有。
+  apply: {
+    prompt: "advise-apply.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
@@ -152,7 +160,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise|decorate>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise|decorate|apply>\n`
   );
   process.exit(1);
 }

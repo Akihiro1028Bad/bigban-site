@@ -7,6 +7,7 @@ import { motion, MotionConfig } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import type { AdviceView } from "@/lib/growth/advise";
+import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 import { pendingStatus } from "@/lib/growth/approve";
 import {
   BODY_REGEN_BUSY_STATUSES,
@@ -145,6 +146,8 @@ interface DraftPreview {
   eyecatch?: string;
   // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済み)。
   advice?: AdviceView;
+  // #165: アドバイス採用→反映の表示用ビュー(ステータス＋提示中のみ before/after 案)。
+  adviceApply?: AdviceApplyView;
   // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
   decorate?: DecorateView;
   // #166: AI再生成の依頼中/処理中/失敗の表示用ビュー(本文画像は対象src付き)。
@@ -1919,6 +1922,8 @@ export function ApproveClient() {
               pageId={item.id}
               token={token}
               advice={draftState.draft.advice}
+              adviceApply={draftState.draft.adviceApply}
+              bodyHtml={draftState.draft.bodyHtml}
               onChanged={() => void loadDraft(item.id)}
             />
             {/* #147: 装飾アシスタント。提案を採用→反映(draft/edit)後に下書きを再取得。 */}

@@ -3,10 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdviceView } from "@/lib/growth/advise";
+import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 
 import { AdviceCard } from "./AdviceCard";
 
 const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
+// fix[0] の quote「重要です。」を一意に含む本文(採用候補の判定に使う)。
+const BODY = "<p>導入です。</p><p>ここは重要です。読んでください。</p>";
 
 const FULL_ADVICE: AdviceView = {
   status: "提示中",
@@ -36,9 +39,18 @@ function mockFetch(...responses: Response[]): ReturnType<typeof vi.fn> {
   return fn;
 }
 
-function setup(advice?: AdviceView) {
+function setup(advice?: AdviceView, opts: { adviceApply?: AdviceApplyView; bodyHtml?: string } = {}) {
   const onChanged = vi.fn();
-  render(<AdviceCard pageId={PAGE_ID} token="" advice={advice} onChanged={onChanged} />);
+  render(
+    <AdviceCard
+      pageId={PAGE_ID}
+      token=""
+      advice={advice}
+      adviceApply={opts.adviceApply}
+      bodyHtml={opts.bodyHtml}
+      onChanged={onChanged}
+    />
+  );
   return { onChanged };
 }
 
@@ -167,5 +179,186 @@ describe("AdviceCard", () => {
       },
     });
     expect(screen.getByText("致命")).toBeInTheDocument();
+  });
+});
+
+describe("AdviceCard 採用→本文反映(#165)", () => {
+  const APPLY_NONE: AdviceApplyView = { status: "なし", proposal: [], raw: "" };
+
+  it("反映なし: 採用候補に採用チェックを出し、採用→反映依頼を POST する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { onChanged } = setup(FULL_ADVICE, { adviceApply: APPLY_NONE, bodyHtml: BODY });
+    // fix[0](文体・quote一致)だけ採用チェックが出る。fix[1](見た目・quote無し)は出ない。
+    const checkbox = screen.getByRole("checkbox", { name: "修正案1を採用" });
+    expect(screen.queryByRole("checkbox", { name: "修正案2を採用" })).not.toBeInTheDocument();
+    // 未選択では反映依頼は無効
+    const submit = screen.getByRole("button", { name: /採用分を反映依頼/ });
+    expect(submit).toBeDisabled();
+    await userEvent.click(checkbox);
+    await userEvent.click(submit);
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toContain("/api/growth/advise/apply?");
+    expect(JSON.parse(init.body)).toEqual({ pageId: PAGE_ID, adoptedIndexes: [0] });
+  });
+
+  it("bodyHtml が無ければ採用候補は出ない", () => {
+    setup(FULL_ADVICE, { adviceApply: APPLY_NONE });
+    expect(screen.queryByRole("checkbox", { name: /採用/ })).not.toBeInTheDocument();
+  });
+
+  it("採用チェックは付け外しできる(再クリックで解除)", async () => {
+    setup(FULL_ADVICE, { adviceApply: APPLY_NONE, bodyHtml: BODY });
+    const checkbox = screen.getByRole("checkbox", { name: "修正案1を採用" });
+    const submit = screen.getByRole("button", { name: /採用分を反映依頼/ });
+    await userEvent.click(checkbox); // 採用
+    expect(submit).toBeEnabled();
+    await userEvent.click(checkbox); // 解除
+    expect(submit).toBeDisabled();
+  });
+
+  it("反映 失敗: raw が空でも文言は出る", () => {
+    setup(FULL_ADVICE, {
+      adviceApply: { status: "失敗", proposal: [], raw: "" },
+      bodyHtml: BODY,
+    });
+    expect(screen.getByText(/反映に失敗しました/)).toBeInTheDocument();
+  });
+
+  it("反映 依頼中: 作成中バッジと再読み込み", async () => {
+    const { onChanged } = setup(FULL_ADVICE, {
+      adviceApply: { status: "依頼中", proposal: [], raw: "" },
+      bodyHtml: BODY,
+    });
+    expect(screen.getByText(/反映案を作成中/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("反映 提示中: 元/新の差分を出し、反映するで draft/edit→dismiss→onChanged", async () => {
+    const proposal = [
+      { fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>ここがポイントです。</p>" },
+    ];
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { onChanged } = setup(FULL_ADVICE, {
+      adviceApply: { status: "提示中", proposal, raw: "" },
+      bodyHtml: BODY,
+    });
+    expect(screen.getByText(/ここがポイントです。/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(String(fetchFn.mock.calls[0][0])).toContain("/api/growth/draft/edit");
+    const saved = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(saved.bodyHtml).toContain("ここがポイントです。");
+    expect(String(fetchFn.mock.calls[1][0])).toContain("/api/growth/advise/apply/dismiss");
+  });
+
+  it("反映 提示中: 本文不一致の案は反映できずエラー(保存しない)", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup(FULL_ADVICE, {
+      adviceApply: {
+        status: "提示中",
+        proposal: [{ fixIndex: 0, before: "<p>存在しない段落</p>", after: "<p>x</p>" }],
+        raw: "",
+      },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/反映できる案がありません/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("反映 提示中: bodyHtml 無しなら反映ボタンは何もしない(防御)", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup(FULL_ADVICE, {
+      adviceApply: {
+        status: "提示中",
+        proposal: [{ fixIndex: 0, before: "<p>x</p>", after: "<p>y</p>" }],
+        raw: "",
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("反映 提示中: 一部のみ一致なら反映＋スキップ件数を知らせる", async () => {
+    const proposal = [
+      { fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>新文。</p>" },
+      { fixIndex: 1, before: "<p>存在しない</p>", after: "<p>z</p>" },
+    ];
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { onChanged } = setup(FULL_ADVICE, {
+      adviceApply: { status: "提示中", proposal, raw: "" },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("alert")).toHaveTextContent(/1件を反映しました（1件は本文不一致/);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("反映 提示中: 片付け(dismiss)失敗はエラー", async () => {
+    mockFetch(jsonResponse({ success: true }), jsonResponse({ success: false }));
+    setup(FULL_ADVICE, {
+      adviceApply: {
+        status: "提示中",
+        proposal: [{ fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>新</p>" }],
+        raw: "",
+      },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("片付けに失敗しました。");
+  });
+
+  it("反映 提示中: 保存失敗(error なし)はフォールバック文言", async () => {
+    mockFetch(jsonResponse({ success: false }, false, 502));
+    setup(FULL_ADVICE, {
+      adviceApply: {
+        status: "提示中",
+        proposal: [{ fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>新</p>" }],
+        raw: "",
+      },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存に失敗しました。");
+  });
+
+  it("反映 提示中: 保存失敗はエラー", async () => {
+    mockFetch(jsonResponse({ success: false, error: "保存NG" }, false, 502));
+    setup(FULL_ADVICE, {
+      adviceApply: {
+        status: "提示中",
+        proposal: [{ fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>新</p>" }],
+        raw: "",
+      },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "本文に反映する" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存NG");
+  });
+
+  it("反映 提示中: 閉じるで dismiss を POST", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { onChanged } = setup(FULL_ADVICE, {
+      adviceApply: { status: "提示中", proposal: [], raw: "" },
+      bodyHtml: BODY,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "反映を閉じる" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(String(fetchFn.mock.calls[0][0])).toContain("/api/growth/advise/apply/dismiss");
+  });
+
+  it("反映 失敗: 理由と閉じる", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup(FULL_ADVICE, {
+      adviceApply: { status: "失敗", proposal: [], raw: "本文が変わりました" },
+      bodyHtml: BODY,
+    });
+    expect(screen.getByText(/本文が変わりました/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "反映を閉じる" }));
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    expect(String(fetchFn.mock.calls[0][0])).toContain("/api/growth/advise/apply/dismiss");
   });
 });
