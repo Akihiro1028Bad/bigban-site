@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   createDraft,
   patchDraft,
+  publishContent,
   slugToContentId,
   resolveRetryConfig,
   ContentTimeoutError,
@@ -188,6 +189,18 @@ describe("patchDraft", () => {
       "https://thepicklebang.microcms.io/api/v1/news/abc123?status=draft"
     );
     expect(init.method).toBe("PATCH");
+  });
+});
+
+describe("publishContent (#167)", () => {
+  it("contentId 指定で status=publish の PATCH を空ボディで送る", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okId("abc123"));
+    const id = await publishContent("news", "abc123", opts(fetchFn));
+    expect(id).toBe("abc123");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://thepicklebang.microcms.io/api/v1/news/abc123?status=publish");
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe("{}");
   });
 });
 

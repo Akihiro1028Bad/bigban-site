@@ -5,5 +5,5 @@
  * `@/lib/growth/content` で import できるよう薄く束ねるだけにする。
  */
 
-export { patchDraft } from "../../../scripts/growth/content";
+export { patchDraft, publishContent } from "../../../scripts/growth/content";
 export type { ContentApiOptions } from "../../../scripts/growth/content";

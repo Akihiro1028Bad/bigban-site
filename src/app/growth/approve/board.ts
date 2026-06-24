@@ -18,12 +18,13 @@ export interface BoardColumn {
   label: string;
 }
 
-// 記事の列(左→右)。公開列は次段(別Issue)。
+// 記事の列(左→右)。#167: 公開済み列を追加(クローズ・却下はアーカイブ扱いで列に出さない)。
 export const ARTICLE_COLUMNS: readonly BoardColumn[] = [
   { stage: "proposed", label: "提案中" },
   { stage: "queued", label: "生成待ち" },
   { stage: "generating", label: "生成中" },
   { stage: "drafted", label: "下書き" },
+  { stage: "published", label: "公開済み" },
 ];
 
 // 5段階インジケータのラベル(提案→承認→生成→下書き→公開)。
@@ -34,9 +35,10 @@ const STEP_INDEX: Record<string, number> = {
   queued: 1,
   generating: 2,
   drafted: 3,
+  published: 4,
 };
 
-/** 段階 → インジケータの現在地(0..3)。未知/却下は -1。 */
+/** 段階 → インジケータの現在地(0..4)。未知/却下/クローズは -1。 */
 export function stageStepIndex(stage: Stage): number {
   return STEP_INDEX[stage] ?? -1;
 }

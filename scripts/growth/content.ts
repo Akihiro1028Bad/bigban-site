@@ -281,3 +281,17 @@ export function patchDraft(
   )}?status=draft`;
   return send("PATCH", url, data, options);
 }
+
+/**
+ * 既存コンテンツを**公開**する(#167)。`?status=publish` で PATCH し、下書きを本番公開する。
+ * 本文は変更せず状態だけ publish にする(空ボディ)。冪等(既に公開済みでも publish のまま)。
+ * 公開は取り消しづらい外向き操作のため、呼び出し側で認証・検証(アイキャッチ/本文)を必ず行うこと。
+ */
+export function publishContent(
+  endpoint: string,
+  contentId: string,
+  options: ContentApiOptions
+): Promise<string> {
+  const url = `${contentUrl(options.serviceDomain, endpoint, contentId)}?status=publish`;
+  return send("PATCH", url, {}, options);
+}
