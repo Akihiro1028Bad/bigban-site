@@ -283,15 +283,43 @@ export function patchDraft(
 }
 
 /**
- * 既存コンテンツを**公開**する(#167)。`?status=publish` で PATCH し、下書きを本番公開する。
- * 本文は変更せず状態だけ publish にする(空ボディ)。冪等(既に公開済みでも publish のまま)。
+ * 公開(ステータス変更)に使う Management API オプション。
+ * apiKey は **Management API キー**で「コンテンツの公開・下書き切り替え(公開ステータス変更)」権限が必要。
+ */
+export interface PublishApiOptions {
+  serviceDomain: string;
+  apiKey: string;
+  fetchFn: FetchFn;
+}
+
+/**
+ * 既存コンテンツを**公開**する(#167)。
+ *
+ * microCMS の公開ステータス変更は **Management API**(`{domain}.microcms-management.io`)の
+ * `PATCH /api/v1/contents/{endpoint}/{contentId}/status` に `{"status":["PUBLISH"]}` を送る。
+ * Content API の `?status=publish` ではない(それでは公開できない=#167 の不具合修正)。
+ * 本文は変更せず状態だけ公開にする。冪等(既に公開済みでも公開のまま)。
  * 公開は取り消しづらい外向き操作のため、呼び出し側で認証・検証(アイキャッチ/本文)を必ず行うこと。
  */
-export function publishContent(
+export async function publishContent(
   endpoint: string,
   contentId: string,
-  options: ContentApiOptions
-): Promise<string> {
-  const url = `${contentUrl(options.serviceDomain, endpoint, contentId)}?status=publish`;
-  return send("PATCH", url, {}, options);
+  options: PublishApiOptions
+): Promise<void> {
+  const url = `https://${options.serviceDomain}.microcms-management.io/api/v1/contents/${endpoint}/${encodeURIComponent(
+    contentId
+  )}/status`;
+  const res = await options.fetchFn(url, {
+    method: "PATCH",
+    headers: {
+      "X-MICROCMS-API-KEY": options.apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status: ["PUBLISH"] }),
+  });
+  if (!res.ok) {
+    // 本文(課金/キー情報を含むことがある)は読み捨て、ステータスのみ例外に載せる。
+    const text = await res.text();
+    throw new Error(`microCMS 公開に失敗しました (HTTP ${res.status}): ${text}`);
+  }
 }

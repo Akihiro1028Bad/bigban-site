@@ -52,17 +52,17 @@ beforeEach(() => {
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
-  process.env.MICROCMS_CONTENT_API_KEY = "content-key";
+  process.env.MICROCMS_MANAGEMENT_API_KEY = "mgmt-key";
   vi.mocked(getPage).mockReset();
   vi.mocked(updatePageSelect).mockReset();
-  vi.mocked(publishContent).mockReset().mockResolvedValue("my-article");
+  vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   delete process.env.APPROVE_SECRET;
   delete process.env.NOTION_TOKEN;
   delete process.env.MICROCMS_SERVICE_DOMAIN;
-  delete process.env.MICROCMS_CONTENT_API_KEY;
+  delete process.env.MICROCMS_MANAGEMENT_API_KEY;
   vi.restoreAllMocks();
 });
 
@@ -109,8 +109,8 @@ describe("POST /api/growth/publish", () => {
     expect((await POST(postReq(SECRET, { pageId: "x" }))).status).toBe(400);
   });
 
-  it("NOTION_TOKEN / microCMS 設定が無ければ 500", async () => {
-    delete process.env.MICROCMS_CONTENT_API_KEY;
+  it("microCMS 管理キーが無ければ 500", async () => {
+    delete process.env.MICROCMS_MANAGEMENT_API_KEY;
     expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(500);
   });
 
