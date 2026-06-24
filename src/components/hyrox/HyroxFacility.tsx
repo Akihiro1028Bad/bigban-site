@@ -201,12 +201,12 @@ export default function HyroxFacility() {
                 <span className="text-xs text-text-gray">
                   {t(`equipment.${item.key}.spec`)}
                 </span>
+                <span className="mt-1.5 w-fit border border-accent/30 px-2 py-0.5 text-[10px] font-medium tracking-wider text-accent">
+                  {item.brand} {t("officialLabel")}
+                </span>
               </li>
             ))}
           </ul>
-          <p className="mt-6 text-center text-xs leading-relaxed text-text-gray">
-            {t("note")}
-          </p>
         </motion.div>
       </div>
     </section>

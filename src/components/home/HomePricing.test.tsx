@@ -75,7 +75,7 @@ describe("HomePricing", () => {
     expect(screen.getByText("週末・祝日")).toBeInTheDocument();
   });
 
-  it("トレーニングエリアを準備中で表示する", () => {
+  it("トレーニングエリアをHYROX料金で表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomePricing />
@@ -83,7 +83,9 @@ describe("HomePricing", () => {
     );
     expect(screen.getByText("TRAINING AREA")).toBeInTheDocument();
     expect(screen.getByText("トレーニングエリア")).toBeInTheDocument();
-    expect(screen.getByText("準備中")).toBeInTheDocument();
+    expect(screen.getByText("¥3,000")).toBeInTheDocument();
+    expect(screen.getByText("1時間あたり")).toBeInTheDocument();
+    expect(screen.queryByText("準備中")).not.toBeInTheDocument();
   });
 
   it("会員制度を近日公開で表示する", () => {

@@ -67,9 +67,14 @@ export default function HomePricing() {
                 {t("trainingAreaJa")}
               </span>
             </div>
-            <span className="text-accent/50 text-xs tracking-wider">
-              {t("preparing")}
-            </span>
+            <div className="text-right">
+              <span className="block font-serif text-lg font-bold tracking-wider text-accent">
+                {t("trainingAreaPrice")}
+              </span>
+              <span className="text-[10px] tracking-wider text-text-gray">
+                {t("trainingAreaUnit")}
+              </span>
+            </div>
           </motion.div>
 
           <motion.div

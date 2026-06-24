@@ -90,6 +90,12 @@ describe("HyroxFacility", () => {
     ).toBeInTheDocument();
   });
 
+  it("各器具に公式ブランドバッジ（Concept2/Centr 公式）を表示する", () => {
+    renderFacility();
+    expect(screen.getAllByText("Concept2 公式")).toHaveLength(2);
+    expect(screen.getAllByText("Centr 公式")).toHaveLength(4);
+  });
+
   it("設置器具6点の名称・仕様・台数を一覧表示する", () => {
     renderFacility();
     expect(
@@ -103,7 +109,9 @@ describe("HyroxFacility", () => {
     expect(screen.getByText("サンドバッグ")).toBeInTheDocument();
     // 仕様（メーカー/重量）
     expect(screen.getByText("Concept2 SkiErg")).toBeInTheDocument();
-    expect(screen.getByText("8–32kg（複数重量）")).toBeInTheDocument();
+    expect(
+      screen.getByText("16 / 24 / 32kg（HYROX全クラス対応）"),
+    ).toBeInTheDocument();
     // 台数: ×2 が3点、一式が3点
     expect(screen.getAllByText("× 2")).toHaveLength(3);
     expect(screen.getAllByText("一式")).toHaveLength(3);

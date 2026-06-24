@@ -318,7 +318,8 @@
     "weekend": "Weekend / Holiday",
     "trainingArea": "TRAINING AREA",
     "trainingAreaJa": "Training Area",
-    "preparing": "Coming Soon",
+    "trainingAreaPrice": "¥3,000",
+    "trainingAreaUnit": "per hour",
     "membership": "MEMBERSHIP",
     "membershipJa": "Membership",
     "comingSoon": "Coming Soon",
@@ -610,7 +611,7 @@
       "titleJa": "Equipment & Layout",
       "lead": "Fully equipped for all 8 official HYROX stations. Train along the same flow as the real race, moving station to station.",
       "equipmentTitle": "Equipment",
-      "note": "Dumbbells, plates and training mats are also fully equipped.",
+      "officialLabel": "Official",
       "equipment": {
         "skierg": {
           "name": "SkiErg",
@@ -625,12 +626,12 @@
         "sled": {
           "name": "Weight Sled",
           "nameJa": "スレッド",
-          "spec": "Plate-loaded"
+          "spec": "Plate-loaded, up to 202kg (all HYROX divisions)"
         },
         "kettlebell": {
           "name": "Kettlebell",
           "nameJa": "ケトルベル",
-          "spec": "8–32kg (multiple weights)"
+          "spec": "16 / 24 / 32kg (all HYROX divisions)"
         },
         "wallball": {
           "name": "Wall Ball",
@@ -761,6 +762,7 @@
           "disciplineJa": "ハイロックス",
           "note": "Japan National Team, 2024–",
           "items": [
+            "World Championship 2026 — Mixed Doubles age 40–44: 7th",
             "Asia Championship 2026 — Mixed Doubles O40: 1st",
             "Asia Championship 2025 — Mixed Relay Overall: 2nd",
             "Asia Championship 2024 — Singles Overall: 4th / Age Group: 2nd",

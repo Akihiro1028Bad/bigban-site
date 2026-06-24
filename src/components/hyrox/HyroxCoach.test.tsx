@@ -27,6 +27,9 @@ describe("HyroxCoach", () => {
 
   it("主要な実績項目を表示する", () => {
     renderWithIntl(<HyroxCoach />);
+    expect(
+      screen.getByText(/mix doubles age40〜44 世界7位/)
+    ).toBeInTheDocument();
     expect(screen.getByText(/mix doubles over40 1位/)).toBeInTheDocument();
     expect(screen.getByText(/日本人男子初表彰台/)).toBeInTheDocument();
     expect(screen.getByText("初代日本チャンピオン")).toBeInTheDocument();
