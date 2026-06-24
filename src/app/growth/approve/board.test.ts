@@ -25,12 +25,13 @@ function idea(id: string, stage: PendingItem["stage"]): PendingItem {
 }
 
 describe("ARTICLE_COLUMNS", () => {
-  it("提案中→生成待ち→生成中→下書き の順", () => {
+  it("提案中→生成待ち→生成中→下書き→公開済み の順(#167)", () => {
     expect(ARTICLE_COLUMNS.map((c) => c.stage)).toEqual([
       "proposed",
       "queued",
       "generating",
       "drafted",
+      "published",
     ]);
   });
 });

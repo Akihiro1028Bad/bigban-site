@@ -271,6 +271,13 @@ describe("parseDecisions", () => {
     expect(result[0]).toEqual({ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" });
   });
 
+  it("クローズ(#167)も受け付ける", () => {
+    const result = parseDecisions({
+      decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "クローズ" }],
+    });
+    expect(result).toEqual([{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "クローズ" }]);
+  });
+
   it("承認待ちへ戻すステータス(未処理/提案中)も受け付ける(#235 取り消し)", () => {
     const result = parseDecisions({
       decisions: [

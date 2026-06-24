@@ -44,6 +44,12 @@ const THEME: Record<ArticleStage, StageTheme> = {
     count: "bg-teal-100 text-teal-700",
     bar: "bg-teal-400",
   },
+  published: {
+    header: "bg-green-50 text-green-800",
+    accent: "border-l-green-500",
+    count: "bg-green-100 text-green-700",
+    bar: "bg-green-500",
+  },
   rejected: {
     header: "bg-gray-100 text-gray-700",
     accent: "border-l-gray-300",

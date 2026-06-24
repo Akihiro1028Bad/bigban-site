@@ -11,6 +11,7 @@ export type ArticleStage =
   | "queued" // 承認(生成待ち=下書きID未取得)
   | "generating" // 生成中(#108 で Notion に書込)
   | "drafted" // 下書き作成済み
+  | "published" // 公開済み(#167)
   | "rejected"; // 却下
 
 /** 施策のパイプライン段階。 */
@@ -26,6 +27,7 @@ const ARTICLE_STAGE_BY_STATUS: Record<string, ArticleStage> = {
   提案中: "proposed",
   生成中: "generating",
   下書き作成済み: "drafted",
+  公開済み: "published",
   却下: "rejected",
 };
 

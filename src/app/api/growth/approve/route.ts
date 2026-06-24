@@ -56,8 +56,8 @@ function statusFilter(value: string): unknown {
   return { property: STATUS_PROP, select: { equals: value } };
 }
 
-// #106: パイプライン盤のため、記事は全段階(提案中/承認=生成待ち/生成中/下書き作成済み)を
-// 横断取得する(却下はアーカイブ扱いで除外)。承認後に消えず盤に残せるようにする。
+// #106/#167: パイプライン盤のため、記事は全段階(提案中/承認=生成待ち/生成中/下書き作成済み/公開済み)を
+// 横断取得する。却下・クローズはアーカイブ扱いで除外(盤から非表示)。公開済みは成否確認のため盤に残す。
 function ideaStatusFilter(): unknown {
   return {
     or: [
@@ -65,6 +65,7 @@ function ideaStatusFilter(): unknown {
       statusFilter("承認"),
       statusFilter("生成中"),
       statusFilter(DRAFT_READY_STATUS),
+      statusFilter("公開済み"),
     ],
   };
 }
