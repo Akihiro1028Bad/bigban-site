@@ -192,6 +192,17 @@ describe("BodyImagePicker", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("差し替えの保存に失敗しました。");
   });
 
+  it("microCMS 以外の URL は保存せずエラー(クライアント防御 M-1)", async () => {
+    const evil = "https://evil.com/x.png";
+    const fetchFn = mockFetch(jsonResponse({ success: true, media: [{ url: evil }] }));
+    const { onSaved } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "本文画像1を差し替え" }));
+    await userEvent.click(await screen.findByRole("button", { name: "この画像に差し替え 1" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("無効な画像URL");
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(fetchFn).toHaveBeenCalledTimes(1); // 一覧のみ・保存しない
+  });
+
   it("保存で fetch が非Errorでrejectしてもフォールバック文言", async () => {
     const fn = vi.fn();
     fn.mockResolvedValueOnce(jsonResponse({ success: true, media: [{ url: MEDIA }] }));

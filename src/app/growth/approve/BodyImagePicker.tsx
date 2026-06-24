@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import Image from "next/image";
 
+import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { listBodyImages, replaceBodyImageSrc } from "./bodyImageEdit";
@@ -73,6 +74,11 @@ export function BodyImagePicker({ pageId, token, bodyHtml, onSaved }: BodyImageP
   }
 
   async function saveReplace(index: number, newUrl: string): Promise<void> {
+    // 多層防御(security M-1): 差し替え先は microCMS アセット URL に限定する。
+    if (!isMicrocmsAssetUrl(newUrl)) {
+      setError("無効な画像URLです。");
+      return;
+    }
     setBusy(true);
     setError("");
     try {

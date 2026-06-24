@@ -56,4 +56,10 @@ describe("replaceBodyImageSrc", () => {
     expect(out).toContain(`https://evil.com/x.png`);
     expect(out).toContain(`<img src="${NEW}" alt="図">`);
   });
+
+  it("URL に $ 特殊シーケンスが含まれても壊れず literal で入る(security H-1)", () => {
+    const tricky = "https://images.microcms-assets.io/assets/x/$2$1.png";
+    const out = replaceBodyImageSrc(`<img src="${A}" alt="図">`, 0, tricky);
+    expect(out).toBe(`<img src="${tricky}" alt="図">`);
+  });
 });
