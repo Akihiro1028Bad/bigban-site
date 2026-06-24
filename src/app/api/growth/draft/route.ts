@@ -24,6 +24,7 @@ import {
   ideaTitleOf,
   isNotionPageId,
 } from "@/lib/growth/approve";
+import { decorateViewOf } from "@/lib/growth/decorate";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -89,6 +90,8 @@ export async function GET(request: Request): Promise<Response> {
         eyecatch: eyecatchUrlOf(page),
         // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済みアドバイス)。
         advice: adviceViewOf(page),
+        // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
+        decorate: decorateViewOf(page),
       },
     });
   } catch {

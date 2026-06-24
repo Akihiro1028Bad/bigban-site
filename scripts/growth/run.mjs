@@ -84,6 +84,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // 記事装飾アシスタント(#147)。決定的処理は growth:decorate CLI、claude は本文をトップレベル
+  // 要素に分割し装飾提案(メタのみ・生HTML無し)を作る。反映は承認画面側。lock/上限を共有。
+  decorate: {
+    prompt: "decorate.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
@@ -144,7 +152,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise|decorate>\n`
   );
   process.exit(1);
 }
