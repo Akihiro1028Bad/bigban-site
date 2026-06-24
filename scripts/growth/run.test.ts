@@ -35,4 +35,10 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain("regen-eyecatch.md");
     expect(out).toContain("--model claude-opus-4-8");
   });
+
+  it("regen-body は本文画像再生成プロンプトと --model を付ける(#156)", () => {
+    const out = dryRun("regen-body");
+    expect(out).toContain("regen-body-image.md");
+    expect(out).toContain("--model claude-opus-4-8");
+  });
 });
