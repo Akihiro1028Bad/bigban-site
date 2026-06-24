@@ -33,6 +33,8 @@
     "growth:advise-loop": "node scripts/growth/run.mjs advise",
     "growth:decorate": "tsx scripts/growth/decorate-cli.ts",
     "growth:decorate-loop": "node scripts/growth/run.mjs decorate",
+    "growth:advise-apply": "tsx scripts/growth/advise-apply-cli.ts",
+    "growth:advise-apply-loop": "node scripts/growth/run.mjs apply",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"
