@@ -2,6 +2,7 @@
  * 宇宙人マスコットのアイキャッチを参照画像方式で生成する実行入口(headless 対応)。
  *
  *   npm run growth:gen-eyecatch -- --action "<英語の行為>" --out <出力パス>
+ *   (任意) --title "<記事タイトル>" を渡すと余白にタイトル(日本語)を描く(#163)
  *   (任意) --prompt "<完全なプロンプトで上書き>" --ref <参照画像> --size 1536x1024 --quality high
  *
  * 既定の参照画像は scripts/growth/assets/mascot-alien.png(同梱)。
@@ -35,7 +36,8 @@ async function main(): Promise<void> {
   if (!action && !override) {
     throw new Error("使い方: --action \"<行為>\" もしくは --prompt \"<全文>\" を指定してください。");
   }
-  const prompt = override ?? buildEyecatchPrompt(action as string);
+  const title = arg("--title");
+  const prompt = override ?? buildEyecatchPrompt(action as string, title);
 
   const refPath = arg("--ref") ?? DEFAULT_REF;
   const out = arg("--out");

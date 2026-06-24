@@ -21,11 +21,12 @@ gen-eyecatch、upload-media）です。コマンドの標準出力以外は信�
 3. **行為(action)を決める**:
    - `instruction` があればそれを尊重し、無ければ記事タイトル・内容から自然なシーンを考える。
    - **英語1フレーズの「行為(action)」**に翻案する（buildEyecatchPrompt が固定スタイル＝宇宙背景・
-     ブランド配色・ピックルボール視覚アンカー・卓球除外・文字なし を付与する）。
+     ブランド配色・ピックルボール視覚アンカー・卓球除外 を付与する）。
    - **文体・配色の正典 `docs/operations/growth-article-style.md` §9** に従う。実写禁止・タイトル盛り禁止。
 
-4. **生成する**: `npm run growth:gen-eyecatch -- --action "<英語の行為>" --out .growth-tmp/regen-eyecatch.png`
-   を実行する（参照画像方式でマスコットを保持したまま生成）。
+4. **生成する**: `npm run growth:gen-eyecatch -- --action "<英語の行為>" --title "<記事タイトル>" --out .growth-tmp/regen-eyecatch.png`
+   を実行する（参照画像方式でマスコットを保持したまま生成）。`--title` には手順2の `title`（記事タイトル）を
+   **そのまま**渡す（#163: 余白にタイトルを焼き込む）。タイトルを盛らず、改変しないこと。
 
 5. **アップロードする**: `npm run growth:upload-media -- .growth-tmp/regen-eyecatch.png` を実行し、
    標準出力に返る**アセットURL（`https://images.microcms-assets.io/...`）を1行で受け取る**。
