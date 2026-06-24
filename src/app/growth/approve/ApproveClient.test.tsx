@@ -3074,3 +3074,115 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     expect(within(dialog).queryByAltText(/アイキャッチ/)).not.toBeInTheDocument();
   });
 });
+
+describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", () => {
+  const IMG = "https://images.microcms-assets.io/assets/a/1.png";
+
+  // 本文画像/アイキャッチ再生成のステータス付き下書きを組み立てる。
+  function draftWithRegen(over: {
+    bodyRegen?: { status: string; targetSrc: string };
+    eyecatchRegen?: { status: string };
+    bodyHtml?: string;
+  }) {
+    return {
+      success: true,
+      exists: true,
+      draft: {
+        title: "T",
+        displayMode: "html",
+        bodyHtml: over.bodyHtml ?? `<figure><img src="${IMG}" alt="図"></figure>`,
+        body: "",
+        bodyRegen: over.bodyRegen ?? { status: "なし", targetSrc: "" },
+        eyecatchRegen: over.eyecatchRegen ?? { status: "なし" },
+      },
+    };
+  }
+
+  async function openWithDraft(busyDraft: unknown, pollResponse: unknown) {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: busyDraft },
+      pollResponse as never
+    );
+    flags.authEnabled = false; // 自動取得(ログイン不要)
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+  }
+
+  it("本文画像が処理中の間はポーリングし、完了でバッジが消える", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await openWithDraft(
+        draftWithRegen({ bodyRegen: { status: "処理中", targetSrc: IMG } }),
+        { json: draftWithRegen({ bodyRegen: { status: "なし", targetSrc: "" } }) }
+      );
+      expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5100);
+      await waitFor(() =>
+        expect(screen.queryByText(/AI再生成 処理中/)).not.toBeInTheDocument()
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("アイキャッチが依頼中: success:false のポーリングは表示を維持する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await openWithDraft(draftWithRegen({ eyecatchRegen: { status: "依頼中" } }), {
+        json: { success: false },
+      });
+      expect(await screen.findByText(/AI再生成 依頼中/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(screen.getByText(/AI再生成 依頼中/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ポーリングの !res.ok は表示を維持する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await openWithDraft(draftWithRegen({ eyecatchRegen: { status: "処理中" } }), {
+        ok: false,
+        status: 502,
+        json: { success: false },
+      });
+      expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ポーリングの exists:false は表示を維持する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await openWithDraft(draftWithRegen({ eyecatchRegen: { status: "処理中" } }), {
+        json: { success: true, exists: false, draft: null },
+      });
+      expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ポーリングの一時障害(reject)は握りつぶして表示を維持する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await openWithDraft(
+        draftWithRegen({ eyecatchRegen: { status: "処理中" } }),
+        new Error("network")
+      );
+      expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

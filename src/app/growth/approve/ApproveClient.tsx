@@ -8,7 +8,12 @@ import { motion, MotionConfig } from "framer-motion";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import type { AdviceView } from "@/lib/growth/advise";
 import { pendingStatus } from "@/lib/growth/approve";
+import {
+  BODY_REGEN_BUSY_STATUSES,
+  type BodyRegenStatus,
+} from "@/lib/growth/bodyImageRegen";
 import type { DecorateView } from "@/lib/growth/decorate";
+import { REGEN_BUSY_STATUSES, type RegenStatus } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import type { Stage } from "@/lib/growth/stage";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -78,6 +83,9 @@ import { revisePhase } from "./revisePhase";
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
 const REVISE_POLL_MS = 5000;
 
+// #166: AI再生成が依頼中/処理中の間、下書きを再取得して依頼中→完了を生更新する間隔(ミリ秒)。
+const DRAFT_REGEN_POLL_MS = 5000;
+
 // #109: 表示密度の保存キー(localStorage)。
 const DENSITY_KEY = "growth-approve-density";
 
@@ -139,6 +147,9 @@ interface DraftPreview {
   advice?: AdviceView;
   // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
   decorate?: DecorateView;
+  // #166: AI再生成の依頼中/処理中/失敗の表示用ビュー(本文画像は対象src付き)。
+  bodyRegen?: { status: BodyRegenStatus; targetSrc: string };
+  eyecatchRegen?: { status: RegenStatus };
 }
 
 type DraftState =
@@ -529,6 +540,43 @@ export function ApproveClient() {
       setDraftState({ status: "idle" });
     }
   }, [openId, openHasDraft, loadDraft]);
+
+  // #166: ローディング表示に切り替えずに下書きだけ静かに再取得する(ポーリング用)。
+  // 失敗/消失時は現在の表示を維持して次の tick に委ねる(沈黙させるが画面は壊さない)。
+  const refreshDraftSilently = useCallback(
+    async (pageId: string): Promise<void> => {
+      try {
+        const res = await fetch(
+          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(token)}`
+        );
+        const json = await readJsonObject(res);
+        if (!res.ok || !json.success || !json.exists) return;
+        setDraftState({ status: "ready", draft: json.draft as DraftPreview });
+      } catch {
+        // ネットワーク一時障害は無視(次の tick で回復)。
+      }
+    },
+    [token]
+  );
+
+  // #166: AI再生成(本文画像/アイキャッチ)が依頼中/処理中の間だけ下書きを定期再取得し、
+  // 「依頼中→完了」をバッジ消滅＋画像更新として生反映する。なし/失敗になったら止める。
+  const draftRegenPending =
+    draftState.status === "ready" &&
+    (((draftState.draft.bodyRegen &&
+      (BODY_REGEN_BUSY_STATUSES as readonly string[]).includes(draftState.draft.bodyRegen.status)) ??
+      false) ||
+      ((draftState.draft.eyecatchRegen &&
+        (REGEN_BUSY_STATUSES as readonly string[]).includes(draftState.draft.eyecatchRegen.status)) ??
+        false));
+
+  useEffect(() => {
+    if (!openId || !draftRegenPending) return;
+    const timer = setInterval(() => {
+      void refreshDraftSilently(openId);
+    }, DRAFT_REGEN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [openId, draftRegenPending, refreshDraftSilently]);
 
   // #77: 下書きの手動リッチ編集モード。
   const [editingDraft, setEditingDraft] = useState(false);
@@ -1855,6 +1903,7 @@ export function ApproveClient() {
               pageId={item.id}
               token={token}
               onReplaced={() => void loadDraft(item.id)}
+              regenStatus={draftState.draft.eyecatchRegen?.status}
             />
             {/* #145: 本文画像の差し替え(画像があるときだけ表示)。保存後は下書きを再取得。 */}
             <BodyImagePicker
@@ -1862,6 +1911,8 @@ export function ApproveClient() {
               token={token}
               bodyHtml={draftState.draft.bodyHtml}
               onSaved={() => void loadDraft(item.id)}
+              regenStatus={draftState.draft.bodyRegen?.status}
+              regenTargetSrc={draftState.draft.bodyRegen?.targetSrc}
             />
             {/* #146: スタイリング・アドバイザー(read-only)。依頼/閉じる後に下書きを再取得。 */}
             <AdviceCard

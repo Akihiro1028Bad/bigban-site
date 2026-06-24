@@ -122,6 +122,19 @@ export function regenRowFromPage(page: NotionPage): RegenRow {
   };
 }
 
+/** 承認画面の表示用ビュー: アイキャッチ再生成ステータス。 */
+export interface EyecatchRegenView {
+  status: RegenStatus;
+}
+
+/**
+ * Notion ページからアイキャッチ再生成の表示用ビューを取り出す(#166・read-only)。
+ * 承認画面が「依頼中/処理中/失敗」をバッジ表示するために status だけ返す。
+ */
+export function regenViewOf(page: NotionPage): EyecatchRegenView {
+  return { status: regenRowFromPage(page).status };
+}
+
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const REGEN_TIMEOUT_MS = 15 * 60 * 1000;
 
