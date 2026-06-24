@@ -22,6 +22,7 @@ import {
   buildDecorateFailMessage,
   buildDecorateFailProps,
   buildDecoratePresentMessage,
+  buildDecoratePresentFlex,
   buildDecoratePresentProps,
   buildDecorateProcessingProps,
   decorateRowFromPage,
@@ -30,8 +31,9 @@ import {
   serializeProposals,
   type DecorateRow,
 } from "./decorate";
+import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage, pushTextMessage } from "./line";
 import {
   getPage,
   queryDataSource,
@@ -83,6 +85,18 @@ async function notify(text: string): Promise<void> {
     return;
   }
   await pushTextMessage(requireEnv("LINE_GROUP_ID"), text, {
+    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+    fetchFn: defaultFetch,
+  });
+}
+
+/** 提示通知を Flex で送る(#162)。altText は Flex 非対応環境のフォールバック。 */
+async function notifyFlex(altText: string, contents: FlexContainer): Promise<void> {
+  if (DRYRUN) {
+    process.stdout.write(`[dry-run] LINE(flex):\n${altText}\n`);
+    return;
+  }
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, contents, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
   });
@@ -148,7 +162,10 @@ async function present(pageId: string, jsonPath: string, options: NotionApiOptio
   const proposalsJson = serializeProposals(result.data);
   const title = decorateRowFromPage(await getPage(pageId, options)).title;
   await write(pageId, buildDecoratePresentProps(proposalsJson), options);
-  await notify(buildDecoratePresentMessage(title, approveUrl()));
+  await notifyFlex(
+    buildDecoratePresentMessage(title, approveUrl()),
+    buildDecoratePresentFlex(title, approveUrl())
+  );
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {

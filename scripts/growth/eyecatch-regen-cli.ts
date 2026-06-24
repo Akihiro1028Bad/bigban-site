@@ -20,6 +20,7 @@ import {
   buildRegenFailProps,
   buildRegenProcessingProps,
   buildRegenDoneMessage,
+  buildRegenDoneFlex,
   buildRegenFailMessage,
   REGEN_PROPS,
   REGEN_TIMEOUT_MS,
@@ -27,8 +28,9 @@ import {
   selectStaleRegenIds,
   type RegenRow,
 } from "./eyecatch-regen";
+import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage, pushTextMessage } from "./line";
 import {
   buildEyecatchMirrorProps,
   getPage,
@@ -99,6 +101,18 @@ async function notify(text: string): Promise<void> {
   });
 }
 
+/** 完了通知を Flex で送る(#162)。altText は Flex 非対応環境のフォールバック。 */
+async function notifyFlex(altText: string, contents: FlexContainer): Promise<void> {
+  if (DRYRUN) {
+    process.stdout.write(`[dry-run] LINE(flex):\n${altText}\n`);
+    return;
+  }
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, contents, {
+    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+    fetchFn: defaultFetch,
+  });
+}
+
 async function write(pageId: string, props: Record<string, unknown>, options: NotionApiOptions): Promise<void> {
   if (DRYRUN) {
     process.stdout.write(`[dry-run] PATCH ${pageId}: ${JSON.stringify(props)}\n`);
@@ -163,7 +177,10 @@ async function done(pageId: string, eyecatchUrl: string, options: NotionApiOptio
     { ...buildEyecatchMirrorProps(eyecatchUrl), ...buildRegenDoneProps() },
     options
   );
-  await notify(buildRegenDoneMessage(row.title, approveUrl()));
+  await notifyFlex(
+    buildRegenDoneMessage(row.title, approveUrl()),
+    buildRegenDoneFlex(row.title, approveUrl())
+  );
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {

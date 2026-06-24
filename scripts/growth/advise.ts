@@ -12,6 +12,8 @@
 
 import { z } from "zod";
 
+import type { FlexBubble } from "./digest-flex";
+import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 
 /** Notion「記事ネタ案」に追加するアドバイスループ用プロパティ名(手動追加)。 */
@@ -252,6 +254,16 @@ export function buildAdvicePresentMessage(title: string, approveUrl: string): st
     "承認画面のプレビューで、強み／直すべき点／スコアを確認してください。",
     approveUrl,
   ].join("\n");
+}
+
+/** アドバイス提示の Flex カード(#162)。altText は buildAdvicePresentMessage を流用する。 */
+export function buildAdvicePresentFlex(title: string, approveUrl: string): FlexBubble {
+  return buildNoticeFlex({
+    heading: "📝 スタイリング・アドバイスができました",
+    title,
+    lines: ["承認画面で、強み／直すべき点／スコアを確認してください。"],
+    approveUrl,
+  });
 }
 
 /** アドバイス失敗の LINE 本文(沈黙させない・#24整合)。 */

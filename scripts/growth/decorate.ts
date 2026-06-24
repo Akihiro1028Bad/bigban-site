@@ -12,6 +12,8 @@
 
 import { z } from "zod";
 
+import type { FlexBubble } from "./digest-flex";
+import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 
 /** Notion「記事ネタ案」に追加する装飾ループ用プロパティ名(手動追加)。 */
@@ -457,6 +459,16 @@ export function buildDecoratePresentMessage(title: string, approveUrl: string): 
     "承認画面で、提案を採用/却下して反映してください。",
     approveUrl,
   ].join("\n");
+}
+
+/** 装飾提案の Flex カード(#162)。altText は buildDecoratePresentMessage を流用する。 */
+export function buildDecoratePresentFlex(title: string, approveUrl: string): FlexBubble {
+  return buildNoticeFlex({
+    heading: "✨ 装飾の提案ができました",
+    title,
+    lines: ["承認画面で、提案を採用/却下して反映してください。"],
+    approveUrl,
+  });
 }
 
 /** 装飾提案失敗の LINE 本文(沈黙させない・#24整合)。 */

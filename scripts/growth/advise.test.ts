@@ -15,6 +15,7 @@ import {
   buildAdviceFailMessage,
   buildAdviceFailProps,
   buildAdvicePresentMessage,
+  buildAdvicePresentFlex,
   buildAdvicePresentProps,
   buildAdviceProcessingProps,
   buildAdviceRequestProps,
@@ -240,6 +241,16 @@ describe("通知本文", () => {
     expect(msg).toContain("アドバイス");
     expect(msg).toContain("市川の記事");
     expect(msg).toContain("https://x/growth/approve");
+  });
+
+  it("buildAdvicePresentFlex はタイトルと承認URIボタンを持つカードを返す(#162)", () => {
+    const bubble = buildAdvicePresentFlex("市川の記事", "https://x/growth/approve");
+    expect(bubble.type).toBe("bubble");
+    expect(bubble.body?.contents[0]).toMatchObject({ text: "市川の記事", weight: "bold" });
+    expect(bubble.footer?.contents[0]).toMatchObject({
+      type: "button",
+      action: { type: "uri", uri: "https://x/growth/approve" },
+    });
   });
 
   it("buildAdviceFailMessage は理由と再依頼導線を含む", () => {
