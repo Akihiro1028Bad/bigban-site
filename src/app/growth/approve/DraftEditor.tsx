@@ -12,7 +12,7 @@
  * 純ロジックは draftEditorContent.ts に切り出してテスト済み。
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Node } from "@tiptap/core";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 import {
@@ -45,12 +45,25 @@ const PRESERVE_SELECTORS = [
 
 function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
   const html = String((node.attrs as { html?: string }).html ?? "");
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // 内側の <img>/<a> はブラウザ標準のドラッグ発生源(#161)。これが ProseMirror の
+  // ノードドラッグと競合し、移動時に画像が複製されていた。描画後に draggable=false を
+  // 付けてネイティブドラッグを無効化し、ドラッグ経路を ProseMirror のノード移動1本に絞る。
+  useEffect(() => {
+    const targets = contentRef.current?.querySelectorAll("img, a");
+    targets?.forEach((el) => {
+      (el as HTMLElement).setAttribute("draggable", "false");
+    });
+  }, [html]);
+
   return (
     <NodeViewWrapper
       className="my-2 flex items-start gap-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2"
       data-preserved="true"
     >
       <div
+        ref={contentRef}
         className="min-w-0 flex-1 text-sm text-gray-600"
         dangerouslySetInnerHTML={{ __html: html }}
       />
