@@ -51,6 +51,28 @@ export function validateUpload(
 }
 
 /**
+ * microCMS のメディア配信ホスト(next.config の remotePatterns と一致)。
+ * バリデータと画像描画(next/image)で同じ許可ホストを使い、不整合を防ぐ(#143)。
+ */
+export const MICROCMS_ASSET_HOST = "images.microcms-assets.io";
+
+/**
+ * 値が microCMS のアセット URL(https・`images.microcms-assets.io`)か判定する(#143)。
+ * アイキャッチ差し替えで、任意 URL(SSRF・外部画像)を下書きへ書き込ませないための境界検証。
+ * ホストは next.config が描画を許可する単一ホストに厳密一致させる。
+ */
+export function isMicrocmsAssetUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:" && parsed.hostname === MICROCMS_ASSET_HOST;
+}
+
+/**
  * アップロードのファイル名を無害化する(#142 security M-1)。
  * パス区切りを除いて basename 化し、英数・`._-` 以外を `_` に、先頭ドットを除去、
  * 200 文字に切り詰める。空になれば `upload`。multipart の Content-Disposition への
