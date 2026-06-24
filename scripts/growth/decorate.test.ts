@@ -69,6 +69,12 @@ describe("parseProposals / serializeProposals", () => {
     expect(parseProposals(JSON.stringify([proposal({ decoration: "rainbow" as never })]))).toEqual([]);
   });
 
+  it("上限超過(長すぎる文字列・多すぎる件数)は空配列(security M-1)", () => {
+    expect(parseProposals(JSON.stringify([proposal({ reason: "あ".repeat(1001) })]))).toEqual([]);
+    const tooMany = Array.from({ length: 51 }, (_, i) => proposal({ id: `p${i}` }));
+    expect(parseProposals(JSON.stringify(tooMany))).toEqual([]);
+  });
+
   it("serializeProposals は不正なら throw", () => {
     expect(() => serializeProposals([{ id: "x" }])).toThrow();
   });

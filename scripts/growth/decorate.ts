@@ -56,18 +56,21 @@ export type Decoration = (typeof DECORATIONS)[number];
 export const DECORATE_OPS = ["add", "change", "remove"] as const;
 export type DecorateOp = (typeof DECORATE_OPS)[number];
 
+// 信頼できない入力(AI 生成 JSON)を扱うため、各文字列・配列に上限を設けてメモリ圧迫を防ぐ(security M-1)。
 export const DecorationProposalSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).max(100),
   /** トップレベル要素のインデックス(0始まり)。 */
-  blockIndex: z.number().int().min(0),
+  blockIndex: z.number().int().min(0).max(10_000),
   /** その要素の現在テキスト抜粋(照合ガード用)。 */
-  excerpt: z.string().min(1),
+  excerpt: z.string().min(1).max(500),
   op: z.enum(DECORATE_OPS),
   decoration: z.enum(DECORATIONS),
-  reason: z.string().min(1),
+  reason: z.string().min(1).max(1000),
 });
 
-export const DecorationProposalsSchema = z.array(DecorationProposalSchema);
+/** 1回の提示で扱う提案の上限(暴走・巨大配列の防止)。 */
+export const MAX_PROPOSALS = 50;
+export const DecorationProposalsSchema = z.array(DecorationProposalSchema).max(MAX_PROPOSALS);
 export type DecorationProposal = z.infer<typeof DecorationProposalSchema>;
 
 /**
