@@ -26,9 +26,21 @@ function mockFetch(...responses: Response[]): ReturnType<typeof vi.fn> {
   return fn;
 }
 
-function setup(bodyHtml = BODY) {
+function setup(
+  bodyHtml = BODY,
+  regen?: { status: "なし" | "依頼中" | "処理中" | "失敗"; targetSrc: string }
+) {
   const onSaved = vi.fn();
-  render(<BodyImagePicker pageId={PAGE_ID} token="" bodyHtml={bodyHtml} onSaved={onSaved} />);
+  render(
+    <BodyImagePicker
+      pageId={PAGE_ID}
+      token=""
+      bodyHtml={bodyHtml}
+      onSaved={onSaved}
+      regenStatus={regen?.status}
+      regenTargetSrc={regen?.targetSrc}
+    />
+  );
   return { onSaved };
 }
 
@@ -303,5 +315,29 @@ describe("BodyImagePicker AI再生成(#156)", () => {
     await userEvent.click(screen.getByRole("button", { name: "本文画像2を差し替え" }));
     expect(await screen.findByRole("group", { name: "メディアから選択" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "AIで再生成" })).not.toBeInTheDocument();
+  });
+
+  it("再生成 処理中: 対象画像にバッジを出し、全画像の再生成ボタンを無効化する(#166)", () => {
+    mockFetch();
+    setup(BODY, { status: "処理中", targetSrc: IMG2 });
+    // 対象画像(IMG2)にだけバッジが出る。
+    expect(screen.getByRole("status")).toHaveTextContent("AI再生成 処理中");
+    // 進行中は記事単位で1件まで → 全画像の再生成ボタンを無効化。
+    expect(screen.getByRole("button", { name: "本文画像1をAIで再生成" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "本文画像2をAIで再生成" })).toBeDisabled();
+  });
+
+  it("再生成 失敗: 対象画像に失敗バッジを出し、再生成ボタンは有効(再依頼可)(#166)", () => {
+    mockFetch();
+    setup(BODY, { status: "失敗", targetSrc: IMG1 });
+    expect(screen.getByRole("status")).toHaveTextContent("AI再生成に失敗しました");
+    expect(screen.getByRole("button", { name: "本文画像1をAIで再生成" })).toBeEnabled();
+  });
+
+  it("再生成 なし: バッジを出さず再生成ボタンは有効(#166)", () => {
+    mockFetch();
+    setup(BODY, { status: "なし", targetSrc: "" });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "本文画像1をAIで再生成" })).toBeEnabled();
   });
 });

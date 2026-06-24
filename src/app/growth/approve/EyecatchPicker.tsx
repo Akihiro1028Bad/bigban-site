@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import Image from "next/image";
 
+import { REGEN_BUSY_STATUSES, type RegenStatus } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 interface EyecatchPickerProps {
@@ -11,6 +12,13 @@ interface EyecatchPickerProps {
   token: string;
   /** 差し替え成功時に呼ぶ(親が下書きを再取得してプレビューを更新する)。 */
   onReplaced: () => void;
+  /** #166: アイキャッチ AI 再生成のステータス(依頼中/処理中/失敗/なし)。未指定は「なし」。 */
+  regenStatus?: RegenStatus;
+}
+
+/** 再生成が進行中(依頼中/処理中)か。進行中は再依頼を無効化しバッジを出す。 */
+function isRegenBusy(status: RegenStatus): boolean {
+  return (REGEN_BUSY_STATUSES as readonly string[]).includes(status);
 }
 
 interface MediaItem {
@@ -37,7 +45,7 @@ function errMsg(error: unknown, fallback: string): string {
  * - 差し替え(#143): microCMS メディアの一覧から選択 or 新規アップロードして即差し替え。
  * - AI 再生成(#144): 指示を添えて PC の画像ループへ再生成を依頼する(プル型・非同期)。
  */
-export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProps) {
+export function EyecatchPicker({ pageId, token, onReplaced, regenStatus = "なし" }: EyecatchPickerProps) {
   const [mode, setMode] = useState<Mode>("closed");
   const [list, setList] = useState<ListPhase>({ status: "loading" });
   const [busy, setBusy] = useState(false);
@@ -144,10 +152,22 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
   }
 
   if (mode === "closed") {
+    // #166: 再生成の進行中/失敗を永続表示する(一時 notice と違い再取得でも消えない)。
+    const regenBusy = isRegenBusy(regenStatus);
     return (
       <div className="mt-2">
         {notice ? (
           <p className="mb-2 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-800">{notice}</p>
+        ) : null}
+        {regenBusy ? (
+          <p role="status" className="mb-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
+          </p>
+        ) : null}
+        {regenStatus === "失敗" ? (
+          <p role="status" className="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
+            AI再生成に失敗しました。もう一度依頼できます。
+          </p>
         ) : null}
         <div className="flex gap-2">
           <button
@@ -162,7 +182,8 @@ export function EyecatchPicker({ pageId, token, onReplaced }: EyecatchPickerProp
             type="button"
             aria-label="アイキャッチをAIで再生成"
             onClick={openRegen}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            disabled={regenBusy}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             AIで再生成
           </button>

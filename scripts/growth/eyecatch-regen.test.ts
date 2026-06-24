@@ -11,6 +11,7 @@ import {
   REGEN_PROPS,
   REGEN_STATUSES,
   regenRowFromPage,
+  regenViewOf,
   selectStaleRegenIds,
   buildRegenDoneMessage,
   buildRegenFailMessage,
@@ -115,6 +116,22 @@ describe("regenRowFromPage", () => {
     expect(row.title).toBe("");
     expect(row.instruction).toBe("");
     expect(row.contentId).toBe("");
+  });
+});
+
+describe("regenViewOf", () => {
+  function page(props: Record<string, unknown>): NotionPage {
+    return { id: "i1", url: "", properties: props };
+  }
+
+  it("ステータスだけを表示用に返す", () => {
+    const view = regenViewOf(page({ "アイキャッチ再生成ステータス": { select: { name: "依頼中" } } }));
+    expect(view).toEqual({ status: "依頼中" });
+  });
+
+  it("未設定・不正ステータスはなし", () => {
+    expect(regenViewOf(page({})).status).toBe("なし");
+    expect(regenViewOf(page({ "アイキャッチ再生成ステータス": { select: { name: "謎" } } })).status).toBe("なし");
   });
 });
 
