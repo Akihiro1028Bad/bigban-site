@@ -143,6 +143,22 @@ export function bodyRegenRowFromPage(page: NotionPage): BodyRegenRow {
   };
 }
 
+/** 承認画面の表示用ビュー: 再生成ステータス＋対象画像src(依頼中/処理中のとき)。 */
+export interface BodyRegenView {
+  status: BodyRegenStatus;
+  /** 再生成対象の本文画像URL(その時点の src)。なし時は空文字。 */
+  targetSrc: string;
+}
+
+/**
+ * Notion ページから本文画像再生成の表示用ビューを取り出す(#166・read-only)。
+ * 承認画面が「どの画像が依頼中/処理中か」をバッジ表示するために status＋targetSrc だけ返す。
+ */
+export function bodyRegenViewOf(page: NotionPage): BodyRegenView {
+  const row = bodyRegenRowFromPage(page);
+  return { status: row.status, targetSrc: row.targetSrc };
+}
+
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const BODY_REGEN_TIMEOUT_MS = 15 * 60 * 1000;
 

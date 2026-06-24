@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import Image from "next/image";
 
+import { BODY_REGEN_BUSY_STATUSES, type BodyRegenStatus } from "@/lib/growth/bodyImageRegen";
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
@@ -15,6 +16,15 @@ interface BodyImagePickerProps {
   bodyHtml: string;
   /** 差し替え保存に成功したら呼ぶ(親が下書きを再取得してプレビューを更新する)。 */
   onSaved: () => void;
+  /** #166: 本文画像 AI 再生成のステータス(依頼中/処理中/失敗/なし)。未指定は「なし」。 */
+  regenStatus?: BodyRegenStatus;
+  /** #166: 再生成対象の画像src(どの画像が依頼中かの表示用)。未指定は空。 */
+  regenTargetSrc?: string;
+}
+
+/** 再生成が進行中(依頼中/処理中)か。進行中はその記事の再依頼を無効化しバッジを出す。 */
+function isRegenBusy(status: BodyRegenStatus): boolean {
+  return (BODY_REGEN_BUSY_STATUSES as readonly string[]).includes(status);
 }
 
 interface MediaItem {
@@ -44,8 +54,17 @@ function errMsg(error: unknown, fallback: string): string {
  *  - **AI で再生成**を /api/growth/body-image/regen に依頼(プル型・PC が後で反映)(#156)
  * できる。再生成は Notion に依頼を記録するだけで、反映は常時稼働 PC の画像ループが行う。
  */
-export function BodyImagePicker({ pageId, token, bodyHtml, onSaved }: BodyImagePickerProps) {
+export function BodyImagePicker({
+  pageId,
+  token,
+  bodyHtml,
+  onSaved,
+  regenStatus = "なし",
+  regenTargetSrc = "",
+}: BodyImagePickerProps) {
   const images = listBodyImages(bodyHtml);
+  // 進行中は記事単位で1件まで(API が同時依頼を弾く)。進行中は全画像の再生成ボタンを無効化する。
+  const regenInFlight = isRegenBusy(regenStatus);
   const [pickFor, setPickFor] = useState<number | null>(null);
   const [list, setList] = useState<ListPhase>({ status: "loading" });
   const [busy, setBusy] = useState(false);
@@ -314,13 +333,25 @@ export function BodyImagePicker({ pageId, token, bodyHtml, onSaved }: BodyImageP
                     type="button"
                     aria-label={`本文画像${i + 1}をAIで再生成`}
                     onClick={() => openRegen(i)}
-                    className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    disabled={regenInFlight}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     AIで再生成
                   </button>
                 </div>
               )}
             </div>
+            {/* #166: この画像が再生成の依頼中/処理中なら永続バッジ(一時 notice と違い再取得でも消えない)。 */}
+            {regenInFlight && regenTargetSrc === image.src ? (
+              <p role="status" className="mt-1 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
+              </p>
+            ) : null}
+            {regenStatus === "失敗" && regenTargetSrc === image.src ? (
+              <p role="status" className="mt-1 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                AI再生成に失敗しました。もう一度依頼できます。
+              </p>
+            ) : null}
             {pickFor === i ? renderGrid(i) : null}
             {regenFor === i ? renderRegen(i, image.src) : null}
           </li>

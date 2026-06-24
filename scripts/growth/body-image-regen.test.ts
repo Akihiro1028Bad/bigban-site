@@ -13,6 +13,7 @@ import {
   buildBodyRegenProcessingProps,
   buildBodyRegenRequestProps,
   bodyRegenRowFromPage,
+  bodyRegenViewOf,
   isMicrocmsAssetUrl,
   replaceBodyImageBySrc,
   selectStaleBodyRegenIds,
@@ -135,6 +136,27 @@ describe("bodyRegenRowFromPage", () => {
     expect(row.contentId).toBe("");
     expect(row.targetSrc).toBe("");
     expect(row.bodyHtml).toBe("");
+  });
+});
+
+describe("bodyRegenViewOf", () => {
+  function page(props: Record<string, unknown>): NotionPage {
+    return { id: "i1", url: "", properties: props };
+  }
+
+  it("ステータスと対象srcだけを表示用に返す", () => {
+    const view = bodyRegenViewOf(
+      page({
+        "本文画像再生成ステータス": { select: { name: "処理中" } },
+        "本文画像再生成対象": { rich_text: [{ plain_text: SRC }] },
+      })
+    );
+    expect(view).toEqual({ status: "処理中", targetSrc: SRC });
+  });
+
+  it("未設定・不正ステータスはなし、対象srcは空文字", () => {
+    const view = bodyRegenViewOf(page({ "本文画像再生成ステータス": { select: { name: "謎" } } }));
+    expect(view).toEqual({ status: "なし", targetSrc: "" });
   });
 });
 

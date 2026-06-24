@@ -72,8 +72,27 @@ describe("GET /api/growth/draft", () => {
         eyecatch: "",
         advice: { status: "なし", advice: null, raw: "" },
         decorate: { status: "なし", proposals: [], raw: "" },
+        bodyRegen: { status: "なし", targetSrc: "" },
+        eyecatchRegen: { status: "なし" },
       },
     });
+  });
+
+  it("AI再生成の依頼中ステータスを draft に含める(#166)", async () => {
+    const page = pageWithMirror("<p>本文</p>");
+    page.properties["本文画像再生成ステータス"] = { select: { name: "処理中" } };
+    page.properties["本文画像再生成対象"] = {
+      rich_text: [{ plain_text: "https://images.microcms-assets.io/assets/a/1.png" }],
+    };
+    page.properties["アイキャッチ再生成ステータス"] = { select: { name: "依頼中" } };
+    vi.mocked(getPage).mockResolvedValue(page);
+
+    const json = await (await GET(getRequest(null, PAGE_ID))).json();
+    expect(json.draft.bodyRegen).toEqual({
+      status: "処理中",
+      targetSrc: "https://images.microcms-assets.io/assets/a/1.png",
+    });
+    expect(json.draft.eyecatchRegen).toEqual({ status: "依頼中" });
   });
 
   it("提示中の装飾提案を draft.decorate に含める(#147)", async () => {

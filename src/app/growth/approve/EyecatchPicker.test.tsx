@@ -25,9 +25,11 @@ function mockFetch(...responses: Response[]): ReturnType<typeof vi.fn> {
   return fn;
 }
 
-function setup() {
+function setup(regenStatus?: "なし" | "依頼中" | "処理中" | "失敗") {
   const onReplaced = vi.fn();
-  render(<EyecatchPicker pageId={PAGE_ID} token="" onReplaced={onReplaced} />);
+  render(
+    <EyecatchPicker pageId={PAGE_ID} token="" onReplaced={onReplaced} regenStatus={regenStatus} />
+  );
   return { onReplaced };
 }
 
@@ -262,5 +264,26 @@ describe("EyecatchPicker", () => {
     await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.queryByRole("group", { name: "アイキャッチをAIで再生成" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "アイキャッチをAIで再生成" })).toBeInTheDocument();
+  });
+
+  it("再生成 依頼中/処理中: 永続バッジを出し再生成ボタンを無効化する(#166)", () => {
+    mockFetch();
+    setup("処理中");
+    expect(screen.getByRole("status")).toHaveTextContent("AI再生成 処理中");
+    expect(screen.getByRole("button", { name: "アイキャッチをAIで再生成" })).toBeDisabled();
+  });
+
+  it("再生成 失敗: 失敗バッジを出し再依頼できる(#166)", () => {
+    mockFetch();
+    setup("失敗");
+    expect(screen.getByRole("status")).toHaveTextContent("AI再生成に失敗しました");
+    expect(screen.getByRole("button", { name: "アイキャッチをAIで再生成" })).toBeEnabled();
+  });
+
+  it("再生成 なし: バッジを出さず再生成ボタンは有効(#166)", () => {
+    mockFetch();
+    setup("なし");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "アイキャッチをAIで再生成" })).toBeEnabled();
   });
 });

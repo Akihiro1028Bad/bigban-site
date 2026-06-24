@@ -24,7 +24,9 @@ import {
   ideaTitleOf,
   isNotionPageId,
 } from "@/lib/growth/approve";
+import { bodyRegenViewOf } from "@/lib/growth/bodyImageRegen";
 import { decorateViewOf } from "@/lib/growth/decorate";
+import { regenViewOf } from "@/lib/growth/eyecatchRegen";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -92,6 +94,10 @@ export async function GET(request: Request): Promise<Response> {
         advice: adviceViewOf(page),
         // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
         decorate: decorateViewOf(page),
+        // #166: AI再生成の依頼中/処理中を承認画面で表示するためのビュー。
+        // 本文画像は対象src付き(どの画像か)、アイキャッチはステータスのみ。
+        bodyRegen: bodyRegenViewOf(page),
+        eyecatchRegen: regenViewOf(page),
       },
     });
   } catch {
