@@ -8,6 +8,7 @@ import { motion, MotionConfig } from "framer-motion";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import type { AdviceView } from "@/lib/growth/advise";
 import { pendingStatus } from "@/lib/growth/approve";
+import type { DecorateView } from "@/lib/growth/decorate";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import type { Stage } from "@/lib/growth/stage";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -58,6 +59,7 @@ import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { AdviceCard } from "./AdviceCard";
 import { BodyImagePicker } from "./BodyImagePicker";
+import { DecorationAssistant } from "./DecorationAssistant";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
@@ -135,6 +137,8 @@ interface DraftPreview {
   eyecatch?: string;
   // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済み)。
   advice?: AdviceView;
+  // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
+  decorate?: DecorateView;
 }
 
 type DraftState =
@@ -1864,6 +1868,14 @@ export function ApproveClient() {
               pageId={item.id}
               token={token}
               advice={draftState.draft.advice}
+              onChanged={() => void loadDraft(item.id)}
+            />
+            {/* #147: 装飾アシスタント。提案を採用→反映(draft/edit)後に下書きを再取得。 */}
+            <DecorationAssistant
+              pageId={item.id}
+              token={token}
+              bodyHtml={draftState.draft.bodyHtml}
+              decorate={draftState.draft.decorate}
               onChanged={() => void loadDraft(item.id)}
             />
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
