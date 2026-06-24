@@ -41,4 +41,10 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain("regen-body-image.md");
     expect(out).toContain("--model claude-opus-4-8");
   });
+
+  it("advise はアドバイスプロンプトと --model を付ける(#146)", () => {
+    const out = dryRun("advise");
+    expect(out).toContain("advise.md");
+    expect(out).toContain("--model claude-opus-4-8");
+  });
 });
