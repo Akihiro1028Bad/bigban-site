@@ -36,6 +36,26 @@ describe("buildEyecatchPrompt", () => {
     expect(prompt).not.toContain("  ");
   });
 
+  it("title を渡すと余白に記事タイトル(日本語)を描く指示になる（#163）", () => {
+    const title = "梅雨の屋内ピックルボール";
+    const prompt = buildEyecatchPrompt("playing pickleball", title);
+    // タイトル本文がそのまま入る
+    expect(prompt).toContain(title);
+    // 日本語テキストを描く指示に切り替わる
+    expect(prompt.toLowerCase()).toContain("title");
+    expect(prompt.toLowerCase()).toContain("japanese text");
+    // 従来の「文字なし」指示(No text, no logos)ではない
+    expect(prompt.toLowerCase()).not.toContain("no text, no logos");
+    // 区切りが壊れない
+    expect(prompt).not.toContain("..");
+    expect(prompt).not.toContain("  ");
+  });
+
+  it("空/空白だけの title は従来どおり文字なし（#163・後方互換）", () => {
+    const prompt = buildEyecatchPrompt("playing pickleball", "  ");
+    expect(prompt.toLowerCase()).toContain("no text, no logos");
+  });
+
   it("ピックルボール視覚アンカーと卓球ネガティブを含む（#89: 卓球バイアス対策）", () => {
     const prompt = buildEyecatchPrompt("playing pickleball with a paddle");
     expect(prompt).toMatch(/pickleball/i);
