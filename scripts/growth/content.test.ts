@@ -193,14 +193,43 @@ describe("patchDraft", () => {
 });
 
 describe("publishContent (#167)", () => {
-  it("contentId 指定で status=publish の PATCH を空ボディで送る", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okId("abc123"));
-    const id = await publishContent("news", "abc123", opts(fetchFn));
-    expect(id).toBe("abc123");
+  function okStatus() {
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "" } as Awaited<
+      ReturnType<FetchFn>
+    >;
+  }
+
+  it("Management API のステータス変更エンドポイントへ PUBLISH を PATCH する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okStatus());
+    await publishContent("news", "abc123", {
+      serviceDomain: "thepicklebang",
+      apiKey: "mgmt-key",
+      fetchFn,
+    });
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe("https://thepicklebang.microcms.io/api/v1/news/abc123?status=publish");
+    expect(url).toBe(
+      "https://thepicklebang.microcms-management.io/api/v1/contents/news/abc123/status"
+    );
     expect(init.method).toBe("PATCH");
-    expect(init.body).toBe("{}");
+    expect((init.headers as Record<string, string>)["X-MICROCMS-API-KEY"]).toBe("mgmt-key");
+    expect(JSON.parse(init.body as string)).toEqual({ status: ["PUBLISH"] });
+  });
+
+  it("contentId は URL エンコードする", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okStatus());
+    await publishContent("news", "a b/c", { serviceDomain: "d", apiKey: "k", fetchFn });
+    expect(fetchFn.mock.calls[0][0]).toContain("/contents/news/a%20b%2Fc/status");
+  });
+
+  it("非 2xx は例外(ステータス込み)を投げる", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockResolvedValue({ ok: false, status: 403, json: async () => ({}), text: async () => "forbidden" } as Awaited<
+        ReturnType<FetchFn>
+      >);
+    await expect(
+      publishContent("news", "abc123", { serviceDomain: "d", apiKey: "k", fetchFn })
+    ).rejects.toThrow(/HTTP 403/);
   });
 });
 
