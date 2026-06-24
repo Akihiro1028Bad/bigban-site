@@ -57,6 +57,7 @@ import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
+import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
@@ -1837,9 +1838,15 @@ export function ApproveClient() {
                 alt={`アイキャッチ: ${draftState.draft.title}`}
                 width={800}
                 height={420}
-                className="mb-3 h-auto w-full rounded-md border border-gray-200"
+                className="mb-1 h-auto w-full rounded-md border border-gray-200"
               />
             ) : null}
+            {/* #143: アイキャッチをメディア選択/アップロードで差し替え。差し替え後は下書きを再取得。 */}
+            <EyecatchPicker
+              pageId={item.id}
+              token={token}
+              onReplaced={() => void loadDraft(item.id)}
+            />
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
               {PREVIEW_DEVICES.map((device) => {

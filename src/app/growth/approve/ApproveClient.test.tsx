@@ -2683,6 +2683,38 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     expect(dialog).toBeInTheDocument();
   });
 
+  it("下書きプレビューにアイキャッチ差し替え導線(#143)を出す", async () => {
+    const dialog = await openIdeaWithDraft("本文");
+    expect(
+      await within(dialog).findByRole("button", { name: "アイキャッチを差し替え" }),
+    ).toBeInTheDocument();
+  });
+
+  it("差し替え→反映で下書きを再取得する(#143 結線)", async () => {
+    const asset = "https://images.microcms-assets.io/a/1.png";
+    const draft = { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" };
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: { success: true, exists: true, draft } },
+      { json: { success: true, media: [{ url: asset }] } }, // メディア一覧
+      { json: { success: true } }, // eyecatch 差し替え
+      { json: { success: true, exists: true, draft: { ...draft, eyecatch: asset } } }, // 再取得
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+
+    await userEvent.click(await within(dialog).findByRole("button", { name: "アイキャッチを差し替え" }));
+    await userEvent.click(await within(dialog).findByRole("button", { name: "アイキャッチに設定 1" }));
+
+    // onReplaced → loadDraft 再取得(/api/growth/draft? が2回呼ばれる)
+    await waitFor(() => {
+      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
+      expect(draftCalls.length).toBe(2);
+    });
+  });
+
   it("Esc で詳細パネルを閉じる", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
