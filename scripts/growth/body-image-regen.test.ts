@@ -7,6 +7,7 @@ import {
   BODY_REGEN_PROPS,
   BODY_REGEN_STATUSES,
   buildBodyRegenDoneMessage,
+  buildBodyRegenDoneFlex,
   buildBodyRegenDoneProps,
   buildBodyRegenFailMessage,
   buildBodyRegenFailProps,
@@ -181,6 +182,15 @@ describe("通知本文", () => {
     expect(msg).toContain("本文画像");
     expect(msg).toContain("市川の記事");
     expect(msg).toContain("https://x/growth/approve");
+  });
+
+  it("buildBodyRegenDoneFlex はタイトルと承認URIボタンを持つカードを返す(#162)", () => {
+    const bubble = buildBodyRegenDoneFlex("市川の記事", "https://x/growth/approve");
+    expect(bubble.type).toBe("bubble");
+    expect(bubble.body?.contents[0]).toMatchObject({ text: "市川の記事", weight: "bold" });
+    expect(bubble.footer?.contents[0]).toMatchObject({
+      action: { type: "uri", uri: "https://x/growth/approve" },
+    });
   });
 
   it("buildBodyRegenFailMessage は理由と再依頼導線を含む", () => {

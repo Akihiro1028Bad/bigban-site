@@ -16,6 +16,7 @@ import "dotenv/config";
 
 import {
   buildBodyRegenDoneMessage,
+  buildBodyRegenDoneFlex,
   buildBodyRegenDoneProps,
   buildBodyRegenFailMessage,
   buildBodyRegenFailProps,
@@ -29,8 +30,9 @@ import {
   type BodyRegenRow,
 } from "./body-image-regen";
 import { patchDraft } from "./content";
+import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
-import { pushTextMessage } from "./line";
+import { pushFlexMessage, pushTextMessage } from "./line";
 import {
   buildBodyMirrorProps,
   getPage,
@@ -97,6 +99,18 @@ async function notify(text: string): Promise<void> {
     return;
   }
   await pushTextMessage(requireEnv("LINE_GROUP_ID"), text, {
+    channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+    fetchFn: defaultFetch,
+  });
+}
+
+/** 完了通知を Flex で送る(#162)。altText は Flex 非対応環境のフォールバック。 */
+async function notifyFlex(altText: string, contents: FlexContainer): Promise<void> {
+  if (DRYRUN) {
+    process.stdout.write(`[dry-run] LINE(flex):\n${altText}\n`);
+    return;
+  }
+  await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, contents, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
   });
@@ -183,7 +197,10 @@ async function done(
     await patchDraft(ENDPOINT, row.contentId, { bodyHtml: html }, contentOptions());
   }
   await write(pageId, { ...buildBodyMirrorProps(html), ...buildBodyRegenDoneProps() }, options);
-  await notify(buildBodyRegenDoneMessage(row.title, approveUrl()));
+  await notifyFlex(
+    buildBodyRegenDoneMessage(row.title, approveUrl()),
+    buildBodyRegenDoneFlex(row.title, approveUrl())
+  );
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {
