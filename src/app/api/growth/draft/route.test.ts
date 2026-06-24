@@ -71,8 +71,26 @@ describe("GET /api/growth/draft", () => {
         body: "",
         eyecatch: "",
         advice: { status: "なし", advice: null, raw: "" },
+        decorate: { status: "なし", proposals: [], raw: "" },
       },
     });
+  });
+
+  it("提示中の装飾提案を draft.decorate に含める(#147)", async () => {
+    const proposals = [
+      { id: "p1", blockIndex: 0, excerpt: "本文", op: "add", decoration: "note", reason: "注意喚起" },
+    ];
+    const page = pageWithMirror("<p>本文</p>");
+    page.properties["装飾ステータス"] = { type: "select", select: { name: "提示中" } };
+    page.properties["装飾提案"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: JSON.stringify(proposals) }],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+    const res = await GET(getRequest(null, PAGE_ID));
+    const json = await res.json();
+    expect(json.draft.decorate.status).toBe("提示中");
+    expect(json.draft.decorate.proposals).toEqual(proposals);
   });
 
   it("提示中のアドバイスを draft.advice に含める(#146)", async () => {

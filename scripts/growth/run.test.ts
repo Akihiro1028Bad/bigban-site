@@ -47,4 +47,10 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain("advise.md");
     expect(out).toContain("--model claude-opus-4-8");
   });
+
+  it("decorate は装飾プロンプトと --model を付ける(#147)", () => {
+    const out = dryRun("decorate");
+    expect(out).toContain("decorate.md");
+    expect(out).toContain("--model claude-opus-4-8");
+  });
 });
