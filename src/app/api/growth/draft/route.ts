@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import { adviceViewOf } from "@/lib/growth/advise";
+import { applyViewOf } from "@/lib/growth/adviseApply";
 import {
   draftBodyOf,
   eyecatchUrlOf,
@@ -92,6 +93,8 @@ export async function GET(request: Request): Promise<Response> {
         eyecatch: eyecatchUrlOf(page),
         // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済みアドバイス)。
         advice: adviceViewOf(page),
+        // #165: アドバイス採用→反映の表示用ビュー(ステータス＋提示中のみ before/after 案)。
+        adviceApply: applyViewOf(page),
         // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
         decorate: decorateViewOf(page),
         // #166: AI再生成の依頼中/処理中を承認画面で表示するためのビュー。
