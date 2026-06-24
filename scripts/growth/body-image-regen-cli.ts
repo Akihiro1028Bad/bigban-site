@@ -23,6 +23,7 @@ import {
   bodyRegenRowFromPage,
   BODY_REGEN_PROPS,
   BODY_REGEN_TIMEOUT_MS,
+  isMicrocmsAssetUrl,
   replaceBodyImageBySrc,
   selectStaleBodyRegenIds,
   type BodyRegenRow,
@@ -43,8 +44,9 @@ const ENDPOINT = "news";
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。もう一度再生成を依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
-// 差し替えに使えるのは microCMS のアセット URL のみ(任意 URL 書き込み防止)。
-const ASSET_URL_RE = /^https:\/\/images\.microcms-assets\.io\//;
+// 差し替えに使えるのは microCMS のアセット URL のみ(任意 URL 書き込み防止)。判定は
+// 純ロジックの isMicrocmsAssetUrl(URLパースでホスト厳密一致)で統一する(security M-1)。
+// 前方一致の正規表現だと `images.microcms-assets.io.evil.example/` 等を弾けないため使わない。
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -135,7 +137,7 @@ async function next(options: NotionApiOptions): Promise<void> {
     process.stdout.write("{}\n");
     return;
   }
-  if (!ASSET_URL_RE.test(row.targetSrc)) {
+  if (!isMicrocmsAssetUrl(row.targetSrc)) {
     // 対象画像が不正(承認画面の検証を通っていれば起きないが念のため)。
     await write(row.id, buildBodyRegenFailProps(), options);
     await notify(buildBodyRegenFailMessage(row.title, "対象画像の指定が不正のため再生成できません。"));
@@ -162,10 +164,10 @@ async function done(
   options: NotionApiOptions
 ): Promise<void> {
   assertPageId(pageId);
-  if (!ASSET_URL_RE.test(targetSrc)) {
+  if (!isMicrocmsAssetUrl(targetSrc)) {
     throw new Error(`targetSrc は microCMS アセットURLにしてください: ${targetSrc}`);
   }
-  if (!ASSET_URL_RE.test(newUrl)) {
+  if (!isMicrocmsAssetUrl(newUrl)) {
     throw new Error(`newUrl は microCMS アセットURLにしてください: ${newUrl}`);
   }
   const row = bodyRegenRowFromPage(await getPage(pageId, options));
