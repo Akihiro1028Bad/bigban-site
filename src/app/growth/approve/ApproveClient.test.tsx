@@ -2745,6 +2745,29 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     });
   });
 
+  it("スタイリング・アドバイスを依頼すると下書きを再取得する(#146 結線)", async () => {
+    const draft = { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" };
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: { success: true, exists: true, draft } },
+      { json: { success: true } }, // advise 依頼
+      { json: { success: true, exists: true, draft } }, // 再取得
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+
+    await userEvent.click(await within(dialog).findByRole("button", { name: "アドバイスを依頼" }));
+
+    // onChanged → loadDraft 再取得(/api/growth/draft? が2回)
+    await waitFor(() => {
+      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
+      expect(draftCalls.length).toBe(2);
+    });
+    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/advise?"))).toBe(true);
+  });
+
   it("Esc で詳細パネルを閉じる", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);

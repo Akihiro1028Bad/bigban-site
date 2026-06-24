@@ -70,8 +70,29 @@ describe("GET /api/growth/draft", () => {
         bodyHtml: "<p>本文</p>",
         body: "",
         eyecatch: "",
+        advice: { status: "なし", advice: null, raw: "" },
       },
     });
+  });
+
+  it("提示中のアドバイスを draft.advice に含める(#146)", async () => {
+    const advice = {
+      summary: "具体性が弱い",
+      scores: [{ axis: "具体性", score: 2 }],
+      strengths: ["導入が良い"],
+      fixes: [{ area: "文体", severity: "中", reason: "翻訳調", suggestion: "言い換え" }],
+    };
+    const page = pageWithMirror("<p>本文</p>");
+    page.properties["アドバイスステータス"] = { type: "select", select: { name: "提示中" } };
+    page.properties["アドバイス結果"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: JSON.stringify(advice) }],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+    const res = await GET(getRequest(null, PAGE_ID));
+    const json = await res.json();
+    expect(json.draft.advice.status).toBe("提示中");
+    expect(json.draft.advice.advice).toEqual(advice);
   });
 
   it("アイキャッチURL があれば draft.eyecatch に含める(#141)", async () => {
@@ -89,6 +110,13 @@ describe("GET /api/growth/draft", () => {
     const res = await GET(getRequest(null, PAGE_ID));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, exists: false, draft: null });
+  });
+
+  it("本文ミラーがあれば advice 未設定でも advice:なし を含める", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
+    const res = await GET(getRequest(null, PAGE_ID));
+    const json = await res.json();
+    expect(json.draft.advice).toEqual({ status: "なし", advice: null, raw: "" });
   });
 
   it("getPage が throw したら 502", async () => {

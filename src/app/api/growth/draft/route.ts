@@ -17,6 +17,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { adviceViewOf } from "@/lib/growth/advise";
 import {
   draftBodyOf,
   eyecatchUrlOf,
@@ -86,6 +87,8 @@ export async function GET(request: Request): Promise<Response> {
         body: "",
         // #141: アイキャッチURLミラー(未設定は空文字)。プレビューが画像表示に使う。
         eyecatch: eyecatchUrlOf(page),
+        // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済みアドバイス)。
+        advice: adviceViewOf(page),
       },
     });
   } catch {

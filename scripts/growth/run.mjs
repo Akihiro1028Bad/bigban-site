@@ -76,6 +76,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // 記事スタイリング・アドバイザー(#146)。決定的処理は growth:advise CLI、claude は
+  // 本文を style-guide に照らして分析しアドバイスJSONを作る(read-only)。lock/上限を共有。
+  advise: {
+    prompt: "advise.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
@@ -136,7 +144,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise>\n`
   );
   process.exit(1);
 }
