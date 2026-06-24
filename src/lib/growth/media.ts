@@ -51,6 +51,21 @@ export function validateUpload(
 }
 
 /**
+ * 値が microCMS のアセット URL(https・`*.microcms-assets.io`)か判定する(#143)。
+ * アイキャッチ差し替えで、任意 URL(SSRF・外部画像)を下書きへ書き込ませないための境界検証。
+ */
+export function isMicrocmsAssetUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:" && parsed.hostname.endsWith(".microcms-assets.io");
+}
+
+/**
  * アップロードのファイル名を無害化する(#142 security M-1)。
  * パス区切りを除いて basename 化し、英数・`._-` 以外を `_` に、先頭ドットを除去、
  * 200 文字に切り詰める。空になれば `upload`。multipart の Content-Disposition への
