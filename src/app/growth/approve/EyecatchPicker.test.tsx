@@ -211,4 +211,56 @@ describe("EyecatchPicker", () => {
     await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.queryByRole("group", { name: "メディアから選択" })).not.toBeInTheDocument();
   });
+
+  it("AIで再生成: 指示を添えて依頼し、完了メッセージを出す(#144)", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "アイキャッチをAIで再生成" }));
+    await screen.findByRole("group", { name: "アイキャッチをAIで再生成" });
+    await userEvent.type(
+      screen.getByLabelText("再生成の指示（任意・空ならおまかせ）"),
+      "夏らしく",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "再生成を依頼" }));
+
+    expect(await screen.findByText(/再生成を依頼しました/)).toBeInTheDocument();
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toContain("/api/growth/eyecatch/regen");
+    expect(JSON.parse(init.body)).toEqual({ pageId: PAGE_ID, instruction: "夏らしく" });
+  });
+
+  it("AIで再生成: 指示なし(空)でも依頼できる(#144)", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "アイキャッチをAIで再生成" }));
+    await userEvent.click(await screen.findByRole("button", { name: "再生成を依頼" }));
+    await screen.findByText(/再生成を依頼しました/);
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ pageId: PAGE_ID, instruction: "" });
+  });
+
+  it("AIで再生成: 依頼失敗はエラーを表示する(#144)", async () => {
+    mockFetch(jsonResponse({ success: false, error: "処理中です" }, false, 409));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "アイキャッチをAIで再生成" }));
+    await userEvent.click(await screen.findByRole("button", { name: "再生成を依頼" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("処理中です");
+  });
+
+  it("AIで再生成: 失敗応答に理由が無ければフォールバック文言(#144)", async () => {
+    mockFetch(jsonResponse({ success: false }, false, 502));
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "アイキャッチをAIで再生成" }));
+    await userEvent.click(await screen.findByRole("button", { name: "再生成を依頼" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("再生成の依頼に失敗しました。");
+  });
+
+  it("AIで再生成: キャンセルで閉じる(#144)", async () => {
+    mockFetch();
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "アイキャッチをAIで再生成" }));
+    await screen.findByRole("group", { name: "アイキャッチをAIで再生成" });
+    await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("group", { name: "アイキャッチをAIで再生成" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "アイキャッチをAIで再生成" })).toBeInTheDocument();
+  });
 });

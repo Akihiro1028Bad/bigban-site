@@ -60,6 +60,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // アイキャッチ AI 再生成(#144)。決定的処理は growth:eyecatch-regen CLI、claude は
+  // 指示→英語の行為に翻案して画像生成・アップロードを回す。revise と同じ lock/上限を共有。
+  regen: {
+    prompt: "regen-eyecatch.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
@@ -120,7 +128,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen>\n`
   );
   process.exit(1);
 }
@@ -175,12 +183,12 @@ function runNpm(scriptName, env = {}) {
 // revise は高頻度起動。多重起動を lockfile で防ぎ、1日上限で暴走を止める(dry-run後・spawn前)。
 if (cfg.lock) {
   if (!acquireReviseLock()) {
-    process.stdout.write("revise: 既に実行中のためスキップします。\n");
+    process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
     process.exit(0);
   }
   if (!underDailyCap()) {
     releaseReviseLock();
-    process.stdout.write(`revise: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
+    process.stdout.write(`${mode}: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
     process.exit(0);
   }
 }
