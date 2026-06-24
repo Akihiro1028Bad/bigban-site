@@ -747,6 +747,46 @@ export function ApproveClient() {
     }
   }
 
+  // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  async function publishArticle(id: string): Promise<void> {
+    if (!window.confirm("この記事を本番公開します。よろしいですか？（公開後は一般に表示されます）")) {
+      return;
+    }
+    setActionBusy(true);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/growth/publish?token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: id }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) throw new Error(json.error ?? "公開に失敗しました。");
+      await pollBoard();
+    } catch (error) {
+      setActionError(toMessage(error, "公開に失敗しました。"));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function closeTask(id: string): Promise<void> {
+    if (!window.confirm("このタスクをクローズして盤から非表示にします。よろしいですか？")) return;
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await postStatus(id, "クローズ");
+      await pollBoard();
+    } catch (error) {
+      setActionError(toMessage(error, "クローズに失敗しました。"));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
   function addProposal(item: PendingItem): void {
     setItems((prev) => [item, ...prev]);
@@ -1934,6 +1974,37 @@ export function ApproveClient() {
               decorate={draftState.draft.decorate}
               onChanged={() => void loadDraft(item.id)}
             />
+            {/* #167: 公開・クローズ。取り消しづらい外向き操作のため確認ダイアログを挟む。 */}
+            <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-wrap gap-2">
+                {item.stage === "drafted" ? (
+                  <button
+                    type="button"
+                    disabled={actionBusy}
+                    onClick={() => void publishArticle(item.id)}
+                    className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
+                  >
+                    公開する
+                  </button>
+                ) : null}
+                {item.stage === "published" ? (
+                  <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={() => void closeTask(item.id)}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  クローズ（盤から非表示）
+                </button>
+              </div>
+              {actionError ? (
+                <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                  {actionError}
+                </p>
+              ) : null}
+            </div>
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
               {PREVIEW_DEVICES.map((device) => {

@@ -21,6 +21,7 @@ const ARTICLE_STAGE_LABEL: Record<ArticleStage, string> = {
   queued: "生成待ち",
   generating: "生成中",
   drafted: "下書き",
+  published: "公開済み",
   rejected: "却下",
 };
 

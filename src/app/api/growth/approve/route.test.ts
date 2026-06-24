@@ -83,7 +83,7 @@ describe("GET", () => {
     expect(queryDataSource).toHaveBeenCalledTimes(2);
   });
 
-  it("記事は全段階(提案中/承認/生成中/下書き作成済み)を横断取得する(#106)", async () => {
+  it("記事は全段階(提案中/承認/生成中/下書き作成済み/公開済み)を横断取得する(#106/#167)", async () => {
     vi.mocked(queryDataSource)
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
@@ -95,6 +95,7 @@ describe("GET", () => {
         { property: "ステータス", select: { equals: "承認" } },
         { property: "ステータス", select: { equals: "生成中" } },
         { property: "ステータス", select: { equals: "下書き作成済み" } },
+        { property: "ステータス", select: { equals: "公開済み" } },
       ],
     });
   });

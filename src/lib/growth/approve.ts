@@ -122,10 +122,10 @@ const PRIORITY_RANK: Record<string, number> = { 高: 3, 中: 2, 低: 1 };
 /** 承認待ちステータス(種別ごとに名前が異なる)。取り消し時の復帰先。 */
 export type PendingStatus = "未処理" | "提案中";
 
-/** ステータス更新で指定できる値。承認/却下に加え、取り消し用の承認待ち復帰。 */
-export type DecisionValue = "承認" | "却下" | PendingStatus;
+/** ステータス更新で指定できる値。承認/却下に加え、取り消し用の承認待ち復帰、終了タスクのクローズ(#167)。 */
+export type DecisionValue = "承認" | "却下" | "クローズ" | PendingStatus;
 
-const DECISION_VALUES: readonly DecisionValue[] = ["承認", "却下", "未処理", "提案中"];
+const DECISION_VALUES: readonly DecisionValue[] = ["承認", "却下", "クローズ", "未処理", "提案中"];
 
 export interface Decision {
   id: string;
@@ -248,7 +248,7 @@ export function parseDecisions(body: unknown): Decision[] {
       throw new Error("不正な id です。");
     }
     if (!DECISION_VALUES.includes(decision as DecisionValue)) {
-      throw new Error("decision は承認/却下/未処理/提案中のみ指定できます。");
+      throw new Error("decision は承認/却下/クローズ/未処理/提案中のみ指定できます。");
     }
     return { id, decision: decision as DecisionValue };
   });

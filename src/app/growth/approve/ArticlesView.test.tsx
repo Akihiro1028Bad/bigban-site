@@ -33,8 +33,8 @@ describe("ArticlesView", () => {
   it("空の列は『なし』を表示する", () => {
     const columns = groupArticlesByStage([], {});
     render(<ArticlesView columns={columns} renderItem={renderItem} densityClass="space-y-2" />);
-    // 全列が空なので「なし」が4つ
-    expect(screen.getAllByText("なし")).toHaveLength(4);
+    // 全列が空なので「なし」が5つ(#167: 公開済み列を追加)
+    expect(screen.getAllByText("なし")).toHaveLength(5);
   });
 
   it("段階で色分けされた列ヘッダ(提案=blue/生成待ち=amber/生成中=purple/下書き=teal)", () => {
@@ -54,8 +54,8 @@ describe("ArticlesView", () => {
     render(<ArticlesView columns={columns} renderItem={renderItem} densityClass="space-y-2" />);
     expect(screen.getByText(/スワイプ/)).toBeInTheDocument();
     const dots = screen.getByRole("group", { name: "段階の位置" });
-    // 4列 → ドット4つ。初期は先頭(0番目)がハイライト。
-    expect(within(dots).getAllByTestId("stage-dot")).toHaveLength(4);
+    // 5列 → ドット5つ。初期は先頭(0番目)がハイライト。
+    expect(within(dots).getAllByTestId("stage-dot")).toHaveLength(5);
     expect(within(dots).getAllByTestId("stage-dot")[0]).toHaveAttribute("aria-current", "true");
   });
 
@@ -66,11 +66,11 @@ describe("ArticlesView", () => {
     Object.defineProperty(scroller, "scrollWidth", { value: 1000, configurable: true });
     Object.defineProperty(scroller, "scrollLeft", { value: 500, configurable: true, writable: true });
     fireEvent.scroll(scroller);
-    // stride=250 → round(500/250)=2 → 3番目(index2)がハイライト
+    // #167: 5列 → stride=1000/5=200 → round(500/200)=3 → 4番目(index3)がハイライト
     const dots = within(screen.getByRole("group", { name: "段階の位置" })).getAllByTestId(
       "stage-dot",
     );
-    expect(dots[2]).toHaveAttribute("aria-current", "true");
+    expect(dots[3]).toHaveAttribute("aria-current", "true");
     expect(dots[0]).not.toHaveAttribute("aria-current");
   });
 });

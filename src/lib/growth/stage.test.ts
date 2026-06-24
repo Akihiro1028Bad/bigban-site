@@ -23,6 +23,10 @@ describe("deriveArticleStage", () => {
     expect(deriveArticleStage("下書き作成済み", true)).toBe("drafted");
   });
 
+  it("公開済み → published (#167)", () => {
+    expect(deriveArticleStage("公開済み", true)).toBe("published");
+  });
+
   it("却下 → rejected", () => {
     expect(deriveArticleStage("却下", false)).toBe("rejected");
   });
