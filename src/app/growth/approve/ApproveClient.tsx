@@ -55,6 +55,7 @@ import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
+import { BodyImagePicker } from "./BodyImagePicker";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
@@ -1846,6 +1847,13 @@ export function ApproveClient() {
               pageId={item.id}
               token={token}
               onReplaced={() => void loadDraft(item.id)}
+            />
+            {/* #145: 本文画像の差し替え(画像があるときだけ表示)。保存後は下書きを再取得。 */}
+            <BodyImagePicker
+              pageId={item.id}
+              token={token}
+              bodyHtml={draftState.draft.bodyHtml}
+              onSaved={() => void loadDraft(item.id)}
             />
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
