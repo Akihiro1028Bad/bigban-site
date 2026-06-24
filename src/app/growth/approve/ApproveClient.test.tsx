@@ -2715,6 +2715,36 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     });
   });
 
+  it("本文画像があれば差し替えパネルを出し、保存で下書きを再取得する(#145 結線)", async () => {
+    const img = "https://images.microcms-assets.io/a/1.png";
+    const media = "https://images.microcms-assets.io/c/new.png";
+    const draft = {
+      title: "T",
+      displayMode: "html",
+      bodyHtml: `<figure><img src="${img}" alt="図1"></figure>`,
+      body: "x",
+    };
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      { json: { success: true, exists: true, draft } },
+      { json: { success: true, media: [{ url: media }] } }, // メディア一覧
+      { json: { success: true } }, // draft/edit 保存
+      { json: { success: true, exists: true, draft } }, // 再取得
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+
+    await userEvent.click(await within(dialog).findByRole("button", { name: "本文画像1を差し替え" }));
+    await userEvent.click(await within(dialog).findByRole("button", { name: "この画像に差し替え 1" }));
+
+    await waitFor(() => {
+      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
+      expect(draftCalls.length).toBe(2);
+    });
+  });
+
   it("Esc で詳細パネルを閉じる", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
