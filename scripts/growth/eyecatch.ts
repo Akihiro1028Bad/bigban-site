@@ -27,21 +27,38 @@ const CHARACTER_PREFIX =
  * #89: 画像モデルの卓球バイアス対策として、競技をピックルボールに固定し卓球を除外する
  * (PICKLEBALL_ANCHOR / NO_TABLE_TENNIS は本文画像と共用)。
  */
-const STYLE_SUFFIX =
+const STYLE_BASE =
   "Cosmic starry deep-space background in deep blue (#11317B) and black " +
   "with bright blue (#306EC3) glow and yellow-green (#F6FF54) accents. " +
   "Keep the alien's face identical to the reference. " +
   "Clean, characterful, premium flat illustration. " +
-  `${PICKLEBALL_ANCHOR} ${NO_TABLE_TENNIS} ` +
-  "Leave clean negative space on one side for text. No text, no logos.";
+  `${PICKLEBALL_ANCHOR} ${NO_TABLE_TENNIS} `;
+
+/** タイトル未指定: 文字を入れず片側に余白だけ残す(従来挙動)。 */
+const NO_TEXT_CLAUSE = "Leave clean negative space on one side for text. No text, no logos.";
+
+/**
+ * タイトル指定時(#163): 確保した余白に記事タイトル(日本語)を描く指示。
+ * 日本語の字形が崩れやすいため「正確に綴る」ことを強調する。
+ */
+function titleClause(title: string): string {
+  return (
+    `Render the article title "${title}" as large, bold, clearly legible Japanese text ` +
+    "in clean negative space on one side, integrated tastefully with the composition. " +
+    "Spell every Japanese character exactly and correctly. No other text, no logos."
+  );
+}
 
 /**
  * 「キャラ固定 + 記事ごとの行為 + 固定スタイル」でアイキャッチ用プロンプトを組む。
- * action は記事ごとに変える行為の説明(英語1フレーズ)。
+ * action は記事ごとに変える行為の説明(英語1フレーズ)。title を渡すと余白に
+ * タイトル(日本語)を描く指示になる(#163)。空/未指定なら従来どおり文字なし。
  */
-export function buildEyecatchPrompt(action: string): string {
+export function buildEyecatchPrompt(action: string, title?: string): string {
   const trimmed = action.trim().replace(/[.\s]+$/, "");
-  return `${CHARACTER_PREFIX} ${trimmed}. ${STYLE_SUFFIX}`;
+  const cleanTitle = (title ?? "").trim();
+  const textClause = cleanTitle ? titleClause(cleanTitle) : NO_TEXT_CLAUSE;
+  return `${CHARACTER_PREFIX} ${trimmed}. ${STYLE_BASE}${textClause}`;
 }
 
 export interface EyecatchRequest {

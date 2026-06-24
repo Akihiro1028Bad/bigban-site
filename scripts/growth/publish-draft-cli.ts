@@ -207,7 +207,11 @@ async function main(): Promise<void> {
             {
               apiKey: requireEnv("OPENAI_API_KEY"),
               refPath: DEFAULT_REF,
-              prompt: buildEyecatchPrompt(spec.eyecatchAction as string),
+              // #163: 記事タイトルを渡し、アイキャッチ原本の余白にタイトル(日本語)を焼き込む。
+              prompt: buildEyecatchPrompt(
+                spec.eyecatchAction as string,
+                String(spec.payload.title ?? "")
+              ),
               size: "1536x1024",
               quality: "high",
             },
