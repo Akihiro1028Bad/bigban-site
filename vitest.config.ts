@@ -62,6 +62,7 @@ export default defineConfig({
         "scripts/growth/publish-draft-cli.ts",
         "scripts/growth/notify-line.ts",
         "scripts/growth/revise-cli.ts",
+        "scripts/growth/eyecatch-regen-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
