@@ -47,7 +47,45 @@ export default defineConfig({
     coverage: {
       provider: "istanbul",
       reporter: ["text", "lcov"],
-      exclude: ["__mocks__/**"],
+      exclude: [
+        "__mocks__/**",
+        // 実行時の薄い入口(実データでの手動検証のためテスト対象外)
+        "scripts/growth/cli.ts",
+        "scripts/growth/existing-cli.ts",
+        "scripts/growth/setup-token.ts",
+        "scripts/growth/upload-media.ts",
+        "scripts/growth/draft-content.ts",
+        "scripts/growth/facility-context-cli.ts",
+        "scripts/growth/notify-drafts.ts",
+        "scripts/growth/gen-eyecatch.ts",
+        "scripts/growth/gen-body-image.ts",
+        "scripts/growth/self-heal-cli.ts",
+        "scripts/growth/publish-draft-cli.ts",
+        "scripts/growth/notify-line.ts",
+        "scripts/growth/revise-cli.ts",
+        "scripts/growth/eyecatch-regen-cli.ts",
+        "scripts/growth/body-image-regen-cli.ts",
+        "scripts/growth/advise-cli.ts",
+        "scripts/growth/decorate-cli.ts",
+        "scripts/growth/advise-apply-cli.ts",
+        "scripts/growth/comment-revise-cli.ts",
+        // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
+        "src/app/growth/approve/DraftEditor.tsx",
+        // 本文インラインコメント(#182)の薄い DOM 結線。純ロジックは bodyComment.ts でテスト済み。
+        "src/app/growth/approve/InlineCommentReview.tsx",
+        // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
+        // 受信側描画は DraftFrameClient.test.tsx でテスト済み。
+        "src/app/growth/approve/DraftPreviewFrame.tsx",
+        // 全画面モーダル/フォーカストラップ/iframe への薄い DOM 結線(#104)。
+        // 純ロジックは draftWorkspace.ts でテスト済み。
+        "src/app/growth/approve/DraftEditWorkspace.tsx",
+        // コマンドパレットの dialog/フォーカストラップ薄結線(#109)。
+        // 絞り込みの純ロジックは boardPrefs.ts でテスト済み。
+        "src/app/growth/approve/CommandPalette.tsx",
+        // pull型の経過時間/滞留警告の薄い DOM+タイマー結線(#C2 UI)。
+        // 純ロジックは pullStale.ts でテスト済み。
+        "src/app/growth/approve/StaleNotice.tsx",
+      ],
       thresholds: {
         statements: 100,
         branches: 100,

@@ -37,6 +37,16 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // 承認ページは URL にトークンを持つため、Referrer 経由の流出と
+        // キャッシュ保持を防ぐ。
+        source: "/growth/approve",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
     ];
   },
 };

@@ -42,6 +42,19 @@ public/
 - Webhook URL (microCMS 管理画面で設定): `${SITE_URL}/api/revalidate`
 - プレビュー URL: `${SITE_URL}/api/draft/enable?secret=...&slug=...&draftKey=...&locale=ja|en`
 
+## グロースループ記事生成 (headless)
+
+- 文体・構成の正典: `docs/operations/growth-article-style.md`、運用手順: `docs/operations/growth-weekly-runbook.md`
+- 記事の前提（施設の現況=開業前/開業済み・確定事実・書いてはいけない未確定項目）は **`scripts/growth/facility-context.json` を唯一の単一ソース**とする。`npm run growth:facility-context` で出力し、下書きモード冒頭で正典として注入（style-guide §13）
+- 文体ルール: 翻訳調・AIっぽさを避ける（§14）／外部リンク濫用・未検証数値・タイトル盛りを避け内部リンクを検討（§15）
+- 実行は自宅 PC の headless `claude -p`（`scripts/growth/run.mjs`）。git push / commit・本番公開はしない
+- 構成案の修正ループ（Epic #40 / タイトルAI修正 #139 B）: 承認画面で構成案に行コメント、またはタイトル専用枠に指示→「修正を依頼」→ 常時稼働PCの `revise` モード（5分間隔・`npm run growth:revise-loop`）が `claude` で**指示が来た方だけ**（構成案／タイトル）を修正→提示中→ユーザーが**元 vs 新**を見比べてまとめて反映（提案がある方だけ適用）。Notion「記事ネタ案」に6プロパティ（`修正指示`/`修正ステータス`/`修正案`/`修正依頼時刻`、#139 B で `修正タイトル指示`/`修正タイトル案`）の事前追加が必要（後者2つが無くても構成案修正は動く）。タイトルは title型 `タイトル案` を上書き。純ロジックは `scripts/growth/revise.ts`、PC配線は `revise-cli.ts`（`present <pageId>` が `.growth-tmp/revise-proposal.txt`／`revise-title.txt` の存在する方を提示）。運用は `docs/operations/growth-weekly-runbook.md` の「構成案の修正ループ」節を参照
+- 本文画像（Epic #59）: 承認画面で構成案のセクションに画像指示（スタイル `mascot`/`minimal`/`diagram` ＋説明）を追加→下書き生成時に `growth:publish-draft` が生成→microCMSへupload→本文の `{{IMG:n}}` を `<figure>` へ置換。実写禁止・`diagram` は「イメージ図」明示・1記事上限3枚。正典は style-guide §9「本文画像」、純ロジックは `scripts/growth/body-image.ts`
+- 下書きプレビュー＋手動リッチ編集（Epic #72）: 承認画面の記事詳細パネルで microCMS 下書きを実プレビュー（`NewsBodyRenderer` 再利用）し、TipTap リッチエディタで本文を直して保存（`/api/growth/draft/edit`→`patchDraft` で下書き上書き・公開しない）。手動編集は Vercel から microCMS を直接読み書き（AI修正ループとは別系統）。Notion「記事ネタ案」に `下書きID`/`下書きプレビューキー` の事前追加＋Vercel に `MICROCMS_CONTENT_API_KEY` が必要。メディアは保持のみ（新規作成は次Epic）。`DraftEditor.tsx` はカバレッジ除外、純ロジックは `draftEditorContent.ts`。運用は runbook の「承認画面で下書きをプレビュー＋手動リッチ編集」節を参照
+- 下書き画像（アイキャッチ＋本文画像）の表示・差し替え・再生成（Epic #140）: 表示=#141（Notionミラー）。基盤=#142 メディア一覧/アップロード API（`/api/growth/media` GET=一覧・POST=アップロード、microCMS **MANAGEMENT API**・`{domain}.microcms-management.io/api/v1/media`）。純ロジック＝`src/lib/growth/media.ts`（list/upload のみ・delete は作らない・サイズ5MB/MIMEホワイトリスト検証・`sanitizeFileName`・`isMicrocmsAssetUrl`）。差し替え=#143（`EyecatchPicker.tsx` でメディア選択/アップロード→`/api/growth/draft/eyecatch` が **CONTENTキー**で `patchDraft({eyecatch})`＋Notionミラー `アイキャッチURL` 更新→プレビュー再取得。`eyecatchUrl` は `images.microcms-assets.io` 厳密一致）。AI再生成=#144（pull型・修正ループ#40と同方式。`EyecatchPicker` の「AIで再生成」→`/api/growth/eyecatch/regen` が Notion に依頼記録→PCの `npm run growth:regen-loop`（run.mjs regen）が `gen-eyecatch`→`upload-media`→`growth:eyecatch-regen done` で差し替え＋LINE通知。純ロジック=`scripts/growth/eyecatch-regen.ts`、CLI/run.mjs はカバレッジ除外。Notion 3プロパティ `アイキャッチ再生成指示/...ステータス/...依頼時刻` の事前追加が必要・欠落耐性）。本文画像差し替え=#145（`BodyImagePicker.tsx` がプレビューの本文画像を一覧→メディア選択/アップロード→`bodyImageEdit.ts` で該当 `<img src>` を差し替え→`/api/growth/draft/edit` で保存。純ロジック `bodyImageEdit.ts`）。本文画像のAI再生成=#156（pull型・#144と同方式。`BodyImagePicker` の各画像「AIで再生成」→`/api/growth/body-image/regen` が Notion に依頼記録（**対象src**＝その時点の画像URLで「どの画像か」を持つ・インデックスは使わない）→PCの `npm run growth:regen-body-loop`（run.mjs regen-body）が `gen-body-image`→`upload-media`→`growth:body-image-regen done <pageId> <targetSrc> <url>` で本文HTMLの当該 `<img>` を `replaceBodyImageBySrc` で差し替え＋CONTENTキーで `patchDraft({bodyHtml})`＋Notionミラー（本文HTML #95）更新＋LINE通知。依頼後に本文が変わり対象srcが消えたら失敗通知＝沈黙させない。純ロジック=`scripts/growth/body-image-regen.ts`（`replaceBodyImageBySrc`/`isMicrocmsAssetUrl` 含む）、CLI/`gen-body-image`/run.mjs はカバレッジ除外。Notion 4プロパティ `本文画像再生成指示/...ステータス/...依頼時刻/...対象` の事前追加が必要・欠落耐性）。**`MICROCMS_MANAGEMENT_API_KEY` は server-only**（`NEXT_PUBLIC_` 禁止・クライアントへ渡さない）。⚠️ **本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON にする**（強権限 API のため。gate は実装済み・開発段階はオフ）。横断的なセキュリティハードニング（safeEqual・featureFlags分離・依存CVE等）は #7 に集約
+- 記事スタイリング・アドバイザー（#146・read-only・pull型）: 承認画面の下書きプレビューに「スタイリング・アドバイス」カード（`AdviceCard.tsx`）。「アドバイスを依頼」→`/api/growth/advise` が Notion に依頼記録（依頼中）→PCの `npm run growth:advise-loop`（run.mjs advise）が `claude` で本文（Notionミラー `下書き本文HTML` #95 を読む・本文は送らない）を style-guide §11/§14/§15/§4/§12/§9 に照らして分析→`growth:advise present <pageId> <jsonファイル>` が**アドバイスJSONを zod 検証**して Notion `アドバイス結果` に書き（提示中）＋LINE通知。承認画面は `/api/growth/draft` GET（`adviceViewOf` で advice も返す）で取得し AdviceCard に総評／観点別スコア／強み／直すべき点（引用＋理由＋修正案）を表示。「閉じる」=`/api/growth/advise/dismiss`（なしに戻す）。**read-only**＝本文・下書き・microCMS には一切書き込まない（書き込み先は Notion のみ・強権キー不要）。純ロジック=`scripts/growth/advise.ts`（`AdviceSchema`/`parseAdvice`(安全側 null)/`serializeAdvice`/`adviceViewOf`/`adviceRowFromPage` 等・`src/lib/growth/advise.ts` 再エクスポート）、CLI/run.mjs はカバレッジ除外。Notion 4プロパティ `アドバイス指示/...ステータス/...結果/...依頼時刻` の事前追加が必要・欠落耐性。#128 `draftQuality.ts`（機械的○×）の**補完**（理由・改善案レイヤー）であり置換ではない。見た目の“具体操作（採用→本文反映）”は装飾アシスタント #147 に分離
+- 記事装飾アシスタント（#147・採用→本文反映・pull型）: 承認画面の下書きプレビューに「装飾アシスタント」カード（`DecorationAssistant.tsx`）。「装飾を提案」→`/api/growth/decorate` が Notion に依頼記録→PCの `npm run growth:decorate-loop`（run.mjs decorate）が `claude` で本文（Notionミラー #95）をトップレベル要素ごとに見て【箇所ごとの装飾提案】（op=add/change/remove × decoration=note/caution/highlight/blockquote）を作り `growth:decorate present <pageId> <json>` が **zod 検証**して Notion `装飾提案` に書く（提示中）。人が提案を採用/却下→「採用分を反映」で**決定的な `applyDecoration`**（許可リスト内の固定変換）で本文へ反映→既存 `/api/growth/draft/edit`（CONTENTキー・STRICT再サニタイズ）で保存。**安全の要＝AIに生HTMLを出させない**（提案はメタのみ・HTMLはシステムが生成）。アンカーはブロックindex＋抜粋照合（不一致は「要確認」で弾く・誤適用防止）。純ロジック=`scripts/growth/decorate.ts`（`splitTopLevelBlocks`/`applyDecoration`/`applyDecorations`/`previewDecoration`/`DecorationProposalSchema`/`parseProposals`(安全側[])/`decorateViewOf` 等・`src/lib/growth/decorate.ts` 再エクスポート）、CLI/run.mjs はカバレッジ除外。Notion 4プロパティ `装飾指示/...ステータス/...提案/...依頼時刻` の事前追加が必要・欠落耐性。list/table/cta は初手対象外（随伴バックログ）。これで文体#146＋装飾#147 の2本が完了
+
 ## Development Process — TDD
 
 Red -> Green -> Refactor cycle is mandatory for all development.
@@ -176,6 +189,14 @@ Blank line between each group. No circular imports.
 - Lighthouse CI in pipeline with performance budgets
 
 ## Git Conventions
+
+### Push Account (MANDATORY)
+
+- **Always push using the dedicated AI account `ttmakhr1028ai-art`.** Never push with a human/owner account.
+- Before any `git push` (or `gh` write operation that pushes), verify the active account:
+  - `gh auth status` → active account must be `ttmakhr1028ai-art`.
+  - If not, switch first: `gh auth switch --user ttmakhr1028ai-art`.
+- If the AI account is unavailable or lacks access, STOP and report — do not silently fall back to another account.
 
 ### Branches
 
