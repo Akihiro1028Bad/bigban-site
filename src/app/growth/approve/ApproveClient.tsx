@@ -73,6 +73,8 @@ import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { StaleNotice } from "./StaleNotice";
+import { authHeaders } from "./authHeaders";
+import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
   IMAGE_STYLES,
@@ -205,13 +207,9 @@ function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function approveUrl(token: string): string {
-  return `/api/growth/approve?token=${encodeURIComponent(token)}`;
-}
-
 /** 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる。 */
 async function fetchPending(token: string): Promise<PendingItem[]> {
-  const res = await fetch(approveUrl(token));
+  const res = await fetch("/api/growth/approve", { headers: authHeaders(token) });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(
@@ -279,10 +277,17 @@ export function ApproveClient() {
   const [items, setItems] = useState<PendingItem[]>([]);
   // #108: 完了トースト/滞留検知用。itemsRef は poll で前回値を参照、nowTick は滞留経過の基準時刻、
   // firstSeenRef は記事が生成待ち/生成中に入った時刻。
-  const [toasts, setToasts] = useState<{ id: string; message: string }[]>([]);
+  const [toasts, setToasts] = useState<
+    { id: string; message: string; tone: "success" | "error" }[]
+  >([]);
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const itemsRef = useRef<PendingItem[]>([]);
   const firstSeenRef = useRef<Map<string, number>>(new Map());
+  // M8: コピー等の通知トーストに使う一意 id 採番。
+  const toastSeq = useRef(0);
+  // #H5: 盤ポーリングの連続失敗と最終成功時刻(沈黙させず「最新化できていない」を可視化)。
+  const [pollFailures, setPollFailures] = useState(0);
+  const [lastBoardSuccessMs, setLastBoardSuccessMs] = useState<number | null>(null);
   // #109: 操作性。フォーカス中カード/コマンドパレット/一括選択/表示密度。
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -422,7 +427,9 @@ export function ApproveClient() {
     try {
       next = await fetchPending(token);
     } catch {
-      return; // 失敗は次の poll で回復(沈黙させるが盤は前回値を維持)。
+      // #H5: 失敗は次の poll で回復するが、沈黙させず連続失敗を数えてバナーで可視化する。
+      setPollFailures((f) => f + 1);
+      return;
     }
     const doneIds = newlyDraftedIds(itemsRef.current, next);
     if (doneIds.length > 0) {
@@ -433,12 +440,15 @@ export function ApproveClient() {
           .filter((item) => done.has(item.id))
           .map((item) => ({
             id: `done-${item.id}`,
-            message: `「${item.title}」の下書きが完成しました`,
+            message: `🎉 「${item.title}」の下書きが完成しました`,
+            tone: "success" as const,
           })),
       ]);
     }
     setItems(next);
     setNowTick(Date.now());
+    setPollFailures(0);
+    setLastBoardSuccessMs(Date.now());
   }, [token]);
 
   // 生成待ち/生成中がある間だけポーリングする(完了検知＋滞留経過の更新)。
@@ -450,6 +460,13 @@ export function ApproveClient() {
     }, REVISE_POLL_MS);
     return () => clearInterval(timer);
   }, [hasInFlight, pollBoard]);
+
+  // M8: 通知トーストを1件積む(一意 id を採番)。
+  function pushToast(message: string, tone: "success" | "error" = "success"): void {
+    toastSeq.current += 1;
+    const id = `toast-${toastSeq.current}`;
+    setToasts((prev) => [...prev, { id, message, tone }]);
+  }
 
   function dismissToast(id: string): void {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -525,7 +542,8 @@ export function ApproveClient() {
       setDraftState({ status: "loading" });
       try {
         const res = await fetch(
-          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(token)}`
+          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
+          { headers: authHeaders(token) }
         );
         const json = await readJsonObject(res);
         if (!res.ok || !json.success) {
@@ -558,7 +576,8 @@ export function ApproveClient() {
     async (pageId: string): Promise<void> => {
       try {
         const res = await fetch(
-          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(token)}`
+          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
+          { headers: authHeaders(token) }
         );
         const json = await readJsonObject(res);
         if (!res.ok || !json.success || !json.exists) return;
@@ -657,10 +676,10 @@ export function ApproveClient() {
     setDraftSaveError("");
     try {
       const res = await fetch(
-        `/api/growth/draft/edit?token=${encodeURIComponent(token)}`,
+        "/api/growth/draft/edit",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(token, { "Content-Type": "application/json" }),
           body: JSON.stringify(buildDraftEditPayload(item.id, editedHtml)),
         }
       );
@@ -726,9 +745,9 @@ export function ApproveClient() {
 
   /** ステータスを 1 件だけ更新する(承認/却下/承認待ち復帰の共通処理)。 */
   async function postStatus(id: string, decision: string): Promise<void> {
-    const res = await fetch(approveUrl(token), {
+    const res = await fetch("/api/growth/approve", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(token, { "Content-Type": "application/json" }),
       body: JSON.stringify({ decisions: [{ id, decision }] }),
     });
     const json = await readJsonObject(res);
@@ -758,22 +777,24 @@ export function ApproveClient() {
   // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  // #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
+  const [confirmAction, setConfirmAction] = useState<
+    { kind: "publish" | "close"; id: string; title: string } | null
+  >(null);
 
   async function publishArticle(id: string): Promise<void> {
-    if (!window.confirm("この記事を本番公開します。よろしいですか？（公開後は一般に表示されます）")) {
-      return;
-    }
     setActionBusy(true);
     setActionError("");
     try {
-      const res = await fetch(`/api/growth/publish?token=${encodeURIComponent(token)}`, {
+      const res = await fetch("/api/growth/publish", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId: id }),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) throw new Error(json.error ?? "公開に失敗しました。");
       await pollBoard();
+      pushToast("記事を公開しました。");
     } catch (error) {
       setActionError(toMessage(error, "公開に失敗しました。"));
     } finally {
@@ -782,7 +803,6 @@ export function ApproveClient() {
   }
 
   async function closeTask(id: string): Promise<void> {
-    if (!window.confirm("このタスクをクローズして盤から非表示にします。よろしいですか？")) return;
     setActionBusy(true);
     setActionError("");
     try {
@@ -793,6 +813,18 @@ export function ApproveClient() {
     } finally {
       setActionBusy(false);
     }
+  }
+
+  /** 公開/クローズの確認ダイアログを開く(対象タイトルを明示)。 */
+  function openConfirm(item: PendingItem, kind: "publish" | "close"): void {
+    setConfirmAction({ kind, id: item.id, title: item.title });
+  }
+
+  /** 確認ダイアログで「確定」したときに実行する(対象はダイアログ表示中の confirmAction)。 */
+  async function runConfirm(action: { kind: "publish" | "close"; id: string }): Promise<void> {
+    setConfirmAction(null);
+    if (action.kind === "publish") await publishArticle(action.id);
+    else await closeTask(action.id);
   }
 
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
@@ -840,9 +872,9 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch(`/api/growth/revise?token=${encodeURIComponent(token)}`, {
+      const res = await fetch("/api/growth/revise", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           pageId: item.id,
           comments,
@@ -938,9 +970,9 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch(`/api/growth/revise/edit?token=${encodeURIComponent(token)}`, {
+      const res = await fetch("/api/growth/revise/edit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId: item.id, ...payload }),
       });
       const json = await readJsonObject(res);
@@ -1072,9 +1104,9 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch(`/api/growth/revise/apply?token=${encodeURIComponent(token)}`, {
+      const res = await fetch("/api/growth/revise/apply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId: item.id, action }),
       });
       const json = await readJsonObject(res);
@@ -1902,10 +1934,16 @@ export function ApproveClient() {
     );
   }
 
-  // #127: クリップボードへコピー(本文など)。非対応環境や権限拒否で落ちないよう握り込む。
+  // #127/M8: クリップボードへコピー(本文など)。成否をトーストで明示する(沈黙させない)。
   function copyText(text: string): void {
-    if (!navigator.clipboard) return;
-    void navigator.clipboard.writeText(text).catch(() => {});
+    if (!navigator.clipboard) {
+      pushToast("このブラウザではコピーできません。", "error");
+      return;
+    }
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => pushToast("本文をコピーしました。"))
+      .catch(() => pushToast("コピーに失敗しました。", "error"));
   }
 
   // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。
@@ -1993,37 +2031,6 @@ export function ApproveClient() {
               bodyComment={draftState.draft.bodyComment}
               onChanged={() => void loadDraft(item.id)}
             />
-            {/* #167: 公開・クローズ。取り消しづらい外向き操作のため確認ダイアログを挟む。 */}
-            <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <div className="flex flex-wrap gap-2">
-                {item.stage === "drafted" ? (
-                  <button
-                    type="button"
-                    disabled={actionBusy}
-                    onClick={() => void publishArticle(item.id)}
-                    className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
-                  >
-                    公開する
-                  </button>
-                ) : null}
-                {item.stage === "published" ? (
-                  <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={() => void closeTask(item.id)}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  クローズ（盤から非表示）
-                </button>
-              </div>
-              {actionError ? (
-                <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
-                  {actionError}
-                </p>
-              ) : null}
-            </div>
             {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
             <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
               {PREVIEW_DEVICES.map((device) => {
@@ -2058,6 +2065,37 @@ export function ApproveClient() {
                 html={draftState.draft.bodyHtml || draftState.draft.body}
                 className={PREVIEW_FRAME_CLASS}
               />
+            </div>
+            {/* #167/H1: 公開・クローズは最終確認(本番プレビュー)の下＝最終アクション位置に置く。 */}
+            <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-wrap gap-2">
+                {item.stage === "drafted" ? (
+                  <button
+                    type="button"
+                    disabled={actionBusy}
+                    onClick={() => openConfirm(item, "publish")}
+                    className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
+                  >
+                    公開する
+                  </button>
+                ) : null}
+                {item.stage === "published" ? (
+                  <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={() => openConfirm(item, "close")}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  クローズ（盤から非表示）
+                </button>
+              </div>
+              {actionError ? (
+                <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                  {actionError}
+                </p>
+              ) : null}
             </div>
             <div className="mt-2 flex gap-2">
               <button
@@ -2369,6 +2407,24 @@ export function ApproveClient() {
       <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
         承認した提案は制作キューに追加されます。この場では公開されません。
       </p>
+      {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
+      {shouldWarnPollStale(pollFailures) ? (
+        <p
+          role="status"
+          className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          <span className="flex-1">
+            最新情報を取得できていません（最終更新 {formatLastUpdated(lastBoardSuccessMs)}）。回線や自宅PCの状態を確認してください。
+          </span>
+          <button
+            type="button"
+            onClick={() => void pollBoard()}
+            className="shrink-0 rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+          >
+            再試行
+          </button>
+        </p>
+      ) : null}
 
       {/* #119: 施策/記事のタブ切替。各タブに未処理件数バッジを出し残件を可視化する。 */}
       <div
@@ -2473,6 +2529,48 @@ export function ApproveClient() {
           </button>
         </div>
       ) : null}
+      {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
+      {confirmAction ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="公開・クローズの確認"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        >
+          <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {confirmAction.kind === "publish" ? "記事を本番公開します" : "タスクをクローズします"}
+            </h2>
+            <p className="mt-1 text-xs text-gray-600">
+              「{confirmAction.title}」を
+              {confirmAction.kind === "publish"
+                ? "公開すると一般に表示されます。よろしいですか？"
+                : "盤から非表示にします。よろしいですか？"}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => void runConfirm(confirmAction)}
+                className={
+                  confirmAction.kind === "publish"
+                    ? "rounded border border-green-700 bg-green-700 px-3 py-1 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
+                    : "rounded border border-gray-700 bg-gray-700 px-3 py-1 text-xs font-bold text-white hover:bg-gray-800 disabled:opacity-50"
+                }
+              >
+                {confirmAction.kind === "publish" ? "公開を確定" : "クローズを確定"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
       {toasts.length > 0 ? (
         <div aria-label="お知らせ" className="mt-2 space-y-1">
@@ -2480,14 +2578,20 @@ export function ApproveClient() {
             <div
               key={toast.id}
               role="status"
-              className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+                toast.tone === "error" ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"
+              }`}
             >
-              <span className="flex-1">🎉 {toast.message}</span>
+              <span className="flex-1">{toast.message}</span>
               <button
                 type="button"
                 aria-label={`通知を閉じる: ${toast.message}`}
                 onClick={() => dismissToast(toast.id)}
-                className="shrink-0 rounded border border-green-300 bg-white px-2 py-0.5 text-xs text-green-700"
+                className={`shrink-0 rounded border bg-white px-2 py-0.5 text-xs ${
+                  toast.tone === "error"
+                    ? "border-red-300 text-red-700"
+                    : "border-green-300 text-green-700"
+                }`}
               >
                 閉じる
               </button>

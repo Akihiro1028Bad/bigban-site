@@ -21,16 +21,14 @@ import {
 } from "@/lib/growth/bodyComment";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { authHeaders } from "./authHeaders";
+
 interface InlineCommentReviewProps {
   pageId: string;
   token: string;
   bodyHtml: string;
   bodyComment?: BodyCommentView;
   onChanged: () => void;
-}
-
-function withToken(path: string, token: string): string {
-  return `${path}?token=${encodeURIComponent(token)}`;
 }
 
 const STATUS_LABEL: Record<BodyCommentStatus, string> = {
@@ -93,9 +91,9 @@ export function InlineCommentReview({
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(withToken(path, token), {
+      const res = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
       const json = await readJsonObject(res);
@@ -132,17 +130,17 @@ export function InlineCommentReview({
     setBusy(true);
     setError("");
     try {
-      const saveRes = await fetch(withToken("/api/growth/draft/edit", token), {
+      const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, bodyHtml: html }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error((saveJson.error as string) ?? "保存に失敗しました。");
       // 反映後は依頼状態をクリア(なしに戻す)。
-      await fetch(withToken("/api/growth/body-comment/dismiss", token), {
+      await fetch("/api/growth/body-comment/dismiss", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
       if (skipped.length > 0) {

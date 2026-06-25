@@ -10,6 +10,7 @@ import {
 } from "@/lib/growth/decorate";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { authHeaders } from "./authHeaders";
 import { StaleNotice } from "./StaleNotice";
 
 interface DecorationAssistantProps {
@@ -30,10 +31,6 @@ const OP_LABEL: Record<DecorationProposal["op"], string> = {
   change: "直す",
   remove: "消す",
 };
-
-function withToken(path: string, token: string): string {
-  return `${path}?token=${encodeURIComponent(token)}`;
-}
 
 function errMsg(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -59,9 +56,9 @@ export function DecorationAssistant({ pageId, token, bodyHtml, decorate, onChang
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(withToken(path, token), {
+      const res = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify(body),
       });
       const json = await readJsonObject(res);

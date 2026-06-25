@@ -94,6 +94,22 @@ describe("POST /api/growth/publish", () => {
     );
   });
 
+  it("既に公開済みなら 409(冪等・二重公開や手直しタイトルの再上書きを防ぐ・#SPEC-14)", async () => {
+    const published = {
+      id: PAGE_ID,
+      url: "",
+      properties: {
+        ...READY.properties,
+        ステータス: { type: "select", select: { name: "公開済み" } },
+      },
+    };
+    vi.mocked(getPage).mockResolvedValue(published);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
   it("MICROCMS_CONTENT_API_KEY 未設定は 500(タイトル最終同期に必要)", async () => {
     delete process.env.MICROCMS_CONTENT_API_KEY;
     vi.mocked(getPage).mockResolvedValue(READY);

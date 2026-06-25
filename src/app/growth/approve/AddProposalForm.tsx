@@ -6,6 +6,8 @@ import type { FormEvent } from "react";
 import { PROPOSAL_CATEGORIES } from "@/lib/growth/proposals";
 import type { Stage } from "@/lib/growth/stage";
 
+import { authHeaders } from "./authHeaders";
+
 interface AddedDetail {
   label: string;
   value: string;
@@ -50,9 +52,9 @@ export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`/api/growth/proposals?token=${encodeURIComponent(token)}`, {
+      const res = await fetch("/api/growth/proposals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ name: trimmed, category, note }),
       });
       const json = await res.json();

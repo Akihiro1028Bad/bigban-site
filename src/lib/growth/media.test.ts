@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "@/lib/growth/notion";
 import {
+  detectImageMime,
   fetchMediaList,
   isMicrocmsAssetUrl,
   MEDIA_ALLOWED_MIME,
@@ -45,6 +46,37 @@ describe("validateUpload", () => {
   it("未対応MIMEは弾く", () => {
     const r = validateUpload({ size: 100, type: "application/pdf" });
     expect(r.ok).toBe(false);
+  });
+
+  it("head が画像のマジックバイトなら ok(#SEC-06)", () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(validateUpload({ size: 100, type: "image/png", head: png })).toEqual({ ok: true });
+  });
+
+  it("申告は画像でも中身が画像でない(SVG偽装)なら弾く(#SEC-06)", () => {
+    const svg = new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'>");
+    const r = validateUpload({ size: 100, type: "image/png", head: svg });
+    expect(r).toEqual({ ok: false, error: expect.stringContaining("偽装") });
+  });
+});
+
+describe("detectImageMime", () => {
+  const sig = (bytes: number[]): Uint8Array => new Uint8Array(bytes);
+  it("各画像形式のマジックバイトを判定する", () => {
+    expect(detectImageMime(sig([0xff, 0xd8, 0xff, 0x00]))).toBe("image/jpeg");
+    expect(detectImageMime(sig([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe("image/png");
+    expect(detectImageMime(sig([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))).toBe("image/gif");
+    expect(detectImageMime(sig([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toBe(
+      "image/webp"
+    );
+    expect(detectImageMime(sig([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]))).toBe(
+      "image/avif"
+    );
+  });
+  it("画像でない(SVG/HTML/ゼロ)は null", () => {
+    expect(detectImageMime(new TextEncoder().encode("<svg "))).toBeNull();
+    expect(detectImageMime(new TextEncoder().encode("<!DOCTYPE html>"))).toBeNull();
+    expect(detectImageMime(sig([0, 0, 0, 0]))).toBeNull();
   });
 });
 

@@ -65,7 +65,8 @@ describe("AdviceCard", () => {
     await userEvent.click(screen.getByRole("button", { name: "アドバイスを依頼" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toContain("/api/growth/advise?");
+    expect(url).toBe("/api/growth/advise");
+    expect(init.headers?.Authorization).toMatch(/^Bearer /);
     const sent = JSON.parse(init.body);
     expect(sent.pageId).toBe(PAGE_ID);
     expect(sent.instruction).toBe("見た目も"); // trim
@@ -150,7 +151,7 @@ describe("AdviceCard", () => {
     expect(screen.getByText(/OpenAI 503/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "再依頼" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(fetchFn.mock.calls[0][0]).toContain("/api/growth/advise?");
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/advise");
   });
 
   it("失敗: raw が空でも文言は出る", () => {
@@ -198,7 +199,8 @@ describe("AdviceCard 採用→本文反映(#165)", () => {
     await userEvent.click(submit);
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toContain("/api/growth/advise/apply?");
+    expect(url).toBe("/api/growth/advise/apply");
+    expect(init.headers?.Authorization).toMatch(/^Bearer /);
     expect(JSON.parse(init.body)).toEqual({ pageId: PAGE_ID, adoptedIndexes: [0] });
   });
 

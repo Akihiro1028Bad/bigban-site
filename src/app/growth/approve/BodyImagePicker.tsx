@@ -8,6 +8,7 @@ import { BODY_REGEN_BUSY_STATUSES, type BodyRegenStatus } from "@/lib/growth/bod
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { authHeaders } from "./authHeaders";
 import { listBodyImages, replaceBodyImageSrc } from "./bodyImageEdit";
 import { StaleNotice } from "./StaleNotice";
 
@@ -41,10 +42,6 @@ type ListPhase =
 
 /** 再生成指示の上限長(API の MAX_INSTRUCTION_LEN と一致)。 */
 const MAX_REGEN_INSTRUCTION = 500;
-
-function withToken(path: string, token: string): string {
-  return `${path}?token=${encodeURIComponent(token)}`;
-}
 
 function errMsg(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -86,7 +83,7 @@ export function BodyImagePicker({
     setList({ status: "loading" });
     setError("");
     try {
-      const res = await fetch(withToken("/api/growth/media", token));
+      const res = await fetch("/api/growth/media", { headers: authHeaders(token) });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) throw new Error("メディアの取得に失敗しました。");
       const media = Array.isArray(json.media) ? (json.media as MediaItem[]) : [];
@@ -126,9 +123,9 @@ export function BodyImagePicker({
     setRegenBusy(true);
     setRegenError("");
     try {
-      const res = await fetch(withToken("/api/growth/body-image/regen", token), {
+      const res = await fetch("/api/growth/body-image/regen", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, targetSrc: src, instruction: regenText.trim() }),
       });
       const json = await readJsonObject(res);
@@ -152,9 +149,9 @@ export function BodyImagePicker({
     setError("");
     try {
       const html = replaceBodyImageSrc(bodyHtml, index, newUrl);
-      const res = await fetch(withToken("/api/growth/draft/edit", token), {
+      const res = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, bodyHtml: html }),
       });
       const json = await readJsonObject(res);
@@ -175,7 +172,7 @@ export function BodyImagePicker({
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(withToken("/api/growth/media", token), { method: "POST", body: form });
+      const res = await fetch("/api/growth/media", { method: "POST", headers: authHeaders(token), body: form });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success || typeof json.url !== "string") {
         throw new Error(json.error ?? "アップロードに失敗しました。");

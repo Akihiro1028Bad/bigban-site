@@ -32,9 +32,26 @@ export const MEDIA_LIST_MAX_LIMIT = 100;
 export interface UploadValidationInput {
   size: number;
   type: string;
+  /** ファイル先頭バイト(マジックバイト検証用・#SEC-06)。未指定なら中身検証はスキップ。 */
+  head?: Uint8Array;
 }
 
-/** アップロードのサイズ / MIME を検証する(API 境界で実行)。 */
+/**
+ * ファイル先頭のマジックバイトから実際の画像 MIME を判定する(#SEC-06)。
+ * 画像でない(SVG/HTML/任意バイナリ)場合は null。クライアント申告の MIME/拡張子を信用しない。
+ */
+export function detectImageMime(head: Uint8Array): string | null {
+  const at = (sig: readonly number[], offset = 0): boolean =>
+    sig.every((value, i) => head[offset + i] === value);
+  if (at([0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (at([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
+  if (at([0x47, 0x49, 0x46, 0x38])) return "image/gif";
+  if (at([0x52, 0x49, 0x46, 0x46]) && at([0x57, 0x45, 0x42, 0x50], 8)) return "image/webp";
+  if (at([0x66, 0x74, 0x79, 0x70], 4) && at([0x61, 0x76, 0x69, 0x66], 8)) return "image/avif";
+  return null;
+}
+
+/** アップロードのサイズ / MIME / 中身(マジックバイト)を検証する(API 境界で実行)。 */
 export function validateUpload(
   input: UploadValidationInput
 ): { ok: true } | { ok: false; error: string } {
@@ -46,6 +63,13 @@ export function validateUpload(
   }
   if (!(MEDIA_ALLOWED_MIME as readonly string[]).includes(input.type)) {
     return { ok: false, error: "対応していない画像形式です(JPEG/PNG/WebP/GIF/AVIF)。" };
+  }
+  // #SEC-06: クライアント申告の MIME ではなく先頭バイトで実形式を検証し、SVG/HTML 偽装を弾く。
+  if (input.head) {
+    const detected = detectImageMime(input.head);
+    if (detected === null || !(MEDIA_ALLOWED_MIME as readonly string[]).includes(detected)) {
+      return { ok: false, error: "ファイルの中身が画像ではありません(拡張子/MIME の偽装)。" };
+    }
   }
   return { ok: true };
 }

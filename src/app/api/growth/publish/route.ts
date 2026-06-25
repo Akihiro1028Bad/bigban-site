@@ -9,11 +9,9 @@
  *    Content API の `?status=publish` では公開できない(#167 不具合の修正)。
  */
 
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
-import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import {
   draftBodyOf,
   draftLinkOf,
@@ -23,33 +21,13 @@ import {
   STATUS_PROP,
 } from "@/lib/growth/approve";
 import { patchDraft, publishContent } from "@/lib/growth/content";
-import { defaultFetch, getPage, updatePageSelect } from "@/lib/growth/notion";
+import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
 
 const ENDPOINT = "news";
 const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
-
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-/** 公開は最強権限: 認証が無効なら拒否し、有効ならトークンを検証する。 */
-function verifyPublishAuth(url: URL): boolean {
-  if (!APPROVE_AUTH_ENABLED) return false;
-  const token = url.searchParams.get("token") ?? "";
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(token, expected);
-}
-
-function unauthorized(): Response {
-  return NextResponse.json(
-    { success: false, error: "公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。" },
-    { status: 401 }
-  );
-}
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -77,9 +55,14 @@ function contentMicrocmsOptions(): { serviceDomain: string; apiKey: string; fetc
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }
 
+/** Notion ページの「ステータス」select 名を読む(未設定は空)。 */
+function articleStatusOf(page: NotionPage): string {
+  const value = page.properties[STATUS_PROP] as { select?: { name?: string } | null } | undefined;
+  return value?.select?.name ?? "";
+}
+
 export async function POST(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyPublishAuth(url)) return unauthorized();
+  if (!verifyToken(request, true)) return unauthorized("公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。");
 
   let body: unknown;
   try {
@@ -99,6 +82,13 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const page = await getPage(pageId, notionOpts);
+    // #SPEC-14: 既に公開済みなら冪等に 409。二重公開や、手直しした公開タイトルの再上書きを防ぐ。
+    if (articleStatusOf(page) === PUBLISHED_STATUS) {
+      return NextResponse.json(
+        { success: false, error: "この記事は既に公開済みです。" },
+        { status: 409 }
+      );
+    }
     const contentId = draftLinkOf(page).contentId;
     if (!contentId || !CONTENT_ID_RE.test(contentId)) {
       return badRequest("下書きがまだありません。下書き作成後に公開できます。");

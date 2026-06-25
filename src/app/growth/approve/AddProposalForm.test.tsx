@@ -46,7 +46,8 @@ describe("AddProposalForm", () => {
       expect.objectContaining({ id: "n1", title: "平日昼クーポン" })
     );
     const [url, init] = fn.mock.calls[0];
-    expect(url).toBe(`/api/growth/proposals?token=${encodeURIComponent(TOKEN)}`);
+    expect(url).toBe("/api/growth/proposals");
+    expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
     expect(JSON.parse(init.body)).toEqual({
       name: "平日昼クーポン",
       category: "MEO",
