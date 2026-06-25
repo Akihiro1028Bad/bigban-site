@@ -1037,7 +1037,8 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "修正を依頼（コメント1件）" }));
     expect(await within(dialog).findByText(/修正を依頼しました/)).toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe("/api/growth/revise");
+    // 認証有効時は token をクエリで送る(送らないと 401「認証に失敗しました」になる)。
+    expect(post[0]).toBe(`/api/growth/revise?token=${encodeURIComponent(PASS)}`);
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
       comments: [{ line: "見出しA", comment: "3つを箇条書きで" }],
@@ -1195,7 +1196,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     // 他セクション(B)は保持される
     expect(within(dialog).getByText("B")).toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe("/api/growth/revise/edit");
+    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
       outline: "## A改\n新説明\n\n## B\n別説明",
@@ -1276,7 +1277,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect((await within(dialog).findAllByText("新タイトル")).length).toBeGreaterThan(0);
     expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe("/api/growth/revise/edit");
+    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
     expect(JSON.parse(post[1].body)).toEqual({ pageId: "i1", title: "新タイトル" });
   });
 
@@ -1356,7 +1357,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect(await within(dialog).findByText("コート図")).toBeInTheDocument();
     expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe("/api/growth/revise/edit");
+    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
     // 追加したセクション(A)だけにトークンが入り、他セクション(B)は保持される
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
@@ -1496,6 +1497,8 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
 
     await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
     expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
+    // 認証有効時は token をクエリで送る(送らないと 401 になる)。
+    expect(fn.mock.calls[2][0]).toBe(`/api/growth/revise/apply?token=${encodeURIComponent(PASS)}`);
     expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply" });
   });
 
@@ -1513,6 +1516,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     const dialog = await openIdea();
     await userEvent.click(within(dialog).getByRole("button", { name: "やり直し" }));
     expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
+    expect(fn.mock.calls[1][0]).toBe(`/api/growth/revise/apply?token=${encodeURIComponent(PASS)}`);
     expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "discard" });
   });
 
