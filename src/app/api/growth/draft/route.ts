@@ -25,6 +25,7 @@ import {
   ideaTitleOf,
   isNotionPageId,
 } from "@/lib/growth/approve";
+import { bodyCommentViewOf } from "@/lib/growth/bodyComment";
 import { bodyRegenViewOf } from "@/lib/growth/bodyImageRegen";
 import { decorateViewOf } from "@/lib/growth/decorate";
 import { regenViewOf } from "@/lib/growth/eyecatchRegen";
@@ -101,6 +102,8 @@ export async function GET(request: Request): Promise<Response> {
         // 本文画像は対象src付き(どの画像か)、アイキャッチはステータスのみ。
         bodyRegen: bodyRegenViewOf(page),
         eyecatchRegen: regenViewOf(page),
+        // #182: 本文インラインコメントの表示用ビュー(ステータス＋投稿済みコメント)。
+        bodyComment: bodyCommentViewOf(page),
       },
     });
   } catch {
