@@ -261,13 +261,16 @@ describe("PC ループ用 row / stale 回収", () => {
         .requestedAtMs
     ).toBeNull();
   });
-  it("selectStaleBodyCommentIds: timeout 超過の id だけ", () => {
+  it("selectStaleBodyCommentIds: 処理中・依頼中の超過のみ回収し提示中は回収しない(#H29)", () => {
     const now = 1_000_000_000_000;
+    const base = { request: "", bodyHtml: "" };
     const rows = [
-      { id: "old", status: "処理中" as const, requestedAtMs: now - BODY_COMMENT_TIMEOUT_MS - 1, request: "", bodyHtml: "" },
-      { id: "fresh", status: "処理中" as const, requestedAtMs: now - 1000, request: "", bodyHtml: "" },
-      { id: "none", status: "処理中" as const, requestedAtMs: null, request: "", bodyHtml: "" },
+      { id: "old", status: "処理中" as const, requestedAtMs: now - BODY_COMMENT_TIMEOUT_MS - 1, ...base },
+      { id: "pending", status: "依頼中" as const, requestedAtMs: now - BODY_COMMENT_TIMEOUT_MS - 1, ...base },
+      { id: "present", status: "提示中" as const, requestedAtMs: now - BODY_COMMENT_TIMEOUT_MS - 1, ...base },
+      { id: "fresh", status: "処理中" as const, requestedAtMs: now - 1000, ...base },
+      { id: "none", status: "処理中" as const, requestedAtMs: null, ...base },
     ];
-    expect(selectStaleBodyCommentIds(rows, now, BODY_COMMENT_TIMEOUT_MS)).toEqual(["old"]);
+    expect(selectStaleBodyCommentIds(rows, now, BODY_COMMENT_TIMEOUT_MS)).toEqual(["old", "pending"]);
   });
 });

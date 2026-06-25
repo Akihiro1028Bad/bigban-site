@@ -129,9 +129,12 @@ async function write(pageId: string, props: Record<string, unknown>, options: No
   await updatePageProps(pageId, props, options);
 }
 
-/** reaper: 処理中のまま放置された行を失敗へ回収し通知する。 */
+/** reaper: 処理中・依頼中のまま放置された行(PC停止等)を失敗へ回収し通知する(C2 止血)。 */
 async function reap(options: NotionApiOptions): Promise<void> {
-  const rows = await rowsByStatus("処理中", options);
+  const rows = [
+    ...(await rowsByStatus("処理中", options)),
+    ...(await rowsByStatus("依頼中", options)),
+  ];
   const staleIds = new Set(selectStaleReviseIds(rows, Date.now(), REVISE_TIMEOUT_MS));
   for (const row of rows) {
     if (!staleIds.has(row.id)) continue;

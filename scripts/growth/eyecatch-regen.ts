@@ -10,6 +10,7 @@
 import type { FlexBubble } from "./digest-flex";
 import { buildNoticeFlex } from "./notice-flex";
 import { chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 /** Notion「記事ネタ案」に追加する再生成ループ用プロパティ名(手動追加)。 */
 export const REGEN_PROPS = {
@@ -127,6 +128,8 @@ export function regenRowFromPage(page: NotionPage): RegenRow {
 /** 承認画面の表示用ビュー: アイキャッチ再生成ステータス。 */
 export interface EyecatchRegenView {
   status: RegenStatus;
+  /** 依頼時刻(ms)。経過時間/滞留警告の表示用(#C2 UI)。 */
+  requestedAtMs?: number | null;
 }
 
 /**
@@ -134,29 +137,23 @@ export interface EyecatchRegenView {
  * 承認画面が「依頼中/処理中/失敗」をバッジ表示するために status だけ返す。
  */
 export function regenViewOf(page: NotionPage): EyecatchRegenView {
-  return { status: regenRowFromPage(page).status };
+  const row = regenRowFromPage(page);
+  return { status: row.status, requestedAtMs: row.requestedAtMs };
 }
 
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const REGEN_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
- * 処理中のまま timeoutMs を超えた行(PC が落ちた等)の id を返す(reaper 対象)。
- * 依頼時刻が無い行は対象にしない(誤回収を避ける)。
+ * 処理中・依頼中のまま timeoutMs を超えた行(PC が落ちた/拾う前に止まった)の id を返す(reaper 対象)。
+ * 依頼時刻が無い行・提示中は対象にしない(誤回収を避ける)。判定は共通の {@link selectStaleJobIds}。
  */
 export function selectStaleRegenIds(
   rows: readonly RegenRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter(
-      (r) =>
-        r.status === "処理中" &&
-        r.requestedAtMs !== null &&
-        nowMs - r.requestedAtMs > timeoutMs
-    )
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }
 
 /** 再生成完了の LINE 本文(承認画面URLへ誘導)。 */

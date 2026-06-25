@@ -127,7 +127,7 @@ describe("regenViewOf", () => {
 
   it("ステータスだけを表示用に返す", () => {
     const view = regenViewOf(page({ "アイキャッチ再生成ステータス": { select: { name: "依頼中" } } }));
-    expect(view).toEqual({ status: "依頼中" });
+    expect(view).toEqual({ status: "依頼中", requestedAtMs: null });
   });
 
   it("未設定・不正ステータスはなし", () => {
@@ -146,8 +146,8 @@ describe("selectStaleRegenIds", () => {
     { id: "pending", status: "依頼中", requestedAtMs: now - 60 * 60 * 1000, ...base },
   ];
 
-  it("処理中かつ timeout 超過の行だけ回収対象にする", () => {
-    expect(selectStaleRegenIds(rows, now, 15 * 60 * 1000)).toEqual(["stale"]);
+  it("処理中・依頼中で timeout 超過のみ回収(fresh・依頼時刻なしは除外)", () => {
+    expect(selectStaleRegenIds(rows, now, 15 * 60 * 1000)).toEqual(["stale", "pending"]);
   });
 });
 

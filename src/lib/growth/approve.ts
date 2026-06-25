@@ -39,6 +39,8 @@ export interface PendingItem {
   reviseTitleProposal?: string;
   /** 直近に送った修正指示(行コメントの JSON)。記事のみ。 */
   reviseInstructions?: string;
+  /** #C2 UI: 構成案修正の依頼時刻(ms)。経過/滞留表示用。記事のみ・未設定は null。 */
+  reviseRequestedAtMs?: number | null;
   /** 生成済み下書きの microCMS contentId(空=未作成)。下書きプレビュー(#75)の有無判定に使う。記事のみ。 */
   contentId?: string;
   /** 下書き作成済み(=承認後に下書き生成が完了)。下書きタブ(#87)の振り分けに使う。記事のみ。 */
@@ -164,6 +166,13 @@ function numberValue(page: NotionPage, prop: string): number | null {
   return typeof value?.number === "number" ? value.number : null;
 }
 
+/** date プロパティの開始時刻(ms)。未設定は null。経過/滞留表示(#C2 UI)で使う。 */
+function dateStartMs(page: NotionPage, prop: string): number | null {
+  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
+  const start = value?.date?.start;
+  return start ? Date.parse(start) : null;
+}
+
 /** ラベルと値の候補から、値が空でないものだけを details 行にする。 */
 function buildDetails(
   candidates: Array<{ label: string; value: string }>
@@ -221,6 +230,7 @@ export function toPendingItems(
       reviseProposal: richText(page, REVISE_PROPS.proposal),
       reviseTitleProposal: richText(page, REVISE_PROPS.titleProposal),
       reviseInstructions: richText(page, REVISE_PROPS.instructions),
+      reviseRequestedAtMs: dateStartMs(page, REVISE_PROPS.requestedAt),
       contentId,
       isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,
       stage: deriveArticleStage(selectName(page, STATUS_PROP), contentId !== ""),

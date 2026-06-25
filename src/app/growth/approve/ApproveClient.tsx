@@ -72,6 +72,7 @@ import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
+import { StaleNotice } from "./StaleNotice";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
   IMAGE_STYLES,
@@ -130,6 +131,8 @@ interface PendingItem {
   // #139 B: AI が提案した新タイトル(提示中に新旧比較で表示)。空=タイトル提案なし。
   reviseTitleProposal?: string;
   reviseInstructions?: string;
+  // #C2 UI: 構成案修正の依頼時刻(ms)。経過/滞留表示用。未設定は null。
+  reviseRequestedAtMs?: number | null;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
   contentId?: string;
   // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
@@ -153,8 +156,9 @@ interface DraftPreview {
   // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
   decorate?: DecorateView;
   // #166: AI再生成の依頼中/処理中/失敗の表示用ビュー(本文画像は対象src付き)。
-  bodyRegen?: { status: BodyRegenStatus; targetSrc: string };
-  eyecatchRegen?: { status: RegenStatus };
+  // #C2 UI: requestedAtMs は経過/滞留表示用(未設定は null)。
+  bodyRegen?: { status: BodyRegenStatus; targetSrc: string; requestedAtMs?: number | null };
+  eyecatchRegen?: { status: RegenStatus; requestedAtMs?: number | null };
   // #182: 本文インラインコメントの表示用ビュー(ステータス＋投稿済みコメント)。
   bodyComment?: BodyCommentView;
 }
@@ -1796,12 +1800,13 @@ export function ApproveClient() {
     );
   }
 
-  function renderRevisePending() {
+  function renderRevisePending(item: PendingItem) {
     return (
       <div>
         <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
           修正を依頼しました。PCが処理して最大5分で修正案を提示します。
         </p>
+        <StaleNotice requestedAtMs={item.reviseRequestedAtMs ?? null} busy />
         <button
           type="button"
           onClick={() => void refreshItems()}
@@ -1951,6 +1956,7 @@ export function ApproveClient() {
               token={token}
               onReplaced={() => void loadDraft(item.id)}
               regenStatus={draftState.draft.eyecatchRegen?.status}
+              regenRequestedAtMs={draftState.draft.eyecatchRegen?.requestedAtMs ?? null}
             />
             {/* #145: 本文画像の差し替え(画像があるときだけ表示)。保存後は下書きを再取得。 */}
             <BodyImagePicker
@@ -1960,6 +1966,7 @@ export function ApproveClient() {
               onSaved={() => void loadDraft(item.id)}
               regenStatus={draftState.draft.bodyRegen?.status}
               regenTargetSrc={draftState.draft.bodyRegen?.targetSrc}
+              regenRequestedAtMs={draftState.draft.bodyRegen?.requestedAtMs ?? null}
             />
             {/* #146: スタイリング・アドバイザー(read-only)。依頼/閉じる後に下書きを再取得。 */}
             <AdviceCard
@@ -2148,7 +2155,7 @@ export function ApproveClient() {
           )}
         </div>
         {phase === "pending"
-          ? renderRevisePending()
+          ? renderRevisePending(item)
           : phase === "ready"
             ? renderReviseReady(item)
             : phase === "failed"

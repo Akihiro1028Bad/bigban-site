@@ -7,6 +7,8 @@ import Image from "next/image";
 import { REGEN_BUSY_STATUSES, type RegenStatus } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { StaleNotice } from "./StaleNotice";
+
 interface EyecatchPickerProps {
   pageId: string;
   token: string;
@@ -14,6 +16,8 @@ interface EyecatchPickerProps {
   onReplaced: () => void;
   /** #166: アイキャッチ AI 再生成のステータス(依頼中/処理中/失敗/なし)。未指定は「なし」。 */
   regenStatus?: RegenStatus;
+  /** #C2 UI: アイキャッチ再生成の依頼時刻(ms)。経過/滞留表示用。未指定は null。 */
+  regenRequestedAtMs?: number | null;
 }
 
 /** 再生成が進行中(依頼中/処理中)か。進行中は再依頼を無効化しバッジを出す。 */
@@ -45,7 +49,13 @@ function errMsg(error: unknown, fallback: string): string {
  * - 差し替え(#143): microCMS メディアの一覧から選択 or 新規アップロードして即差し替え。
  * - AI 再生成(#144): 指示を添えて PC の画像ループへ再生成を依頼する(プル型・非同期)。
  */
-export function EyecatchPicker({ pageId, token, onReplaced, regenStatus = "なし" }: EyecatchPickerProps) {
+export function EyecatchPicker({
+  pageId,
+  token,
+  onReplaced,
+  regenStatus = "なし",
+  regenRequestedAtMs = null,
+}: EyecatchPickerProps) {
   const [mode, setMode] = useState<Mode>("closed");
   const [list, setList] = useState<ListPhase>({ status: "loading" });
   const [busy, setBusy] = useState(false);
@@ -164,6 +174,7 @@ export function EyecatchPicker({ pageId, token, onReplaced, regenStatus = "な�
             AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
           </p>
         ) : null}
+        <StaleNotice requestedAtMs={regenRequestedAtMs} busy={regenBusy} />
         {regenStatus === "失敗" ? (
           <p role="status" className="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
             AI再生成に失敗しました。もう一度依頼できます。

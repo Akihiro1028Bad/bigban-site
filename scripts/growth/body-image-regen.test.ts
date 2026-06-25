@@ -152,12 +152,12 @@ describe("bodyRegenViewOf", () => {
         "本文画像再生成対象": { rich_text: [{ plain_text: SRC }] },
       })
     );
-    expect(view).toEqual({ status: "処理中", targetSrc: SRC });
+    expect(view).toEqual({ status: "処理中", targetSrc: SRC, requestedAtMs: null });
   });
 
   it("未設定・不正ステータスはなし、対象srcは空文字", () => {
     const view = bodyRegenViewOf(page({ "本文画像再生成ステータス": { select: { name: "謎" } } }));
-    expect(view).toEqual({ status: "なし", targetSrc: "" });
+    expect(view).toEqual({ status: "なし", targetSrc: "", requestedAtMs: null });
   });
 });
 
@@ -171,8 +171,8 @@ describe("selectStaleBodyRegenIds", () => {
     { id: "pending", status: "依頼中", requestedAtMs: now - 60 * 60 * 1000, ...base },
   ];
 
-  it("処理中かつ timeout 超過の行だけ回収対象にする", () => {
-    expect(selectStaleBodyRegenIds(rows, now, 15 * 60 * 1000)).toEqual(["stale"]);
+  it("処理中・依頼中で timeout 超過のみ回収(fresh・依頼時刻なしは除外)", () => {
+    expect(selectStaleBodyRegenIds(rows, now, 15 * 60 * 1000)).toEqual(["stale", "pending"]);
   });
 });
 

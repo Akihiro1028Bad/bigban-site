@@ -9,6 +9,7 @@
  */
 
 import { chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 /** Notion「記事ネタ案」に追加する修正ループ用プロパティ名(#45 でDBに作成)。 */
 export const REVISE_PROPS = {
@@ -278,22 +279,15 @@ export function reviseRowFromPage(page: NotionPage): ReviseRow {
 }
 
 /**
- * 処理中のまま timeoutMs を超えた行(PCが落ちた等)の id を返す(reaper 対象)。
- * 依頼時刻が無い行は対象にしない(誤回収を避ける)。
+ * 処理中・依頼中のまま timeoutMs を超えた行(PCが落ちた/拾う前に止まった)の id を返す(reaper 対象)。
+ * 依頼時刻が無い行・提示中は対象にしない(誤回収を避ける)。判定は共通の {@link selectStaleJobIds}。
  */
 export function selectStaleReviseIds(
   rows: readonly ReviseRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter(
-      (r) =>
-        r.status === "処理中" &&
-        r.requestedAtMs !== null &&
-        nowMs - r.requestedAtMs > timeoutMs
-    )
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }
 
 /** 修正案提示の LINE 本文(承認画面URLへ誘導)。 */

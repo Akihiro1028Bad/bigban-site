@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { FlexBubble } from "./digest-flex";
 import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 /** Notion「記事ネタ案」に追加する装飾ループ用プロパティ名(手動追加)。 */
 export const DECORATE_PROPS = {
@@ -400,13 +401,20 @@ export interface DecorateView {
   status: DecorateStatus;
   proposals: DecorationProposal[];
   raw: string;
+  /** 依頼時刻(ms)。経過時間/滞留警告の表示用(#C2 UI)。 */
+  requestedAtMs?: number | null;
 }
 
 /** ページから装飾の表示用ビューを取り出す(read-only・壊れていても落とさない)。 */
 export function decorateViewOf(page: NotionPage): DecorateView {
   const status = decorateStatusOf(page);
   const raw = readRichTextPlain(page, DECORATE_PROPS.result);
-  return { status, proposals: status === "提示中" ? parseProposals(raw) : [], raw };
+  return {
+    status,
+    proposals: status === "提示中" ? parseProposals(raw) : [],
+    raw,
+    requestedAtMs: readDateStartMs(page, DECORATE_PROPS.requestedAt),
+  };
 }
 
 export interface DecorateRow {
@@ -435,20 +443,13 @@ export function decorateRowFromPage(page: NotionPage): DecorateRow {
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const DECORATE_TIMEOUT_MS = 15 * 60 * 1000;
 
-/** 処理中のまま timeoutMs を超えた行の id を返す(reaper 対象)。依頼時刻が無い行は対象外。 */
+/** 処理中・依頼中で timeoutMs を超えた行の id を返す(reaper 対象)。依頼時刻が無い行・提示中は対象外。 */
 export function selectStaleDecorateIds(
   rows: readonly DecorateRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter(
-      (r) =>
-        r.status === "処理中" &&
-        r.requestedAtMs !== null &&
-        nowMs - r.requestedAtMs > timeoutMs
-    )
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }
 
 /** 装飾提案の LINE 本文(承認画面URLへ誘導)。 */

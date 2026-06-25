@@ -144,6 +144,19 @@ describe("toPendingItems", () => {
     expect(item.reviseTitleProposal).toBe("新しいタイトル案");
   });
 
+  it("記事ネタ案の修正依頼時刻を ms で反映する(#C2 UI: 経過/滞留表示)", () => {
+    const iso = "2026-06-25T00:00:00.000Z";
+    const page = idea("i11", "T", "S");
+    page.properties["修正依頼時刻"] = { type: "date", date: { start: iso } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.reviseRequestedAtMs).toBe(Date.parse(iso));
+  });
+
+  it("修正依頼時刻が未設定なら reviseRequestedAtMs は null", () => {
+    const [item] = toPendingItems([], [idea("i12", "T", "S")]);
+    expect(item.reviseRequestedAtMs).toBeNull();
+  });
+
   it("記事ネタ案の根拠が空なら details から除外する(#238)", () => {
     const noRationale: NotionPage = {
       id: "i2",
@@ -181,6 +194,7 @@ describe("toPendingItems", () => {
         reviseProposal: "",
         reviseTitleProposal: "",
         reviseInstructions: "",
+        reviseRequestedAtMs: null,
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
@@ -232,6 +246,7 @@ describe("toPendingItems", () => {
         reviseProposal: "",
         reviseTitleProposal: "",
         reviseInstructions: "",
+        reviseRequestedAtMs: null,
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
