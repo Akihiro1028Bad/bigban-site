@@ -166,11 +166,13 @@ function numberValue(page: NotionPage, prop: string): number | null {
   return typeof value?.number === "number" ? value.number : null;
 }
 
-/** date プロパティの開始時刻(ms)。未設定は null。経過/滞留表示(#C2 UI)で使う。 */
+/** date プロパティの開始時刻(ms)。未設定・不正日付は null。経過/滞留表示(#C2 UI)で使う。 */
 function dateStartMs(page: NotionPage, prop: string): number | null {
   const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
   const start = value?.date?.start;
-  return start ? Date.parse(start) : null;
+  if (!start) return null;
+  const ms = Date.parse(start);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 /** ラベルと値の候補から、値が空でないものだけを details 行にする。 */

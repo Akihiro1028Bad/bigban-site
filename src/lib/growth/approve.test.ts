@@ -157,6 +157,13 @@ describe("toPendingItems", () => {
     expect(item.reviseRequestedAtMs).toBeNull();
   });
 
+  it("修正依頼時刻が不正日付なら reviseRequestedAtMs は null(NaN を弾く)", () => {
+    const page = idea("i13", "T", "S");
+    page.properties["修正依頼時刻"] = { type: "date", date: { start: "not-a-date" } };
+    const [item] = toPendingItems([], [page]);
+    expect(item.reviseRequestedAtMs).toBeNull();
+  });
+
   it("記事ネタ案の根拠が空なら details から除外する(#238)", () => {
     const noRationale: NotionPage = {
       id: "i2",
