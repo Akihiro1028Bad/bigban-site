@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDraftEditPayload,
-  DRAFT_DECORATIONS,
+  DECORATION_OPTIONS,
   sanitizeDraftHtml,
 } from "./draftEditorContent";
 
@@ -32,11 +32,36 @@ describe("buildDraftEditPayload", () => {
   });
 });
 
-describe("DRAFT_DECORATIONS", () => {
-  it("許可クラス装飾のカタログ(className/label)を提供する", () => {
-    const classNames = DRAFT_DECORATIONS.map((d) => d.className);
-    expect(classNames).toContain("lead");
-    expect(classNames).toContain("note");
-    expect(DRAFT_DECORATIONS.every((d) => d.label.length > 0)).toBe(true);
+describe("DECORATION_OPTIONS", () => {
+  it("装飾カタログ(key/label/kind)を提供する", () => {
+    const keys = DECORATION_OPTIONS.map((d) => d.key);
+    expect(keys).toEqual(["lead", "note", "caution", "highlight", "badge", "mark"]);
+    expect(DECORATION_OPTIONS.every((d) => d.label.length > 0)).toBe(true);
+    expect(DECORATION_OPTIONS.every((d) => ["block", "paragraph", "inline"].includes(d.kind))).toBe(
+      true
+    );
+  });
+
+  it("note/caution/highlight は #147 と同じ aside.<variant> の HTML 例にする", () => {
+    const blocks = DECORATION_OPTIONS.filter((d) => d.kind === "block");
+    for (const d of blocks) {
+      expect(d.sampleHtml).toBe(`<aside class="${d.key}"><p>本文</p></aside>`);
+    }
+  });
+
+  it("各装飾の HTML は STRICT サニタイズを往復しても消えない(保存後も残る)", () => {
+    for (const d of DECORATION_OPTIONS) {
+      const out = sanitizeDraftHtml(d.sampleHtml);
+      if (d.kind === "block") {
+        expect(out).toContain(`<aside class="${d.key}">`);
+      } else if (d.key === "lead") {
+        expect(out).toContain('class="lead"');
+      } else if (d.key === "badge") {
+        expect(out).toContain('class="badge"');
+      } else if (d.key === "mark") {
+        expect(out).toContain("<mark>");
+      }
+      expect(out).toContain("本文");
+    }
   });
 });
