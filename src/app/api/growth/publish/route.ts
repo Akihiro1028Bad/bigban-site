@@ -18,10 +18,11 @@ import {
   draftBodyOf,
   draftLinkOf,
   eyecatchUrlOf,
+  ideaTitleOf,
   isNotionPageId,
   STATUS_PROP,
 } from "@/lib/growth/approve";
-import { publishContent } from "@/lib/growth/content";
+import { patchDraft, publishContent } from "@/lib/growth/content";
 import { defaultFetch, getPage, updatePageSelect } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -68,6 +69,14 @@ function microcmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: ty
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }
 
+// #176: 公開直前のタイトル最終同期(本文書き込み)は content API キーで行う(管理キーは使わない=#76)。
+function contentMicrocmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } | null {
+  const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
+  const apiKey = process.env.MICROCMS_CONTENT_API_KEY;
+  if (!serviceDomain || !apiKey) return null;
+  return { serviceDomain, apiKey, fetchFn: defaultFetch };
+}
+
 export async function POST(request: Request): Promise<Response> {
   const url = new URL(request.url);
   if (!verifyPublishAuth(url)) return unauthorized();
@@ -83,7 +92,8 @@ export async function POST(request: Request): Promise<Response> {
 
   const notionOpts = notionOptions();
   const microOpts = microcmsOptions();
-  if (!notionOpts || !microOpts) {
+  const contentOpts = contentMicrocmsOptions();
+  if (!notionOpts || !microOpts || !contentOpts) {
     return NextResponse.json({ success: false, error: "サーバー設定エラー" }, { status: 500 });
   }
 
@@ -99,6 +109,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (!draftBodyOf(page).trim()) {
       return badRequest("本文が空です。");
+    }
+    // #176: 公開直前に承認画面の正タイトル(Notion タイトル案)を microCMS 下書きへ最終同期する。
+    // これで承認・編集したタイトルが公開記事に確実に反映される(AI 生成時のタイトルで公開しない)。
+    const title = ideaTitleOf(page).trim();
+    if (title) {
+      await patchDraft(ENDPOINT, contentId, { title }, contentOpts);
     }
     await publishContent(ENDPOINT, contentId, microOpts);
     await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);

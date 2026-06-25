@@ -5,7 +5,7 @@ vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageSelect: vi.fn(), defaultFetch: vi.fn() };
 });
-vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn() }));
+vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn(), patchDraft: vi.fn() }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
 vi.mock("@/config/featureFlags", () => ({
@@ -14,7 +14,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { publishContent } from "@/lib/growth/content";
+import { patchDraft, publishContent } from "@/lib/growth/content";
 import { getPage, updatePageSelect } from "@/lib/growth/notion";
 import { POST } from "./route";
 
@@ -27,7 +27,7 @@ function postReq(token: string | null, body: unknown, raw?: string): Request {
   return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
 }
 
-function page(opts: { contentId?: string; eyecatch?: string; body?: string } = {}) {
+function page(opts: { contentId?: string; eyecatch?: string; body?: string; title?: string } = {}) {
   const properties: Record<string, unknown> = {};
   if (opts.contentId !== undefined) {
     properties["下書きID"] = { rich_text: [{ plain_text: opts.contentId }] };
@@ -38,6 +38,9 @@ function page(opts: { contentId?: string; eyecatch?: string; body?: string } = {
   if (opts.body !== undefined) {
     properties["下書き本文HTML"] = { rich_text: [{ plain_text: opts.body }] };
   }
+  if (opts.title !== undefined) {
+    properties["タイトル案"] = { type: "title", title: [{ plain_text: opts.title }] };
+  }
   return { id: PAGE_ID, url: "", properties };
 }
 
@@ -45,6 +48,7 @@ const READY = page({
   contentId: "my-article",
   eyecatch: "https://images.microcms-assets.io/x.png",
   body: "<p>本文</p>",
+  title: "公開する承認タイトル",
 });
 
 beforeEach(() => {
@@ -53,9 +57,11 @@ beforeEach(() => {
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
   process.env.MICROCMS_MANAGEMENT_API_KEY = "mgmt-key";
+  process.env.MICROCMS_CONTENT_API_KEY = "content-key";
   vi.mocked(getPage).mockReset();
   vi.mocked(updatePageSelect).mockReset();
   vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
+  vi.mocked(patchDraft).mockReset().mockResolvedValue("my-article");
 });
 
 afterEach(() => {
@@ -63,6 +69,7 @@ afterEach(() => {
   delete process.env.NOTION_TOKEN;
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_MANAGEMENT_API_KEY;
+  delete process.env.MICROCMS_CONTENT_API_KEY;
   vi.restoreAllMocks();
 });
 
@@ -74,6 +81,40 @@ describe("POST /api/growth/publish", () => {
     expect(await res.json()).toEqual({ success: true });
     expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
     expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
+    // #176: 公開直前に Notion タイトル案を microCMS 下書きの title へ最終同期する(content キー)。
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { title: "公開する承認タイトル" },
+      expect.objectContaining({ apiKey: "content-key" })
+    );
+    // タイトル同期 → 公開の順(公開後に title を変えない)。
+    expect(vi.mocked(patchDraft).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(publishContent).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("MICROCMS_CONTENT_API_KEY 未設定は 500(タイトル最終同期に必要)", async () => {
+    delete process.env.MICROCMS_CONTENT_API_KEY;
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(500);
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("タイトル案が空でも公開はする(title 同期はスキップ)", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "   ",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).toHaveBeenCalled();
   });
 
   it("APPROVE_AUTH_ENABLED が無効なら常に 401(公開は最強権限)", async () => {
