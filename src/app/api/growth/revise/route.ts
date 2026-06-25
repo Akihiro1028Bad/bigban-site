@@ -9,11 +9,9 @@
  * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
  */
 
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
-import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
 import { isNotionPageId, reviseStatusOf } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
@@ -28,23 +26,6 @@ export const runtime = "nodejs";
 /** タイトルへの修正指示(自由文)の上限長。濫用・巨大ペイロード防止(#139 B)。 */
 const MAX_TITLE_INSTRUCTION_LEN = 500;
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-function verifyToken(url: URL): boolean {
-  // 合言葉認証が無効(一時措置)のときは token 検証をスキップする。
-  if (!APPROVE_AUTH_ENABLED) return true;
-  const token = url.searchParams.get("token") ?? "";
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(token, expected);
-}
-
-function unauthorized(): Response {
-  return NextResponse.json({ success: false, error: "認証に失敗しました" }, { status: 401 });
-}
-
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
 }
@@ -56,8 +37,7 @@ function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyToken(url)) return unauthorized();
+  if (!verifyToken(request)) return unauthorized();
 
   let body: unknown;
   try {

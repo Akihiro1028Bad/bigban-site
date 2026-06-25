@@ -11,11 +11,9 @@
  * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate)。強権キーは使わない。
  */
 
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
-import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
 import { adviceViewOf } from "@/lib/growth/advise";
 import { draftBodyOf, isNotionPageId } from "@/lib/growth/approve";
@@ -31,22 +29,6 @@ export const runtime = "nodejs";
 
 /** 一度に採用できる fix の上限(濫用・巨大ペイロード防止)。 */
 const MAX_ADOPTED = 20;
-
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-function verifyToken(url: URL): boolean {
-  if (!APPROVE_AUTH_ENABLED) return true;
-  const token = url.searchParams.get("token") ?? "";
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(token, expected);
-}
-
-function unauthorized(): Response {
-  return NextResponse.json({ success: false, error: "認証に失敗しました" }, { status: 401 });
-}
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -72,8 +54,7 @@ function parseAdoptedIndexes(body: unknown): number[] | null {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyToken(url)) return unauthorized();
+  if (!verifyToken(request)) return unauthorized();
 
   let body: unknown;
   try {

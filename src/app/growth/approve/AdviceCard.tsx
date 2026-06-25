@@ -11,6 +11,7 @@ import {
 } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { authHeaders } from "./authHeaders";
 import { StaleNotice } from "./StaleNotice";
 
 interface AdviceCardProps {
@@ -34,10 +35,6 @@ const SEVERITY_CLASS: Record<string, string> = {
   中: "bg-amber-100 text-amber-700",
   低: "bg-gray-100 text-gray-600",
 };
-
-function withToken(path: string, token: string): string {
-  return `${path}?token=${encodeURIComponent(token)}`;
-}
 
 function errMsg(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -69,9 +66,9 @@ export function AdviceCard({
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(withToken(path, token), {
+      const res = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify(body),
       });
       const json = await readJsonObject(res);
@@ -125,16 +122,16 @@ export function AdviceCard({
     setBusy(true);
     setError("");
     try {
-      const saveRes = await fetch(withToken("/api/growth/draft/edit", token), {
+      const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, bodyHtml: html }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");
-      const clearRes = await fetch(withToken("/api/growth/advise/apply/dismiss", token), {
+      const clearRes = await fetch("/api/growth/advise/apply/dismiss", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
       const clearJson = await readJsonObject(clearRes);

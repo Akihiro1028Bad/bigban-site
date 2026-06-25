@@ -8,11 +8,9 @@
  * Notion 更新には内部インテグレーションの NOTION_TOKEN が必要。
  */
 
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
-import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { DRAFT_READY_STATUS, parseDecisions, toPendingItems } from "@/lib/growth/approve";
 import { defaultFetch, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
 
@@ -22,28 +20,11 @@ const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460"; // 施策提案
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-function unauthorized(): Response {
-  return NextResponse.json({ success: false, error: "認証に失敗しました" }, { status: 401 });
-}
-
 function serverError(): Response {
   return NextResponse.json(
     { success: false, error: "サーバー設定エラー" },
     { status: 500 }
   );
-}
-
-function verifyToken(url: URL): boolean {
-  // 合言葉認証が無効(一時措置)のときは token 検証をスキップする。
-  if (!APPROVE_AUTH_ENABLED) return true;
-  const token = url.searchParams.get("token") ?? "";
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(token, expected);
 }
 
 function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null {
@@ -76,8 +57,7 @@ function proposalStatusFilter(): unknown {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyToken(url)) return unauthorized();
+  if (!verifyToken(request)) return unauthorized();
 
   const options = notionOptions();
   if (!options) return serverError();
@@ -109,8 +89,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyToken(url)) return unauthorized();
+  if (!verifyToken(request)) return unauthorized();
 
   const options = notionOptions();
   if (!options) return serverError();

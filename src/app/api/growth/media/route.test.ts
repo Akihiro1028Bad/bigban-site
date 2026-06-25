@@ -30,8 +30,12 @@ function postReq(body: BodyInit, token: string | null = null, headers?: HeadersI
   return new Request(url, { method: "POST", body, headers });
 }
 
-function pngFile(bytes = 4, name = "a.png", type = "image/png"): File {
-  return new File([new Uint8Array(bytes)], name, { type });
+const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function pngFile(bytes = 8, name = "a.png", type = "image/png"): File {
+  const data = new Uint8Array(Math.max(bytes, PNG_SIG.length));
+  data.set(PNG_SIG);
+  return new File([data], name, { type });
 }
 
 beforeEach(() => {
@@ -129,6 +133,17 @@ describe("POST /api/growth/media", () => {
 
   it("ファイル未指定は 400", async () => {
     const res = await POST(postReq(form()));
+    expect(res.status).toBe(400);
+    expect(uploadMediaBlob).not.toHaveBeenCalled();
+  });
+
+  it("MIME は image/png 申告でも中身が SVG なら 400(#SEC-06 magic byte)", async () => {
+    const svg = new File(
+      [new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'></svg>")],
+      "evil.png",
+      { type: "image/png" }
+    );
+    const res = await POST(postReq(form(svg)));
     expect(res.status).toBe(400);
     expect(uploadMediaBlob).not.toHaveBeenCalled();
   });

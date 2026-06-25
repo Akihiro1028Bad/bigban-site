@@ -45,7 +45,8 @@ describe("DecorationAssistant", () => {
     await userEvent.click(screen.getByRole("button", { name: "装飾を提案" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toContain("/api/growth/decorate?");
+    expect(url).toBe("/api/growth/decorate");
+    expect(init.headers?.Authorization).toMatch(/^Bearer /);
     expect(JSON.parse(init.body).instruction).toBe("強調を");
   });
 
@@ -163,7 +164,7 @@ describe("DecorationAssistant", () => {
     expect(screen.getByText(/OpenAI 503/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "再依頼" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(fetchFn.mock.calls[0][0]).toContain("/api/growth/decorate?");
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/decorate");
   });
 
   it("失敗: raw 空でも文言は出る・閉じるで dismiss", async () => {

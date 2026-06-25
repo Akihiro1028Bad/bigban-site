@@ -7,6 +7,7 @@ import Image from "next/image";
 import { REGEN_BUSY_STATUSES, type RegenStatus } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { authHeaders } from "./authHeaders";
 import { StaleNotice } from "./StaleNotice";
 
 interface EyecatchPickerProps {
@@ -36,10 +37,6 @@ type ListPhase =
 
 type Mode = "closed" | "pick" | "regen";
 
-function withToken(path: string, token: string): string {
-  return `${path}?token=${encodeURIComponent(token)}`;
-}
-
 function errMsg(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -67,7 +64,7 @@ export function EyecatchPicker({
     setList({ status: "loading" });
     setActionError("");
     try {
-      const res = await fetch(withToken("/api/growth/media", token));
+      const res = await fetch("/api/growth/media", { headers: authHeaders(token) });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) throw new Error("メディアの取得に失敗しました。");
       const media = Array.isArray(json.media) ? (json.media as MediaItem[]) : [];
@@ -99,9 +96,9 @@ export function EyecatchPicker({
     setBusy(true);
     setActionError("");
     try {
-      const res = await fetch(withToken("/api/growth/draft/eyecatch", token), {
+      const res = await fetch("/api/growth/draft/eyecatch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, eyecatchUrl }),
       });
       const json = await readJsonObject(res);
@@ -122,7 +119,7 @@ export function EyecatchPicker({
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(withToken("/api/growth/media", token), { method: "POST", body: form });
+      const res = await fetch("/api/growth/media", { method: "POST", headers: authHeaders(token), body: form });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success || typeof json.url !== "string") {
         throw new Error(json.error ?? "アップロードに失敗しました。");
@@ -145,9 +142,9 @@ export function EyecatchPicker({
     setBusy(true);
     setActionError("");
     try {
-      const res = await fetch(withToken("/api/growth/eyecatch/regen", token), {
+      const res = await fetch("/api/growth/eyecatch/regen", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, instruction: regenText.trim() }),
       });
       const json = await readJsonObject(res);

@@ -69,7 +69,7 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 const PASS = "ビックマン";
-const TOKEN_URL = `/api/growth/approve?token=${encodeURIComponent(PASS)}`;
+const TOKEN_URL = "/api/growth/approve";
 
 beforeEach(() => {
   flags.authEnabled = true;
@@ -1038,7 +1038,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect(await within(dialog).findByText(/修正を依頼しました/)).toBeInTheDocument();
     const post = fn.mock.calls[1];
     // 認証有効時は token をクエリで送る(送らないと 401「認証に失敗しました」になる)。
-    expect(post[0]).toBe(`/api/growth/revise?token=${encodeURIComponent(PASS)}`);
+    expect(post[0]).toBe("/api/growth/revise");
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
       comments: [{ line: "見出しA", comment: "3つを箇条書きで" }],
@@ -1196,7 +1196,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     // 他セクション(B)は保持される
     expect(within(dialog).getByText("B")).toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
+    expect(post[0]).toBe("/api/growth/revise/edit");
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
       outline: "## A改\n新説明\n\n## B\n別説明",
@@ -1277,7 +1277,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect((await within(dialog).findAllByText("新タイトル")).length).toBeGreaterThan(0);
     expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
+    expect(post[0]).toBe("/api/growth/revise/edit");
     expect(JSON.parse(post[1].body)).toEqual({ pageId: "i1", title: "新タイトル" });
   });
 
@@ -1357,7 +1357,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect(await within(dialog).findByText("コート図")).toBeInTheDocument();
     expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
     const post = fn.mock.calls[1];
-    expect(post[0]).toBe(`/api/growth/revise/edit?token=${encodeURIComponent(PASS)}`);
+    expect(post[0]).toBe("/api/growth/revise/edit");
     // 追加したセクション(A)だけにトークンが入り、他セクション(B)は保持される
     expect(JSON.parse(post[1].body)).toEqual({
       pageId: "i1",
@@ -1498,7 +1498,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "反映する" }));
     expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
     // 認証有効時は token をクエリで送る(送らないと 401 になる)。
-    expect(fn.mock.calls[2][0]).toBe(`/api/growth/revise/apply?token=${encodeURIComponent(PASS)}`);
+    expect(fn.mock.calls[2][0]).toBe("/api/growth/revise/apply");
     expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply" });
   });
 
@@ -1516,7 +1516,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     const dialog = await openIdea();
     await userEvent.click(within(dialog).getByRole("button", { name: "やり直し" }));
     expect(await within(dialog).findByRole("button", { name: "修正を依頼" })).toBeInTheDocument();
-    expect(fn.mock.calls[1][0]).toBe(`/api/growth/revise/apply?token=${encodeURIComponent(PASS)}`);
+    expect(fn.mock.calls[1][0]).toBe("/api/growth/revise/apply");
     expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "discard" });
   });
 
@@ -1731,7 +1731,7 @@ describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
     expect(screen.queryByLabelText("合言葉")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認する" })).not.toBeInTheDocument();
     // token を付けずに取得する(空 token)
-    expect(fn.mock.calls[0][0]).toBe("/api/growth/approve?token=");
+    expect(fn.mock.calls[0][0]).toBe("/api/growth/approve");
   });
 
   it("承認の保存も token なし(空)で送る", async () => {
@@ -1745,7 +1745,7 @@ describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     expect(await screen.findByText("承認しました")).toBeInTheDocument();
-    expect(fn.mock.calls[1][0]).toBe("/api/growth/approve?token=");
+    expect(fn.mock.calls[1][0]).toBe("/api/growth/approve");
   });
 
   it("自動取得が失敗したらエラーと再読み込みを出し、再取得で復帰する", async () => {
@@ -1805,7 +1805,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "コメント" }));
     await userEvent.click(within(dialog).getByRole("button", { name: /AIに指摘を依頼/ }));
     await waitFor(() =>
-      expect(String(fn.mock.calls[2][0])).toContain("/api/growth/body-comment?")
+      expect(String(fn.mock.calls[2][0])).toContain("/api/growth/body-comment")
     );
     expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
       pageId: "i1",
@@ -2108,11 +2108,40 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       expect(toast).toBeInTheDocument();
 
       await userEvent.click(
-        screen.getByRole("button", { name: "通知を閉じる: 「完成待ち」の下書きが完成しました" })
+        screen.getByRole("button", { name: "通知を閉じる: 🎉 「完成待ち」の下書きが完成しました" })
       );
       expect(
         screen.queryByText("「完成待ち」の下書きが完成しました")
       ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ポーリングが連続失敗すると『最新化できていません』バナーを出し、再試行で消える(#H5)", async () => {
+    flags.authEnabled = false;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "進行中", stage: "generating" })] } },
+        new Error("down"), // poll 失敗1
+        new Error("down"), // poll 失敗2(閾値2)
+        {
+          json: {
+            success: true,
+            items: [ideaItem({ id: "i1", title: "進行中", stage: "drafted", isDraftReady: true })],
+          },
+        } // 再試行 → 成功(以後 in-flight なしで停止)
+      );
+      render(<ApproveClient />);
+      await screen.findByText("進行中");
+      await vi.advanceTimersByTimeAsync(5100);
+      await vi.advanceTimersByTimeAsync(5100);
+      expect(await screen.findByText(/最新情報を取得できていません/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "再試行" }));
+      await waitFor(() =>
+        expect(screen.queryByText(/最新情報を取得できていません/)).not.toBeInTheDocument()
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -2693,6 +2722,8 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     const dialog = await openIdeaWithDraft("コピー対象の本文");
     await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
     expect(writeText).toHaveBeenCalledWith("コピー対象の本文");
+    // M8: 成功トーストを出す(沈黙させない)。
+    expect(await screen.findByText("本文をコピーしました。")).toBeInTheDocument();
   });
 
   it("コピーが拒否(reject)されても握り込んで壊れない", async () => {
@@ -2701,6 +2732,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     const dialog = await openIdeaWithDraft("本文");
     await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
     expect(dialog).toBeInTheDocument();
+    expect(await screen.findByText("コピーに失敗しました。")).toBeInTheDocument();
   });
 
   it("クリップボード非対応でもコピーで壊れない", async () => {
@@ -2709,6 +2741,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
     // 例外で落ちずパネルは開いたまま。
     expect(dialog).toBeInTheDocument();
+    expect(await screen.findByText("このブラウザではコピーできません。")).toBeInTheDocument();
   });
 
   it("下書きプレビューにアイキャッチ差し替え導線(#143)を出す", async () => {
@@ -2793,7 +2826,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
       const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
       expect(draftCalls.length).toBe(2);
     });
-    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/advise?"))).toBe(true);
+    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/advise"))).toBe(true);
   });
 
   it("装飾を提案すると下書きを再取得する(#147 結線)", async () => {
@@ -2815,7 +2848,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
       const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
       expect(draftCalls.length).toBe(2);
     });
-    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/decorate?"))).toBe(true);
+    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/decorate"))).toBe(true);
   });
 
   it("Esc で詳細パネルを閉じる", async () => {
@@ -3238,44 +3271,47 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
     return fn;
   }
 
-  it("下書き段階: 公開ボタンを出し、確認OKで /api/growth/publish に POST する", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  async function confirmDialogButton(name: string): Promise<HTMLElement> {
+    const cd = await screen.findByRole("dialog", { name: "公開・クローズの確認" });
+    return within(cd).getByRole("button", { name });
+  }
+
+  it("下書き段階: 公開ボタンを出し、確認ダイアログ確定で /api/growth/publish に POST する", async () => {
     const fn = await openPanel(
       "drafted",
       { json: { success: true } }, // publish
       { json: { success: true, items: [ideaItem({ contentId: "g-abc", stage: "published" })] } } // pollBoard
     );
     await userEvent.click(screen.getByRole("button", { name: "公開する" }));
+    await userEvent.click(await confirmDialogButton("公開を確定"));
     await waitFor(() =>
       expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(true)
     );
     const call = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/publish"))!;
     expect(JSON.parse(call[1].body).pageId).toBe("i1");
-    confirmSpy.mockRestore();
+    // H2: 公開成功でトーストを出す。
+    expect(await screen.findByText("記事を公開しました。")).toBeInTheDocument();
   });
 
-  it("公開: 確認キャンセルなら POST しない", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("公開: 確認ダイアログをキャンセルすると POST しない", async () => {
     const fn = await openPanel("drafted");
     await userEvent.click(screen.getByRole("button", { name: "公開する" }));
+    await userEvent.click(await confirmDialogButton("キャンセル"));
     expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(false);
-    confirmSpy.mockRestore();
   });
 
   it("公開: 失敗するとエラーを表示する", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     await openPanel("drafted", { ok: false, status: 502, json: { success: false, error: "公開NG" } });
     await userEvent.click(screen.getByRole("button", { name: "公開する" }));
+    await userEvent.click(await confirmDialogButton("公開を確定"));
     expect(await screen.findByText("公開NG")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it("公開: error が無い失敗はフォールバック文言", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     await openPanel("drafted", { ok: false, status: 502, json: { success: false } });
     await userEvent.click(screen.getByRole("button", { name: "公開する" }));
+    await userEvent.click(await confirmDialogButton("公開を確定"));
     expect(await screen.findByText("公開に失敗しました。")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it("公開済み段階: 公開バッジを出し公開ボタンは出さない", async () => {
@@ -3286,14 +3322,14 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
     expect(within(group).getByRole("button", { name: "クローズ（盤から非表示）" })).toBeInTheDocument();
   });
 
-  it("クローズ: 確認OKで decision=クローズ を POST する", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("クローズ: 確認ダイアログ確定で decision=クローズ を POST する", async () => {
     const fn = await openPanel(
       "drafted",
       { json: { success: true } }, // close decision
       { json: { success: true, items: [] } } // pollBoard
     );
     await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
+    await userEvent.click(await confirmDialogButton("クローズを確定"));
     await waitFor(() =>
       expect(
         fn.mock.calls.some(
@@ -3305,24 +3341,21 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
       (c) => String(c[0]).includes("/api/growth/approve") && c[1]?.method === "POST"
     )!;
     expect(JSON.parse(call[1].body).decisions[0].decision).toBe("クローズ");
-    confirmSpy.mockRestore();
   });
 
   it("クローズ: 失敗するとエラーを表示する", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     await openPanel("drafted", { ok: false, status: 502, json: { success: false, error: "クローズNG" } });
     await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
+    await userEvent.click(await confirmDialogButton("クローズを確定"));
     expect(await screen.findByText("クローズNG")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
-  it("クローズ: 確認キャンセルなら POST しない", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("クローズ: 確認ダイアログをキャンセルすると POST しない", async () => {
     const fn = await openPanel("drafted");
     await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
+    await userEvent.click(await confirmDialogButton("キャンセル"));
     expect(
       fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/approve") && c[1]?.method === "POST")
     ).toBe(false);
-    confirmSpy.mockRestore();
   });
 });

@@ -7,34 +7,17 @@
  * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
  */
 
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
-import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { isNotionPageId } from "@/lib/growth/approve";
 import { buildDecorateClearProps } from "@/lib/growth/decorate";
 import { defaultFetch, updatePageProps } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-function verifyToken(url: URL): boolean {
-  if (!APPROVE_AUTH_ENABLED) return true;
-  const token = url.searchParams.get("token") ?? "";
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(token, expected);
-}
-
 export async function POST(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  if (!verifyToken(url)) {
-    return NextResponse.json({ success: false, error: "認証に失敗しました" }, { status: 401 });
-  }
+  if (!verifyToken(request)) return unauthorized();
 
   let body: unknown;
   try {

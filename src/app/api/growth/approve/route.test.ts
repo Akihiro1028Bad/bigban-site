@@ -20,16 +20,20 @@ import { GET, POST } from "./route";
 
 const SECRET = "approve-secret-token";
 
+function authHeaders(token: string | null): Record<string, string> {
+  return token !== null ? { authorization: `Bearer ${token}` } : {};
+}
+
 function getRequest(token: string | null): Request {
-  const url = new URL("http://localhost/api/growth/approve");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url);
+  return new Request("http://localhost/api/growth/approve", { headers: authHeaders(token) });
 }
 
 function postRequest(token: string | null, body: unknown): Request {
-  const url = new URL("http://localhost/api/growth/approve");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: JSON.stringify(body) });
+  return new Request("http://localhost/api/growth/approve", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(body),
+  });
 }
 
 beforeEach(() => {
