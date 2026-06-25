@@ -14,7 +14,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
+import { draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
 import {
   buildBodyMirrorProps,
@@ -95,8 +95,13 @@ export async function POST(request: Request): Promise<Response> {
   if (!notionOpts || !microOpts) return serverError();
 
   let contentId: string;
+  // #176: 承認画面の正タイトル(Notion タイトル案)を microCMS 下書きにも同期し、
+  // 承認画面と公開記事のタイトル不一致を防ぐ。空なら送らない(本文だけ更新)。
+  let title = "";
   try {
-    contentId = draftLinkOf(await getPage(pageId, notionOpts)).contentId;
+    const page = await getPage(pageId, notionOpts);
+    contentId = draftLinkOf(page).contentId;
+    title = ideaTitleOf(page).trim();
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
@@ -124,7 +129,12 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   try {
-    await patchDraft(ENDPOINT, contentId, { bodyHtml: sanitized }, microOpts);
+    await patchDraft(
+      ENDPOINT,
+      contentId,
+      { ...(title ? { title } : {}), bodyHtml: sanitized },
+      microOpts
+    );
   } catch {
     return NextResponse.json(
       { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。再保存してください。" },

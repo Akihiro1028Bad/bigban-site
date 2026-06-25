@@ -31,10 +31,13 @@ function postRequest(token: string | null, body: unknown, raw?: string): Request
   return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
 }
 
-function pageWith(contentId?: string) {
+function pageWith(contentId?: string, title?: string) {
   const properties: Record<string, unknown> = {};
   if (contentId !== undefined) {
     properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
+  }
+  if (title !== undefined) {
+    properties["タイトル案"] = { type: "title", title: [{ plain_text: title }] };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -60,7 +63,7 @@ afterEach(() => {
 
 describe("POST /api/growth/draft/edit", () => {
   it("保存時にサーバで再サニタイズし、危険タグを除去して content キーで patch する", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc"));
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "承認したタイトル"));
 
     const res = await POST(
       postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>本文</p><script>alert(1)</script>" })
@@ -75,6 +78,8 @@ describe("POST /api/growth/draft/edit", () => {
     expect(saved).toContain("本文");
     expect(saved).not.toContain("<script");
     expect(saved).not.toContain("alert");
+    // #176: Notion タイトル案を microCMS 下書きの title にも同期する(承認画面と公開タイトルを一致させる)。
+    expect((data as { title?: string }).title).toBe("承認したタイトル");
     expect((opts as { apiKey: string }).apiKey).toBe("content-key");
 
     // #95: Notion 本文ミラーも同じサニタイズ済みHTMLで更新される。
@@ -84,6 +89,15 @@ describe("POST /api/growth/draft/edit", () => {
       BODY_MIRROR_PROP
     ];
     expect(mirror.rich_text.map((r) => r.text.content).join("")).toBe(saved);
+  });
+
+  it("Notion タイトル案が空なら title を送らない(本文だけ patch・#176)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "   "));
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
+    expect(res.status).toBe(200);
+    const [, , data] = vi.mocked(patchDraft).mock.calls[0];
+    expect(data as Record<string, unknown>).not.toHaveProperty("title");
+    expect((data as { bodyHtml?: string }).bodyHtml).toContain("x");
   });
 
   it("Notion ミラー更新が失敗したら 502(microCMS を叩かない / #95)", async () => {
