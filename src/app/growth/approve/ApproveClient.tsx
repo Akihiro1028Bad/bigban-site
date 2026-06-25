@@ -832,7 +832,7 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise", {
+      const res = await fetch(`/api/growth/revise?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -930,7 +930,7 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise/edit", {
+      const res = await fetch(`/api/growth/revise/edit?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pageId: item.id, ...payload }),
@@ -1064,7 +1064,7 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise/apply", {
+      const res = await fetch(`/api/growth/revise/apply?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pageId: item.id, action }),
