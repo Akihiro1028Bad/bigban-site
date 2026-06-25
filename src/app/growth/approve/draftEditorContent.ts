@@ -28,16 +28,38 @@ export function buildDraftEditPayload(pageId: string, html: string): DraftEditPa
   return { pageId, bodyHtml: sanitizeDraftHtml(html) };
 }
 
-/** クラス装飾(本文サニタイザの許可クラスのうち、エディタから付けられるもの)。 */
-export interface DraftDecoration {
-  className: string;
+/**
+ * ツールバーの装飾(#179)。種別ごとに付け方が異なる:
+ * - block      … 段落を `<aside class="...">` で包むコールアウト(note/caution/highlight)。
+ *                 装飾アシスタント #147 の `applyDecoration` と同一の HTML にして表示を一致させる。
+ * - paragraph  … 現在の段落に `class="lead"` を付ける(リード文)。
+ * - inline     … 選択範囲に `<span class="badge">` / `<mark>` を付ける。
+ *
+ * `sampleHtml` は反映後 HTML の代表例。本文サニタイザ(STRICT)を往復しても装飾が
+ * 消えないこと(=エディタで付けた装飾が保存後も残ること)をテストで担保する。
+ */
+export type DecorationKind = "block" | "paragraph" | "inline";
+
+export type DecorationKey =
+  | "lead"
+  | "note"
+  | "caution"
+  | "highlight"
+  | "badge"
+  | "mark";
+
+export interface DecorationOption {
+  key: DecorationKey;
   label: string;
+  kind: DecorationKind;
+  sampleHtml: string;
 }
 
-export const DRAFT_DECORATIONS: readonly DraftDecoration[] = [
-  { className: "lead", label: "リード文" },
-  { className: "note", label: "ノート" },
-  { className: "caution", label: "注意" },
-  { className: "badge", label: "バッジ" },
-  { className: "highlight", label: "ハイライト" },
+export const DECORATION_OPTIONS: readonly DecorationOption[] = [
+  { key: "lead", label: "リード文", kind: "paragraph", sampleHtml: '<p class="lead">本文</p>' },
+  { key: "note", label: "ノート", kind: "block", sampleHtml: '<aside class="note"><p>本文</p></aside>' },
+  { key: "caution", label: "注意", kind: "block", sampleHtml: '<aside class="caution"><p>本文</p></aside>' },
+  { key: "highlight", label: "ハイライト", kind: "block", sampleHtml: '<aside class="highlight"><p>本文</p></aside>' },
+  { key: "badge", label: "バッジ", kind: "inline", sampleHtml: '<p><span class="badge">本文</span></p>' },
+  { key: "mark", label: "インライン強調", kind: "inline", sampleHtml: "<p><mark>本文</mark></p>" },
 ];
