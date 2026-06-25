@@ -68,6 +68,7 @@ export default defineConfig({
         "scripts/growth/advise-cli.ts",
         "scripts/growth/decorate-cli.ts",
         "scripts/growth/advise-apply-cli.ts",
+        "scripts/growth/comment-revise-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
         // 本文インラインコメント(#182)の薄い DOM 結線。純ロジックは bodyComment.ts でテスト済み。

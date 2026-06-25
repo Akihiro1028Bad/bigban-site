@@ -12,7 +12,7 @@
 import { z } from "zod";
 
 import { splitTopLevelBlocks } from "./decorate";
-import { chunkRichText, type NotionPage } from "./notion";
+import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 
 // ── 文分割 / レビュー行 ──────────────────────────────────────────────
 
@@ -145,6 +145,86 @@ export function selectAnchoredComments(
   return comments.filter((c) => anchorExists(bodyHtml, c.blockIndex, c.excerpt));
 }
 
+// ── PC が返す before/after 案(信頼できない JSON を zod 検証) / 決定的反映 ──────────
+
+export const BodyCommentProposalItemSchema = z.object({
+  /** 対応するコメントの index(送ったコメント配列内)。 */
+  commentIndex: z.number().int().min(0).max(MAX_BODY_COMMENTS),
+  /** 反映前の該当ブロック HTML(照合用)。 */
+  before: z.string().min(1).max(5000),
+  /** AI 書き換え後のブロック HTML(保存時に STRICT 再サニタイズされる)。 */
+  after: z.string().min(1).max(8000),
+});
+export type BodyCommentProposalItem = z.infer<typeof BodyCommentProposalItemSchema>;
+
+export const BodyCommentProposalSchema = z.array(BodyCommentProposalItemSchema).max(MAX_BODY_COMMENTS);
+
+/** 信頼できない反映案 JSON を検証して配列にする。壊れていれば空配列(安全側)。 */
+export function parseBodyCommentProposal(raw: string): BodyCommentProposalItem[] {
+  try {
+    const result = BodyCommentProposalSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 反映案を検証して JSON 文字列にする(PC 書き込み用)。不正なら throw(沈黙させない)。 */
+export function serializeBodyCommentProposal(items: unknown): string {
+  return JSON.stringify(BodyCommentProposalSchema.parse(items));
+}
+
+export interface ApplyOneResult {
+  html: string;
+  applied: boolean;
+  /** 反映できなかった理由(要確認表示用)。成功時は空文字。 */
+  reason: string;
+}
+
+/**
+ * 1 件の反映: `before`(正規化)に一致するトップレベルブロックを `after` で置換する。
+ * 一致が 0 件 / 複数のときは弾く(本文が変わった or 特定不能 = 要確認)。誤適用防止。
+ */
+export function applyBodyCommentItem(bodyHtml: string, item: BodyCommentProposalItem): ApplyOneResult {
+  const beforeNorm = plainText(item.before);
+  const blocks = splitTopLevelBlocks(bodyHtml);
+  const matches = blocks.filter((b) => plainText(b.html) === beforeNorm);
+  if (matches.length === 0) {
+    return { html: bodyHtml, applied: false, reason: "対象の段落が見つかりません(本文が変わった可能性)。要確認。" };
+  }
+  if (matches.length > 1) {
+    return { html: bodyHtml, applied: false, reason: "同じ段落が複数あり特定できません。要確認。" };
+  }
+  const block = matches[0];
+  return { html: bodyHtml.slice(0, block.start) + item.after + bodyHtml.slice(block.end), applied: true, reason: "" };
+}
+
+export interface ApplyManyResult {
+  html: string;
+  applied: number[];
+  skipped: Array<{ commentIndex: number; reason: string }>;
+}
+
+/** 複数案を順に反映する。各 item は毎回その時点の本文で `before` 照合する。 */
+export function applyBodyCommentProposal(
+  bodyHtml: string,
+  items: readonly BodyCommentProposalItem[]
+): ApplyManyResult {
+  let current = bodyHtml;
+  const applied: number[] = [];
+  const skipped: Array<{ commentIndex: number; reason: string }> = [];
+  for (const item of items) {
+    const result = applyBodyCommentItem(current, item);
+    if (result.applied) {
+      current = result.html;
+      applied.push(item.commentIndex);
+    } else {
+      skipped.push({ commentIndex: item.commentIndex, reason: result.reason });
+    }
+  }
+  return { html: current, applied, skipped };
+}
+
 // ── Notion 連携(依頼・状態遷移・読み取り) ──────────────────────────────
 
 /** Notion「記事ネタ案」に追加する本文コメントループ用プロパティ名(手動 or API 追加)。 */
@@ -186,6 +266,30 @@ export function buildBodyCommentRequestProps(
   };
 }
 
+/** ロック取得(依頼中 → 処理中)。 */
+export function buildBodyCommentProcessingProps(): Record<string, unknown> {
+  const processing: BodyCommentStatus = "処理中";
+  return { [BODY_COMMENT_PROPS.status]: { select: { name: processing } } };
+}
+
+/** 完了: before/after 案を書き込み、提示中にする(1 PATCH)。 */
+export function buildBodyCommentPresentProps(proposalJson: string): Record<string, unknown> {
+  const presented: BodyCommentStatus = "提示中";
+  return {
+    [BODY_COMMENT_PROPS.result]: { rich_text: chunkRichText(proposalJson) },
+    [BODY_COMMENT_PROPS.status]: { select: { name: presented } },
+  };
+}
+
+/** 失敗: 失敗にして理由を結果へ入れる(沈黙させない・1 PATCH)。 */
+export function buildBodyCommentFailProps(reason: string): Record<string, unknown> {
+  const failed: BodyCommentStatus = "失敗";
+  return {
+    [BODY_COMMENT_PROPS.status]: { select: { name: failed } },
+    [BODY_COMMENT_PROPS.result]: { rich_text: chunkRichText(reason) },
+  };
+}
+
 /** 「閉じる/反映後」: 指示・結果・ステータスをクリアして「なし」に戻す(本文は触らない)。 */
 export function buildBodyCommentClearProps(): Record<string, unknown> {
   const cleared: BodyCommentStatus = "なし";
@@ -221,15 +325,61 @@ export interface BodyCommentView {
   status: BodyCommentStatus;
   /** 投稿済みコメント(JSON が妥当なときのみ非空)。 */
   comments: BodyComment[];
+  /** 提示中で JSON が妥当なときのみ非空の before/after 案。 */
+  proposal: BodyCommentProposalItem[];
   /** 結果欄の生テキスト(失敗理由など・表示用)。 */
   raw: string;
 }
 
 export function bodyCommentViewOf(page: NotionPage): BodyCommentView {
   const status = bodyCommentStatusOf(page);
+  const raw = readRichTextPlain(page, BODY_COMMENT_PROPS.result);
   return {
     status,
     comments: parseBodyComments(readRichTextPlain(page, BODY_COMMENT_PROPS.request)),
-    raw: readRichTextPlain(page, BODY_COMMENT_PROPS.result),
+    proposal: status === "提示中" ? parseBodyCommentProposal(raw) : [],
+    raw,
   };
+}
+
+// ── PC ループ(comment-revise)用の行読み取り / stale 回収 ─────────────────
+
+function readDateStartMs(page: NotionPage, prop: string): number | null {
+  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
+  const start = value?.date?.start;
+  if (!start) return null;
+  const ms = Date.parse(start);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** PC ループが処理する1行(依頼中/処理中)。request=投稿コメントJSON、bodyHtml=下書きミラー本文。 */
+export interface BodyCommentRow {
+  id: string;
+  status: BodyCommentStatus;
+  requestedAtMs: number | null;
+  request: string;
+  bodyHtml: string;
+}
+
+export function bodyCommentRowFromPage(page: NotionPage): BodyCommentRow {
+  return {
+    id: page.id,
+    status: bodyCommentStatusOf(page),
+    requestedAtMs: readDateStartMs(page, BODY_COMMENT_PROPS.requestedAt),
+    request: readRichTextPlain(page, BODY_COMMENT_PROPS.request),
+    bodyHtml: readRichTextPlain(page, BODY_MIRROR_PROP),
+  };
+}
+
+/** 処理中のまま放置された(timeout 超過)行 id。PC 再起動等の stale-lock を回収するため。 */
+export const BODY_COMMENT_TIMEOUT_MS = 15 * 60 * 1000;
+
+export function selectStaleBodyCommentIds(
+  rows: readonly BodyCommentRow[],
+  nowMs: number,
+  timeoutMs: number
+): string[] {
+  return rows
+    .filter((r) => r.requestedAtMs !== null && nowMs - r.requestedAtMs > timeoutMs)
+    .map((r) => r.id);
 }

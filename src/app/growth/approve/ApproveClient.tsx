@@ -1983,7 +1983,7 @@ export function ApproveClient() {
               pageId={item.id}
               token={token}
               bodyHtml={draftState.draft.bodyHtml}
-              status={draftState.draft.bodyComment?.status ?? "なし"}
+              bodyComment={draftState.draft.bodyComment}
               onChanged={() => void loadDraft(item.id)}
             />
             {/* #167: 公開・クローズ。取り消しづらい外向き操作のため確認ダイアログを挟む。 */}
