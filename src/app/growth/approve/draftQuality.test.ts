@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { draftQuality, QUALITY_THRESHOLDS } from "./draftQuality";
+import {
+  detectDoNotWrite,
+  draftPlainText,
+  draftQuality,
+  extractInternalLinkPaths,
+  findBrokenInternalLinks,
+  hasBlockingCheck,
+  QUALITY_THRESHOLDS,
+} from "./draftQuality";
+
+const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 function pick(checks: ReturnType<typeof draftQuality>, label: string) {
   const found = checks.find((c) => c.label === label);
@@ -8,38 +18,47 @@ function pick(checks: ReturnType<typeof draftQuality>, label: string) {
   return found;
 }
 
+function okHtml(): string {
+  return (
+    "<h2>見出し1</h2><h2>見出し2</h2>" +
+    "<figure><img src='x'></figure>" +
+    '<a href="/ja/news/a">内部</a>'
+  );
+}
+
 describe("draftQuality", () => {
-  it("十分な下書きは全項目 ok", () => {
-    const body = "あ".repeat(QUALITY_THRESHOLDS.minChars);
-    const bodyHtml =
-      "<h2>見出し1</h2><h2>見出し2</h2>" +
-      "<figure><img src='x'></figure>" +
-      '<a href="https://thepicklebang.com/news/a">内部</a>';
-    const checks = draftQuality({ bodyHtml, body, title: "短いタイトル" });
-    expect(pick(checks, "文字数").ok).toBe(true);
-    expect(pick(checks, "見出し").ok).toBe(true);
-    expect(pick(checks, "画像").ok).toBe(true);
-    expect(pick(checks, "内部リンク").ok).toBe(true);
-    expect(pick(checks, "タイトル長").ok).toBe(true);
+  it("十分な下書き(免責あり・断定なし)は全項目 ok・公開ブロックなし", () => {
+    const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + DISCLAIMER;
+    const checks = draftQuality({ bodyHtml: okHtml(), body, title: "短いタイトル" });
+    for (const label of ["文字数", "見出し", "画像", "内部リンク", "タイトル長", "AI免責文", "断定NG(可変情報)"]) {
+      expect(pick(checks, label).level).toBe("ok");
+    }
+    expect(hasBlockingCheck(checks)).toBe(false);
   });
 
-  it("不足している下書きは warn(ok=false)", () => {
+  it("文字数: 下限未満は warn、上限超過(水増し)は warn、境界は ok", () => {
+    const { min, max } = QUALITY_THRESHOLDS.chars.single;
+    expect(pick(draftQuality({ bodyHtml: "", body: "短い", title: "t" }), "文字数").level).toBe("warn");
+    expect(pick(draftQuality({ bodyHtml: "", body: "あ".repeat(min), title: "t" }), "文字数").level).toBe("ok");
+    expect(pick(draftQuality({ bodyHtml: "", body: "あ".repeat(max + 1), title: "t" }), "文字数").hint).toBe("水増し疑い(冗長)");
+  });
+
+  it("文字数: cornerstone は 3000字下限", () => {
+    const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min); // 1500: single では ok だが
+    expect(pick(draftQuality({ bodyHtml: "", body, title: "t", articleType: "cornerstone" }), "文字数").level).toBe("warn");
+  });
+
+  it("見出し/画像/内部リンク/タイトル長 の不足は warn", () => {
     const checks = draftQuality({
       bodyHtml: "<p>短い</p>",
       body: "短い",
       title: "あ".repeat(QUALITY_THRESHOLDS.maxTitleLen + 1),
     });
-    expect(pick(checks, "文字数").ok).toBe(false);
-    expect(pick(checks, "見出し").ok).toBe(false);
-    expect(pick(checks, "画像").ok).toBe(false); // 0/3
-    expect(pick(checks, "内部リンク").ok).toBe(false); // 0
-    expect(pick(checks, "タイトル長").ok).toBe(false); // 長すぎ
+    expect(pick(checks, "見出し").level).toBe("warn");
+    expect(pick(checks, "画像").level).toBe("warn");
     expect(pick(checks, "画像").value).toBe("0 / 3");
-  });
-
-  it("h2/h3 を見出しとして数える", () => {
-    const checks = draftQuality({ bodyHtml: "<h2>A</h2><h3>B</h3>", body: "x", title: "t" });
-    expect(pick(checks, "見出し").value).toBe("2");
+    expect(pick(checks, "内部リンク").level).toBe("warn");
+    expect(pick(checks, "タイトル長").level).toBe("warn");
   });
 
   it("内部リンクは thepicklebang.com とルート相対(/...)を数え、外部は除く", () => {
@@ -47,19 +66,101 @@ describe("draftQuality", () => {
       '<a href="https://thepicklebang.com/x">in1</a>' +
       '<a href="/news/y">in2</a>' +
       '<a href="https://example.com/z">外部</a>';
-    const checks = draftQuality({ bodyHtml, body: "x", title: "t" });
-    expect(pick(checks, "内部リンク").value).toBe("2");
+    expect(pick(draftQuality({ bodyHtml, body: "x", title: "t" }), "内部リンク").value).toBe("2");
   });
 
-  it("body が空なら bodyHtml からタグを除いて文字数を数える", () => {
-    const bodyHtml = `<p>${"あ".repeat(QUALITY_THRESHOLDS.minChars)}</p>`;
-    const checks = draftQuality({ bodyHtml, body: "", title: "t" });
-    expect(pick(checks, "文字数").ok).toBe(true);
+  it("AI免責文が無いと block(赤・公開ブロック)", () => {
+    const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min); // 免責文なし
+    const checks = draftQuality({ bodyHtml: okHtml(), body, title: "t" });
+    expect(pick(checks, "AI免責文").level).toBe("block");
+    expect(hasBlockingCheck(checks)).toBe(true);
   });
 
-  it("文字数は境界値(minChars)で ok", () => {
-    const body = "あ".repeat(QUALITY_THRESHOLDS.minChars);
-    const checks = draftQuality({ bodyHtml: "", body, title: "t" });
-    expect(pick(checks, "文字数").ok).toBe(true);
+  it("§13 断定NG(料金/営業時間/コート面数/所要分)は block", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    expect(pick(draftQuality({ ...base, body: `月額5,000円${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `営業時間は10時から${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `コート4面完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩5分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+  });
+
+  it("body が空なら bodyHtml からタグを除いて判定する", () => {
+    const bodyHtml = `<p>${"あ".repeat(QUALITY_THRESHOLDS.chars.single.min)}${DISCLAIMER}</p>`;
+    expect(pick(draftQuality({ bodyHtml, body: "", title: "t" }), "文字数").level).toBe("ok");
+  });
+});
+
+describe("extractInternalLinkPaths", () => {
+  it("内部リンクを正規化パスで抽出し、外部は除く", () => {
+    const html =
+      '<a href="https://thepicklebang.com/ja/news/a?x=1#h">in1</a>' +
+      '<a href="/ja/news/b/">in2</a>' +
+      '<a href="https://example.com/z">外部</a>';
+    expect(extractInternalLinkPaths(html)).toEqual(["/ja/news/a", "/ja/news/b"]);
+  });
+
+  it("ホスト/相対のルートは / に正規化し、href が無ければ空配列", () => {
+    expect(extractInternalLinkPaths('<a href="https://thepicklebang.com/">top</a>')).toEqual(["/"]);
+    expect(extractInternalLinkPaths('<a href="/">top</a>')).toEqual(["/"]);
+    expect(extractInternalLinkPaths("<p>本文(リンク無し)</p>")).toEqual([]);
+  });
+});
+
+describe("findBrokenInternalLinks", () => {
+  const known = new Set(["/ja/news/exists"]);
+  it("既知に無い記事リンクだけを壊れと判定(一覧/静的は対象外)", () => {
+    const html =
+      '<a href="/ja/news/exists">ok</a>' +
+      '<a href="/ja/news/missing">壊れ</a>' +
+      '<a href="/ja/news">一覧</a>' +
+      '<a href="/ja/about">施設</a>';
+    expect(findBrokenInternalLinks(html, known)).toEqual(["/ja/news/missing"]);
+  });
+});
+
+describe("draftQuality: 内部リンク先(#H19)", () => {
+  const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + DISCLAIMER;
+  it("knownNewsPaths 未指定なら『内部リンク先』チェックは出さない", () => {
+    const checks = draftQuality({ bodyHtml: okHtml(), body, title: "t" });
+    expect(checks.find((c) => c.label === "内部リンク先")).toBeUndefined();
+  });
+  it("壊れ記事リンクがあると block", () => {
+    const bodyHtml = okHtml() + '<a href="/ja/news/missing">壊れ</a>';
+    const checks = draftQuality({ bodyHtml, body, title: "t", knownNewsPaths: new Set(["/ja/news/a"]) });
+    expect(pick(checks, "内部リンク先").level).toBe("block");
+  });
+  it("全て実在すれば ok", () => {
+    const checks = draftQuality({
+      bodyHtml: okHtml(),
+      body,
+      title: "t",
+      knownNewsPaths: new Set(["/ja/news/a"]),
+    });
+    expect(pick(checks, "内部リンク先").level).toBe("ok");
+  });
+});
+
+describe("detectDoNotWrite", () => {
+  it("該当カテゴリのラベルを返す", () => {
+    expect(detectDoNotWrite("コート4面・月額3000円")).toEqual(["料金", "コート面数"]);
+  });
+  it("該当なしは空", () => {
+    expect(detectDoNotWrite("市川の屋内コートで打てる")).toEqual([]);
+  });
+});
+
+describe("draftPlainText", () => {
+  it("body 優先、無ければ bodyHtml のタグを除去する", () => {
+    expect(draftPlainText("<p>x</p>", "本文")).toBe("本文");
+    expect(draftPlainText("<p>タグ除去</p>", "")).toBe("タグ除去");
+  });
+});
+
+describe("hasBlockingCheck", () => {
+  it("block があれば true", () => {
+    expect(hasBlockingCheck([{ label: "x", value: "", level: "block" }])).toBe(true);
+  });
+  it("warn/ok だけなら false", () => {
+    expect(hasBlockingCheck([{ label: "x", value: "", level: "warn" }, { label: "y", value: "", level: "ok" }])).toBe(false);
   });
 });

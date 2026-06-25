@@ -1502,6 +1502,17 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply" });
   });
 
+  it("元の構成案が未設定でも修正案の差分を表示する(#M4・outline欠落)", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ reviseStatus: "提示中", reviseProposal: "## 新しい構成" })],
+      },
+    });
+    const dialog = await openIdea();
+    expect(await within(dialog).findByLabelText("元と新の差分")).toBeInTheDocument();
+  });
+
   it("やり直しで修正案を破棄し、再コメントできる", async () => {
     const fn = mockFetchSequence(
       {
@@ -3249,11 +3260,24 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
 });
 
 describe("ApproveClient 公開・クローズ(#167)", () => {
+  // #H4: 公開前チェックが全て緑になる妥当な下書き(免責文あり・断定なし・十分な分量/見出し/画像/内部リンク)。
+  const VALID_DRAFT_HTML =
+    "<h2>見出し1</h2><h2>見出し2</h2>" +
+    "<figure><img src='x' alt='図'></figure>" +
+    '<a href="/ja/news/a">関連記事</a>' +
+    `<p>${"あ".repeat(1500)}</p>` +
+    "<p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>";
   const DRAFT = {
     json: {
       success: true,
       exists: true,
-      draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "" },
+      draft: {
+        title: "T",
+        displayMode: "html",
+        bodyHtml: VALID_DRAFT_HTML,
+        body: "",
+        knownNewsPaths: ["/ja/news/a"],
+      },
     },
   };
 
@@ -3298,6 +3322,26 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
     await userEvent.click(screen.getByRole("button", { name: "公開する" }));
     await userEvent.click(await confirmDialogButton("キャンセル"));
     expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(false);
+  });
+
+  it("公開前チェックに赤(§5免責欠落)があると公開ボタンを無効化し赤ヒントを出す(#H4)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc", stage: "drafted" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>短い本文(免責なし)</p>", body: "" },
+        },
+      }
+    );
+    flags.authEnabled = false;
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog");
+    expect(screen.getByRole("button", { name: "公開する" })).toBeDisabled();
+    expect(screen.getByText(/公開前チェックに赤/)).toBeInTheDocument();
   });
 
   it("公開: 失敗するとエラーを表示する", async () => {

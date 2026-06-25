@@ -28,6 +28,7 @@ import { bodyRegenViewOf } from "@/lib/growth/bodyImageRegen";
 import { decorateViewOf } from "@/lib/growth/decorate";
 import { regenViewOf } from "@/lib/growth/eyecatchRegen";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
+import { getNewsSlugs } from "@/lib/microcms/queries";
 
 export const runtime = "nodejs";
 
@@ -63,6 +64,16 @@ export async function GET(request: Request): Promise<Response> {
       // まだ本文ミラーが保存されていない(下書きモード未実行 / 旧記事)。
       return NextResponse.json({ success: true, exists: false, draft: null });
     }
+    // #H19: 壊れ内部リンク検査用に公開記事の slug 一覧を取得する(公開リスト=ドラフトではない#95対象外)。
+    // 取得不可(未設定/障害)でも本文表示は止めない。未設定なら承認画面は壊れリンク検査をスキップする。
+    let knownNewsPaths: string[] | undefined;
+    try {
+      knownNewsPaths = (await getNewsSlugs())
+        .filter((s) => s.locale === "ja")
+        .map((s) => `/ja/news/${s.slug}`);
+    } catch {
+      knownNewsPaths = undefined;
+    }
     // #95: 本文ミラーは常に html モード。NewsBodyRenderer(#75)が bodyHtml をそのまま使う。
     return NextResponse.json({
       success: true,
@@ -72,6 +83,8 @@ export async function GET(request: Request): Promise<Response> {
         displayMode: "html",
         bodyHtml,
         body: "",
+        // #H19: 既知の公開記事リンクパス(壊れ内部リンク検査用・取得不可なら未設定)。
+        knownNewsPaths,
         // #141: アイキャッチURLミラー(未設定は空文字)。プレビューが画像表示に使う。
         eyecatch: eyecatchUrlOf(page),
         // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済みアドバイス)。

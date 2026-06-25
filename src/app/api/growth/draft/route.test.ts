@@ -14,7 +14,11 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
+// #H19: 公開記事 slug 取得をモック(壊れ内部リンク検査の既知集合)。
+vi.mock("@/lib/microcms/queries", () => ({ getNewsSlugs: vi.fn() }));
+
 import { getPage } from "@/lib/growth/notion";
+import { getNewsSlugs } from "@/lib/microcms/queries";
 import { GET } from "./route";
 
 const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
@@ -48,6 +52,8 @@ beforeEach(() => {
   flags.authEnabled = false;
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(getPage).mockReset();
+  vi.mocked(getNewsSlugs).mockReset();
+  vi.mocked(getNewsSlugs).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -76,8 +82,31 @@ describe("GET /api/growth/draft", () => {
         bodyRegen: { status: "なし", targetSrc: "", requestedAtMs: null },
         eyecatchRegen: { status: "なし", requestedAtMs: null },
         bodyComment: { status: "なし", comments: [], proposal: [], raw: "" },
+        knownNewsPaths: [],
       },
     });
+  });
+
+  it("#H19: 公開記事 slug を /ja/news/<slug> パスにして knownNewsPaths に入れる(ja のみ)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
+    vi.mocked(getNewsSlugs).mockResolvedValue([
+      { locale: "ja", slug: "a" },
+      { locale: "en", slug: "b" },
+    ]);
+    const json = (await (await GET(getRequest(null, PAGE_ID))).json()) as {
+      draft: { knownNewsPaths: string[] };
+    };
+    expect(json.draft.knownNewsPaths).toEqual(["/ja/news/a"]);
+  });
+
+  it("#H19: slug 取得に失敗しても本文は返し knownNewsPaths は undefined(検査スキップ)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
+    vi.mocked(getNewsSlugs).mockRejectedValue(new Error("microcms down"));
+    const res = await GET(getRequest(null, PAGE_ID));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { exists: boolean; draft: { knownNewsPaths?: string[] } };
+    expect(json.exists).toBe(true);
+    expect(json.draft.knownNewsPaths).toBeUndefined();
   });
 
   it("AI再生成の依頼中ステータスを draft に含める(#166)", async () => {
