@@ -14,6 +14,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { growthApiError } from "@/lib/growth/apiError";
 import { isNotionPageId, reviseStatusOf } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
 import {
@@ -117,12 +118,10 @@ export async function POST(request: Request): Promise<Response> {
       ),
       options
     );
-  } catch {
-    // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)
-    return NextResponse.json(
-      { success: false, error: "修正依頼の登録に失敗しました" },
-      { status: 502 }
-    );
+  } catch (error) {
+    // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)。真因はサーバログへ(#177)。
+    const { status, body } = growthApiError("revise", error, "修正依頼の登録に失敗しました");
+    return NextResponse.json(body, { status });
   }
 
   return NextResponse.json({ success: true });

@@ -13,6 +13,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { growthApiError } from "@/lib/growth/apiError";
 import {
   isNotionPageId,
   reviseProposalOf,
@@ -104,11 +105,10 @@ export async function POST(request: Request): Promise<Response> {
       }
       await updatePageProps(pageId, buildReviseDiscardProps(), options);
     }
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "更新中にエラーが発生しました" },
-      { status: 502 }
-    );
+  } catch (error) {
+    // 真因はサーバログへ。Notion プロパティ欠落は 500＋プロパティ名で可視化(#177)。
+    const { status, body } = growthApiError("revise/apply", error, "更新中にエラーが発生しました");
+    return NextResponse.json(body, { status });
   }
 
   return NextResponse.json({ success: true });

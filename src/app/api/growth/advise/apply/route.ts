@@ -16,6 +16,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { growthApiError } from "@/lib/growth/apiError";
 import { adviceViewOf } from "@/lib/growth/advise";
 import { draftBodyOf, isNotionPageId } from "@/lib/growth/approve";
 import {
@@ -109,11 +110,10 @@ export async function POST(request: Request): Promise<Response> {
       return badRequest("反映できる採用がありません(quote 必須・文体/読みやすさ/構成のみ)。");
     }
     await updatePageProps(pageId, buildApplyRequestProps(adopted, new Date().toISOString()), options);
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "反映依頼の登録に失敗しました" },
-      { status: 502 }
-    );
+  } catch (error) {
+    // 真因はサーバログへ。Notion プロパティ欠落は 500＋プロパティ名で可視化(#177)。
+    const { status, body } = growthApiError("advise/apply", error, "反映依頼の登録に失敗しました");
+    return NextResponse.json(body, { status });
   }
 
   return NextResponse.json({ success: true });
