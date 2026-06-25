@@ -207,6 +207,33 @@ describe("AdviceCard 採用→本文反映(#165)", () => {
     expect(screen.queryByRole("checkbox", { name: /採用/ })).not.toBeInTheDocument();
   });
 
+  it("引用が無い修正案には理由を表示する(#178)", () => {
+    setup(FULL_ADVICE, { adviceApply: APPLY_NONE, bodyHtml: BODY });
+    // fix[1](見た目・quote無し)はチェック不可だが、なぜ不可かを理由表示する。
+    expect(screen.queryByRole("checkbox", { name: "修正案2を採用" })).not.toBeInTheDocument();
+    expect(screen.getByText("引用がないため自動反映できません")).toBeInTheDocument();
+  });
+
+  it("事実・タイトル等の除外カテゴリは『助言のみ』理由を表示する(#178)", () => {
+    const advice: AdviceView = {
+      status: "提示中",
+      raw: "",
+      advice: {
+        summary: "s",
+        scores: [],
+        strengths: [],
+        fixes: [
+          { area: "正確性", severity: "高", quote: "重要です。", reason: "r", suggestion: "g" },
+        ],
+      },
+    };
+    setup(advice, { adviceApply: APPLY_NONE, bodyHtml: BODY });
+    expect(screen.queryByRole("checkbox", { name: /採用/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("助言のみ（事実・タイトル・リンク等は自動反映の対象外）")
+    ).toBeInTheDocument();
+  });
+
   it("採用チェックは付け外しできる(再クリックで解除)", async () => {
     setup(FULL_ADVICE, { adviceApply: APPLY_NONE, bodyHtml: BODY });
     const checkbox = screen.getByRole("checkbox", { name: "修正案1を採用" });

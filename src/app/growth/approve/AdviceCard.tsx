@@ -5,7 +5,8 @@ import { useState } from "react";
 import type { AdviceFix, AdviceView } from "@/lib/growth/advise";
 import {
   applyAdviceItems,
-  selectApplicableFixes,
+  classifyFix,
+  FIX_REASON_NO_QUOTE,
   type AdviceApplyView,
 } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
@@ -155,10 +156,10 @@ export function AdviceCard({
     ) : null;
   }
 
-  function renderFix(fix: AdviceFix, i: number, selectable: boolean) {
+  function renderFix(fix: AdviceFix, i: number, selectable: boolean, reason: string | null) {
     return (
       <li key={i} className="rounded-md border border-gray-200 bg-white p-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectable ? (
             <label className="flex items-center gap-1 text-[10px] text-blue-700">
               <input
@@ -176,6 +177,15 @@ export function AdviceCard({
             {fix.severity}
           </span>
           <span className="text-[11px] font-semibold text-gray-600">{fix.area}</span>
+          {/* #178: 自動反映できない理由を表示(なぜチェックできないかを明示・沈黙させない)。 */}
+          {reason ? (
+            <span
+              className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500"
+              title={reason}
+            >
+              {reason}
+            </span>
+          ) : null}
         </div>
         {fix.quote ? (
           <p className="mt-1 border-l-2 border-gray-300 pl-2 text-[11px] italic text-gray-500">「{fix.quote}」</p>
@@ -196,10 +206,12 @@ export function AdviceCard({
         </div>
       );
     }
-    // #165: 本文反映の採用候補(quote 必須・反映可能カテゴリ・一意アンカー)。反映が「なし」のときだけ選べる。
-    const applicable = bodyHtml ? selectApplicableFixes(data.fixes, bodyHtml) : [];
-    const applicableSet = new Set(applicable.map((f) => f.index));
-    const selectable = applyStatus === "なし" && applicable.length > 0;
+    // #165/#178: 各 fix を分類(applicable か、不可なら理由)。反映が「なし」のときだけ選べる。
+    const canSelect = applyStatus === "なし" && !!bodyHtml;
+    const classifications = data.fixes.map((f) =>
+      bodyHtml ? classifyFix(f, bodyHtml) : ({ applicable: false, reason: FIX_REASON_NO_QUOTE } as const)
+    );
+    const selectable = canSelect && classifications.some((c) => c.applicable);
     return (
       <div>
         <p className="text-xs text-gray-800">{data.summary}</p>
@@ -227,7 +239,15 @@ export function AdviceCard({
           <div className="mt-2">
             <h5 className="text-[11px] font-bold text-amber-700">直すべき点</h5>
             <ul className="mt-1 space-y-1.5">
-              {data.fixes.map((fix, i) => renderFix(fix, i, selectable && applicableSet.has(i)))}
+              {data.fixes.map((fix, i) => {
+                const c = classifications[i];
+                return renderFix(
+                  fix,
+                  i,
+                  canSelect && c.applicable,
+                  canSelect && !c.applicable ? c.reason : null
+                );
+              })}
             </ul>
           </div>
         ) : null}

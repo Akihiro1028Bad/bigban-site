@@ -25,26 +25,50 @@ import { splitTopLevelBlocks } from "./decorate";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 
 // ── 反映可能カテゴリの判定(決定: 文体・読みやすさ・構成のみ) ──────────────────
-/** 事実・正確性・数値・タイトル・リンクに関わる area は反映対象外(助言のみ)。 */
-const EXCLUDED_AREA_KEYWORDS = ["事実", "正確", "数値", "データ", "タイトル", "リンク", "url"] as const;
-/** 反映を許可する area のキーワード(文体・読みやすさ・構成系)。 */
-const APPLICABLE_AREA_KEYWORDS = [
-  "文体",
-  "読みやす",
-  "構成",
-  "リズム",
-  "トーン",
-  "言い回し",
-  "表現",
-  "語尾",
-  "冗長",
+/**
+ * 事実・正確性・数値・タイトル・リンク等、決定的に直せない(=人の判断が要る) area は反映対象外(助言のみ)。
+ * #178: 以前は「許可語ホワイトリスト」方式で、文体・読みやすさ・構成系でも area ラベルが
+ * 許可語に当たらないと取りこぼしていた。**除外語に当たらなければ候補**とする方式に変え、
+ * 取りこぼしを減らす(安全性は quote 必須＋一意アンカーで担保)。
+ */
+const EXCLUDED_AREA_KEYWORDS = [
+  "事実",
+  "正確",
+  "数値",
+  "データ",
+  "統計",
+  "出典",
+  "タイトル",
+  "リンク",
+  "url",
 ] as const;
 
-/** area(自由文)が本文反映を許可するカテゴリか。除外語が含まれれば常に false。 */
+/** area(自由文)が本文反映を許可するカテゴリか。除外語(事実/タイトル/リンク等)を含まなければ可。 */
 export function isApplicableArea(area: string): boolean {
   const lower = area.toLowerCase();
-  if (EXCLUDED_AREA_KEYWORDS.some((k) => lower.includes(k.toLowerCase()))) return false;
-  return APPLICABLE_AREA_KEYWORDS.some((k) => area.includes(k));
+  return !EXCLUDED_AREA_KEYWORDS.some((k) => lower.includes(k.toLowerCase()));
+}
+
+/** 反映できない理由(承認画面で「なぜチェックできないか」を表示する=#178)。 */
+export const FIX_REASON_EXCLUDED = "助言のみ（事実・タイトル・リンク等は自動反映の対象外）";
+export const FIX_REASON_NO_QUOTE = "引用がないため自動反映できません";
+export const FIX_REASON_NO_ANCHOR = "引用が本文に一致せず要確認（本文が変わった可能性）";
+
+/**
+ * fix が本文へ自動反映できるか(不可なら理由付き)。3条件: 反映可能カテゴリ・quote 非空・一意アンカー。
+ * 反映可能なときは確定した quote と blockIndex を返す(selectApplicableFixes が再計算せず使う=DRY)。
+ */
+export type FixClassification =
+  | { applicable: true; quote: string; blockIndex: number }
+  | { applicable: false; reason: string };
+
+export function classifyFix(fix: AdviceFix, bodyHtml: string): FixClassification {
+  if (!isApplicableArea(fix.area)) return { applicable: false, reason: FIX_REASON_EXCLUDED };
+  const quote = (fix.quote ?? "").trim();
+  if (!quote) return { applicable: false, reason: FIX_REASON_NO_QUOTE };
+  const blockIndex = findAnchorBlock(bodyHtml, quote);
+  if (blockIndex < 0) return { applicable: false, reason: FIX_REASON_NO_ANCHOR };
+  return { applicable: true, quote, blockIndex };
 }
 
 // ── テキスト正規化 / アンカー照合 ──────────────────────────────────
@@ -88,12 +112,17 @@ export function selectApplicableFixes(
 ): ApplicableFix[] {
   const out: ApplicableFix[] = [];
   fixes.forEach((f, index) => {
-    const quote = (f.quote ?? "").trim();
-    if (!quote) return;
-    if (!isApplicableArea(f.area)) return;
-    const blockIndex = findAnchorBlock(bodyHtml, quote);
-    if (blockIndex < 0) return;
-    out.push({ index, area: f.area, quote, reason: f.reason, suggestion: f.suggestion, blockIndex });
+    // 表示(classifyFix)と挙動を一致させ、確定済みの quote/blockIndex をそのまま使う(再計算しない)。
+    const c = classifyFix(f, bodyHtml);
+    if (!c.applicable) return;
+    out.push({
+      index,
+      area: f.area,
+      quote: c.quote,
+      reason: f.reason,
+      suggestion: f.suggestion,
+      blockIndex: c.blockIndex,
+    });
   });
   return out;
 }

@@ -17,6 +17,10 @@ import {
   buildApplyPresentProps,
   buildApplyProcessingProps,
   buildApplyRequestProps,
+  classifyFix,
+  FIX_REASON_EXCLUDED,
+  FIX_REASON_NO_ANCHOR,
+  FIX_REASON_NO_QUOTE,
   findAnchorBlock,
   isApplicableArea,
   parseApplyProposal,
@@ -43,16 +47,51 @@ describe("isApplicableArea", () => {
     expect(isApplicableArea("読みやすさ")).toBe(true);
     expect(isApplicableArea("構成の組み替え")).toBe(true);
   });
-  it("事実・正確性・数値・タイトル・リンクは反映不可(除外語優先)", () => {
+  it("事実・正確性・数値・タイトル・リンク・統計・出典は反映不可(除外語)", () => {
     expect(isApplicableArea("正確性")).toBe(false);
     expect(isApplicableArea("数値")).toBe(false);
     expect(isApplicableArea("タイトル")).toBe(false);
     expect(isApplicableArea("リンク")).toBe(false);
-    // 除外語が含まれれば、許可語があっても false
+    expect(isApplicableArea("統計データ")).toBe(false);
+    expect(isApplicableArea("出典の明記")).toBe(false);
+    // 除外語が含まれれば、文体的な語があっても false
     expect(isApplicableArea("文体（ただし事実関係）")).toBe(false);
   });
-  it("どちらにも当たらない area は不可", () => {
-    expect(isApplicableArea("見た目")).toBe(false);
+  it("除外語を含まない area は反映可(#178: ホワイトリスト撤廃で取りこぼしを減らす)", () => {
+    // 旧ホワイトリストに無く取りこぼしていた文体・読みやすさ・構成系
+    expect(isApplicableArea("見た目")).toBe(true);
+    expect(isApplicableArea("テンポ")).toBe(true);
+    expect(isApplicableArea("導入の流れ")).toBe(true);
+    expect(isApplicableArea("一文の長さ")).toBe(true);
+    expect(isApplicableArea("重複")).toBe(true);
+  });
+});
+
+describe("classifyFix", () => {
+  it("3条件を満たせば applicable(確定した quote/blockIndex を返す)", () => {
+    expect(classifyFix(fix({ area: "文体", quote: "導入の段落" }), BODY)).toEqual({
+      applicable: true,
+      quote: "導入の段落",
+      blockIndex: 1,
+    });
+  });
+  it("除外カテゴリは理由付きで不可", () => {
+    expect(classifyFix(fix({ area: "正確性", quote: "導入の段落" }), BODY)).toEqual({
+      applicable: false,
+      reason: FIX_REASON_EXCLUDED,
+    });
+  });
+  it("quote 無しは理由付きで不可", () => {
+    expect(classifyFix(fix({ area: "文体", quote: "" }), BODY)).toEqual({
+      applicable: false,
+      reason: FIX_REASON_NO_QUOTE,
+    });
+  });
+  it("本文に一致しない引用は要確認", () => {
+    expect(classifyFix(fix({ area: "文体", quote: "存在しない文字列" }), BODY)).toEqual({
+      applicable: false,
+      reason: FIX_REASON_NO_ANCHOR,
+    });
   });
 });
 
