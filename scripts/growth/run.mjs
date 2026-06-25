@@ -100,6 +100,14 @@ const MODES = {
     model: DRAFTS_MODEL,
     lock: true,
   },
+  // 本文インラインコメント→AI修正(#182)。決定的処理は growth:comment-revise CLI、claude は
+  // コメントされた文を含むブロックだけを書き換え before/after 案(メタ)を作る。反映は承認画面側。lock/上限を共有。
+  "comment-revise": {
+    prompt: "comment-revise.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
 };
 
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
