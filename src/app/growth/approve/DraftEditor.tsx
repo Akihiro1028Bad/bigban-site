@@ -59,7 +59,7 @@ function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
 
   return (
     <NodeViewWrapper
-      className="my-2 flex items-start gap-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2"
+      className="my-2 flex items-start gap-2 rounded-md border border-dashed border-gray-300 bg-white p-2"
       data-preserved="true"
     >
       {/* #180: ドラッグの掴み所。TipTap は draggable:true に加え data-drag-handle が必須
@@ -75,9 +75,11 @@ function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
       >
         ⠿
       </span>
+      {/* #181: 保持ブロックの中身(画像/表)を減光せず実色・実寸で表示する。
+          画像は枠内に収め、表は横幅いっぱいにして「本物の見た目」に近づける。 */}
       <div
         ref={contentRef}
-        className="min-w-0 flex-1 text-sm text-gray-600"
+        className="min-w-0 flex-1 text-gray-800 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-md [&_table]:w-full"
         dangerouslySetInnerHTML={{ __html: html }}
       />
       <button
@@ -137,7 +139,7 @@ export function DraftEditor({ initialHtml, onChange }: DraftEditorProps) {
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none min-h-40 rounded-md border border-gray-300 bg-white p-3 focus:outline-none",
+          "prose max-w-none min-h-64 rounded-md border border-gray-300 bg-white p-4 focus:outline-none",
         "aria-label": "下書き本文エディタ",
       },
     },
