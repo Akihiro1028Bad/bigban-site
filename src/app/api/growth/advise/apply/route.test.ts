@@ -141,4 +141,18 @@ describe("POST /api/growth/advise/apply", () => {
     const res = await POST(postReq(null, { pageId: PAGE_ID, adoptedIndexes: [0] }));
     expect(res.status).toBe(502);
   });
+
+  it("Notion プロパティ欠落は 500 ＋ どのプロパティかを返す(沈黙させない・#177)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(getPage).mockResolvedValue(page({ advice: ADVICE, body: BODY }));
+    vi.mocked(updatePageProps).mockRejectedValue(
+      new Error("アドバイス反映指示 is not a property that exists")
+    );
+    const res = await POST(postReq(null, { pageId: PAGE_ID, adoptedIndexes: [0] }));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toContain("アドバイス反映指示");
+    // 真因はサーバログに出ている(握り潰さない)。
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
 });

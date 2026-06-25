@@ -15,6 +15,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import { growthApiError } from "@/lib/growth/apiError";
 import { isNotionPageId } from "@/lib/growth/approve";
 import {
   DECORATE_BUSY_STATUSES,
@@ -93,11 +94,10 @@ export async function POST(request: Request): Promise<Response> {
       buildDecorateRequestProps(instruction, new Date().toISOString()),
       options
     );
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "装飾提案の依頼登録に失敗しました" },
-      { status: 502 }
-    );
+  } catch (error) {
+    // 真因はサーバログへ。Notion プロパティ欠落は 500＋プロパティ名で可視化(#177)。
+    const { status, body } = growthApiError("decorate", error, "装飾提案の依頼登録に失敗しました");
+    return NextResponse.json(body, { status });
   }
 
   return NextResponse.json({ success: true });
