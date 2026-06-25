@@ -73,6 +73,8 @@ export default defineConfig({
         "src/app/growth/approve/DraftEditor.tsx",
         // 本文インラインコメント(#182)の薄い DOM 結線。純ロジックは bodyComment.ts でテスト済み。
         "src/app/growth/approve/InlineCommentReview.tsx",
+        // メタディスクリプション編集(#H20)の薄い fetch/DOM 結線。純ロジックは excerptDraft.ts でテスト済み。
+        "src/app/growth/approve/ExcerptEditor.tsx",
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
         // 受信側描画は DraftFrameClient.test.tsx でテスト済み。
         "src/app/growth/approve/DraftPreviewFrame.tsx",

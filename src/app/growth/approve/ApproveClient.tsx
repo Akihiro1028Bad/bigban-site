@@ -52,7 +52,10 @@ import { ArticlesView } from "./ArticlesView";
 import { DetailHeader } from "./DetailHeader";
 import { detailBadge } from "./detailBadge";
 import { DraftChecklist } from "./DraftChecklist";
-import { draftQuality } from "./draftQuality";
+import { draftPlainText, draftQuality, hasBlockingCheck } from "./draftQuality";
+import { ExcerptEditor } from "./ExcerptEditor";
+import { StyleHints } from "./StyleHints";
+import { WordDiffView } from "./WordDiffView";
 import { MetricChips } from "./MetricChips";
 import {
   PREVIEW_DEVICES,
@@ -163,6 +166,8 @@ interface DraftPreview {
   eyecatchRegen?: { status: RegenStatus; requestedAtMs?: number | null };
   // #182: 本文インラインコメントの表示用ビュー(ステータス＋投稿済みコメント)。
   bodyComment?: BodyCommentView;
+  // #H19: 既知の公開記事リンクパス(/ja/news/<slug>)。壊れ内部リンク検査に使う(取得不可なら未設定)。
+  knownNewsPaths?: readonly string[];
 }
 
 type DraftState =
@@ -1855,7 +1860,9 @@ export function ApproveClient() {
 
   function renderReviseReady(item: PendingItem) {
     // #139 B: 構成案・タイトルのうち提案がある方だけ新旧比較を出す(部分提案を許容)。
-    const hasOutlineProposal = (item.reviseProposal ?? "") !== "";
+    const currentOutline = item.outline ?? "";
+    const outlineProposal = item.reviseProposal ?? "";
+    const hasOutlineProposal = outlineProposal !== "";
     const hasTitleProposal = (item.reviseTitleProposal ?? "") !== "";
     return (
       <div>
@@ -1877,20 +1884,27 @@ export function ApproveClient() {
           </div>
         ) : null}
         {hasOutlineProposal ? (
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
-              <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
-                {item.outline}
-              </pre>
+          <>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
+                <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
+                  {currentOutline}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-blue-700">修正案</h4>
+                <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
+                  {outlineProposal}
+                </pre>
+              </div>
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-blue-700">修正案</h4>
-              <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
-                {item.reviseProposal}
-              </pre>
+            {/* #M4: 元 vs 新の語句単位 diff(縦並びだけでなく変更点をハイライト)。 */}
+            <div className="mt-2">
+              <h4 className="text-xs font-bold text-gray-500">変更点（差分）</h4>
+              <WordDiffView before={currentOutline} after={outlineProposal} />
             </div>
-          </div>
+          </>
         ) : null}
         <div className="mt-2 flex gap-2">
           <button
@@ -2067,36 +2081,56 @@ export function ApproveClient() {
               />
             </div>
             {/* #167/H1: 公開・クローズは最終確認(本番プレビュー)の下＝最終アクション位置に置く。 */}
-            <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <div className="flex flex-wrap gap-2">
-                {item.stage === "drafted" ? (
-                  <button
-                    type="button"
-                    disabled={actionBusy}
-                    onClick={() => openConfirm(item, "publish")}
-                    className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
-                  >
-                    公開する
-                  </button>
-                ) : null}
-                {item.stage === "published" ? (
-                  <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={() => openConfirm(item, "close")}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  クローズ（盤から非表示）
-                </button>
-              </div>
-              {actionError ? (
-                <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
-                  {actionError}
-                </p>
-              ) : null}
-            </div>
+            {(() => {
+              // #H4: 公開前チェックに赤(block)があれば公開を無効化する(§5免責欠落・§13断定など)。
+              const publishBlocked = hasBlockingCheck(
+                draftQuality({
+                  bodyHtml: draftState.draft.bodyHtml,
+                  body: draftState.draft.body,
+                  title: item.title,
+                  knownNewsPaths: draftState.draft.knownNewsPaths
+                    ? new Set(draftState.draft.knownNewsPaths)
+                    : undefined,
+                })
+              );
+              return (
+                <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {item.stage === "drafted" ? (
+                      <button
+                        type="button"
+                        disabled={actionBusy || publishBlocked}
+                        onClick={() => openConfirm(item, "publish")}
+                        className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
+                      >
+                        公開する
+                      </button>
+                    ) : null}
+                    {item.stage === "published" ? (
+                      <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={actionBusy}
+                      onClick={() => openConfirm(item, "close")}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      クローズ（盤から非表示）
+                    </button>
+                  </div>
+                  {item.stage === "drafted" && publishBlocked ? (
+                    <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                      公開前チェックに赤（要修正）があります。修正してから公開してください。
+                    </p>
+                  ) : null}
+                  {actionError ? (
+                    <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                      {actionError}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })()}
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
@@ -2354,7 +2388,18 @@ export function ApproveClient() {
                           bodyHtml: draftState.draft.bodyHtml,
                           body: draftState.draft.body,
                           title: item.title,
+                          knownNewsPaths: draftState.draft.knownNewsPaths
+                            ? new Set(draftState.draft.knownNewsPaths)
+                            : undefined,
                         })}
+                      />
+                      <StyleHints
+                        plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
+                      />
+                      <ExcerptEditor
+                        pageId={item.id}
+                        token={token}
+                        plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
                       />
                     </div>
                   ) : null}

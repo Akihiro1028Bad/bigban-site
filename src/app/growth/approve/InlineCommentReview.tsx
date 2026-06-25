@@ -39,6 +39,15 @@ const STATUS_LABEL: Record<BodyCommentStatus, string> = {
   失敗: "AIの処理に失敗しました。もう一度依頼してください。",
 };
 
+/** #M5: before/after の HTMLタグ構造の変化(追加要素)を一言で示す。タグ除去で隠れる装飾変化を可視化。 */
+function structureNote(before: string, after: string): string | null {
+  const tagNames = (html: string): string[] =>
+    [...html.matchAll(/<([a-z][a-z0-9]*)\b/gi)].map((m) => m[1].toLowerCase());
+  const beforeTags = new Set(tagNames(before));
+  const added = [...new Set(tagNames(after))].filter((t) => !beforeTags.has(t));
+  return added.length > 0 ? `構造変化: <${added.join(">, <")}> を追加` : null;
+}
+
 export function InlineCommentReview({
   pageId,
   token,
@@ -193,6 +202,12 @@ export function InlineCommentReview({
               <li key={idx} className="rounded border border-gray-200 bg-white p-2 text-xs">
                 <p className="text-gray-400 line-through">{item.before.replace(/<[^>]*>/g, "")}</p>
                 <p className="mt-0.5 text-gray-900">{item.after.replace(/<[^>]*>/g, "")}</p>
+                {/* #M5: タグ除去で見えなくなる装飾/構造の追加(aside・リンク等)を明示する。 */}
+                {structureNote(item.before, item.after) ? (
+                  <p className="mt-0.5 text-[10px] font-medium text-amber-700">
+                    {structureNote(item.before, item.after)}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
