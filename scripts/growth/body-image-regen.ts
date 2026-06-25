@@ -14,6 +14,7 @@
 import type { FlexBubble } from "./digest-flex";
 import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 /** Notion「記事ネタ案」に追加する本文画像再生成ループ用プロパティ名(手動追加)。 */
 export const BODY_REGEN_PROPS = {
@@ -150,6 +151,8 @@ export interface BodyRegenView {
   status: BodyRegenStatus;
   /** 再生成対象の本文画像URL(その時点の src)。なし時は空文字。 */
   targetSrc: string;
+  /** 依頼時刻(ms)。経過時間/滞留警告の表示用(#C2 UI)。 */
+  requestedAtMs?: number | null;
 }
 
 /**
@@ -158,29 +161,22 @@ export interface BodyRegenView {
  */
 export function bodyRegenViewOf(page: NotionPage): BodyRegenView {
   const row = bodyRegenRowFromPage(page);
-  return { status: row.status, targetSrc: row.targetSrc };
+  return { status: row.status, targetSrc: row.targetSrc, requestedAtMs: row.requestedAtMs };
 }
 
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const BODY_REGEN_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
- * 処理中のまま timeoutMs を超えた行(PC が落ちた等)の id を返す(reaper 対象)。
- * 依頼時刻が無い行は対象にしない(誤回収を避ける)。
+ * 処理中・依頼中のまま timeoutMs を超えた行(PC が落ちた/拾う前に止まった)の id を返す(reaper 対象)。
+ * 依頼時刻が無い行・提示中は対象にしない(誤回収を避ける)。判定は共通の {@link selectStaleJobIds}。
  */
 export function selectStaleBodyRegenIds(
   rows: readonly BodyRegenRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter(
-      (r) =>
-        r.status === "処理中" &&
-        r.requestedAtMs !== null &&
-        nowMs - r.requestedAtMs > timeoutMs
-    )
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }
 
 /** 再生成完了の LINE 本文(承認画面URLへ誘導)。 */

@@ -323,7 +323,12 @@ describe("decorateStatusOf / decorateViewOf", () => {
   });
 
   it("プロパティ全欠落のページでも落ちない(全 reader の未設定パス)", () => {
-    expect(decorateViewOf(page({}))).toEqual({ status: "なし", proposals: [], raw: "" });
+    expect(decorateViewOf(page({}))).toEqual({
+      status: "なし",
+      proposals: [],
+      raw: "",
+      requestedAtMs: null,
+    });
   });
 });
 

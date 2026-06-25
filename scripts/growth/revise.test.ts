@@ -286,10 +286,11 @@ describe("selectStaleReviseIds", () => {
     { id: "fresh", status: "処理中", requestedAtMs: now - 5 * 60 * 1000, ...base },
     { id: "nodate", status: "処理中", requestedAtMs: null, ...base },
     { id: "pending", status: "依頼中", requestedAtMs: now - 60 * 60 * 1000, ...base },
+    { id: "present", status: "提示中", requestedAtMs: now - 60 * 60 * 1000, ...base },
   ];
 
-  it("処理中かつ timeout 超過の行だけ回収対象にする", () => {
-    expect(selectStaleReviseIds(rows, now, 15 * 60 * 1000)).toEqual(["stale"]);
+  it("処理中・依頼中で timeout 超過のみ回収(提示中・fresh・依頼時刻なしは除外)", () => {
+    expect(selectStaleReviseIds(rows, now, 15 * 60 * 1000)).toEqual(["stale", "pending"]);
   });
 });
 

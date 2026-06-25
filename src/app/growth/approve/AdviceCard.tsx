@@ -11,6 +11,8 @@ import {
 } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
+import { StaleNotice } from "./StaleNotice";
+
 interface AdviceCardProps {
   pageId: string;
   token: string;
@@ -366,16 +368,19 @@ export function AdviceCard({
   function renderBody() {
     if (status === "依頼中" || status === "処理中") {
       return (
-        <div className="flex items-center gap-2 text-xs text-gray-600" aria-busy="true">
-          <span>AIが分析中です。数分後に再読み込みしてください。</span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onChanged}
-            className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            再読み込み
-          </button>
+        <div>
+          <div className="flex items-center gap-2 text-xs text-gray-600" aria-busy="true">
+            <span>AIが分析中です。数分後に再読み込みしてください。</span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onChanged}
+              className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              再読み込み
+            </button>
+          </div>
+          <StaleNotice requestedAtMs={advice?.requestedAtMs ?? null} busy />
         </div>
       );
     }

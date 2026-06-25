@@ -9,6 +9,7 @@ import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { listBodyImages, replaceBodyImageSrc } from "./bodyImageEdit";
+import { StaleNotice } from "./StaleNotice";
 
 interface BodyImagePickerProps {
   pageId: string;
@@ -20,6 +21,8 @@ interface BodyImagePickerProps {
   regenStatus?: BodyRegenStatus;
   /** #166: 再生成対象の画像src(どの画像が依頼中かの表示用)。未指定は空。 */
   regenTargetSrc?: string;
+  /** #C2 UI: 本文画像再生成の依頼時刻(ms)。経過/滞留表示用。未指定は null。 */
+  regenRequestedAtMs?: number | null;
 }
 
 /** 再生成が進行中(依頼中/処理中)か。進行中はその記事の再依頼を無効化しバッジを出す。 */
@@ -61,6 +64,7 @@ export function BodyImagePicker({
   onSaved,
   regenStatus = "なし",
   regenTargetSrc = "",
+  regenRequestedAtMs = null,
 }: BodyImagePickerProps) {
   const images = listBodyImages(bodyHtml);
   // 進行中は記事単位で1件まで(API が同時依頼を弾く)。進行中は全画像の再生成ボタンを無効化する。
@@ -347,6 +351,10 @@ export function BodyImagePicker({
                 AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
               </p>
             ) : null}
+            <StaleNotice
+              requestedAtMs={regenRequestedAtMs}
+              busy={regenInFlight && regenTargetSrc === image.src}
+            />
             {regenStatus === "失敗" && regenTargetSrc === image.src ? (
               <p role="status" className="mt-1 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
                 AI再生成に失敗しました。もう一度依頼できます。

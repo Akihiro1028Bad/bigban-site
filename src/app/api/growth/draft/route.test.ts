@@ -70,11 +70,11 @@ describe("GET /api/growth/draft", () => {
         bodyHtml: "<p>本文</p>",
         body: "",
         eyecatch: "",
-        advice: { status: "なし", advice: null, raw: "" },
+        advice: { status: "なし", advice: null, raw: "", requestedAtMs: null },
         adviceApply: { status: "なし", proposal: [], raw: "" },
-        decorate: { status: "なし", proposals: [], raw: "" },
-        bodyRegen: { status: "なし", targetSrc: "" },
-        eyecatchRegen: { status: "なし" },
+        decorate: { status: "なし", proposals: [], raw: "", requestedAtMs: null },
+        bodyRegen: { status: "なし", targetSrc: "", requestedAtMs: null },
+        eyecatchRegen: { status: "なし", requestedAtMs: null },
         bodyComment: { status: "なし", comments: [], proposal: [], raw: "" },
       },
     });
@@ -93,8 +93,9 @@ describe("GET /api/growth/draft", () => {
     expect(json.draft.bodyRegen).toEqual({
       status: "処理中",
       targetSrc: "https://images.microcms-assets.io/assets/a/1.png",
+      requestedAtMs: null,
     });
-    expect(json.draft.eyecatchRegen).toEqual({ status: "依頼中" });
+    expect(json.draft.eyecatchRegen).toEqual({ status: "依頼中", requestedAtMs: null });
   });
 
   it("提示中の装飾提案を draft.decorate に含める(#147)", async () => {
@@ -155,7 +156,7 @@ describe("GET /api/growth/draft", () => {
     vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
     const res = await GET(getRequest(null, PAGE_ID));
     const json = await res.json();
-    expect(json.draft.advice).toEqual({ status: "なし", advice: null, raw: "" });
+    expect(json.draft.advice).toEqual({ status: "なし", advice: null, raw: "", requestedAtMs: null });
   });
 
   it("getPage が throw したら 502", async () => {

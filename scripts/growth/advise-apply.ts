@@ -23,6 +23,7 @@ import { z } from "zod";
 import type { AdviceFix } from "./advise";
 import { splitTopLevelBlocks } from "./decorate";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 // ── 反映可能カテゴリの判定(決定: 文体・読みやすさ・構成のみ) ──────────────────
 /**
@@ -356,15 +357,11 @@ export function applyRowFromPage(page: NotionPage): AdviceApplyRow {
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
 export const ADVISE_APPLY_TIMEOUT_MS = 15 * 60 * 1000;
 
-/** 処理中のまま timeoutMs を超えた行の id を返す(reaper 対象)。依頼時刻が無い行は対象外。 */
+/** 処理中・依頼中で timeoutMs を超えた行の id を返す(reaper 対象)。依頼時刻が無い行・提示中は対象外。 */
 export function selectStaleApplyIds(
   rows: readonly AdviceApplyRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter(
-      (r) => r.status === "処理中" && r.requestedAtMs !== null && nowMs - r.requestedAtMs > timeoutMs
-    )
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }

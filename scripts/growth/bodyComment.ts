@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { splitTopLevelBlocks } from "./decorate";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
+import { selectStaleJobIds } from "./staleJob";
 
 // ── 文分割 / レビュー行 ──────────────────────────────────────────────
 
@@ -371,15 +372,17 @@ export function bodyCommentRowFromPage(page: NotionPage): BodyCommentRow {
   };
 }
 
-/** 処理中のまま放置された(timeout 超過)行 id。PC 再起動等の stale-lock を回収するため。 */
+/** 処理中・依頼中のまま放置された(timeout 超過)行 id。PC 再起動等の stale-lock を回収するため。 */
 export const BODY_COMMENT_TIMEOUT_MS = 15 * 60 * 1000;
 
+/**
+ * reaper 対象の行 id。共通の {@link selectStaleJobIds} に委譲し、他ループと同じく
+ * 「処理中・依頼中」かつ timeout 超過のみを対象にする(#H29: 提示中の誤回収を防ぐ)。
+ */
 export function selectStaleBodyCommentIds(
   rows: readonly BodyCommentRow[],
   nowMs: number,
   timeoutMs: number
 ): string[] {
-  return rows
-    .filter((r) => r.requestedAtMs !== null && nowMs - r.requestedAtMs > timeoutMs)
-    .map((r) => r.id);
+  return selectStaleJobIds(rows, nowMs, timeoutMs);
 }

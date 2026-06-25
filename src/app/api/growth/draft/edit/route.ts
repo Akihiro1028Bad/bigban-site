@@ -14,7 +14,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
+import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
 import {
   buildBodyMirrorProps,
@@ -98,10 +98,13 @@ export async function POST(request: Request): Promise<Response> {
   // #176: 承認画面の正タイトル(Notion タイトル案)を microCMS 下書きにも同期し、
   // 承認画面と公開記事のタイトル不一致を防ぐ。空なら送らない(本文だけ更新)。
   let title = "";
+  // #C3: microCMS 同期失敗時にミラーを戻すための旧本文(ロールバック用)。
+  let previousBody = "";
   try {
     const page = await getPage(pageId, notionOpts);
     contentId = draftLinkOf(page).contentId;
     title = ideaTitleOf(page).trim();
+    previousBody = draftBodyOf(page);
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
@@ -136,6 +139,14 @@ export async function POST(request: Request): Promise<Response> {
       microOpts
     );
   } catch {
+    // #C3: microCMS 同期に失敗 → Notion ミラーを旧本文へ戻し、ミラー(プレビュー正本)が
+    // 公開ターゲット(microCMS)より先行=「見せた本文≠公開する本文」になるのを防ぐ。
+    // ロールバックも失敗した場合は先行状態が残るが、再保存で冪等に回復する(沈黙させず 502)。
+    try {
+      await updatePageProps(pageId, buildBodyMirrorProps(previousBody), notionOpts);
+    } catch {
+      /* rollback 失敗。再保存で回復する。 */
+    }
     return NextResponse.json(
       { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。再保存してください。" },
       { status: 502 }

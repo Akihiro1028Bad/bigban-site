@@ -3,13 +3,15 @@ export function isCmsNewsEnabled(): boolean {
 }
 
 /**
- * 承認画面(/growth/approve)の合言葉認証フラグ。一旦オフ(false)にしている。
+ * 承認画面(/growth/approve)の合言葉認証フラグ。**フェイルセーフ(既定ON)**。
  *
- * 復元するにはこの値を `true` に戻すだけ(1行・env 設定は不要)。
- * - false: 合言葉ゲートを表示せず、承認/施策追加 API も token 検証をスキップする。
- *   URL を知る人なら誰でも承認/却下/施策追加できる一時措置(セキュリティ低下)。
- * - true : 現行どおり APPROVE_SECRET と入力合言葉の定数時間比較で保護する。
+ * - 未設定 / "false" 以外 → 有効(true): 本番で env 未設定でも認証が外れない(C1: フェイルオープン解消)。
+ * - "false" のときだけ無効: 合言葉ゲートを出さず token 検証もスキップする(ローカル開発用)。
+ * - 有効時は APPROVE_SECRET と入力合言葉の定数時間比較で保護する。
  *
- * クライアント・サーバ双方がこの定数を import するため、設定の手間ゼロで両層が一致する。
+ * サーバ(API ルート)は env の実値で判定する。クライアント束には server 環境変数が載らない
+ * (Next.js が NEXT_PUBLIC_ 以外を undefined 化)ため、ブラウザ側では常に true=ゲート表示となり
+ * 安全側へ倒れる(SEC-08: フラグ値や秘密は漏れない)。本番デプロイの誤無効化は
+ * prebuild ガード(scripts/check-prod-auth.mjs)で検知する。
  */
-export const APPROVE_AUTH_ENABLED = false;
+export const APPROVE_AUTH_ENABLED = process.env.APPROVE_AUTH_ENABLED !== "false";

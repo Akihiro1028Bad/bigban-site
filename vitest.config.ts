@@ -82,6 +82,9 @@ export default defineConfig({
         // コマンドパレットの dialog/フォーカストラップ薄結線(#109)。
         // 絞り込みの純ロジックは boardPrefs.ts でテスト済み。
         "src/app/growth/approve/CommandPalette.tsx",
+        // pull型の経過時間/滞留警告の薄い DOM+タイマー結線(#C2 UI)。
+        // 純ロジックは pullStale.ts でテスト済み。
+        "src/app/growth/approve/StaleNotice.tsx",
       ],
       thresholds: {
         statements: 100,

@@ -169,6 +169,43 @@ describe("POST /api/growth/draft/edit", () => {
     expect(res.status).toBe(502);
   });
 
+  it("patchDraft 失敗時は Notion ミラーを旧本文へロールバックする(#C3: 公開stale 防止)", async () => {
+    const page = pageWith("g-abc", "t");
+    (page.properties as Record<string, unknown>)[BODY_MIRROR_PROP] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "<p>旧本文</p>" }],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+    vi.mocked(patchDraft).mockRejectedValue(new Error("microcms down"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>新本文</p>" }));
+    expect(res.status).toBe(502);
+
+    // 1回目=新本文で更新 → microCMS 失敗 → 2回目=旧本文へロールバック。
+    expect(vi.mocked(updatePageProps)).toHaveBeenCalledTimes(2);
+    const join = (props: unknown): string =>
+      (props as Record<string, { rich_text: Array<{ text: { content: string } }> }>)[
+        BODY_MIRROR_PROP
+      ].rich_text
+        .map((r) => r.text.content)
+        .join("");
+    expect(join(vi.mocked(updatePageProps).mock.calls[0][1])).toContain("新本文");
+    expect(join(vi.mocked(updatePageProps).mock.calls[1][1])).toBe("<p>旧本文</p>");
+  });
+
+  it("ロールバック(2回目のミラー更新)も失敗しても 502(沈黙させない・#C3)", async () => {
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc"));
+    vi.mocked(updatePageProps).mockReset();
+    vi.mocked(updatePageProps)
+      .mockResolvedValueOnce(PAGE_ID)
+      .mockRejectedValueOnce(new Error("rollback fail"));
+    vi.mocked(patchDraft).mockRejectedValue(new Error("microcms down"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
+    expect(res.status).toBe(502);
+    expect(vi.mocked(updatePageProps)).toHaveBeenCalledTimes(2);
+  });
+
   it("getPage が失敗したら 502", async () => {
     vi.mocked(getPage).mockRejectedValue(new Error("notion down"));
     const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
