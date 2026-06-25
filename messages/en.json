@@ -162,7 +162,9 @@
       "items": [
         "Reservations follow the booking system's accepted time window.",
         "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
-        "Late arrivals are accommodated only within the reserved time slot."
+        "Late arrivals are accommodated only within the reserved time slot.",
+        "Rental paddles are available for ¥500 each (up to 6 per court).",
+        "Rental shoes are not available."
       ]
     },
     "faq": {
@@ -323,7 +325,7 @@
     "membership": "MEMBERSHIP",
     "membershipJa": "Membership",
     "comingSoon": "Coming Soon",
-    "rentalPaddleNote": "Rental paddles available for events and private bookings only",
+    "rentalPaddleNote": "Rental paddles ¥500 each (up to 6 per court). Rental shoes are not available.",
     "privateFacilityNote": "For full facility private bookings including training area and lounge, or corporate use, please",
     "contactUs": "contact us",
     "pleaseContact": ".",
@@ -593,9 +595,9 @@
       "titleJa": "",
       "cta": "Reserve now",
       "imageAlts": [
-        "Athletes running through the HYROX start gate",
+        "Athlete taking on the sled pull",
         "HYROX arena with athletes taking on wall balls",
-        "Athlete taking on the sled pull"
+        "Athletes running through the HYROX start gate"
       ]
     },
     "concept": {

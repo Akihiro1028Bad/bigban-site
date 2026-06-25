@@ -37,9 +37,12 @@ describe("HyroxHero", () => {
     expect(imgs).toHaveLength(3);
     expect(imgs[0].className).toContain("opacity-90");
     expect(imgs[1].className).toContain("opacity-0");
-    expect(
-      screen.getByAltText("HYROXのスタートゲートを駆け抜けるアスリート")
-    ).toBeInTheDocument();
+    // 1枚目はスレッドプル画像、3枚目はスタートゲート画像（順番入れ替え後）
+    expect(imgs[0]).toHaveAttribute("alt", "スレッドプルに挑むアスリート");
+    expect(imgs[2]).toHaveAttribute(
+      "alt",
+      "HYROXのスタートゲートを駆け抜けるアスリート"
+    );
   });
 
   it("一定時間ごとに表示画像を切り替える", () => {

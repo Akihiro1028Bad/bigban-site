@@ -10,9 +10,9 @@ import { EASE } from "@/constants/motion";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
 const HERO_IMAGES = [
-  "/images/hyrox/hero-venue.jpg",
-  "/images/hyrox/hero-arena.jpg",
   "/images/hyrox/hero-rope.jpg",
+  "/images/hyrox/hero-arena.jpg",
+  "/images/hyrox/hero-venue.jpg",
 ];
 const ROTATE_MS = 5500;
 

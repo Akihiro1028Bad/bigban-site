@@ -105,7 +105,11 @@ describe("HomePricing", () => {
         <HomePricing />
       </NextIntlClientProvider>
     );
-    expect(screen.getByText("イベント利用もしくは貸切のみレンタルパドルあり")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません"
+      )
+    ).toBeInTheDocument();
   });
 
   it("貸切・法人利用の案内とリンクを表示する", () => {

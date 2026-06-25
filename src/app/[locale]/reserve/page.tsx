@@ -11,7 +11,6 @@ import ReserveHero from "@/components/reserve/ReserveHero";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
 import ReserveInfo from "@/components/reserve/ReserveInfo";
-import ReserveFaq from "@/components/reserve/ReserveFaq";
 
 import type { Metadata } from "next";
 
@@ -80,7 +79,6 @@ export default async function ReservePage({
       <ReserveSteps />
       <ReserveCalendar initialTab={initialTab} />
       <ReserveInfo />
-      <ReserveFaq />
       <HomeFooter />
     </main>
   );
