@@ -8,6 +8,7 @@ import { motion, MotionConfig } from "framer-motion";
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import type { AdviceView } from "@/lib/growth/advise";
 import type { AdviceApplyView } from "@/lib/growth/adviseApply";
+import type { BodyCommentView } from "@/lib/growth/bodyComment";
 import { pendingStatus } from "@/lib/growth/approve";
 import {
   BODY_REGEN_BUSY_STATUSES,
@@ -66,6 +67,7 @@ import type { ApproveView } from "./viewRouting";
 import { AdviceCard } from "./AdviceCard";
 import { BodyImagePicker } from "./BodyImagePicker";
 import { DecorationAssistant } from "./DecorationAssistant";
+import { InlineCommentReview } from "./InlineCommentReview";
 import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
@@ -153,6 +155,8 @@ interface DraftPreview {
   // #166: AI再生成の依頼中/処理中/失敗の表示用ビュー(本文画像は対象src付き)。
   bodyRegen?: { status: BodyRegenStatus; targetSrc: string };
   eyecatchRegen?: { status: RegenStatus };
+  // #182: 本文インラインコメントの表示用ビュー(ステータス＋投稿済みコメント)。
+  bodyComment?: BodyCommentView;
 }
 
 type DraftState =
@@ -1972,6 +1976,14 @@ export function ApproveClient() {
               token={token}
               bodyHtml={draftState.draft.bodyHtml}
               decorate={draftState.draft.decorate}
+              onChanged={() => void loadDraft(item.id)}
+            />
+            {/* #182: 本文インラインコメント(1文＝1行)→AIに指摘依頼。依頼/片付け後に下書きを再取得。 */}
+            <InlineCommentReview
+              pageId={item.id}
+              token={token}
+              bodyHtml={draftState.draft.bodyHtml}
+              status={draftState.draft.bodyComment?.status ?? "なし"}
               onChanged={() => void loadDraft(item.id)}
             />
             {/* #167: 公開・クローズ。取り消しづらい外向き操作のため確認ダイアログを挟む。 */}

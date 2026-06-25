@@ -1791,6 +1791,30 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     expect(String(fn.mock.calls[1][0])).toContain("/api/growth/draft?pageId=i1");
   });
 
+  it("インラインコメントを投稿してAIに依頼し、下書きを再取得する(#182)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      draftReady("<p>一文目です。</p>"),
+      { json: { success: true } }, // POST /api/growth/body-comment
+      draftReady("<p>一文目です。</p>") // onChanged 後の再取得
+    );
+    const dialog = await openIdeaPanel();
+    await within(dialog).findByText("インラインコメント");
+    await userEvent.click(within(dialog).getByRole("button", { name: "1行目にコメント" }));
+    await userEvent.type(within(dialog).getByLabelText("1行目へのコメント入力"), "やわらかく");
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメント" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /AIに指摘を依頼/ }));
+    await waitFor(() =>
+      expect(String(fn.mock.calls[2][0])).toContain("/api/growth/body-comment?")
+    );
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
+      pageId: "i1",
+      comments: [{ blockIndex: 0, excerpt: "一文目です。", comment: "やわらかく" }],
+    });
+    // onChanged → 下書き再取得(GET)まで呼ばれる
+    await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
+  });
+
   it("bodyHtml が空でも body にフォールバックしてプレビューへ渡す(#100)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },

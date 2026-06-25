@@ -75,6 +75,7 @@ describe("GET /api/growth/draft", () => {
         decorate: { status: "なし", proposals: [], raw: "" },
         bodyRegen: { status: "なし", targetSrc: "" },
         eyecatchRegen: { status: "なし" },
+        bodyComment: { status: "なし", comments: [], raw: "" },
       },
     });
   });
