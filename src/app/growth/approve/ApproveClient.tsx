@@ -53,6 +53,7 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseFailed } from "./ReviseFailed";
+import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
@@ -67,7 +68,6 @@ import { DraftChecklist } from "./DraftChecklist";
 import { draftPlainText, draftQuality, hasBlockingCheck } from "./draftQuality";
 import { ExcerptEditor } from "./ExcerptEditor";
 import { StyleHints } from "./StyleHints";
-import { WordDiffView } from "./WordDiffView";
 import { MetricChips } from "./MetricChips";
 import {
   PREVIEW_DEVICES,
@@ -1772,74 +1772,16 @@ export function ApproveClient() {
   }
 
   function renderReviseReady(item: PendingItem) {
-    // #139 B: 構成案・タイトルのうち提案がある方だけ新旧比較を出す(部分提案を許容)。
-    const currentOutline = item.outline ?? "";
-    const outlineProposal = item.reviseProposal ?? "";
-    const hasOutlineProposal = outlineProposal !== "";
-    const hasTitleProposal = (item.reviseTitleProposal ?? "") !== "";
     return (
-      <div>
-        <p className="mt-2 text-xs text-gray-500">
-          修正案が届きました。元と見比べて反映してください。
-        </p>
-        {hasTitleProposal ? (
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <h4 className="text-xs font-bold text-gray-500">元のタイトル</h4>
-              <p className="mt-1 rounded-md bg-gray-50 p-2 text-xs text-gray-700">{item.title}</p>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-blue-700">タイトル案</h4>
-              <p className="mt-1 rounded-md bg-blue-50 p-2 text-xs font-medium text-gray-900">
-                {item.reviseTitleProposal}
-              </p>
-            </div>
-          </div>
-        ) : null}
-        {hasOutlineProposal ? (
-          <>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div>
-                <h4 className="text-xs font-bold text-gray-500">元の構成案</h4>
-                <pre className="mt-1 whitespace-pre-wrap rounded-md bg-gray-50 p-2 text-xs text-gray-700">
-                  {currentOutline}
-                </pre>
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-blue-700">修正案</h4>
-                <pre className="mt-1 whitespace-pre-wrap rounded-md bg-blue-50 p-2 text-xs text-gray-900">
-                  {outlineProposal}
-                </pre>
-              </div>
-            </div>
-            {/* #M4: 元 vs 新の語句単位 diff(縦並びだけでなく変更点をハイライト)。 */}
-            <div className="mt-2">
-              <h4 className="text-xs font-bold text-gray-500">変更点（差分）</h4>
-              <WordDiffView before={currentOutline} after={outlineProposal} />
-            </div>
-          </>
-        ) : null}
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => applyRevise(item, "apply")}
-            disabled={reviseBusy}
-            className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
-          >
-            反映する
-          </button>
-          <button
-            type="button"
-            onClick={() => applyRevise(item, "discard")}
-            disabled={reviseBusy}
-            className={choiceButtonClass(
-              "flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-            )}
-          >
-            やり直し
-          </button>
-        </div>
-      </div>
+      <ReviseReady
+        title={item.title}
+        currentOutline={item.outline ?? ""}
+        outlineProposal={item.reviseProposal ?? ""}
+        titleProposal={item.reviseTitleProposal ?? ""}
+        busy={reviseBusy}
+        onApply={() => applyRevise(item, "apply")}
+        onDiscard={() => applyRevise(item, "discard")}
+      />
     );
   }
 
