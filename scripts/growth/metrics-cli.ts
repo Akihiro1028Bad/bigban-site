@@ -14,16 +14,20 @@
 import "dotenv/config";
 
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
+import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
-import { loadGrowthConfig } from "./config";
+import { loadGrowthConfig, type GrowthConfig } from "./config";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import {
   articlePagePath,
+  articleSearchUrl,
   buildMetricsMirrorProps,
+  buildSearchMetrics,
   metricsForPagePath,
+  type SearchMetrics,
 } from "./metrics";
-import { computeWeeklyPeriods } from "./period";
+import { computeWeeklyPeriods, type DateRange } from "./period";
 import {
   queryDataSource,
   updatePageProps,
@@ -39,13 +43,17 @@ const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 
-// topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数)。
+// topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数/keyEvents)。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
   key: "topPages",
   dimensions: ["pagePath"],
-  metrics: ["screenPageViews", "activeUsers"],
+  // #計測強化 S2: keyEvents(CTAキーイベント)も取得し、CTA 計測に使う。
+  metrics: ["screenPageViews", "activeUsers", "keyEvents"],
   limit: 200,
 };
+
+// #計測強化 S2: 記事ごとの上位クエリ取得件数。
+const GSC_TOP_QUERIES = 5;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -108,6 +116,35 @@ async function notifyLine(text: string): Promise<void> {
   await pushTextMessage(to, text, { channelAccessToken: token, fetchFn: defaultFetch });
 }
 
+/**
+ * 記事1件の GSC 検索成績(page フィルタの summary＋query を2期間)を取得する。
+ * 失敗しても GA4 分の成績は維持したいので、エラーは握って null を返す(沈黙はログで明示)。
+ */
+async function fetchArticleSearch(
+  config: GrowthConfig,
+  accessToken: string,
+  current: DateRange,
+  prior: DateRange,
+  pageUrl: string
+): Promise<SearchMetrics | null> {
+  const reports: GscReportDef[] = [
+    { key: "articleSummary", dimensions: [], filters: [{ dimension: "page", expression: pageUrl }] },
+    {
+      key: "articleQueries",
+      dimensions: ["query"],
+      rowLimit: 25,
+      filters: [{ dimension: "page", expression: pageUrl }],
+    },
+  ];
+  try {
+    const gsc = await fetchGsc({ config, accessToken, current, prior, reports });
+    return buildSearchMetrics(gsc.articleSummary ?? [], gsc.articleQueries ?? [], GSC_TOP_QUERIES);
+  } catch (error) {
+    console.warn(`[metrics] GSC 取得失敗(検索成績スキップ): ${pageUrl}`, error);
+    return null;
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadGrowthConfig(process.env);
   const accessToken = await getAccessToken(config);
@@ -145,14 +182,22 @@ async function main(): Promise<void> {
       continue;
     }
     const pagePath = articlePagePath(sl.slug, sl.locale);
-    const metrics = metricsForPagePath(pagePath, rows, current);
-    if (!metrics) {
+    const base = metricsForPagePath(pagePath, rows, current);
+    if (!base) {
       unmatched += 1;
       console.warn(`[metrics] GA4 一致なし: ${titleOf(page)} (${pagePath})`);
       continue;
     }
+    // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
+    const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
+    const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
+    const metrics = search ? { ...base, search } : base;
     if (DRYRUN) {
-      console.log(`[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current}`);
+      const s = metrics.search;
+      console.log(
+        `[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current} keyEvents=${metrics.keyEvents?.current ?? 0}` +
+          (s ? ` clicks=${s.clicks.current} ctr=${s.ctr.current} pos=${s.position.current} q=${s.topQueries.length}` : " (GSCなし)")
+      );
     } else {
       await updatePageProps(page.id, buildMetricsMirrorProps(metrics, nowIso), options);
     }
