@@ -51,6 +51,7 @@ import {
 
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
@@ -2355,45 +2356,12 @@ export function ApproveClient() {
       ) : null}
       {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
       {confirmAction ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="公開・クローズの確認"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl">
-            <h2 className="text-sm font-semibold text-gray-900">
-              {confirmAction.kind === "publish" ? "記事を本番公開します" : "タスクをクローズします"}
-            </h2>
-            <p className="mt-1 text-xs text-gray-600">
-              「{confirmAction.title}」を
-              {confirmAction.kind === "publish"
-                ? "公開すると一般に表示されます。よろしいですか？"
-                : "盤から非表示にします。よろしいですか？"}
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmAction(null)}
-                className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                disabled={actionBusy}
-                onClick={() => void runConfirm(confirmAction)}
-                className={
-                  confirmAction.kind === "publish"
-                    ? "rounded border border-green-700 bg-green-700 px-3 py-1 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
-                    : "rounded border border-gray-700 bg-gray-700 px-3 py-1 text-xs font-bold text-white hover:bg-gray-800 disabled:opacity-50"
-                }
-              >
-                {confirmAction.kind === "publish" ? "公開を確定" : "クローズを確定"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmActionDialog
+          action={confirmAction}
+          busy={actionBusy}
+          onCancel={() => setConfirmAction(null)}
+          onConfirm={() => void runConfirm(confirmAction)}
+        />
       ) : null}
       {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
       <ToastList toasts={toasts} onDismiss={dismissToast} />
