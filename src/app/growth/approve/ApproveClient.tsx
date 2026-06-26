@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
-import { motion, MotionConfig } from "framer-motion";
+import { motion } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 import type { AdviceView } from "@/lib/growth/advise";
@@ -52,6 +52,7 @@ import {
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
+import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
@@ -1722,42 +1723,17 @@ export function ApproveClient() {
   // #42/#43/#52/#53/#54/#139 B: 構成案の修正セクション(記事のみ)。コメント＋タイトル指示＋手動編集。
   function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
     const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
-    const hasTitlePrompt = titleRevisePrompt.trim() !== "";
     return (
-      <MotionConfig reducedMotion="user">
-        <p className="mt-1 text-xs text-gray-500">
-          見出しの「＋ コメント」でAIに修正を依頼、「編集」で自分で直せます。
-        </p>
-        {/* #139 B: タイトルへの AI 修正指示(専用枠)。書いたときだけタイトルも直す。 */}
-        <div className="mt-2">
-          <label
-            htmlFor={`title-revise-${item.id}`}
-            className="block text-xs font-medium text-gray-500"
-          >
-            タイトルについて（AIに修正を依頼）
-          </label>
-          <textarea
-            id={`title-revise-${item.id}`}
-            value={titleRevisePrompt}
-            onChange={(event) => setTitleRevisePrompt(event.target.value)}
-            disabled={reviseBusy}
-            rows={2}
-            placeholder="例: 市川という地名を入れて、もっと具体的に"
-            className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-          />
-        </div>
-        <ul className="mt-2 space-y-2">
-          {sections.map((_, i) => renderSection(item, sections, i))}
-        </ul>
-        <button
-          type="button"
-          onClick={() => requestRevise(item)}
-          disabled={reviseBusy || (total === 0 && !hasTitlePrompt)}
-          className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
-        >
-          修正を依頼{total > 0 ? `（コメント${total}件）` : ""}
-        </button>
-      </MotionConfig>
+      <ReviseCommentForm
+        itemId={item.id}
+        titlePrompt={titleRevisePrompt}
+        onTitlePromptChange={setTitleRevisePrompt}
+        busy={reviseBusy}
+        sectionCount={sections.length}
+        commentTotal={total}
+        renderSection={(i) => renderSection(item, sections, i)}
+        onRequestRevise={() => requestRevise(item)}
+      />
     );
   }
 
