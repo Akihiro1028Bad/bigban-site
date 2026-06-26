@@ -176,6 +176,7 @@ async function main(): Promise<void> {
   const nowIso = new Date().toISOString();
   let updated = 0;
   let unmatched = 0;
+  let gscFailed = 0; // #計測強化 S2: GSC 取得失敗(クォータ枯渇等)の沈黙を防ぐため件数を可視化。
 
   for (const page of pages) {
     const contentId = contentIdOf(page);
@@ -196,6 +197,7 @@ async function main(): Promise<void> {
     // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
     const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
     const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
+    if (search === null) gscFailed += 1; // 失敗は GA4 分を維持しつつ件数だけ数える(沈黙させない)。
     // #計測強化 S3: 公開日(要改稿判定)も載せる。
     const metrics = {
       ...base,
@@ -214,7 +216,8 @@ async function main(): Promise<void> {
     updated += 1;
   }
 
-  const summary = `📊 成績更新: ${updated}件 / 未一致 ${unmatched}件 (期間 ${current.start}〜${current.end})`;
+  const gscNote = gscFailed > 0 ? ` / GSC失敗 ${gscFailed}件` : "";
+  const summary = `📊 成績更新: ${updated}件 / 未一致 ${unmatched}件${gscNote} (期間 ${current.start}〜${current.end})`;
   console.log(summary);
   if (!DRYRUN && updated > 0) {
     await notifyLine(summary);
