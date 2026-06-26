@@ -27,6 +27,9 @@ interface PublishQueueProps {
   onChanged: () => void;
 }
 
+// 折りたたみ本体の id(トグルの aria-controls と対応・a11y)。
+const CONTENT_ID = "publish-queue-content";
+
 export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
   const { ready, blocked } = partitionPublishQueue(items);
   const [open, setOpen] = useState(false);
@@ -50,11 +53,12 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
     setError(null);
     try {
       await task();
-      onChanged();
     } catch {
       setError("処理中にエラーが発生しました。もう一度お試しください。");
     } finally {
       setBusy(false);
+      // 成否に関わらず盤を再取得する。一括公開が途中で失敗しても、既に公開済みの分を盤へ反映させる。
+      onChanged();
     }
   }
 
@@ -67,8 +71,10 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
   }
 
   function handleSchedule(): void {
-    const iso = new Date(scheduledLocal).toISOString();
+    // parse は run() 内に置く。不正値で toISOString() が throw しても run() の catch が拾う
+    // (ボタンは空欄で disabled・datetime-local は基本 valid/空のみ。防御として内側に置く)。
     void run(async () => {
+      const iso = new Date(scheduledLocal).toISOString();
       for (const article of ready) {
         await post("/api/growth/publish/schedule", { pageId: article.id, scheduledAt: iso });
       }
@@ -87,6 +93,7 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-controls={CONTENT_ID}
         className="flex w-full items-center justify-between text-sm font-bold text-gray-900"
       >
         <span>公開キュー（公開OK {ready.length} 件 / 要対応 {blocked.length} 件）</span>
@@ -94,7 +101,7 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
       </button>
 
       {open ? (
-        <>
+        <div id={CONTENT_ID}>
       {blocked.length > 0 ? (
         <div className="mt-3">
           <p className="text-xs font-semibold text-rose-700">要対応（公開できない例外）</p>
@@ -123,6 +130,7 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
                       type="button"
                       onClick={() => handleUnschedule(article.id)}
                       disabled={busy}
+                      aria-label={`予約を解除: ${article.title}`}
                       className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-700 disabled:opacity-50"
                     >
                       解除
@@ -164,7 +172,7 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
       ) : null}
 
       {error ? <p className="mt-2 text-sm text-rose-700">{error}</p> : null}
-        </>
+        </div>
       ) : null}
     </section>
   );
