@@ -49,6 +49,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/body-comment", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postReq(null, { pageId: PAGE_ID, comments: [COMMENT] }));
+    expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("アンカーできるコメントを依頼として記録する(200・依頼中)", async () => {
     vi.mocked(getPage).mockResolvedValue(page({ body: BODY }));
     const res = await POST(postReq(null, { pageId: PAGE_ID, comments: [COMMENT] }));

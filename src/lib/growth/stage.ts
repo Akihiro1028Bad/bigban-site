@@ -55,3 +55,15 @@ const PROPOSAL_STAGE_BY_STATUS: Record<string, ProposalStage> = {
 export function deriveProposalStage(status: string): ProposalStage {
   return PROPOSAL_STAGE_BY_STATUS[status] ?? "untouched";
 }
+
+/**
+ * 編集/AI依頼を弾く段階(#H9)。
+ * - generating: 下書き生成中＝書込が競合する。
+ * - published : 公開済み＝確定。下書きへの再編集は「下書きに戻す」明示操作を介すべき。
+ */
+export const EDIT_BLOCKED_STAGES: ReadonlySet<ArticleStage> = new Set(["generating", "published"]);
+
+/** 記事が編集/AI依頼を受け付ける段階か。生成中・公開済みは false。 */
+export function isArticleStageEditable(stage: ArticleStage): boolean {
+  return !EDIT_BLOCKED_STAGES.has(stage);
+}

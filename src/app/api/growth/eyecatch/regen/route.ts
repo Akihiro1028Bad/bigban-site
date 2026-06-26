@@ -20,6 +20,7 @@ import {
   regenRowFromPage,
 } from "@/lib/growth/eyecatchRegen";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
@@ -59,7 +60,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const row = regenRowFromPage(await getPage(pageId, options));
+    const page = await getPage(pageId, options);
+    const blocked = articleEditGuard(page);
+    if (blocked) return blocked;
+    const row = regenRowFromPage(page);
     if (!row.contentId) {
       return badRequest("下書きがまだありません。下書き作成後に再生成できます。");
     }

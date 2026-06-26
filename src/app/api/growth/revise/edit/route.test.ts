@@ -1,11 +1,10 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/growth/notion", () => ({
-  getPage: vi.fn(),
-  updatePageProps: vi.fn(),
-  defaultFetch: vi.fn(),
-}));
+vi.mock("@/lib/growth/notion", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/growth/notion")>();
+  return { ...actual, getPage: vi.fn(), updatePageProps: vi.fn(), defaultFetch: vi.fn() };
+});
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
 vi.mock("@/config/featureFlags", () => ({
@@ -46,6 +45,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/revise/edit", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, outline: "## A" }));
+    expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("構成案を直接上書きする(修正状態は触らない)", async () => {
     vi.mocked(getPage).mockResolvedValue(page());
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);

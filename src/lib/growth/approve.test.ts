@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NotionPage } from "./notion";
 import {
+  articleStageOf,
   draftBodyOf,
   draftLinkOf,
   eyecatchUrlOf,
@@ -106,6 +107,53 @@ describe("toPendingItems", () => {
     expect(item.isDraftReady).toBe(false);
   });
 
+  it("成績データ(成績ミラー #C4)があれば metrics を付ける", () => {
+    const page = idea("i8m", "T", "S");
+    const metrics = {
+      pagePath: "/news/a",
+      views: { current: 120, prior: 100, deltaPct: 20 },
+      users: { current: 80, prior: 70, deltaPct: 14.3 },
+      period: { start: "2026-06-15", end: "2026-06-21" },
+    };
+    page.properties["成績データ"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: JSON.stringify(metrics) }],
+    };
+    const [item] = toPendingItems([], [page]);
+    expect(item.metrics).toEqual(metrics);
+  });
+
+  it("成績データが無ければ metrics は undefined", () => {
+    const [item] = toPendingItems([], [idea("i8n", "T", "S")]);
+    expect(item.metrics).toBeUndefined();
+  });
+
+  it("公開キュー用の項目(eyecatchUrl/hasDraftBody/scheduledAtMs)を載せる(#H23/#H24)", () => {
+    const page = idea("i8q", "T", "S");
+    page.properties["アイキャッチURL"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "https://images.microcms-assets.io/x.png" }],
+    };
+    page.properties["下書き本文HTML"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "<p>本文</p>" }],
+    };
+    page.properties["公開予約時刻"] = {
+      type: "date",
+      date: { start: "2026-07-01T00:00:00.000Z" },
+    };
+    const [item] = toPendingItems([], [page]);
+    expect(item.eyecatchUrl).toBe("https://images.microcms-assets.io/x.png");
+    expect(item.hasDraftBody).toBe(true);
+    expect(item.scheduledAtMs).toBe(Date.parse("2026-07-01T00:00:00.000Z"));
+  });
+
+  it("本文・予約が無ければ hasDraftBody=false / scheduledAtMs=null", () => {
+    const [item] = toPendingItems([], [idea("i8r", "T", "S")]);
+    expect(item.hasDraftBody).toBe(false);
+    expect(item.scheduledAtMs).toBeNull();
+  });
+
   it("記事の段階(stage)を導出する: 承認かつ下書きID無し→queued(#106)", () => {
     const page = idea("i9", "T", "S");
     page.properties["ステータス"] = { type: "select", select: { name: "承認" } };
@@ -205,6 +253,9 @@ describe("toPendingItems", () => {
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
+        eyecatchUrl: "",
+        hasDraftBody: false,
+        scheduledAtMs: null,
       },
     ]);
   });
@@ -257,6 +308,9 @@ describe("toPendingItems", () => {
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
+        eyecatchUrl: "",
+        hasDraftBody: false,
+        scheduledAtMs: null,
       },
     ]);
   });
@@ -417,6 +471,33 @@ describe("draftLinkOf", () => {
       contentId: "",
       draftKey: "",
     });
+  });
+});
+
+describe("articleStageOf (#H9)", () => {
+  it("ステータス=生成中 → generating(編集ガード対象)", () => {
+    const page = idea("i1", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "生成中" } };
+    expect(articleStageOf(page)).toBe("generating");
+  });
+
+  it("ステータス=公開済み → published(編集ガード対象)", () => {
+    const page = idea("i1", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "公開済み" } };
+    expect(articleStageOf(page)).toBe("published");
+  });
+
+  it("承認かつ下書きID有り → drafted(編集可)", () => {
+    const page = idea("i1", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "承認" } };
+    page.properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: "g-1" }] };
+    expect(articleStageOf(page)).toBe("drafted");
+  });
+
+  it("承認かつ下書きID無し → queued(編集可)", () => {
+    const page = idea("i1", "T", "S");
+    page.properties["ステータス"] = { type: "select", select: { name: "承認" } };
+    expect(articleStageOf(page)).toBe("queued");
   });
 });
 

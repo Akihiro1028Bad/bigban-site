@@ -55,6 +55,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/draft/eyecatch", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postReq(null, { pageId: PAGE_ID, eyecatchUrl: ASSET }));
+    expect(res.status).toBe(409);
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
   it("Notion ミラー更新→microCMS 下書きの eyecatch を差し替える", async () => {
     vi.mocked(getPage).mockResolvedValue(pageWithContentId("g-abc"));
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);

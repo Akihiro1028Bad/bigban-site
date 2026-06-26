@@ -47,6 +47,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/body-image/regen", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: SRC }));
+    expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("再生成リクエスト(指示・対象src・依頼中・依頼時刻)を書き込む", async () => {
     vi.mocked(getPage).mockResolvedValue(page({ contentId: "g-abc" }));
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
