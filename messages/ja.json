@@ -272,7 +272,8 @@
         "walkTime": "徒歩5分"
       }
     },
-    "parkingNote": "お車でお越しの方は近隣のコインパーキングをご利用ください。"
+    "parkingNote": "お車でお越しの方は近隣のコインパーキングをご利用ください。",
+    "openInMaps": "Googleマップで開く"
   },
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
