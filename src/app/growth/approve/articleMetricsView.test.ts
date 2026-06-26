@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCount, formatDelta, formatScheduledAt } from "./articleMetricsView";
+import {
+  formatCount,
+  formatCtr,
+  formatDelta,
+  formatPosition,
+  formatScheduledAt,
+} from "./articleMetricsView";
+
+describe("formatCtr", () => {
+  it("0..1 を % (小数第1位)で整形", () => {
+    expect(formatCtr(0.05)).toBe("5%");
+    expect(formatCtr(0.053)).toBe("5.3%");
+    expect(formatCtr(0)).toBe("0%");
+  });
+});
+
+describe("formatPosition", () => {
+  it("平均掲載順位を小数第1位＋位で整形", () => {
+    expect(formatPosition(3.25)).toBe("3.3位");
+    expect(formatPosition(10)).toBe("10位");
+  });
+  it("0以下(未取得)は —", () => {
+    expect(formatPosition(0)).toBe("—");
+  });
+});
 
 describe("formatCount", () => {
   it("1000未満はそのまま", () => {

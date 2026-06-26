@@ -67,4 +67,46 @@ describe("PerformanceBoard", () => {
     expect(screen.getByText("±0%")).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("GSC検索成績(search)があればクリック/CTR/順位/CTA/上位クエリを出す(#S2)", () => {
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      keyEvents: { current: 7, prior: 3, deltaPct: 133 },
+      search: {
+        clicks: { current: 12, prior: 8, deltaPct: 50 },
+        impressions: { current: 200, prior: 150, deltaPct: 33.3 },
+        ctr: { current: 0.06, prior: 0.05, deltaPct: 20 },
+        position: { current: 3.2, prior: 4.1, deltaPct: -22 },
+        topQueries: [{ query: "本八幡 ピックルボール", clicks: 6, impressions: 60, ctr: 0.1, position: 2.5 }],
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "検索成績あり", m)]} />);
+    expect(screen.getByText(/クリック/)).toBeInTheDocument();
+    expect(screen.getByText(/CTR 6%/)).toBeInTheDocument();
+    expect(screen.getByText(/順位 3.2位/)).toBeInTheDocument();
+    expect(screen.getByText(/CTA/)).toBeInTheDocument();
+    expect(screen.getByText(/本八幡 ピックルボール/)).toBeInTheDocument();
+  });
+
+  it("search が無い記事は検索成績行を出さない(後方互換)", () => {
+    render(<PerformanceBoard items={[published("a", "旧データ", metrics(10, null, 5))]} />);
+    expect(screen.queryByText(/クリック/)).not.toBeInTheDocument();
+  });
+
+  it("search はあるが keyEvents 無し・topQueries 空なら CTA/クエリは出さない", () => {
+    const m: ArticleMetrics = {
+      ...metrics(50, null, 20),
+      search: {
+        clicks: { current: 3, prior: 0, deltaPct: null },
+        impressions: { current: 90, prior: 0, deltaPct: null },
+        ctr: { current: 0.033, prior: 0, deltaPct: null },
+        position: { current: 8, prior: 0, deltaPct: null },
+        topQueries: [],
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "検索のみ記事", m)]} />);
+    expect(screen.getByText(/クリック/)).toBeInTheDocument();
+    expect(screen.queryByText(/CTA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/「/)).not.toBeInTheDocument();
+  });
 });

@@ -5,7 +5,13 @@
 
 import { type ArticleMetrics, summarizeMetrics } from "@/lib/growth/metrics";
 
-import { type DeltaTone, formatCount, formatDelta } from "./articleMetricsView";
+import {
+  type DeltaTone,
+  formatCount,
+  formatCtr,
+  formatDelta,
+  formatPosition,
+} from "./articleMetricsView";
 
 /** 成績ボードが必要とする最小形状(lib/ApproveClient どちらの記事 item でも満たす)。 */
 interface MetricsItem {
@@ -65,17 +71,48 @@ export function PerformanceBoard({ items }: PerformanceBoardProps) {
 
           <ul className="mt-3 divide-y divide-gray-100">
             {measured.map(({ item, metrics }) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm text-gray-900">{item.title}</span>
-                <span className="flex items-center gap-1.5 text-xs text-gray-600">
-                  <span className="font-semibold text-gray-900">{formatCount(metrics.views.current)}</span>
-                  表示
-                  <DeltaBadge deltaPct={metrics.views.deltaPct} />
-                </span>
-                <span className="text-xs text-gray-600">
-                  <span className="font-semibold text-gray-900">{formatCount(metrics.users.current)}</span>
-                  {" "}ユーザー
-                </span>
+              <li key={item.id} className="py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-900">{item.title}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span className="font-semibold text-gray-900">{formatCount(metrics.views.current)}</span>
+                    表示
+                    <DeltaBadge deltaPct={metrics.views.deltaPct} />
+                  </span>
+                  <span className="text-xs text-gray-600">
+                    <span className="font-semibold text-gray-900">{formatCount(metrics.users.current)}</span>
+                    {" "}ユーザー
+                  </span>
+                </div>
+                {/* #計測強化 S2: GSC 検索成績(あれば)。クリック/CTR/順位＋上位クエリ。 */}
+                {metrics.search ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                    <span className="flex items-center gap-1">
+                      🔍
+                      <span className="font-semibold text-gray-700">
+                        {formatCount(metrics.search.clicks.current)}
+                      </span>
+                      クリック
+                      <DeltaBadge deltaPct={metrics.search.clicks.deltaPct} />
+                    </span>
+                    <span>表示 {formatCount(metrics.search.impressions.current)}</span>
+                    <span>CTR {formatCtr(metrics.search.ctr.current)}</span>
+                    <span>順位 {formatPosition(metrics.search.position.current)}</span>
+                    {metrics.keyEvents ? (
+                      <span>
+                        CTA{" "}
+                        <span className="font-semibold text-gray-700">
+                          {formatCount(metrics.keyEvents.current)}
+                        </span>
+                      </span>
+                    ) : null}
+                    {metrics.search.topQueries[0] ? (
+                      <span className="min-w-0 max-w-[14rem] truncate text-gray-400">
+                        「{metrics.search.topQueries[0].query}」
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

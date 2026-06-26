@@ -19,6 +19,17 @@ export function formatDelta(deltaPct: number | null): { text: string; tone: Delt
   return { text: `${deltaPct}%`, tone: "down" };
 }
 
+/** CTR(0..1)を % 表記に整形する(小数第1位)。#計測強化 S2。 */
+export function formatCtr(ctr: number): string {
+  return `${Math.round(ctr * 1000) / 10}%`;
+}
+
+/** 平均掲載順位を整形する(小数第1位・"位")。0以下は未取得として "—"。#計測強化 S2。 */
+export function formatPosition(pos: number): string {
+  if (pos <= 0) return "—";
+  return `${Math.round(pos * 10) / 10}位`;
+}
+
 /** 予約時刻(ms)を環境非依存に整形する(UTC・分まで)。#H24 の予約表示で使う。 */
 export function formatScheduledAt(ms: number): string {
   return `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
