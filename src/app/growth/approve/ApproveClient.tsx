@@ -6,11 +6,9 @@ import type { FormEvent } from "react";
 // useDebouncedValue は useDraftEditing フックへ移設(#H7)。
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { pendingStatus } from "@/lib/growth/approve";
 import { BODY_REGEN_BUSY_STATUSES } from "@/lib/growth/bodyImageRegen";
 import { REGEN_BUSY_STATUSES } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
-import type { Stage } from "@/lib/growth/stage";
 
 import {
   effectiveStage,
@@ -39,7 +37,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
+import { fetchBoard, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
@@ -77,6 +75,8 @@ import { authHeaders } from "./authHeaders";
 import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { type DraftPreview, type DraftState } from "./draftTypes";
 import { toMessage } from "./errorMessage";
+import type { Choice, PendingItem } from "./types";
+import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
 import { DraftReadyView } from "./DraftReadyView";
 import {
@@ -101,36 +101,6 @@ const DRAFT_REGEN_POLL_MS = 5000;
 const DENSITY_KEY = "growth-approve-density";
 
 
-interface PendingDetail {
-  label: string;
-  value: string;
-}
-
-interface PendingItem {
-  id: string;
-  kind: "proposal" | "idea";
-  title: string;
-  subtitle: string;
-  details?: PendingDetail[];
-  score?: number;
-  // #42: 記事ネタ案の構成案修正ループ。
-  outline?: string;
-  reviseStatus?: string;
-  reviseProposal?: string;
-  // #139 B: AI が提案した新タイトル(提示中に新旧比較で表示)。空=タイトル提案なし。
-  reviseTitleProposal?: string;
-  reviseInstructions?: string;
-  // #C2 UI: 構成案修正の依頼時刻(ms)。経過/滞留表示用。未設定は null。
-  reviseRequestedAtMs?: number | null;
-  // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
-  contentId?: string;
-  // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
-  isDraftReady?: boolean;
-  // #106/#107: パイプライン段階。盤の列分け・段階インジケータに使う。
-  stage: Stage;
-}
-
-
 // 修正処理中(再依頼不可・承認排他の対象)の状態。
 const REVISE_BUSY_STATUSES = ["依頼中", "処理中", "提示中"];
 
@@ -147,24 +117,12 @@ function byScoreDesc(a: PendingItem, b: PendingItem): number {
   return (b.score ?? 0) - (a.score ?? 0);
 }
 
-type Choice = "承認" | "却下";
-
-interface Failure {
-  message: string;
-  retry: () => void;
-}
-
 const KIND_BADGE: Record<PendingItem["kind"], string> = {
   proposal: "📋 施策",
   idea: "📝 記事",
 };
 
 
-function removeKey<T>(obj: Record<string, T>, key: string): Record<string, T> {
-  const next = { ...obj };
-  delete next[key];
-  return next;
-}
 
 // #275: 一覧は高密度行。未処理=通常枠 / 処理済み=細い行 / 失敗=赤枠。
 function rowClass(choice: Choice | undefined, failed: boolean): string {
@@ -252,10 +210,6 @@ export function ApproveClient() {
   // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
   // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
   const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
-  // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
-  const [decided, setDecided] = useState<Record<string, Choice>>({});
-  const [failures, setFailures] = useState<Record<string, Failure>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
   const [busy, setBusy] = useState(authDisabled);
@@ -263,6 +217,23 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
   const [openId, setOpenId] = useState<string | null>(null);
+  // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
+  // decisionMutation はクローズ操作でも共用するため公開分を受け取る。
+  const {
+    decided,
+    failures,
+    savingId,
+    setDecided,
+    decisionMutation,
+    decide,
+    undo,
+    decideFromPanel,
+    undoFromPanel,
+  } = useApproveDecisions({
+    token,
+    onFocus: setFocusId,
+    onClosePanel: () => setOpenId(null),
+  });
   // #90: トリアージ型UI。表示中のカテゴリタブ・未処理のみ表示・処理済みアコーディオンの開閉。
   // #53: 構成案セクション(index)ごとに溜めたコメント(複数可)。送信時に {見出し, comment} へ展開。
   const [draftComments, setDraftComments] = useState<Record<number, string[]>>({});
@@ -412,7 +383,8 @@ export function ApproveClient() {
       ]);
     }
     setDecided((prev) => reconcileDecided(prev, next));
-  }, [boardQuery.data]);
+    // setDecided は useApproveDecisions が返す安定参照(useState セッター)。
+  }, [boardQuery.data, setDecided]);
 
   // #H5: poll/refetch の失敗を連続失敗として可視化(沈黙させない)。初期ロード失敗は loadError/failAuth 側。
   useEffect(() => {
@@ -633,12 +605,9 @@ export function ApproveClient() {
     void loadPending();
   }, [authDisabled, loadPending]);
 
-  // #H7: 承認/却下/クローズ/復帰の更新と公開を useMutation 化(fetch ロジックは api.ts)。
+  // #H7: 公開/修正系の更新を useMutation 化(fetch ロジックは api.ts)。承認/却下/復帰の
+  // decisionMutation は useApproveDecisions から受け取る(クローズで共用)。
   // 公開は外向き操作のため成功時に盤を invalidate して最新化する。
-  const decisionMutation = useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: string }) =>
-      postDecision(token, id, decision),
-  });
   const publishMutation = useMutation({
     mutationFn: (id: string) => postPublish(token, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: APPROVE_BOARD_KEY }),
@@ -654,24 +623,6 @@ export function ApproveClient() {
     mutationFn: ({ pageId, action }: { pageId: string; action: "apply" | "discard" }) =>
       postReviseApply(token, pageId, action),
   });
-
-  async function decide(item: PendingItem, choice: Choice): Promise<void> {
-    setSavingId(item.id);
-    setFailures((prev) => removeKey(prev, item.id));
-    try {
-      await decisionMutation.mutateAsync({ id: item.id, decision: choice });
-      setDecided((prev) => ({ ...prev, [item.id]: choice }));
-      setFocusId(`undo-${item.id}`);
-    } catch (error) {
-      const text = toMessage(error, "保存に失敗しました。");
-      setFailures((prev) => ({
-        ...prev,
-        [item.id]: { message: text, retry: () => decide(item, choice) },
-      }));
-    } finally {
-      setSavingId(null);
-    }
-  }
 
   // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
   const [actionBusy, setActionBusy] = useState(false);
@@ -722,35 +673,6 @@ export function ApproveClient() {
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
   function addProposal(item: PendingItem): void {
     setBoardData((prev) => [item, ...prev]);
-  }
-
-  async function undo(item: PendingItem): Promise<void> {
-    setSavingId(item.id);
-    setFailures((prev) => removeKey(prev, item.id));
-    try {
-      await decisionMutation.mutateAsync({ id: item.id, decision: pendingStatus(item.kind) });
-      setDecided((prev) => removeKey(prev, item.id));
-      setFocusId(`approve-${item.id}`);
-    } catch (error) {
-      const text = toMessage(error, "取り消しに失敗しました。");
-      setFailures((prev) => ({
-        ...prev,
-        [item.id]: { message: text, retry: () => undo(item) },
-      }));
-    } finally {
-      setSavingId(null);
-    }
-  }
-
-  // #275: 詳細パネルからの操作。実行して即座にパネルを閉じる(結果は一覧の行に反映)。
-  function decideFromPanel(item: PendingItem, choice: Choice): void {
-    void decide(item, choice);
-    setOpenId(null);
-  }
-
-  function undoFromPanel(item: PendingItem): void {
-    void undo(item);
-    setOpenId(null);
   }
 
   // #53/#139 B: セクションに溜めたコメントを {見出し, comment} へ展開し、タイトル指示と一緒に送る。
