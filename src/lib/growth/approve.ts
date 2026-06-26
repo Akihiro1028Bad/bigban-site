@@ -195,12 +195,14 @@ function selectName(page: NotionPage, prop: string): string {
   return value?.select?.name ?? "";
 }
 
-/** multi_select の選択名一覧。未設定は空配列(#計測強化 S4)。 */
+/** multi_select の選択名一覧(重複除去)。未設定は空配列(#計測強化 S4)。 */
 function multiSelectNames(page: NotionPage, prop: string): string[] {
   const value = page.properties[prop] as
     | { multi_select?: Array<{ name?: string }> }
     | undefined;
-  return (value?.multi_select ?? []).map((o) => o.name ?? "").filter((n) => n !== "");
+  const names = (value?.multi_select ?? []).map((o) => o.name ?? "").filter((n) => n !== "");
+  // 重複は除く(描画 key の衝突防止＝意図シグナルの集合として正しくする)。
+  return [...new Set(names)];
 }
 
 /**
