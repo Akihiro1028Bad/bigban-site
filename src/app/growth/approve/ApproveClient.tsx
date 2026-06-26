@@ -43,14 +43,7 @@ import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { DetailPanel } from "./DetailPanel";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
-import { ReviseCommentForm } from "./ReviseCommentForm";
-import { ReviseFailed } from "./ReviseFailed";
-import { ReviseReady } from "./ReviseReady";
-import { RevisePending } from "./RevisePending";
-import { ReviseSection } from "./ReviseSection";
-import { Section } from "./Section";
-import { SectionEditor } from "./SectionEditor";
-import { SectionImages } from "./SectionImages";
+import { ReviseSectionView } from "./ReviseSectionView";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -80,7 +73,6 @@ import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
 import { useReviseEditing } from "./hooks/useReviseEditing";
 import { DraftReadyView } from "./DraftReadyView";
-import { outlineSections, type OutlineSection } from "./outline";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
@@ -224,52 +216,11 @@ export function ApproveClient() {
     onFocus: setFocusId,
     onClosePanel: () => setOpenId(null),
   });
-  // #H7: 構成案の修正(AI依頼/手動編集/画像指示/タイトル/提示反映)はカスタムフックへ集約。
-  // refreshItems(修正後の最新化)も提示待ちポーリング/再取得で共用するため受け取る。
-  const {
-    refreshItems,
-    draftComments,
-    openCommentFor,
-    commentText,
-    editingIdx,
-    editingSection,
-    editHeading,
-    editDescription,
-    imageFormFor,
-    editingImageIdx,
-    imageStyle,
-    imageDesc,
-    reviseBusy,
-    reviseError,
-    editingTitle,
-    titleInput,
-    titleRevisePrompt,
-    setCommentText,
-    setEditHeading,
-    setEditDescription,
-    setImageStyle,
-    setImageDesc,
-    setTitleInput,
-    setTitleRevisePrompt,
-    requestRevise,
-    startAddComment,
-    startEditComment,
-    cancelComment,
-    saveComment,
-    deleteComment,
-    startEditSection,
-    cancelEditSection,
-    startEditTitle,
-    cancelEditTitle,
-    saveTitle,
-    saveSection,
-    startAddImage,
-    startEditImage,
-    cancelImage,
-    saveImage,
-    deleteImage,
-    applyRevise,
-  } = useReviseEditing({ token, openId, setBoardData });
+  // #H7: 構成案の修正(AI依頼/手動編集/画像指示/タイトル/提示反映)はカスタムフックへ集約し、
+  // 戻り値を丸ごと ReviseSectionView へ渡す。refreshItems(最新化)のみ提示待ちポーリングで共用。
+  const revise = useReviseEditing({ token, openId, setBoardData });
+  // 提示待ちポーリングの依存に使う安定参照(useCallback)。
+  const { refreshItems } = revise;
   const passphraseRef = useRef<HTMLInputElement>(null);
 
   const processed = Object.keys(decided).length;
@@ -814,120 +765,6 @@ export function ApproveClient() {
       />
     );
   }
-  function renderSectionEditor(item: PendingItem, sections: OutlineSection[], i: number) {
-    return (
-      <SectionEditor
-        heading={sections[i].heading}
-        editHeading={editHeading}
-        onHeadingChange={setEditHeading}
-        editDescription={editDescription}
-        onDescriptionChange={setEditDescription}
-        busy={reviseBusy}
-        onCancel={cancelEditSection}
-        onSave={() => saveSection(item, sections, i)}
-      />
-    );
-  }
-
-  // #61: 1セクション分の画像指示(チップ＋スタイル選択フォーム)を描画。
-  function renderSectionImages(item: PendingItem, sections: OutlineSection[], i: number) {
-    return (
-      <SectionImages
-        heading={sections[i].heading}
-        images={sections[i].images}
-        open={imageFormFor === i}
-        busy={reviseBusy}
-        sectionIndex={i}
-        imageStyle={imageStyle}
-        onImageStyleChange={setImageStyle}
-        imageDesc={imageDesc}
-        onImageDescChange={setImageDesc}
-        editing={editingImageIdx !== null}
-        onStartEdit={(idx, image) => startEditImage(i, idx, image)}
-        onDelete={(idx) => deleteImage(item, sections, i, idx)}
-        onStartAdd={() => startAddImage(i)}
-        onCancel={cancelImage}
-        onSave={() => saveImage(item, sections, i)}
-      />
-    );
-  }
-  // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
-  function renderSection(item: PendingItem, sections: OutlineSection[], i: number) {
-    const section = sections[i];
-    return (
-      <Section
-        key={i}
-        heading={section.heading}
-        description={section.description}
-        comments={draftComments[i] ?? []}
-        editing={editingSection === i}
-        commentOpen={openCommentFor === i}
-        commentText={commentText}
-        onCommentTextChange={setCommentText}
-        editingComment={editingIdx !== null}
-        busy={reviseBusy}
-        onStartEditComment={(idx, comment) => startEditComment(i, idx, comment)}
-        onDeleteComment={(idx) => deleteComment(i, idx)}
-        onCancelComment={cancelComment}
-        onSaveComment={() => saveComment(i)}
-        onStartAddComment={() => startAddComment(i)}
-        onStartEditSection={() => startEditSection(i, section)}
-        editor={renderSectionEditor(item, sections, i)}
-        images={renderSectionImages(item, sections, i)}
-      />
-    );
-  }
-
-  // #42/#43/#52/#53/#54/#139 B: 構成案の修正セクション(記事のみ)。コメント＋タイトル指示＋手動編集。
-  function renderReviseCommentForm(item: PendingItem, sections: OutlineSection[]) {
-    const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
-    return (
-      <ReviseCommentForm
-        itemId={item.id}
-        titlePrompt={titleRevisePrompt}
-        onTitlePromptChange={setTitleRevisePrompt}
-        busy={reviseBusy}
-        sectionCount={sections.length}
-        commentTotal={total}
-        renderSection={(i) => renderSection(item, sections, i)}
-        onRequestRevise={() => requestRevise(item)}
-      />
-    );
-  }
-
-  function renderRevisePending(item: PendingItem) {
-    return (
-      <RevisePending
-        requestedAtMs={item.reviseRequestedAtMs ?? null}
-        busy={reviseBusy}
-        onRefresh={() => void refreshItems()}
-      />
-    );
-  }
-
-  function renderReviseReady(item: PendingItem) {
-    return (
-      <ReviseReady
-        title={item.title}
-        currentOutline={item.outline ?? ""}
-        outlineProposal={item.reviseProposal ?? ""}
-        titleProposal={item.reviseTitleProposal ?? ""}
-        busy={reviseBusy}
-        onApply={() => applyRevise(item, "apply")}
-        onDiscard={() => applyRevise(item, "discard")}
-      />
-    );
-  }
-
-  function renderReviseFailed(item: PendingItem) {
-    return (
-      <ReviseFailed
-        reason={item.reviseProposal || "理由不明"}
-        busy={reviseBusy}
-        onDiscard={() => applyRevise(item, "discard")}
-      />
-    );
-  }
 
   // #127/M8: クリップボードへコピー(本文など)。成否をトーストで明示する(沈黙させない)。
   function copyText(text: string): void {
@@ -988,35 +825,6 @@ export function ApproveClient() {
           <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
         )}
       </section>
-    );
-  }
-
-  function renderReviseSection(item: PendingItem) {
-    const sections = outlineSections(item.outline);
-    const phase = revisePhase(item.reviseStatus);
-    if (phase === "idle" && sections.length === 0) return null;
-    const phaseContent =
-      phase === "pending"
-        ? renderRevisePending(item)
-        : phase === "ready"
-          ? renderReviseReady(item)
-          : phase === "failed"
-            ? renderReviseFailed(item)
-            : renderReviseCommentForm(item, sections);
-    return (
-      <ReviseSection
-        itemId={item.id}
-        title={item.title}
-        editingTitle={editingTitle}
-        titleValue={titleInput}
-        busy={reviseBusy}
-        onTitleChange={setTitleInput}
-        onStartEditTitle={() => startEditTitle(item.title)}
-        onCancelTitle={cancelEditTitle}
-        onSaveTitle={() => saveTitle(item)}
-        phaseContent={phaseContent}
-        error={reviseError}
-      />
     );
   }
 
@@ -1166,7 +974,7 @@ export function ApproveClient() {
         insight={insight}
         checklist={checklist}
         draftPreview={renderDraftPreview(item)}
-        reviseSection={renderReviseSection(item)}
+        reviseSection={<ReviseSectionView item={item} revise={revise} />}
         decisionActions={decisionActions}
         onClose={() => setOpenId(null)}
       />
