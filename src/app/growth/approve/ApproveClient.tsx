@@ -76,8 +76,7 @@ const EMPTY_ITEMS: PendingItem[] = [];
 // #109: 表示密度の保存キー(localStorage)。
 const DENSITY_KEY = "growth-approve-density";
 
-
-// 修正処理中(再依頼不可・承認排他の対象)の状態。
+// #242: 施策/記事を優先度スコア降順に並べる比較関数。
 function byScoreDesc(a: PendingItem, b: PendingItem): number {
   return (b.score ?? 0) - (a.score ?? 0);
 }
@@ -414,12 +413,10 @@ export function ApproveClient() {
     void loadPending();
   }, [authDisabled, loadPending]);
 
-  // #H7: 公開/修正系の更新を useMutation 化(fetch ロジックは api.ts)。承認/却下/復帰の
+  // #H7: 公開の更新を useMutation 化(fetch ロジックは api.ts)。承認/却下/復帰の
   // decisionMutation は useApproveDecisions から受け取る(クローズで共用)。
-  // 公開は外向き操作のため成功時に盤を invalidate して最新化する。
   const publishMutation = useMutation({
     mutationFn: (id: string) => postPublish(token, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: APPROVE_BOARD_KEY }),
   });
 
   // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
@@ -435,6 +432,8 @@ export function ApproveClient() {
     setActionError("");
     try {
       await publishMutation.mutateAsync(id);
+      // 挙動保存(#H7): 盤が最新化されてからトーストを出す(公開反映を確認できてから通知)。
+      await pollBoard();
       pushToast("記事を公開しました。");
     } catch (error) {
       setActionError(toMessage(error, "公開に失敗しました。"));

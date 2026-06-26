@@ -353,7 +353,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     deleteComment,
     startEditSection,
     cancelEditSection,
-    submitReviseEdit,
     startEditTitle,
     cancelEditTitle,
     saveTitle,
