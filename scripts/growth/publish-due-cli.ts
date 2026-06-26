@@ -34,8 +34,8 @@ const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
 const DRAFTED_STATUS = "下書き作成済み";
 const APPROVED_STATUS = "承認";
-// microCMS contentId の許可文字(他の参照箇所と同じ)。不正値を URL パスに載せない。
-const CONTENT_ID_RE = /^[a-z0-9-]+$/;
+// microCMS contentId の許可文字＋長さ上限(draft/eyecatch route と同じ)。不正値・過大値を URL パスに載せない。
+const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 
 function requireEnv(name: string): string {
