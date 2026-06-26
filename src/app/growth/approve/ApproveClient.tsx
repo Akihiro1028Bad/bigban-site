@@ -3,20 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import Image from "next/image";
-import { motion } from "framer-motion";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import type { AdviceView } from "@/lib/growth/advise";
-import type { AdviceApplyView } from "@/lib/growth/adviseApply";
-import type { BodyCommentView } from "@/lib/growth/bodyComment";
 import { pendingStatus } from "@/lib/growth/approve";
-import {
-  BODY_REGEN_BUSY_STATUSES,
-  type BodyRegenStatus,
-} from "@/lib/growth/bodyImageRegen";
-import type { DecorateView } from "@/lib/growth/decorate";
-import { REGEN_BUSY_STATUSES, type RegenStatus } from "@/lib/growth/eyecatchRegen";
+import { BODY_REGEN_BUSY_STATUSES } from "@/lib/growth/bodyImageRegen";
+import { REGEN_BUSY_STATUSES } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import type { Stage } from "@/lib/growth/stage";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -52,8 +43,6 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
-import { DraftPreviewPane } from "./DraftPreviewPane";
-import { PublishCloseActions } from "./PublishCloseActions";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
@@ -82,16 +71,13 @@ import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
-import { AdviceCard } from "./AdviceCard";
-import { BodyImagePicker } from "./BodyImagePicker";
-import { DecorationAssistant } from "./DecorationAssistant";
-import { InlineCommentReview } from "./InlineCommentReview";
 import { CommandPalette } from "./CommandPalette";
-import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { authHeaders } from "./authHeaders";
 import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { buildDraftEditPayload } from "./draftEditorContent";
+import { type DraftPreview, type DraftState } from "./draftTypes";
+import { DraftReadyView } from "./DraftReadyView";
 import {
   parseOutlineSections,
   serializeOutlineSections,
@@ -146,36 +132,6 @@ interface PendingItem {
   stage: Stage;
 }
 
-// #75: 下書きプレビューの取得状態。
-interface DraftPreview {
-  title: string;
-  displayMode: "html" | "rich";
-  bodyHtml: string;
-  body: string;
-  // #141: アイキャッチURLミラー(未設定は空文字)。プレビュー上部の画像表示に使う。
-  eyecatch?: string;
-  // #146: スタイリング・アドバイスの表示用ビュー(ステータス＋提示中のみ解析済み)。
-  advice?: AdviceView;
-  // #165: アドバイス採用→反映の表示用ビュー(ステータス＋提示中のみ before/after 案)。
-  adviceApply?: AdviceApplyView;
-  // #147: 装飾提案の表示用ビュー(ステータス＋提示中のみ解析済み提案配列)。
-  decorate?: DecorateView;
-  // #166: AI再生成の依頼中/処理中/失敗の表示用ビュー(本文画像は対象src付き)。
-  // #C2 UI: requestedAtMs は経過/滞留表示用(未設定は null)。
-  bodyRegen?: { status: BodyRegenStatus; targetSrc: string; requestedAtMs?: number | null };
-  eyecatchRegen?: { status: RegenStatus; requestedAtMs?: number | null };
-  // #182: 本文インラインコメントの表示用ビュー(ステータス＋投稿済みコメント)。
-  bodyComment?: BodyCommentView;
-  // #H19: 既知の公開記事リンクパス(/ja/news/<slug>)。壊れ内部リンク検査に使う(取得不可なら未設定)。
-  knownNewsPaths?: readonly string[];
-}
-
-type DraftState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "empty" }
-  | { status: "error"; error: string }
-  | { status: "ready"; draft: DraftPreview };
 
 // 修正処理中(再依頼不可・承認排他の対象)の状態。
 const REVISE_BUSY_STATUSES = ["依頼中", "処理中", "提示中"];
@@ -1427,106 +1383,22 @@ export function ApproveClient() {
             下書きが見つかりませんでした。
           </p>
         ) : draftState.status === "ready" ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-2"
-          >
-            {/* #141: アイキャッチ(あれば)をプレビュー上部に表示。microCMS Media は next.config 許可済み。 */}
-            {draftState.draft.eyecatch ? (
-              <Image
-                src={draftState.draft.eyecatch}
-                alt={`アイキャッチ: ${draftState.draft.title}`}
-                width={800}
-                height={420}
-                className="mb-1 h-auto w-full rounded-md border border-gray-200"
-              />
-            ) : null}
-            {/* #143: アイキャッチをメディア選択/アップロードで差し替え。差し替え後は下書きを再取得。 */}
-            <EyecatchPicker
-              pageId={item.id}
-              token={token}
-              onReplaced={() => void loadDraft(item.id)}
-              regenStatus={draftState.draft.eyecatchRegen?.status}
-              regenRequestedAtMs={draftState.draft.eyecatchRegen?.requestedAtMs ?? null}
-            />
-            {/* #145: 本文画像の差し替え(画像があるときだけ表示)。保存後は下書きを再取得。 */}
-            <BodyImagePicker
-              pageId={item.id}
-              token={token}
-              bodyHtml={draftState.draft.bodyHtml}
-              onSaved={() => void loadDraft(item.id)}
-              regenStatus={draftState.draft.bodyRegen?.status}
-              regenTargetSrc={draftState.draft.bodyRegen?.targetSrc}
-              regenRequestedAtMs={draftState.draft.bodyRegen?.requestedAtMs ?? null}
-            />
-            {/* #146: スタイリング・アドバイザー(read-only)。依頼/閉じる後に下書きを再取得。 */}
-            <AdviceCard
-              pageId={item.id}
-              token={token}
-              advice={draftState.draft.advice}
-              adviceApply={draftState.draft.adviceApply}
-              bodyHtml={draftState.draft.bodyHtml}
-              onChanged={() => void loadDraft(item.id)}
-            />
-            {/* #147: 装飾アシスタント。提案を採用→反映(draft/edit)後に下書きを再取得。 */}
-            <DecorationAssistant
-              pageId={item.id}
-              token={token}
-              bodyHtml={draftState.draft.bodyHtml}
-              decorate={draftState.draft.decorate}
-              onChanged={() => void loadDraft(item.id)}
-            />
-            {/* #182: 本文インラインコメント(1文＝1行)→AIに指摘依頼。依頼/片付け後に下書きを再取得。 */}
-            <InlineCommentReview
-              pageId={item.id}
-              token={token}
-              bodyHtml={draftState.draft.bodyHtml}
-              bodyComment={draftState.draft.bodyComment}
-              onChanged={() => void loadDraft(item.id)}
-            />
-            {/* #129/#124: PC/モバイル幅トグル＋ブラウザ風chrome＋本番プレビュー iframe。 */}
-            <DraftPreviewPane
-              device={previewDevice}
-              onDeviceChange={setPreviewDevice}
-              html={draftState.draft.bodyHtml || draftState.draft.body}
-            />
-            {/* #167/H1: 公開・クローズは最終確認(本番プレビュー)の下＝最終アクション位置に置く。 */}
-            <PublishCloseActions
-              stage={item.stage}
-              title={item.title}
-              bodyHtml={draftState.draft.bodyHtml}
-              body={draftState.draft.body}
-              knownNewsPaths={draftState.draft.knownNewsPaths}
-              busy={actionBusy}
-              error={actionError}
-              onPublish={() => openConfirm(item, "publish")}
-              onClose={() => openConfirm(item, "close")}
-            />
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                aria-label="下書きを編集"
-                onClick={() => startEditDraft(draftState.draft.bodyHtml)}
-                className={choiceButtonClass(
-                  "border border-blue-600 bg-blue-600 text-white"
-                )}
-              >
-                編集
-              </button>
-              {/* #127: 本文(プレーン)をクリップボードへコピー。 */}
-              <button
-                type="button"
-                aria-label="本文をコピー"
-                onClick={() => copyText(draftState.draft.body)}
-                className={choiceButtonClass(
-                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                コピー
-              </button>
-            </div>
-          </motion.div>
+          <DraftReadyView
+            draft={draftState.draft}
+            pageId={item.id}
+            itemTitle={item.title}
+            itemStage={item.stage}
+            token={token}
+            previewDevice={previewDevice}
+            onPreviewDeviceChange={setPreviewDevice}
+            actionBusy={actionBusy}
+            actionError={actionError}
+            onReloadDraft={() => void loadDraft(item.id)}
+            onPublish={() => openConfirm(item, "publish")}
+            onClose={() => openConfirm(item, "close")}
+            onStartEdit={() => startEditDraft(draftState.draft.bodyHtml)}
+            onCopy={() => copyText(draftState.draft.body)}
+          />
         ) : (
           <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
         )}
