@@ -37,6 +37,9 @@ export function useApproveBoard({
     queryKey: APPROVE_BOARD_KEY,
     queryFn: () => fetchBoard(token),
     enabled,
+    // 盤は「初期ロードでseed→以降はpoll/手動refetchでのみ更新」。staleTime:Infinity で
+    // enable 時の自動再取得(二重フェッチ)を防ぎ、更新契機を refetchInterval/refetch に限定する。
+    staleTime: Infinity,
     refetchInterval: (query) => (shouldPoll(query.state.data) ? pollIntervalMs : false),
   });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
@@ -48,6 +49,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
+import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
 import { PerformanceBoard } from "./PerformanceBoard";
@@ -94,6 +96,9 @@ import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
 const REVISE_POLL_MS = 5000;
+
+// 盤データ未取得時の安定した空配列(#H7: 参照を固定して不要な再計算を避ける)。
+const EMPTY_ITEMS: PendingItem[] = [];
 
 // #166: AI再生成が依頼中/処理中の間、下書きを再取得して依頼中→完了を生更新する間隔(ミリ秒)。
 const DRAFT_REGEN_POLL_MS = 5000;
@@ -282,7 +287,27 @@ export function ApproveClient() {
   const [authed, setAuthed] = useState(authDisabled);
   // 認証無効時はマウント時の自動取得が走るため、その間は読み込み中表示にする。
   const [loadError, setLoadError] = useState("");
-  const [items, setItems] = useState<PendingItem[]>([]);
+  // #H7: 盤(サーバ状態)は React Query を単一ソースにする。初期ロードは命令的に取得して
+  // cache を seed し(boardSeeded で query を有効化)、以降の更新は poll/手動 refetch のみ。
+  const queryClient = useQueryClient();
+  const [boardSeeded, setBoardSeeded] = useState(false);
+  const boardQuery = useApproveBoard({
+    token,
+    enabled: authed && boardSeeded,
+    pollIntervalMs: REVISE_POLL_MS,
+    shouldPoll: (data) => (data ?? []).some((it) => isInFlight(it.stage)),
+  });
+  const items = boardQuery.data ?? EMPTY_ITEMS;
+  /** 盤データを差し替える(命令的 seed/楽観更新)。setItems 相当。 */
+  const setBoardData = useCallback(
+    (updater: PendingItem[] | ((prev: PendingItem[]) => PendingItem[])): void => {
+      // 関数形は seed 後(楽観更新)のみ呼ぶため prev は常に定義済み。
+      queryClient.setQueryData<PendingItem[]>(APPROVE_BOARD_KEY, (prev) =>
+        typeof updater === "function" ? updater(prev as PendingItem[]) : updater
+      );
+    },
+    [queryClient]
+  );
   // #108: 完了トースト/滞留検知用。itemsRef は poll で前回値を参照、nowTick は滞留経過の基準時刻、
   // firstSeenRef は記事が生成待ち/生成中に入った時刻。
   const [toasts, setToasts] = useState<
@@ -380,12 +405,11 @@ export function ApproveClient() {
 
   // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。失敗は明示する。
   const refreshItems = useCallback(async (): Promise<void> => {
-    try {
-      setItems(await fetchPending(token));
-    } catch (error) {
-      setReviseError(toMessage(error, "最新の取得に失敗しました。"));
+    const res = await boardQuery.refetch();
+    if (res.isError) {
+      setReviseError(toMessage(res.error, "最新の取得に失敗しました。"));
     }
-  }, [token]);
+  }, [boardQuery]);
 
   // #108: poll で前回 items を参照できるよう itemsRef を最新化する。
   useEffect(() => {
@@ -430,16 +454,35 @@ export function ApproveClient() {
   }, [items]);
 
   // #108: 盤の最新化ポーリング。生成完了(→drafted)を検知してトースト、滞留経過の基準時刻も更新。
+  // 盤の手動再取得(公開/クローズ/再試行/公開キュー)。自動ポーリングは useApproveBoard の
+  // refetchInterval が担う。完了検知トースト等の副作用は boardQuery.data の変化を見る effect 側。
   const pollBoard = useCallback(async (): Promise<void> => {
-    let next: PendingItem[];
-    try {
-      next = await fetchPending(token);
-    } catch {
-      // #H5: 失敗は次の poll で回復するが、沈黙させず連続失敗を数えてバナーで可視化する。
-      setPollFailures((f) => f + 1);
+    await boardQuery.refetch();
+  }, [boardQuery]);
+
+  const boardInitRef = useRef(false);
+  const prevBoardRef = useRef<PendingItem[]>([]);
+
+  // 取得成功(値が同じでも)ごとの副作用: 滞留経過の基準時刻・最終成功時刻・連続失敗リセット。
+  // dataUpdatedAt は毎回の成功で更新されるため、ポーリングで値が変わらなくても確実に走る。
+  useEffect(() => {
+    if (boardQuery.data === undefined) return;
+    setNowTick(Date.now());
+    setLastBoardSuccessMs(Date.now());
+    setPollFailures(0);
+  }, [boardQuery.dataUpdatedAt, boardQuery.data]);
+
+  // 値が変化したときの副作用: 完成トースト・楽観決定の掃除(#H10)。初回(seed)はトーストを出さない。
+  useEffect(() => {
+    const next = boardQuery.data;
+    if (next === undefined) return;
+    if (!boardInitRef.current) {
+      boardInitRef.current = true;
+      prevBoardRef.current = next;
       return;
     }
-    const doneIds = newlyDraftedIds(itemsRef.current, next);
+    const doneIds = newlyDraftedIds(prevBoardRef.current, next);
+    prevBoardRef.current = next;
     if (doneIds.length > 0) {
       const done = new Set(doneIds);
       setToasts((prev) => [
@@ -453,23 +496,13 @@ export function ApproveClient() {
           })),
       ]);
     }
-    setItems(next);
-    // #H10: サーバ最新に楽観的決定を突き合わせ、消失/前進済みのゴースト決定を掃除する。
     setDecided((prev) => reconcileDecided(prev, next));
-    setNowTick(Date.now());
-    setPollFailures(0);
-    setLastBoardSuccessMs(Date.now());
-  }, [token]);
+  }, [boardQuery.data]);
 
-  // 生成待ち/生成中がある間だけポーリングする(完了検知＋滞留経過の更新)。
-  const hasInFlight = items.some((item) => isInFlight(item.stage));
+  // #H5: poll/refetch の失敗を連続失敗として可視化(沈黙させない)。初期ロード失敗は loadError/failAuth 側。
   useEffect(() => {
-    if (!hasInFlight) return;
-    const timer = setInterval(() => {
-      void pollBoard();
-    }, REVISE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [hasInFlight, pollBoard]);
+    if (boardQuery.isError) setPollFailures((f) => f + 1);
+  }, [boardQuery.isError, boardQuery.errorUpdatedAt]);
 
   // M8: 通知トーストを1件積む(一意 id を採番)。
   function pushToast(message: string, tone: "success" | "error" = "success"): void {
@@ -725,7 +758,8 @@ export function ApproveClient() {
     setBusy(true);
     setMessage("");
     try {
-      setItems(await fetchPending(pass));
+      setBoardData(await fetchPending(pass));
+      setBoardSeeded(true);
       setToken(pass);
       setAuthed(true);
     } catch (error) {
@@ -740,13 +774,14 @@ export function ApproveClient() {
     setBusy(true);
     setLoadError("");
     try {
-      setItems(await fetchPending(""));
+      setBoardData(await fetchPending(""));
+      setBoardSeeded(true);
     } catch (error) {
       setLoadError(toMessage(error, "取得に失敗しました。"));
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [setBoardData]);
 
   useEffect(() => {
     if (!authDisabled) return;
@@ -839,7 +874,7 @@ export function ApproveClient() {
 
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
   function addProposal(item: PendingItem): void {
-    setItems((prev) => [item, ...prev]);
+    setBoardData((prev) => [item, ...prev]);
   }
 
   async function undo(item: PendingItem): Promise<void> {
@@ -900,7 +935,7 @@ export function ApproveClient() {
         );
       }
       // 楽観更新: 依頼中にして即ポーリング表示へ(以降は poll が提示を取りに行く)。
-      setItems((prev) =>
+      setBoardData((prev) =>
         prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
       );
       setDraftComments({});
