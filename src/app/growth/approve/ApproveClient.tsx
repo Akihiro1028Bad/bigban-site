@@ -38,9 +38,12 @@ import {
 } from "./boardPrefs";
 
 import { fetchBoard, postPublish } from "./api";
-import { choiceButtonClass, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
+import { BoardTabs } from "./BoardTabs";
+import { BoardToolbar } from "./BoardToolbar";
+import { BulkActionBar } from "./BulkActionBar";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { PollStaleBanner } from "./PollStaleBanner";
 import { DetailPanelView } from "./DetailPanelView";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
@@ -52,12 +55,12 @@ import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
-import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
+import { decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { authHeaders } from "./authHeaders";
-import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
+import { shouldWarnPollStale } from "./pollHealth";
 import { type DraftPreview, type DraftState } from "./draftTypes";
 import { toMessage } from "./errorMessage";
 import { columnHeaderClass, isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
@@ -769,87 +772,18 @@ export function ApproveClient() {
       </p>
       {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
       {shouldWarnPollStale(pollFailures) ? (
-        <p
-          role="status"
-          className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800"
-        >
-          <span className="flex-1">
-            最新情報を取得できていません（最終更新 {formatLastUpdated(lastBoardSuccessMs)}）。回線や自宅PCの状態を確認してください。
-          </span>
-          <button
-            type="button"
-            onClick={() => void pollBoard()}
-            className="shrink-0 rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
-          >
-            再試行
-          </button>
-        </p>
+        <PollStaleBanner lastBoardSuccessMs={lastBoardSuccessMs} onRetry={() => void pollBoard()} />
       ) : null}
 
       {/* #119: 施策/記事のタブ切替。各タブに未処理件数バッジを出し残件を可視化する。 */}
-      <div
-        role="tablist"
-        aria-label="表示切替"
-        onKeyDown={(event) => {
-          // WAI-ARIA tabs: ←→ でタブ移動。それ以外のキーは既定動作を維持する。
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          event.preventDefault();
-          const idx = APPROVE_VIEWS.indexOf(activeView);
-          const delta = event.key === "ArrowRight" ? 1 : -1;
-          changeView(APPROVE_VIEWS[(idx + delta + APPROVE_VIEWS.length) % APPROVE_VIEWS.length]);
-        }}
-        className="mt-3 inline-flex gap-1 rounded-md bg-gray-100 p-1"
-      >
-        {APPROVE_VIEWS.map((v) => {
-          const selectedTab = activeView === v;
-          const label = v === "proposals" ? "施策" : "記事";
-          const count = pendingByView[v];
-          return (
-            <button
-              key={v}
-              type="button"
-              role="tab"
-              id={`approve-tab-${v}`}
-              aria-controls="approve-tabpanel"
-              aria-selected={selectedTab}
-              tabIndex={selectedTab ? 0 : -1}
-              onClick={() => changeView(v)}
-              className={`min-h-11 flex items-center gap-2 rounded px-4 text-sm font-medium transition-colors ${
-                selectedTab ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {label}
-              {count > 0 ? (
-                <span
-                  aria-label={`未処理 ${count} 件`}
-                  className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700"
-                >
-                  {count}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      <BoardTabs activeView={activeView} pendingByView={pendingByView} onChangeView={changeView} />
 
       {/* #109: 操作ツールバー。コマンドパレット起動と表示密度トグル(キーボード非依存の可視UI)。 */}
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(true)}
-          className={`${TAP_TARGET} flex-1 border border-gray-300 bg-white text-left text-sm text-gray-600 hover:bg-gray-50`}
-        >
-          🔍 検索・ジャンプ（⌘K / /）
-        </button>
-        <button
-          type="button"
-          aria-pressed={density === "compact"}
-          onClick={toggleDensity}
-          className={`${TAP_TARGET} border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50`}
-        >
-          {density === "compact" ? "コンパクト" : "標準"}
-        </button>
-      </div>
+      <BoardToolbar
+        density={density}
+        onToggleDensity={toggleDensity}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
       {/* #137: キーボードヒントはPCのみ。スマホにはタッチ向けの一言を出す。 */}
       <p className="mt-1 hidden text-xs text-gray-400 lg:block">
         キーボード: j/k 移動・a 承認・r 却下・e 詳細・/ 検索・Esc 解除
@@ -860,34 +794,12 @@ export function ApproveClient() {
 
       {/* #109: 一括選択バー(選択がある時のみ)。一括承認/却下は各カードと同じ即時保存＋取り消し。 */}
       {selected.size > 0 ? (
-        <div
-          role="group"
-          aria-label="一括操作"
-          className="mt-2 flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm"
-        >
-          <span className="flex-1 text-gray-700">{selected.size}件 選択中</span>
-          <button
-            type="button"
-            onClick={() => bulkDecide("承認")}
-            className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-          >
-            一括承認
-          </button>
-          <button
-            type="button"
-            onClick={() => bulkDecide("却下")}
-            className={choiceButtonClass("border border-gray-700 bg-gray-700 text-white")}
-          >
-            一括却下
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className={choiceButtonClass("border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
-          >
-            解除
-          </button>
-        </div>
+        <BulkActionBar
+          count={selected.size}
+          onApprove={() => bulkDecide("承認")}
+          onReject={() => bulkDecide("却下")}
+          onClear={() => setSelected(new Set())}
+        />
       ) : null}
       {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
       {confirmAction ? (
