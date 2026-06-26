@@ -21,5 +21,4 @@ export const FACILITY_PHOTOS: readonly string[] = [
   "/images/hyrox/facility-1.jpg",
   "/images/hyrox/facility-2.jpg",
   "/images/hyrox/facility-3.jpg",
-  "/images/hyrox/facility-4.jpg",
 ];
