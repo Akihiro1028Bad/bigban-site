@@ -116,6 +116,8 @@ export async function getNewsByContentId({
 export interface NewsSlug {
   locale: Locale;
   slug: string;
+  // sitemap の lastModified（鮮度シグナル）に使用。
+  updatedAt: string;
 }
 
 export async function getNewsSlugs(): Promise<NewsSlug[]> {
@@ -136,7 +138,7 @@ export async function getNewsSlugs(): Promise<NewsSlug[]> {
       );
     }
     for (const item of list.contents) {
-      results.push({ locale, slug: item.slug });
+      results.push({ locale, slug: item.slug, updatedAt: item.updatedAt });
     }
   }
   return results;

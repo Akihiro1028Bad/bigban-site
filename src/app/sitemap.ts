@@ -56,19 +56,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     slugLocales.get(slug)?.add(locale);
   }
 
-  const newsDetails: MetadataRoute.Sitemap = slugs.map(({ locale, slug }) => {
-    const url =
-      locale === "ja"
-        ? `${SITE_URL}/news/${slug}`
-        : `${SITE_URL}/en/news/${slug}`;
-    /* istanbul ignore next -- @preserve slugLocales は事前に slugs から populate するため必ず存在 (defensive ?? 分岐は到達不可) */
-    const localesForSlug = slugLocales.get(slug) ?? new Set([locale]);
-    const hasBoth = localesForSlug.has("ja") && localesForSlug.has("en");
-    return {
-      url,
-      changeFrequency: "monthly",
-      priority: 0.6,
-      ...(hasBoth
+  const newsDetails: MetadataRoute.Sitemap = slugs.map(
+    ({ locale, slug, updatedAt }) => {
+      const url =
+        locale === "ja"
+          ? `${SITE_URL}/news/${slug}`
+          : `${SITE_URL}/en/news/${slug}`;
+      /* istanbul ignore next -- @preserve slugLocales は事前に slugs から populate するため必ず存在 (defensive ?? 分岐は到達不可) */
+      const localesForSlug = slugLocales.get(slug) ?? new Set([locale]);
+      const hasBoth = localesForSlug.has("ja") && localesForSlug.has("en");
+      return {
+        url,
+        changeFrequency: "monthly",
+        priority: 0.6,
+        ...(updatedAt ? { lastModified: updatedAt } : {}),
+        ...(hasBoth
         ? {
             alternates: {
               languages: {

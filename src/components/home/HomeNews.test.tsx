@@ -104,9 +104,12 @@ describe("HomeNews", () => {
   });
 
   it("microCMS 取得失敗時は何も描画しない (rejected)", async () => {
+    // 取得失敗時の意図的な console.error（別テストで検証済み）はノイズになるため抑制
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     getNewsListMock.mockRejectedValueOnce(new Error("microcms down"));
     const { container } = await renderHomeNews("ja");
     expect(container.firstChild).toBeNull();
+    errorSpy.mockRestore();
   });
 
   it("microCMS 取得失敗時にサーバーログへ console.error する (Vercel Function logs で追跡可能にする)", async () => {

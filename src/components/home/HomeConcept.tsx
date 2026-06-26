@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 export default function HomeConcept() {
   const t = useTranslations("HomeConcept");

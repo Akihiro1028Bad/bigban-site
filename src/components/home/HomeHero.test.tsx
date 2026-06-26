@@ -1,10 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
+import { forwardRef } from "react";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeHero from "./HomeHero";
 
 import type { ReactElement } from "react";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: forwardRef<HTMLAnchorElement, Record<string, unknown>>(
+    ({ children, href, ...props }, ref) => (
+      <a ref={ref} href={href as string} {...props}>
+        {children as React.ReactNode}
+      </a>
+    )
+  ),
+}));
 
 vi.mock("@/hooks/useMagneticButton", () => ({
   useMagneticButton: () => ({
@@ -44,7 +55,7 @@ describe("HomeHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("CTAボタン（RESERVE A COURT）を表示する", () => {
+  it("CTAボタン（RESERVE A COURT）が外部予約サービスにリンクする", () => {
     renderWithProvider(<HomeHero />);
     const cta = screen.getByRole("link", { name: /RESERVE A COURT/ });
     expect(cta).toBeInTheDocument();

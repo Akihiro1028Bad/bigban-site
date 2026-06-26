@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 const MAPS_EMBED_URL =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3240.!2d139.924!3d35.726!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z5Y2D6JGJ55yM5biC5bed5biC5YWr5bmhMi0xNi02!5e0!3m2!1sja!2sjp!4v1";

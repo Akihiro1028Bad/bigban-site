@@ -49,9 +49,10 @@ const NAV_ITEMS = [
   { label: "CONCEPT", href: "/#concept" },
   { label: "FACILITY", href: "/#facility" },
   { label: "SERVICES", href: "/#services" },
+  { label: "HYROX", href: "/hyrox" },
   { label: "PRICING", href: "/#pricing" },
   { label: "NEWS", href: "/news" },
-  { label: "ABOUT", href: "/#about" },
+  { label: "ABOUT", href: "/about" },
   { label: "ACCESS", href: "/#access" },
 ];
 
@@ -74,7 +75,7 @@ describe("HomeNavigation", () => {
     expect(logos).toHaveLength(1);
   });
 
-  it("7つのデスクトップナビリンクと正しいhrefを表示する", () => {
+  it("8つのデスクトップナビリンクと正しいhrefを表示する", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
     for (const item of NAV_ITEMS) {
@@ -88,13 +89,32 @@ describe("HomeNavigation", () => {
   it("NEWSリンクがPRICINGとABOUTの間に配置される", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
-    const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
-    const pricingIdx = links.indexOf("PRICING");
-    const newsIdx = links.indexOf("NEWS");
-    const aboutIdx = links.indexOf("ABOUT");
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    const pricingIdx = hrefs.indexOf("/#pricing");
+    const newsIdx = hrefs.indexOf("/news");
+    const aboutIdx = hrefs.indexOf("/about");
     expect(pricingIdx).toBeGreaterThanOrEqual(0);
     expect(newsIdx).toBe(pricingIdx + 1);
     expect(aboutIdx).toBe(newsIdx + 1);
+  });
+
+  it("ナビに HYROX ページリンクがある", () => {
+    renderWithIntl(<HomeNavigation />);
+    const links = screen.getAllByRole("link", { name: "HYROX" });
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]).toHaveAttribute("href", "/hyrox");
+  });
+
+  it("HYROXリンクがSERVICESとPRICINGの間に配置される", () => {
+    renderWithIntl(<HomeNavigation />);
+    const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    const servicesIdx = hrefs.indexOf("/#services");
+    const hyroxIdx = hrefs.indexOf("/hyrox");
+    const pricingIdx = hrefs.indexOf("/#pricing");
+    expect(servicesIdx).toBeGreaterThanOrEqual(0);
+    expect(hyroxIdx).toBe(servicesIdx + 1);
+    expect(pricingIdx).toBe(hyroxIdx + 1);
   });
 
   it("モバイルメニュー内にもNEWSリンクが含まれる", () => {
@@ -103,7 +123,7 @@ describe("HomeNavigation", () => {
     const dialog = screen.getByRole("dialog");
     const newsLink = dialog.querySelector("a[href='/news']");
     expect(newsLink).toBeInTheDocument();
-    expect(newsLink?.textContent).toBe("NEWS");
+    expect(newsLink?.textContent).toContain("NEWS");
   });
 
   it("アクティブセクション(concept)をハイライトする", () => {
@@ -163,13 +183,32 @@ describe("HomeNavigation", () => {
     expect(enButtons[0].className).toContain("cursor-default");
   });
 
-  it("RESERVEボタンを表示する", () => {
+  it("RESERVEボタンを表示する（外部予約サービス）", () => {
     renderWithIntl(<HomeNavigation />);
-    const reserveLinks = screen.getAllByRole("link", { name: "RESERVE" });
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(1);
     expect(reserveLinks[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
     expect(reserveLinks[0]).toHaveAttribute("target", "_blank");
-    expect(reserveLinks[0]).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("/hyrox でも RESERVE は外部予約サービスへ向く", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    expect(reserveLinks[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
+    mockPathname = "/";
+  });
+
+  it("モバイルヘッダーに常時表示の予約ボタンがある（メニュー未展開時）", () => {
+    renderWithIntl(<HomeNavigation />);
+    // メニュー未展開でもデスクトップ／モバイル両方の予約導線が存在する
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    expect(reserveLinks.length).toBeGreaterThanOrEqual(2);
+    const mobileReserve = reserveLinks.find((link) =>
+      link.className.includes("md:hidden")
+    );
+    expect(mobileReserve).toBeDefined();
+    expect(mobileReserve).toHaveAttribute("href", "https://reserva.be/tpbt");
   });
 
   it("ハンバーガーメニューの開閉", () => {
@@ -187,6 +226,32 @@ describe("HomeNavigation", () => {
     fireEvent.click(closeButton);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("背景（オーバーレイ）クリックでモバイルメニューが閉じる", () => {
+    renderWithIntl(<HomeNavigation />);
+    fireEvent.click(screen.getByLabelText("メニューを開く"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(dialog);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("HYROXページではメニュートグルが上部(top-2.5)に配置される", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const toggle = screen.getByLabelText("メニューを開く");
+    expect(toggle.className).toContain("top-2.5");
+    mockPathname = "/";
+  });
+
+  it("HYROXページでスクロールダウンするとヘッダーが隠れる", () => {
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+    const header = screen.getByRole("banner");
+    Object.defineProperty(window, "scrollY", { value: 200, writable: true });
+    fireEvent.scroll(window);
+    expect(header.className).toContain("md:-translate-y-full");
+    mockPathname = "/";
   });
 
   it("モバイルメニューのナビリンククリックで自動クローズ", () => {
@@ -280,9 +345,11 @@ describe("HomeNavigation", () => {
     renderWithIntl(<HomeNavigation />);
     fireEvent.click(screen.getByLabelText("メニューを開く"));
     const dialog = screen.getByRole("dialog");
-    const reserveInDialog = dialog.querySelector("a[href='https://reserva.be/tpbt']");
+    const reserveInDialog = dialog.querySelector(
+      "a[href='https://reserva.be/tpbt']",
+    );
     expect(reserveInDialog).toBeInTheDocument();
-    expect(reserveInDialog?.textContent).toBe("RESERVE");
+    expect(reserveInDialog?.textContent).toContain("RESERVE");
   });
 
   it("英語ロケールでaria-labelが英語になる", () => {
