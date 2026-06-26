@@ -38,12 +38,11 @@ import {
 } from "./boardPrefs";
 
 import { fetchBoard, postPublish } from "./api";
-import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
+import { choiceButtonClass, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
-import { DetailPanel } from "./DetailPanel";
+import { DetailPanelView } from "./DetailPanelView";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
-import { ReviseSectionView } from "./ReviseSectionView";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -51,13 +50,6 @@ import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
-import { DetailHeader } from "./DetailHeader";
-import { detailBadge } from "./detailBadge";
-import { DraftChecklist } from "./DraftChecklist";
-import { draftPlainText, draftQuality } from "./draftQuality";
-import { ExcerptEditor } from "./ExcerptEditor";
-import { StyleHints } from "./StyleHints";
-import { MetricChips } from "./MetricChips";
 import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
@@ -68,11 +60,11 @@ import { authHeaders } from "./authHeaders";
 import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { type DraftPreview, type DraftState } from "./draftTypes";
 import { toMessage } from "./errorMessage";
+import { columnHeaderClass, isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
 import type { Choice, PendingItem } from "./types";
 import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
 import { useReviseEditing } from "./hooks/useReviseEditing";
-import { DraftReadyView } from "./DraftReadyView";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
@@ -89,34 +81,8 @@ const DENSITY_KEY = "growth-approve-density";
 
 
 // 修正処理中(再依頼不可・承認排他の対象)の状態。
-const REVISE_BUSY_STATUSES = ["依頼中", "処理中", "提示中"];
-
-function isReviseBusy(status: string | undefined): boolean {
-  return REVISE_BUSY_STATUSES.includes(status ?? "なし");
-}
-
 function byScoreDesc(a: PendingItem, b: PendingItem): number {
   return (b.score ?? 0) - (a.score ?? 0);
-}
-
-const KIND_BADGE: Record<PendingItem["kind"], string> = {
-  proposal: "📋 施策",
-  idea: "📝 記事",
-};
-
-
-
-// #275: 一覧は高密度行。未処理=通常枠 / 処理済み=細い行 / 失敗=赤枠。
-function rowClass(choice: Choice | undefined, failed: boolean): string {
-  const base = "rounded-lg border transition-colors";
-  if (failed) return `${base} border-red-400 bg-red-50 p-3`;
-  if (choice) return `${base} border-gray-200 bg-gray-50 px-3 py-2`;
-  return `${base} border-gray-200 bg-white p-3`;
-}
-
-// #107: 盤の列ヘッダ用スタイル。件数バッジ付きの淡色ヘッダ。
-function columnHeaderClass(): string {
-  return "flex items-center justify-between rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700";
 }
 
 // #119: マウント時の初期タブ(SSR では URL を読めないため null)。同期初期化で proposals の
@@ -766,67 +732,6 @@ export function ApproveClient() {
     );
   }
 
-  // #127/M8: クリップボードへコピー(本文など)。成否をトーストで明示する(沈黙させない)。
-  function copyText(text: string): void {
-    if (!navigator.clipboard) {
-      pushToast("このブラウザではコピーできません。", "error");
-      return;
-    }
-    void navigator.clipboard
-      .writeText(text)
-      .then(() => pushToast("本文をコピーしました。"))
-      .catch(() => pushToast("コピーに失敗しました。", "error"));
-  }
-
-  // #75: 生成済み下書きを実プレビュー(NewsBodyRenderer)で表示する。記事のみ。
-  function renderDraftPreview(item: PendingItem) {
-    return (
-      <section aria-label="下書きプレビュー" className={`mt-4 ${SECTION_CARD}`}>
-        <h3 className={SECTION_HEAD}>下書きプレビュー</h3>
-        {draftState.status === "loading" ? (
-          <p className="mt-2 text-sm text-gray-500" aria-busy="true">
-            読み込み中…
-          </p>
-        ) : draftState.status === "error" ? (
-          <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            <span>{draftState.error}</span>
-            <button
-              type="button"
-              onClick={() => void loadDraft(item.id)}
-              className={choiceButtonClass(
-                "ml-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              )}
-            >
-              再読み込み
-            </button>
-          </div>
-        ) : draftState.status === "empty" ? (
-          <p className="mt-2 rounded-md bg-gray-50 px-3 py-4 text-center text-sm text-gray-500">
-            下書きが見つかりませんでした。
-          </p>
-        ) : draftState.status === "ready" ? (
-          <DraftReadyView
-            draft={draftState.draft}
-            pageId={item.id}
-            itemTitle={item.title}
-            itemStage={item.stage}
-            token={token}
-            previewDevice={previewDevice}
-            onPreviewDeviceChange={setPreviewDevice}
-            actionBusy={actionBusy}
-            actionError={actionError}
-            onReloadDraft={() => void loadDraft(item.id)}
-            onPublish={() => openConfirm(item, "publish")}
-            onClose={() => openConfirm(item, "close")}
-            onStartEdit={() => startEditDraft(draftState.draft.bodyHtml)}
-            onCopy={() => copyText(draftState.draft.body)}
-          />
-        ) : (
-          <p className="mt-2 text-sm text-gray-500">まだ下書きは生成されていません。</p>
-        )}
-      </section>
-    );
-  }
 
   // #104/#136: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。
   // 詳細パネル(Framer の transform・sticky を持つ)の内側にネストすると position:fixed が
@@ -850,136 +755,6 @@ export function ApproveClient() {
     );
   }
 
-  // #127: 記事=全画面の中央モーダル(レビュー・ワークスペース) / 施策=コンパクトな右ドロワー。
-  function renderPanel(item: PendingItem) {
-    const choice = decided[item.id];
-    const isBusy = savingId === item.id;
-    // #43: 修正中(依頼中/処理中/提示中)は承認/却下を無効化(古い構成案での承認を防ぐ)。
-    const lockedForRevise = isReviseBusy(item.reviseStatus);
-    const isIdea = item.kind === "idea";
-
-    // 主操作(承認/却下/承認待ちに戻す)。下書き作成済みは出さない。コマンドバー/ドロワー共用。
-    const decisionActions = item.isDraftReady ? null : choice ? (
-      <button
-        type="button"
-        onClick={() => undoFromPanel(item)}
-        disabled={isBusy}
-        className={choiceButtonClass(
-          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-        )}
-      >
-        承認待ちに戻す
-      </button>
-    ) : (
-      <>
-        <button
-          type="button"
-          onClick={() => decideFromPanel(item, "承認")}
-          disabled={isBusy || lockedForRevise}
-          className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-        >
-          承認
-        </button>
-        <button
-          type="button"
-          onClick={() => decideFromPanel(item, "却下")}
-          disabled={isBusy || lockedForRevise}
-          className={choiceButtonClass(
-            "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          )}
-        >
-          却下
-        </button>
-      </>
-    );
-
-    // インサイト: 「なぜこの記事か」(SEO機会=subtitle を整形 callout)＋根拠メトリクス。
-    const insight = (
-      <>
-        {item.subtitle ? (
-          <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
-            <p className="mb-1 text-xs font-bold text-blue-800">なぜこの記事か</p>
-            <p className="text-sm leading-relaxed text-gray-700">{item.subtitle}</p>
-          </div>
-        ) : null}
-        <div className="mt-3">
-          <MetricChips details={item.details} />
-        </div>
-      </>
-    );
-
-    // #130: 「次の記事へ」= 並び順上の次の未処理記事へ(閉じずに連続レビュー)。末尾は無効。
-    const nextReviewableId = isIdea ? nextReviewId(reviewOrder, item.id, 1) : null;
-    const nextButton = isIdea ? (
-      <button
-        type="button"
-        disabled={!nextReviewableId}
-        onClick={() => {
-          /* istanbul ignore else -- @preserve disabled 時は押せないため null は到達不可 */
-          if (nextReviewableId) setOpenId(nextReviewableId);
-        }}
-        className={choiceButtonClass(
-          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-        )}
-      >
-        次へ →
-      </button>
-    ) : null;
-
-    // ヘッダー(記事はコマンドバーとして主操作スロット＋「次へ」を持つ)。
-    const header = (
-      <DetailHeader
-        title={item.title}
-        kindLabel={KIND_BADGE[item.kind]}
-        badge={detailBadge(item, choice)}
-        onClose={() => setOpenId(null)}
-        actions={
-          isIdea ? (
-            <>
-              {decisionActions}
-              {nextButton}
-            </>
-          ) : undefined
-        }
-      />
-    );
-
-    const checklist =
-      draftState.status === "ready" ? (
-        <div className="mt-4">
-          <DraftChecklist
-            checks={draftQuality({
-              bodyHtml: draftState.draft.bodyHtml,
-              body: draftState.draft.body,
-              title: item.title,
-              knownNewsPaths: draftState.draft.knownNewsPaths
-                ? new Set(draftState.draft.knownNewsPaths)
-                : undefined,
-            })}
-          />
-          <StyleHints plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)} />
-          <ExcerptEditor
-            pageId={item.id}
-            token={token}
-            plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
-          />
-        </div>
-      ) : null;
-
-    return (
-      <DetailPanel
-        isIdea={isIdea}
-        title={item.title}
-        header={header}
-        insight={insight}
-        checklist={checklist}
-        draftPreview={renderDraftPreview(item)}
-        reviseSection={<ReviseSectionView item={item} revise={revise} />}
-        decisionActions={decisionActions}
-        onClose={() => setOpenId(null)}
-      />
-    );
-  }
 
   return (
     <main className="mx-auto max-w-md p-4 lg:max-w-7xl lg:px-8">
@@ -1161,7 +936,29 @@ export function ApproveClient() {
           </>
         )}
       </div>
-      {openItem ? renderPanel(openItem) : null}
+      {openItem ? (
+        <DetailPanelView
+          item={openItem}
+          choice={decided[openItem.id]}
+          isBusy={savingId === openItem.id}
+          draftState={draftState}
+          token={token}
+          previewDevice={previewDevice}
+          actionBusy={actionBusy}
+          actionError={actionError}
+          reviewOrder={reviewOrder}
+          revise={revise}
+          onDecide={decideFromPanel}
+          onUndo={undoFromPanel}
+          onOpen={setOpenId}
+          onClose={() => setOpenId(null)}
+          onPreviewDeviceChange={setPreviewDevice}
+          onStartEdit={startEditDraft}
+          onReloadDraft={(pageId) => void loadDraft(pageId)}
+          onConfirm={openConfirm}
+          onToast={pushToast}
+        />
+      ) : null}
       {renderEditWorkspace()}
       {/* #109/#119: コマンドパレット(⌘K / /)。両ストリーム横断検索→タブ切替＋詳細へジャンプ。 */}
       {paletteOpen ? (
