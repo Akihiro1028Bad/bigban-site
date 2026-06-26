@@ -1,5 +1,10 @@
 import { ApproveClient } from "./ApproveClient";
+import { ApproveProviders } from "./providers";
 
 export default function ApprovePage() {
-  return <ApproveClient />;
+  return (
+    <ApproveProviders>
+      <ApproveClient />
+    </ApproveProviders>
+  );
 }
