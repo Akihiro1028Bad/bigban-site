@@ -28,7 +28,6 @@ import {
   isAwaitingDownstream,
   reconcileDecided,
   scoreBarPct,
-  STAGE_STEPS,
   stageStepIndex,
 } from "./board";
 import { stageTheme } from "./boardColors";
@@ -51,6 +50,7 @@ import {
 
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
+import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
@@ -1245,209 +1245,41 @@ export function ApproveClient() {
   // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
   function renderItem(item: PendingItem) {
     const choice = decided[item.id];
-    const isBusy = savingId === item.id;
-    // #43: 修正依頼中/処理中/提示中は、古い構成案のまま承認させない(承認排他)。
-    const lockedForRevise = isReviseBusy(item.reviseStatus);
-    const failure = failures[item.id];
-    const detailButton = (
-      <button
-        type="button"
-        aria-label={`詳細: ${item.title}`}
-        onClick={() => setOpenId(item.id)}
-        className={`${TAP_TARGET} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
-      >
-        詳細
-      </button>
-    );
-    // #107: 記事カードは段階インジケータ(提案→…→公開)とスコアバーを上部に出す。
     const isIdea = item.kind === "idea";
-    const step = isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1;
-    // #119: 記事カードは段階で左ボーダーを色分け(列ヘッダの色と揃え、流れを視覚化)。
-    const stageAccent = isIdea
-      ? `border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}`
-      : "";
-    // #108: 生成待ち/生成中が閾値を超えて滞留しているか(自宅PC停止の疑い)。
-    const stuck =
-      isIdea &&
-      isInFlight(item.stage) &&
-      isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS);
-    const ideaHeader = isIdea ? (
-      <div className="mb-2">
-        <div aria-label="進捗" className="flex items-center gap-1">
-          {STAGE_STEPS.map((label, i) => (
-            <span
-              key={label}
-              aria-current={i === step ? "step" : undefined}
-              className={`h-1.5 w-1.5 rounded-full ${i <= step ? "bg-blue-600" : "bg-gray-300"}`}
-            />
-          ))}
-          <span className="ml-1 text-xs text-gray-500">{STAGE_STEPS[step]}</span>
-        </div>
-        <div className="mt-1 h-1 w-full rounded-full bg-gray-200">
-          <div
-            className="h-1 rounded-full bg-blue-500"
-            style={{ width: `${scoreBarPct(item.score ?? 0, ideaMaxScore)}%` }}
-          />
-        </div>
-      </div>
-    ) : null;
+    const failure = failures[item.id];
     return (
-      <li
+      <BoardCard
         key={item.id}
-        className={`${rowClass(choice, Boolean(failure))} ${stageAccent} ${item.id === focusedId ? "ring-2 ring-blue-500" : ""}`}
-        data-decision={choice ?? ""}
-      >
-        {isBulkActionable(item) ? (
-          <label className="mb-1 flex items-center gap-2 text-xs text-gray-500">
-            <input
-              type="checkbox"
-              aria-label={`一括選択: ${item.title}`}
-              checked={selected.has(item.id)}
-              onChange={() => toggleSelect(item.id)}
-            />
-            選択
-          </label>
-        ) : null}
-        {ideaHeader}
-        {/* #119 follow-up: タイトルを最上段・全幅・2行クランプで主役化(列幅が狭い盤でも読める)。
-            #137: タイトル自体を詳細を開くボタンにし、スマホでも大きなタップ領域を確保する。
-            アクセシブル名はタイトル文字列(小さい「詳細: …」ボタンとは別名)。 */}
-        <button
-          type="button"
-          onClick={() => setOpenId(item.id)}
-          className={`w-full text-left line-clamp-2 text-[15px] font-semibold leading-snug ${
-            choice ? "text-gray-600" : "text-gray-900"
-          }`}
-        >
-          {item.title}
-        </button>
-        {choice ? (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm text-gray-700">
-              ✓ <span className="font-semibold">{choice}しました</span>
-            </span>
-            <div className="ml-auto flex gap-2">
-              {detailButton}
-              <button
-                type="button"
-                id={`undo-${item.id}`}
-                aria-label={`取り消す: ${item.title}`}
-                onClick={() => undo(item)}
-                disabled={isBusy}
-                className={choiceButtonClass(
-                  "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                取り消す
-              </button>
-            </div>
-          </div>
-        ) : item.isDraftReady ? (
-          // #87/#110: 下書き作成済みは承認/却下を出さず、詳細(プレビュー)と編集(全画面)へ。
-          <div className="mt-2 flex items-center gap-2">
-            <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
-              📝 下書き
-            </span>
-            <div className="ml-auto flex gap-2">
-              {detailButton}
-              <button
-                type="button"
-                id={`card-edit-${item.id}`}
-                aria-label={`編集: ${item.title}`}
-                onClick={() => openCardEditor(item.id)}
-                className={`${TAP_TARGET} border border-blue-600 bg-blue-600 text-white`}
-              >
-                編集
-              </button>
-            </div>
-          </div>
-        ) : isAwaitingDownstream(item.stage) ? (
-          // #107/#108: 承認済みで下流(自宅PC生成)待ち。承認/却下は出さず状態表示＋詳細。
-          // 生成中は脈動＋進捗ステップで「執筆中」を可視化、滞留時は優しい警告を出す。
-          <div>
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className={`shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white ${
-                  item.stage === "generating" ? "motion-safe:animate-pulse" : ""
-                }`}
-              >
-                {item.kind === "proposal"
-                  ? "承認済み"
-                  : item.stage === "generating"
-                    ? "生成中"
-                    : "生成待ち"}
-              </span>
-              <div className="ml-auto">{detailButton}</div>
-            </div>
-            {item.stage === "generating" ? (
-              <div className="mt-2 text-xs text-gray-500">
-                <span className="motion-safe:animate-pulse">🖊 自宅PCで執筆中…</span>
-                <span className="ml-2">{GENERATING_STEPS.join(" → ")}</span>
-              </div>
-            ) : null}
-            {stuck ? (
-              <p role="status" className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">
-                時間がかかっています。自宅PCの巡回が動いているか確認してください。
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="shrink-0 rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
-                {KIND_BADGE[item.kind]}
-              </span>
-            </div>
-            <div
-              role="group"
-              aria-label={`承認または却下: ${item.title}`}
-              className="mt-2 flex flex-col gap-2 sm:flex-row"
-            >
-              <button
-                type="button"
-                id={`approve-${item.id}`}
-                aria-label={`承認: ${item.title}`}
-                onClick={() => decide(item, "承認")}
-                disabled={isBusy || lockedForRevise}
-                className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
-              >
-                承認
-              </button>
-              <button
-                type="button"
-                aria-label={`却下: ${item.title}`}
-                onClick={() => decide(item, "却下")}
-                disabled={isBusy || lockedForRevise}
-                className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
-              >
-                却下
-              </button>
-              {detailButton}
-            </div>
-          </>
-        )}
-        {failure ? (
-          <div
-            role="alert"
-            className="mt-2 flex items-center justify-between gap-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800"
-          >
-            <span>{failure.message}</span>
-            <button
-              type="button"
-              aria-label={`再試行: ${item.title}`}
-              onClick={failure.retry}
-              disabled={isBusy}
-              className={choiceButtonClass("shrink-0 border border-red-600 bg-red-600 text-white")}
-            >
-              再試行
-            </button>
-          </div>
-        ) : null}
-      </li>
+        item={item}
+        choice={choice}
+        isBusy={savingId === item.id}
+        lockedForRevise={isReviseBusy(item.reviseStatus)}
+        failure={failure}
+        isFocused={item.id === focusedId}
+        bulkSelectable={isBulkActionable(item)}
+        selected={selected.has(item.id)}
+        isIdea={isIdea}
+        step={isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1}
+        scoreBarWidth={scoreBarPct(item.score ?? 0, ideaMaxScore)}
+        stageAccentClass={isIdea ? `border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}` : ""}
+        stuck={
+          isIdea &&
+          isInFlight(item.stage) &&
+          isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS)
+        }
+        rowClassName={rowClass(choice, Boolean(failure))}
+        kindLabel={KIND_BADGE[item.kind]}
+        generatingStepsText={GENERATING_STEPS.join(" → ")}
+        awaitingDownstream={isAwaitingDownstream(item.stage)}
+        onOpen={() => setOpenId(item.id)}
+        onUndo={() => void undo(item)}
+        onEdit={() => openCardEditor(item.id)}
+        onToggleSelect={() => toggleSelect(item.id)}
+        onApprove={() => void decide(item, "承認")}
+        onReject={() => void decide(item, "却下")}
+      />
     );
   }
-
-  // #54: セクションの手動編集フォーム(見出し＋説明 → この行を保存)。
   function renderSectionEditor(item: PendingItem, sections: OutlineSection[], i: number) {
     return (
       <SectionEditor
