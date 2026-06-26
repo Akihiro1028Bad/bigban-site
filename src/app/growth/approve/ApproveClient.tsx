@@ -52,6 +52,7 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { DraftPreviewPane } from "./DraftPreviewPane";
 import { PublishCloseActions } from "./PublishCloseActions";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
@@ -76,12 +77,7 @@ import { draftPlainText, draftQuality } from "./draftQuality";
 import { ExcerptEditor } from "./ExcerptEditor";
 import { StyleHints } from "./StyleHints";
 import { MetricChips } from "./MetricChips";
-import {
-  PREVIEW_DEVICES,
-  previewDeviceLabel,
-  previewWidthClass,
-  type PreviewDevice,
-} from "./previewDevice";
+import { type PreviewDevice } from "./previewDevice";
 import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
@@ -91,7 +87,6 @@ import { BodyImagePicker } from "./BodyImagePicker";
 import { DecorationAssistant } from "./DecorationAssistant";
 import { InlineCommentReview } from "./InlineCommentReview";
 import { CommandPalette } from "./CommandPalette";
-import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { authHeaders } from "./authHeaders";
@@ -121,9 +116,6 @@ const DENSITY_KEY = "growth-approve-density";
 // #98: 編集中ライブプレビューのデバウンス間隔(ミリ秒)。入力追従とコストの折衷。
 const LIVE_PREVIEW_DEBOUNCE_MS = 250;
 
-// #100/#124: 本番プレビュー iframe の見た目。外側のブラウザ風chromeカードが枠/角丸を
-// 担うため、iframe 自体は枠なし・暗背景のみ。中身は iframe 内で本番テーマ描画される。
-const PREVIEW_FRAME_CLASS = "block h-96 w-full bg-[#0A0A0A]";
 
 interface PendingDetail {
   label: string;
@@ -1493,41 +1485,12 @@ export function ApproveClient() {
               bodyComment={draftState.draft.bodyComment}
               onChanged={() => void loadDraft(item.id)}
             />
-            {/* #129: PC/モバイルで表示幅を切替(読者の大半はスマホ)。 */}
-            <div role="group" aria-label="プレビュー幅" className="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-xs">
-              {PREVIEW_DEVICES.map((device) => {
-                const selected = previewDevice === device;
-                return (
-                  <button
-                    key={device}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setPreviewDevice(device)}
-                    className={`rounded px-3 py-1 font-medium transition-colors ${
-                      selected ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    {previewDeviceLabel(device)}
-                  </button>
-                );
-              })}
-            </div>
-            {/* #124: ブラウザ風 chrome の額装で「本番イメージ」感を出す。#129: 幅をデバイスで切替。 */}
-            <div className={`overflow-hidden rounded-md border border-gray-800 ${previewWidthClass(previewDevice)}`}>
-              <div className="flex items-center gap-1.5 bg-gray-900 px-3 py-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
-                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
-                <span className="h-2.5 w-2.5 rounded-full bg-gray-600" aria-hidden="true" />
-                <span className="ml-2 truncate text-[10px] text-gray-400">
-                  thepicklebang.com / news
-                </span>
-              </div>
-              <DraftPreviewFrame
-                title="本番プレビュー"
-                html={draftState.draft.bodyHtml || draftState.draft.body}
-                className={PREVIEW_FRAME_CLASS}
-              />
-            </div>
+            {/* #129/#124: PC/モバイル幅トグル＋ブラウザ風chrome＋本番プレビュー iframe。 */}
+            <DraftPreviewPane
+              device={previewDevice}
+              onDeviceChange={setPreviewDevice}
+              html={draftState.draft.bodyHtml || draftState.draft.body}
+            />
             {/* #167/H1: 公開・クローズは最終確認(本番プレビュー)の下＝最終アクション位置に置く。 */}
             <PublishCloseActions
               stage={item.stage}
