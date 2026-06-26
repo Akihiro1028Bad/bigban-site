@@ -27,6 +27,18 @@ export interface PendingDetail {
   value: string;
 }
 
+/** 記事の仮説(#計測強化 S4・修正案4)。承認カードで「狙い」を確認するために表示する。 */
+export interface ArticleHypothesis {
+  /** 記事タイプ(獲得/不安解消/資産/比較/イベント)。未設定は空。 */
+  articleType: string;
+  targetReader: string;
+  searchIntent: string;
+  winningAngle: string;
+  /** 想定CTA(Instagram/LINE/予約/アクセス/価格/問い合わせ)。未設定は []。 */
+  plannedCta: string[];
+  successMetric: string;
+}
+
 export interface PendingItem {
   id: string;
   kind: PendingKind;
@@ -62,6 +74,8 @@ export interface PendingItem {
   hasDraftBody?: boolean;
   /** 予約公開時刻(#H24)。Notion `公開予約時刻` の ms。未予約は null。記事のみ。 */
   scheduledAtMs?: number | null;
+  /** 記事の仮説(#計測強化 S4)。未記入は undefined。記事のみ。 */
+  hypothesis?: ArticleHypothesis;
 }
 
 /** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
@@ -181,6 +195,37 @@ function selectName(page: NotionPage, prop: string): string {
   return value?.select?.name ?? "";
 }
 
+/** multi_select の選択名一覧。未設定は空配列(#計測強化 S4)。 */
+function multiSelectNames(page: NotionPage, prop: string): string[] {
+  const value = page.properties[prop] as
+    | { multi_select?: Array<{ name?: string }> }
+    | undefined;
+  return (value?.multi_select ?? []).map((o) => o.name ?? "").filter((n) => n !== "");
+}
+
+/**
+ * 記事の仮説(#計測強化 S4・修正案4)。公開後に「成功か」を判断するための前提。
+ * 全項目が空(=未記入の旧データ)なら undefined を返す(欠落耐性・カードは何も出さない)。
+ */
+function hypothesisOf(page: NotionPage): ArticleHypothesis | undefined {
+  const h: ArticleHypothesis = {
+    articleType: selectName(page, "記事タイプ"),
+    targetReader: richText(page, "狙う読者"),
+    searchIntent: richText(page, "検索意図"),
+    winningAngle: richText(page, "勝ち筋"),
+    plannedCta: multiSelectNames(page, "想定CTA"),
+    successMetric: richText(page, "成功指標"),
+  };
+  const hasAny =
+    h.articleType !== "" ||
+    h.targetReader !== "" ||
+    h.searchIntent !== "" ||
+    h.winningAngle !== "" ||
+    h.plannedCta.length > 0 ||
+    h.successMetric !== "";
+  return hasAny ? h : undefined;
+}
+
 function numberValue(page: NotionPage, prop: string): number | null {
   const value = page.properties[prop] as { number?: number | null } | undefined;
   return typeof value?.number === "number" ? value.number : null;
@@ -260,6 +305,7 @@ export function toPendingItems(
       eyecatchUrl: eyecatchUrlOf(page),
       hasDraftBody: draftBodyOf(page).trim() !== "",
       scheduledAtMs: dateStartMs(page, PUBLISH_SCHEDULE_PROP),
+      hypothesis: hypothesisOf(page),
     };
   });
   return [...proposalItems, ...ideaItems];

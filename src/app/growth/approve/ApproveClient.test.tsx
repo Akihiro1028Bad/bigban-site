@@ -928,6 +928,34 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     expect(within(dialog).queryByLabelText("AI壁打ち（準備中）")).not.toBeInTheDocument();
   });
 
+  it("詳細パネルに記事の仮説(#S4)を表示する", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          ideaItem({
+            hypothesis: {
+              articleType: "獲得",
+              targetReader: "本八幡近隣の初心者",
+              searchIntent: "始め方を知りたい",
+              winningAngle: "一次情報＋内部リンク",
+              plannedCta: ["予約", "LINE"],
+              successMetric: "予約クリック10件/月",
+            },
+          }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("記事の仮説")).toBeInTheDocument();
+    expect(within(dialog).getByText("本八幡近隣の初心者")).toBeInTheDocument();
+    expect(within(dialog).getByText("予約")).toBeInTheDocument();
+  });
+
   it("施策の詳細パネルにも準備中プレースホルダは無い(#124)", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
