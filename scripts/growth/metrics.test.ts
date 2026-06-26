@@ -18,12 +18,18 @@ import {
 
 const PERIOD = { start: "2026-06-15", end: "2026-06-21" };
 
-function row(pagePath: string, views: [number, number], users: [number, number]): MergedRow {
+function row(
+  pagePath: string,
+  views: [number, number],
+  users: [number, number],
+  keyEvents: [number, number] = [0, 0]
+): MergedRow {
   return {
     keys: [pagePath],
     metrics: {
       screenPageViews: { current: views[0], prior: views[1], deltaPct: null },
       activeUsers: { current: users[0], prior: users[1], deltaPct: null },
+      keyEvents: { current: keyEvents[0], prior: keyEvents[1], deltaPct: null },
     },
   };
 }
@@ -75,6 +81,12 @@ describe("metricsForPagePath", () => {
     expect(m?.views.prior).toBe(60);
     expect(m?.users.current).toBe(70);
     expect(m?.views.deltaPct).toBe(100);
+  });
+
+  it("keyEvents(CTA)も合算する(#S2)", () => {
+    const rows = [row("/news/a", [100, 50], [60, 30], [4, 2]), row("/news/a?ref=line", [20, 10], [10, 5], [1, 0])];
+    const m = metricsForPagePath("/news/a", rows, PERIOD);
+    expect(m?.keyEvents).toEqual({ current: 5, prior: 2, deltaPct: 150 });
   });
 
   it("prior が 0 なら deltaPct は null", () => {

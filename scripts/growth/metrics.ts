@@ -41,6 +41,8 @@ export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
   users: MetricDelta;
+  // #計測強化 S2: GA4 keyEvents(CTAキーイベント。後方互換のため任意。旧データには無い)。
+  keyEvents?: MetricDelta;
   // #計測強化 S2: GSC 検索成績(後方互換のため任意。旧データには無い)。
   search?: SearchMetrics;
   period: { start: string; end: string };
@@ -54,6 +56,7 @@ export const METRICS_PROPS = {
 
 const VIEWS_METRIC = "screenPageViews";
 const USERS_METRIC = "activeUsers";
+const KEY_EVENTS_METRIC = "keyEvents";
 
 /** 公開記事の GA4 pagePath を組み立てる。ja は接頭辞なし、それ以外(en)は /en。 */
 export function articlePagePath(slug: string, locale: string): string {
@@ -131,16 +134,21 @@ export function metricsForPagePath(
   let viewsP = 0;
   let usersC = 0;
   let usersP = 0;
+  let keyC = 0;
+  let keyP = 0;
   for (const r of matching) {
     viewsC += r.metrics[VIEWS_METRIC]?.current ?? 0;
     viewsP += r.metrics[VIEWS_METRIC]?.prior ?? 0;
     usersC += r.metrics[USERS_METRIC]?.current ?? 0;
     usersP += r.metrics[USERS_METRIC]?.prior ?? 0;
+    keyC += r.metrics[KEY_EVENTS_METRIC]?.current ?? 0;
+    keyP += r.metrics[KEY_EVENTS_METRIC]?.prior ?? 0;
   }
   return {
     pagePath: target,
     views: { current: viewsC, prior: viewsP, deltaPct: deltaPct(viewsC, viewsP) },
     users: { current: usersC, prior: usersP, deltaPct: deltaPct(usersC, usersP) },
+    keyEvents: { current: keyC, prior: keyP, deltaPct: deltaPct(keyC, keyP) },
     period,
   };
 }
@@ -171,7 +179,8 @@ const metricsSchema = z.object({
   pagePath: z.string(),
   views: deltaSchema,
   users: deltaSchema,
-  // #計測強化 S2: 後方互換。旧データ(search 無し)も valid のまま。
+  // #計測強化 S2: 後方互換。旧データ(keyEvents/search 無し)も valid のまま。
+  keyEvents: deltaSchema.optional(),
   search: searchSchema.optional(),
   period: z.object({ start: z.string(), end: z.string() }),
 });
