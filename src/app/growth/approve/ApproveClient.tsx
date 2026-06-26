@@ -309,13 +309,12 @@ export function ApproveClient() {
     },
     [queryClient]
   );
-  // #108: 完了トースト/滞留検知用。itemsRef は poll で前回値を参照、nowTick は滞留経過の基準時刻、
-  // firstSeenRef は記事が生成待ち/生成中に入った時刻。
+  // #108: 完了トースト/滞留検知用。nowTick は滞留経過の基準時刻、
+  // firstSeenRef は記事が生成待ち/生成中に入った時刻。前回値の参照は prevBoardRef(盤更新effect)が担う。
   const [toasts, setToasts] = useState<
     { id: string; message: string; tone: "success" | "error" }[]
   >([]);
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
-  const itemsRef = useRef<PendingItem[]>([]);
   const firstSeenRef = useRef<Map<string, number>>(new Map());
   // M8: コピー等の通知トーストに使う一意 id 採番。
   const toastSeq = useRef(0);
@@ -405,17 +404,16 @@ export function ApproveClient() {
   }, [openId]);
 
   // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。失敗は明示する。
+  // #43: 構成案修正の最新化(提示待ちポーリング・反映/編集後)。手動取得のため失敗は
+  // 修正パネルのエラーに留め、盤の連続失敗バナー(pollFailures)には載せない(挙動保存)。
   const refreshItems = useCallback(async (): Promise<void> => {
-    const res = await boardQuery.refetch();
-    if (res.isError) {
-      setReviseError(toMessage(res.error, "最新の取得に失敗しました。"));
+    try {
+      setBoardData(await fetchPending(token));
+    } catch (error) {
+      setReviseError(toMessage(error, "最新の取得に失敗しました。"));
     }
-  }, [boardQuery]);
+  }, [token, setBoardData]);
 
-  // #108: poll で前回 items を参照できるよう itemsRef を最新化する。
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
 
   // #119: 初期表示タブの確定。URL の ?view 指定はマウント時に同期確定済み。ここでは未確定時に
   // 一覧読込後、未処理がある方(両方あれば施策)を自動選択する。確定後は自動上書きしない。
