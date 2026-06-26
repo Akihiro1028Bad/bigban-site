@@ -57,6 +57,7 @@ import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
+import { Section } from "./Section";
 import { SectionEditor } from "./SectionEditor";
 import { SectionImages } from "./SectionImages";
 import { TitleEditor } from "./TitleEditor";
@@ -1487,115 +1488,27 @@ export function ApproveClient() {
   // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
   function renderSection(item: PendingItem, sections: OutlineSection[], i: number) {
     const section = sections[i];
-    const comments = draftComments[i] ?? [];
-    const open = openCommentFor === i;
-    const editing = editingSection === i;
     return (
-      <li key={i} className="group rounded-md border border-gray-200 p-2 hover:border-gray-300">
-        {editing ? (
-          renderSectionEditor(item, sections, i)
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{section.heading}</p>
-              {comments.length > 0 ? (
-                <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                  コメント{comments.length}
-                </span>
-              ) : null}
-            </div>
-            {section.description ? (
-              <p className="mt-0.5 text-xs text-gray-500">{section.description}</p>
-            ) : null}
-
-            {comments.length > 0 ? (
-              <ul className="mt-2 space-y-1">
-                {comments.map((comment, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-start gap-2 border-l-2 border-blue-200 pl-2 text-sm text-gray-700"
-                  >
-                    <span className="min-w-0 flex-1 whitespace-pre-wrap">{comment}</span>
-                    <button
-                      type="button"
-                      aria-label={`コメントを編集: ${section.heading} ${idx + 1}`}
-                      onClick={() => startEditComment(i, idx, comment)}
-                      className="shrink-0 text-xs text-gray-500 hover:text-gray-800"
-                    >
-                      編集
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`コメントを削除: ${section.heading} ${idx + 1}`}
-                      onClick={() => deleteComment(i, idx)}
-                      className="shrink-0 text-xs text-gray-500 hover:text-red-700"
-                    >
-                      削除
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            {open ? (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="mt-2 overflow-hidden"
-              >
-                <textarea
-                  aria-label={`コメント入力: ${section.heading}`}
-                  value={commentText}
-                  onChange={(event) => setCommentText(event.target.value)}
-                  placeholder="この見出しへの修正指示を書く…"
-                  className="h-16 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-                />
-                <div className="mt-1 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelComment}
-                    className={choiceButtonClass(
-                      "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => saveComment(i)}
-                    className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-                  >
-                    {editingIdx !== null ? "更新" : "コメントを追加"}
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <div className="mt-1 flex gap-3">
-                <button
-                  type="button"
-                  aria-label={`コメントを追加: ${section.heading}`}
-                  onClick={() => startAddComment(i)}
-                  disabled={reviseBusy}
-                  className="text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
-                >
-                  ＋ コメント
-                </button>
-                <button
-                  type="button"
-                  aria-label={`セクションを編集: ${section.heading}`}
-                  onClick={() => startEditSection(i, section)}
-                  disabled={reviseBusy}
-                  className="text-xs text-gray-600 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
-                >
-                  編集
-                </button>
-              </div>
-            )}
-
-            {renderSectionImages(item, sections, i)}
-          </>
-        )}
-      </li>
+      <Section
+        key={i}
+        heading={section.heading}
+        description={section.description}
+        comments={draftComments[i] ?? []}
+        editing={editingSection === i}
+        commentOpen={openCommentFor === i}
+        commentText={commentText}
+        onCommentTextChange={setCommentText}
+        editingComment={editingIdx !== null}
+        busy={reviseBusy}
+        onStartEditComment={(idx, comment) => startEditComment(i, idx, comment)}
+        onDeleteComment={(idx) => deleteComment(i, idx)}
+        onCancelComment={cancelComment}
+        onSaveComment={() => saveComment(i)}
+        onStartAddComment={() => startAddComment(i)}
+        onStartEditSection={() => startEditSection(i, section)}
+        editor={renderSectionEditor(item, sections, i)}
+        images={renderSectionImages(item, sections, i)}
+      />
     );
   }
 
