@@ -19,10 +19,30 @@ export interface MetricDelta {
 }
 
 /** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
+/** 1クエリぶんの検索成績(今期値・上位クエリ表示用)。 */
+export interface SearchQueryStat {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+/** 記事の検索パフォーマンス(GSC・#計測強化 S2)。clicks/impressions/ctr/position は前週比つき。 */
+export interface SearchMetrics {
+  clicks: MetricDelta;
+  impressions: MetricDelta;
+  ctr: MetricDelta;
+  position: MetricDelta;
+  topQueries: SearchQueryStat[];
+}
+
 export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
   users: MetricDelta;
+  // #計測強化 S2: GSC 検索成績(後方互換のため任意。旧データには無い)。
+  search?: SearchMetrics;
   period: { start: string; end: string };
 }
 
@@ -51,6 +71,47 @@ export function normalizePagePath(path: string): string {
 function deltaPct(current: number, prior: number): number | null {
   if (prior <= 0) return null;
   return Math.round(((current - prior) / prior) * 1000) / 10;
+}
+
+/** GSC の page フィルタ用に、記事のフル URL を組み立てる(origin の末尾スラッシュは正規化)。 */
+export function articleSearchUrl(origin: string, pagePath: string): string {
+  return `${origin.replace(/\/+$/, "")}${pagePath}`;
+}
+
+/** MergedRow の 1 指標を MetricDelta へ写す(無ければ 0/0/null)。 */
+function metricDeltaFrom(row: MergedRow | undefined, name: string): MetricDelta {
+  const m = row?.metrics[name];
+  return { current: m?.current ?? 0, prior: m?.prior ?? 0, deltaPct: m?.deltaPct ?? null };
+}
+
+/**
+ * GSC の page フィルタ済みレポートから記事の検索成績を作る(#計測強化 S2)。
+ * - summaryRows: dimensions=[] のページ集計(1行。クエリ秘匿の影響を受けない正確な合計)。
+ * - queryRows: dimensions=[query] の行。clicks 降順で上位 limit 件を topQueries にする。
+ */
+export function buildSearchMetrics(
+  summaryRows: readonly MergedRow[],
+  queryRows: readonly MergedRow[],
+  limit = 5
+): SearchMetrics {
+  const summary = summaryRows[0];
+  const topQueries: SearchQueryStat[] = [...queryRows]
+    .sort((a, b) => (b.metrics.clicks?.current ?? 0) - (a.metrics.clicks?.current ?? 0))
+    .slice(0, limit)
+    .map((r) => ({
+      query: r.keys[0] ?? "",
+      clicks: r.metrics.clicks?.current ?? 0,
+      impressions: r.metrics.impressions?.current ?? 0,
+      ctr: r.metrics.ctr?.current ?? 0,
+      position: r.metrics.position?.current ?? 0,
+    }));
+  return {
+    clicks: metricDeltaFrom(summary, "clicks"),
+    impressions: metricDeltaFrom(summary, "impressions"),
+    ctr: metricDeltaFrom(summary, "ctr"),
+    position: metricDeltaFrom(summary, "position"),
+    topQueries,
+  };
 }
 
 /**
@@ -90,10 +151,28 @@ const deltaSchema = z.object({
   deltaPct: z.number().nullable(),
 });
 
+const searchQuerySchema = z.object({
+  query: z.string(),
+  clicks: z.number(),
+  impressions: z.number(),
+  ctr: z.number(),
+  position: z.number(),
+});
+
+const searchSchema = z.object({
+  clicks: deltaSchema,
+  impressions: deltaSchema,
+  ctr: deltaSchema,
+  position: deltaSchema,
+  topQueries: z.array(searchQuerySchema),
+});
+
 const metricsSchema = z.object({
   pagePath: z.string(),
   views: deltaSchema,
   users: deltaSchema,
+  // #計測強化 S2: 後方互換。旧データ(search 無し)も valid のまま。
+  search: searchSchema.optional(),
   period: z.object({ start: z.string(), end: z.string() }),
 });
 
