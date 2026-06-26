@@ -50,8 +50,9 @@ import {
 } from "./boardPrefs";
 
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
-import { TAP_TARGET } from "./approveStyles";
+import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
+import { RevisePending } from "./RevisePending";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -85,7 +86,6 @@ import { CommandPalette } from "./CommandPalette";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
 import { EyecatchPicker } from "./EyecatchPicker";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
-import { StaleNotice } from "./StaleNotice";
 import { authHeaders } from "./authHeaders";
 import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { buildDraftEditPayload } from "./draftEditorContent";
@@ -121,9 +121,6 @@ const LIVE_PREVIEW_DEBOUNCE_MS = 250;
 // 担うため、iframe 自体は枠なし・暗背景のみ。中身は iframe 内で本番テーマ描画される。
 const PREVIEW_FRAME_CLASS = "block h-96 w-full bg-[#0A0A0A]";
 
-// #124: 詳細パネルのセクションカード共通スタイル(淡色サーフェスでグルーピング)。
-const SECTION_CARD = "rounded-lg border border-gray-200 bg-white p-3";
-const SECTION_HEAD = "text-sm font-bold text-gray-700";
 
 // スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
 const STYLE_LABEL = Object.fromEntries(
@@ -235,10 +232,6 @@ function rowClass(choice: Choice | undefined, failed: boolean): string {
   if (failed) return `${base} border-red-400 bg-red-50 p-3`;
   if (choice) return `${base} border-gray-200 bg-gray-50 px-3 py-2`;
   return `${base} border-gray-200 bg-white p-3`;
-}
-
-function choiceButtonClass(activeClass: string): string {
-  return `${TAP_TARGET} ${activeClass} disabled:opacity-50`;
 }
 
 // #107: 盤の列ヘッダ用スタイル。件数バッジ付きの淡色ヘッダ。
@@ -1769,22 +1762,11 @@ export function ApproveClient() {
 
   function renderRevisePending(item: PendingItem) {
     return (
-      <div>
-        <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
-          修正を依頼しました。PCが処理して最大5分で修正案を提示します。
-        </p>
-        <StaleNotice requestedAtMs={item.reviseRequestedAtMs ?? null} busy />
-        <button
-          type="button"
-          onClick={() => void refreshItems()}
-          disabled={reviseBusy}
-          className={choiceButtonClass(
-            "mt-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          )}
-        >
-          最新を確認
-        </button>
-      </div>
+      <RevisePending
+        requestedAtMs={item.reviseRequestedAtMs ?? null}
+        busy={reviseBusy}
+        onRefresh={() => void refreshItems()}
+      />
     );
   }
 
