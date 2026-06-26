@@ -106,8 +106,11 @@ describe("toPendingItems", () => {
     page.properties["狙う読者"] = { type: "rich_text", rich_text: [{ plain_text: "本八幡近隣の初心者" }] };
     page.properties["検索意図"] = { type: "rich_text", rich_text: [{ plain_text: "始め方を知りたい" }] };
     page.properties["勝ち筋"] = { type: "rich_text", rich_text: [{ plain_text: "一次情報＋内部リンク" }] };
-    // 名前欠落のオプションは除外する(欠落耐性)。
-    page.properties["想定CTA"] = { type: "multi_select", multi_select: [{ name: "予約" }, {}, { name: "LINE" }] };
+    // 名前欠落のオプションは除外し、重複は1つにまとめる(描画 key 衝突防止)。
+    page.properties["想定CTA"] = {
+      type: "multi_select",
+      multi_select: [{ name: "予約" }, {}, { name: "LINE" }, { name: "予約" }],
+    };
     page.properties["成功指標"] = { type: "rich_text", rich_text: [{ plain_text: "予約クリック10件/月" }] };
     const [item] = toPendingItems([], [page]);
     expect(item.hypothesis).toEqual({
