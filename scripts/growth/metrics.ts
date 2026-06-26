@@ -18,7 +18,6 @@ export interface MetricDelta {
   deltaPct: number | null;
 }
 
-/** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
 /** 1クエリぶんの検索成績(今期値・上位クエリ表示用)。 */
 export interface SearchQueryStat {
   query: string;
@@ -37,6 +36,7 @@ export interface SearchMetrics {
   topQueries: SearchQueryStat[];
 }
 
+/** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
 export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
