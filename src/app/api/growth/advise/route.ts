@@ -20,6 +20,7 @@ import {
 } from "@/lib/growth/advise";
 import { isNotionPageId } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
@@ -59,7 +60,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const row = adviceRowFromPage(await getPage(pageId, options));
+    const page = await getPage(pageId, options);
+    const blocked = articleEditGuard(page);
+    if (blocked) return blocked;
+    const row = adviceRowFromPage(page);
     if (!row.contentId) {
       return badRequest("下書きがまだありません。下書き作成後にアドバイスを依頼できます。");
     }

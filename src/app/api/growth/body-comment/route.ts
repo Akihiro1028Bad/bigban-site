@@ -23,6 +23,7 @@ import {
   selectAnchoredComments,
 } from "@/lib/growth/bodyComment";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,8 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const page = await getPage(pageId, options);
+    const blocked = articleEditGuard(page);
+    if (blocked) return blocked;
     if (BODY_COMMENT_BUSY_STATUSES.includes(bodyCommentStatusOf(page))) {
       return NextResponse.json(
         { success: false, error: "この記事は既にコメントを処理中/提示中です。" },

@@ -9,8 +9,15 @@ import {
   EYECATCH_MIRROR_PROP,
   type NotionPage,
 } from "./notion";
+import { type ArticleMetrics, METRICS_PROPS, parseMetrics } from "./metrics";
+import { PUBLISH_SCHEDULE_PROP } from "./publishQueue";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
-import { deriveArticleStage, deriveProposalStage, type Stage } from "./stage";
+import {
+  type ArticleStage,
+  deriveArticleStage,
+  deriveProposalStage,
+  type Stage,
+} from "./stage";
 
 export type PendingKind = "proposal" | "idea";
 
@@ -47,6 +54,14 @@ export interface PendingItem {
   isDraftReady?: boolean;
   /** パイプライン段階(#106)。盤の列分けに使う。記事=ArticleStage / 施策=ProposalStage。 */
   stage: Stage;
+  /** 公開記事の成績(#C4 計測ループ)。Notion `成績データ` ミラーから。未計測は undefined。記事のみ。 */
+  metrics?: ArticleMetrics;
+  /** 公開キュー判定用(#H23)。アイキャッチ URL(ミラー)。記事のみ。 */
+  eyecatchUrl?: string;
+  /** 公開キュー判定用(#H23)。下書き本文(ミラー)が非空か。記事のみ。 */
+  hasDraftBody?: boolean;
+  /** 予約公開時刻(#H24)。Notion `公開予約時刻` の ms。未予約は null。記事のみ。 */
+  scheduledAtMs?: number | null;
 }
 
 /** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
@@ -88,6 +103,11 @@ export function draftLinkOf(page: NotionPage): DraftLink {
     contentId: richText(page, DRAFT_LINK_PROPS.contentId),
     draftKey: richText(page, DRAFT_LINK_PROPS.draftKey),
   };
+}
+
+/** ページの記事段階(ステータス＋下書きID有無から導出・#H9 ガードで使う)。 */
+export function articleStageOf(page: NotionPage): ArticleStage {
+  return deriveArticleStage(selectName(page, STATUS_PROP), draftLinkOf(page).contentId !== "");
 }
 
 /**
@@ -236,6 +256,10 @@ export function toPendingItems(
       contentId,
       isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,
       stage: deriveArticleStage(selectName(page, STATUS_PROP), contentId !== ""),
+      metrics: parseMetrics(richText(page, METRICS_PROPS.data)) ?? undefined,
+      eyecatchUrl: eyecatchUrlOf(page),
+      hasDraftBody: draftBodyOf(page).trim() !== "",
+      scheduledAtMs: dateStartMs(page, PUBLISH_SCHEDULE_PROP),
     };
   });
   return [...proposalItems, ...ideaItems];

@@ -15,6 +15,7 @@ import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
 import { isNotionPageId, reviseStatusOf } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 import {
   buildOutlineEditProps,
   buildTitleEditProps,
@@ -65,6 +66,8 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const page = await getPage(pageId, options);
+    const blocked = articleEditGuard(page);
+    if (blocked) return blocked;
     if (REVISE_BUSY_STATUSES.includes(reviseStatusOf(page))) {
       return NextResponse.json(
         { success: false, error: "この記事はAI修正処理中です。完了後に編集してください。" },

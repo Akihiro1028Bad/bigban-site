@@ -54,6 +54,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/draft/excerpt", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, excerpt: "市川の屋内コートで打てる" }));
+    expect(res.status).toBe(409);
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
   it("excerpt を content キーで patch する(200)", async () => {
     const res = await POST(postRequest(null, { pageId: PAGE_ID, excerpt: "市川の屋内コートで打てる" }));
     expect(res.status).toBe(200);

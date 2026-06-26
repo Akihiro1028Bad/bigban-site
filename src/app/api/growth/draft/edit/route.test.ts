@@ -62,6 +62,17 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/draft/edit", () => {
+  it("生成中の記事は 409 で弾く(#H9)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
+    expect(res.status).toBe(409);
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
   it("保存時にサーバで再サニタイズし、危険タグを除去して content キーで patch する", async () => {
     vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "承認したタイトル"));
 

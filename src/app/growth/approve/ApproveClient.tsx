@@ -25,6 +25,7 @@ import {
   groupArticlesByStage,
   isActionable,
   isAwaitingDownstream,
+  reconcileDecided,
   scoreBarPct,
   STAGE_STEPS,
   stageStepIndex,
@@ -49,6 +50,8 @@ import {
 
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
+import { PerformanceBoard } from "./PerformanceBoard";
+import { PublishQueue } from "./PublishQueue";
 import { DetailHeader } from "./DetailHeader";
 import { detailBadge } from "./detailBadge";
 import { DraftChecklist } from "./DraftChecklist";
@@ -451,6 +454,8 @@ export function ApproveClient() {
       ]);
     }
     setItems(next);
+    // #H10: サーバ最新に楽観的決定を突き合わせ、消失/前進済みのゴースト決定を掃除する。
+    setDecided((prev) => reconcileDecided(prev, next));
     setNowTick(Date.now());
     setPollFailures(0);
     setLastBoardSuccessMs(Date.now());
@@ -2667,11 +2672,17 @@ export function ApproveClient() {
             <AddProposalForm token={token} onAdded={addProposal} />
           </>
         ) : (
-          <ArticlesView
-            columns={articleColumns}
-            renderItem={renderItem}
-            densityClass={densityClass}
-          />
+          <>
+            <div className="mb-4 space-y-4">
+              <PublishQueue items={ideas} token={token} onChanged={() => void pollBoard()} />
+              <PerformanceBoard items={ideas} />
+            </div>
+            <ArticlesView
+              columns={articleColumns}
+              renderItem={renderItem}
+              densityClass={densityClass}
+            />
+          </>
         )}
       </div>
       {openItem ? renderPanel(openItem) : null}

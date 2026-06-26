@@ -3403,3 +3403,44 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
     ).toBe(false);
   });
 });
+
+describe("ApproveClient 公開キュー(#H23/#H24)", () => {
+  it("『今すぐ公開』で publish 後に盤を再取得する(onChanged→pollBoard)", async () => {
+    flags.authEnabled = false;
+    const fn = mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [
+            ideaItem({
+              id: "i1",
+              title: "公開可能下書き",
+              stage: "drafted",
+              isDraftReady: true,
+              contentId: "g-1",
+              eyecatchUrl: "https://images.microcms-assets.io/x.png",
+              hasDraftBody: true,
+            }),
+          ],
+        },
+      },
+      { json: { success: true } }, // /api/growth/publish
+      { json: { success: true, items: [] } }, // pollBoard 再取得
+    );
+    render(<ApproveClient />);
+    await screen.findByRole("tab", { name: /記事/ });
+    await selectTab(/記事/);
+    await userEvent.click(await screen.findByRole("button", { name: /公開キュー/ }));
+    await userEvent.click(screen.getByRole("button", { name: /今すぐ公開/ }));
+
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]) === "/api/growth/publish")).toBe(true)
+    );
+    // onChanged → pollBoard が承認 API を再取得する(初回＋ポーリングで2回以上)。
+    await waitFor(() =>
+      expect(
+        fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/approve")).length
+      ).toBeGreaterThanOrEqual(2)
+    );
+  });
+});

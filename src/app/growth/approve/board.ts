@@ -66,6 +66,31 @@ export function isActionable(
   return !decided[item.id] && !item.isDraftReady && !isAwaitingDownstream(item.stage);
 }
 
+// 楽観的決定がまだ意味を持つ段階(この段階の間だけ decided を保持する)。
+const PRE_DECISION_STAGES: ReadonlySet<string> = new Set(["proposed", "untouched"]);
+
+/**
+ * 楽観的決定(decided)をサーバ最新(items)に突き合わせて掃除する(#H10)。
+ * - items に存在しない id(消失・却下で盤から除外)→ drop。
+ * - サーバが既に前進した id(段階が proposed/untouched でない=承認等が反映済み)→ drop。
+ * これで二重前進・操作不能ゴースト・件数バッジ不整合を防ぐ。
+ */
+export function reconcileDecided<T extends BoardItem, C extends string>(
+  decided: Record<string, C | undefined>,
+  items: readonly T[]
+): Record<string, C> {
+  const byId = new Map(items.map((it) => [it.id, it]));
+  const next: Record<string, C> = {};
+  for (const [id, choice] of Object.entries(decided)) {
+    if (choice === undefined) continue;
+    const item = byId.get(id);
+    if (!item) continue;
+    if (!PRE_DECISION_STAGES.has(item.stage)) continue;
+    next[id] = choice;
+  }
+  return next;
+}
+
 /** スコア → 進捗バーの幅(%)。max<=0 は 0。 */
 export function scoreBarPct(score: number, max: number): number {
   if (max <= 0) return 0;

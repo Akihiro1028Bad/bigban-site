@@ -22,6 +22,7 @@ import {
   getPage,
   updatePageProps,
 } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
@@ -71,14 +72,18 @@ export async function POST(request: Request): Promise<Response> {
   if (!notionOpts || !microOpts) return serverError();
 
   let contentId: string;
+  let stageBlocked: Response | null = null;
   try {
-    contentId = draftLinkOf(await getPage(pageId, notionOpts)).contentId;
+    const page = await getPage(pageId, notionOpts);
+    stageBlocked = articleEditGuard(page);
+    contentId = draftLinkOf(page).contentId;
   } catch {
     return NextResponse.json(
       { success: false, error: "更新中にエラーが発生しました" },
       { status: 502 }
     );
   }
+  if (stageBlocked) return stageBlocked;
   if (!contentId || !CONTENT_ID_RE.test(contentId)) {
     return NextResponse.json(
       { success: false, error: "差し替え対象の下書きが見つかりません。" },

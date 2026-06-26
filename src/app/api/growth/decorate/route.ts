@@ -21,6 +21,7 @@ import {
   decorateRowFromPage,
 } from "@/lib/growth/decorate";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
@@ -60,7 +61,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const row = decorateRowFromPage(await getPage(pageId, options));
+    const page = await getPage(pageId, options);
+    const blocked = articleEditGuard(page);
+    if (blocked) return blocked;
+    const row = decorateRowFromPage(page);
     if (!row.contentId) {
       return badRequest("下書きがまだありません。下書き作成後に提案を依頼できます。");
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveArticleStage, deriveProposalStage } from "./stage";
+import { deriveArticleStage, deriveProposalStage, isArticleStageEditable } from "./stage";
 
 describe("deriveArticleStage", () => {
   it("提案中 → proposed", () => {
@@ -52,5 +52,18 @@ describe("deriveProposalStage", () => {
 
   it("未知ステータスは untouched に倒す", () => {
     expect(deriveProposalStage("謎")).toBe("untouched");
+  });
+});
+
+describe("isArticleStageEditable (#H9)", () => {
+  it("生成中・公開済みは編集/AI依頼不可", () => {
+    expect(isArticleStageEditable("generating")).toBe(false);
+    expect(isArticleStageEditable("published")).toBe(false);
+  });
+
+  it("提案中/生成待ち/下書き/却下は編集可", () => {
+    for (const stage of ["proposed", "queued", "drafted", "rejected"] as const) {
+      expect(isArticleStageEditable(stage)).toBe(true);
+    }
   });
 });

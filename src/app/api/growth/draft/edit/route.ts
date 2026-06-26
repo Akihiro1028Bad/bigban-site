@@ -20,6 +20,7 @@ import {
   getPage,
   updatePageProps,
 } from "@/lib/growth/notion";
+import { articleEditGuard } from "@/lib/growth/stageGuard";
 import { sanitizeNewsHtml, STRICT_HTML_CONFIG } from "@/lib/news/sanitize";
 
 export const runtime = "nodejs";
@@ -81,8 +82,11 @@ export async function POST(request: Request): Promise<Response> {
   let title = "";
   // #C3: microCMS 同期失敗時にミラーを戻すための旧本文(ロールバック用)。
   let previousBody = "";
+  // #H9: 生成中・公開済みの記事は本文編集を弾く(getPage 失敗とは別経路で 409 を返す)。
+  let stageBlocked: Response | null = null;
   try {
     const page = await getPage(pageId, notionOpts);
+    stageBlocked = articleEditGuard(page);
     contentId = draftLinkOf(page).contentId;
     title = ideaTitleOf(page).trim();
     previousBody = draftBodyOf(page);
@@ -92,6 +96,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 502 }
     );
   }
+  if (stageBlocked) return stageBlocked;
   if (!contentId || !CONTENT_ID_RE.test(contentId)) {
     return NextResponse.json(
       { success: false, error: "編集対象の下書きが見つかりません。" },

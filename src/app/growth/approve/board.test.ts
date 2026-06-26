@@ -8,6 +8,7 @@ import {
   groupArticlesByStage,
   isActionable,
   isAwaitingDownstream,
+  reconcileDecided,
   scoreBarPct,
   stageStepIndex,
 } from "./board";
@@ -122,5 +123,38 @@ describe("isActionable", () => {
   it("生成待ち/生成中(下流待ち)は対象外", () => {
     expect(isActionable(idea("a", "queued"), {})).toBe(false);
     expect(isActionable(idea("a", "generating"), {})).toBe(false);
+  });
+});
+
+describe("reconcileDecided (#H10)", () => {
+  it("提案中のまま残っている決定は保持する", () => {
+    const items = [idea("a", "proposed"), idea("b", "proposed")];
+    const next = reconcileDecided({ a: "承認", b: "却下" }, items);
+    expect(next).toEqual({ a: "承認", b: "却下" });
+  });
+
+  it("サーバ最新に存在しない id の決定は捨てる(消失・盤から除外)", () => {
+    const items = [idea("a", "proposed")];
+    const next = reconcileDecided({ a: "承認", gone: "承認" }, items);
+    expect(next).toEqual({ a: "承認" });
+  });
+
+  it("サーバが既に前進した id の決定は捨てる(二重前進防止)", () => {
+    // 承認がサーバへ反映され段階が queued になったら、楽観決定は不要。
+    const items = [idea("a", "queued")];
+    const next = reconcileDecided({ a: "承認" }, items);
+    expect(next).toEqual({});
+  });
+
+  it("untouched(施策)の決定は保持する", () => {
+    const items = [idea("a", "untouched")];
+    const next = reconcileDecided({ a: "承認" }, items);
+    expect(next).toEqual({ a: "承認" });
+  });
+
+  it("値が undefined の決定は除外する", () => {
+    const items = [idea("a", "proposed")];
+    const next = reconcileDecided({ a: undefined }, items);
+    expect(next).toEqual({});
   });
 });
