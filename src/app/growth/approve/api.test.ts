@@ -4,7 +4,15 @@ import { describe, expect, it } from "vitest";
 import { server } from "@/test/msw/server";
 import { setupMswServer } from "@/test/msw/setup";
 
-import { BOARD_URL, fetchBoard, postDecision, postPublish } from "./api";
+import {
+  BOARD_URL,
+  fetchBoard,
+  postDecision,
+  postPublish,
+  postRevise,
+  postReviseApply,
+  postReviseEdit,
+} from "./api";
 
 setupMswServer();
 
@@ -88,5 +96,69 @@ describe("postPublish", () => {
     await expect(postPublish("t", "p1")).rejects.toThrow("PUBNG");
     server.use(http.post("/api/growth/publish", () => HttpResponse.json({ success: false }, { status: 500 })));
     await expect(postPublish("t", "p1")).rejects.toThrow("公開に失敗しました。");
+  });
+});
+
+describe("postRevise", () => {
+  it("成功で解決し body を送る", async () => {
+    let body: unknown;
+    server.use(
+      http.post("/api/growth/revise", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ success: true });
+      })
+    );
+    await postRevise("t", { pageId: "i1", comments: [{ line: "H2", comment: "直して" }] });
+    expect(body).toEqual({ pageId: "i1", comments: [{ line: "H2", comment: "直して" }] });
+  });
+  it("409 は処理中、その他は error/既定文言", async () => {
+    server.use(http.post("/api/growth/revise", () => HttpResponse.json({ success: false }, { status: 409 })));
+    await expect(postRevise("t", { pageId: "i1", comments: [] })).rejects.toThrow("修正処理中");
+    server.use(http.post("/api/growth/revise", () => HttpResponse.json({ success: false, error: "X" }, { status: 500 })));
+    await expect(postRevise("t", { pageId: "i1", comments: [] })).rejects.toThrow("X");
+    server.use(http.post("/api/growth/revise", () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(postRevise("t", { pageId: "i1", comments: [] })).rejects.toThrow("修正依頼に失敗しました。");
+  });
+});
+
+describe("postReviseEdit", () => {
+  it("pageId＋payload を送り成功で解決", async () => {
+    let body: unknown;
+    server.use(
+      http.post("/api/growth/revise/edit", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ success: true });
+      })
+    );
+    await postReviseEdit("t", "i1", { outline: "## A" });
+    expect(body).toEqual({ pageId: "i1", outline: "## A" });
+  });
+  it("409 は AI 処理中、その他は error/既定文言", async () => {
+    server.use(http.post("/api/growth/revise/edit", () => HttpResponse.json({ success: false }, { status: 409 })));
+    await expect(postReviseEdit("t", "i1", {})).rejects.toThrow("AI修正処理中");
+    server.use(http.post("/api/growth/revise/edit", () => HttpResponse.json({ success: false, error: "Y" }, { status: 500 })));
+    await expect(postReviseEdit("t", "i1", {})).rejects.toThrow("Y");
+    server.use(http.post("/api/growth/revise/edit", () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(postReviseEdit("t", "i1", {})).rejects.toThrow("保存に失敗しました。");
+  });
+});
+
+describe("postReviseApply", () => {
+  it("action を送り成功で解決", async () => {
+    let body: unknown;
+    server.use(
+      http.post("/api/growth/revise/apply", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ success: true });
+      })
+    );
+    await postReviseApply("t", "i1", "apply");
+    expect(body).toEqual({ pageId: "i1", action: "apply" });
+  });
+  it("失敗は error/既定文言", async () => {
+    server.use(http.post("/api/growth/revise/apply", () => HttpResponse.json({ success: false, error: "Z" }, { status: 500 })));
+    await expect(postReviseApply("t", "i1", "discard")).rejects.toThrow("Z");
+    server.use(http.post("/api/growth/revise/apply", () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(postReviseApply("t", "i1", "discard")).rejects.toThrow("更新に失敗しました。");
   });
 });

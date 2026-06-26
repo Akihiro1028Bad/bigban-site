@@ -53,3 +53,59 @@ export async function postPublish(token: string, pageId: string): Promise<void> 
     throw new Error(json.error ?? "公開に失敗しました。");
   }
 }
+
+async function postJson(token: string, url: string, body: unknown): Promise<{ status: number; ok: boolean; error?: string }> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  const json = await readJsonObject(res);
+  return { status: res.status, ok: res.ok && json.success === true, error: json.error };
+}
+
+export interface ReviseRequest {
+  pageId: string;
+  comments: { line: string; comment: string }[];
+  titleInstruction?: string;
+}
+
+/** 構成案/タイトルの AI 修正を依頼する。409 は処理中メッセージ。 */
+export async function postRevise(token: string, body: ReviseRequest): Promise<void> {
+  const res = await postJson(token, "/api/growth/revise", body);
+  if (!res.ok) {
+    throw new Error(
+      res.status === 409
+        ? "この記事は修正処理中です。完了までお待ちください。"
+        : res.error ?? "修正依頼に失敗しました。"
+    );
+  }
+}
+
+/** 構成案/タイトルを直接上書き保存する(手動編集)。409 は AI 修正処理中メッセージ。 */
+export async function postReviseEdit(
+  token: string,
+  pageId: string,
+  payload: { outline?: string; title?: string }
+): Promise<void> {
+  const res = await postJson(token, "/api/growth/revise/edit", { pageId, ...payload });
+  if (!res.ok) {
+    throw new Error(
+      res.status === 409
+        ? "この記事はAI修正処理中です。完了後に編集してください。"
+        : res.error ?? "保存に失敗しました。"
+    );
+  }
+}
+
+/** 提示中の修正案を反映/破棄する。 */
+export async function postReviseApply(
+  token: string,
+  pageId: string,
+  action: "apply" | "discard"
+): Promise<void> {
+  const res = await postJson(token, "/api/growth/revise/apply", { pageId, action });
+  if (!res.ok) {
+    throw new Error(res.error ?? "更新に失敗しました。");
+  }
+}
