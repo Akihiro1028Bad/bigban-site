@@ -58,6 +58,7 @@ import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
 import { SectionEditor } from "./SectionEditor";
+import { SectionImages } from "./SectionImages";
 import { TitleEditor } from "./TitleEditor";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
@@ -95,7 +96,6 @@ import { authHeaders } from "./authHeaders";
 import { formatLastUpdated, shouldWarnPollStale } from "./pollHealth";
 import { buildDraftEditPayload } from "./draftEditorContent";
 import {
-  IMAGE_STYLES,
   parseOutlineSections,
   serializeOutlineSections,
   type ImageStyleKey,
@@ -116,21 +116,12 @@ const DRAFT_REGEN_POLL_MS = 5000;
 // #109: 表示密度の保存キー(localStorage)。
 const DENSITY_KEY = "growth-approve-density";
 
-// 1 セクションに付けられる本文画像の上限(#61)。超過は下書き生成側(#63)でスキップ＋通知。
-const MAX_SECTION_IMAGES = 3;
-
 // #98: 編集中ライブプレビューのデバウンス間隔(ミリ秒)。入力追従とコストの折衷。
 const LIVE_PREVIEW_DEBOUNCE_MS = 250;
 
 // #100/#124: 本番プレビュー iframe の見た目。外側のブラウザ風chromeカードが枠/角丸を
 // 担うため、iframe 自体は枠なし・暗背景のみ。中身は iframe 内で本番テーマ描画される。
 const PREVIEW_FRAME_CLASS = "block h-96 w-full bg-[#0A0A0A]";
-
-
-// スタイルキー → 表示名(チップのバッジ用・分岐を作らない単一マップ)。
-const STYLE_LABEL = Object.fromEntries(
-  IMAGE_STYLES.map((s) => [s.key, s.label])
-) as Record<ImageStyleKey, string>;
 
 interface PendingDetail {
   label: string;
@@ -1473,115 +1464,26 @@ export function ApproveClient() {
 
   // #61: 1セクション分の画像指示(チップ＋スタイル選択フォーム)を描画。
   function renderSectionImages(item: PendingItem, sections: OutlineSection[], i: number) {
-    const section = sections[i];
-    const images = section.images;
-    const open = imageFormFor === i;
     return (
-      <div className="mt-2 border-t border-gray-100 pt-2">
-        {images.length > 0 ? (
-          <ul className="space-y-1">
-            {images.map((image, idx) => (
-              <li
-                key={idx}
-                className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1"
-              >
-                <span className="shrink-0 rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
-                  {STYLE_LABEL[image.style]}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
-                  {image.description}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`画像を編集: ${section.heading} ${idx + 1}`}
-                  onClick={() => startEditImage(i, idx, image)}
-                  disabled={reviseBusy}
-                  className="shrink-0 text-xs text-gray-500 hover:text-gray-800 disabled:opacity-40"
-                >
-                  編集
-                </button>
-                <button
-                  type="button"
-                  aria-label={`画像を削除: ${section.heading} ${idx + 1}`}
-                  onClick={() => deleteImage(item, sections, i, idx)}
-                  disabled={reviseBusy}
-                  className="shrink-0 text-xs text-gray-500 hover:text-red-700 disabled:opacity-40"
-                >
-                  削除
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="mt-2 overflow-hidden"
-          >
-            <label
-              htmlFor={`image-style-${i}`}
-              className="block text-xs font-medium text-gray-600"
-            >
-              スタイル
-            </label>
-            <select
-              id={`image-style-${i}`}
-              value={imageStyle}
-              onChange={(event) => setImageStyle(event.target.value as ImageStyleKey)}
-              className="mt-0.5 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-            >
-              {IMAGE_STYLES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <textarea
-              aria-label={`画像の説明: ${section.heading}`}
-              value={imageDesc}
-              onChange={(event) => setImageDesc(event.target.value)}
-              placeholder="何を描くか（例: 宇宙人がパドルを構える）"
-              className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              alt・キャプションは執筆AIが補完します。図解は「イメージ図」として下書きに入り、公開前に確認できます。
-            </p>
-            <div className="mt-1 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={cancelImage}
-                className={choiceButtonClass(
-                  "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => saveImage(item, sections, i)}
-                disabled={reviseBusy}
-                className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-              >
-                {editingImageIdx !== null ? "更新" : "追加"}
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <button
-            type="button"
-            aria-label={`画像を追加: ${section.heading}`}
-            onClick={() => startAddImage(i)}
-            disabled={reviseBusy || images.length >= MAX_SECTION_IMAGES}
-            className="text-xs text-indigo-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
-          >
-            ＋画像（{images.length} / {MAX_SECTION_IMAGES}）
-          </button>
-        )}
-      </div>
+      <SectionImages
+        heading={sections[i].heading}
+        images={sections[i].images}
+        open={imageFormFor === i}
+        busy={reviseBusy}
+        sectionIndex={i}
+        imageStyle={imageStyle}
+        onImageStyleChange={setImageStyle}
+        imageDesc={imageDesc}
+        onImageDescChange={setImageDesc}
+        editing={editingImageIdx !== null}
+        onStartEdit={(idx, image) => startEditImage(i, idx, image)}
+        onDelete={(idx) => deleteImage(item, sections, i, idx)}
+        onStartAdd={() => startAddImage(i)}
+        onCancel={cancelImage}
+        onSave={() => saveImage(item, sections, i)}
+      />
     );
   }
-
   // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
   function renderSection(item: PendingItem, sections: OutlineSection[], i: number) {
     const section = sections[i];
