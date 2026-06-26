@@ -64,6 +64,7 @@ import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
 import { useDraftPreview } from "./hooks/useDraftPreview";
 import { useReviseEditing } from "./hooks/useReviseEditing";
+import { useToasts } from "./hooks/useToasts";
 import { revisePhase } from "./revisePhase";
 
 // 提示待ちのあいだ修正ステータスを再取得する間隔(ミリ秒)。
@@ -132,15 +133,11 @@ export function ApproveClient() {
     },
     [queryClient]
   );
-  // #108: 完了トースト/滞留検知用。nowTick は滞留経過の基準時刻、
+  // #108: 通知トーストはカスタムフックへ集約(#H7)。nowTick は滞留経過の基準時刻、
   // firstSeenRef は記事が生成待ち/生成中に入った時刻。前回値の参照は prevBoardRef(盤更新effect)が担う。
-  const [toasts, setToasts] = useState<
-    { id: string; message: string; tone: "success" | "error" }[]
-  >([]);
+  const { toasts, pushToast, pushToasts, dismissToast } = useToasts();
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const firstSeenRef = useRef<Map<string, number>>(new Map());
-  // M8: コピー等の通知トーストに使う一意 id 採番。
-  const toastSeq = useRef(0);
   // #H5: 盤ポーリングの連続失敗と最終成功時刻(沈黙させず「最新化できていない」を可視化)。
   const [pollFailures, setPollFailures] = useState(0);
   const [lastBoardSuccessMs, setLastBoardSuccessMs] = useState<number | null>(null);
@@ -266,36 +263,24 @@ export function ApproveClient() {
     prevBoardRef.current = next;
     if (doneIds.length > 0) {
       const done = new Set(doneIds);
-      setToasts((prev) => [
-        ...prev,
-        ...next
+      pushToasts(
+        next
           .filter((item) => done.has(item.id))
           .map((item) => ({
             id: `done-${item.id}`,
             message: `🎉 「${item.title}」の下書きが完成しました`,
             tone: "success" as const,
-          })),
-      ]);
+          }))
+      );
     }
     setDecided((prev) => reconcileDecided(prev, next));
-    // setDecided は useApproveDecisions が返す安定参照(useState セッター)。
-  }, [boardQuery.data, setDecided]);
+    // setDecided / pushToasts は安定参照(useState セッター / useCallback)。
+  }, [boardQuery.data, setDecided, pushToasts]);
 
   // #H5: poll/refetch の失敗を連続失敗として可視化(沈黙させない)。初期ロード失敗は loadError/failAuth 側。
   useEffect(() => {
     if (boardQuery.isError) setPollFailures((f) => f + 1);
   }, [boardQuery.isError, boardQuery.errorUpdatedAt]);
-
-  // M8: 通知トーストを1件積む(一意 id を採番)。
-  function pushToast(message: string, tone: "success" | "error" = "success"): void {
-    toastSeq.current += 1;
-    const id = `toast-${toastSeq.current}`;
-    setToasts((prev) => [...prev, { id, message, tone }]);
-  }
-
-  function dismissToast(id: string): void {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }
 
   // #109: キーボード操作の最新ハンドラを ref に保持(早期 return より前で document に結線するため)。
   const dispatchRef = useRef<
