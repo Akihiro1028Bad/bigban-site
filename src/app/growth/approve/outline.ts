@@ -111,6 +111,11 @@ export function parseOutlineSections(outline: string): OutlineSection[] {
   return sections;
 }
 
+/** 構成案文字列(未設定可)をセクション配列に分割する(#H7 共有ヘルパ)。 */
+export function outlineSections(outline: string | undefined): OutlineSection[] {
+  return parseOutlineSections(outline ?? "");
+}
+
 /**
  * セクション配列を構成案テキストへ戻す(#54 手動編集の保存で使用)。
  * 各セクションを `## 見出し` ＋(説明があれば)説明行 ＋(画像があれば)画像指示行にし、

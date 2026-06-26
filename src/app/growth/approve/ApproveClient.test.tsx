@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
+
+import { renderWithClient } from "@/test/renderWithClient";
+
+// #H7: ApproveClient は React Query を使うため、全 render を QueryClientProvider 配下に置く。
+// 盤フェッチは boardSeeded ゲートで命令的 fetchPending(=mockFetchSequence)が seed するため、
+// 既存の fetch スタブ方式はそのまま使える(query はマウント時に fetch しない)。
+function render(ui: ReactElement): ReturnType<typeof renderWithClient> {
+  return renderWithClient(ui);
+}
 
 // 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
 // 無効(一時措置)の挙動は専用 describe で flags.authEnabled=false にして検証する。
@@ -2184,6 +2194,41 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       expect(screen.getByText(/時間がかかっています/)).toBeInTheDocument();
     } finally {
       nowSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("生成中の記事が継続したまま別の記事が増えても滞留基準を二重記録しない", async () => {
+    flags.authEnabled = false;
+    vi.useFakeTimers({
+      toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"],
+    });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "継続中", stage: "generating" })] } },
+        {
+          json: {
+            success: true,
+            items: [
+              ideaItem({ id: "i1", title: "継続中", stage: "generating" }),
+              ideaItem({ id: "i2", title: "新着", stage: "generating" }),
+            ],
+          },
+        }
+      );
+      render(<ApproveClient />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByText("継続中")).toBeInTheDocument();
+      // poll で i2 が増えて盤の参照が変わり firstSeen 効果が再実行されるが、
+      // 既に在中の i1 は seen 済みで再記録しない(滞留基準=最初に在中した時刻を保つ)。
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
+      expect(screen.getByText("新着")).toBeInTheDocument();
+      expect(screen.getByText("継続中")).toBeInTheDocument();
+    } finally {
       vi.useRealTimers();
     }
   });
