@@ -51,6 +51,7 @@ import {
 
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { TAP_TARGET } from "./approveStyles";
+import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
@@ -1123,29 +1124,11 @@ export function ApproveClient() {
 
   // 認証無効(一時措置): 自動取得の読み込み中・失敗をそれぞれ明示する(沈黙させない)。
   if (authDisabled && busy) {
-    return (
-      <main className="mx-auto max-w-md p-6 text-center" aria-busy="true">
-        <p className="mt-10 text-sm text-gray-600">読み込み中…</p>
-      </main>
-    );
+    return <LoadingGate />;
   }
 
   if (authDisabled && loadError) {
-    return (
-      <main className="mx-auto max-w-md p-6">
-        <h1 className="text-xl font-bold text-gray-900">承認ページ</h1>
-        <p role="alert" className="mt-3 text-sm text-red-700">
-          {loadError}
-        </p>
-        <button
-          type="button"
-          onClick={() => void loadPending()}
-          className={`${TAP_TARGET} mt-4 w-full bg-blue-600 text-white hover:bg-blue-700`}
-        >
-          再読み込み
-        </button>
-      </main>
-    );
+    return <LoadErrorGate message={loadError} onRetry={() => void loadPending()} />;
   }
 
   if (!authed) {
@@ -1164,18 +1147,7 @@ export function ApproveClient() {
   }
 
   if (items.length === 0) {
-    return (
-      <main className="mx-auto max-w-md p-6 text-center">
-        <p className="mt-10 text-3xl">🎉</p>
-        <h1 className="mt-2 text-lg font-bold text-gray-900">
-          今週の承認待ちはありません
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">お疲れさまでした。</p>
-        <div className="mx-auto mt-6 max-w-md text-left">
-          <AddProposalForm token={token} onAdded={addProposal} />
-        </div>
-      </main>
-    );
+    return <EmptyGate token={token} onAdded={addProposal} />;
   }
 
   const allDone = processed === items.length;
