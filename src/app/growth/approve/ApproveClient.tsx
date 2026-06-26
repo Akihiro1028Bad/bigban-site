@@ -53,6 +53,7 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { TAP_TARGET } from "./approveStyles";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
+import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
@@ -2546,33 +2547,7 @@ export function ApproveClient() {
         </div>
       ) : null}
       {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
-      {toasts.length > 0 ? (
-        <div aria-label="お知らせ" className="mt-2 space-y-1">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              role="status"
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-                toast.tone === "error" ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"
-              }`}
-            >
-              <span className="flex-1">{toast.message}</span>
-              <button
-                type="button"
-                aria-label={`通知を閉じる: ${toast.message}`}
-                onClick={() => dismissToast(toast.id)}
-                className={`shrink-0 rounded border bg-white px-2 py-0.5 text-xs ${
-                  toast.tone === "error"
-                    ? "border-red-300 text-red-700"
-                    : "border-green-300 text-green-700"
-                }`}
-              >
-                閉じる
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <ToastList toasts={toasts} onDismiss={dismissToast} />
       {allDone ? (
         <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
           🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
