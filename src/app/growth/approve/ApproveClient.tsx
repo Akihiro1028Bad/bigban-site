@@ -49,7 +49,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
+import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
@@ -219,20 +219,6 @@ const TAP_TARGET = "min-h-11 min-w-11 px-4 rounded-md text-sm font-medium transi
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
-}
-
-/** 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる。 */
-async function fetchPending(token: string): Promise<PendingItem[]> {
-  const res = await fetch("/api/growth/approve", { headers: authHeaders(token) });
-  const json = await readJsonObject(res);
-  if (!res.ok || !json.success) {
-    throw new Error(
-      res.status === 401
-        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
-        : json.error ?? "取得に失敗しました。"
-    );
-  }
-  return json.items as PendingItem[];
 }
 
 function removeKey<T>(obj: Record<string, T>, key: string): Record<string, T> {
@@ -408,7 +394,7 @@ export function ApproveClient() {
   // 修正パネルのエラーに留め、盤の連続失敗バナー(pollFailures)には載せない(挙動保存)。
   const refreshItems = useCallback(async (): Promise<void> => {
     try {
-      setBoardData(await fetchPending(token));
+      setBoardData(await fetchBoard(token));
     } catch (error) {
       setReviseError(toMessage(error, "最新の取得に失敗しました。"));
     }
@@ -757,7 +743,7 @@ export function ApproveClient() {
     setBusy(true);
     setMessage("");
     try {
-      setBoardData(await fetchPending(pass));
+      setBoardData(await fetchBoard(pass));
       setBoardSeeded(true);
       setToken(pass);
       setAuthed(true);
@@ -773,7 +759,7 @@ export function ApproveClient() {
     setBusy(true);
     setLoadError("");
     try {
-      setBoardData(await fetchPending(""));
+      setBoardData(await fetchBoard(""));
       setBoardSeeded(true);
     } catch (error) {
       setLoadError(toMessage(error, "取得に失敗しました。"));
