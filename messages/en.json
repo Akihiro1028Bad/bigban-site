@@ -390,7 +390,8 @@
         "walkTime": "5 min walk"
       }
     },
-    "parkingNote": "For those arriving by car, please use nearby coin parking."
+    "parkingNote": "For those arriving by car, please use nearby coin parking.",
+    "openInMaps": "Open in Google Maps"
   },
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
