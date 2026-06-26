@@ -52,6 +52,7 @@ import {
 import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
+import { ReviseFailed } from "./ReviseFailed";
 import { RevisePending } from "./RevisePending";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
@@ -1844,19 +1845,11 @@ export function ApproveClient() {
 
   function renderReviseFailed(item: PendingItem) {
     return (
-      <div>
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          修正に失敗しました: {item.reviseProposal || "理由不明"}
-        </p>
-        <button
-          type="button"
-          onClick={() => applyRevise(item, "discard")}
-          disabled={reviseBusy}
-          className={choiceButtonClass("mt-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
-        >
-          やり直し
-        </button>
-      </div>
+      <ReviseFailed
+        reason={item.reviseProposal || "理由不明"}
+        busy={reviseBusy}
+        onDiscard={() => applyRevise(item, "discard")}
+      />
     );
   }
 
