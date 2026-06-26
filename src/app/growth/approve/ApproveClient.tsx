@@ -49,7 +49,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { postDecision, postPublish } from "./api";
+import { postDecision, postPublish, postRevise, postReviseApply, postReviseEdit } from "./api";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
@@ -799,6 +799,17 @@ export function ApproveClient() {
     mutationFn: (id: string) => postPublish(token, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: APPROVE_BOARD_KEY }),
   });
+  const reviseMutation = useMutation({
+    mutationFn: (body: Parameters<typeof postRevise>[1]) => postRevise(token, body),
+  });
+  const reviseEditMutation = useMutation({
+    mutationFn: ({ pageId, payload }: { pageId: string; payload: { outline?: string; title?: string } }) =>
+      postReviseEdit(token, pageId, payload),
+  });
+  const reviseApplyMutation = useMutation({
+    mutationFn: ({ pageId, action }: { pageId: string; action: "apply" | "discard" }) =>
+      postReviseApply(token, pageId, action),
+  });
 
   async function decide(item: PendingItem, choice: Choice): Promise<void> {
     setSavingId(item.id);
@@ -909,23 +920,11 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          pageId: item.id,
-          comments,
-          ...(titleInstruction ? { titleInstruction } : {}),
-        }),
+      await reviseMutation.mutateAsync({
+        pageId: item.id,
+        comments,
+        ...(titleInstruction ? { titleInstruction } : {}),
       });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) {
-        throw new Error(
-          res.status === 409
-            ? "この記事は修正処理中です。完了までお待ちください。"
-            : json.error ?? "修正依頼に失敗しました。"
-        );
-      }
       // 楽観更新: 依頼中にして即ポーリング表示へ(以降は poll が提示を取りに行く)。
       setBoardData((prev) =>
         prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
@@ -1000,26 +999,14 @@ export function ApproveClient() {
 
   // #54/#61/#139: /revise/edit へ直接上書き(AI不要)を送る共通処理。成否を返す。
   // payload は構成案(outline)・タイトル(title)のいずれか/両方。
-  async function postReviseEdit(
+  async function submitReviseEdit(
     item: PendingItem,
     payload: { outline?: string; title?: string }
   ): Promise<boolean> {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise/edit", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId: item.id, ...payload }),
-      });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) {
-        throw new Error(
-          res.status === 409
-            ? "この記事はAI修正処理中です。完了後に編集してください。"
-            : json.error ?? "保存に失敗しました。"
-        );
-      }
+      await reviseEditMutation.mutateAsync({ pageId: item.id, payload });
       await refreshItems();
       return true;
     } catch (error) {
@@ -1035,7 +1022,7 @@ export function ApproveClient() {
     item: PendingItem,
     nextSections: OutlineSection[]
   ): Promise<boolean> {
-    return postReviseEdit(item, { outline: serializeOutlineSections(nextSections) });
+    return submitReviseEdit(item, { outline: serializeOutlineSections(nextSections) });
   }
 
   // #139 A: 記事タイトルを直接上書き保存する(AI不要)。空は弾く。
@@ -1053,7 +1040,7 @@ export function ApproveClient() {
       setReviseError("タイトルは空にできません。");
       return;
     }
-    if (await postReviseEdit(item, { title })) cancelEditTitle();
+    if (await submitReviseEdit(item, { title })) cancelEditTitle();
   }
 
   async function saveSection(
@@ -1141,15 +1128,7 @@ export function ApproveClient() {
     setReviseBusy(true);
     setReviseError("");
     try {
-      const res = await fetch("/api/growth/revise/apply", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId: item.id, action }),
-      });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) {
-        throw new Error(json.error ?? "更新に失敗しました。");
-      }
+      await reviseApplyMutation.mutateAsync({ pageId: item.id, action });
       await refreshItems();
     } catch (error) {
       setReviseError(toMessage(error, "更新に失敗しました。"));
