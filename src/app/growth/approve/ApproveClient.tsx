@@ -56,6 +56,7 @@ import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
+import { TitleEditor } from "./TitleEditor";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -1993,62 +1994,17 @@ export function ApproveClient() {
       <section aria-label="構成案の修正" className={`mt-4 ${SECTION_CARD}`}>
         <h3 className={SECTION_HEAD}>構成案の修正</h3>
         {/* #139 A: 記事タイトルの直接編集(AI不要)。 */}
-        <div className="mb-3">
-          {editingTitle ? (
-            <div>
-              <label
-                htmlFor={`title-edit-${item.id}`}
-                className="block text-xs font-medium text-gray-500"
-              >
-                記事タイトル
-              </label>
-              <input
-                id={`title-edit-${item.id}`}
-                type="text"
-                aria-label="タイトルを編集"
-                value={titleInput}
-                onChange={(event) => setTitleInput(event.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm font-medium text-gray-900"
-              />
-              <div className="mt-1 flex justify-end gap-2">
-                <button
-                  type="button"
-                  aria-label="タイトル編集をキャンセル"
-                  onClick={cancelEditTitle}
-                  className={choiceButtonClass(
-                    "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                  )}
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  aria-label="タイトルを保存"
-                  onClick={() => saveTitle(item)}
-                  disabled={reviseBusy}
-                  className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-                >
-                  保存
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-gray-500">タイトル</span>
-              <span className="flex-1 text-sm font-medium text-gray-900">{item.title}</span>
-              <button
-                type="button"
-                aria-label={`タイトルを編集: ${item.title}`}
-                onClick={() => startEditTitle(item.title)}
-                className={choiceButtonClass(
-                  "shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                )}
-              >
-                編集
-              </button>
-            </div>
-          )}
-        </div>
+        <TitleEditor
+          itemId={item.id}
+          title={item.title}
+          editing={editingTitle}
+          value={titleInput}
+          busy={reviseBusy}
+          onChange={setTitleInput}
+          onStartEdit={() => startEditTitle(item.title)}
+          onCancel={cancelEditTitle}
+          onSave={() => saveTitle(item)}
+        />
         {phase === "pending"
           ? renderRevisePending(item)
           : phase === "ready"
