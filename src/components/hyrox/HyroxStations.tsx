@@ -1,0 +1,56 @@
+"use client";
+
+import Image from "next/image";
+import { useTranslations } from "next-intl";
+import { motion } from "framer-motion";
+import { HYROX_STATIONS } from "./stations";
+import { EASE } from "@/constants/motion";
+
+
+// 「WHAT IS HYROX」セクション内に内包されるサブブロック（種目一覧）。
+export default function HyroxStations() {
+  const t = useTranslations("HyroxPage.stations");
+
+  return (
+    <div className="mt-12 lg:mt-16">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {HYROX_STATIONS.map((station, i) => (
+          <motion.div
+            key={station.key}
+            className="group relative overflow-hidden border-t-2 border-t-transparent bg-white/[0.02] transition-colors hover:border-t-accent"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.9, delay: 0.05 + i * 0.06, ease: EASE }}
+          >
+            <div className="relative aspect-[4/5] overflow-hidden">
+              <Image
+                src={station.image}
+                alt={t(`${station.key}.name`)}
+                fill
+                sizes="(min-width: 1024px) 25vw, 50vw"
+                loading="lazy"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-black via-deep-black/30 to-transparent" />
+              <span className="absolute left-3 top-3 font-serif text-2xl text-accent">
+                {station.number}
+              </span>
+              <div className="absolute inset-x-0 bottom-0 p-4">
+                <span className="block text-sm font-bold tracking-wide text-text-light">
+                  {t(`${station.key}.name`)}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-text-gray">
+                  {t(`${station.key}.nameJa`)}
+                </span>
+              </div>
+            </div>
+            <p className="px-4 py-4 text-xs leading-relaxed text-text-gray">
+              {t(`${station.key}.description`)}
+            </p>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}

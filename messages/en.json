@@ -28,7 +28,7 @@
       ]
     },
     "about": {
-      "title": "ABOUT US · PICKLE BANG THEORY",
+      "title": "ABOUT US",
       "description": "About RST Agency Inc., the team behind THE PICKLE BANG THEORY. Company overview, founder message, players and crew.",
       "keywords": [
         "Akihiko Nishimura",
@@ -48,7 +48,7 @@
       ]
     },
     "tokushoho": {
-      "title": "Specified Commercial Transactions Act · PICKLE BANG THEORY",
+      "title": "Specified Commercial Transactions Act",
       "description": "Disclosure under the Specified Commercial Transactions Act for THE PICKLE BANG THEORY.",
       "keywords": [
         "Specified Commercial Transactions Act",
@@ -68,8 +68,25 @@
         "teaser"
       ]
     },
+    "reserve": {
+      "title": "Reservation",
+      "description": "Book a court at THE PICKLE BANG THEORY. Pick your time and reserve online in seconds. 1 min from Motoyawata Station, open 6:00–23:00."
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
+    },
+    "hyrox": {
+      "title": "HYROX Training Area",
+      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is now open at THE PICKLE BANG THEORY in Motoyawata.",
+      "keywords": [
+        "HYROX",
+        "HYROX Japan",
+        "HYROX Chiba",
+        "HYROX Motoyawata",
+        "HYROX training",
+        "functional fitness",
+        "fitness racing"
+      ]
     }
   },
   "Navigation": {
@@ -81,15 +98,108 @@
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
+    "reserveJa": "予約",
     "contact": "CONTACT",
+    "hyrox": "HYROX",
+    "conceptJa": "",
+    "facilityJa": "",
+    "servicesJa": "",
+    "hyroxJa": "",
+    "pricingJa": "",
+    "newsJa": "",
+    "aboutJa": "",
+    "accessJa": "",
     "mainNav": "Main Navigation",
     "openMenu": "Open Menu",
-    "closeMenu": "Close Menu"
+    "closeMenu": "Close Menu",
+    "mobileMenuAria": "Mobile menu",
+    "menuAccess": "1 min from Motoyawata Sta. · Open 24h",
+    "instagramAria": "THE PICKLE BANG THEORY on Instagram",
+    "followUs": "Follow us"
   },
   "PromoBanner": {
-    "text": "🈹\uFE0F 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
+    "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
     "ariaLabel": "30% off court campaign. Go to reservation page"
+  },
+  "Reserve": {
+    "hero": {
+      "title": "RESERVE",
+      "subtitle": "Book a Court",
+      "lead": "Pick your preferred date and time and book a court online in just a few taps."
+    },
+    "steps": {
+      "heading": "How to Book",
+      "headingEn": "HOW TO BOOK",
+      "swipeHint": "← Swipe to view →",
+      "goToStep": "Go to step {num}",
+      "step01": { "title": "Pick a date & time", "description": "Choose an open slot from the calendar.", "imageAlt": "Selecting a date and time on the booking calendar" },
+      "step02": { "title": "Enter booking details", "description": "Follow the booking form to enter your reservation and contact details.", "imageAlt": "Booking details confirmation screen" },
+      "step03": { "title": "Confirm & pay", "description": "Enter payment details to confirm your booking.", "imageAlt": "Booking complete screen" }
+    },
+    "calendar": {
+      "title": "BOOK A COURT",
+      "subtitle": "Reserve from the calendar",
+      "iframeTitle": "Reservation calendar",
+      "scrollHint": "Scroll to see all hours",
+      "tablistLabel": "Reservation category",
+      "tabs": {
+        "pickleball": "ピックルボールコート",
+        "hyrox": "H Y R O X"
+      }
+    },
+    "info": {
+      "heading": "INFORMATION",
+      "hoursLabel": "Hours",
+      "hoursValue": "6:00 – 23:00 (irregular holidays)",
+      "accessLabel": "Access",
+      "accessStation": "1 min from Motoyawata Station",
+      "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
+    },
+    "notes": {
+      "heading": "Before You Visit",
+      "headingEn": "NOTES",
+      "items": [
+        "Reservations follow the booking system's accepted time window.",
+        "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
+        "Late arrivals are accommodated only within the reserved time slot.",
+        "Rental paddles are available for ¥500 each (up to 6 per court).",
+        "Rental shoes are not available."
+      ]
+    },
+    "faq": {
+      "heading": "FAQ",
+      "items": [
+        {
+          "question": "What are your opening hours?",
+          "answer": "We're open from 6:00 in the morning until 23:00 at night."
+        },
+        {
+          "question": "How do I make a reservation?",
+          "answer": "Choose your preferred date and time on the reservation page to book a court or the HYROX area online."
+        },
+        {
+          "question": "How much is court rental?",
+          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week."
+        },
+        {
+          "question": "Can I use the HYROX area, and how much is it?",
+          "answer": "Yes. The HYROX area rental is ¥2,980 per hour."
+        },
+        {
+          "question": "Where are you located?",
+          "answer": "We're a 1-minute walk from Motoyawata Station."
+        },
+        {
+          "question": "I'm a beginner — is that okay?",
+          "answer": "Absolutely. We offer trial sessions and small-group lessons, and our coaches guide you from the basics."
+        },
+        {
+          "question": "What payment methods do you accept?",
+          "answer": "Cash and credit cards are accepted."
+        }
+      ]
+    }
   },
   "HomeHero": {
     "headline1": "The Big Bang",
@@ -210,11 +320,12 @@
     "weekend": "Weekend / Holiday",
     "trainingArea": "TRAINING AREA",
     "trainingAreaJa": "Training Area",
-    "preparing": "Coming Soon",
+    "trainingAreaPrice": "¥2,980",
+    "trainingAreaUnit": "per hour",
     "membership": "MEMBERSHIP",
     "membershipJa": "Membership",
     "comingSoon": "Coming Soon",
-    "rentalPaddleNote": "Rental paddles available for events and private bookings only",
+    "rentalPaddleNote": "Rental paddles ¥500 each (up to 6 per court). Rental shoes are not available.",
     "privateFacilityNote": "For full facility private bookings including training area and lounge, or corporate use, please",
     "contactUs": "contact us",
     "pleaseContact": ".",
@@ -477,5 +588,241 @@
       },
       "fallbackLabel": "Open externally"
     }
+  },
+  "HyroxPage": {
+    "hero": {
+      "title": "HYROX",
+      "titleJa": "",
+      "cta": "Reserve now",
+      "comingSoon": "Coming soon",
+      "imageAlts": [
+        "Athlete taking on the sled pull",
+        "HYROX arena with athletes taking on wall balls",
+        "Athletes running through the HYROX start gate"
+      ]
+    },
+    "concept": {
+      "words": [
+        "Run.",
+        "Train.",
+        "Challenge."
+      ],
+      "body": "The stage to pour it all out is right here. <accent>HYROX</accent>, the ultimate endurance race the world is hooked on — its dedicated training area arrives in <strong>Motoyawata</strong>."
+    },
+    "facility": {
+      "title": "FACILITY",
+      "titleJa": "Equipment & Layout",
+      "lead": "Fully equipped for all 8 official HYROX stations. Train along the same flow as the real race, moving station to station.",
+      "equipmentTitle": "Equipment",
+      "officialLabel": "Official",
+      "equipment": {
+        "skierg": {
+          "name": "SkiErg",
+          "nameJa": "スキーエルゴ",
+          "spec": "Concept2 SkiErg"
+        },
+        "rowing": {
+          "name": "Rowing Machine",
+          "nameJa": "ローイングマシン",
+          "spec": "Concept2 RowErg"
+        },
+        "sled": {
+          "name": "Weight Sled",
+          "nameJa": "スレッド",
+          "spec": "Plate-loaded, up to 202kg (all HYROX divisions)"
+        },
+        "kettlebell": {
+          "name": "Kettlebell",
+          "nameJa": "ケトルベル",
+          "spec": "16 / 24 / 32kg (all HYROX divisions)"
+        },
+        "wallball": {
+          "name": "Wall Ball",
+          "nameJa": "ウォールボール",
+          "spec": "Medicine ball, 4 / 6 / 9kg"
+        },
+        "sandbag": {
+          "name": "Sandbag",
+          "nameJa": "サンドバッグ",
+          "spec": "10–30kg"
+        }
+      },
+      "carousel": {
+        "regionLabel": "Facility photo carousel",
+        "prev": "Previous photo",
+        "next": "Next photo",
+        "showPhoto": "Show facility photo {index}"
+      },
+      "photos": [
+        "HYROX training lane with SkiErg and rowing machines",
+        "SkiErg, rowing machines and weight plates in the HYROX area",
+        "Full view of the HYROX training area with rowing machines and wall balls"
+      ],
+      "fullSet": "Full set"
+    },
+    "services": {
+      "title": "SERVICES",
+      "titleJa": "Services",
+      "lead": "Three ways to train, whatever your goal — from first-timers to athletes aiming for the race.",
+      "cta": "RESERVE",
+      "ctaJa": "予約",
+      "comingSoon": "Coming soon",
+      "items": [
+        {
+          "key": "rental",
+          "titleEn": "AREA RENTAL",
+          "titleJa": "時間制レンタル",
+          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 to 23:00.",
+          "imageAlt": "An athlete driving the sled"
+        },
+        {
+          "key": "trial",
+          "titleEn": "TRIAL",
+          "titleJa": "体験・トライアル",
+          "description": "A trial session for first-timers. A coach guides you through all 8 HYROX movements from scratch. Drop in empty-handed.",
+          "imageAlt": "Performing wall balls"
+        },
+        {
+          "key": "group",
+          "titleEn": "GROUP SESSION",
+          "titleJa": "グループセッション",
+          "description": "Small-group coached classes. Take on an authentic program with friends—covering technique and tips for each station plus race-day advice. Sessions are tailored to each participant's level, so beginners are welcome too.",
+          "imageAlt": "Athletes training together"
+        }
+      ]
+    },
+    "whatIs": {
+      "title": "WHAT IS HYROX",
+      "titleJa": "About HYROX",
+      "lead": "HYROX is a fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
+    },
+    "film": {
+      "kicker": "OFFICIAL FILM"
+    },
+    "stations": {
+      "station01": {
+        "name": "SkiErg",
+        "nameJa": "SkiErg",
+        "description": "1,000m powered by your upper body and core — the opening leg of the race."
+      },
+      "station02": {
+        "name": "Sled Push",
+        "nameJa": "Sled Push",
+        "description": "Drive a loaded sled 50m. A test of pure leg and full-body power."
+      },
+      "station03": {
+        "name": "Sled Pull",
+        "nameJa": "Sled Pull",
+        "description": "Haul the sled back 50m by rope, calling on your back and grip."
+      },
+      "station04": {
+        "name": "Burpee Broad Jumps",
+        "nameJa": "Burpee Broad Jumps",
+        "description": "Burpees into broad jumps for 80m — the cardio crux of the race."
+      },
+      "station05": {
+        "name": "Rowing",
+        "nameJa": "Rowing",
+        "description": "Row 1,000m with legs, back and arms working in sync."
+      },
+      "station06": {
+        "name": "Farmers Carry",
+        "nameJa": "Farmers Carry",
+        "description": "Carry weights 200m, one in each hand — grip and core under fire."
+      },
+      "station07": {
+        "name": "Sandbag Lunges",
+        "nameJa": "Sandbag Lunges",
+        "description": "Lunge 100m with a sandbag on your shoulders — the brutal back half."
+      },
+      "station08": {
+        "name": "Wall Balls",
+        "nameJa": "Wall Balls",
+        "description": "100 wall-ball throws from a squat. The final test before the line."
+      }
+    },
+    "program": {
+      "title": "PROGRAM",
+      "titleJa": "Program & Pricing",
+      "rateLabel": "Area Rental",
+      "price": "¥2,980",
+      "unit": "/ hour",
+      "note": "Use the training area equipped for all 8 official HYROX stations, by the hour."
+    },
+    "coach": {
+      "sectionTitle": "CREW",
+      "sectionTitleJa": "Meet the Crew",
+      "name": "DAISUKE SEKIYOSHI",
+      "nameKana": "関吉大亮",
+      "nameEn": "関吉大亮",
+      "intro": "A pioneer of HYROX in Japan and a current HYROX Team Japan athlete — Spartan Race's first-ever Japanese champion and a national triathlon title holder, and one of Japan's finest hybrid athletes.",
+      "profile": "Born June 25, 1985 · From Chiba, Japan",
+      "achievementsTitle": "ACHIEVEMENTS",
+      "achievementsTitleJa": "Achievements",
+      "achievements": [
+        {
+          "discipline": "HYROX",
+          "disciplineJa": "ハイロックス",
+          "note": "Japan National Team, 2024–",
+          "items": [
+            "World Championship 2026 — Mixed Doubles age 40–44: 7th",
+            "Asia Championship 2026 — Mixed Doubles O40: 1st",
+            "Asia Championship 2025 — Mixed Relay Overall: 2nd",
+            "Asia Championship 2024 — Singles Overall: 4th / Age Group: 2nd",
+            "HYROX Hong Kong 2023 — Singles Pro: first Japanese man on the podium (3rd)",
+            "Many other podium finishes"
+          ]
+        },
+        {
+          "discipline": "SPARTAN RACE",
+          "disciplineJa": "スパルタンレース",
+          "note": "Japan National Team, 2017–2023",
+          "items": [
+            "Inaugural Japan Champion",
+            "2018 Japan–Korea Series Overall Champion",
+            "5× Elite Category wins",
+            "Many other podium finishes"
+          ]
+        },
+        {
+          "discipline": "TRIATHLON",
+          "disciplineJa": "トライアスロン",
+          "note": "",
+          "items": [
+            "2022 Age-Group Japan National Championship, Sprint — Annual Ranking: 1st",
+            "Many other podium finishes"
+          ]
+        }
+      ],
+      "careerTitle": "CAREER",
+      "careerTitleJa": "Career",
+      "career": [
+        "22 years of service as a Chiba Prefectural Police officer",
+        "Retired in 2026; now works as a company employee in charge of the fitness business"
+      ],
+      "instagram": "@tac_monk",
+      "instagramAria": "Open Daisuke Sekiyoshi's Instagram (new tab)",
+      "portraitAlt": "HYROX Coach Daisuke Sekiyoshi",
+      "apacAlt": "Daisuke Sekiyoshi at the HYROX APAC Championships"
+    },
+    "picklePromo": {
+      "kicker": "MAIN FACILITY",
+      "kickerJa": "メイン施設",
+      "title": "PICKLEBALL",
+      "titleJa": "ピックルボール",
+      "description": "This is THE PICKLE BANG THEORY, a premium indoor pickleball facility — 1 min from Motoyawata Station. Come experience pickleball on our pro-spec courts.",
+      "cta": "Discover Pickleball",
+      "courtImageAlt": "Pickleball courts at THE PICKLE BANG THEORY"
+    }
+  },
+  "HomeHyroxPromo": {
+    "kicker": "TRAINING AREA",
+    "kickerJa": "",
+    "title": "HYROX",
+    "titleJa": "The World Series of Fitness Racing",
+    "tagline": "Run. Train. Challenge.",
+    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area is now open at THE PICKLE BANG THEORY.",
+    "cta": "DISCOVER HYROX",
+    "imageAlt": "Female athlete carrying a HYROX sandbag"
   }
 }

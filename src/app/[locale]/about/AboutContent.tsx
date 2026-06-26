@@ -16,8 +16,8 @@ import { NEWS_CATEGORIES } from "@/constants/news";
 
 import type { FormEvent } from "react";
 import type { NewsItem } from "@/lib/microcms/schema";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 // a5 (Vol.3 優勝) を a4 (Vol.1 準優勝) より先に表示するため意図的に逆順
 const ACHIEVEMENT_KEYS = ["a1", "a2", "a3", "a5", "a4", "a6", "a7", "a8"] as const;

@@ -7,6 +7,14 @@ import enMessages from "../../../messages/en.json";
 
 import type { ReactElement } from "react";
 
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}));
+
 // JST の境界をまたぐ表示切替を検証するため、テスト内でシステム時刻を固定する。
 const MAY_JST = new Date("2026-05-29T03:00:00Z"); // JST 5/29 → 5月キャンペーン
 const JUNE_JST = new Date("2026-06-05T03:00:00Z"); // JST 6/5 → 6月キャンペーン
@@ -61,7 +69,7 @@ describe("PromoBanner", () => {
     expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
   });
 
-  it("links to the reserve URL opening in a new tab with safe rel", () => {
+  it("外部予約サービスにリンクする", () => {
     vi.useFakeTimers();
     vi.setSystemTime(MAY_JST);
     renderWithIntl(<PromoBanner />, "ja");

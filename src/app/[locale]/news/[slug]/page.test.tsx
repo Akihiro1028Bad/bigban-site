@@ -296,6 +296,18 @@ describe("NewsDetailPage", () => {
     expect(meta.alternates?.languages).toBeUndefined();
   });
 
+  it("公開記事は self canonical を常に出力する", async () => {
+    getNewsDetailMock.mockImplementation(async ({ locale }) =>
+      locale === "ja" ? makeNewsItem({ title: "T", slug: "x" }) : null,
+    );
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.alternates?.canonical).toContain("/news/x");
+  });
+
   describe("preview (URL クエリ ?contentId & ?draftKey)", () => {
     it("preview パラメータ揃って microCMS から返れば draft 表示 + プレビューバナー表示", async () => {
       getNewsByContentIdMock.mockResolvedValue(

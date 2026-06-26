@@ -4,8 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 import type { FormEvent } from "react";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 interface ContactCategory {
   value: string;

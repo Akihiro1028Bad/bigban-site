@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeServices from "./HomeServices";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}));
 
 describe("HomeServices", () => {
   it('セクションID "services" を持つ', () => {
