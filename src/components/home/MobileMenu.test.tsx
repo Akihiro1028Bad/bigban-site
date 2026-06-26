@@ -85,7 +85,7 @@ function renderMenu(opts: Options = {}) {
     onSwitchLocale = vi.fn(),
     isJa = true,
     locale = "ja",
-    reserveHref = "/reserve?tab=pickleball",
+    reserveHref = "https://reserva.be/tpbt",
   } = opts;
   const messages = locale === "ja" ? jaMessages : enMessages;
   const ui: ReactElement = (
@@ -167,11 +167,12 @@ describe("MobileMenu", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("RESERVE 内部リンクに渡された reserveHref を使う", () => {
-    renderMenu({ reserveHref: "/reserve?tab=hyrox" });
+  it("RESERVE は渡された reserveHref を外部リンクとして使う", () => {
+    renderMenu({ reserveHref: "https://reserva.be/tpbt" });
     const reserve = screen.getByRole("link", { name: /RESERVE/ });
-    expect(reserve).toHaveAttribute("href", "/reserve?tab=hyrox");
-    expect(reserve).not.toHaveAttribute("target");
+    expect(reserve).toHaveAttribute("href", "https://reserva.be/tpbt");
+    expect(reserve).toHaveAttribute("target", "_blank");
+    expect(reserve).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("Instagram リンクとアクセス情報を表示する", () => {
@@ -220,7 +221,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
-          reserveHref="/reserve?tab=pickleball"
+          reserveHref="https://reserva.be/tpbt"
         />
       </NextIntlClientProvider>
     );
@@ -325,7 +326,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
-          reserveHref="/reserve?tab=pickleball"
+          reserveHref="https://reserva.be/tpbt"
         />
       </NextIntlClientProvider>
     );

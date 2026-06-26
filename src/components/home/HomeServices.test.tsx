@@ -102,7 +102,9 @@ describe("HomeServices", () => {
     const reserveButton = screen.getByText("RESERVE");
     expect(reserveButton).toBeInTheDocument();
     const link = reserveButton.closest("a");
-    expect(link).toHaveAttribute("href", "/reserve?tab=pickleball");
+    expect(link).toHaveAttribute("href", "https://reserva.be/tpbt");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("他のサービスにはRESERVEボタンを表示しない", () => {

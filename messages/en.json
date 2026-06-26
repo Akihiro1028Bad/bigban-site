@@ -184,7 +184,7 @@
         },
         {
           "question": "Can I use the HYROX area, and how much is it?",
-          "answer": "Yes. The HYROX area rental is ¥3,000 per hour."
+          "answer": "Yes. The HYROX area rental is ¥2,980 per hour."
         },
         {
           "question": "Where are you located?",
@@ -320,7 +320,7 @@
     "weekend": "Weekend / Holiday",
     "trainingArea": "TRAINING AREA",
     "trainingAreaJa": "Training Area",
-    "trainingAreaPrice": "¥3,000",
+    "trainingAreaPrice": "¥2,980",
     "trainingAreaUnit": "per hour",
     "membership": "MEMBERSHIP",
     "membershipJa": "Membership",
@@ -594,6 +594,7 @@
       "title": "HYROX",
       "titleJa": "",
       "cta": "Reserve now",
+      "comingSoon": "Coming soon",
       "imageAlts": [
         "Athlete taking on the sled pull",
         "HYROX arena with athletes taking on wall balls",
@@ -666,6 +667,7 @@
       "lead": "Three ways to train, whatever your goal — from first-timers to athletes aiming for the race.",
       "cta": "RESERVE",
       "ctaJa": "予約",
+      "comingSoon": "Coming soon",
       "items": [
         {
           "key": "rental",
@@ -744,7 +746,7 @@
       "title": "PROGRAM",
       "titleJa": "Program & Pricing",
       "rateLabel": "Area Rental",
-      "price": "¥3,000",
+      "price": "¥2,980",
       "unit": "/ hour",
       "note": "Use the training area equipped for all 8 official HYROX stations, by the hour."
     },

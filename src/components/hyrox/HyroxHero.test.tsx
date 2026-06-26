@@ -24,11 +24,12 @@ describe("HyroxHero", () => {
     expect(screen.getByText("ハイロックス")).toBeInTheDocument();
   });
 
-  it("予約ページ(/reserve)への CTA を表示する", () => {
+  it("予約は「近日開始」表示で、リンクは張らない", () => {
     renderWithIntl(<HyroxHero />);
-    const cta = screen.getByRole("link", { name: "今すぐ予約" });
-    expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute("href", "/reserve?tab=hyrox");
+    expect(screen.getByText("近日開始")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "今すぐ予約" })
+    ).not.toBeInTheDocument();
   });
 
   it("3枚のヒーロー画像をフェード表示する", () => {

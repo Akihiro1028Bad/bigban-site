@@ -33,12 +33,12 @@ describe("HyroxServices", () => {
     expect(screen.getByText("グループセッション")).toBeInTheDocument();
   });
 
-  it("各サービスに予約ページ(/reserve)への内部リンクを表示する", () => {
+  it("各サービスの予約は「近日開始」表示で、リンクは張らない", () => {
     renderWithIntl(<HyroxServices />);
-    const links = screen.getAllByRole("link", { name: /RESERVE/ });
-    expect(links).toHaveLength(3);
-    expect(links[0]).toHaveAttribute("href", "/reserve?tab=hyrox");
-    expect(links[0]).not.toHaveAttribute("target");
+    expect(screen.getAllByText("近日開始")).toHaveLength(3);
+    expect(
+      screen.queryAllByRole("link", { name: /RESERVE/ })
+    ).toHaveLength(0);
   });
 
   it("items が配列でない場合も見出しを描画する（フォールバック）", () => {

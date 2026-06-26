@@ -12,6 +12,10 @@ export const OG_IMAGE = {
   alt: "THE PICKLE BANG THEORY",
 } as const;
 
+// 外部予約サービス (RESERVA)。labola 設定完了までの暫定で、予約導線はここに戻している。
+// 復活時は各導線を RESERVE_PATH / reserveHref に戻す。
+export const RESERVE_URL = "https://reserva.be/tpbt";
+
 // 内部予約ページのパス（next-intl Link 用）
 export const RESERVE_PATH = "/reserve";
 

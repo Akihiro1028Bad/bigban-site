@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   LABOLA_CALENDAR_BASE,
   LABOLA_CALENDAR_TABS,
+  RESERVE_URL,
   buildLabolaCalendarSrc,
   reserveHref,
   resolveCalendarTabKey,
@@ -39,6 +40,10 @@ describe("labola calendar constants", () => {
   it("reserveHref はタブ指定つきの予約パスを返す", () => {
     expect(reserveHref("pickleball")).toBe("/reserve?tab=pickleball");
     expect(reserveHref("hyrox")).toBe("/reserve?tab=hyrox");
+  });
+
+  it("RESERVE_URL は外部予約サービス(RESERVA)のURL", () => {
+    expect(RESERVE_URL).toBe("https://reserva.be/tpbt");
   });
 
   it("resolveCalendarTabKey は有効なキーをそのまま返す", () => {

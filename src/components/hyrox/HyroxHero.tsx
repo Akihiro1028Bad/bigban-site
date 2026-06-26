@@ -4,8 +4,6 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { Link } from "@/i18n/navigation";
-import { reserveHref } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
@@ -106,19 +104,16 @@ export default function HyroxHero() {
           </p>
         </motion.div>
 
-        {/* CTA */}
+        {/* CTA: labola 設定完了までは予約導線を塞ぎ「近日開始」表示 */}
         <motion.div
           className="mt-10 inline-block"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.0, delay: 1.15, ease: EASE }}
         >
-          <Link
-            href={reserveHref("hyrox")}
-            className="inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
-          >
-            {t("cta")}
-          </Link>
+          <span className="inline-block border border-accent/40 px-8 py-3 text-xs font-bold uppercase tracking-widest text-accent/70">
+            {t("comingSoon")}
+          </span>
         </motion.div>
       </div>
     </section>

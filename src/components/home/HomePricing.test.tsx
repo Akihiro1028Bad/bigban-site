@@ -83,7 +83,7 @@ describe("HomePricing", () => {
     );
     expect(screen.getByText("TRAINING AREA")).toBeInTheDocument();
     expect(screen.getByText("トレーニングエリア")).toBeInTheDocument();
-    expect(screen.getByText("¥3,000")).toBeInTheDocument();
+    expect(screen.getByText("¥2,980")).toBeInTheDocument();
     expect(screen.getByText("1時間あたり")).toBeInTheDocument();
     expect(screen.queryByText("準備中")).not.toBeInTheDocument();
   });

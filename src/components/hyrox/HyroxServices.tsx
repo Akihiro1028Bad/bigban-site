@@ -3,8 +3,6 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { Link } from "@/i18n/navigation";
-import { reserveHref } from "@/constants/site";
 import { EASE } from "@/constants/motion";
 
 
@@ -92,20 +90,12 @@ export default function HyroxServices() {
                 <p className="flex-1 text-sm leading-relaxed text-text-light/75">
                   {item.description}
                 </p>
-                <Link
-                  href={reserveHref("hyrox")}
-                  className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-accent px-5 py-3 text-deep-black hover:bg-accent/90 motion-safe:transition-all"
-                >
+                {/* labola 設定完了までは予約導線を塞ぎ「近日開始」表示 */}
+                <span className="mt-6 inline-flex w-full items-center justify-center gap-2 border border-accent/30 px-5 py-3 text-accent/70">
                   <span className="text-sm font-bold tracking-[0.15em]">
-                    {t("ctaJa")}
+                    {t("comingSoon")}
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-deep-black/60">
-                    {t("cta")}
-                  </span>
-                  <span aria-hidden className="text-base leading-none">
-                    →
-                  </span>
-                </Link>
+                </span>
               </div>
             </motion.article>
           ))}

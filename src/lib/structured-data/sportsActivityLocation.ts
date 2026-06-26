@@ -1,4 +1,4 @@
-import { SITE_URL } from "@/constants/site";
+import { SITE_URL, RESERVE_URL } from "@/constants/site";
 
 export interface LocationFeatureSpecification {
   "@type": "LocationFeatureSpecification";
@@ -121,7 +121,7 @@ export function buildSportsActivityLocation(
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
     potentialAction: {
       "@type": "ReserveAction",
-      target: `${SITE_URL}/reserve`,
+      target: RESERVE_URL,
     },
     amenityFeature: AMENITY_NAMES.map((name) => ({
       "@type": "LocationFeatureSpecification",

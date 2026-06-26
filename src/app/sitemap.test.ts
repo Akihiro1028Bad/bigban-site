@@ -16,18 +16,19 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ5つ + ニュース一覧1つ = 6エントリ（slugなし時）", async () => {
+  it("静的ページ4つ + ニュース一覧1つ = 5エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(6);
+    expect(entries).toHaveLength(5);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
-    expect(urls).toContain(`${PROD_URL}/reserve`);
     expect(urls).toContain(`${PROD_URL}/about`);
     expect(urls).toContain(`${PROD_URL}/hyrox`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
     expect(urls).toContain(`${PROD_URL}/news`);
+    // labola 設定完了まで予約導線は塞いでいるため /reserve は sitemap に含めない
+    expect(urls).not.toContain(`${PROD_URL}/reserve`);
   });
 
   it("/hyrox を ja/en alternates 付きで含む", async () => {

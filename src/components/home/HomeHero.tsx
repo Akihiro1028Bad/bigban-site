@@ -3,8 +3,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
-import { Link } from "@/i18n/navigation";
-import { reserveHref } from "@/constants/site";
+import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import { useMagneticButton } from "@/hooks/useMagneticButton";
 import { EASE } from "@/constants/motion";
 
@@ -85,9 +84,10 @@ export default function HomeHero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1.5, ease: EASE }}
             >
-              <Link
+              <a
                 ref={ref as React.RefObject<HTMLAnchorElement>}
-                href={reserveHref("pickleball")}
+                href={RESERVE_URL}
+                {...EXTERNAL_LINK_PROPS}
                 className="inline-block bg-accent px-8 py-3 text-sm font-bold tracking-widest text-deep-black transition-transform"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
@@ -96,7 +96,7 @@ export default function HomeHero() {
                 }}
               >
                 {t("cta")}
-              </Link>
+              </a>
             </motion.div>
           </div>
         </div>

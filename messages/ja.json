@@ -198,7 +198,7 @@
         },
         {
           "question": "HYROXエリアは利用できますか？料金は？",
-          "answer": "ご利用いただけます。エリア利用料は1時間 ¥3,000 です。"
+          "answer": "ご利用いただけます。エリア利用料は1時間 ¥2,980 です。"
         },
         {
           "question": "最寄り駅・アクセスは？",
@@ -334,7 +334,7 @@
     "weekend": "週末・祝日",
     "trainingArea": "TRAINING AREA",
     "trainingAreaJa": "トレーニングエリア",
-    "trainingAreaPrice": "¥3,000",
+    "trainingAreaPrice": "¥2,980",
     "trainingAreaUnit": "1時間あたり",
     "membership": "MEMBERSHIP",
     "membershipJa": "会員制度",
@@ -608,6 +608,7 @@
       "title": "HYROX",
       "titleJa": "ハイロックス",
       "cta": "今すぐ予約",
+      "comingSoon": "近日開始",
       "imageAlts": [
         "スレッドプルに挑むアスリート",
         "HYROX大会会場とウォールボールに挑む選手たち",
@@ -680,6 +681,7 @@
       "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
       "cta": "RESERVE",
       "ctaJa": "予約",
+      "comingSoon": "近日開始",
       "items": [
         {
           "key": "rental",
@@ -758,7 +760,7 @@
       "title": "PROGRAM",
       "titleJa": "プログラム・料金",
       "rateLabel": "エリア利用料",
-      "price": "¥3,000",
+      "price": "¥2,980",
       "unit": "／ 1時間",
       "note": "HYROX公式8種目に対応したトレーニングエリアを時間制でご利用いただけます。"
     },
