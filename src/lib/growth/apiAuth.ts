@@ -25,10 +25,22 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(digest(a), digest(b));
 }
 
-/** `Authorization: Bearer <token>` からトークンを取り出す。無ければ空文字。 */
+/**
+ * `Authorization: Bearer <token>` からトークンを取り出す。無ければ空文字。
+ *
+ * クライアント(authHeaders)は ISO-8859-1 制約を満たすため token を percent-encode して送るので、
+ * ここで decodeURIComponent して元の値に戻す(日本語等の合言葉に対応)。ASCII の token は不変。
+ * 不正な % シーケンス(復号失敗)は素のまま返す(後方互換・沈黙故障を避ける)。
+ */
 export function bearerToken(request: Request): string {
   const header = request.headers.get("authorization") ?? "";
-  return header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
+  if (!header.startsWith("Bearer ")) return "";
+  const raw = header.slice("Bearer ".length);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 /**

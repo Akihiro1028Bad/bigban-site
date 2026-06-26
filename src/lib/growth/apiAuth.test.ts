@@ -37,6 +37,17 @@ describe("bearerToken", () => {
   it("Bearer のみ(トークン空)は空文字", () => {
     expect(bearerToken(req("Bearer "))).toBe("");
   });
+  it("percent-encode された非ASCIIトークンを復元する(クライアントの encode と対)", () => {
+    const token = "ひみつの合言葉";
+    expect(bearerToken(req(`Bearer ${encodeURIComponent(token)}`))).toBe(token);
+  });
+  it("絵文字を含む合言葉もラウンドトリップする", () => {
+    const token = "合言葉🔑テスト";
+    expect(bearerToken(req(`Bearer ${encodeURIComponent(token)}`))).toBe(token);
+  });
+  it("不正な % シーケンスは復号せずそのまま返す(フォールバック)", () => {
+    expect(bearerToken(req("Bearer %E0%A4%A"))).toBe("%E0%A4%A");
+  });
 });
 
 describe("unauthorized", () => {
