@@ -137,6 +137,7 @@ describe("serializeMetrics / parseMetrics", () => {
   it("search ブロック付き(S2)も往復できる", () => {
     const withSearch: ArticleMetrics = {
       ...metrics,
+      publishedAt: "2026-06-01T00:00:00.000Z",
       search: {
         clicks: { current: 10, prior: 8, deltaPct: 25 },
         impressions: { current: 200, prior: 150, deltaPct: 33.3 },

@@ -45,6 +45,8 @@ export interface ArticleMetrics {
   keyEvents?: MetricDelta;
   // #計測強化 S2: GSC 検索成績(後方互換のため任意。旧データには無い)。
   search?: SearchMetrics;
+  // #計測強化 S3: 公開日(microCMS publishedAt・ISO)。要改稿(公開28日後)判定に使う。任意・後方互換。
+  publishedAt?: string;
   period: { start: string; end: string };
 }
 
@@ -179,9 +181,10 @@ const metricsSchema = z.object({
   pagePath: z.string(),
   views: deltaSchema,
   users: deltaSchema,
-  // #計測強化 S2: 後方互換。旧データ(keyEvents/search 無し)も valid のまま。
+  // #計測強化 S2/S3: 後方互換。旧データ(keyEvents/search/publishedAt 無し)も valid のまま。
   keyEvents: deltaSchema.optional(),
   search: searchSchema.optional(),
+  publishedAt: z.string().optional(),
   period: z.object({ start: z.string(), end: z.string() }),
 });
 

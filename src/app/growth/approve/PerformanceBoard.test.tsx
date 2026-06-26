@@ -95,7 +95,7 @@ describe("PerformanceBoard", () => {
 
   it("search はあるが keyEvents 無し・topQueries 空なら CTA/クエリは出さない", () => {
     const m: ArticleMetrics = {
-      ...metrics(50, null, 20),
+      ...metrics(40, null, 20),
       search: {
         clicks: { current: 3, prior: 0, deltaPct: null },
         impressions: { current: 90, prior: 0, deltaPct: null },
@@ -108,5 +108,29 @@ describe("PerformanceBoard", () => {
     expect(screen.getByText(/クリック/)).toBeInTheDocument();
     expect(screen.queryByText(/CTA/)).not.toBeInTheDocument();
     expect(screen.queryByText(/「/)).not.toBeInTheDocument();
+  });
+
+  it("判定ラベル(#S3)を表示する: 伸びている/CTR弱い", () => {
+    // publishedAt 付き(daysSincePublished 経路を通す)。views=100 なので要改稿は付かない。
+    const grow: ArticleMetrics = { ...metrics(100, 20, 50), publishedAt: "2026-06-20T00:00:00Z" };
+    const weak: ArticleMetrics = {
+      ...metrics(100, 0, 60), // keyEvents>0(下記)・views横ばい
+      keyEvents: { current: 4, prior: 4, deltaPct: 0 },
+      search: {
+        clicks: { current: 2, prior: 2, deltaPct: 0 },
+        impressions: { current: 300, prior: 0, deltaPct: null }, // imp>=100
+        ctr: { current: 0.006, prior: 0, deltaPct: null }, // ctr<0.03 → CTR弱い
+        position: { current: 2, prior: 0, deltaPct: null }, // 5未満 → 順位ラベルは付かない
+        topQueries: [],
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "伸び記事", grow), published("b", "弱記事", weak)]} />);
+    expect(screen.getByText("伸びている")).toBeInTheDocument();
+    expect(screen.getByText("CTR弱い")).toBeInTheDocument();
+  });
+
+  it("ラベルが無い記事(公開日不明・低調横ばい)はラベル行を出さない", () => {
+    render(<PerformanceBoard items={[published("a", "ラベル無し", metrics(10, 0, 5))]} />);
+    expect(screen.queryByText("伸びている")).not.toBeInTheDocument();
   });
 });

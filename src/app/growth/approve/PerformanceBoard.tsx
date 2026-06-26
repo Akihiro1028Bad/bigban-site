@@ -3,7 +3,12 @@
  * プル型: データは Notion `成績データ` 由来で、ここは表示のみ。
  */
 
+"use client";
+
+import { useState } from "react";
+
 import { type ArticleMetrics, summarizeMetrics } from "@/lib/growth/metrics";
+import { daysSincePublished, reviewLabels, type ReviewLabel } from "@/lib/growth/metricsReview";
 
 import {
   type DeltaTone,
@@ -12,6 +17,16 @@ import {
   formatDelta,
   formatPosition,
 } from "./articleMetricsView";
+
+// #計測強化 S3: 判定ラベルの配色(行動の緊急度で色分け)。
+const LABEL_CLASS: Record<ReviewLabel, string> = {
+  伸びている: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  CTR弱い: "bg-amber-50 text-amber-700 ring-amber-200",
+  順位あと少し: "bg-blue-50 text-blue-700 ring-blue-200",
+  読まれるがCTA弱い: "bg-amber-50 text-amber-700 ring-amber-200",
+  要改稿: "bg-rose-50 text-rose-700 ring-rose-200",
+  未計測: "bg-gray-50 text-gray-500 ring-gray-200",
+};
 
 /** 成績ボードが必要とする最小形状(lib/ApproveClient どちらの記事 item でも満たす)。 */
 interface MetricsItem {
@@ -37,6 +52,8 @@ function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {
 }
 
 export function PerformanceBoard({ items }: PerformanceBoardProps) {
+  // #計測強化 S3: 公開後経過日数(要改稿判定)の基準時刻はマウント時に1度だけ確定する(描画の純粋性)。
+  const [nowMs] = useState(() => Date.now());
   const measured = items
     .map((item) => (item.metrics ? { item, metrics: item.metrics } : null))
     .filter((x): x is { item: MetricsItem; metrics: ArticleMetrics } => x !== null)
@@ -70,7 +87,12 @@ export function PerformanceBoard({ items }: PerformanceBoardProps) {
           </dl>
 
           <ul className="mt-3 divide-y divide-gray-100">
-            {measured.map(({ item, metrics }) => (
+            {measured.map(({ item, metrics }) => {
+              const labels = reviewLabels(
+                metrics,
+                metrics.publishedAt ? daysSincePublished(metrics.publishedAt, nowMs) : null
+              );
+              return (
               <li key={item.id} className="py-2">
                 <div className="flex items-center justify-between gap-3">
                   <span className="min-w-0 flex-1 truncate text-sm text-gray-900">{item.title}</span>
@@ -113,8 +135,22 @@ export function PerformanceBoard({ items }: PerformanceBoardProps) {
                     ) : null}
                   </div>
                 ) : null}
+                {/* #計測強化 S3: 判定ラベル(次の打ち手)。 */}
+                {labels.length > 0 ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {labels.map((label) => (
+                      <span
+                        key={label}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${LABEL_CLASS[label]}`}
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </>
       )}
