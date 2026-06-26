@@ -52,6 +52,7 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { PublishCloseActions } from "./PublishCloseActions";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
@@ -71,7 +72,7 @@ import { PublishQueue } from "./PublishQueue";
 import { DetailHeader } from "./DetailHeader";
 import { detailBadge } from "./detailBadge";
 import { DraftChecklist } from "./DraftChecklist";
-import { draftPlainText, draftQuality, hasBlockingCheck } from "./draftQuality";
+import { draftPlainText, draftQuality } from "./draftQuality";
 import { ExcerptEditor } from "./ExcerptEditor";
 import { StyleHints } from "./StyleHints";
 import { MetricChips } from "./MetricChips";
@@ -1528,56 +1529,17 @@ export function ApproveClient() {
               />
             </div>
             {/* #167/H1: 公開・クローズは最終確認(本番プレビュー)の下＝最終アクション位置に置く。 */}
-            {(() => {
-              // #H4: 公開前チェックに赤(block)があれば公開を無効化する(§5免責欠落・§13断定など)。
-              const publishBlocked = hasBlockingCheck(
-                draftQuality({
-                  bodyHtml: draftState.draft.bodyHtml,
-                  body: draftState.draft.body,
-                  title: item.title,
-                  knownNewsPaths: draftState.draft.knownNewsPaths
-                    ? new Set(draftState.draft.knownNewsPaths)
-                    : undefined,
-                })
-              );
-              return (
-                <div role="group" aria-label="公開・クローズ" className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-                  <div className="flex flex-wrap gap-2">
-                    {item.stage === "drafted" ? (
-                      <button
-                        type="button"
-                        disabled={actionBusy || publishBlocked}
-                        onClick={() => openConfirm(item, "publish")}
-                        className="rounded-md border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-800 disabled:opacity-50"
-                      >
-                        公開する
-                      </button>
-                    ) : null}
-                    {item.stage === "published" ? (
-                      <span className="rounded-md bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">公開済み</span>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={actionBusy}
-                      onClick={() => openConfirm(item, "close")}
-                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      クローズ（盤から非表示）
-                    </button>
-                  </div>
-                  {item.stage === "drafted" && publishBlocked ? (
-                    <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
-                      公開前チェックに赤（要修正）があります。修正してから公開してください。
-                    </p>
-                  ) : null}
-                  {actionError ? (
-                    <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
-                      {actionError}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })()}
+            <PublishCloseActions
+              stage={item.stage}
+              title={item.title}
+              bodyHtml={draftState.draft.bodyHtml}
+              body={draftState.draft.body}
+              knownNewsPaths={draftState.draft.knownNewsPaths}
+              busy={actionBusy}
+              error={actionError}
+              onPublish={() => openConfirm(item, "publish")}
+              onClose={() => openConfirm(item, "close")}
+            />
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
