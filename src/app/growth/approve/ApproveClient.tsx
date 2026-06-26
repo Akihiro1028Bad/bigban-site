@@ -57,10 +57,10 @@ import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
+import { ReviseSection } from "./ReviseSection";
 import { Section } from "./Section";
 import { SectionEditor } from "./SectionEditor";
 import { SectionImages } from "./SectionImages";
-import { TitleEditor } from "./TitleEditor";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -1613,34 +1613,28 @@ export function ApproveClient() {
     const sections = outlineSections(item.outline);
     const phase = revisePhase(item.reviseStatus);
     if (phase === "idle" && sections.length === 0) return null;
+    const phaseContent =
+      phase === "pending"
+        ? renderRevisePending(item)
+        : phase === "ready"
+          ? renderReviseReady(item)
+          : phase === "failed"
+            ? renderReviseFailed(item)
+            : renderReviseCommentForm(item, sections);
     return (
-      <section aria-label="構成案の修正" className={`mt-4 ${SECTION_CARD}`}>
-        <h3 className={SECTION_HEAD}>構成案の修正</h3>
-        {/* #139 A: 記事タイトルの直接編集(AI不要)。 */}
-        <TitleEditor
-          itemId={item.id}
-          title={item.title}
-          editing={editingTitle}
-          value={titleInput}
-          busy={reviseBusy}
-          onChange={setTitleInput}
-          onStartEdit={() => startEditTitle(item.title)}
-          onCancel={cancelEditTitle}
-          onSave={() => saveTitle(item)}
-        />
-        {phase === "pending"
-          ? renderRevisePending(item)
-          : phase === "ready"
-            ? renderReviseReady(item)
-            : phase === "failed"
-              ? renderReviseFailed(item)
-              : renderReviseCommentForm(item, sections)}
-        {reviseError ? (
-          <p role="alert" className="mt-2 text-sm text-red-700">
-            {reviseError}
-          </p>
-        ) : null}
-      </section>
+      <ReviseSection
+        itemId={item.id}
+        title={item.title}
+        editingTitle={editingTitle}
+        titleValue={titleInput}
+        busy={reviseBusy}
+        onTitleChange={setTitleInput}
+        onStartEditTitle={() => startEditTitle(item.title)}
+        onCancelTitle={cancelEditTitle}
+        onSaveTitle={() => saveTitle(item)}
+        phaseContent={phaseContent}
+        error={reviseError}
+      />
     );
   }
 
