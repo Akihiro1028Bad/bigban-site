@@ -43,6 +43,7 @@ import { fetchBoard, postDecision, postPublish, postRevise, postReviseApply, pos
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD, TAP_TARGET } from "./approveStyles";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { DetailPanel } from "./DetailPanel";
 import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
 import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
@@ -1551,86 +1552,40 @@ export function ApproveClient() {
       />
     );
 
-    if (isIdea) {
-      // 全画面・中央フローティングモーダルのレビュー・ワークスペース。
-      // 上=コマンドバー(固定) / 下=3ゾーン(左:インサイト / 中央:プレビュー追従 / 右:構成案)。
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-[2.5vw]">
-          <button
-            type="button"
-            aria-label="オーバーレイを閉じる"
-            onClick={() => setOpenId(null)}
-            className="absolute inset-0 bg-black/50"
+    const checklist =
+      draftState.status === "ready" ? (
+        <div className="mt-4">
+          <DraftChecklist
+            checks={draftQuality({
+              bodyHtml: draftState.draft.bodyHtml,
+              body: draftState.draft.body,
+              title: item.title,
+              knownNewsPaths: draftState.draft.knownNewsPaths
+                ? new Set(draftState.draft.knownNewsPaths)
+                : undefined,
+            })}
           />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`詳細: ${item.title}`}
-            className="relative flex h-[94vh] w-[95vw] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
-          >
-            <div className="shrink-0 border-b border-gray-200 bg-white px-4 pb-2">{header}</div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="lg:flex lg:items-start lg:gap-6">
-                <div className="lg:w-[20rem] lg:shrink-0">
-                  {insight}
-                  {/* #128: 下書きが取得できたら公開前チェックリストを出す。 */}
-                  {draftState.status === "ready" ? (
-                    <div className="mt-4">
-                      <DraftChecklist
-                        checks={draftQuality({
-                          bodyHtml: draftState.draft.bodyHtml,
-                          body: draftState.draft.body,
-                          title: item.title,
-                          knownNewsPaths: draftState.draft.knownNewsPaths
-                            ? new Set(draftState.draft.knownNewsPaths)
-                            : undefined,
-                        })}
-                      />
-                      <StyleHints
-                        plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
-                      />
-                      <ExcerptEditor
-                        pageId={item.id}
-                        token={token}
-                        plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-                <div className="lg:sticky lg:top-0 lg:min-w-0 lg:flex-1">
-                  {renderDraftPreview(item)}
-                </div>
-                <div className="lg:w-[24rem] lg:shrink-0">{renderReviseSection(item)}</div>
-              </div>
-            </div>
-          </div>
+          <StyleHints plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)} />
+          <ExcerptEditor
+            pageId={item.id}
+            token={token}
+            plain={draftPlainText(draftState.draft.bodyHtml, draftState.draft.body)}
+          />
         </div>
-      );
-    }
+      ) : null;
 
-    // 施策: コンパクトな右ドロワー(プレビュー/構成案は無い)。
     return (
-      <div className="fixed inset-0 z-50 flex">
-        <button
-          type="button"
-          aria-label="オーバーレイを閉じる"
-          onClick={() => setOpenId(null)}
-          className="flex-1 bg-black/40"
-        />
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`詳細: ${item.title}`}
-          className="ml-auto flex h-full w-full max-w-md flex-col overflow-y-auto bg-white p-4 shadow-xl sm:w-[28rem]"
-        >
-          {header}
-          <div className="mt-3">
-            {insight}
-            {/* 施策は決定可能(下書き作成済みにならない)ため常に主操作を出す。 */}
-            <div className="mt-4 flex gap-2">{decisionActions}</div>
-          </div>
-        </div>
-      </div>
+      <DetailPanel
+        isIdea={isIdea}
+        title={item.title}
+        header={header}
+        insight={insight}
+        checklist={checklist}
+        draftPreview={renderDraftPreview(item)}
+        reviseSection={renderReviseSection(item)}
+        decisionActions={decisionActions}
+        onClose={() => setOpenId(null)}
+      />
     );
   }
 
