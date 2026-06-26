@@ -47,7 +47,8 @@ describe("AddProposalForm", () => {
     );
     const [url, init] = fn.mock.calls[0];
     expect(url).toBe("/api/growth/proposals");
-    expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    // 非ASCIIの合言葉は percent-encode して載せる(ISO-8859-1 制約・authHeaders と対)。
+    expect(init.headers.Authorization).toBe(`Bearer ${encodeURIComponent(TOKEN)}`);
     expect(JSON.parse(init.body)).toEqual({
       name: "平日昼クーポン",
       category: "MEO",
