@@ -18,7 +18,6 @@ export const CTA_EVENTS = {
 } as const;
 
 export type CtaKey = keyof typeof CTA_EVENTS;
-export type CtaEventName = (typeof CTA_EVENTS)[CtaKey];
 
 /**
  * クリック計測のパラメータを組み立てる。location=設置箇所(分析の切り口)、
