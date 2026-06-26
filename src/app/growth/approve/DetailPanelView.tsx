@@ -16,6 +16,7 @@ import { draftPlainText, draftQuality } from "./draftQuality";
 import { DraftReadyView } from "./DraftReadyView";
 import type { DraftState } from "./draftTypes";
 import { ExcerptEditor } from "./ExcerptEditor";
+import { HypothesisCard } from "./HypothesisCard";
 import { MetricChips } from "./MetricChips";
 import type { PreviewDevice } from "./previewDevice";
 import { nextReviewId } from "./reviewNav";
@@ -178,6 +179,8 @@ export function DetailPanelView({
       <div className="mt-3">
         <MetricChips details={item.details} />
       </div>
+      {/* #計測強化 S4: 記事の仮説(狙い)。未記入は出さない。 */}
+      {item.hypothesis ? <HypothesisCard hypothesis={item.hypothesis} /> : null}
     </>
   );
 

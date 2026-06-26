@@ -2,6 +2,7 @@
  * 承認画面の共有ドメイン型(#H7 分解で共有化)。ApproveClient と各カスタムフック/コンポーネントで使う。
  */
 
+import type { ArticleHypothesis } from "@/lib/growth/approve";
 import type { Stage } from "@/lib/growth/stage";
 
 export interface PendingDetail {
@@ -31,6 +32,8 @@ export interface PendingItem {
   isDraftReady?: boolean;
   // #106/#107: パイプライン段階。盤の列分け・段階インジケータに使う。
   stage: Stage;
+  // #計測強化 S4: 記事の仮説(狙い)。未記入は undefined。
+  hypothesis?: ArticleHypothesis;
 }
 
 // 即時保存モデルでのカードごとの選択(承認/却下)。
