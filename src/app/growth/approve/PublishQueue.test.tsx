@@ -102,13 +102,13 @@ describe("PublishQueue", () => {
     expand();
     expect(screen.getByText(/予約 2099-01-01 09:30 UTC/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "解除" }));
+    fireEvent.click(screen.getByRole("button", { name: /予約を解除/ }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     const call = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/publish/schedule");
     expect(JSON.parse(call![1].body)).toEqual({ pageId: "a", scheduledAt: null });
   });
 
-  it("失敗時はエラーを表示し onChanged は呼ばない", async () => {
+  it("失敗時はエラーを表示しつつ、盤は再取得する(部分公開の反映)", async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 502 });
     const onChanged = vi.fn();
     render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
@@ -116,7 +116,8 @@ describe("PublishQueue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /今すぐ公開/ }));
     await waitFor(() => expect(screen.getByText(/処理中にエラーが発生しました/)).toBeInTheDocument());
-    expect(onChanged).not.toHaveBeenCalled();
+    // 一括公開が途中失敗しても、既に公開済みの分を盤へ反映するため onChanged は呼ぶ。
+    expect(onChanged).toHaveBeenCalled();
   });
 
   it("要対応のみ(公開OK 0件)でも例外リストは出す", () => {

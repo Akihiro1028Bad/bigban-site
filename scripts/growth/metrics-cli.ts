@@ -35,6 +35,8 @@ const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
 const CONTENT_ID_PROP = "下書きID";
 const PUBLISHED_STATUS = "公開済み";
+// microCMS contentId の許可文字(他の参照箇所と同じ)。不正値を URL パスに載せない。
+const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 
 // topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数)。
@@ -89,7 +91,8 @@ async function fetchSlugLocale(
   apiKey: string,
   contentId: string
 ): Promise<{ slug: string; locale: string } | null> {
-  const url = `https://${domain}.microcms.io/api/v1/news/${contentId}`;
+  if (!CONTENT_ID_RE.test(contentId)) return null; // 不正な contentId は引かない(URL 汚染防止)。
+  const url = `https://${domain}.microcms.io/api/v1/news/${encodeURIComponent(contentId)}`;
   const res = await defaultFetch(url, { headers: { "X-MICROCMS-API-KEY": apiKey } });
   if (!res.ok) return null;
   const body = (await res.json()) as { slug?: string; locale?: string | string[] };

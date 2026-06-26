@@ -34,6 +34,8 @@ const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
 const DRAFTED_STATUS = "下書き作成済み";
 const APPROVED_STATUS = "承認";
+// microCMS contentId の許可文字(他の参照箇所と同じ)。不正値を URL パスに載せない。
+const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 
 function requireEnv(name: string): string {
@@ -115,6 +117,10 @@ async function main(): Promise<void> {
     const page = byId.get(item.id);
     if (!page) continue;
     const contentId = richTextOf(page, "下書きID").trim();
+    if (!CONTENT_ID_RE.test(contentId)) {
+      console.warn(`[publish-due] 不正な contentId のためスキップ: ${titleOf(page)} (${contentId})`);
+      continue;
+    }
     const title = titleOf(page);
     if (DRYRUN) {
       console.log(`[publish-due][dryrun] ${title || page.id} (contentId=${contentId})`);
@@ -122,9 +128,17 @@ async function main(): Promise<void> {
     }
     // 公開直前に承認画面の正タイトルを下書きへ同期(#176 と同じ)。
     if (title) await patchDraft(ENDPOINT, contentId, { title }, contentOpts);
+    // PATCH status PUBLISH は冪等(既に公開済みでも PUBLISH のまま)。
     await publishContent(ENDPOINT, contentId, managementOpts);
+    // 先に Notion ステータスを公開済みにする(=次回ループの再公開を防ぐ要)。
     await updatePageSelect(page.id, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
-    await updatePageProps(page.id, buildScheduleProps(null), notionOpts); // 予約を消す
+    // 予約の消去は付随処理。失敗しても公開自体は完了しているのでループは止めず警告だけ出す
+    // (ステータスは既に公開済みなので次回ループで再公開されることはない)。
+    try {
+      await updatePageProps(page.id, buildScheduleProps(null), notionOpts);
+    } catch (error: unknown) {
+      console.warn(`[publish-due] 予約消去に失敗(公開は完了): ${title || page.id}`, error);
+    }
     published += 1;
     console.log(`[publish-due] 公開: ${title || page.id}`);
   }
