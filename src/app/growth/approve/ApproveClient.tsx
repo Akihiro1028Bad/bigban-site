@@ -6,9 +6,6 @@ import type { FormEvent } from "react";
 // useDebouncedValue は useDraftEditing フックへ移設(#H7)。
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
-import { BODY_REGEN_BUSY_STATUSES } from "@/lib/growth/bodyImageRegen";
-import { REGEN_BUSY_STATUSES } from "@/lib/growth/eyecatchRegen";
-import { readJsonObject } from "@/lib/growth/safeJson";
 
 import {
   effectiveStage,
@@ -59,14 +56,13 @@ import { decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
-import { authHeaders } from "./authHeaders";
 import { shouldWarnPollStale } from "./pollHealth";
-import { type DraftPreview, type DraftState } from "./draftTypes";
 import { toMessage } from "./errorMessage";
 import { columnHeaderClass, isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
 import type { Choice, PendingItem } from "./types";
 import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
+import { useDraftPreview } from "./hooks/useDraftPreview";
 import { useReviseEditing } from "./hooks/useReviseEditing";
 import { revisePhase } from "./revisePhase";
 
@@ -75,9 +71,6 @@ const REVISE_POLL_MS = 5000;
 
 // 盤データ未取得時の安定した空配列(#H7: 参照を固定して不要な再計算を避ける)。
 const EMPTY_ITEMS: PendingItem[] = [];
-
-// #166: AI再生成が依頼中/処理中の間、下書きを再取得して依頼中→完了を生更新する間隔(ミリ秒)。
-const DRAFT_REGEN_POLL_MS = 5000;
 
 // #109: 表示密度の保存キー(localStorage)。
 const DENSITY_KEY = "growth-approve-density";
@@ -365,80 +358,9 @@ export function ApproveClient() {
     return () => clearInterval(timer);
   }, [isRevisePending, refreshItems]);
 
-  // #75: 下書きプレビュー。開いている記事が下書き作成済み(contentId あり)のときだけ取得する。
-  const [draftState, setDraftState] = useState<DraftState>({ status: "idle" });
+  // #75/#166: 下書きプレビューの取得・ポーリングはカスタムフックへ集約(#H7 分解)。
   const openHasDraft = polledItem?.kind === "idea" && Boolean(polledItem.contentId);
-
-  const loadDraft = useCallback(
-    async (pageId: string): Promise<void> => {
-      setDraftState({ status: "loading" });
-      try {
-        const res = await fetch(
-          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
-          { headers: authHeaders(token) }
-        );
-        const json = await readJsonObject(res);
-        if (!res.ok || !json.success) {
-          throw new Error(json.error ?? "下書きの取得に失敗しました。");
-        }
-        if (!json.exists) {
-          setDraftState({ status: "empty" });
-          return;
-        }
-        setDraftState({ status: "ready", draft: json.draft as DraftPreview });
-      } catch (error) {
-        setDraftState({ status: "error", error: toMessage(error, "下書きの取得に失敗しました。") });
-      }
-    },
-    [token]
-  );
-
-  // パネルを開いたら(下書きありの記事のみ)取得。閉じる/対象外は idle に戻す。
-  useEffect(() => {
-    if (openId && openHasDraft) {
-      void loadDraft(openId);
-    } else {
-      setDraftState({ status: "idle" });
-    }
-  }, [openId, openHasDraft, loadDraft]);
-
-  // #166: ローディング表示に切り替えずに下書きだけ静かに再取得する(ポーリング用)。
-  // 失敗/消失時は現在の表示を維持して次の tick に委ねる(沈黙させるが画面は壊さない)。
-  const refreshDraftSilently = useCallback(
-    async (pageId: string): Promise<void> => {
-      try {
-        const res = await fetch(
-          `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
-          { headers: authHeaders(token) }
-        );
-        const json = await readJsonObject(res);
-        if (!res.ok || !json.success || !json.exists) return;
-        setDraftState({ status: "ready", draft: json.draft as DraftPreview });
-      } catch {
-        // ネットワーク一時障害は無視(次の tick で回復)。
-      }
-    },
-    [token]
-  );
-
-  // #166: AI再生成(本文画像/アイキャッチ)が依頼中/処理中の間だけ下書きを定期再取得し、
-  // 「依頼中→完了」をバッジ消滅＋画像更新として生反映する。なし/失敗になったら止める。
-  const draftRegenPending =
-    draftState.status === "ready" &&
-    (((draftState.draft.bodyRegen &&
-      (BODY_REGEN_BUSY_STATUSES as readonly string[]).includes(draftState.draft.bodyRegen.status)) ??
-      false) ||
-      ((draftState.draft.eyecatchRegen &&
-        (REGEN_BUSY_STATUSES as readonly string[]).includes(draftState.draft.eyecatchRegen.status)) ??
-        false));
-
-  useEffect(() => {
-    if (!openId || !draftRegenPending) return;
-    const timer = setInterval(() => {
-      void refreshDraftSilently(openId);
-    }, DRAFT_REGEN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [openId, draftRegenPending, refreshDraftSilently]);
+  const { draftState, loadDraft } = useDraftPreview({ token, openId, openHasDraft });
 
   // #77/#98/#110/#129: 下書きの手動リッチ編集はカスタムフックへ集約(#H7 分解)。
   const {
