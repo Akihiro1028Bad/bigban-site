@@ -93,20 +93,25 @@ async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> 
   return pages;
 }
 
-/** microCMS 公開記事を contentId で引いて slug / locale を得る。失敗は null。 */
+/** microCMS 公開記事を contentId で引いて slug / locale / publishedAt を得る。失敗は null。 */
 async function fetchSlugLocale(
   domain: string,
   apiKey: string,
   contentId: string
-): Promise<{ slug: string; locale: string } | null> {
+): Promise<{ slug: string; locale: string; publishedAt?: string } | null> {
   if (!CONTENT_ID_RE.test(contentId)) return null; // 不正な contentId は引かない(URL 汚染防止)。
   const url = `https://${domain}.microcms.io/api/v1/news/${encodeURIComponent(contentId)}`;
   const res = await defaultFetch(url, { headers: { "X-MICROCMS-API-KEY": apiKey } });
   if (!res.ok) return null;
-  const body = (await res.json()) as { slug?: string; locale?: string | string[] };
+  const body = (await res.json()) as {
+    slug?: string;
+    locale?: string | string[];
+    publishedAt?: string;
+  };
   if (!body.slug) return null;
   const locale = Array.isArray(body.locale) ? (body.locale[0] ?? "ja") : (body.locale ?? "ja");
-  return { slug: body.slug, locale };
+  // #計測強化 S3: 公開日(要改稿=公開28日後 判定に使う)。
+  return { slug: body.slug, locale, publishedAt: body.publishedAt };
 }
 
 async function notifyLine(text: string): Promise<void> {
@@ -191,7 +196,12 @@ async function main(): Promise<void> {
     // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
     const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
     const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
-    const metrics = search ? { ...base, search } : base;
+    // #計測強化 S3: 公開日(要改稿判定)も載せる。
+    const metrics = {
+      ...base,
+      ...(search ? { search } : {}),
+      ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
+    };
     if (DRYRUN) {
       const s = metrics.search;
       console.log(
