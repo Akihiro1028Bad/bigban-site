@@ -27,3 +27,29 @@ export async function fetchBoard(token: string): Promise<PendingItem[]> {
   }
   return json.items as PendingItem[];
 }
+
+/** 承認/却下/クローズ/承認待ち復帰: ステータスを1件更新する。失敗時は表示用 Error を投げる。 */
+export async function postDecision(token: string, id: string, decision: string): Promise<void> {
+  const res = await fetch(BOARD_URL, {
+    method: "POST",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ decisions: [{ id, decision }] }),
+  });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(json.error ?? "保存に失敗しました。");
+  }
+}
+
+/** 記事を公開する。失敗時は表示用 Error を投げる。 */
+export async function postPublish(token: string, pageId: string): Promise<void> {
+  const res = await fetch("/api/growth/publish", {
+    method: "POST",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ pageId }),
+  });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(json.error ?? "公開に失敗しました。");
+  }
+}

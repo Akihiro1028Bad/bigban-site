@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
@@ -49,6 +49,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
+import { postDecision, postPublish } from "./api";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
@@ -788,24 +789,22 @@ export function ApproveClient() {
     void loadPending();
   }, [authDisabled, loadPending]);
 
-  /** ステータスを 1 件だけ更新する(承認/却下/承認待ち復帰の共通処理)。 */
-  async function postStatus(id: string, decision: string): Promise<void> {
-    const res = await fetch("/api/growth/approve", {
-      method: "POST",
-      headers: authHeaders(token, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ decisions: [{ id, decision }] }),
-    });
-    const json = await readJsonObject(res);
-    if (!res.ok || !json.success) {
-      throw new Error(json.error ?? "保存に失敗しました。");
-    }
-  }
+  // #H7: 承認/却下/クローズ/復帰の更新と公開を useMutation 化(fetch ロジックは api.ts)。
+  // 公開は外向き操作のため成功時に盤を invalidate して最新化する。
+  const decisionMutation = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: string }) =>
+      postDecision(token, id, decision),
+  });
+  const publishMutation = useMutation({
+    mutationFn: (id: string) => postPublish(token, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: APPROVE_BOARD_KEY }),
+  });
 
   async function decide(item: PendingItem, choice: Choice): Promise<void> {
     setSavingId(item.id);
     setFailures((prev) => removeKey(prev, item.id));
     try {
-      await postStatus(item.id, choice);
+      await decisionMutation.mutateAsync({ id: item.id, decision: choice });
       setDecided((prev) => ({ ...prev, [item.id]: choice }));
       setFocusId(`undo-${item.id}`);
     } catch (error) {
@@ -831,14 +830,7 @@ export function ApproveClient() {
     setActionBusy(true);
     setActionError("");
     try {
-      const res = await fetch("/api/growth/publish", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId: id }),
-      });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) throw new Error(json.error ?? "公開に失敗しました。");
-      await pollBoard();
+      await publishMutation.mutateAsync(id);
       pushToast("記事を公開しました。");
     } catch (error) {
       setActionError(toMessage(error, "公開に失敗しました。"));
@@ -851,7 +843,7 @@ export function ApproveClient() {
     setActionBusy(true);
     setActionError("");
     try {
-      await postStatus(id, "クローズ");
+      await decisionMutation.mutateAsync({ id, decision: "クローズ" });
       await pollBoard();
     } catch (error) {
       setActionError(toMessage(error, "クローズに失敗しました。"));
@@ -881,7 +873,7 @@ export function ApproveClient() {
     setSavingId(item.id);
     setFailures((prev) => removeKey(prev, item.id));
     try {
-      await postStatus(item.id, pendingStatus(item.kind));
+      await decisionMutation.mutateAsync({ id: item.id, decision: pendingStatus(item.kind) });
       setDecided((prev) => removeKey(prev, item.id));
       setFocusId(`approve-${item.id}`);
     } catch (error) {
