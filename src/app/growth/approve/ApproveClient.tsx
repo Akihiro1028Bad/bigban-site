@@ -57,6 +57,7 @@ import { ReviseCommentForm } from "./ReviseCommentForm";
 import { ReviseFailed } from "./ReviseFailed";
 import { ReviseReady } from "./ReviseReady";
 import { RevisePending } from "./RevisePending";
+import { SectionEditor } from "./SectionEditor";
 import { TitleEditor } from "./TitleEditor";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
@@ -1456,43 +1457,17 @@ export function ApproveClient() {
 
   // #54: セクションの手動編集フォーム(見出し＋説明 → この行を保存)。
   function renderSectionEditor(item: PendingItem, sections: OutlineSection[], i: number) {
-    const section = sections[i];
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <input
-          type="text"
-          aria-label={`見出しを編集: ${section.heading}`}
-          value={editHeading}
-          onChange={(event) => setEditHeading(event.target.value)}
-          className="w-full rounded-md border border-gray-300 p-2 text-sm font-medium text-gray-900"
-        />
-        <textarea
-          aria-label={`説明を編集: ${section.heading}`}
-          value={editDescription}
-          onChange={(event) => setEditDescription(event.target.value)}
-          placeholder="このセクションの内容(1行)"
-          className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-700"
-        />
-        <div className="mt-1 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={cancelEditSection}
-            className={choiceButtonClass(
-              "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-            )}
-          >
-            キャンセル
-          </button>
-          <button
-            type="button"
-            onClick={() => saveSection(item, sections, i)}
-            disabled={reviseBusy}
-            className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
-          >
-            この行を保存
-          </button>
-        </div>
-      </motion.div>
+      <SectionEditor
+        heading={sections[i].heading}
+        editHeading={editHeading}
+        onHeadingChange={setEditHeading}
+        editDescription={editDescription}
+        onDescriptionChange={setEditDescription}
+        busy={reviseBusy}
+        onCancel={cancelEditSection}
+        onSave={() => saveSection(item, sections, i)}
+      />
     );
   }
 
