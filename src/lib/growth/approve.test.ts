@@ -100,6 +100,34 @@ describe("toPendingItems", () => {
     expect(item.isDraftReady).toBe(true);
   });
 
+  it("仮説プロパティを読む(#S4)", () => {
+    const page = idea("i9", "T", "S");
+    page.properties["記事タイプ"] = { type: "select", select: { name: "獲得" } };
+    page.properties["狙う読者"] = { type: "rich_text", rich_text: [{ plain_text: "本八幡近隣の初心者" }] };
+    page.properties["検索意図"] = { type: "rich_text", rich_text: [{ plain_text: "始め方を知りたい" }] };
+    page.properties["勝ち筋"] = { type: "rich_text", rich_text: [{ plain_text: "一次情報＋内部リンク" }] };
+    // 名前欠落のオプションは除外し、重複は1つにまとめる(描画 key 衝突防止)。
+    page.properties["想定CTA"] = {
+      type: "multi_select",
+      multi_select: [{ name: "予約" }, {}, { name: "LINE" }, { name: "予約" }],
+    };
+    page.properties["成功指標"] = { type: "rich_text", rich_text: [{ plain_text: "予約クリック10件/月" }] };
+    const [item] = toPendingItems([], [page]);
+    expect(item.hypothesis).toEqual({
+      articleType: "獲得",
+      targetReader: "本八幡近隣の初心者",
+      searchIntent: "始め方を知りたい",
+      winningAngle: "一次情報＋内部リンク",
+      plannedCta: ["予約", "LINE"],
+      successMetric: "予約クリック10件/月",
+    });
+  });
+
+  it("仮説プロパティ未記入(旧データ)は hypothesis=undefined(欠落耐性・#S4)", () => {
+    const [item] = toPendingItems([], [idea("i10", "T", "S")]);
+    expect(item.hypothesis).toBeUndefined();
+  });
+
   it("ステータスが下書き作成済み以外なら isDraftReady=false(#87)", () => {
     const page = idea("i8b", "T", "S");
     page.properties["ステータス"] = { type: "select", select: { name: "提案中" } };
