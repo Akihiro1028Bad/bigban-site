@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import enMessages from "../../../messages/en.json";
 import HomeAbout from "./HomeAbout";
 
 import type React from "react";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
@@ -124,6 +130,18 @@ describe("HomeAbout", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link?.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("Instagramクリックで instagram_click を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeAbout />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByText("@akihiko.rst").closest("a");
+    await userEvent.click(link!);
+    expect(trackCtaClick).toHaveBeenCalledWith("instagram", "home_about");
   });
 
   it("英語ロケールでfounderBio1を表示する", () => {

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
@@ -97,6 +98,7 @@ export default function HomeAbout() {
               href={`https://www.instagram.com/${t("founderInstagram").replace(/^@/, "")}/`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackCtaClick("instagram", "home_about")}
               className="inline-flex items-center gap-1.5 text-text-light/90 text-sm mb-8 hover:text-accent transition-colors"
             >
               <InstagramIcon className="w-4 h-4" />

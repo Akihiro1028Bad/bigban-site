@@ -51,6 +51,8 @@ export default defineConfig({
         "__mocks__/**",
         // テスト基盤(MSW server/handlers・renderWithClient)。プロダクトコードではない。
         "src/test/**",
+        // CTA クリックの gtag/dataLayer 送信(薄い I/O)。純ロジックは events.ts でテスト済み。
+        "src/lib/analytics/trackEvent.ts",
         // react-query Provider の薄い結線(server/browser 分岐は jsdom で到達不可)。
         "src/app/growth/approve/providers.tsx",
         // 実行時の薄い入口(実データでの手動検証のためテスト対象外)

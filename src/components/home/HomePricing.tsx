@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 interface PriceRow {
   timeSlot: string;
@@ -173,6 +174,7 @@ export default function HomePricing() {
               {t("privateFacilityNote")}
               <Link
                 href="/about#contact"
+                onClick={() => trackCtaClick("price", "home_pricing")}
                 className="text-accent hover:underline"
               >
                 {t("contactUs")}
