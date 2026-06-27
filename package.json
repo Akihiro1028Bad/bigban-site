@@ -38,6 +38,7 @@
     "growth:advise-apply-loop": "node scripts/growth/run.mjs apply",
     "growth:metrics": "tsx scripts/growth/metrics-cli.ts",
     "growth:publish-due": "tsx scripts/growth/publish-due-cli.ts",
+    "growth:review-due": "tsx scripts/growth/review-due-cli.ts",
     "growth:comment-revise": "tsx scripts/growth/comment-revise-cli.ts",
     "growth:comment-revise-loop": "node scripts/growth/run.mjs comment-revise",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
