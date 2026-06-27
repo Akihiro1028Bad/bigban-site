@@ -24,20 +24,21 @@ export const REVIEW_DATE_PROPS: Record<ReviewMilestone, string> = {
 export const REVIEW_MEMO_PROP = "判定メモ";
 
 /**
- * 到来済み(daysSince >= マイルストーン)で、まだ記録していない最大のマイルストーンを返す。
- * 無ければ null。公開日不明(null)も null。週次実行で1回だけ各マイルストーンを拾うため、
- * `done` は各判定日プロパティが既に入っているか。
+ * 到来済み(daysSince >= マイルストーン)で、まだ記録していない**最小**のマイルストーンを返す。
+ * 無ければ null。公開日不明(null)も null。`done` は各判定日プロパティが既に入っているか。
+ *
+ * 最小を返すのは「飛ばさず順番に拾う」ため。複数マイルストーンを跨いだ記事(取り込みが遅れた等)でも、
+ * 1回の実行で1つずつ 28→56→90 と順に拾い、低い方を取りこぼさない。
  */
 export function selectReviewMilestone(
   daysSince: number | null,
   done: Record<ReviewMilestone, boolean>
 ): ReviewMilestone | null {
   if (daysSince === null) return null;
-  let pick: ReviewMilestone | null = null;
   for (const m of REVIEW_MILESTONES) {
-    if (daysSince >= m && !done[m]) pick = m;
+    if (daysSince >= m && !done[m]) return m;
   }
-  return pick;
+  return null;
 }
 
 /** 判定メモの候補文を作る(マイルストーン＋判定ラベル＋成功指標)。公開後判定 select は人が決める。 */
