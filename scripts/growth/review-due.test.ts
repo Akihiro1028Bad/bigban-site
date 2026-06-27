@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReviewMemo,
+  daysSincePublished,
   REVIEW_DATE_PROPS,
   REVIEW_MEMO_PROP,
   REVIEW_MILESTONES,
   selectReviewMilestone,
 } from "./review-due";
+
+describe("daysSincePublished(再エクスポート)", () => {
+  it("review-due 経由でも経過日を返す", () => {
+    expect(daysSincePublished("2026-01-01T00:00:00Z", Date.parse("2026-01-29T00:00:00Z"))).toBe(28);
+  });
+});
 
 describe("REVIEW_MILESTONES / props", () => {
   it("28/56/90日のマイルストーンとプロパティ名を持つ(S4の判定日に対応)", () => {
@@ -19,15 +26,16 @@ describe("REVIEW_MILESTONES / props", () => {
 describe("selectReviewMilestone", () => {
   const none = { 28: false, 56: false, 90: false };
 
-  it("到来済みで未記録の最大マイルストーンを返す", () => {
+  it("到来済みで未記録の最小マイルストーンを返す(飛ばさず順番に拾う)", () => {
     expect(selectReviewMilestone(30, none)).toBe(28);
-    expect(selectReviewMilestone(60, none)).toBe(56);
-    expect(selectReviewMilestone(120, none)).toBe(90);
+    // 複数跨いでいても最小(28)から1つずつ。次回実行で56→90と進む。
+    expect(selectReviewMilestone(60, none)).toBe(28);
+    expect(selectReviewMilestone(120, none)).toBe(28);
   });
 
   it("境界(ちょうど)も到来として扱う", () => {
     expect(selectReviewMilestone(28, none)).toBe(28);
-    expect(selectReviewMilestone(56, none)).toBe(56);
+    expect(selectReviewMilestone(56, { 28: true, 56: false, 90: false })).toBe(56);
   });
 
   it("28日未満は null", () => {
