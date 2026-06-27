@@ -643,7 +643,7 @@
         "sled": {
           "name": "Weight Sled",
           "nameJa": "スレッド",
-          "spec": "プレート負荷調整式・最大202kg（HYROX全クラス対応）"
+          "spec": "プレート負荷調整式・最大202kg（HYROX全クラス対応／オモリは市販プレート）"
         },
         "kettlebell": {
           "name": "Kettlebell",
@@ -653,7 +653,7 @@
         "wallball": {
           "name": "Wall Ball",
           "nameJa": "ウォールボール",
-          "spec": "メディシンボール 4 / 6 / 9kg"
+          "spec": "メディシンボール 4 / 6 / 9kg（ターゲットは非公式）"
         },
         "sandbag": {
           "name": "Sandbag",

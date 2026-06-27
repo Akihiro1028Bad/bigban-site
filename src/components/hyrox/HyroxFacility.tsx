@@ -194,9 +194,13 @@ export default function HyroxFacility() {
                   <span className="text-sm font-bold text-text-light">
                     {t(`equipment.${item.key}.nameJa`)}
                   </span>
-                  <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent">
-                    {item.quantity ? `× ${item.quantity}` : t("fullSet")}
-                  </span>
+                  {item.quantity !== null ? (
+                    <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent">
+                      {typeof item.quantity === "number"
+                        ? `× ${item.quantity}`
+                        : t("fullSet")}
+                    </span>
+                  ) : null}
                 </div>
                 <span className="text-xs text-text-gray">
                   {t(`equipment.${item.key}.spec`)}
