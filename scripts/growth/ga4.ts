@@ -60,7 +60,8 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
   {
     key: "topPages",
     dimensions: ["pagePath"],
-    metrics: ["screenPageViews", "activeUsers"],
+    // #計測強化 S2: keyEvents(CTAキーイベント)も取得し、記事ごとの CTA 計測に使う。
+    metrics: ["screenPageViews", "activeUsers", "keyEvents"],
     limit: 20,
   },
   {

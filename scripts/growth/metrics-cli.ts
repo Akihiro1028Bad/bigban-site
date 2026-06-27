@@ -14,16 +14,20 @@
 import "dotenv/config";
 
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
+import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
-import { loadGrowthConfig } from "./config";
+import { loadGrowthConfig, type GrowthConfig } from "./config";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import {
   articlePagePath,
+  articleSearchUrl,
   buildMetricsMirrorProps,
+  buildSearchMetrics,
   metricsForPagePath,
+  type SearchMetrics,
 } from "./metrics";
-import { computeWeeklyPeriods } from "./period";
+import { computeWeeklyPeriods, type DateRange } from "./period";
 import {
   queryDataSource,
   updatePageProps,
@@ -39,13 +43,17 @@ const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 
-// topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数)。
+// topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数/keyEvents)。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
   key: "topPages",
   dimensions: ["pagePath"],
-  metrics: ["screenPageViews", "activeUsers"],
+  // #計測強化 S2: keyEvents(CTAキーイベント)も取得し、CTA 計測に使う。
+  metrics: ["screenPageViews", "activeUsers", "keyEvents"],
   limit: 200,
 };
+
+// #計測強化 S2: 記事ごとの上位クエリ取得件数。
+const GSC_TOP_QUERIES = 5;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -85,20 +93,25 @@ async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> 
   return pages;
 }
 
-/** microCMS 公開記事を contentId で引いて slug / locale を得る。失敗は null。 */
+/** microCMS 公開記事を contentId で引いて slug / locale / publishedAt を得る。失敗は null。 */
 async function fetchSlugLocale(
   domain: string,
   apiKey: string,
   contentId: string
-): Promise<{ slug: string; locale: string } | null> {
+): Promise<{ slug: string; locale: string; publishedAt?: string } | null> {
   if (!CONTENT_ID_RE.test(contentId)) return null; // 不正な contentId は引かない(URL 汚染防止)。
   const url = `https://${domain}.microcms.io/api/v1/news/${encodeURIComponent(contentId)}`;
   const res = await defaultFetch(url, { headers: { "X-MICROCMS-API-KEY": apiKey } });
   if (!res.ok) return null;
-  const body = (await res.json()) as { slug?: string; locale?: string | string[] };
+  const body = (await res.json()) as {
+    slug?: string;
+    locale?: string | string[];
+    publishedAt?: string;
+  };
   if (!body.slug) return null;
   const locale = Array.isArray(body.locale) ? (body.locale[0] ?? "ja") : (body.locale ?? "ja");
-  return { slug: body.slug, locale };
+  // #計測強化 S3: 公開日(要改稿=公開28日後 判定に使う)。
+  return { slug: body.slug, locale, publishedAt: body.publishedAt };
 }
 
 async function notifyLine(text: string): Promise<void> {
@@ -106,6 +119,35 @@ async function notifyLine(text: string): Promise<void> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!to || !token) return; // LINE 未設定なら通知はスキップ(エラーにしない)。
   await pushTextMessage(to, text, { channelAccessToken: token, fetchFn: defaultFetch });
+}
+
+/**
+ * 記事1件の GSC 検索成績(page フィルタの summary＋query を2期間)を取得する。
+ * 失敗しても GA4 分の成績は維持したいので、エラーは握って null を返す(沈黙はログで明示)。
+ */
+async function fetchArticleSearch(
+  config: GrowthConfig,
+  accessToken: string,
+  current: DateRange,
+  prior: DateRange,
+  pageUrl: string
+): Promise<SearchMetrics | null> {
+  const reports: GscReportDef[] = [
+    { key: "articleSummary", dimensions: [], filters: [{ dimension: "page", expression: pageUrl }] },
+    {
+      key: "articleQueries",
+      dimensions: ["query"],
+      rowLimit: 25,
+      filters: [{ dimension: "page", expression: pageUrl }],
+    },
+  ];
+  try {
+    const gsc = await fetchGsc({ config, accessToken, current, prior, reports });
+    return buildSearchMetrics(gsc.articleSummary ?? [], gsc.articleQueries ?? [], GSC_TOP_QUERIES);
+  } catch (error) {
+    console.warn(`[metrics] GSC 取得失敗(検索成績スキップ): ${pageUrl}`, error);
+    return null;
+  }
 }
 
 async function main(): Promise<void> {
@@ -134,6 +176,7 @@ async function main(): Promise<void> {
   const nowIso = new Date().toISOString();
   let updated = 0;
   let unmatched = 0;
+  let gscFailed = 0; // #計測強化 S2: GSC 取得失敗(クォータ枯渇等)の沈黙を防ぐため件数を可視化。
 
   for (const page of pages) {
     const contentId = contentIdOf(page);
@@ -145,21 +188,36 @@ async function main(): Promise<void> {
       continue;
     }
     const pagePath = articlePagePath(sl.slug, sl.locale);
-    const metrics = metricsForPagePath(pagePath, rows, current);
-    if (!metrics) {
+    const base = metricsForPagePath(pagePath, rows, current);
+    if (!base) {
       unmatched += 1;
       console.warn(`[metrics] GA4 一致なし: ${titleOf(page)} (${pagePath})`);
       continue;
     }
+    // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
+    const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
+    const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
+    if (search === null) gscFailed += 1; // 失敗は GA4 分を維持しつつ件数だけ数える(沈黙させない)。
+    // #計測強化 S3: 公開日(要改稿判定)も載せる。
+    const metrics = {
+      ...base,
+      ...(search ? { search } : {}),
+      ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
+    };
     if (DRYRUN) {
-      console.log(`[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current}`);
+      const s = metrics.search;
+      console.log(
+        `[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current} keyEvents=${metrics.keyEvents?.current ?? 0}` +
+          (s ? ` clicks=${s.clicks.current} ctr=${s.ctr.current} pos=${s.position.current} q=${s.topQueries.length}` : " (GSCなし)")
+      );
     } else {
       await updatePageProps(page.id, buildMetricsMirrorProps(metrics, nowIso), options);
     }
     updated += 1;
   }
 
-  const summary = `📊 成績更新: ${updated}件 / 未一致 ${unmatched}件 (期間 ${current.start}〜${current.end})`;
+  const gscNote = gscFailed > 0 ? ` / GSC失敗 ${gscFailed}件` : "";
+  const summary = `📊 成績更新: ${updated}件 / 未一致 ${unmatched}件${gscNote} (期間 ${current.start}〜${current.end})`;
   console.log(summary);
   if (!DRYRUN && updated > 0) {
     await notifyLine(summary);

@@ -12,6 +12,14 @@ import { parseGscReport, mergeRows, type GscReport, type MergedRow } from "./tra
 
 const GSC_ENDPOINT = "https://www.googleapis.com/webmasters/v3";
 
+/** ディメンションフィルタ(#計測強化 S2: 記事ごとの page 絞り込み等)。 */
+export interface GscDimensionFilter {
+  dimension: string;
+  /** GSC の演算子。既定は "equals"。 */
+  operator?: string;
+  expression: string;
+}
+
 export interface GscReportDef {
   /** 出力オブジェクトのキー。 */
   key: string;
@@ -19,6 +27,8 @@ export interface GscReportDef {
   dimensions: string[];
   /** 取得行数の上限。 */
   rowLimit?: number;
+  /** dimensionFilterGroups(AND グループ1つ)。記事ごとの page=URL 絞り込みに使う。 */
+  filters?: GscDimensionFilter[];
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
@@ -49,6 +59,17 @@ function buildBody(def: GscReportDef, range: DateRange) {
   }
   if (def.rowLimit !== undefined) {
     body.rowLimit = def.rowLimit;
+  }
+  if (def.filters && def.filters.length > 0) {
+    body.dimensionFilterGroups = [
+      {
+        filters: def.filters.map((f) => ({
+          dimension: f.dimension,
+          operator: f.operator ?? "equals",
+          expression: f.expression,
+        })),
+      },
+    ];
   }
   return body;
 }

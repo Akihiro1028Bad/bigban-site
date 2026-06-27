@@ -45,6 +45,28 @@ describe("fetchGsc", () => {
     );
   });
 
+  it("filters を dimensionFilterGroups(operator 既定=equals)としてボディに載せる(#S2 page絞り込み)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ rows: [] }));
+    const pageReports: GscReportDef[] = [
+      {
+        key: "articleSummary",
+        dimensions: [],
+        filters: [{ dimension: "page", expression: "https://www.thepicklebang.com/news/a" }],
+      },
+    ];
+
+    await fetchGsc({ config, accessToken: "t", current, prior, fetchFn, reports: pageReports });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string);
+    expect(body.dimensionFilterGroups).toEqual([
+      {
+        filters: [
+          { dimension: "page", operator: "equals", expression: "https://www.thepicklebang.com/news/a" },
+        ],
+      },
+    ]);
+  });
+
   it("各レポートを current/prior の2期間ぶん、計 N×2 回リクエストする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ rows: [] }));
 

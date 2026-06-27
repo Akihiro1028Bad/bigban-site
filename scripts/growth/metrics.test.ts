@@ -3,24 +3,33 @@ import { describe, expect, it } from "vitest";
 import type { MergedRow } from "./transform";
 import {
   articlePagePath,
+  articleSearchUrl,
   buildMetricsMirrorProps,
+  buildSearchMetrics,
   type ArticleMetrics,
   metricsForPagePath,
   METRICS_PROPS,
   normalizePagePath,
   parseMetrics,
+  type SearchMetrics,
   serializeMetrics,
   summarizeMetrics,
 } from "./metrics";
 
 const PERIOD = { start: "2026-06-15", end: "2026-06-21" };
 
-function row(pagePath: string, views: [number, number], users: [number, number]): MergedRow {
+function row(
+  pagePath: string,
+  views: [number, number],
+  users: [number, number],
+  keyEvents: [number, number] = [0, 0]
+): MergedRow {
   return {
     keys: [pagePath],
     metrics: {
       screenPageViews: { current: views[0], prior: views[1], deltaPct: null },
       activeUsers: { current: users[0], prior: users[1], deltaPct: null },
+      keyEvents: { current: keyEvents[0], prior: keyEvents[1], deltaPct: null },
     },
   };
 }
@@ -74,6 +83,12 @@ describe("metricsForPagePath", () => {
     expect(m?.views.deltaPct).toBe(100);
   });
 
+  it("keyEvents(CTA)も合算する(#S2)", () => {
+    const rows = [row("/news/a", [100, 50], [60, 30], [4, 2]), row("/news/a?ref=line", [20, 10], [10, 5], [1, 0])];
+    const m = metricsForPagePath("/news/a", rows, PERIOD);
+    expect(m?.keyEvents).toEqual({ current: 5, prior: 2, deltaPct: 150 });
+  });
+
   it("prior が 0 なら deltaPct は null", () => {
     const rows = [row("/news/a", [10, 0], [5, 0])];
     const m = metricsForPagePath("/news/a", rows, PERIOD);
@@ -117,6 +132,85 @@ describe("serializeMetrics / parseMetrics", () => {
   it("形が違えば null", () => {
     expect(parseMetrics(JSON.stringify({ pagePath: "/news/a" }))).toBeNull();
     expect(parseMetrics(JSON.stringify({ ...metrics, views: { current: "x" } }))).toBeNull();
+  });
+
+  it("search ブロック付き(S2)も往復できる", () => {
+    const withSearch: ArticleMetrics = {
+      ...metrics,
+      publishedAt: "2026-06-01T00:00:00.000Z",
+      search: {
+        clicks: { current: 10, prior: 8, deltaPct: 25 },
+        impressions: { current: 200, prior: 150, deltaPct: 33.3 },
+        ctr: { current: 0.05, prior: 0.053, deltaPct: -5.7 },
+        position: { current: 3.2, prior: 4.1, deltaPct: -22 },
+        topQueries: [{ query: "本八幡 ピックルボール", clicks: 6, impressions: 60, ctr: 0.1, position: 2.5 }],
+      },
+    };
+    expect(parseMetrics(serializeMetrics(withSearch))).toEqual(withSearch);
+  });
+
+  it("search 無しの旧データも valid(後方互換)", () => {
+    expect(parseMetrics(serializeMetrics(metrics))).toEqual(metrics);
+    expect(parseMetrics(serializeMetrics(metrics))?.search).toBeUndefined();
+  });
+});
+
+describe("articleSearchUrl", () => {
+  it("origin + pagePath を連結(origin 末尾スラッシュは正規化)", () => {
+    expect(articleSearchUrl("https://thepicklebang.com", "/news/a")).toBe(
+      "https://thepicklebang.com/news/a"
+    );
+    expect(articleSearchUrl("https://thepicklebang.com/", "/news/a")).toBe(
+      "https://thepicklebang.com/news/a"
+    );
+  });
+});
+
+describe("buildSearchMetrics", () => {
+  const summary: MergedRow[] = [
+    {
+      keys: [],
+      metrics: {
+        clicks: { current: 10, prior: 8, deltaPct: 25 },
+        impressions: { current: 200, prior: 150, deltaPct: 33.3 },
+        ctr: { current: 0.05, prior: 0.053, deltaPct: -5.7 },
+        position: { current: 3.2, prior: 4.1, deltaPct: -22 },
+      },
+    },
+  ];
+  const queries: MergedRow[] = [
+    { keys: ["q-low"], metrics: { clicks: { current: 2, prior: 0, deltaPct: null }, impressions: { current: 30, prior: 0, deltaPct: null }, ctr: { current: 0.066, prior: 0, deltaPct: null }, position: { current: 5, prior: 0, deltaPct: null } } },
+    { keys: ["q-high"], metrics: { clicks: { current: 6, prior: 4, deltaPct: 50 }, impressions: { current: 60, prior: 40, deltaPct: 50 }, ctr: { current: 0.1, prior: 0.1, deltaPct: 0 }, position: { current: 2.5, prior: 3, deltaPct: -16.7 } } },
+  ];
+
+  it("summary から clicks/impressions/ctr/position(前週比つき)を作る", () => {
+    const s = buildSearchMetrics(summary, queries);
+    expect(s.clicks).toEqual({ current: 10, prior: 8, deltaPct: 25 });
+    expect(s.position).toEqual({ current: 3.2, prior: 4.1, deltaPct: -22 });
+  });
+
+  it("topQueries は clicks 降順・limit で切る", () => {
+    const s = buildSearchMetrics(summary, queries, 1);
+    expect(s.topQueries).toEqual([
+      { query: "q-high", clicks: 6, impressions: 60, ctr: 0.1, position: 2.5 },
+    ]);
+  });
+
+  it("summary 行が無ければ 0/0/null・topQueries は空", () => {
+    const s: SearchMetrics = buildSearchMetrics([], []);
+    expect(s.clicks).toEqual({ current: 0, prior: 0, deltaPct: null });
+    expect(s.topQueries).toEqual([]);
+  });
+
+  it("欠損行(keys/metrics 無し・clicks 無しで sort も実行)は query='' ・各値 0 にフォールバック", () => {
+    const s = buildSearchMetrics([], [
+      { keys: [], metrics: {} },
+      { keys: ["x"], metrics: {} },
+    ]);
+    expect(s.topQueries).toEqual([
+      { query: "", clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      { query: "x", clicks: 0, impressions: 0, ctr: 0, position: 0 },
+    ]);
   });
 });
 
