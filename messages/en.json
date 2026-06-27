@@ -629,7 +629,7 @@
         "sled": {
           "name": "Weight Sled",
           "nameJa": "スレッド",
-          "spec": "Plate-loaded, up to 202kg (all HYROX divisions)"
+          "spec": "Plate-loaded, up to 202kg (all HYROX divisions; commercial plates)"
         },
         "kettlebell": {
           "name": "Kettlebell",
@@ -639,7 +639,7 @@
         "wallball": {
           "name": "Wall Ball",
           "nameJa": "ウォールボール",
-          "spec": "Medicine ball, 4 / 6 / 9kg"
+          "spec": "Medicine ball, 4 / 6 / 9kg (target not official)"
         },
         "sandbag": {
           "name": "Sandbag",
