@@ -34,9 +34,10 @@ export async function fetchPrompts(token: string): Promise<PromptsData> {
         : json.error ?? "取得に失敗しました。"
     );
   }
+  // 外部レスポンスを鵜呑みにせず最小限の形チェックをしてから返す(壊れた本文での描画時例外を防ぐ)。
   return {
-    facilityContext: (json.facilityContext as string | null) ?? null,
-    groups: (json.groups as PromptGroup[]) ?? [],
+    facilityContext: typeof json.facilityContext === "string" ? json.facilityContext : null,
+    groups: Array.isArray(json.groups) ? (json.groups as PromptGroup[]) : [],
   };
 }
 

@@ -115,4 +115,15 @@ describe("PromptsView", () => {
       expect(screen.getByRole("button", { name: "コピー済み" })).toBeInTheDocument()
     );
   });
+
+  it("コピーに失敗したら『コピー済み』表示にしない", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("no clipboard"));
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    renderWithClient(<PromptsView token="t" />);
+    const copy = await screen.findByRole("button", { name: "コピー" });
+    fireEvent.click(copy);
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "コピー済み" })).not.toBeInTheDocument();
+  });
 });
