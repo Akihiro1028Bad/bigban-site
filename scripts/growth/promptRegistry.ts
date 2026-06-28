@@ -183,6 +183,13 @@ export const PROMPT_REGISTRY: readonly PromptPhaseMeta[] = [
     order: 2,
     whenItRuns: "下書き生成時に文体を真似る few-shot 例(初心者×地域系)",
   },
+  {
+    filename: "ng-ok-examples.md",
+    label: "NG→OK 対比例",
+    group: "文体の例",
+    order: 3,
+    whenItRuns: "下書きの編集者ゲートで参照する、ありがちな事故と直し方(§13/§14/§15/§7)",
+  },
   // この分析機能(グロースループ)を動かすための運用・セットアップ手順(人間向け資料)。
   {
     filename: "growth-windows-setup.md",
