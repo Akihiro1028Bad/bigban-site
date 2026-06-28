@@ -5,13 +5,14 @@
  * - 初期表示タブの決定(URL 指定 > 未処理がある方 > 既定=施策)
  */
 
-export type ApproveView = "proposals" | "articles";
+// "prompts" は各フェーズのプロンプト/前提情報を確認する read-only タブ(未処理という概念はない)。
+export type ApproveView = "proposals" | "articles" | "prompts";
 
-export const APPROVE_VIEWS: readonly ApproveView[] = ["proposals", "articles"];
+export const APPROVE_VIEWS: readonly ApproveView[] = ["proposals", "articles", "prompts"];
 
 /** `?view` の生値を ApproveView に正規化する。未知/欠落は null。 */
 export function parseView(raw: string | null | undefined): ApproveView | null {
-  return raw === "proposals" || raw === "articles" ? raw : null;
+  return raw === "proposals" || raw === "articles" || raw === "prompts" ? raw : null;
 }
 
 /**

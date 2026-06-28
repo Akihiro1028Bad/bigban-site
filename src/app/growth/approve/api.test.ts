@@ -7,11 +7,13 @@ import { setupMswServer } from "@/test/msw/setup";
 import {
   BOARD_URL,
   fetchBoard,
+  fetchPrompts,
   postDecision,
   postPublish,
   postRevise,
   postReviseApply,
   postReviseEdit,
+  PROMPTS_URL,
 } from "./api";
 
 setupMswServer();
@@ -160,5 +162,54 @@ describe("postReviseApply", () => {
     await expect(postReviseApply("t", "i1", "discard")).rejects.toThrow("Z");
     server.use(http.post("/api/growth/revise/apply", () => HttpResponse.json({ success: false }, { status: 500 })));
     await expect(postReviseApply("t", "i1", "discard")).rejects.toThrow("更新に失敗しました。");
+  });
+});
+
+describe("fetchPrompts", () => {
+  it("success から facilityContext と groups を返す", async () => {
+    server.use(
+      http.get(PROMPTS_URL, () =>
+        HttpResponse.json({
+          success: true,
+          facilityContext: "{}",
+          groups: [{ group: "分析", phases: [] }],
+        })
+      )
+    );
+    await expect(fetchPrompts("tok")).resolves.toEqual({
+      facilityContext: "{}",
+      groups: [{ group: "分析", phases: [] }],
+    });
+  });
+
+  it("facilityContext/groups 欠落時は null / 空配列に既定化する", async () => {
+    server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: true })));
+    await expect(fetchPrompts("tok")).resolves.toEqual({ facilityContext: null, groups: [] });
+  });
+
+  it("Authorization: Bearer ヘッダで token を送る", async () => {
+    let auth: string | null = null;
+    server.use(
+      http.get(PROMPTS_URL, ({ request }) => {
+        auth = request.headers.get("authorization");
+        return HttpResponse.json({ success: true, facilityContext: null, groups: [] });
+      })
+    );
+    await fetchPrompts("mytoken");
+    expect(auth).toBe("Bearer mytoken");
+  });
+
+  it("401 は合言葉エラー", async () => {
+    server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
+    await expect(fetchPrompts("tok")).rejects.toThrow(/合言葉が違います/);
+  });
+
+  it("その他失敗は error 文言、無ければ既定文言", async () => {
+    server.use(
+      http.get(PROMPTS_URL, () => HttpResponse.json({ success: false, error: "読込障害" }, { status: 500 }))
+    );
+    await expect(fetchPrompts("tok")).rejects.toThrow("読込障害");
+    server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(fetchPrompts("tok")).rejects.toThrow("取得に失敗しました。");
   });
 });
