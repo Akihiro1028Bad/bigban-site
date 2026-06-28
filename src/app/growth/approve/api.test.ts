@@ -10,6 +10,7 @@ import {
   fetchPrompts,
   postDecision,
   postPublish,
+  postRevert,
   postRevise,
   postReviseApply,
   postReviseEdit,
@@ -98,6 +99,37 @@ describe("postPublish", () => {
     await expect(postPublish("t", "p1")).rejects.toThrow("PUBNG");
     server.use(http.post("/api/growth/publish", () => HttpResponse.json({ success: false }, { status: 500 })));
     await expect(postPublish("t", "p1")).rejects.toThrow("公開に失敗しました。");
+  });
+});
+
+describe("postRevert", () => {
+  const REVERT_URL = "/api/growth/approve/revert";
+
+  it("pageId で POST し Authorization ヘッダを送る", async () => {
+    let auth: string | null = null;
+    let body: unknown;
+    server.use(
+      http.post(REVERT_URL, async ({ request }) => {
+        auth = request.headers.get("authorization");
+        body = await request.json();
+        return HttpResponse.json({ success: true });
+      })
+    );
+    await postRevert("tok", "i1");
+    expect(body).toEqual({ pageId: "i1" });
+    expect(auth).toBe("Bearer tok");
+  });
+
+  it("409 は段階エラー文言", async () => {
+    server.use(http.post(REVERT_URL, () => HttpResponse.json({ success: false }, { status: 409 })));
+    await expect(postRevert("t", "i1")).rejects.toThrow("生成中・公開済み");
+  });
+
+  it("その他失敗は error 文言、無ければ既定文言", async () => {
+    server.use(http.post(REVERT_URL, () => HttpResponse.json({ success: false, error: "RVNG" }, { status: 500 })));
+    await expect(postRevert("t", "i1")).rejects.toThrow("RVNG");
+    server.use(http.post(REVERT_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(postRevert("t", "i1")).rejects.toThrow("提案中に戻せませんでした。");
   });
 });
 

@@ -34,7 +34,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { fetchBoard, postPublish } from "./api";
+import { fetchBoard, postPublish, postRevert } from "./api";
 import { BoardCard } from "./BoardCard";
 import { BoardTabs } from "./BoardTabs";
 import { BoardToolbar } from "./BoardToolbar";
@@ -423,9 +423,9 @@ export function ApproveClient() {
   // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
-  // #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
+  // #167/H2: 公開・クローズ・構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
   const [confirmAction, setConfirmAction] = useState<
-    { kind: "publish" | "close"; id: string; title: string } | null
+    { kind: "publish" | "close" | "revert"; id: string; title: string } | null
   >(null);
 
   async function publishArticle(id: string): Promise<void> {
@@ -456,15 +456,35 @@ export function ApproveClient() {
     }
   }
 
-  /** 公開/クローズの確認ダイアログを開く(対象タイトルを明示)。 */
-  function openConfirm(item: PendingItem, kind: "publish" | "close"): void {
+  /**
+   * 下書き作成済みを提案中に戻す(構成からやり直す)。成功で盤を最新化しパネルを閉じる。
+   * 起点(構成からやり直すボタン)はコマンドバーにあり、失敗時の inline 表示先(下書きプレビュー)が
+   * 必ずしも描画されていないため、成否はトーストで明示する(沈黙させない)。
+   */
+  async function revertArticle(id: string): Promise<void> {
+    setActionBusy(true);
+    try {
+      await postRevert(token, id);
+      await pollBoard();
+      setOpenId(null);
+      pushToast("提案中に戻しました。構成・タイトルを直して再承認してください。");
+    } catch (error) {
+      pushToast(toMessage(error, "提案中に戻せませんでした。"), "error");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  /** 公開/クローズ/構成やり直しの確認ダイアログを開く(対象タイトルを明示)。 */
+  function openConfirm(item: PendingItem, kind: "publish" | "close" | "revert"): void {
     setConfirmAction({ kind, id: item.id, title: item.title });
   }
 
   /** 確認ダイアログで「確定」したときに実行する(対象はダイアログ表示中の confirmAction)。 */
-  async function runConfirm(action: { kind: "publish" | "close"; id: string }): Promise<void> {
+  async function runConfirm(action: { kind: "publish" | "close" | "revert"; id: string }): Promise<void> {
     setConfirmAction(null);
     if (action.kind === "publish") await publishArticle(action.id);
+    else if (action.kind === "revert") await revertArticle(action.id);
     else await closeTask(action.id);
   }
 
@@ -777,6 +797,7 @@ export function ApproveClient() {
           revise={revise}
           onDecide={decideFromPanel}
           onUndo={undoFromPanel}
+          onRevert={(item) => openConfirm(item, "revert")}
           onOpen={setOpenId}
           onClose={() => setOpenId(null)}
           onPreviewDeviceChange={setPreviewDevice}

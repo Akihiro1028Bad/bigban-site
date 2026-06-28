@@ -5,6 +5,7 @@
 
 import {
   BODY_MIRROR_PROP,
+  chunkRichText,
   DRAFT_LINK_PROPS,
   EYECATCH_MIRROR_PROP,
   type NotionPage,
@@ -171,6 +172,22 @@ export interface Decision {
 /** 種別から承認待ち(取り消し時の復帰先)ステータスを返す。 */
 export function pendingStatus(kind: PendingKind): PendingStatus {
   return kind === "proposal" ? "未処理" : "提案中";
+}
+
+/**
+ * 「構成からやり直す」(下書き作成済み → 提案中)の Notion 更新プロパティを組み立てる純関数。
+ *
+ * - ステータスを記事の承認待ち(`提案中`=`pendingStatus("idea")`)へ戻す。
+ * - 下書きリンク(`下書きID`/`下書きプレビューキー`)を空にし、`openHasDraft` を false にして
+ *   古い下書き・アドバイス・装飾が提案中カラムで表示されないようにする(設計書 §2「なぜ contentId クリアが必要か」)。
+ * - microCMS には一切触らない(Notion 書き込みのみ)。下書き本文HTML等のミラーは残置(contentId 空で非表示・再生成で上書き)。
+ */
+export function buildRevertProps(): Record<string, unknown> {
+  return {
+    [STATUS_PROP]: { select: { name: pendingStatus("idea") } },
+    [DRAFT_LINK_PROPS.contentId]: { rich_text: chunkRichText("") },
+    [DRAFT_LINK_PROPS.draftKey]: { rich_text: chunkRichText("") },
+  };
 }
 
 // Notion ページ ID(UUID。ダッシュ有り/無しの32桁16進)のみ許可

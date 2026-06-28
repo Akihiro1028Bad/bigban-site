@@ -3495,6 +3495,93 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
   });
 });
 
+describe("ApproveClient 構成からやり直す(下書き→提案中)", () => {
+  const REVERT_URL = "/api/growth/approve/revert";
+
+  async function openDrafted(...after: Array<{ json?: unknown; ok?: boolean; status?: number }>) {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ stage: "drafted", isDraftReady: true })] } },
+      ...after
+    );
+    flags.authEnabled = false;
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    return fn;
+  }
+
+  async function openStage(stage: string) {
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ stage, isDraftReady: false })] },
+    });
+    flags.authEnabled = false;
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+  }
+
+  async function revertConfirmButton(name: string): Promise<HTMLElement> {
+    const cd = await screen.findByRole("dialog", { name: "構成からやり直すの確認" });
+    return within(cd).getByRole("button", { name });
+  }
+
+  it("下書き作成済み: 確認確定で revert API に pageId を POST しトーストを出す", async () => {
+    const fn = await openDrafted(
+      { json: { success: true } }, // revert
+      { json: { success: true, items: [ideaItem({ stage: "proposed" })] } } // pollBoard
+    );
+    await userEvent.click(screen.getByRole("button", { name: "構成からやり直す" }));
+    await userEvent.click(await revertConfirmButton("提案中に戻す"));
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]).includes(REVERT_URL))).toBe(true)
+    );
+    const call = fn.mock.calls.find((c) => String(c[0]).includes(REVERT_URL))!;
+    expect(JSON.parse(call[1].body).pageId).toBe("i1");
+    expect(await screen.findByText(/提案中に戻しました/)).toBeInTheDocument();
+  });
+
+  it("確認ダイアログをキャンセルすると POST しない", async () => {
+    const fn = await openDrafted();
+    await userEvent.click(screen.getByRole("button", { name: "構成からやり直す" }));
+    await userEvent.click(await revertConfirmButton("キャンセル"));
+    expect(fn.mock.calls.some((c) => String(c[0]).includes(REVERT_URL))).toBe(false);
+  });
+
+  it("失敗するとエラートーストを出す", async () => {
+    await openDrafted({ ok: false, status: 502, json: { success: false, error: "戻すNG" } });
+    await userEvent.click(screen.getByRole("button", { name: "構成からやり直す" }));
+    await userEvent.click(await revertConfirmButton("提案中に戻す"));
+    expect(await screen.findByText("戻すNG")).toBeInTheDocument();
+  });
+
+  it("修正ループ busy 中はボタンを無効化する", async () => {
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ stage: "drafted", isDraftReady: true, reviseStatus: "提示中" })],
+      },
+    });
+    flags.authEnabled = false;
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
+    expect(screen.getByRole("button", { name: "構成からやり直す" })).toBeDisabled();
+  });
+
+  it("生成中・公開済みでは構成からやり直すボタンを出さない(#H9)", async () => {
+    await openStage("generating");
+    expect(screen.queryByRole("button", { name: "構成からやり直す" })).not.toBeInTheDocument();
+  });
+
+  it("公開済みでは構成からやり直すボタンを出さない", async () => {
+    await openStage("published");
+    expect(screen.queryByRole("button", { name: "構成からやり直す" })).not.toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 公開キュー(#H23/#H24)", () => {
   it("『今すぐ公開』で publish 後に盤を再取得する(onChanged→pollBoard)", async () => {
     flags.authEnabled = false;
