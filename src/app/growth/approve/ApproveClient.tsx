@@ -50,9 +50,8 @@ import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
-import { ProposalsView } from "./ProposalsView";
-
 import { PromptsView } from "./PromptsView";
+import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";

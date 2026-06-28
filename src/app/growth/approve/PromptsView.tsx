@@ -81,8 +81,11 @@ export function PromptsView({ token }: PromptsViewProps) {
   const selected = allItems.find((i) => i.key === selectedKey) ?? allItems[0];
 
   function handleCopy(): void {
-    void navigator.clipboard.writeText(selected.content);
-    setCopiedKey(selected.key);
+    // 成功した時だけ「コピー済み」にする(失敗時に成功表示を出さない)。
+    navigator.clipboard.writeText(selected.content).then(
+      () => setCopiedKey(selected.key),
+      () => setCopiedKey(null),
+    );
   }
 
   return (
