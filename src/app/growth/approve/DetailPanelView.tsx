@@ -38,6 +38,7 @@ interface DetailPanelViewProps {
   revise: ReturnType<typeof useReviseEditing>;
   onDecide: (item: PendingItem, choice: Choice) => void;
   onUndo: (item: PendingItem) => void;
+  onRevert: (item: PendingItem) => void;
   onOpen: (id: string) => void;
   onClose: () => void;
   onPreviewDeviceChange: (device: PreviewDevice) => void;
@@ -60,6 +61,7 @@ export function DetailPanelView({
   revise,
   onDecide,
   onUndo,
+  onRevert,
   onOpen,
   onClose,
   onPreviewDeviceChange,
@@ -132,8 +134,20 @@ export function DetailPanelView({
     </section>
   );
 
-  // 主操作(承認/却下/承認待ちに戻す)。下書き作成済みは出さない。コマンドバー/ドロワー共用。
-  const decisionActions = item.isDraftReady ? null : choice ? (
+  // 主操作。下書き作成済みは「構成からやり直す」(提案中へ戻す)を出す。コマンドバー/ドロワー共用。
+  // 修正ループ busy(依頼中/処理中/提示中)中は無効化(古い構成案・処理中との競合を避ける)。
+  const decisionActions = item.isDraftReady ? (
+    <button
+      type="button"
+      onClick={() => onRevert(item)}
+      disabled={lockedForRevise}
+      className={choiceButtonClass(
+        "border border-amber-600 bg-white text-amber-700 hover:bg-amber-50"
+      )}
+    >
+      構成からやり直す
+    </button>
+  ) : choice ? (
     <button
       type="button"
       onClick={() => onUndo(item)}

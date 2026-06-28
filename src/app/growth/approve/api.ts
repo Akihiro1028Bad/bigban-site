@@ -100,6 +100,18 @@ export interface ReviseRequest {
   titleInstruction?: string;
 }
 
+/** 下書き作成済みを提案中に戻す(構成からやり直す)。409 は段階エラー、その他は表示用 Error。 */
+export async function postRevert(token: string, pageId: string): Promise<void> {
+  const res = await postJson(token, "/api/growth/approve/revert", { pageId });
+  if (!res.ok) {
+    throw new Error(
+      res.status === 409
+        ? "この記事は生成中・公開済みのため、提案中に戻せません。"
+        : res.error ?? "提案中に戻せませんでした。"
+    );
+  }
+}
+
 /** 構成案/タイトルの AI 修正を依頼する。409 は処理中メッセージ。 */
 export async function postRevise(token: string, body: ReviseRequest): Promise<void> {
   const res = await postJson(token, "/api/growth/revise", body);
