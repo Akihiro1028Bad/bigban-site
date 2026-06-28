@@ -78,6 +78,8 @@ export default defineConfig({
         "scripts/growth/metrics-cli.ts",
         "scripts/growth/publish-due-cli.ts",
         "scripts/growth/review-due-cli.ts",
+        "scripts/growth/prompt-lint-cli.ts",
+        "scripts/growth/article-eval-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
         // 本文インラインコメント(#182)の薄い DOM 結線。純ロジックは bodyComment.ts でテスト済み。

@@ -57,6 +57,7 @@ import {
   type NotifyThrottleRecord,
 } from "./notify-throttle";
 import { runStages, type Stage } from "./pipeline";
+import { evaluatePublishGate } from "./publishGate";
 
 const ENDPOINT = "news";
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -159,6 +160,22 @@ async function main(): Promise<void> {
   }
 
   const stages: Stage[] = [];
+
+  // 品質ゲート(P1-B 案B): 投入前に draftQuality の block を判定し、1つでもあれば中断する。
+  // 画像生成や microCMS 投入の前に止めることで、不合格の下書きを作らず API 課金も無駄にしない。
+  // block 例: §5 AI免責文欠落 / §13 doNotWrite の断定。失敗は既存の failedAt 経路で LINE 通知される。
+  stages.push({
+    name: "quality-gate",
+    run: async () => {
+      const gate = evaluatePublishGate({
+        bodyHtml: String(spec.payload.bodyHtml ?? ""),
+        title: String(spec.payload.title ?? ""),
+      });
+      if (!gate.ok) {
+        throw new Error(`品質ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);
+      }
+    },
+  });
 
   // 本文画像(#63): create より前に、生成→upload→{{IMG:n}} 置換で bodyHtml を確定させる。
   // 1枚失敗しても全体は止めず、そのプレースホルダは除去・スキップを LINE 通知する。
