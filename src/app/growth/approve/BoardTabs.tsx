@@ -7,6 +7,13 @@
 
 import { APPROVE_VIEWS, type ApproveView } from "./viewRouting";
 
+// タブの表示名。prompts は各フェーズのプロンプト/前提情報を確認する read-only タブ(バッジ無し)。
+const VIEW_LABELS: Record<ApproveView, string> = {
+  proposals: "施策",
+  articles: "記事",
+  prompts: "プロンプト",
+};
+
 interface BoardTabsProps {
   activeView: ApproveView;
   pendingByView: Record<ApproveView, number>;
@@ -30,7 +37,7 @@ export function BoardTabs({ activeView, pendingByView, onChangeView }: BoardTabs
     >
       {APPROVE_VIEWS.map((v) => {
         const selectedTab = activeView === v;
-        const label = v === "proposals" ? "施策" : "記事";
+        const label = VIEW_LABELS[v];
         const count = pendingByView[v];
         return (
           <button

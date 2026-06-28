@@ -6,6 +6,7 @@ describe("parseView", () => {
   it("妥当な値はそのまま返す", () => {
     expect(parseView("proposals")).toBe("proposals");
     expect(parseView("articles")).toBe("articles");
+    expect(parseView("prompts")).toBe("prompts");
   });
   it("未知/欠落は null", () => {
     expect(parseView("foo")).toBeNull();
@@ -36,7 +37,7 @@ describe("decideInitialView", () => {
 });
 
 describe("APPROVE_VIEWS", () => {
-  it("施策・記事の2タブ", () => {
-    expect(APPROVE_VIEWS).toEqual(["proposals", "articles"]);
+  it("施策・記事・プロンプトの3タブ", () => {
+    expect(APPROVE_VIEWS).toEqual(["proposals", "articles", "prompts"]);
   });
 });
