@@ -5,11 +5,41 @@
  */
 
 import type { PendingItem } from "@/lib/growth/approve";
+import type { PromptGroup } from "@/lib/growth/promptRegistry";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { authHeaders } from "./authHeaders";
 
 export const BOARD_URL = "/api/growth/approve";
+
+export const PROMPTS_URL = "/api/growth/prompts";
+
+/** プロンプト確認タブのデータ(前提情報の生テキスト＋フェーズ群)。 */
+export interface PromptsData {
+  facilityContext: string | null;
+  groups: PromptGroup[];
+}
+
+/**
+ * 各フェーズのプロンプトと前提情報(facility-context)を取得する。read-only。
+ * 失敗時は表示用メッセージを持つ Error を投げる(401 は合言葉エラー、その他は error 文言)。
+ */
+export async function fetchPrompts(token: string): Promise<PromptsData> {
+  const res = await fetch(PROMPTS_URL, { headers: authHeaders(token) });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(
+      res.status === 401
+        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        : json.error ?? "取得に失敗しました。"
+    );
+  }
+  // 外部レスポンスを鵜呑みにせず最小限の形チェックをしてから返す(壊れた本文での描画時例外を防ぐ)。
+  return {
+    facilityContext: typeof json.facilityContext === "string" ? json.facilityContext : null,
+    groups: Array.isArray(json.groups) ? (json.groups as PromptGroup[]) : [],
+  };
+}
 
 /**
  * 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる

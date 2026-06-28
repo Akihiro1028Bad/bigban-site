@@ -50,6 +50,7 @@ import { AddProposalForm } from "./AddProposalForm";
 import { ArticlesView } from "./ArticlesView";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
+import { PromptsView } from "./PromptsView";
 import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { decideInitialView, parseView } from "./viewRouting";
@@ -516,14 +517,18 @@ export function ApproveClient() {
   const activeView: ApproveView = view ?? "proposals";
   const proposalPending = proposals.filter((item) => isActionable(item, decided)).length;
   const articlePending = ideas.filter((item) => isActionable(item, decided)).length;
+  // prompts は read-only の確認タブで未処理という概念が無いため常に 0。
   const pendingByView: Record<ApproveView, number> = {
     proposals: proposalPending,
     articles: articlePending,
+    prompts: 0,
   };
 
   // #109/#119: キーボード操作対象はアクティブタブのカードに限定。パレットは両ストリーム横断。
   const articleNavItems = articleColumns.flatMap((col) => col.items);
-  const navItems = activeView === "proposals" ? proposals : articleNavItems;
+  // prompts タブはカードを持たないのでキー操作対象は空。
+  const navItems =
+    activeView === "proposals" ? proposals : activeView === "articles" ? articleNavItems : [];
   const paletteSource = [...proposals, ...articleNavItems];
   const focusedItem = focusedIndex >= 0 ? navItems[focusedIndex] : undefined;
   const focusedId = focusedItem?.id;
@@ -728,7 +733,9 @@ export function ApproveClient() {
         role="tabpanel"
         id="approve-tabpanel"
         aria-labelledby={`approve-tab-${activeView}`}
-        aria-label={activeView === "proposals" ? "施策" : "記事"}
+        aria-label={
+          activeView === "proposals" ? "施策" : activeView === "articles" ? "記事" : "プロンプト"
+        }
       >
         {activeView === "proposals" ? (
           <>
@@ -740,7 +747,7 @@ export function ApproveClient() {
             />
             <AddProposalForm token={token} onAdded={addProposal} />
           </>
-        ) : (
+        ) : activeView === "articles" ? (
           <>
             <div className="mb-4 space-y-4">
               <PublishQueue items={ideas} token={token} onChanged={() => void pollBoard()} />
@@ -752,6 +759,8 @@ export function ApproveClient() {
               densityClass={densityClass}
             />
           </>
+        ) : (
+          <PromptsView token={token} />
         )}
       </div>
       {openItem ? (

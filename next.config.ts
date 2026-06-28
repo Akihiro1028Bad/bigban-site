@@ -18,6 +18,21 @@ const NEWS_CSP_REPORT_ONLY = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // プロンプト確認 API(/api/growth/prompts)は実行時に、各フェーズのプロンプト・few-shot 例・
+  // 参考ドキュメント・前提情報を読む。サーバーレス関数のバンドルへ確実に同梱させる。
+  outputFileTracingIncludes: {
+    "/api/growth/prompts": [
+      "./scripts/growth/prompts/**/*.md",
+      "./scripts/growth/facility-context.json",
+      "./CLAUDE.md",
+      "./docs/operations/growth-article-style.md",
+      "./docs/operations/ai-news-prompt.md",
+      "./docs/operations/growth-weekly-runbook.md",
+      "./docs/operations/growth-windows-setup.md",
+      "./docs/operations/growth-line-approval-setup.md",
+      "./docs/operations/news-admin-manual.md",
+    ],
+  },
   images: {
     remotePatterns: [
       {

@@ -40,6 +40,12 @@ vi.mock("./DraftEditor", () => ({
   ),
 }));
 
+// プロンプト確認タブは自前で fetch するため、ApproveClient の結線検証では軽量スタブに差し替える
+// (中身は PromptsView.test.tsx で個別に検証済み)。
+vi.mock("./PromptsView", () => ({
+  PromptsView: ({ token }: { token: string }) => <div>プロンプト確認スタブ:{token}</div>,
+}));
+
 import { ApproveClient } from "./ApproveClient";
 import { STUCK_THRESHOLD_MS } from "./generating";
 
@@ -182,6 +188,18 @@ describe("ApproveClient 合言葉画面", () => {
     await selectTab(/記事/);
     expect(screen.getByText("猛暑記事")).toBeInTheDocument();
     expect(fn.mock.calls[0][0]).toBe(TOKEN_URL);
+  });
+
+  it("プロンプトタブに切り替えると確認ビューを表示する(#プロンプト透明化)", async () => {
+    mockFetchSequence({
+      json: { success: true, items: [proposalItem(), ideaItem()] },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+    await selectTab(/プロンプト/);
+    expect(screen.getByText(/プロンプト確認スタブ/)).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-label", "プロンプト");
   });
 
   it("種別バッジを一覧に表示し、判断根拠(details)は詳細パネルで見る(#226/#227)", async () => {
