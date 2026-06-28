@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { NotionPage } from "./notion";
 import {
   articleStageOf,
+  buildRevertProps,
   draftBodyOf,
   draftLinkOf,
   eyecatchUrlOf,
@@ -419,6 +420,23 @@ describe("pendingStatus", () => {
 
   it("記事ネタ案の承認待ちは提案中", () => {
     expect(pendingStatus("idea")).toBe("提案中");
+  });
+});
+
+describe("buildRevertProps（構成からやり直す）", () => {
+  it("ステータスを提案中に、下書きリンク2件を空にするプロパティを返す", () => {
+    expect(buildRevertProps()).toEqual({
+      "ステータス": { select: { name: "提案中" } },
+      "下書きID": { rich_text: [] },
+      "下書きプレビューキー": { rich_text: [] },
+    });
+  });
+
+  it("ステータス値は pendingStatus('idea') と一致する（重複定義を避ける）", () => {
+    const props = buildRevertProps() as {
+      "ステータス": { select: { name: string } };
+    };
+    expect(props["ステータス"].select.name).toBe(pendingStatus("idea"));
   });
 });
 
