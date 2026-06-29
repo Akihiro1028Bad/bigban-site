@@ -12,7 +12,7 @@ describe("ReserveChoice", () => {
 
   it("7月までの予約は RESERVA へ外部リンクする（文言にシステム名は出さない）", () => {
     renderWithIntl(<ReserveChoice />);
-    const link = screen.getByRole("link", { name: /7月までを予約する/ });
+    const link = screen.getByRole("link", { name: /7月末までの予約/ });
     expect(link).toHaveAttribute("href", RESERVE_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -20,7 +20,7 @@ describe("ReserveChoice", () => {
 
   it("8月以降の予約は labola へ外部リンクする（文言にシステム名は出さない）", () => {
     renderWithIntl(<ReserveChoice />);
-    const link = screen.getByRole("link", { name: /8月以降を予約する/ });
+    const link = screen.getByRole("link", { name: /8月以降の予約/ });
     expect(link).toHaveAttribute("href", LABOLA_RESERVE_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");

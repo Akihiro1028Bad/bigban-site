@@ -146,11 +146,11 @@
       "julyLabel": "〜7月のご予約",
       "julyPeriod": "〜2026年7月",
       "julyDesc": "2026年7月までのご利用分はこちらから。",
-      "julyCta": "7月までを予約する",
+      "julyCta": "7月末までの予約",
       "augLabel": "8月以降のご予約",
       "augPeriod": "2026年8月〜",
       "augDesc": "2026年8月以降のご利用分はこちらから。",
-      "augCta": "8月以降を予約する"
+      "augCta": "8月以降の予約"
     },
     "steps": {
       "heading": "予約の流れ",
