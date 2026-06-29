@@ -28,11 +28,8 @@ import { mediaSvgUrl } from "./mediaLibrary";
 import { MOCK_ARTICLES } from "./mockData";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
-import { applyBlockImprovement, improvementSentence, splitBlocks, stripTags } from "./bodyBlocks";
 import { countByLevel, qualityChecks } from "./draftQuality";
 import { ProposalFormModal } from "./ProposalFormModal";
-import { proposeBody, proposeTitle } from "./reviseMock";
-import { ReviseRequestModal } from "./ReviseRequestModal";
 import { ShortcutBar } from "./ShortcutBar";
 import {
   BoardEmpty,
@@ -53,8 +50,6 @@ import type {
   ImageInstruction,
   MainView,
   OutlineSection,
-  ReviseProposal,
-  ReviseTarget,
   SegmentKey,
   Stage,
   Toast,
@@ -111,25 +106,6 @@ const GENERATED_BODY = `
 // 生成1ステップの進み幅。
 const GEN_STEP = 16;
 
-// アドバイス未生成の記事を「依頼」したときに返すモック結果。
-const DEFAULT_ADVICE = {
-  overall: 82,
-  scores: [
-    { label: "文体の自然さ", score: 86 },
-    { label: "構成の流れ", score: 80 },
-    { label: "具体性・根拠", score: 74 },
-    { label: "内部リンク導線", score: 68 },
-  ],
-  strengths: ["一文が短く、翻訳調を避けた自然な日本語", "確定事実に沿っていて誇張がない"],
-  fixes: [
-    {
-      quote: "まず一度コートに立ってみてください。",
-      reason: "締めは良いが、次アクションへの内部導線がない。",
-      suggestion: "体験予約 or 施設紹介ページへの内部リンクを添える。",
-    },
-  ],
-};
-
 /** 生成中の記事を1ティック進める。100到達で下書きレビューへ。 */
 function tickGenerating(a: Article): Article {
   if (a.stage !== "generating" || a.stuck) return a;
@@ -175,7 +151,6 @@ export default function ApproveProtoPage() {
   const [editing, setEditing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [reviseModalFor, setReviseModalFor] = useState<string | null>(null);
   const [confirmFor, setConfirmFor] = useState<{ kind: ConfirmKind; id: string } | null>(null);
   const [proposalOpen, setProposalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState<{
@@ -347,17 +322,6 @@ export default function ApproveProtoPage() {
     []
   );
 
-  // 「修正を依頼」は指示を書くモーダルを開く。
-  const revise = useCallback(
-    (id: string) => {
-      const a = articles.find((x) => x.id === id);
-      const reason = editBlockReason(a);
-      if (reason) return pushToast("danger", reason);
-      if (a) setReviseModalFor(id);
-    },
-    [articles, editBlockReason, pushToast]
-  );
-
   // 相談ドロワーを開く(段階ガード付き)。
   const openConsult = useCallback(
     (mode: ConsultKind) => {
@@ -369,90 +333,6 @@ export default function ApproveProtoPage() {
       setConsultOpen(true);
     },
     [activeArticle, editBlockReason, pushToast],
-  );
-
-  // 指示を送信 → requested(待ち) → 一定時間後に presenting(提示中)へ。
-  const requestRevise = useCallback(
-    (id: string, instruction: { title?: string; body?: string }) => {
-      setArticles((prev) =>
-        prev.map((a) =>
-          a.id === id
-            ? { ...a, reviseStatus: "requested", reviseInstruction: instruction, reviseProposal: undefined }
-            : a
-        )
-      );
-      setReviseModalFor(null);
-      setActiveId(id);
-      setTab("revise");
-      pushToast("info", "修正を依頼しました — AIが案を作成します");
-      const timer = window.setTimeout(() => {
-        setArticles((prev) =>
-          prev.map((a) => {
-            if (a.id !== id) return a;
-            const proposal: ReviseProposal = {};
-            if (instruction.title) proposal.title = proposeTitle(a.title, instruction.title);
-            if (instruction.body) proposal.body = proposeBody(a.bodyHtml, instruction.body);
-            return { ...a, reviseStatus: "presenting", reviseProposal: proposal };
-          })
-        );
-        pushToast("success", "修正案が届きました — 元 vs 新 を見比べられます");
-      }, 1800);
-      reviseTimers.current.push(timer);
-    },
-    [pushToast]
-  );
-
-  const retryRevise = useCallback(() => {
-    if (!activeId) return;
-    const a = articles.find((x) => x.id === activeId);
-    const ins = a?.reviseInstruction;
-    if (!ins) return;
-    requestRevise(activeId, { title: ins.title, body: ins.body });
-  }, [activeId, articles, requestRevise]);
-
-  const settleRevise = useCallback(
-    (id: string, target: ReviseTarget, apply: boolean) => {
-      setArticles((prev) =>
-        prev.map((a) => {
-          if (a.id !== id || !a.reviseProposal) return a;
-          const proposal = a.reviseProposal;
-          if (!proposal[target]) return a;
-          const nextProposal: ReviseProposal = { ...proposal };
-          delete nextProposal[target];
-          const remaining = Object.keys(nextProposal).length > 0;
-          return {
-            ...a,
-            title: apply && proposal.title && target === "title" ? proposal.title.to : a.title,
-            bodyHtml: apply && proposal.body && target === "body" ? proposal.body.to : a.bodyHtml,
-            outline: apply && proposal.outline && target === "outline" ? proposal.outline.to : a.outline,
-            reviseProposal: remaining ? nextProposal : undefined,
-            reviseStatus: remaining ? "presenting" : "none",
-            reviseInstruction: remaining ? a.reviseInstruction : undefined,
-          };
-        })
-      );
-      if (apply) {
-        const label =
-          target === "title" ? "タイトル" : target === "body" ? "本文" : "構成案";
-        pushToast("success", `${label}を反映しました`);
-      } else {
-        pushToast("info", "提案を却下しました");
-      }
-    },
-    [pushToast]
-  );
-
-  const applyRevise = useCallback(
-    (target: ReviseTarget) => {
-      if (activeId) settleRevise(activeId, target, true);
-    },
-    [activeId, settleRevise]
-  );
-  const dismissRevise = useCallback(
-    (target: ReviseTarget) => {
-      if (activeId) settleRevise(activeId, target, false);
-    },
-    [activeId, settleRevise]
   );
 
   // 退場時に提示タイマーを掃除する。
@@ -518,55 +398,14 @@ export default function ApproveProtoPage() {
     [bodyUrlsOf, pushToast]
   );
 
-  // ---- アドバイスの採用→本文反映 ----
+  // ---- アドバイス採用(相談ドロワー): consult へ委譲しつつ、反映済みキーを記録 ----
   const adoptAdvice = useCallback(
-    (index: number) => {
-      if (!activeId) return;
-      setArticles((prev) =>
-        prev.map((a) => {
-          if (a.id !== activeId) return a;
-          const fix = a.advice.fixes[index];
-          if (!fix) return a;
-          return { ...a, bodyHtml: `${a.bodyHtml}<p class="proto-changed">${fix.suggestion}</p>` };
-        })
-      );
-      setAdoptedFixes((prev) => new Set(prev).add(`${activeId}:${index}`));
-      pushToast("success", "アドバイスを本文に反映しました");
+    (consultId: string, index: number) => {
+      consult.adoptAdvice(consultId, index);
+      if (activeId) setAdoptedFixes((prev) => new Set(prev).add(`${activeId}:${index}`));
     },
-    [activeId, pushToast]
+    [consult, activeId]
   );
-
-  // ---- アドバイス(#146) 依頼フロー: none→依頼→処理中→提示中/失敗→再依頼 ----
-  const requestAdvice = useCallback(
-    (instruction: string) => {
-      if (!activeId) return;
-      setArticles((prev) =>
-        prev.map((x) => (x.id === activeId ? { ...x, adviceStatus: "requested", adviceInstruction: instruction || undefined } : x))
-      );
-      pushToast("info", "アドバイスを依頼しました — AIが分析します");
-      const timer = window.setTimeout(() => {
-        setArticles((prev) =>
-          prev.map((x) =>
-            x.id === activeId
-              ? { ...x, adviceStatus: "presenting", advice: x.advice.overall > 0 ? x.advice : DEFAULT_ADVICE }
-              : x
-          )
-        );
-        pushToast("success", "アドバイスが届きました");
-      }, 1800);
-      reviseTimers.current.push(timer);
-    },
-    [activeId, pushToast]
-  );
-  const retryAdvice = useCallback(() => {
-    if (!activeId) return;
-    const a = articles.find((x) => x.id === activeId);
-    requestAdvice(a?.adviceInstruction ?? "");
-  }, [activeId, articles, requestAdvice]);
-  const dismissAdvice = useCallback(() => {
-    if (!activeId) return;
-    setArticles((prev) => prev.map((x) => (x.id === activeId ? { ...x, adviceStatus: "none" } : x)));
-  }, [activeId]);
 
   // ---- メタディスクリプション編集(#H20) ----
   const saveMeta = useCallback(
@@ -654,40 +493,7 @@ export default function ApproveProtoPage() {
     [activeId]
   );
 
-  const requestBodyComment = useCallback(() => {
-    if (!activeId) return;
-    const a = articles.find((x) => x.id === activeId);
-    if (!a || !(a.bodyComments && a.bodyComments.length)) return;
-    setArticles((prev) => prev.map((x) => (x.id === activeId ? { ...x, bodyCommentStatus: "requested" } : x)));
-    setTab("bodyComment");
-    pushToast("info", "本文への指摘を依頼しました — AIが案を作成します");
-    const timer = window.setTimeout(() => {
-      setArticles((prev) =>
-        prev.map((x) => {
-          if (x.id !== activeId) return x;
-          const blocks = splitBlocks(x.bodyHtml);
-          const firstByBlock = new Map<number, string>();
-          for (const c of x.bodyComments ?? []) {
-            if (!firstByBlock.has(c.block)) firstByBlock.set(c.block, c.text);
-          }
-          const fixes = [...firstByBlock.entries()]
-            .map(([block, firstText]) => {
-              const b = blocks[block];
-              const sentence = improvementSentence(firstText);
-              const from = b ? stripTags(b.inner) : "";
-              return { block, from, to: `${from} ${sentence}`, sentence };
-            })
-            .filter((f) => f.from)
-            .sort((p, q) => p.block - q.block);
-          return { ...x, bodyCommentStatus: "presenting", bodyCommentFixes: fixes };
-        })
-      );
-      pushToast("success", "本文の修正案が届きました — 元 vs 新 を見比べられます");
-    }, 1800);
-    reviseTimers.current.push(timer);
-  }, [activeId, articles, pushToast]);
-
-  // ---- 相談ドロワー送信ハンドラ(旧タブと並走、consult フックへ転送) ----
+  // ---- 相談ドロワー送信ハンドラ(consult フックへ転送) ----
   const submitOverall = useCallback(
     (focus: string) => consult.request("overall", { overall: { focus } }),
     [consult],
@@ -701,70 +507,6 @@ export default function ApproveProtoPage() {
     if (list.length === 0) return;
     consult.request("sentence", { sentence: list });
   }, [consult, activeArticle]);
-
-  const applyBodyFix = useCallback(
-    (block: number) => {
-      if (!activeId) return;
-      const target = articles.find((x) => x.id === activeId);
-      const fix = target?.bodyCommentFixes?.find((f) => f.block === block);
-      // 安全弁: 反映前に本文が変わり対象段落が一致しなければ「要確認」で弾く(誤適用防止)。
-      const blocks = target ? splitBlocks(target.bodyHtml) : [];
-      const currentText = blocks[block] ? stripTags(blocks[block].inner) : "";
-      if (fix && currentText !== fix.from) {
-        pushToast("danger", "対象の段落が変わっています（要確認）— 再依頼してください");
-        return;
-      }
-      setArticles((prev) =>
-        prev.map((x) => {
-          if (x.id !== activeId) return x;
-          const f = (x.bodyCommentFixes ?? []).find((q) => q.block === block);
-          if (!f) return x;
-          const remaining = (x.bodyCommentFixes ?? []).filter((q) => q.block !== block);
-          return {
-            ...x,
-            bodyHtml: applyBlockImprovement(x.bodyHtml, block, f.sentence),
-            bodyCommentFixes: remaining.length ? remaining : undefined,
-            bodyCommentStatus: remaining.length ? "presenting" : "none",
-            bodyComments: (x.bodyComments ?? []).filter((c) => c.block !== block),
-          };
-        })
-      );
-      pushToast("success", "本文に反映しました");
-    },
-    [activeId, articles, pushToast]
-  );
-
-  const dismissBodyFix = useCallback(
-    (block: number) => {
-      if (!activeId) return;
-      setArticles((prev) =>
-        prev.map((x) => {
-          if (x.id !== activeId) return x;
-          const remaining = (x.bodyCommentFixes ?? []).filter((f) => f.block !== block);
-          return {
-            ...x,
-            bodyCommentFixes: remaining.length ? remaining : undefined,
-            bodyCommentStatus: remaining.length ? "presenting" : "none",
-          };
-        })
-      );
-      pushToast("info", "提案を却下しました");
-    },
-    [activeId, pushToast]
-  );
-
-  const applyAllBodyFixes = useCallback(() => {
-    if (!activeId) return;
-    setArticles((prev) =>
-      prev.map((x) => {
-        if (x.id !== activeId) return x;
-        let html = x.bodyHtml;
-        for (const f of x.bodyCommentFixes ?? []) html = applyBlockImprovement(html, f.block, f.sentence);
-        return { ...x, bodyHtml: html, bodyCommentFixes: undefined, bodyCommentStatus: "none", bodyComments: [] };
-      })
-    );
-    pushToast("success", "本文にすべて反映しました");
-  }, [activeId, pushToast]);
 
   // ---- 生成のライブ感: 生成中の記事を一定間隔で進め、完了で下書きへ ----
   useEffect(() => {
@@ -823,9 +565,6 @@ export default function ApproveProtoPage() {
                 bodyImageHues: undefined,
                 wordCount: 0,
                 readMinutes: 0,
-                reviseStatus: "none",
-                reviseProposal: undefined,
-                reviseInstruction: undefined,
                 checklist: [
                   { key: "eyecatch", label: "アイキャッチ", done: false },
                   { key: "body", label: "本文", done: false },
@@ -1138,13 +877,12 @@ export default function ApproveProtoPage() {
         if (proposalOpen) return setProposalOpen(false);
         if (mediaTarget) return setMediaTarget(null);
         if (consultOpen) return setConsultOpen(false);
-        if (reviseModalFor) return setReviseModalFor(null);
         if (editing) return setEditing(false);
         if (selectedIds.size > 0) return setSelectedIds(new Set());
         return;
       }
       if (isTypingTarget(e.target)) return;
-      if (shortcutsOpen || editing || reviseModalFor || mediaTarget || confirmFor || proposalOpen || consultOpen) return;
+      if (shortcutsOpen || editing || mediaTarget || confirmFor || proposalOpen || consultOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const propIds = proposals.map((p) => p.id);
@@ -1175,7 +913,7 @@ export default function ApproveProtoPage() {
           } else if (activeId) approve(activeId);
           break;
         case "r":
-          if (activeId) revise(activeId);
+          if (activeId) openConsult("revise");
           break;
         case "e":
           startEdit();
@@ -1194,9 +932,6 @@ export default function ApproveProtoPage() {
           setTab("preview");
           break;
         case "3":
-          setTab("bodyComment");
-          break;
-        case "4":
           setTab("images");
           break;
         case "?":
@@ -1211,7 +946,6 @@ export default function ApproveProtoPage() {
   }, [
     shortcutsOpen,
     editing,
-    reviseModalFor,
     mediaTarget,
     confirmFor,
     proposalOpen,
@@ -1224,7 +958,7 @@ export default function ApproveProtoPage() {
     view,
     activate,
     approve,
-    revise,
+    openConsult,
     startEdit,
     toggleSelect,
   ]);
@@ -1243,31 +977,18 @@ export default function ApproveProtoPage() {
       onEdit={startEdit}
       onSaveEdit={saveEdit}
       onCancelEdit={() => setEditing(false)}
-      onApplyRevise={applyRevise}
-      onDismissRevise={dismissRevise}
       regenKeys={regenKeys}
-      adoptedFixes={adoptedFixes}
       onPickEyecatch={() => activeId && setMediaTarget({ id: activeId, kind: "eyecatch" })}
       onRegenEyecatch={() => activeId && regenImage(activeId, "eyecatch")}
       onPickBodyImage={(i) => activeId && setMediaTarget({ id: activeId, kind: "body", index: i })}
       onRegenBodyImage={(i) => activeId && regenImage(activeId, "body", i)}
-      onAdoptAdvice={adoptAdvice}
       onAddComment={addOutlineComment}
       onRemoveComment={removeOutlineComment}
       onUpdateImage={updateImage}
       onRequestOutlineRevise={requestOutlineRevise}
       onAddBodyComment={addBodyComment}
       onRemoveBodyComment={removeBodyComment}
-      onRequestBodyComment={requestBodyComment}
-      onApplyBodyFix={applyBodyFix}
-      onDismissBodyFix={dismissBodyFix}
-      onApplyAllBodyFixes={applyAllBodyFixes}
-      onRequestAdvice={requestAdvice}
-      onRetryAdvice={retryAdvice}
-      onDismissAdvice={dismissAdvice}
       onSaveMeta={saveMeta}
-      onRetryRevise={retryRevise}
-      onRetryBodyComment={requestBodyComment}
       consultSentenceMode={consultOpen && consultMode === "sentence"}
     />
   );
@@ -1402,19 +1123,11 @@ export default function ApproveProtoPage() {
         onDismiss={consult.dismiss}
         onApplyRevise={consult.applyRevise}
         onDismissRevise={consult.dismissRevise}
-        onAdoptAdvice={consult.adoptAdvice}
+        onAdoptAdvice={adoptAdvice}
         onApplyFix={consult.applyFix}
         onDismissFix={consult.dismissFix}
         onApplyAll={consult.applyAll}
       />
-
-      {reviseModalFor && (
-        <ReviseRequestModal
-          title={articles.find((a) => a.id === reviseModalFor)?.title ?? ""}
-          onClose={() => setReviseModalFor(null)}
-          onSubmit={(instruction) => requestRevise(reviseModalFor, instruction)}
-        />
-      )}
 
       {mediaTarget && (
         <MediaLibraryModal

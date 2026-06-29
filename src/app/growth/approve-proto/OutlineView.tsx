@@ -39,7 +39,9 @@ export function OutlineView({
 
   const total = article.outline.length;
   const totalComments = article.outline.reduce((n, s) => n + (s.comments?.length ?? 0), 0);
-  const revising = article.reviseStatus === "requested" || article.reviseStatus === "presenting";
+  const revising = (article.consults ?? []).some(
+    (c) => c.kind === "revise" && (c.status === "requested" || c.status === "presenting"),
+  );
 
   const submitComment = (i: number) => {
     if (!commentText.trim()) return;

@@ -17,9 +17,6 @@ export interface DiffToken {
   text: string;
 }
 
-/** 修正ループ(#40)の往復状態。failed=外部障害で失敗(再依頼可)。 */
-export type ReviseStatus = "none" | "requested" | "presenting" | "failed";
-
 /** 仮説カード(承認の判断材料)。 */
 export interface Hypothesis {
   articleType: string;
@@ -160,18 +157,10 @@ export interface Article {
   genProgress?: number;
   /** 本文への行コメント(#182)。 */
   bodyComments?: BodyComment[];
-  /** 本文コメントのAI依頼状態。 */
-  bodyCommentStatus?: ReviseStatus;
-  /** 提示中の本文コメント修正案。 */
-  bodyCommentFixes?: BodyCommentFix[];
   /** 仮説カード(記事の狙い)。 */
   hypothesis?: Hypothesis;
   /** メタディスクリプション(SEOスニペット・#H20)。 */
   metaDescription?: string;
-  /** アドバイス(#146)の依頼状態。failed=失敗(再依頼可)。 */
-  adviceStatus?: ReviseStatus;
-  /** アドバイス依頼時の「見てほしい点」。 */
-  adviceInstruction?: string;
   /** 生成滞留(自宅PCの巡回停止の疑い)。 */
   stuck?: boolean;
   /** 施策トリアージの状態(設定されていれば「施策」として扱う)。 */
@@ -184,12 +173,6 @@ export interface Article {
   evidence?: string[];
   advice: Advice;
   checklist: ChecklistItem[];
-  /** 修正ループの状態(既定は none 扱い)。 */
-  reviseStatus?: ReviseStatus;
-  /** 依頼時の指示文(対象ごと)。 */
-  reviseInstruction?: { outline?: string; title?: string; body?: string };
-  /** 提示中の修正案。 */
-  reviseProposal?: ReviseProposal;
   scheduledLabel?: string;
   /** 予約公開の時刻(ms)。並び替え用。 */
   scheduledAtMs?: number;
@@ -214,10 +197,7 @@ export type DetailTab =
   | "outline"
   | "prompt"
   | "preview"
-  | "bodyComment"
-  | "revise"
-  | "images"
-  | "advice";
+  | "images";
 
 /** 本文への行コメント(#182)。block=トップレベル要素index, unit=対象の文/項目。 */
 export interface BodyComment {

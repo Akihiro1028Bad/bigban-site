@@ -57,8 +57,7 @@ export function ReviseProposalBody({ proposal, onApply, onDismiss }: RevisePropo
   );
 }
 
-// 以下 ApplyRow / TitleDiff / OutlineDiff / BodyColumn は ReviseCompareView.tsx から移植。
-// （ReviseCompareView.tsx の 47-67, 166-257 をそのまま貼り、OutlineSection import を上の行に統合する）
+// 以下 ApplyRow / TitleDiff / OutlineDiff / BodyColumn は修正案の比較表示用。
 
 function ApplyRow({
   onApply,
