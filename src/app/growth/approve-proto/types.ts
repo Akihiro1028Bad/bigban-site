@@ -202,14 +202,11 @@ export interface Article {
 
 export type SegmentKey = "all" | "awaiting" | "generating" | "published";
 
-/** 盤の表示モード(リスト⇄カンバン)。 */
-export type BoardMode = "list" | "kanban";
-
 /** 左レールの主ビュー。 */
 export type MainView = "proposal" | "approve" | "prompt" | "performance" | "queue";
 
 /** 施策トリアージの状態。 */
-export type ProposalStatus = "pending" | "considering" | "rejected" | "adopted";
+export type ProposalStatus = "pending" | "rejected" | "adopted";
 
 export type DetailTab =
   | "outline"

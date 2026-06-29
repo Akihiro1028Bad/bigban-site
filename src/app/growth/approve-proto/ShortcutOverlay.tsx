@@ -19,7 +19,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       { keys: ["J"], label: "次の記事" },
       { keys: ["K"], label: "前の記事" },
-      { keys: ["⌘", "K"], label: "コマンドパレット" },
       { keys: ["/"], label: "検索にフォーカス" },
     ],
   },
