@@ -1,0 +1,306 @@
+/**
+ * 承認画面リッチUIプロトタイプ専用スタイル(#proto)。
+ *
+ * 既存 growth.css(白背景) の上に、このルートだけダーク・プロツール系の配色を
+ * スコープして上書きする。トークンは .proto-root 配下の CSS 変数として持ち、
+ * 各コンポーネントは Tailwind の arbitrary value(例: bg-[var(--p-bg)]) で参照する。
+ * ここは捨てる前提の見た目検証用プロトタイプであり、本番ロジックには一切依存しない。
+ */
+
+.proto-root {
+  /* サーフェス */
+  --p-bg: #0a0c10;
+  --p-bg-elevated: #0f1218;
+  --p-bg-raised: #141821;
+  --p-bg-hover: #181d27;
+  --p-bg-active: #1d2330;
+  --p-bg-input: #0c0f15;
+
+  /* 罫線 */
+  --p-border: rgba(255, 255, 255, 0.07);
+  --p-border-strong: rgba(255, 255, 255, 0.13);
+  --p-ring: rgba(91, 140, 255, 0.55);
+
+  /* テキスト */
+  --p-text: #e8eaee;
+  --p-text-2: #9aa3b2;
+  --p-text-3: #626b7b;
+
+  /* アクセント / セマンティック */
+  --p-accent: #5b8cff;
+  --p-accent-ink: #c9d8ff;
+  --p-accent-weak: rgba(91, 140, 255, 0.13);
+  --p-green: #3ddc97;
+  --p-green-weak: rgba(61, 220, 151, 0.13);
+  --p-amber: #f9b94e;
+  --p-amber-weak: rgba(249, 185, 78, 0.13);
+  --p-red: #f87171;
+  --p-red-weak: rgba(248, 113, 113, 0.13);
+  --p-purple: #b794f6;
+  --p-purple-weak: rgba(183, 148, 246, 0.13);
+  --p-teal: #4fd1c5;
+  --p-teal-weak: rgba(79, 209, 197, 0.13);
+
+  --p-font: ui-sans-serif, -apple-system, "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  --p-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+
+  position: fixed;
+  inset: 0;
+  background: var(--p-bg);
+  color: var(--p-text);
+  font-family: var(--p-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.1px;
+}
+
+.proto-root *,
+.proto-root *::before,
+.proto-root *::after {
+  box-sizing: border-box;
+}
+
+/* 細いスクロールバー(プロツールらしい控えめな見た目) */
+.proto-root *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.proto-root *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+.proto-root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+  background-clip: content-box;
+}
+
+.proto-root :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--p-bg), 0 0 0 4px var(--p-ring);
+  border-radius: 8px;
+}
+
+/* ブランド変種(#proto・feature4): アクセントを施設のアクセント黄(#F6FF54)に差し替える。
+   黄の上の文字は地のインク(#0a0c10)で読ませる。 */
+.proto-root.proto-brand {
+  --p-accent: #f6ff54;
+  --p-accent-ink: #fbffc4;
+  --p-accent-weak: rgba(246, 255, 84, 0.14);
+  --p-ring: rgba(246, 255, 84, 0.5);
+  /* 施設の新パレット寄りに、地をわずかにディープブルー側へ振る */
+  --p-bg: #06080f;
+  --p-bg-elevated: #0b0e18;
+  --p-bg-raised: #10131f;
+  --p-bg-hover: #161a28;
+  --p-bg-active: #1b2031;
+}
+
+/* インライン編集ツールバー(#proto・feature2) */
+.proto-root .proto-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--p-text-2);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease, transform 0.08s ease;
+}
+.proto-root .proto-tool:hover:not(:disabled) {
+  background: var(--p-bg-hover);
+  color: var(--p-text);
+}
+.proto-root .proto-tool:not(:disabled):active {
+  transform: scale(0.96);
+}
+.proto-root .proto-tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/*
+ * プライマリ塗りボタンの共通“触感”レイヤー(#proto・磨き)。
+ * 色とサイズは呼び出し側が持ち、ここで hover/press/disabled を横断で統一する。
+ */
+.proto-root .proto-btn-primary {
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.12s ease;
+}
+.proto-root .proto-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.proto-root .proto-btn-primary:not(:disabled):active {
+  transform: scale(0.97);
+}
+.proto-root .proto-btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.proto-root .proto-editable {
+  outline: none;
+  border-radius: 10px;
+  transition: box-shadow 0.15s ease;
+}
+.proto-root .proto-editable:focus {
+  box-shadow: 0 0 0 1px var(--p-accent);
+}
+
+/* ボタン(プロトタイプ共通) */
+.proto-root .proto-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  background: var(--p-bg-raised);
+  border: 1px solid var(--p-border-strong);
+  color: var(--p-text-2);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.proto-root .proto-btn-ghost:hover:not(:disabled) {
+  background: var(--p-bg-hover);
+  color: var(--p-text);
+}
+.proto-root .proto-btn-ghost:not(:disabled):active {
+  transform: scale(0.97);
+}
+.proto-root .proto-btn-ghost:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/*
+ * 全ボタン共通の“押下感”(#proto・磨き)。行/カード(.proto-row)は対象外
+ * (押下で全体が縮むと不自然・Framer の transform と競合するため)。
+ */
+.proto-root button:not(.proto-row) {
+  transition: transform 0.09s ease, filter 0.12s ease, background-color 0.12s ease,
+    color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.proto-root button:not(:disabled):not(.proto-row):active {
+  transform: scale(0.97);
+}
+.proto-root button:disabled {
+  cursor: not-allowed;
+}
+
+/* 生成中カードの脈動 */
+@keyframes proto-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.proto-pulse { animation: proto-pulse 1.6s ease-in-out infinite; }
+
+/* 更新スピナー */
+@keyframes proto-spin {
+  to { transform: rotate(360deg); }
+}
+.proto-spin { animation: proto-spin 0.8s linear infinite; }
+
+/* スケルトンのシマー */
+@keyframes proto-shimmer {
+  0% { background-position: -340px 0; }
+  100% { background-position: 340px 0; }
+}
+.proto-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 680px 100%;
+  animation: proto-shimmer 1.4s ease-in-out infinite;
+}
+
+/* 生成中バーの不定進捗 */
+@keyframes proto-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+.proto-indeterminate { animation: proto-indeterminate 1.5s ease-in-out infinite; }
+
+/* 修正案で変わった段落の印(#proto・修正ループ) */
+.proto-root .proto-article .proto-changed {
+  position: relative;
+  padding: 10px 12px;
+  margin-left: -12px;
+  border-radius: 8px;
+  background: var(--p-green-weak);
+  box-shadow: inset 3px 0 0 var(--p-green);
+}
+
+/* プレビュー本文の記事タイポグラフィ(ダーク可読) */
+.proto-article { color: var(--p-text); }
+.proto-article h2 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin: 1.9em 0 0.7em;
+  padding-left: 12px;
+  border-left: 3px solid var(--p-accent);
+  line-height: 1.4;
+}
+.proto-article h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 1.5em 0 0.5em;
+  color: var(--p-text);
+}
+.proto-article p {
+  margin: 0 0 1.05em;
+  color: #cdd2dc;
+  line-height: 1.85;
+}
+.proto-article ul {
+  margin: 0 0 1.1em;
+  padding-left: 1.25em;
+  list-style: none;
+}
+.proto-article li {
+  position: relative;
+  margin: 0.4em 0;
+  color: #cdd2dc;
+  line-height: 1.8;
+}
+.proto-article li::before {
+  content: "";
+  position: absolute;
+  left: -1em;
+  top: 0.7em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--p-accent);
+}
+.proto-article strong { color: #fff; font-weight: 600; }
+.proto-article blockquote {
+  margin: 1.3em 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--p-accent-weak);
+  border: 1px solid rgba(91, 140, 255, 0.22);
+  color: var(--p-accent-ink);
+}
+.proto-article figure { margin: 1.6em 0; }
+.proto-article figcaption {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--p-text-3);
+  text-align: center;
+}
