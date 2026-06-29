@@ -9,18 +9,15 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import {
-  AdviceView,
   ImagesView,
   PreviewView,
   PromptView,
 } from "./DetailViews";
-import { BodyCommentView } from "./BodyCommentView";
 import { CommentableBody } from "./CommentableBody";
 import { countByLevel, qualityChecks } from "./draftQuality";
 import { styleChecks } from "./styleHints";
 import { OutlineView } from "./OutlineView";
 import { QualityChecklist } from "./QualityChecklist";
-import { ReviseCompareView } from "./ReviseCompareView";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -33,13 +30,12 @@ import {
   IconImage,
   IconKeyboard,
   IconLayout,
-  IconMessage,
   IconSparkles,
   IconWand,
   IconX,
 } from "./icons";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
-import type { Article, DetailTab, ImageInstruction, ReviseTarget } from "./types";
+import type { Article, DetailTab, ImageInstruction } from "./types";
 import { Kbd, MetaStat, StageChip } from "./ui";
 
 interface TabDef {
@@ -49,58 +45,18 @@ interface TabDef {
   dot?: string;
 }
 
-function tabsFor(article: Article): TabDef[] {
-  const base: TabDef[] = [
+function tabsFor(): TabDef[] {
+  return [
     { key: "outline", label: "構成案", icon: <IconLayout size={14} /> },
     { key: "prompt", label: "プロンプト・参照", icon: <IconFileText size={14} /> },
     { key: "preview", label: "プレビュー", icon: <IconSparkles size={14} /> },
+    { key: "images", label: "画像", icon: <IconImage size={14} /> },
   ];
-  if (article.bodyHtml) {
-    const bc = article.bodyCommentStatus;
-    base.push({
-      key: "bodyComment",
-      label: "本文コメント",
-      icon: <IconMessage size={14} />,
-      dot:
-        bc === "presenting"
-          ? "var(--p-green)"
-          : bc === "requested"
-            ? "var(--p-purple)"
-            : (article.bodyComments?.length ?? 0) > 0
-              ? "var(--p-amber)"
-              : undefined,
-    });
-  }
-  const revising = article.reviseStatus === "requested" || article.reviseStatus === "presenting";
-  if (revising) {
-    base.push({
-      key: "revise",
-      label: "修正案",
-      icon: <IconWand size={14} />,
-      dot: article.reviseStatus === "presenting" ? "var(--p-green)" : "var(--p-purple)",
-    });
-  }
-  base.push({ key: "images", label: "画像", icon: <IconImage size={14} /> });
-  const ad = article.adviceStatus;
-  base.push({
-    key: "advice",
-    label: "アドバイス",
-    icon: <IconCheckCircle size={14} />,
-    dot:
-      ad === "presenting"
-        ? "var(--p-green)"
-        : ad === "requested"
-          ? "var(--p-purple)"
-          : ad === "failed"
-            ? "var(--p-red)"
-            : undefined,
-  });
-  return base;
 }
 
-// 7枚フラットなタブを「構成案 / プレビュー / 校正 / 素材」の4クラスタに束ねる(#proto・タブ整理)。
+// フラットなタブを「構成案 / プレビュー / 素材」のクラスタに束ねる(#proto・タブ整理)。
 // page.tsx 側の状態はリーフ(DetailTab)のまま据え置き、二段ナビは本コンポーネント内で完結させる。
-type ClusterKey = "outline" | "preview" | "proof" | "material";
+type ClusterKey = "outline" | "preview" | "material";
 
 interface ClusterDef {
   key: ClusterKey;
@@ -125,7 +81,6 @@ function clustersFromLeaves(leaves: TabDef[]): ClusterDef[] {
   const defs: Array<Omit<ClusterDef, "dot">> = [
     { key: "outline", label: "構成案", icon: <IconLayout size={14} />, leaves: pick("outline") },
     { key: "preview", label: "プレビュー", icon: <IconSparkles size={14} />, leaves: pick("preview") },
-    { key: "proof", label: "校正", icon: <IconMessage size={14} />, leaves: pick("bodyComment", "revise", "advice") },
     { key: "material", label: "素材", icon: <IconImage size={14} />, leaves: pick("images", "prompt") },
   ];
   return defs.filter((d) => d.leaves.length > 0).map((d) => ({ ...d, dot: aggregateDot(d.leaves) }));
@@ -150,31 +105,18 @@ interface DetailPanelProps {
   onEdit: () => void;
   onSaveEdit: (html: string) => void;
   onCancelEdit: () => void;
-  onApplyRevise: (target: ReviseTarget) => void;
-  onDismissRevise: (target: ReviseTarget) => void;
   regenKeys: Set<string>;
-  adoptedFixes: Set<string>;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
   onPickBodyImage: (index: number) => void;
   onRegenBodyImage: (index: number) => void;
-  onAdoptAdvice: (index: number) => void;
   onAddComment: (sectionIndex: number, text: string) => void;
   onRemoveComment: (sectionIndex: number, commentIndex: number) => void;
   onUpdateImage: (sectionIndex: number, patch: Partial<ImageInstruction>) => void;
   onRequestOutlineRevise: () => void;
   onAddBodyComment: (block: number, unit: string, text: string) => void;
   onRemoveBodyComment: (index: number) => void;
-  onRequestBodyComment: () => void;
-  onApplyBodyFix: (block: number) => void;
-  onDismissBodyFix: (block: number) => void;
-  onApplyAllBodyFixes: () => void;
-  onRequestAdvice: (instruction: string) => void;
-  onRetryAdvice: () => void;
-  onDismissAdvice: () => void;
   onSaveMeta: (text: string) => void;
-  onRetryRevise: () => void;
-  onRetryBodyComment: () => void;
   /** 「この文」相談モード中=true のとき本文注釈UI(CommentableBody)を前面に出す */
   consultSentenceMode?: boolean;
 }
@@ -192,37 +134,24 @@ export function DetailPanel({
   onEdit,
   onSaveEdit,
   onCancelEdit,
-  onApplyRevise,
-  onDismissRevise,
   regenKeys,
-  adoptedFixes,
   onPickEyecatch,
   onRegenEyecatch,
   onPickBodyImage,
   onRegenBodyImage,
-  onAdoptAdvice,
   onAddComment,
   onRemoveComment,
   onUpdateImage,
   onRequestOutlineRevise,
   onAddBodyComment,
   onRemoveBodyComment,
-  onRequestBodyComment,
-  onApplyBodyFix,
-  onDismissBodyFix,
-  onApplyAllBodyFixes,
-  onRequestAdvice,
-  onRetryAdvice,
-  onDismissAdvice,
   onSaveMeta,
-  onRetryRevise,
-  onRetryBodyComment,
   consultSentenceMode,
 }: DetailPanelProps) {
   const [qOpen, setQOpen] = useState(false);
   if (!article) return <EmptyDetail />;
 
-  const tabs = tabsFor(article);
+  const tabs = tabsFor();
   const safeTab = tabs.some((t) => t.key === tab) ? tab : "preview";
   const clusters = clustersFromLeaves(tabs);
   const activeCluster = clusters.find((c) => c.leaves.some((l) => l.key === safeTab)) ?? clusters[0];
@@ -253,23 +182,6 @@ export function DetailPanel({
           {article.scheduledLabel && (
             <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-teal)" }}>
               <IconCalendar size={13} /> {article.scheduledLabel}
-            </span>
-          )}
-          {article.reviseStatus === "presenting" && (
-            <button
-              onClick={() => onTabChange("revise")}
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-medium"
-              style={{ background: "var(--p-green-weak)", color: "var(--p-green)" }}
-            >
-              <IconWand size={12} /> 修正案が届いています
-            </button>
-          )}
-          {article.reviseStatus === "requested" && (
-            <span
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-medium proto-pulse"
-              style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)" }}
-            >
-              <IconWand size={12} /> 修正中…
             </span>
           )}
           {!editing && article.bodyHtml && (
@@ -408,14 +320,12 @@ export function DetailPanel({
             onCancel={onCancelEdit}
           />
         ) : consultSentenceMode && article.bodyHtml ? (
-          <div className="overflow-y-auto px-6 py-4">
-            <CommentableBody
-              bodyHtml={article.bodyHtml}
-              comments={article.bodyComments ?? []}
-              onAddComment={onAddBodyComment}
-              onRemoveComment={onRemoveBodyComment}
-            />
-          </div>
+          <CommentableBody
+            bodyHtml={article.bodyHtml}
+            comments={article.bodyComments ?? []}
+            onAddComment={onAddBodyComment}
+            onRemoveComment={onRemoveBodyComment}
+          />
         ) : (
           <AnimatePresence mode="wait">
             <motion.div
@@ -436,26 +346,6 @@ export function DetailPanel({
               )}
               {safeTab === "prompt" && <PromptView article={article} />}
               {safeTab === "preview" && <PreviewView article={article} onSaveMeta={onSaveMeta} />}
-              {safeTab === "bodyComment" && (
-                <BodyCommentView
-                  article={article}
-                  onAddComment={onAddBodyComment}
-                  onRemoveComment={onRemoveBodyComment}
-                  onRequest={onRequestBodyComment}
-                  onApplyFix={onApplyBodyFix}
-                  onDismissFix={onDismissBodyFix}
-                  onApplyAll={onApplyAllBodyFixes}
-                  onRetry={onRetryBodyComment}
-                />
-              )}
-              {safeTab === "revise" && (
-                <ReviseCompareView
-                  article={article}
-                  onApply={onApplyRevise}
-                  onDismiss={onDismissRevise}
-                  onRetry={onRetryRevise}
-                />
-              )}
               {safeTab === "images" && (
                 <ImagesView
                   article={article}
@@ -464,16 +354,6 @@ export function DetailPanel({
                   onRegenEyecatch={onRegenEyecatch}
                   onPickBodyImage={onPickBodyImage}
                   onRegenBodyImage={onRegenBodyImage}
-                />
-              )}
-              {safeTab === "advice" && (
-                <AdviceView
-                  article={article}
-                  adoptedFixes={adoptedFixes}
-                  onAdopt={onAdoptAdvice}
-                  onRequest={onRequestAdvice}
-                  onRetry={onRetryAdvice}
-                  onDismiss={onDismissAdvice}
                 />
               )}
             </motion.div>
@@ -522,7 +402,7 @@ export function DetailPanel({
                 <IconX size={14} /> 却下
               </button>
               <button onClick={onRevise} className="proto-btn-ghost">
-                <IconWand size={14} /> 修正を依頼 <span className="hidden sm:inline-flex"><Kbd>R</Kbd></span>
+                <IconWand size={14} /> AIに相談 <span className="hidden sm:inline-flex"><Kbd>R</Kbd></span>
               </button>
               <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
                 {hasBlock && (

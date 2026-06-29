@@ -7,7 +7,6 @@
 import { migrateImageHint } from "./imageIntent";
 import { mediaSvgUrl } from "./mediaLibrary";
 import type { MediaKind } from "./mediaLibrary";
-import { proposeBody } from "./reviseMock";
 import type { Advice, Article, ChecklistItem, ProposalStatus } from "./types";
 
 let propSeq = 0;
@@ -182,18 +181,6 @@ const RAW_ARTICLES: Article[] = [
       },
     ]),
     checklist: checklist(true, true, true, true),
-    reviseStatus: "presenting",
-    reviseInstruction: {
-      title: "もう少し短く、すっきりさせたい",
-      body: "結びに体験予約への内部リンク導線を一つ足してほしい",
-    },
-    reviseProposal: {
-      title: {
-        from: "ピックルボールとは？初心者が最初の1時間で知るべきルールと魅力",
-        to: "はじめてのピックルボール｜最初の1時間で楽しむ基本ルール",
-      },
-      body: proposeBody(introBody, "内部リンク"),
-    },
   },
   {
     id: "a2",
@@ -226,8 +213,6 @@ const RAW_ARTICLES: Article[] = [
       },
     ]),
     checklist: checklist(true, true, false, true),
-    adviceStatus: "failed",
-    adviceInstruction: "導入の説得力を中心に見てほしい",
   },
   {
     id: "a3",
@@ -588,7 +573,6 @@ function finalize(a: Article): Article {
         : undefined,
     hypothesis: a.hypothesis ?? deriveHypothesis(a),
     metaDescription: a.metaDescription ?? a.excerpt,
-    adviceStatus: a.adviceStatus ?? (a.advice.overall > 0 ? "presenting" : "none"),
     metrics: a.metrics ? { ...a.metrics, search: a.metrics.search ?? deriveSearch(a) } : undefined,
     publishedDaysAgo:
       a.publishedDaysAgo ??

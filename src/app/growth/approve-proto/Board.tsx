@@ -147,7 +147,7 @@ export function Board({
                         滞留
                       </span>
                     )}
-                    {a.reviseStatus === "presenting" && (
+                    {(a.consults ?? []).some((c) => c.status === "presenting") && (
                       <span
                         className="rounded-full px-1.5 py-[1px] text-[10px] font-medium"
                         style={{ background: "var(--p-green-weak)", color: "var(--p-green)" }}
@@ -164,7 +164,7 @@ export function Board({
                         文体{styleHintCount(a)}
                       </span>
                     )}
-                    {a.reviseStatus === "requested" && (
+                    {(a.consults ?? []).some((c) => c.status === "requested") && (
                       <span
                         className="proto-pulse rounded-full px-1.5 py-[1px] text-[10px] font-medium"
                         style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)" }}
