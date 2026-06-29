@@ -82,6 +82,18 @@ export default async function ReservePage({
   const { tab } = await searchParams;
   const initialTab = resolveCalendarTabKey(tab);
 
+  // RESERVE_GUIDANCE_MODE は常に true のため false（埋め込み版）側は到達不可。
+  // ロールバック用に残す意図的な dead branch なのでカバレッジ計測から除外する。
+  /* istanbul ignore next -- @preserve ロールバック用フラグ分岐: 埋め込み版(false)側は到達不可 */
+  const reserveBody = RESERVE_GUIDANCE_MODE ? (
+    <ReserveChoice />
+  ) : (
+    <>
+      <ReserveSteps />
+      <ReserveCalendar initialTab={initialTab} />
+    </>
+  );
+
   return (
     <main className="bg-deep-black min-h-screen">
       <StructuredData
@@ -89,16 +101,7 @@ export default async function ReservePage({
       />
       <HomeNavigation />
       <ReserveHero />
-      {RESERVE_GUIDANCE_MODE ? (
-        // 暫定: 予約案内（二択）
-        <ReserveChoice />
-      ) : (
-        // 既存: labola 埋め込み版
-        <>
-          <ReserveSteps />
-          <ReserveCalendar initialTab={initialTab} />
-        </>
-      )}
+      {reserveBody}
       <ReserveInfo />
       <HomeFooter />
     </main>
