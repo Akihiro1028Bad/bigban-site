@@ -85,7 +85,7 @@ function renderMenu(opts: Options = {}) {
     onSwitchLocale = vi.fn(),
     isJa = true,
     locale = "ja",
-    reserveHref = "https://reserva.be/tpbt",
+    reserveHref = "/reserve",
   } = opts;
   const messages = locale === "ja" ? jaMessages : enMessages;
   const ui: ReactElement = (
@@ -167,12 +167,11 @@ describe("MobileMenu", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("RESERVE は渡された reserveHref を外部リンクとして使う", () => {
-    renderMenu({ reserveHref: "https://reserva.be/tpbt" });
+  it("RESERVE は渡された reserveHref を内部の予約案内ページへのリンクとして使う", () => {
+    renderMenu({ reserveHref: "/reserve" });
     const reserve = screen.getByRole("link", { name: /RESERVE/ });
-    expect(reserve).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(reserve).toHaveAttribute("target", "_blank");
-    expect(reserve).toHaveAttribute("rel", "noopener noreferrer");
+    expect(reserve).toHaveAttribute("href", "/reserve");
+    expect(reserve).not.toHaveAttribute("target", "_blank");
   });
 
   it("Instagram リンクとアクセス情報を表示する", () => {
@@ -221,7 +220,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
-          reserveHref="https://reserva.be/tpbt"
+          reserveHref="/reserve"
         />
       </NextIntlClientProvider>
     );
@@ -326,7 +325,7 @@ describe("MobileMenu", () => {
           activeSection="concept"
           isJa
           onSwitchLocale={vi.fn()}
-          reserveHref="https://reserva.be/tpbt"
+          reserveHref="/reserve"
         />
       </NextIntlClientProvider>
     );

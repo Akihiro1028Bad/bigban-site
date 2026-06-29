@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
+import { RESERVE_PATH } from "@/constants/site";
 import HyroxServices from "./HyroxServices";
 import jaMessages from "../../../messages/ja.json";
 
@@ -33,12 +34,14 @@ describe("HyroxServices", () => {
     expect(screen.getByText("グループセッション")).toBeInTheDocument();
   });
 
-  it("各サービスの予約は「近日開始」表示で、リンクは張らない", () => {
+  it("各サービスの予約が予約案内ページ（/reserve）へ内部リンクする（3つ・aria-labelでサービス名を区別）", () => {
     renderWithIntl(<HyroxServices />);
-    expect(screen.getAllByText("近日開始")).toHaveLength(3);
-    expect(
-      screen.queryAllByRole("link", { name: /RESERVE/ })
-    ).toHaveLength(0);
+    // aria-label は「<サービス名> 予約する」。3本が同一導線にならないよう区別する。
+    const links = screen.getAllByRole("link", { name: /予約する/ });
+    expect(links).toHaveLength(3);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", RESERVE_PATH);
+    }
   });
 
   it("items が配列でない場合も見出しを描画する（フォールバック）", () => {

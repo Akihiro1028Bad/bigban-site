@@ -8,11 +8,23 @@ import StructuredData from "@/components/StructuredData";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
 import ReserveHero from "@/components/reserve/ReserveHero";
+import ReserveChoice from "@/components/reserve/ReserveChoice";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
 import ReserveInfo from "@/components/reserve/ReserveInfo";
 
 import type { Metadata } from "next";
+
+/**
+ * ⚠️ 一時対応フラグ（予約システム移行の暫定措置）。
+ *
+ * true  … 暫定の「予約案内ページ」（ReserveChoice：7月=RESERVA / 8月以降=labola の二択）
+ * false … 既存の labola 埋め込み版（ReserveSteps + ReserveCalendar）に復元
+ *
+ * labola 本番運用に切り替えたら、このフラグを false に戻すだけで既存ページに復元される。
+ * （埋め込み版のコード・タブ解決ロジックはこのファイルにそのまま残してある）
+ */
+const RESERVE_GUIDANCE_MODE = true;
 
 interface ReserveMetadataProps {
   params: Promise<{ locale: string }>;
@@ -66,8 +78,21 @@ export default async function ReservePage({
   if (!locale) notFound();
   setRequestLocale(locale);
 
+  // 埋め込み版（RESERVE_GUIDANCE_MODE=false 時）で使うタブ初期値。
   const { tab } = await searchParams;
   const initialTab = resolveCalendarTabKey(tab);
+
+  // RESERVE_GUIDANCE_MODE は常に true のため false（埋め込み版）側は到達不可。
+  // ロールバック用に残す意図的な dead branch なのでカバレッジ計測から除外する。
+  /* istanbul ignore next -- @preserve ロールバック用フラグ分岐: 埋め込み版(false)側は到達不可 */
+  const reserveBody = RESERVE_GUIDANCE_MODE ? (
+    <ReserveChoice />
+  ) : (
+    <>
+      <ReserveSteps />
+      <ReserveCalendar initialTab={initialTab} />
+    </>
+  );
 
   return (
     <main className="bg-deep-black min-h-screen">
@@ -76,8 +101,7 @@ export default async function ReservePage({
       />
       <HomeNavigation />
       <ReserveHero />
-      <ReserveSteps />
-      <ReserveCalendar initialTab={initialTab} />
+      {reserveBody}
       <ReserveInfo />
       <HomeFooter />
     </main>

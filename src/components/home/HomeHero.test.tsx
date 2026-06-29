@@ -55,13 +55,12 @@ describe("HomeHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("CTAボタン（RESERVE A COURT）が外部予約サービスにリンクする", () => {
+  it("CTAボタン（RESERVE A COURT）が予約案内ページ(/reserve)にリンクする", () => {
     renderWithProvider(<HomeHero />);
     const cta = screen.getByRole("link", { name: /RESERVE A COURT/ });
     expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(cta).toHaveAttribute("target", "_blank");
-    expect(cta).toHaveAttribute("rel", "noopener noreferrer");
+    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).not.toHaveAttribute("target", "_blank");
   });
 
   it("スクロールインジケーター（SCROLL）を表示する", () => {

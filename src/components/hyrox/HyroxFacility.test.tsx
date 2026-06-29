@@ -114,9 +114,27 @@ describe("HyroxFacility", () => {
     expect(
       screen.getByText("16 / 24 / 32kg（HYROX全クラス対応）"),
     ).toBeInTheDocument();
-    // 台数: ×2 が3点、一式が3点
+    // スレッドはオモリ非公式、ウォールボールはターゲット非公式を明記
+    expect(
+      screen.getByText(
+        "プレート負荷調整式・最大202kg（HYROX全クラス対応／オモリは市販プレート）",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("メディシンボール 4 / 6 / 9kg（ターゲットは非公式）"),
+    ).toBeInTheDocument();
+    // 台数: ×2 が3点（スキーエルゴ/ローイング/スレッド）、一式が2点（ケトルベル/サンドバッグ）
     expect(screen.getAllByText("× 2")).toHaveLength(3);
-    expect(screen.getAllByText("一式")).toHaveLength(3);
+    expect(screen.getAllByText("一式")).toHaveLength(2);
+  });
+
+  it("ウォールボールは数量表記（一式/×N）を出さない", () => {
+    renderFacility();
+    // ウォールボールのカードには数量表記を付けない（ターゲット非公式のため一式扱いにしない）
+    const wallball = screen.getByText("ウォールボール").closest("li");
+    expect(wallball).not.toBeNull();
+    expect(wallball?.textContent).not.toContain("一式");
+    expect(wallball?.textContent).not.toMatch(/×/);
   });
 
   it("ドットクリックで scrollTo が呼ばれる", () => {
