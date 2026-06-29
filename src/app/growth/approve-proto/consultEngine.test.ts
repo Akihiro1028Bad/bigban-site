@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createConsult,
+  failConsult,
   findConsult,
   removeConsult,
+  resolveConsult,
   upsertConsult,
 } from "./consultEngine";
 import type { Consult } from "./types";
@@ -42,5 +44,22 @@ describe("consultEngine: 基本ライフサイクル", () => {
     const b = createConsult("c2", "sentence", {});
     const out = removeConsult([a, b], "c1");
     expect(out.map((c) => c.id)).toEqual(["c2"]);
+  });
+});
+
+describe("consultEngine: resolve/fail", () => {
+  it("resolveConsult は presenting にして result を載せる", () => {
+    const c = createConsult("c1", "overall", {});
+    const out = resolveConsult(c, { overall: { overall: 80, scores: [], strengths: [], fixes: [] } });
+    expect(out.status).toBe("presenting");
+    expect(out.result?.overall?.overall).toBe(80);
+    expect(c.status).toBe("requested"); // 元は不変
+  });
+
+  it("failConsult は failed にして result を落とす", () => {
+    const c = resolveConsult(createConsult("c1", "revise", {}), { revise: {} });
+    const out = failConsult(c);
+    expect(out.status).toBe("failed");
+    expect(out.result).toBeUndefined();
   });
 });

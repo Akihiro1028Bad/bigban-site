@@ -4,7 +4,7 @@
  * ライフサイクル(requested→presenting→failed)と提示の反映を、Reactやタイマー無しの
  * 純関数として持つ。型専用 import のみ(HTML加工は薄い useConsult 側に置く)。
  */
-import type { Consult, ConsultInput, ConsultKind } from "./types";
+import type { Consult, ConsultInput, ConsultKind, ConsultResult } from "./types";
 
 export function createConsult(
   id: string,
@@ -26,4 +26,12 @@ export function findConsult(list: Consult[], id: string): Consult | undefined {
 
 export function removeConsult(list: Consult[], id: string): Consult[] {
   return list.filter((x) => x.id !== id);
+}
+
+export function resolveConsult(c: Consult, result: ConsultResult): Consult {
+  return { ...c, status: "presenting", result };
+}
+
+export function failConsult(c: Consult): Consult {
+  return { ...c, status: "failed", result: undefined };
 }
