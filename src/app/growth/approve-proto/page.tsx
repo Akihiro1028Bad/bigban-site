@@ -18,6 +18,7 @@ import { Board } from "./Board";
 import { BulkBar } from "./BulkBar";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import type { ConfirmKind } from "./ConfirmActionDialog";
+import { ConsultDrawer } from "./ConsultDrawer";
 import { DetailPanel } from "./DetailPanel";
 import { LeftRail } from "./LeftRail";
 import { ProposalView } from "./ProposalView";
@@ -44,8 +45,10 @@ import { ShortcutOverlay } from "./ShortcutOverlay";
 import { STAGE_ORDER } from "./stages";
 import { ToastStack } from "./ToastStack";
 import { TopBar } from "./TopBar";
+import { useConsult } from "./useConsult";
 import type {
   Article,
+  ConsultKind,
   DetailTab,
   ImageInstruction,
   MainView,
@@ -182,6 +185,8 @@ export default function ApproveProtoPage() {
   } | null>(null);
   const [regenKeys, setRegenKeys] = useState<Set<string>>(new Set());
   const [adoptedFixes, setAdoptedFixes] = useState<Set<string>>(new Set());
+  const [consultOpen, setConsultOpen] = useState(false);
+  const [consultMode, setConsultMode] = useState<ConsultKind>("revise");
   // #proto 状態の質: 初期読み込み / 同期。
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -250,6 +255,8 @@ export default function ApproveProtoPage() {
     () => articles.find((a) => a.id === activeId) ?? null,
     [articles, activeId]
   );
+
+  const consult = useConsult({ activeArticle, setArticles, pushToast });
 
   const awaitingCount = useMemo(
     () => articles.filter((a) => a.awaitingYou).length,
@@ -349,6 +356,19 @@ export default function ApproveProtoPage() {
       if (a) setReviseModalFor(id);
     },
     [articles, editBlockReason, pushToast]
+  );
+
+  // 相談ドロワーを開く(段階ガード付き)。
+  const openConsult = useCallback(
+    (mode: ConsultKind) => {
+      const a = activeArticle;
+      const reason = editBlockReason(a ?? undefined);
+      if (reason) return pushToast("danger", reason);
+      if (!a) return;
+      setConsultMode(mode);
+      setConsultOpen(true);
+    },
+    [activeArticle, editBlockReason, pushToast],
   );
 
   // 指示を送信 → requested(待ち) → 一定時間後に presenting(提示中)へ。
@@ -685,6 +705,21 @@ export default function ApproveProtoPage() {
     }, 1800);
     reviseTimers.current.push(timer);
   }, [activeId, articles, pushToast]);
+
+  // ---- 相談ドロワー送信ハンドラ(旧タブと並走、consult フックへ転送) ----
+  const submitOverall = useCallback(
+    (focus: string) => consult.request("overall", { overall: { focus } }),
+    [consult],
+  );
+  const submitRevise = useCallback(
+    (i: { title?: string; body?: string }) => consult.request("revise", { revise: i }),
+    [consult],
+  );
+  const submitSentence = useCallback(() => {
+    const list = activeArticle?.bodyComments ?? [];
+    if (list.length === 0) return;
+    consult.request("sentence", { sentence: list });
+  }, [consult, activeArticle]);
 
   const applyBodyFix = useCallback(
     (block: number) => {
@@ -1121,13 +1156,14 @@ export default function ApproveProtoPage() {
         if (confirmFor) return setConfirmFor(null);
         if (proposalOpen) return setProposalOpen(false);
         if (mediaTarget) return setMediaTarget(null);
+        if (consultOpen) return setConsultOpen(false);
         if (reviseModalFor) return setReviseModalFor(null);
         if (editing) return setEditing(false);
         if (selectedIds.size > 0) return setSelectedIds(new Set());
         return;
       }
       if (isTypingTarget(e.target)) return;
-      if (shortcutsOpen || editing || reviseModalFor || mediaTarget || confirmFor || proposalOpen) return;
+      if (shortcutsOpen || editing || reviseModalFor || mediaTarget || confirmFor || proposalOpen || consultOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const propIds = proposals.map((p) => p.id);
@@ -1198,6 +1234,7 @@ export default function ApproveProtoPage() {
     mediaTarget,
     confirmFor,
     proposalOpen,
+    consultOpen,
     orderedIds,
     proposals,
     approveProposal,
@@ -1219,7 +1256,7 @@ export default function ApproveProtoPage() {
       onBack={() => setActiveId(null)}
       onTabChange={setTab}
       onApprove={() => activeId && approve(activeId)}
-      onRevise={() => activeId && revise(activeId)}
+      onRevise={() => openConsult("revise")}
       onReject={() => activeId && reject(activeId)}
       onRevert={() => activeId && revert(activeId)}
       onEdit={startEdit}
@@ -1366,6 +1403,28 @@ export default function ApproveProtoPage() {
       />
 
       {shortcutsOpen && <ShortcutOverlay onClose={() => setShortcutsOpen(false)} />}
+
+      <ConsultDrawer
+        open={consultOpen}
+        mode={consultMode}
+        consults={activeArticle?.consults ?? []}
+        articleId={activeArticle?.id ?? ""}
+        adoptedFixes={adoptedFixes}
+        sentenceCount={activeArticle?.bodyComments?.length ?? 0}
+        onModeChange={setConsultMode}
+        onClose={() => setConsultOpen(false)}
+        onSubmitOverall={submitOverall}
+        onSubmitRevise={submitRevise}
+        onSubmitSentence={submitSentence}
+        onRetry={consult.retry}
+        onDismiss={consult.dismiss}
+        onApplyRevise={consult.applyRevise}
+        onDismissRevise={consult.dismissRevise}
+        onAdoptAdvice={consult.adoptAdvice}
+        onApplyFix={consult.applyFix}
+        onDismissFix={consult.dismissFix}
+        onApplyAll={consult.applyAll}
+      />
 
       {reviseModalFor && (
         <ReviseRequestModal
