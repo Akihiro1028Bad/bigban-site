@@ -13,23 +13,15 @@ import {
   IconArrowUp,
   IconChart,
   IconCheck,
-  IconChevronDown,
   IconFileText,
   IconImage,
   IconSparkles,
   IconX,
 } from "./icons";
-import { PROMPT_GROUP_ORDER, PROTO_PROMPTS } from "./promptData";
 import type { Article } from "./types";
 import { EyecatchThumb, RingScore } from "./ui";
 
 export function PromptView({ article }: { article: Article }) {
-  const [open, setOpen] = useState<string | null>(PROTO_PROMPTS[0]?.filename ?? null);
-  const groups = PROMPT_GROUP_ORDER.map((g) => ({
-    group: g,
-    prompts: PROTO_PROMPTS.filter((p) => p.group === g),
-  })).filter((x) => x.prompts.length > 0);
-
   return (
     <div className="flex flex-col gap-4">
       <div
@@ -38,67 +30,10 @@ export function PromptView({ article }: { article: Article }) {
       >
         <IconFileText size={15} {...{ style: { color: "var(--p-text-3)", marginTop: 1 } }} />
         <span className="text-[12.5px] leading-relaxed" style={{ color: "var(--p-text-2)" }}>
-          各フェーズで実際に AI へ渡す<strong style={{ color: "var(--p-text)" }}>静的プロンプトの全文</strong>（デプロイ時点の実テンプレ）。
-          記事ごとの文ではなく、パイプライン全体の透明性のための一覧です。
+          各フェーズで AI へ渡す<strong style={{ color: "var(--p-text)" }}>静的プロンプトの全文</strong>は、左の「プロンプト」面でまとめて確認できます。
+          ここはこの記事に固有の生成メモと参照だけを表示します。
         </span>
       </div>
-
-      {groups.map(({ group, prompts }) => (
-        <div key={group}>
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
-            {group}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {prompts.map((p) => {
-              const isOpen = open === p.filename;
-              return (
-                <div
-                  key={p.filename}
-                  className="overflow-hidden rounded-[10px]"
-                  style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
-                >
-                  <button
-                    onClick={() => setOpen(isOpen ? null : p.filename)}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-medium">{p.label}</span>
-                      <span className="mt-[2px] block truncate text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
-                        {p.whenItRuns}
-                      </span>
-                    </span>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-[1px] text-[10.5px]"
-                      style={{ background: "var(--p-bg-active)", color: "var(--p-text-3)", fontFamily: "var(--p-mono)" }}
-                    >
-                      {p.filename}
-                    </span>
-                    <span
-                      className="shrink-0 transition-transform"
-                      style={{ color: "var(--p-text-3)", transform: isOpen ? "rotate(180deg)" : "none" }}
-                    >
-                      <IconChevronDown size={16} />
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <pre
-                      className="max-h-[360px] overflow-auto whitespace-pre-wrap px-3.5 py-3 text-[12px] leading-relaxed"
-                      style={{
-                        borderTop: "1px solid var(--p-border)",
-                        background: "var(--p-bg-input)",
-                        color: "var(--p-text-2)",
-                        fontFamily: "var(--p-mono)",
-                      }}
-                    >
-                      {p.content}
-                    </pre>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
 
       <div>
         <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>

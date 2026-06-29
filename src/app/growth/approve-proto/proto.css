@@ -85,21 +85,6 @@
   border-radius: 8px;
 }
 
-/* ブランド変種(#proto・feature4): アクセントを施設のアクセント黄(#F6FF54)に差し替える。
-   黄の上の文字は地のインク(#0a0c10)で読ませる。 */
-.proto-root.proto-brand {
-  --p-accent: #f6ff54;
-  --p-accent-ink: #fbffc4;
-  --p-accent-weak: rgba(246, 255, 84, 0.14);
-  --p-ring: rgba(246, 255, 84, 0.5);
-  /* 施設の新パレット寄りに、地をわずかにディープブルー側へ振る */
-  --p-bg: #06080f;
-  --p-bg-elevated: #0b0e18;
-  --p-bg-raised: #10131f;
-  --p-bg-hover: #161a28;
-  --p-bg-active: #1b2031;
-}
-
 /* インライン編集ツールバー(#proto・feature2) */
 .proto-root .proto-tool {
   display: inline-flex;

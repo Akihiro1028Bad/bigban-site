@@ -10,32 +10,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { MotionConfig } from "framer-motion";
 
 import "./proto.css";
 
 import { Board } from "./Board";
 import { BulkBar } from "./BulkBar";
-import { CommandPalette } from "./CommandPalette";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import type { ConfirmKind } from "./ConfirmActionDialog";
-import type { Command } from "./CommandPalette";
 import { DetailPanel } from "./DetailPanel";
-import {
-  IconCalendar,
-  IconChart,
-  IconCheck,
-  IconEdit,
-  IconFileText,
-  IconInbox,
-  IconLayout,
-  IconList,
-  IconPlus,
-  IconRefresh,
-  IconSparkles,
-  IconWand,
-} from "./icons";
-import { KanbanBoard } from "./KanbanBoard";
 import { LeftRail } from "./LeftRail";
 import { ProposalView } from "./ProposalView";
 import { PromptRegistryView } from "./PromptRegistryView";
@@ -52,8 +35,6 @@ import { ReviseRequestModal } from "./ReviseRequestModal";
 import { ShortcutBar } from "./ShortcutBar";
 import {
   BoardEmpty,
-  ErrorState,
-  PollFailBanner,
   ReviewDoneEmpty,
   SearchEmpty,
   SkeletonBoard,
@@ -65,7 +46,6 @@ import { ToastStack } from "./ToastStack";
 import { TopBar } from "./TopBar";
 import type {
   Article,
-  BoardMode,
   DetailTab,
   ImageInstruction,
   MainView,
@@ -185,16 +165,12 @@ export default function ApproveProtoPage() {
     if (MOCK_ARTICLES.some((a) => a.awaitingYou)) return "approve";
     return "performance";
   });
-  const [boardMode, setBoardMode] = useState<BoardMode>("list");
   const [segment, setSegment] = useState<SegmentKey>("all");
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>("a1");
   const [tab, setTab] = useState<DetailTab>("preview");
   const [editing, setEditing] = useState(false);
-  const [brand, setBrand] = useState(false);
-  const [compact, setCompact] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [reviseModalFor, setReviseModalFor] = useState<string | null>(null);
   const [confirmFor, setConfirmFor] = useState<{ kind: ConfirmKind; id: string } | null>(null);
@@ -206,22 +182,11 @@ export default function ApproveProtoPage() {
   } | null>(null);
   const [regenKeys, setRegenKeys] = useState<Set<string>>(new Set());
   const [adoptedFixes, setAdoptedFixes] = useState<Set<string>>(new Set());
-  // #proto デモ: 次のAI依頼を失敗させる(pull型の失敗→再依頼を見せる)。
-  const [failNext, setFailNext] = useState(false);
-  const failNextRef = useRef(false);
-  const consumeFailNext = useCallback((): boolean => {
-    if (!failNextRef.current) return false;
-    failNextRef.current = false;
-    setFailNext(false);
-    return true;
-  }, []);
-  // #proto 状態の質: 初期読み込み / 同期 / エラー。
+  // #proto 状態の質: 初期読み込み / 同期。
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [lastSyncMs, setLastSyncMs] = useState(0);
   const [nowMs, setNowMs] = useState(0);
-  const [pollFailures, setPollFailures] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
   const toastSeq = useRef(0);
@@ -233,14 +198,7 @@ export default function ApproveProtoPage() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2600);
   }, []);
 
-  const toggleFailNext = useCallback(() => {
-    const v = !failNextRef.current;
-    failNextRef.current = v;
-    setFailNext(v);
-    pushToast("info", v ? "次のAI依頼を失敗させます（デモ）" : "失敗デモを解除しました");
-  }, [pushToast]);
-
-  // トリアージ中の施策(未処理/検討中/却下)は記事ビューから除外する。
+  // トリアージ中の施策(未処理/却下)は記事ビューから除外する。
   const isProposalInTriage = (a: Article): boolean =>
     a.proposalStatus != null && a.proposalStatus !== "adopted";
 
@@ -408,11 +366,6 @@ export default function ApproveProtoPage() {
       setTab("revise");
       pushToast("info", "修正を依頼しました — AIが案を作成します");
       const timer = window.setTimeout(() => {
-        if (consumeFailNext()) {
-          setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, reviseStatus: "failed", reviseProposal: undefined } : a)));
-          pushToast("danger", "修正の生成に失敗しました — 再依頼できます");
-          return;
-        }
         setArticles((prev) =>
           prev.map((a) => {
             if (a.id !== id) return a;
@@ -426,7 +379,7 @@ export default function ApproveProtoPage() {
       }, 1800);
       reviseTimers.current.push(timer);
     },
-    [pushToast, consumeFailNext]
+    [pushToast]
   );
 
   const retryRevise = useCallback(() => {
@@ -521,15 +474,6 @@ export default function ApproveProtoPage() {
       setRegenKeys((prev) => new Set(prev).add(key));
       pushToast("info", kind === "eyecatch" ? "アイキャッチをAIで再生成中…" : "本文画像をAIで再生成中…");
       const timer = window.setTimeout(() => {
-        if (consumeFailNext()) {
-          setRegenKeys((prev) => {
-            const s = new Set(prev);
-            s.delete(key);
-            return s;
-          });
-          pushToast("danger", "画像の再生成に失敗しました — もう一度お試しください");
-          return;
-        }
         setArticles((prev) =>
           prev.map((a) => {
             if (a.id !== id) return a;
@@ -551,7 +495,7 @@ export default function ApproveProtoPage() {
       }, 1600);
       reviseTimers.current.push(timer);
     },
-    [bodyUrlsOf, pushToast, consumeFailNext]
+    [bodyUrlsOf, pushToast]
   );
 
   // ---- アドバイスの採用→本文反映 ----
@@ -581,11 +525,6 @@ export default function ApproveProtoPage() {
       );
       pushToast("info", "アドバイスを依頼しました — AIが分析します");
       const timer = window.setTimeout(() => {
-        if (consumeFailNext()) {
-          setArticles((prev) => prev.map((x) => (x.id === activeId ? { ...x, adviceStatus: "failed" } : x)));
-          pushToast("danger", "アドバイス生成に失敗しました — 再依頼できます");
-          return;
-        }
         setArticles((prev) =>
           prev.map((x) =>
             x.id === activeId
@@ -597,7 +536,7 @@ export default function ApproveProtoPage() {
       }, 1800);
       reviseTimers.current.push(timer);
     },
-    [activeId, pushToast, consumeFailNext]
+    [activeId, pushToast]
   );
   const retryAdvice = useCallback(() => {
     if (!activeId) return;
@@ -676,11 +615,6 @@ export default function ApproveProtoPage() {
     setTab("revise");
     pushToast("info", "構成案の修正を依頼しました — AIが案を作成します");
     const timer = window.setTimeout(() => {
-      if (consumeFailNext()) {
-        setArticles((prev) => prev.map((x) => (x.id === activeId ? { ...x, reviseStatus: "failed", reviseProposal: undefined } : x)));
-        pushToast("danger", "構成案の修正に失敗しました — 再依頼できます");
-        return;
-      }
       setArticles((prev) =>
         prev.map((x) => {
           if (x.id !== activeId) return x;
@@ -693,7 +627,7 @@ export default function ApproveProtoPage() {
       pushToast("success", "構成案の修正案が届きました");
     }, 1800);
     reviseTimers.current.push(timer);
-  }, [activeId, articles, pushToast, consumeFailNext]);
+  }, [activeId, articles, pushToast]);
 
   // ---- 本文コメント(#182): 文ごとに注釈→AIに指摘を依頼→元/新→反映 ----
   const addBodyComment = useCallback(
@@ -727,11 +661,6 @@ export default function ApproveProtoPage() {
     setTab("bodyComment");
     pushToast("info", "本文への指摘を依頼しました — AIが案を作成します");
     const timer = window.setTimeout(() => {
-      if (consumeFailNext()) {
-        setArticles((prev) => prev.map((x) => (x.id === activeId ? { ...x, bodyCommentStatus: "failed", bodyCommentFixes: undefined } : x)));
-        pushToast("danger", "本文の修正に失敗しました — 再依頼できます");
-        return;
-      }
       setArticles((prev) =>
         prev.map((x) => {
           if (x.id !== activeId) return x;
@@ -755,7 +684,7 @@ export default function ApproveProtoPage() {
       pushToast("success", "本文の修正案が届きました — 元 vs 新 を見比べられます");
     }, 1800);
     reviseTimers.current.push(timer);
-  }, [activeId, articles, pushToast, consumeFailNext]);
+  }, [activeId, articles, pushToast]);
 
   const applyBodyFix = useCallback(
     (block: number) => {
@@ -1010,7 +939,6 @@ export default function ApproveProtoPage() {
   const fixFromQueue = useCallback(
     (id: string, tab: DetailTab) => {
       setView("approve");
-      setBoardMode("list");
       setActiveId(id);
       setTab(tab);
     },
@@ -1126,10 +1054,10 @@ export default function ApproveProtoPage() {
     },
     [proposals, pushToast]
   );
-  const holdProposal = useCallback(
+  const reopenProposal = useCallback(
     (id: string) => {
-      setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, proposalStatus: "considering" } : a)));
-      pushToast("info", "検討中にしました");
+      setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, proposalStatus: "pending", proposalRejectNote: undefined } : a)));
+      pushToast("info", "未処理に戻しました");
     },
     [pushToast]
   );
@@ -1169,20 +1097,7 @@ export default function ApproveProtoPage() {
       setLastSyncMs(now);
       setNowMs(now);
       setSyncing(false);
-      setPollFailures(0);
     }, 700);
-    reviseTimers.current.push(t);
-  }, []);
-
-  const retryLoad = useCallback(() => {
-    setLoadError(false);
-    setLoading(true);
-    const t = window.setTimeout(() => {
-      setLoading(false);
-      const now = Date.now();
-      setLastSyncMs(now);
-      setNowMs(now);
-    }, 900);
     reviseTimers.current.push(t);
   }, []);
 
@@ -1193,21 +1108,15 @@ export default function ApproveProtoPage() {
 
   // アクティブ行をリスト内に見えるようスクロール。
   useEffect(() => {
-    if (view !== "approve" || boardMode !== "list" || !activeId) return;
+    if (view !== "approve" || !activeId) return;
     const el = document.querySelector(`[data-row-id="${activeId}"]`);
     el?.scrollIntoView({ block: "nearest" });
-  }, [activeId, view, boardMode]);
+  }, [activeId, view]);
 
   // グローバルなキーボード操作。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-        return;
-      }
       if (e.key === "Escape") {
-        if (paletteOpen) return setPaletteOpen(false);
         if (shortcutsOpen) return setShortcutsOpen(false);
         if (confirmFor) return setConfirmFor(null);
         if (proposalOpen) return setProposalOpen(false);
@@ -1218,7 +1127,7 @@ export default function ApproveProtoPage() {
         return;
       }
       if (isTypingTarget(e.target)) return;
-      if (paletteOpen || shortcutsOpen || editing || reviseModalFor || mediaTarget || confirmFor || proposalOpen) return;
+      if (shortcutsOpen || editing || reviseModalFor || mediaTarget || confirmFor || proposalOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const propIds = proposals.map((p) => p.id);
@@ -1283,7 +1192,6 @@ export default function ApproveProtoPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    paletteOpen,
     shortcutsOpen,
     editing,
     reviseModalFor,
@@ -1302,30 +1210,6 @@ export default function ApproveProtoPage() {
     startEdit,
     toggleSelect,
   ]);
-
-  const commands: Command[] = useMemo(
-    () => [
-      { id: "approve", label: "この記事を承認", hint: "A", icon: <IconCheck size={14} />, run: () => activeId && approve(activeId) },
-      { id: "revise", label: "修正を依頼", hint: "R", icon: <IconWand size={14} />, run: () => activeId && revise(activeId) },
-      { id: "edit", label: "本文を編集", hint: "E", icon: <IconEdit size={14} />, run: startEdit },
-      { id: "v-proposal", label: "施策ビューを開く", icon: <IconList size={14} />, run: () => setView("proposal") },
-      { id: "v-approve", label: "記事ビューを開く", icon: <IconInbox size={14} />, run: () => setView("approve") },
-      { id: "v-prompt", label: "プロンプトビューを開く", icon: <IconFileText size={14} />, run: () => setView("prompt") },
-      { id: "v-perf", label: "成績ボードを開く", icon: <IconChart size={14} />, run: () => setView("performance") },
-      { id: "v-queue", label: "公開キューを開く", icon: <IconCalendar size={14} />, run: () => setView("queue") },
-      { id: "kanban", label: "カンバン表示に切替", icon: <IconLayout size={14} />, run: () => { setView("approve"); setBoardMode("kanban"); } },
-      { id: "listmode", label: "リスト表示に切替", icon: <IconList size={14} />, run: () => { setView("approve"); setBoardMode("list"); } },
-      { id: "brand", label: "ブランド配色を切替", icon: <IconSparkles size={14} />, run: () => setBrand((b) => !b) },
-      { id: "refresh", label: "データを再読み込み", icon: <IconRefresh size={14} />, run: refreshBoard },
-      { id: "proposal", label: "施策を追加", icon: <IconPlus size={14} />, run: () => setProposalOpen(true) },
-      { id: "fail-next", label: failNext ? "失敗デモを解除" : "次のAI依頼を失敗させる（デモ）", icon: <IconWand size={14} />, run: toggleFailNext },
-      { id: "demo-poll", label: "ポーリング失敗を再現（デモ）", icon: <IconRefresh size={14} />, run: () => setPollFailures((n) => n + 1) },
-      { id: "demo-error", label: "読み込みエラーを再現（デモ）", icon: <IconRefresh size={14} />, run: () => setLoadError(true) },
-    ],
-    [activeId, approve, revise, startEdit, refreshBoard, failNext, toggleFailNext]
-  );
-
-  const kanbanDrawerOpen = view === "approve" && boardMode === "kanban" && activeArticle !== null;
 
   const detail = (
     <DetailPanel
@@ -1372,7 +1256,7 @@ export default function ApproveProtoPage() {
   return (
     // reducedMotion="user" でOSの「視差効果を減らす」設定を尊重し、配下の motion を自動で抑制(a11y仕上げ)。
     <MotionConfig reducedMotion="user">
-    <div className={`proto-root flex flex-col ${brand ? "proto-brand" : ""}`}>
+    <div className="proto-root flex flex-col">
       <TopBar
         segment={segment}
         segments={segmentDefs}
@@ -1381,7 +1265,6 @@ export default function ApproveProtoPage() {
         publishedThisWeek={publishedThisWeek}
         onSegmentChange={setSegment}
         onQueryChange={setQuery}
-        onOpenPalette={() => setPaletteOpen(true)}
         searchRef={searchRef}
         syncLabel={syncLabel}
         syncStale={syncStale}
@@ -1400,20 +1283,14 @@ export default function ApproveProtoPage() {
         />
 
         <main className="min-w-0 flex-1 flex flex-col">
-          {pollFailures >= 2 && !loadError && (
-            <PollFailBanner lastLabel={syncLabel ?? "—"} onRetry={refreshBoard} />
-          )}
-          {loadError ? (
-            <ErrorState onRetry={retryLoad} />
-          ) : (
-            <><div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1">
           {view === "proposal" && (
             <ProposalView
               proposals={proposals}
               activeId={proposals.some((p) => p.id === activeId) ? activeId : (proposals[0]?.id ?? null)}
               onActivate={setActiveId}
               onApprove={approveProposal}
-              onHold={holdProposal}
+              onReopen={reopenProposal}
               onReject={rejectProposal}
               onOpenForm={() => setProposalOpen(true)}
             />
@@ -1421,7 +1298,7 @@ export default function ApproveProtoPage() {
 
           {view === "prompt" && <PromptRegistryView />}
 
-          {view === "approve" && boardMode === "list" && (
+          {view === "approve" && (
             // 狭幅(lg未満)では1ペイン: 記事未選択=リスト全幅 / 選択中=詳細全幅(「←一覧」で戻る)。lg以上は現行の2ペイン。
             <div className="flex h-full min-h-0">
               <div
@@ -1443,7 +1320,6 @@ export default function ApproveProtoPage() {
                     groups={groups}
                     activeId={activeId}
                     selectedIds={selectedIds}
-                    compact={compact}
                     onActivate={activate}
                     onToggleSelect={toggleSelect}
                   />
@@ -1455,40 +1331,6 @@ export default function ApproveProtoPage() {
               >
                 {loading ? <SkeletonDetail /> : detail}
               </div>
-            </div>
-          )}
-
-          {view === "approve" && boardMode === "kanban" && (
-            <div className="relative h-full">
-              <KanbanBoard articles={filtered} activeId={activeId} onActivate={activate} />
-              <AnimatePresence>
-                {kanbanDrawerOpen && (
-                  <>
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-20"
-                      style={{ background: "rgba(4,6,9,0.5)" }}
-                      onClick={() => setActiveId(null)}
-                    />
-                    <motion.aside
-                      initial={{ x: 48, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: 48, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute inset-y-0 right-0 z-30 w-[640px] max-w-[92%]"
-                      style={{
-                        background: "var(--p-bg)",
-                        borderLeft: "1px solid var(--p-border-strong)",
-                        boxShadow: "-20px 0 50px rgba(0,0,0,0.5)",
-                      }}
-                    >
-                      {detail}
-                    </motion.aside>
-                  </>
-                )}
-              </AnimatePresence>
             </div>
           )}
 
@@ -1510,21 +1352,11 @@ export default function ApproveProtoPage() {
               />
             </div>
           )}
-            </div></>
-          )}
+          </div>
         </main>
       </div>
 
-      <ShortcutBar
-        boardMode={boardMode}
-        showBoardToggle={view === "approve"}
-        compact={compact}
-        brand={brand}
-        onBoardModeChange={setBoardMode}
-        onToggleCompact={() => setCompact((c) => !c)}
-        onToggleBrand={() => setBrand((b) => !b)}
-        onOpenShortcuts={() => setShortcutsOpen(true)}
-      />
+      <ShortcutBar onOpenShortcuts={() => setShortcutsOpen(true)} />
 
       <BulkBar
         count={selectedIds.size}
@@ -1532,18 +1364,6 @@ export default function ApproveProtoPage() {
         onRejectAll={rejectSelected}
         onClear={() => setSelectedIds(new Set())}
       />
-
-      {paletteOpen && (
-        <CommandPalette
-          commands={commands}
-          articles={articles}
-          onClose={() => setPaletteOpen(false)}
-          onJump={(id) => {
-            setView("approve");
-            activate(id);
-          }}
-        />
-      )}
 
       {shortcutsOpen && <ShortcutOverlay onClose={() => setShortcutsOpen(false)} />}
 

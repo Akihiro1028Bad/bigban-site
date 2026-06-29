@@ -21,7 +21,6 @@ interface BoardProps {
   groups: BoardGroup[];
   activeId: string | null;
   selectedIds: Set<string>;
-  compact?: boolean;
   onActivate: (id: string) => void;
   onToggleSelect: (id: string) => void;
 }
@@ -30,7 +29,6 @@ export function Board({
   groups,
   activeId,
   selectedIds,
-  compact,
   onActivate,
   onToggleSelect,
 }: BoardProps) {
@@ -81,7 +79,7 @@ export function Board({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18 }}
                 onClick={() => onActivate(a.id)}
-                className={`proto-row group relative flex w-full items-start gap-3 px-4 text-left transition-colors ${compact ? "py-[6px]" : "py-[11px]"}`}
+                className="proto-row group relative flex w-full items-start gap-3 px-4 py-[11px] text-left transition-colors"
                 style={{
                   background: active ? "var(--p-bg-raised)" : "transparent",
                 }}
@@ -131,14 +129,12 @@ export function Board({
                     </span>
                   </span>
 
-                  {!compact && (
-                    <span
-                      className="mt-[3px] block truncate text-[12px] leading-snug"
-                      style={{ color: "var(--p-text-3)" }}
-                    >
-                      {a.excerpt}
-                    </span>
-                  )}
+                  <span
+                    className="mt-[3px] block truncate text-[12px] leading-snug"
+                    style={{ color: "var(--p-text-3)" }}
+                  >
+                    {a.excerpt}
+                  </span>
 
                   <span className="mt-2 flex items-center gap-3">
                     <StageChip stage={a.stage} small />

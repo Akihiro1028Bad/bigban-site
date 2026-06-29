@@ -12,17 +12,16 @@ import type { Article, ProposalStatus } from "./types";
 
 const STATUS_META: Record<Exclude<ProposalStatus, "adopted">, { label: string; tone: string; order: number }> = {
   pending: { label: "未処理", tone: "var(--p-amber)", order: 0 },
-  considering: { label: "検討中", tone: "var(--p-accent)", order: 1 },
-  rejected: { label: "却下", tone: "var(--p-text-3)", order: 2 },
+  rejected: { label: "却下", tone: "var(--p-text-3)", order: 1 },
 };
-const ORDER: Exclude<ProposalStatus, "adopted">[] = ["pending", "considering", "rejected"];
+const ORDER: Exclude<ProposalStatus, "adopted">[] = ["pending", "rejected"];
 
 interface ProposalViewProps {
   proposals: Article[];
   activeId: string | null;
   onActivate: (id: string) => void;
   onApprove: (id: string) => void;
-  onHold: (id: string) => void;
+  onReopen: (id: string) => void;
   onReject: (id: string, note: string) => void;
   onOpenForm: () => void;
 }
@@ -44,7 +43,7 @@ function EvidenceChips({ items }: { items: string[] }) {
   );
 }
 
-export function ProposalView({ proposals, activeId, onActivate, onApprove, onHold, onReject, onOpenForm }: ProposalViewProps) {
+export function ProposalView({ proposals, activeId, onActivate, onApprove, onReopen, onReject, onOpenForm }: ProposalViewProps) {
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
   // 狭幅(lg未満)の1ペイン制御: 一覧で施策を選ぶと詳細へ、戻る/トリアージ完了で一覧へ。lg以上は常に両ペイン。
@@ -181,13 +180,12 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onHol
                   </button>
                 </div>
               ) : active.proposalStatus === "rejected" ? (
-                <button onClick={() => { onHold(active.id); setShowDetailMobile(false); }} className="proto-btn-ghost">検討中に戻す</button>
+                <button onClick={() => { onReopen(active.id); setShowDetailMobile(false); }} className="proto-btn-ghost">未処理に戻す</button>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => setRejecting(true)} className="proto-btn-ghost" style={{ color: "var(--p-red)" }}>
                     <IconX size={14} /> 却下
                   </button>
-                  <button onClick={() => { onHold(active.id); setShowDetailMobile(false); }} className="proto-btn-ghost">保留</button>
                   <button
                     onClick={() => { onApprove(active.id); setShowDetailMobile(false); }}
                     className="proto-btn-primary ml-auto flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold sm:w-auto sm:justify-start"

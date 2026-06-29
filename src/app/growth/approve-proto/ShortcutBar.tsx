@@ -1,33 +1,16 @@
 /**
- * 下部バー(#proto): キーヒント / 盤モード切替(リスト⇄カンバン) / ブランド配色 / ヘルプ。
+ * 下部バー(#proto): キーヒント / ヘルプ。
  */
 "use client";
 
-import { IconKeyboard, IconLayout, IconList, IconSparkles } from "./icons";
+import { IconKeyboard } from "./icons";
 import { Kbd } from "./ui";
-import type { BoardMode } from "./types";
 
 interface ShortcutBarProps {
-  boardMode: BoardMode;
-  showBoardToggle: boolean;
-  compact: boolean;
-  brand: boolean;
-  onBoardModeChange: (mode: BoardMode) => void;
-  onToggleCompact: () => void;
-  onToggleBrand: () => void;
   onOpenShortcuts: () => void;
 }
 
-export function ShortcutBar({
-  boardMode,
-  showBoardToggle,
-  compact,
-  brand,
-  onBoardModeChange,
-  onToggleCompact,
-  onToggleBrand,
-  onOpenShortcuts,
-}: ShortcutBarProps) {
+export function ShortcutBar({ onOpenShortcuts }: ShortcutBarProps) {
   return (
     <footer
       className="flex h-[34px] shrink-0 items-center gap-4 px-4 text-[11.5px]"
@@ -57,75 +40,17 @@ export function ShortcutBar({
         </span>
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        {showBoardToggle && (
-          <div
-            className="flex items-center gap-[2px] rounded-[8px] p-[2px]"
-            style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
-          >
-            <button
-              onClick={() => onBoardModeChange("list")}
-              className="flex items-center gap-1 rounded-[6px] px-2 py-[3px] text-[11.5px] font-medium"
-              style={{
-                background: boardMode === "list" ? "var(--p-bg-raised)" : "transparent",
-                color: boardMode === "list" ? "var(--p-text)" : "var(--p-text-3)",
-              }}
-            >
-              <IconList size={13} /> リスト
-            </button>
-            <button
-              onClick={() => onBoardModeChange("kanban")}
-              className="flex items-center gap-1 rounded-[6px] px-2 py-[3px] text-[11.5px] font-medium"
-              style={{
-                background: boardMode === "kanban" ? "var(--p-bg-raised)" : "transparent",
-                color: boardMode === "kanban" ? "var(--p-text)" : "var(--p-text-3)",
-              }}
-            >
-              <IconLayout size={13} /> カンバン
-            </button>
-          </div>
-        )}
-
-        {showBoardToggle && (
-          <button
-            onClick={onToggleCompact}
-            className="flex items-center gap-1.5 rounded-[8px] px-2 py-[4px] font-medium"
-            style={{
-              background: compact ? "var(--p-accent-weak)" : "var(--p-bg-input)",
-              border: "1px solid var(--p-border)",
-              color: compact ? "var(--p-accent)" : "var(--p-text-3)",
-            }}
-            title="表示密度を切替"
-          >
-            <IconList size={13} /> <span className="hidden sm:inline">{compact ? "コンパクト" : "標準"}</span>
-          </button>
-        )}
-
-        <button
-          onClick={onToggleBrand}
-          className="flex items-center gap-1.5 rounded-[8px] px-2 py-[4px] font-medium transition-colors"
-          style={{
-            background: brand ? "var(--p-accent-weak)" : "var(--p-bg-input)",
-            border: "1px solid var(--p-border)",
-            color: brand ? "var(--p-accent)" : "var(--p-text-3)",
-          }}
-          title="ブランド配色(アクセント黄)を切替"
-        >
-          <IconSparkles size={13} /> <span className="hidden sm:inline">ブランド配色</span>
-        </button>
-
-        <button
-          onClick={onOpenShortcuts}
-          className="flex items-center gap-1.5 rounded-[8px] px-2 py-[4px]"
-          style={{
-            background: "var(--p-bg-input)",
-            border: "1px solid var(--p-border)",
-            color: "var(--p-text-3)",
-          }}
-        >
-          <IconKeyboard size={13} /> <Kbd>?</Kbd>
-        </button>
-      </div>
+      <button
+        onClick={onOpenShortcuts}
+        className="ml-auto flex items-center gap-1.5 rounded-[8px] px-2 py-[4px]"
+        style={{
+          background: "var(--p-bg-input)",
+          border: "1px solid var(--p-border)",
+          color: "var(--p-text-3)",
+        }}
+      >
+        <IconKeyboard size={13} /> <Kbd>?</Kbd>
+      </button>
     </footer>
   );
 }

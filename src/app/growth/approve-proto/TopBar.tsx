@@ -1,9 +1,9 @@
 /**
- * 上部バー(#proto): ブランド / 段階セグメント / 検索 / 統計ピル / ⌘K。
+ * 上部バー(#proto): ブランド / 段階セグメント / 検索 / 統計ピル。
  */
 "use client";
 
-import { IconCommand, IconInbox, IconPlus, IconRefresh, IconSearch } from "./icons";
+import { IconInbox, IconPlus, IconRefresh, IconSearch } from "./icons";
 import { Kbd } from "./ui";
 import type { SegmentKey } from "./types";
 
@@ -21,7 +21,6 @@ interface TopBarProps {
   publishedThisWeek: number;
   onSegmentChange: (key: SegmentKey) => void;
   onQueryChange: (q: string) => void;
-  onOpenPalette: () => void;
   searchRef: React.RefObject<HTMLInputElement | null>;
   syncLabel: string | null;
   syncStale: boolean;
@@ -38,7 +37,6 @@ export function TopBar({
   publishedThisWeek,
   onSegmentChange,
   onQueryChange,
-  onOpenPalette,
   searchRef,
   syncLabel,
   syncStale,
@@ -167,22 +165,6 @@ export function TopBar({
           <IconRefresh size={13} />
         </span>
         <span className="hidden sm:inline">{syncing ? "更新中…" : (syncLabel ?? "—")}</span>
-      </button>
-
-      <button
-        onClick={onOpenPalette}
-        className="hidden items-center gap-2 rounded-[9px] px-2.5 py-[6px] text-[12.5px] transition-colors hover:brightness-125 sm:flex"
-        style={{
-          background: "var(--p-bg-input)",
-          border: "1px solid var(--p-border)",
-          color: "var(--p-text-2)",
-        }}
-      >
-        <IconCommand size={14} />
-        <span className="flex items-center gap-1">
-          <Kbd>⌘</Kbd>
-          <Kbd>K</Kbd>
-        </span>
       </button>
     </header>
   );
