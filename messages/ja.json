@@ -139,8 +139,24 @@
   "Reserve": {
     "hero": {
       "title": "RESERVE",
-      "subtitle": "コート予約",
-      "lead": "ご希望の日時を選んで、オンラインでかんたんにコートを予約できます。"
+      "subtitle": "コート予約"
+    },
+    "choice": {
+      "notice": "現在、予約システムの切り替えを行っております。ご利用になる月によって予約サイトが異なりますので、予約日を基準にお選びください。",
+      "pickleballKicker": "PICKLEBALL COURT",
+      "pickleballHeading": "ピックルボールコート",
+      "julyLabel": "〜7月のご予約",
+      "julyPeriod": "〜2026年7月",
+      "julyDesc": "2026年7月までのご利用分はこちらから。",
+      "julyCta": "7月末までの予約",
+      "augLabel": "8月以降のご予約",
+      "augPeriod": "2026年8月〜",
+      "augDesc": "2026年8月以降のご利用分はこちらから。",
+      "augCta": "8月以降の予約",
+      "hyroxKicker": "HYROX AREA",
+      "hyroxHeading": "HYROXエリア",
+      "hyroxDesc": "HYROXエリアのご予約はこちらから。",
+      "hyroxCta": "HYROXの予約"
     },
     "steps": {
       "heading": "予約の流れ",
@@ -607,8 +623,7 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "ハイロックス",
-      "cta": "今すぐ予約",
-      "comingSoon": "近日開始",
+      "reserveCta": "今すぐ予約",
       "imageAlts": [
         "スレッドプルに挑むアスリート",
         "HYROX大会会場とウォールボールに挑む選手たち",
@@ -678,9 +693,7 @@
       "title": "SERVICES",
       "titleJa": "サービス",
       "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
-      "cta": "RESERVE",
-      "ctaJa": "予約",
-      "comingSoon": "近日開始",
+      "reserveCta": "予約する",
       "items": [
         {
           "key": "rental",
@@ -759,9 +772,12 @@
       "title": "PROGRAM",
       "titleJa": "プログラム・料金",
       "rateLabel": "エリア利用料",
-      "price": "¥2,980",
-      "unit": "／ 1時間",
-      "note": "HYROX公式8種目に対応したトレーニングエリアを時間制でご利用いただけます。"
+      "duration": "90分",
+      "weekday": "平日",
+      "weekdayPrice": "¥3,500",
+      "weekend": "土日祝",
+      "weekendPrice": "¥4,000",
+      "note": "HYROX公式8種目に対応したトレーニングエリアを1回90分制でご利用いただけます。"
     },
     "coach": {
       "sectionTitle": "CREW",

@@ -22,13 +22,8 @@ describe("ReserveHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("和文サブタイトルとリード文を表示する", () => {
+  it("和文サブタイトルを表示する", () => {
     renderWithIntl(<ReserveHero />);
     expect(screen.getByText("コート予約")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "ご希望の日時を選んで、オンラインでかんたんにコートを予約できます。"
-      )
-    ).toBeInTheDocument();
   });
 });

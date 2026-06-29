@@ -9,11 +9,20 @@ describe("HyroxProgram", () => {
     expect(screen.getByRole("heading", { name: "PROGRAM" })).toBeInTheDocument();
   });
 
-  it("HYROX エリア利用料（1時間 ¥2,980）を表示する", () => {
+  it("エリア利用料・90分・平日/土日祝の料金を表示する", () => {
     renderWithIntl(<HyroxProgram />);
     expect(screen.getByText("エリア利用料")).toBeInTheDocument();
-    expect(screen.getByText("¥2,980")).toBeInTheDocument();
-    expect(screen.getByText("／ 1時間")).toBeInTheDocument();
+    expect(screen.getByText("90分")).toBeInTheDocument();
+    expect(screen.getByText("平日")).toBeInTheDocument();
+    expect(screen.getByText("¥3,500")).toBeInTheDocument();
+    expect(screen.getByText("土日祝")).toBeInTheDocument();
+    expect(screen.getByText("¥4,000")).toBeInTheDocument();
+  });
+
+  it("旧料金（¥2,980／1時間）は表示しない", () => {
+    renderWithIntl(<HyroxProgram />);
+    expect(screen.queryByText("¥2,980")).not.toBeInTheDocument();
+    expect(screen.queryByText("／ 1時間")).not.toBeInTheDocument();
   });
 
   it("ピックルのコートレンタル料金表は表示しない", () => {

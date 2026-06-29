@@ -256,9 +256,8 @@ export default function MobileMenu({
             </div>
 
             <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3">
-              <a
+              <Link
                 href={reserveHref}
-                {...EXTERNAL_LINK_PROPS}
                 onClick={onLinkClick}
                 className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-deep-black hover:gap-3 motion-safe:transition-all"
               >
@@ -271,7 +270,7 @@ export default function MobileMenu({
                 <span aria-hidden className="text-base leading-none">
                   →
                 </span>
-              </a>
+              </Link>
             </div>
           </motion.div>
         </motion.div>
