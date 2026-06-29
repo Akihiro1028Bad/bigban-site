@@ -67,3 +67,19 @@ export function settleReviseTarget(c: Consult, target: ReviseTarget): Consult | 
   if (Object.keys(next).length === 0) return null;
   return { ...c, result: { ...c.result, revise: next } };
 }
+
+/** sentence result から block を除く。残り0なら null。 */
+export function settleSentenceFix(c: Consult, block: number): Consult | null {
+  const fixes = c.result?.sentence;
+  if (!fixes) return c;
+  const next = fixes.filter((f) => f.block !== block);
+  if (next.length === 0) return null;
+  return { ...c, result: { ...c.result, sentence: next } };
+}
+
+/** advice の直すべき点(index)を本文末尾へ反映する(イミュータブル)。 */
+export function adoptAdviceFix(article: Article, c: Consult, index: number): Article {
+  const fix = c.result?.overall?.fixes[index];
+  if (!fix) return article;
+  return { ...article, bodyHtml: `${article.bodyHtml}<p class="proto-changed">${fix.suggestion}</p>` };
+}
