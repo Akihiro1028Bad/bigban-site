@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { IconCommand, IconInbox, IconRefresh, IconSearch } from "./icons";
+import { IconCommand, IconInbox, IconPlus, IconRefresh, IconSearch } from "./icons";
 import { Kbd } from "./ui";
 import type { SegmentKey } from "./types";
 
@@ -27,6 +27,7 @@ interface TopBarProps {
   syncStale: boolean;
   syncing: boolean;
   onRefresh: () => void;
+  onOpenProposal: () => void;
 }
 
 export function TopBar({
@@ -43,10 +44,11 @@ export function TopBar({
   syncStale,
   syncing,
   onRefresh,
+  onOpenProposal,
 }: TopBarProps) {
   return (
     <header
-      className="flex h-[52px] shrink-0 items-center gap-4 px-4"
+      className="flex h-[52px] shrink-0 items-center gap-2 px-3 sm:gap-4 sm:px-4"
       style={{ borderBottom: "1px solid var(--p-border)", background: "var(--p-bg-elevated)" }}
     >
       <div className="flex items-center gap-2.5">
@@ -56,9 +58,9 @@ export function TopBar({
         >
           <IconInbox size={16} />
         </span>
-        <span className="text-[14px] font-semibold tracking-tight">Growth Console</span>
+        <span className="hidden text-[14px] font-semibold tracking-tight sm:inline">Growth Console</span>
         <span
-          className="rounded-full px-2 py-[1px] text-[10px] font-medium"
+          className="hidden rounded-full px-2 py-[1px] text-[10px] font-medium sm:inline"
           style={{ background: "var(--p-bg-active)", color: "var(--p-text-3)" }}
         >
           承認
@@ -66,7 +68,7 @@ export function TopBar({
       </div>
 
       <div
-        className="flex items-center gap-[2px] rounded-[9px] p-[3px]"
+        className="hidden items-center gap-[2px] rounded-[9px] p-[3px] md:flex"
         style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
         role="tablist"
         aria-label="段階フィルタ"
@@ -98,7 +100,7 @@ export function TopBar({
         })}
       </div>
 
-      <div className="relative ml-auto w-[260px]">
+      <div className="relative ml-auto min-w-0 flex-1 sm:w-[260px] sm:flex-none">
         <span
           className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
           style={{ color: "var(--p-text-3)" }}
@@ -122,7 +124,7 @@ export function TopBar({
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="hidden items-center gap-3 lg:flex">
         <span
           className="flex items-center gap-1.5 text-[12px]"
           style={{ color: "var(--p-text-2)" }}
@@ -142,6 +144,15 @@ export function TopBar({
       </div>
 
       <button
+        onClick={onOpenProposal}
+        title="施策を追加"
+        className="flex items-center gap-1 rounded-[9px] px-2.5 py-[6px] text-[12px] font-medium"
+        style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)", color: "var(--p-text-2)" }}
+      >
+        <IconPlus size={14} /> <span className="hidden sm:inline">施策</span>
+      </button>
+
+      <button
         onClick={onRefresh}
         disabled={syncing}
         title="データを更新"
@@ -155,12 +166,12 @@ export function TopBar({
         <span className={syncing ? "proto-spin" : undefined} style={{ display: "inline-flex" }}>
           <IconRefresh size={13} />
         </span>
-        {syncing ? "更新中…" : (syncLabel ?? "—")}
+        <span className="hidden sm:inline">{syncing ? "更新中…" : (syncLabel ?? "—")}</span>
       </button>
 
       <button
         onClick={onOpenPalette}
-        className="flex items-center gap-2 rounded-[9px] px-2.5 py-[6px] text-[12.5px] transition-colors hover:brightness-125"
+        className="hidden items-center gap-2 rounded-[9px] px-2.5 py-[6px] text-[12.5px] transition-colors hover:brightness-125 sm:flex"
         style={{
           background: "var(--p-bg-input)",
           border: "1px solid var(--p-border)",

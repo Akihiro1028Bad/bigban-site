@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { IconArrowRight, IconSearch } from "./icons";
 import type { Article } from "./types";
 import { EyecatchThumb, Kbd, StageChip } from "./ui";
+import { useDialog } from "./useDialog";
 
 export interface Command {
   id: string;
@@ -35,6 +36,7 @@ export function CommandPalette({
   const [q, setQ] = useState("");
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialog();
 
   // マウント時に入力へフォーカス(外部DOMの同期なので effect が適切)。
   useEffect(() => {
@@ -76,6 +78,10 @@ export function CommandPalette({
       onMouseDown={onClose}
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="コマンドパレット"
         initial={{ opacity: 0, y: -8, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}
@@ -143,7 +149,7 @@ export function CommandPalette({
                   </>
                 ) : (
                   <>
-                    <EyecatchThumb hue={row.art.hue} has={row.art.hasEyecatch} size={26} />
+                    <EyecatchThumb hue={row.art.hue} has={row.art.hasEyecatch} url={row.art.eyecatchUrl} size={26} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px]">{row.art.title}</span>
                     </span>

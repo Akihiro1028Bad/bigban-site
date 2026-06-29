@@ -10,8 +10,10 @@ import type { BoardMode } from "./types";
 interface ShortcutBarProps {
   boardMode: BoardMode;
   showBoardToggle: boolean;
+  compact: boolean;
   brand: boolean;
   onBoardModeChange: (mode: BoardMode) => void;
+  onToggleCompact: () => void;
   onToggleBrand: () => void;
   onOpenShortcuts: () => void;
 }
@@ -19,8 +21,10 @@ interface ShortcutBarProps {
 export function ShortcutBar({
   boardMode,
   showBoardToggle,
+  compact,
   brand,
   onBoardModeChange,
+  onToggleCompact,
   onToggleBrand,
   onOpenShortcuts,
 }: ShortcutBarProps) {
@@ -33,22 +37,25 @@ export function ShortcutBar({
         color: "var(--p-text-3)",
       }}
     >
-      <span className="flex items-center gap-1.5">
-        <Kbd>J</Kbd>
-        <Kbd>K</Kbd> 移動
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Kbd>A</Kbd> 承認
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Kbd>R</Kbd> 修正
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Kbd>X</Kbd> 選択
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Kbd>E</Kbd> 編集
-      </span>
+      {/* キーヒントはキーボード専用。タッチ中心の狭幅では隠す。 */}
+      <div className="hidden items-center gap-4 md:flex">
+        <span className="flex items-center gap-1.5">
+          <Kbd>J</Kbd>
+          <Kbd>K</Kbd> 移動
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Kbd>A</Kbd> 承認
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Kbd>R</Kbd> 修正
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Kbd>X</Kbd> 選択
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Kbd>E</Kbd> 編集
+        </span>
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
         {showBoardToggle && (
@@ -79,6 +86,21 @@ export function ShortcutBar({
           </div>
         )}
 
+        {showBoardToggle && (
+          <button
+            onClick={onToggleCompact}
+            className="flex items-center gap-1.5 rounded-[8px] px-2 py-[4px] font-medium"
+            style={{
+              background: compact ? "var(--p-accent-weak)" : "var(--p-bg-input)",
+              border: "1px solid var(--p-border)",
+              color: compact ? "var(--p-accent)" : "var(--p-text-3)",
+            }}
+            title="表示密度を切替"
+          >
+            <IconList size={13} /> <span className="hidden sm:inline">{compact ? "コンパクト" : "標準"}</span>
+          </button>
+        )}
+
         <button
           onClick={onToggleBrand}
           className="flex items-center gap-1.5 rounded-[8px] px-2 py-[4px] font-medium transition-colors"
@@ -89,7 +111,7 @@ export function ShortcutBar({
           }}
           title="ブランド配色(アクセント黄)を切替"
         >
-          <IconSparkles size={13} /> ブランド配色
+          <IconSparkles size={13} /> <span className="hidden sm:inline">ブランド配色</span>
         </button>
 
         <button

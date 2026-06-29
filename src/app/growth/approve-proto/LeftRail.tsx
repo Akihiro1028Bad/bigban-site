@@ -1,9 +1,9 @@
 /**
- * 左レール(#proto): 主ビュー(承認 / 成績 / 公開キュー)を切替える。
+ * 左レール(#proto): 情報源タワー型。5面をループ順(施策→記事→プロンプト→成績→公開キュー)で切替。
  */
 "use client";
 
-import { IconCalendar, IconChart, IconInbox } from "./icons";
+import { IconCalendar, IconChart, IconFileText, IconInbox, IconList } from "./icons";
 import type { MainView } from "./types";
 
 interface RailItem {
@@ -16,19 +16,23 @@ interface RailItem {
 interface LeftRailProps {
   view: MainView;
   awaitingCount: number;
+  proposalCount: number;
+  queueReadyCount: number;
   onChange: (view: MainView) => void;
 }
 
-export function LeftRail({ view, awaitingCount, onChange }: LeftRailProps) {
+export function LeftRail({ view, awaitingCount, proposalCount, queueReadyCount, onChange }: LeftRailProps) {
   const items: RailItem[] = [
-    { key: "approve", label: "承認", icon: <IconInbox size={20} />, badge: awaitingCount },
-    { key: "performance", label: "成績", icon: <IconChart size={20} /> },
-    { key: "queue", label: "公開キュー", icon: <IconCalendar size={20} /> },
+    { key: "proposal", label: "施策", icon: <IconList size={18} />, badge: proposalCount },
+    { key: "approve", label: "記事", icon: <IconInbox size={18} />, badge: awaitingCount },
+    { key: "prompt", label: "プロンプト", icon: <IconFileText size={18} /> },
+    { key: "performance", label: "成績", icon: <IconChart size={18} /> },
+    { key: "queue", label: "公開キュー", icon: <IconCalendar size={18} />, badge: queueReadyCount },
   ];
 
   return (
     <nav
-      className="flex w-[64px] shrink-0 flex-col items-center gap-1.5 py-3"
+      className="flex w-[60px] shrink-0 flex-col gap-1 px-2 py-3 sm:w-[156px] sm:px-2.5"
       style={{ borderRight: "1px solid var(--p-border)", background: "var(--p-bg-elevated)" }}
     >
       {items.map((it) => {
@@ -37,25 +41,30 @@ export function LeftRail({ view, awaitingCount, onChange }: LeftRailProps) {
           <button
             key={it.key}
             onClick={() => onChange(it.key)}
-            className="relative flex w-[52px] flex-col items-center gap-1 rounded-[10px] py-2 transition-colors"
+            title={it.label}
+            aria-label={it.label}
+            className="relative flex items-center justify-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left transition-colors sm:justify-start"
             style={{
               background: active ? "var(--p-bg-active)" : "transparent",
-              color: active ? "var(--p-text)" : "var(--p-text-3)",
+              color: active ? "var(--p-text)" : "var(--p-text-2)",
             }}
-            title={it.label}
           >
-            <span className="relative">
-              {it.icon}
-              {it.badge ? (
-                <span
-                  className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full px-[3px] text-[10px] font-semibold tabular-nums"
-                  style={{ background: "var(--p-amber)", color: "#0a0c10" }}
-                >
-                  {it.badge}
-                </span>
-              ) : null}
-            </span>
-            <span className="text-[10.5px] font-medium">{it.label}</span>
+            {active && (
+              <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full" style={{ background: "var(--p-accent)" }} />
+            )}
+            <span style={{ color: active ? "var(--p-accent)" : "var(--p-text-3)" }}>{it.icon}</span>
+            <span className="hidden text-[13px] font-medium sm:inline">{it.label}</span>
+            {it.badge ? (
+              <span
+                className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10.5px] font-semibold tabular-nums sm:static sm:ml-auto"
+                style={{
+                  background: it.key === "proposal" || it.key === "approve" ? "var(--p-amber)" : "var(--p-bg-raised)",
+                  color: it.key === "proposal" || it.key === "approve" ? "#0a0c10" : "var(--p-text-2)",
+                }}
+              >
+                {it.badge}
+              </span>
+            ) : null}
           </button>
         );
       })}

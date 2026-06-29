@@ -1,33 +1,28 @@
 /**
- * 構成案タブ(#proto・最初の承認ゲート): セクションごとの行コメント・画像指示編集と、
+ * 構成案タブ(#proto・最初の承認ゲート): セクションごとの行コメントと【画像指示(再設計)】、
  * コメントをまとめた構成案の修正依頼。
+ *
+ * 画像指示は house style(宇宙人マスコット×コスミック)ロックを前提に「オフ/おまかせ/指定」の
+ * 3状態トグル＋行為(action)一言に正規化。コメント編集とは非排他の独立レーン(痛点6)。
  */
 "use client";
 
 import { useState } from "react";
 
-import {
-  IconImage,
-  IconMessage,
-  IconPlus,
-  IconWand,
-  IconX,
-} from "./icons";
-import type { Article, ImageStyle } from "./types";
-
-const STYLE_LABEL: Record<ImageStyle, string> = {
-  mascot: "マスコット",
-  minimal: "ミニマル",
-  diagram: "図解",
-};
-const STYLES: ImageStyle[] = ["mascot", "minimal", "diagram"];
+import { ImageDirector } from "./ImageDirector";
+import { ImagePlanBanner } from "./ImagePlanBanner";
+import { ImageSlot } from "./ImageSlot";
+import { ImageStateToggle } from "./ImageStateToggle";
+import { IconMessage, IconPlus, IconSparkles, IconWand, IconX } from "./icons";
+import { effectiveMode, recommendOff, resolveAction } from "./imageIntent";
+import type { Article, ImageInstruction, ImageMode } from "./types";
 
 interface OutlineViewProps {
   article: Article;
   onAddComment: (sectionIndex: number, text: string) => void;
   onRemoveComment: (sectionIndex: number, commentIndex: number) => void;
-  onSetImageInstruction: (sectionIndex: number, style: ImageStyle, description: string) => void;
-  onClearImageInstruction: (sectionIndex: number) => void;
+  /** 画像指示の部分更新(immutable マージは page 側)。 */
+  onUpdateImage: (sectionIndex: number, patch: Partial<ImageInstruction>) => void;
   onRequestOutlineRevise: () => void;
 }
 
@@ -35,16 +30,14 @@ export function OutlineView({
   article,
   onAddComment,
   onRemoveComment,
-  onSetImageInstruction,
-  onClearImageInstruction,
+  onUpdateImage,
   onRequestOutlineRevise,
 }: OutlineViewProps) {
   const [commentFor, setCommentFor] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [imgFor, setImgFor] = useState<number | null>(null);
-  const [imgStyle, setImgStyle] = useState<ImageStyle>("mascot");
-  const [imgDesc, setImgDesc] = useState("");
+  const [editingImg, setEditingImg] = useState<number | null>(null);
 
+  const total = article.outline.length;
   const totalComments = article.outline.reduce((n, s) => n + (s.comments?.length ?? 0), 0);
   const revising = article.reviseStatus === "requested" || article.reviseStatus === "presenting";
 
@@ -55,20 +48,41 @@ export function OutlineView({
     setCommentFor(null);
   };
 
-  const openImg = (i: number) => {
-    const cur = article.outline[i].imageInstruction;
-    setImgStyle(cur?.style ?? "mascot");
-    setImgDesc(cur?.description ?? "");
-    setImgFor(i);
+  const changeMode = (i: number, mode: ImageMode) => {
+    onUpdateImage(i, { mode });
+    setEditingImg(mode === "custom" ? i : null);
   };
-  const saveImg = (i: number) => {
-    if (!imgDesc.trim()) return;
-    onSetImageInstruction(i, imgStyle, imgDesc.trim());
-    setImgFor(null);
-  };
+
+  const hyp = article.hypothesis;
 
   return (
     <div className="flex flex-col gap-3">
+      {hyp && (
+        <section
+          className="rounded-[12px] p-3.5"
+          style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+        >
+          <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+            <IconSparkles size={13} {...{ style: { color: "var(--p-accent)" } }} /> この記事の狙い（仮説）
+          </div>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
+            {[
+              ["記事タイプ", hyp.articleType],
+              ["狙う読者", hyp.targetReader],
+              ["検索意図", hyp.searchIntent],
+              ["勝ち筋", hyp.winningAngle],
+              ["成功指標", hyp.successMetric],
+              ["想定CTA", hyp.plannedCta],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <div className="text-[10.5px]" style={{ color: "var(--p-text-3)" }}>{label}</div>
+                <div className="mt-[1px] text-[12.5px]" style={{ color: "var(--p-text-2)" }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div
         className="flex items-center gap-2 rounded-[10px] px-3 py-2.5"
         style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
@@ -89,9 +103,14 @@ export function OutlineView({
         </button>
       </div>
 
+      <ImagePlanBanner outline={article.outline} />
+
       <ol className="flex flex-col gap-2.5">
         {article.outline.map((s, i) => {
           const inst = s.imageInstruction;
+          const mode = effectiveMode(inst);
+          const recOff = recommendOff(s, i, total);
+          const slotAction = mode === "custom" ? (inst?.action ?? "") : resolveAction(s);
           return (
             <li
               key={i}
@@ -110,16 +129,6 @@ export function OutlineView({
                   {s.summary && (
                     <div className="mt-[2px] text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
                       {s.summary}
-                    </div>
-                  )}
-
-                  {(inst || s.imageHint) && (
-                    <div
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2 py-[2px] text-[11px]"
-                      style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)" }}
-                    >
-                      <IconImage size={12} />
-                      {inst ? `${STYLE_LABEL[inst.style]}: ${inst.description}` : `画像指示: ${s.imageHint}`}
                     </div>
                   )}
 
@@ -143,7 +152,7 @@ export function OutlineView({
                     </div>
                   )}
 
-                  {commentFor === i ? (
+                  {commentFor === i && (
                     <div className="mt-2.5 flex items-center gap-2">
                       <input
                         autoFocus
@@ -165,60 +174,41 @@ export function OutlineView({
                         追加
                       </button>
                     </div>
-                  ) : imgFor === i ? (
-                    <div
-                      className="mt-2.5 rounded-[10px] p-2.5"
-                      style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
+                  )}
+
+                  {/* コントロール行: コメント追加 | 画像レーン(トグル＋状態) */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                    <button
+                      onClick={() => { setCommentFor(commentFor === i ? null : i); setCommentText(""); }}
+                      className="proto-tool"
+                      style={{ height: 28 }}
                     >
-                      <div className="flex items-center gap-1.5">
-                        {STYLES.map((st) => (
-                          <button
-                            key={st}
-                            onClick={() => setImgStyle(st)}
-                            className="rounded-[7px] px-2.5 py-[4px] text-[11.5px] font-medium"
-                            style={{
-                              background: imgStyle === st ? "var(--p-purple-weak)" : "transparent",
-                              color: imgStyle === st ? "var(--p-purple)" : "var(--p-text-3)",
-                              border: imgStyle === st ? "1px solid var(--p-purple)" : "1px solid var(--p-border)",
-                            }}
-                          >
-                            {STYLE_LABEL[st]}
-                          </button>
-                        ))}
-                      </div>
-                      <textarea
-                        value={imgDesc}
-                        onChange={(e) => setImgDesc(e.target.value)}
-                        placeholder="どんな画像か（例：コートに立つ宇宙人マスコット）"
-                        rows={2}
-                        className="mt-2 w-full resize-none rounded-[8px] p-2 text-[12.5px] outline-none"
-                        style={{ background: "var(--p-bg-elevated)", border: "1px solid var(--p-border)", color: "var(--p-text)" }}
+                      <IconPlus size={13} /> コメント
+                    </button>
+                    <span className="h-4 w-px" style={{ background: "var(--p-border)" }} />
+                    <ImageStateToggle mode={mode} recommendOff={recOff} onChange={(m) => changeMode(i, m)} />
+                    {editingImg !== i && (
+                      <ImageSlot
+                        mode={mode}
+                        action={slotAction}
+                        hue={article.hue}
+                        isEyecatch={inst?.isEyecatch}
+                        onEdit={() => { onUpdateImage(i, { mode: "custom" }); setEditingImg(i); }}
                       />
-                      <div className="mt-2 flex items-center gap-2">
-                        {inst && (
-                          <button onClick={() => { onClearImageInstruction(i); setImgFor(null); }} className="proto-btn-ghost" style={{ color: "var(--p-red)" }}>
-                            削除
-                          </button>
-                        )}
-                        <button onClick={() => setImgFor(null)} className="proto-btn-ghost ml-auto">取消</button>
-                        <button
-                          onClick={() => saveImg(i)}
-                          className="rounded-[8px] px-3 py-[6px] text-[12px] font-semibold"
-                          style={{ background: "var(--p-accent)", color: "#0a0c10" }}
-                        >
-                          保存
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2.5 flex items-center gap-1.5">
-                      <button onClick={() => { setCommentFor(i); setCommentText(""); }} className="proto-tool" style={{ height: 28 }}>
-                        <IconPlus size={13} /> コメント
-                      </button>
-                      <button onClick={() => openImg(i)} className="proto-tool" style={{ height: 28 }}>
-                        <IconImage size={13} /> 画像指示
-                      </button>
-                    </div>
+                    )}
+                  </div>
+
+                  {editingImg === i && (
+                    <ImageDirector
+                      section={s}
+                      hue={article.hue}
+                      isFirst={i === 0}
+                      instruction={inst}
+                      onSetAction={(action) => { onUpdateImage(i, { mode: "custom", action }); setEditingImg(null); }}
+                      onToggleEyecatch={() => onUpdateImage(i, { isEyecatch: !inst?.isEyecatch })}
+                      onSetAdvancedNote={(note) => onUpdateImage(i, { advancedNote: note })}
+                      onCancel={() => { onUpdateImage(i, { mode: "auto" }); setEditingImg(null); }}
+                    />
                   )}
                 </div>
               </div>

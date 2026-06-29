@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 
 import { IconCalendar, IconClock } from "./icons";
 import { Kbd } from "./ui";
+import { useDialog } from "./useDialog";
 
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -57,6 +58,7 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
   }, []);
 
   const [custom, setCustom] = useState("");
+  const dialogRef = useDialog();
 
   const confirmPreset = (p: Preset) => onConfirm(formatSchedule(p.date), p.date.getTime());
   const confirmCustom = () => {
@@ -73,6 +75,10 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
       onMouseDown={onClose}
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="公開日時を予約"
         initial={{ opacity: 0, y: -8, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}

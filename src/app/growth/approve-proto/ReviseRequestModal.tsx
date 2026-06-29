@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 
 import { IconWand } from "./icons";
 import { Kbd } from "./ui";
+import { useDialog } from "./useDialog";
 
 interface ReviseRequestModalProps {
   title: string;
@@ -21,6 +22,7 @@ export function ReviseRequestModal({ title, onClose, onSubmit }: ReviseRequestMo
   const [bodyOn, setBodyOn] = useState(true);
   const [titleText, setTitleText] = useState("");
   const [bodyText, setBodyText] = useState("");
+  const dialogRef = useDialog();
 
   const canSend = (titleOn && titleText.trim()) || (bodyOn && bodyText.trim());
 
@@ -39,6 +41,10 @@ export function ReviseRequestModal({ title, onClose, onSubmit }: ReviseRequestMo
       onMouseDown={onClose}
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`「${title}」の修正を依頼`}
         initial={{ opacity: 0, y: -8, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}

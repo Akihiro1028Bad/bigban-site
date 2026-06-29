@@ -2,7 +2,7 @@
  * 成績ボードの期間スケーリング(#proto・純ロジック)。
  * 基準=7日のメトリクスから 28日/90日の見え方を決定的に作る(外部I/Oなし)。
  */
-import type { Metrics } from "./types";
+import type { Metrics, SearchMetrics } from "./types";
 
 export type Range = "7" | "28" | "90";
 
@@ -42,6 +42,7 @@ export interface RangeMetrics {
   users: number;
   deltaPct: number;
   series: number[];
+  search?: SearchMetrics;
 }
 
 export function rangeView(m: Metrics, range: Range): RangeMetrics {
@@ -51,5 +52,35 @@ export function rangeView(m: Metrics, range: Range): RangeMetrics {
     users: Math.round(m.users * s.factor),
     deltaPct: Math.round(m.deltaPct * s.deltaScale),
     series: fitSeries(m.series, s.points),
+    search: m.search
+      ? {
+          ...m.search,
+          clicks: Math.round(m.search.clicks * s.factor),
+          impressions: Math.round(m.search.impressions * s.factor),
+        }
+      : undefined,
   };
+}
+
+export interface ReviewLabel {
+  text: string;
+  tone: "green" | "amber" | "blue" | "red" | "gray";
+}
+
+/**
+ * 数字の一覧を「次の打ち手」に翻訳する行動ラベル(#計測強化 S3)。複数該当しうるので配列で返す。
+ * daysSincePublished を渡すと、公開後28日超で伸びていない記事を「要改稿」にする。
+ */
+export function reviewLabels(m: RangeMetrics, daysSincePublished?: number): ReviewLabel[] {
+  const s = m.search;
+  if (!s) return [{ text: "未計測", tone: "gray" }];
+  const out: ReviewLabel[] = [];
+  if (m.deltaPct >= 20) out.push({ text: "伸びている", tone: "green" });
+  if (s.position > 7 && s.position <= 20) out.push({ text: "順位あと少し", tone: "blue" });
+  if (s.impressions > 2000 && s.ctr < 2) out.push({ text: "CTRが弱い", tone: "amber" });
+  if (m.views > 1000 && s.clicks < s.impressions * 0.02) out.push({ text: "読まれるがCTA弱い", tone: "amber" });
+  if (m.deltaPct <= -10 || (daysSincePublished != null && daysSincePublished > 28 && m.deltaPct < 5)) {
+    out.push({ text: "要改稿", tone: "red" });
+  }
+  return out.length ? out : [{ text: "安定", tone: "gray" }];
 }

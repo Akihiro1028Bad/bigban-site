@@ -33,6 +33,7 @@ function blockInfo(a: Article): BlockInfo | null {
 
 interface PublishQueueProps {
   articles: Article[];
+  nowMs: number;
   onPublishNow: (ids: string[]) => void;
   onSchedule: (ids: string[], label: string, atMs: number) => void;
   onUnschedule: (id: string) => void;
@@ -41,6 +42,7 @@ interface PublishQueueProps {
 
 export function PublishQueue({
   articles,
+  nowMs,
   onPublishNow,
   onSchedule,
   onUnschedule,
@@ -64,7 +66,7 @@ export function PublishQueue({
         <h2 className="text-[16px] font-semibold">公開キュー</h2>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard color="var(--p-green)" label="公開OK" value={ready.length} />
         <SummaryCard color="var(--p-teal)" label="予約済み" value={scheduled.length} sub={nextLabel ? `次: ${nextLabel}` : undefined} />
         <SummaryCard color="var(--p-amber)" label="要対応" value={blocked.length} />
@@ -113,11 +115,22 @@ export function PublishQueue({
 
       {scheduled.length > 0 && (
         <Section dot="var(--p-teal)" title="予約済み" count={scheduled.length} empty="">
-          {scheduled.map((a) => (
+          <div className="px-4 pt-2 pb-1 text-[11px]" style={{ color: "var(--p-text-3)" }}>
+            プル型: 時刻になると常時稼働PCが公開します（予約はNotionに時刻を書くだけ）。
+          </div>
+          {scheduled.map((a) => {
+            const pastDue = a.scheduledAtMs != null && a.scheduledAtMs < nowMs;
+            return (
             <Row key={a.id} article={a}>
-              <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-teal)" }}>
-                <IconClock size={13} /> {a.scheduledLabel ?? "予約済み"}
-              </span>
+              {pastDue ? (
+                <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-amber)" }}>
+                  <IconClock size={13} /> 予定時刻を過ぎています（巡回待ち）
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-teal)" }}>
+                  <IconClock size={13} /> {a.scheduledLabel ?? "予約済み"}
+                </span>
+              )}
               <button onClick={() => onUnschedule(a.id)} className="proto-tool" style={{ height: 28 }}>
                 <IconX size={13} /> 解除
               </button>
@@ -129,7 +142,8 @@ export function PublishQueue({
                 <IconBolt size={13} /> 今すぐ
               </button>
             </Row>
-          ))}
+            );
+          })}
         </Section>
       )}
 
@@ -214,7 +228,7 @@ function Section({ dot, title, count, empty, action, children }: SectionProps) {
 function Row({ article, children }: { article: Article; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: "1px solid var(--p-border)" }}>
-      <EyecatchThumb hue={article.hue} has={article.hasEyecatch} size={36} />
+      <EyecatchThumb hue={article.hue} has={article.hasEyecatch} url={article.eyecatchUrl} size={36} />
       <span className="min-w-0 flex-1 truncate text-[13px]">{article.title}</span>
       {children}
     </div>

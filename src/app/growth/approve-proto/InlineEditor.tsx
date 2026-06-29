@@ -21,6 +21,7 @@ interface InlineEditorProps {
   html: string;
   onSave: (html: string) => void;
   onCancel: () => void;
+  onLiveChange?: (html: string) => void;
 }
 
 interface ToolDef {
@@ -41,18 +42,22 @@ const TOOLS: ToolDef[] = [
   { label: "画像", icon: <IconImage size={14} />, command: "noop" },
 ];
 
-export function InlineEditor({ html, onSave, onCancel }: InlineEditorProps) {
+export function InlineEditor({ html, onSave, onCancel, onLiveChange }: InlineEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
 
   // ツールバーのクリックを1か所で受け、押されたボタンの data 属性から書式を実行する。
-  const handleToolbarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-command]");
-    if (!btn) return;
-    const command = btn.dataset.command;
-    if (!command || command === "noop") return;
-    editorRef.current?.focus();
-    document.execCommand(command, false, btn.dataset.value || undefined);
-  }, []);
+  const handleToolbarClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-command]");
+      if (!btn) return;
+      const command = btn.dataset.command;
+      if (!command || command === "noop") return;
+      editorRef.current?.focus();
+      document.execCommand(command, false, btn.dataset.value || undefined);
+      onLiveChange?.(editorRef.current?.innerHTML ?? "");
+    },
+    [onLiveChange]
+  );
 
   const handleSave = useCallback(() => {
     onSave(editorRef.current?.innerHTML ?? html);
@@ -61,7 +66,7 @@ export function InlineEditor({ html, onSave, onCancel }: InlineEditorProps) {
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="sticky top-0 z-10 flex items-center gap-1 rounded-[10px] p-1.5"
+        className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-[10px] p-1.5"
         style={{
           background: "var(--p-bg-elevated)",
           border: "1px solid var(--p-border-strong)",
@@ -100,6 +105,7 @@ export function InlineEditor({ html, onSave, onCancel }: InlineEditorProps) {
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        onInput={() => onLiveChange?.(editorRef.current?.innerHTML ?? "")}
         className="proto-article proto-editable p-4"
         style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)", minHeight: 280 }}
         dangerouslySetInnerHTML={{ __html: html }}

@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 
 import { IconCheck, IconClock } from "./icons";
 import { STAGE_META } from "./stages";
+import { styleHintCount } from "./styleHints";
 import type { Article, Stage } from "./types";
 import { AwaitingDot, EyecatchThumb, MetaStat, ScoreBar, StageChip } from "./ui";
 
@@ -20,6 +21,7 @@ interface BoardProps {
   groups: BoardGroup[];
   activeId: string | null;
   selectedIds: Set<string>;
+  compact?: boolean;
   onActivate: (id: string) => void;
   onToggleSelect: (id: string) => void;
 }
@@ -28,6 +30,7 @@ export function Board({
   groups,
   activeId,
   selectedIds,
+  compact,
   onActivate,
   onToggleSelect,
 }: BoardProps) {
@@ -78,7 +81,7 @@ export function Board({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18 }}
                 onClick={() => onActivate(a.id)}
-                className="proto-row group relative flex w-full items-start gap-3 px-4 py-[11px] text-left transition-colors"
+                className={`proto-row group relative flex w-full items-start gap-3 px-4 text-left transition-colors ${compact ? "py-[6px]" : "py-[11px]"}`}
                 style={{
                   background: active ? "var(--p-bg-raised)" : "transparent",
                 }}
@@ -115,7 +118,7 @@ export function Board({
                   {selected && <IconCheck size={13} style={{ color: "#0a0c10" }} />}
                 </span>
 
-                <EyecatchThumb hue={a.hue} has={a.hasEyecatch} size={38} />
+                <EyecatchThumb hue={a.hue} has={a.hasEyecatch} url={a.eyecatchUrl} size={38} />
 
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
@@ -128,21 +131,41 @@ export function Board({
                     </span>
                   </span>
 
-                  <span
-                    className="mt-[3px] block truncate text-[12px] leading-snug"
-                    style={{ color: "var(--p-text-3)" }}
-                  >
-                    {a.excerpt}
-                  </span>
+                  {!compact && (
+                    <span
+                      className="mt-[3px] block truncate text-[12px] leading-snug"
+                      style={{ color: "var(--p-text-3)" }}
+                    >
+                      {a.excerpt}
+                    </span>
+                  )}
 
                   <span className="mt-2 flex items-center gap-3">
                     <StageChip stage={a.stage} small />
+                    {a.stuck && (
+                      <span
+                        className="proto-pulse rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+                        style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
+                        title="生成が滞留しています"
+                      >
+                        滞留
+                      </span>
+                    )}
                     {a.reviseStatus === "presenting" && (
                       <span
                         className="rounded-full px-1.5 py-[1px] text-[10px] font-medium"
                         style={{ background: "var(--p-green-weak)", color: "var(--p-green)" }}
                       >
                         提示中
+                      </span>
+                    )}
+                    {styleHintCount(a) > 0 && (
+                      <span
+                        className="rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+                        style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+                        title="文体チェックの指摘あり"
+                      >
+                        文体{styleHintCount(a)}
                       </span>
                     )}
                     {a.reviseStatus === "requested" && (
