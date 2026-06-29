@@ -31,7 +31,7 @@ import { PublishQueue } from "./PublishQueue";
 import { applyBlockImprovement, improvementSentence, splitBlocks, stripTags } from "./bodyBlocks";
 import { countByLevel, qualityChecks } from "./draftQuality";
 import { ProposalFormModal } from "./ProposalFormModal";
-import { proposeBody, proposeOutline, proposeTitle } from "./reviseMock";
+import { proposeBody, proposeTitle } from "./reviseMock";
 import { ReviseRequestModal } from "./ReviseRequestModal";
 import { ShortcutBar } from "./ShortcutBar";
 import {
@@ -619,35 +619,16 @@ export default function ApproveProtoPage() {
   );
 
   const requestOutlineRevise = useCallback(() => {
-    if (!activeId) return;
-    const target = articles.find((x) => x.id === activeId);
-    if (!target) return;
-    const comments = target.outline.flatMap((s) => s.comments ?? []);
+    const a = activeArticle;
+    if (!a) return;
+    const comments = a.outline.flatMap((s) => s.comments ?? []);
     if (comments.length === 0) return;
     const summary = comments.map((c) => `・${c}`).join("\n");
-    setArticles((prev) =>
-      prev.map((x) =>
-        x.id === activeId
-          ? { ...x, reviseStatus: "requested", reviseInstruction: { outline: summary }, reviseProposal: undefined }
-          : x
-      )
-    );
-    setTab("revise");
+    setConsultMode("revise");
+    setConsultOpen(true);
+    consult.request("revise", { revise: { outline: summary } });
     pushToast("info", "構成案の修正を依頼しました — AIが案を作成します");
-    const timer = window.setTimeout(() => {
-      setArticles((prev) =>
-        prev.map((x) => {
-          if (x.id !== activeId) return x;
-          const proposal: ReviseProposal = {
-            outline: { from: x.outline, to: proposeOutline(x.outline) },
-          };
-          return { ...x, reviseStatus: "presenting", reviseProposal: proposal };
-        })
-      );
-      pushToast("success", "構成案の修正案が届きました");
-    }, 1800);
-    reviseTimers.current.push(timer);
-  }, [activeId, articles, pushToast]);
+  }, [activeArticle, consult, pushToast]);
 
   // ---- 本文コメント(#182): 文ごとに注釈→AIに指摘を依頼→元/新→反映 ----
   const addBodyComment = useCallback(
@@ -1287,6 +1268,7 @@ export default function ApproveProtoPage() {
       onSaveMeta={saveMeta}
       onRetryRevise={retryRevise}
       onRetryBodyComment={requestBodyComment}
+      consultSentenceMode={consultOpen && consultMode === "sentence"}
     />
   );
 
