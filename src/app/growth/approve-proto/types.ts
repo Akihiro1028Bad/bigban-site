@@ -237,3 +237,35 @@ export interface Toast {
   tone: "success" | "info" | "danger";
   text: string;
 }
+
+/** AI相談(#proto・往復統合)。revise/advice/sentence の3モードを1ライフサイクルへ束ねる。 */
+export type ConsultKind = "overall" | "revise" | "sentence";
+
+/** 相談の状態。requested=待ち, presenting=提示中, failed=失敗(再依頼可)。 */
+export type ConsultStatus = "requested" | "presenting" | "failed";
+
+/** モード別の入力。kind に対応する1キーだけ入る。 */
+export interface ConsultInput {
+  /** overall: 任意の「見てほしい点」。 */
+  overall?: { focus: string };
+  /** revise: 対象ごとの自由文指示(構成案は outline)。 */
+  revise?: { title?: string; body?: string; outline?: string };
+  /** sentence: 送信時にスナップショットした文ごと注釈。 */
+  sentence?: BodyComment[];
+}
+
+/** モード別の提示結果。既存の提示型を再利用する。 */
+export interface ConsultResult {
+  overall?: Advice;
+  revise?: ReviseProposal;
+  sentence?: BodyCommentFix[];
+}
+
+/** 1件の相談(往復1単位)。並行相談を許すため Article は配列で保持する。 */
+export interface Consult {
+  id: string;
+  kind: ConsultKind;
+  status: ConsultStatus;
+  input: ConsultInput;
+  result?: ConsultResult;
+}
