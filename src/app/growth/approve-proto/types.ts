@@ -198,6 +198,8 @@ export interface Article {
   publishedDaysAgo?: number;
   /** 生成中の進捗ラベル。 */
   generatingStep?: string;
+  /** AI相談(#proto・往復統合)の進行中リスト。並行相談を許容。 */
+  consults?: Consult[];
 }
 
 export type SegmentKey = "all" | "awaiting" | "generating" | "published";
