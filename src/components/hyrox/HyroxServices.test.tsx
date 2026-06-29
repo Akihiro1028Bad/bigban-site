@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
-import { LABOLA_RESERVE_URL } from "@/constants/site";
+import { RESERVE_PATH } from "@/constants/site";
 import HyroxServices from "./HyroxServices";
 import jaMessages from "../../../messages/ja.json";
 
@@ -34,15 +34,13 @@ describe("HyroxServices", () => {
     expect(screen.getByText("グループセッション")).toBeInTheDocument();
   });
 
-  it("各サービスの予約が labola へ外部リンクする（3つ・aria-labelでサービス名を区別）", () => {
+  it("各サービスの予約が予約案内ページ（/reserve）へ内部リンクする（3つ・aria-labelでサービス名を区別）", () => {
     renderWithIntl(<HyroxServices />);
     // aria-label は「<サービス名> 予約する」。3本が同一導線にならないよう区別する。
     const links = screen.getAllByRole("link", { name: /予約する/ });
     expect(links).toHaveLength(3);
     for (const link of links) {
-      expect(link).toHaveAttribute("href", LABOLA_RESERVE_URL);
-      expect(link).toHaveAttribute("target", "_blank");
-      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link).toHaveAttribute("href", RESERVE_PATH);
     }
   });
 

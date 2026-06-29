@@ -129,6 +129,8 @@
     },
     "choice": {
       "notice": "We're currently switching booking systems. The booking site depends on the month of your visit, so please choose based on your reservation date.",
+      "pickleballKicker": "PICKLEBALL COURT",
+      "pickleballHeading": "Pickleball Court",
       "julyLabel": "Bookings through July",
       "julyPeriod": "Through July 2026",
       "julyDesc": "For visits through July 2026.",
@@ -136,7 +138,11 @@
       "augLabel": "Bookings from August",
       "augPeriod": "From August 2026",
       "augDesc": "For visits from August 2026 onward.",
-      "augCta": "Book from August"
+      "augCta": "Book from August",
+      "hyroxKicker": "HYROX AREA",
+      "hyroxHeading": "HYROX Area",
+      "hyroxDesc": "Book the HYROX area here.",
+      "hyroxCta": "Book HYROX"
     },
     "steps": {
       "heading": "How to Book",
