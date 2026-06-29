@@ -148,6 +148,41 @@
   scrollbar-width: thin;
 }
 
+/* 本文プレビュー(light) */
+.proto2-article {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--p-text-2);
+}
+.proto2-article h2 {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--p-text);
+  margin: 1.5em 0 0.6em;
+  padding-left: 10px;
+  border-left: 2px solid var(--p-accent);
+}
+.proto2-article h2:first-child { margin-top: 0; }
+.proto2-article p { margin: 0.7em 0; }
+.proto2-article a { color: var(--p-accent); text-underline-offset: 2px; }
+.proto2-article ul, .proto2-article ol { margin: 0.7em 0; padding-left: 1.4em; }
+.proto2-article li { margin: 0.3em 0; }
+.proto2-article blockquote {
+  margin: 1em 0;
+  padding: 8px 14px;
+  background: var(--p-accent-weak);
+  border-left: 3px solid var(--p-accent);
+  border-radius: 0;
+  color: var(--p-text-2);
+}
+.proto2-article img { max-width: 100%; border-radius: 8px; }
+
+/* ドロワー右スライド */
+@keyframes proto2-drawer-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .proto2-root *,
   .proto2-root *::before,

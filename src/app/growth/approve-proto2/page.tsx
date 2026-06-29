@@ -3,35 +3,19 @@
  *
  * 0ベース再設計の実装。現 approve-proto は温存し、本ルートで作り直す。
  * 段階を切り替えるのではなく記事が段階を進む。左レール=段階別ステーション、作業ホームは盤ひとつ。
- * 本increment: 基盤＋パイプライン盤(TopBar/StationRail/ArticleRow/StageStepper)。ドロワー等は後続。
+ * 本increment: 盤＋ドロワー(承認の核)。pull型トレイ/校正/素材/一括は後続。
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import { STAGE_META } from "../approve-proto/stages";
+import { AnimatePresence } from "framer-motion";
+
 import type { Article, Stage } from "../approve-proto/types";
 import { MOCK_ARTICLES } from "../approve-proto/mockData";
+import { Drawer } from "./Drawer";
+import { hasReturn, StageChip, StageStepper, stageToneVar } from "./parts";
 import "./proto2.css";
-
-const STAGE_STEP: Record<Stage, number> = {
-  idea: 1,
-  outline_review: 2,
-  generating: 3,
-  draft_review: 4,
-  scheduled: 5,
-  published: 6,
-};
-
-/** 戻り(pull型の依頼の返り)が届いているか。決定済み(公開/予約/ネタ)は対象外。 */
-function hasReturn(a: Article): boolean {
-  if (a.stage === "published" || a.stage === "scheduled" || a.stage === "idea") return false;
-  return (
-    a.reviseStatus === "presenting" ||
-    a.adviceStatus === "presenting" ||
-    a.bodyCommentStatus === "presenting"
-  );
-}
 
 interface Station {
   key: string;
@@ -54,7 +38,6 @@ const STATIONS: Station[] = [
 
 interface NextAction {
   label: string;
-  /** 承認可(黒CTA) / それ以外(ゴースト) / 無効(ミュート・触れない)。 */
   kind: "primary" | "ghost" | "muted";
 }
 
@@ -79,72 +62,11 @@ function nextAction(a: Article): NextAction {
   }
 }
 
-function StageStepper({ stage }: { stage: Stage }) {
-  const filled = STAGE_STEP[stage];
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }} aria-hidden>
-      {Array.from({ length: 6 }).map((_, i) => {
-        const done = i < filled;
-        const cur = i === filled - 1;
-        return (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-            <span
-              style={{
-                width: cur ? 8 : 7,
-                height: cur ? 8 : 7,
-                borderRadius: "50%",
-                background: done ? "var(--p-accent)" : "transparent",
-                border: done ? "none" : "1.5px solid var(--p-border-strong)",
-                boxShadow: cur ? "0 0 0 3px var(--p-accent-weak)" : "none",
-              }}
-            />
-            {i < 5 && <span style={{ width: 7, height: 2, background: done ? "var(--p-accent)" : "var(--p-border)" }} />}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-function StageChip({ stage }: { stage: Stage }) {
-  const meta = STAGE_META[stage];
-  const tone = meta.tone === "gray" ? "text-3" : meta.tone;
-  const shortLabel = meta.label.replace("レビュー", "").replace("案", "");
-  return (
-    <span
-      className="proto2-num"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        fontSize: 11.5,
-        fontWeight: 500,
-        color: `var(--p-${tone})`,
-        background: `var(--p-${tone}-weak)`,
-        borderRadius: 999,
-        padding: "2px 9px",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {shortLabel}
-    </span>
-  );
-}
-
-function ArticleRow({
-  article,
-  active,
-  onSelect,
-}: {
-  article: Article;
-  active: boolean;
-  onSelect: () => void;
-}) {
+function ArticleRow({ article, active, onSelect }: { article: Article; active: boolean; onSelect: () => void }) {
   const na = nextAction(article);
   const returned = hasReturn(article);
   const muted = article.stage === "generating";
-  const tone = STAGE_META[article.stage].tone;
-  const toneVar = tone === "gray" ? "text-3" : tone;
+  const toneVar = stageToneVar(article.stage);
 
   return (
     <button
@@ -157,36 +79,17 @@ function ArticleRow({
         padding: "11px 13px",
         textAlign: "left",
         borderRadius: 10,
-        background: active ? "var(--p-surface)" : muted ? "var(--p-surface-2)" : "var(--p-surface)",
-        border: active ? "0.5px solid var(--p-border-strong)" : "0.5px solid var(--p-border)",
+        background: muted ? "var(--p-surface-2)" : "var(--p-surface)",
+        border: "0.5px solid var(--p-border)",
         boxShadow: active ? "0 0 0 1px var(--p-border-strong)" : "none",
         opacity: muted ? 0.82 : 1,
         transition: "background 0.14s cubic-bezier(0.2,0,0,1), border-color 0.14s",
       }}
     >
       <StageStepper stage={article.stage} />
-      <span
-        style={{
-          width: 40,
-          height: 40,
-          flexShrink: 0,
-          borderRadius: 8,
-          background: `var(--p-${toneVar}-weak)`,
-          border: "0.5px solid var(--p-border)",
-        }}
-      />
+      <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 8, background: `var(--p-${toneVar}-weak)`, border: "0.5px solid var(--p-border)" }} />
       <span style={{ minWidth: 0, flex: 1 }}>
-        <span
-          style={{
-            display: "block",
-            fontSize: 13.5,
-            fontWeight: 500,
-            color: muted ? "var(--p-text-3)" : "var(--p-text)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: muted ? "var(--p-text-3)" : "var(--p-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {article.title}
         </span>
         <span style={{ display: "block", fontSize: 11.5, color: "var(--p-text-3)", marginTop: 1 }}>{article.keyword}</span>
@@ -214,39 +117,52 @@ function ArticleRow({
   );
 }
 
+const NEXT_STAGE: Partial<Record<Stage, Stage>> = {
+  idea: "outline_review",
+  outline_review: "generating",
+  draft_review: "scheduled",
+};
+
 export default function ApproveConsoleV2() {
-  const articles = useMemo(() => MOCK_ARTICLES, []);
-  const counts = useMemo(
-    () => STATIONS.map((s) => ({ ...s, count: articles.filter(s.match).length })),
-    [articles]
-  );
+  const [articles, setArticles] = useState<Article[]>(MOCK_ARTICLES);
   const [stationKey, setStationKey] = useState("awaiting");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (m: string) => {
+    setToast(m);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
+
+  const counts = useMemo(() => STATIONS.map((s) => ({ ...s, count: articles.filter(s.match).length })), [articles]);
   const station = STATIONS.find((s) => s.key === stationKey) ?? STATIONS[0];
   const rows = useMemo(() => articles.filter(station.match), [articles, station]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const awaitingCount = useMemo(() => articles.filter((a) => a.awaitingYou).length, [articles]);
+  const activeArticle = articles.find((a) => a.id === activeId) ?? null;
 
-  const awaitingCount = articles.filter((a) => a.awaitingYou).length;
+  const patch = (id: string, p: Partial<Article>) => setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, ...p } : a)));
+
+  const approve = (id: string) => {
+    const a = articles.find((x) => x.id === id);
+    if (!a) return;
+    const next = NEXT_STAGE[a.stage];
+    if (!next) return;
+    if (a.stage === "outline_review") { patch(id, { stage: next, awaitingYou: false, genProgress: 8 }); showToast("構成を承認しました。本文生成を依頼（取り消し）"); }
+    else if (a.stage === "draft_review") { patch(id, { stage: next, awaitingYou: false, scheduledLabel: "明日 09:00" }); showToast("下書きを承認しました。公開予約（取り消し）"); }
+    else { patch(id, { stage: next, awaitingYou: true }); showToast("記事化を承認しました"); }
+    setActiveId(null);
+  };
+  const revise = (id: string) => { patch(id, { awaitingYou: false, reviseStatus: "requested" }); showToast("修正を依頼しました（取り消し）"); setActiveId(null); };
+  const reject = (id: string) => { patch(id, { awaitingYou: false }); showToast("却下しました（取り消し）"); setActiveId(null); };
+  const revert = (id: string) => { patch(id, { stage: "outline_review", awaitingYou: true, reviseStatus: "none" }); showToast("構成からやり直します"); setActiveId(null); };
 
   return (
     <div className="proto2-root flex flex-col">
-      {/* TopBar: ループヘルス + 投げた依頼トレイ + ⌘K */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          height: 48,
-          padding: "0 16px",
-          borderBottom: "0.5px solid var(--p-border)",
-          background: "var(--p-surface)",
-          flexShrink: 0,
-        }}
-      >
+      <header style={{ display: "flex", alignItems: "center", gap: 16, height: 48, padding: "0 16px", borderBottom: "0.5px solid var(--p-border)", background: "var(--p-surface)", flexShrink: 0 }}>
         <span style={{ fontSize: 14, fontWeight: 500 }}>承認コンソール</span>
-        <span
-          className="proto2-num"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--p-green)", background: "var(--p-green-weak)", border: "0.5px solid #cdebd6", borderRadius: 999, padding: "3px 10px" }}
-        >
+        <span className="proto2-num" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--p-green)", background: "var(--p-green-weak)", border: "0.5px solid #cdebd6", borderRadius: 999, padding: "3px 10px" }}>
           <span className="proto2-dot" style={{ background: "var(--p-ready)" }} /> ループ：最終巡回 14:20 ✓
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--p-muted)" }}>
@@ -259,53 +175,20 @@ export default function ApproveConsoleV2() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* 左レール: 段階別ステーション */}
-        <nav
-          className="proto2-scroll"
-          style={{ width: 172, flexShrink: 0, padding: "8px 8px", borderRight: "0.5px solid var(--p-border)", background: "var(--p-surface)" }}
-          aria-label="パイプライン段階"
-        >
+        <nav className="proto2-scroll" style={{ width: 172, flexShrink: 0, padding: "8px 8px", borderRight: "0.5px solid var(--p-border)", background: "var(--p-surface)" }} aria-label="パイプライン段階">
           {counts.map((s) => {
             const isActive = s.key === stationKey;
             return (
               <button
                 key={s.key}
                 onClick={() => { setStationKey(s.key); setActiveId(null); }}
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  width: "100%",
-                  height: 34,
-                  padding: "0 9px",
-                  borderRadius: 7,
-                  background: isActive ? "var(--p-surface-2)" : "transparent",
-                  color: isActive ? "var(--p-text)" : "var(--p-text-2)",
-                  fontSize: 12.5,
-                  fontWeight: isActive ? 500 : 400,
-                  textAlign: "left",
-                }}
+                style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, width: "100%", height: 34, padding: "0 9px", borderRadius: 7, background: isActive ? "var(--p-surface-2)" : "transparent", color: isActive ? "var(--p-text)" : "var(--p-text-2)", fontSize: 12.5, fontWeight: isActive ? 500 : 400, textAlign: "left" }}
               >
-                {isActive && <span style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 3, borderRadius: 0, background: "var(--p-accent)" }} />}
-                {s.tone && s.count > 0 && (
-                  <span className="proto2-dot" style={{ background: s.tone === "accent" ? "var(--p-accent)" : "var(--p-ready)" }} />
-                )}
+                {isActive && <span style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 3, background: "var(--p-accent)" }} />}
+                {s.tone && s.count > 0 && <span className="proto2-dot" style={{ background: s.tone === "accent" ? "var(--p-accent)" : "var(--p-ready)" }} />}
                 <span style={{ flex: 1 }}>{s.label}</span>
                 {s.count > 0 && (
-                  <span
-                    className="proto2-num"
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      minWidth: 18,
-                      textAlign: "center",
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      background: s.tone === "accent" ? "var(--p-ink)" : s.tone === "ready" ? "var(--p-fail-weak)" : "transparent",
-                      color: s.tone === "accent" ? "#fff" : s.tone === "ready" ? "#a32d2d" : "var(--p-muted)",
-                    }}
-                  >
+                  <span className="proto2-num" style={{ fontSize: 11, fontWeight: 500, minWidth: 18, textAlign: "center", padding: "1px 6px", borderRadius: 999, background: s.tone === "accent" ? "var(--p-ink)" : s.tone === "ready" ? "var(--p-fail-weak)" : "transparent", color: s.tone === "accent" ? "#fff" : s.tone === "ready" ? "#a32d2d" : "var(--p-muted)" }}>
                     {s.count}
                   </span>
                 )}
@@ -314,22 +197,15 @@ export default function ApproveConsoleV2() {
           })}
         </nav>
 
-        {/* 盤本体 */}
         <main className="proto2-scroll" style={{ flex: 1, minWidth: 0, padding: "14px 18px", background: "var(--p-bg)" }}>
           <div style={{ maxWidth: 880, margin: "0 auto" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
               <h1 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{station.label}</h1>
-              <span style={{ fontSize: 12.5, color: "var(--p-muted)" }}>
-                {station.key === "awaiting"
-                  ? `あなた待ち ${awaitingCount}件 ・ 推定18分`
-                  : `${rows.length}件`}
-              </span>
+              <span style={{ fontSize: 12.5, color: "var(--p-muted)" }}>{station.key === "awaiting" ? `あなた待ち ${awaitingCount}件 ・ 推定18分` : `${rows.length}件`}</span>
             </div>
 
             {rows.length === 0 ? (
-              <div style={{ padding: "48px 0", textAlign: "center", color: "var(--p-muted)", fontSize: 13 }}>
-                このステーションは空です。
-              </div>
+              <div style={{ padding: "48px 0", textAlign: "center", color: "var(--p-muted)", fontSize: 13 }}>このステーションは空です。</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {rows.map((a) => (
@@ -340,6 +216,27 @@ export default function ApproveConsoleV2() {
           </div>
         </main>
       </div>
+
+      <AnimatePresence>
+        {activeArticle && (
+          <Drawer
+            key={activeArticle.id}
+            article={activeArticle}
+            onClose={() => setActiveId(null)}
+            onApprove={() => approve(activeArticle.id)}
+            onRevise={() => revise(activeArticle.id)}
+            onReject={() => reject(activeArticle.id)}
+            onRevert={() => revert(activeArticle.id)}
+          />
+        )}
+      </AnimatePresence>
+
+      {toast && (
+        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: "var(--p-ink)", color: "#fff", fontSize: 12.5, boxShadow: "0 8px 28px rgba(20,22,28,0.18)" }}>
+          {toast}
+          <button onClick={() => setToast(null)} style={{ color: "#cfd2d6", fontSize: 11.5, background: "transparent", border: "none" }}>取り消し</button>
+        </div>
+      )}
     </div>
   );
 }
