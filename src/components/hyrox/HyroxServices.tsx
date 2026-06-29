@@ -95,6 +95,7 @@ export default function HyroxServices() {
                 <a
                   href={LABOLA_RESERVE_URL}
                   {...EXTERNAL_LINK_PROPS}
+                  aria-label={`${item.titleEn} ${t("reserveCta")}`}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 border border-accent/30 px-5 py-3 text-accent transition-colors hover:bg-accent hover:text-deep-black"
                 >
                   <span className="text-sm font-bold tracking-[0.15em]">

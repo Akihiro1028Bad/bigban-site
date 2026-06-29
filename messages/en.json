@@ -603,8 +603,6 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "",
-      "cta": "Reserve now",
-      "comingSoon": "Coming soon",
       "reserveCta": "Book Now",
       "imageAlts": [
         "Athlete taking on the sled pull",
@@ -675,9 +673,6 @@
       "title": "SERVICES",
       "titleJa": "Services",
       "lead": "Three ways to train, whatever your goal — from first-timers to athletes aiming for the race.",
-      "cta": "RESERVE",
-      "ctaJa": "予約",
-      "comingSoon": "Coming soon",
       "reserveCta": "Book Now",
       "items": [
         {

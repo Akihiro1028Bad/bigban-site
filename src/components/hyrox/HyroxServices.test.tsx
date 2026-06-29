@@ -34,9 +34,10 @@ describe("HyroxServices", () => {
     expect(screen.getByText("グループセッション")).toBeInTheDocument();
   });
 
-  it("各サービスの予約が labola へ外部リンクする（3つ）", () => {
+  it("各サービスの予約が labola へ外部リンクする（3つ・aria-labelでサービス名を区別）", () => {
     renderWithIntl(<HyroxServices />);
-    const links = screen.getAllByRole("link", { name: "予約する" });
+    // aria-label は「<サービス名> 予約する」。3本が同一導線にならないよう区別する。
+    const links = screen.getAllByRole("link", { name: /予約する/ });
     expect(links).toHaveLength(3);
     for (const link of links) {
       expect(link).toHaveAttribute("href", LABOLA_RESERVE_URL);

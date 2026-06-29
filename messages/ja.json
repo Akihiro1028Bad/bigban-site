@@ -617,8 +617,6 @@
     "hero": {
       "title": "HYROX",
       "titleJa": "ハイロックス",
-      "cta": "今すぐ予約",
-      "comingSoon": "近日開始",
       "reserveCta": "今すぐ予約",
       "imageAlts": [
         "スレッドプルに挑むアスリート",
@@ -689,9 +687,6 @@
       "title": "SERVICES",
       "titleJa": "サービス",
       "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
-      "cta": "RESERVE",
-      "ctaJa": "予約",
-      "comingSoon": "近日開始",
       "reserveCta": "予約する",
       "items": [
         {
