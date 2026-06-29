@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adoptAdviceFix,
   applyReviseTarget,
   createConsult,
   failConsult,
   findConsult,
   removeConsult,
   resolveConsult,
+  settleSentenceFix,
   settleReviseTarget,
   upsertConsult,
 } from "./consultEngine";
@@ -33,6 +35,15 @@ describe("consultEngine: 基本ライフサイクル", () => {
     expect(list2).toHaveLength(1);
     expect(list2[0].status).toBe("presenting");
     expect(list1[0].status).toBe("requested"); // 元配列は不変
+
+    // 既存を置換する際、他の要素は維持
+    const b = createConsult("c2", "sentence", {});
+    const list3 = upsertConsult(list2, b);
+    expect(list3).toHaveLength(2);
+    const updated = upsertConsult(list3, { ...a2, id: "c1", status: "failed" });
+    expect(updated).toHaveLength(2);
+    expect(updated[0].status).toBe("failed");
+    expect(updated[1].status).toBe("requested");
   });
 
   it("findConsult は id 一致を返し、無ければ undefined", () => {
@@ -113,10 +124,82 @@ describe("consultEngine: revise の反映/残り", () => {
     expect(out?.status).toBe("presenting");
   });
 
+  it("settleReviseTarget は result がなければ元の相談を返す", () => {
+    const c = createConsult("c1b", "revise", {});
+    const out = settleReviseTarget(c, "title");
+    expect(out).toBe(c);
+  });
+
   it("settleReviseTarget は最後の対象を除くと null(相談終了)", () => {
     const only = resolveConsult(createConsult("c3", "revise", {}), {
       revise: { title: { from: "a", to: "b" } },
     });
     expect(settleReviseTarget(only, "title")).toBeNull();
+  });
+
+  it("applyReviseTarget は target と result が一致しなければ素通し", () => {
+    const c = resolveConsult(createConsult("c4", "revise", {}), {
+      revise: { title: { from: "a", to: "b" } },
+    });
+    const article = stubArticle();
+    const out = applyReviseTarget(article, c, "body");
+    expect(out).toBe(article);
+  });
+
+  it("applyReviseTarget は target フィールドが result にあっても target 指定がなければ素通し", () => {
+    const c = resolveConsult(createConsult("c5", "revise", {}), {
+      revise: { outline: { from: [], to: [{ heading: "新", summary: "" }] } },
+    });
+    const article = stubArticle();
+    const out = applyReviseTarget(article, c, "title");
+    expect(out).toBe(article);
+  });
+
+  it("applyReviseTarget は result がなければ素通し", () => {
+    const c = createConsult("c6", "revise", {});
+    const article = stubArticle();
+    const out = applyReviseTarget(article, c, "title");
+    expect(out).toBe(article);
+  });
+});
+
+describe("consultEngine: sentence/advice", () => {
+  it("settleSentenceFix は block を除き、残りがあれば presenting", () => {
+    const c = resolveConsult(createConsult("c1", "sentence", {}), {
+      sentence: [
+        { block: 0, from: "A", to: "A 改", sentence: "改" },
+        { block: 2, from: "B", to: "B 改", sentence: "改" },
+      ],
+    });
+    const out = settleSentenceFix(c, 0);
+    expect(out?.result?.sentence?.map((f) => f.block)).toEqual([2]);
+  });
+
+  it("settleSentenceFix は最後の fix を除くと null", () => {
+    const c = resolveConsult(createConsult("c1", "sentence", {}), {
+      sentence: [{ block: 0, from: "A", to: "A 改", sentence: "改" }],
+    });
+    expect(settleSentenceFix(c, 0)).toBeNull();
+  });
+
+  it("settleSentenceFix は result がなければ元の相談を返す", () => {
+    const c = createConsult("c1", "sentence", {});
+    const out = settleSentenceFix(c, 0);
+    expect(out).toBe(c);
+  });
+
+  it("adoptAdviceFix は提案を proto-changed 段落として本文末尾に足す", () => {
+    const c = resolveConsult(createConsult("c1", "overall", {}), {
+      overall: { overall: 80, scores: [], strengths: [], fixes: [{ quote: "q", reason: "r", suggestion: "内部リンクを足す" }] },
+    });
+    const out = adoptAdviceFix(stubArticle({ bodyHtml: "<p>本文</p>" }), c, 0);
+    expect(out.bodyHtml).toBe('<p>本文</p><p class="proto-changed">内部リンクを足す</p>');
+  });
+
+  it("adoptAdviceFix は fix がなければ元の article を返す", () => {
+    const c = createConsult("c1", "overall", {});
+    const article = stubArticle({ bodyHtml: "<p>元本文</p>" });
+    const out = adoptAdviceFix(article, c, 0);
+    expect(out).toBe(article);
   });
 });
