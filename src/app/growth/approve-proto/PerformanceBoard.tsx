@@ -13,10 +13,19 @@ import {
   IconChart,
   IconChevronDown,
   IconPlus,
+  IconSearch,
   IconSparkles,
 } from "./icons";
-import { RANGES, rangeView } from "./metricsView";
-import type { Range } from "./metricsView";
+import { RANGES, rangeView, reviewLabels } from "./metricsView";
+import type { Range, RangeMetrics, ReviewLabel } from "./metricsView";
+
+const LABEL_TONE: Record<ReviewLabel["tone"], { color: string; bg: string }> = {
+  green: { color: "var(--p-green)", bg: "var(--p-green-weak)" },
+  amber: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
+  blue: { color: "var(--p-accent)", bg: "var(--p-accent-weak)" },
+  red: { color: "var(--p-red)", bg: "var(--p-red-weak)" },
+  gray: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
+};
 import type { Article } from "./types";
 import { EyecatchThumb, Sparkline } from "./ui";
 
@@ -76,7 +85,7 @@ export function PerformanceBoard({ articles, onAddIdea }: PerformanceBoardProps)
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard label="公開記事" value={String(rows.length)} />
         <SummaryCard label="合計表示数" value={fmt(totalViews)} />
         <SummaryCard label="合計ユーザー" value={fmt(totalUsers)} />
@@ -120,22 +129,36 @@ export function PerformanceBoard({ articles, onAddIdea }: PerformanceBoardProps)
             >
               <button
                 onClick={() => setExpandedId(expanded ? null : a.id)}
-                className="proto-row flex w-full items-center gap-3.5 p-3.5 text-left"
+                className="proto-row flex w-full items-center gap-2.5 p-3 text-left sm:gap-3.5 sm:p-3.5"
               >
-                <EyecatchThumb hue={a.hue} has={a.hasEyecatch} size={44} />
+                <EyecatchThumb hue={a.hue} has={a.hasEyecatch} url={a.eyecatchUrl} size={44} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-medium">{a.title}</div>
                   <div className="mt-1.5 h-[6px] overflow-hidden rounded-full" style={{ background: "var(--p-bg-active)" }}>
                     <div className="h-full rounded-full" style={{ width: `${(m.views / maxViews) * 100}%`, background: "var(--p-accent)" }} />
                   </div>
                 </div>
-                <Sparkline data={m.series} up={up} />
-                <div className="w-[84px] text-right">
+                {/* 補助情報はモバイルで隠し、画面幅に応じて段階的に開示する(行のクリップ回避)。 */}
+                <span className="hidden shrink-0 flex-wrap justify-end gap-1 md:flex" style={{ maxWidth: 150 }}>
+                  {reviewLabels(m, a.publishedDaysAgo).map((lab) => (
+                    <span
+                      key={lab.text}
+                      className="rounded-full px-2 py-[2px] text-[11px] font-medium"
+                      style={{ background: LABEL_TONE[lab.tone].bg, color: LABEL_TONE[lab.tone].color }}
+                    >
+                      {lab.text}
+                    </span>
+                  ))}
+                </span>
+                <span className="hidden lg:block">
+                  <Sparkline data={m.series} up={up} />
+                </span>
+                <div className="hidden w-[78px] text-right sm:block">
                   <div className="text-[14px] font-semibold tabular-nums">{fmt(m.views)}</div>
                   <div className="text-[11px]" style={{ color: "var(--p-text-3)" }}>表示数</div>
                 </div>
                 <div
-                  className="flex w-[64px] items-center justify-end gap-1 text-[13px] font-medium tabular-nums"
+                  className="flex w-[58px] items-center justify-end gap-1 text-[13px] font-medium tabular-nums"
                   style={{ color: up ? "var(--p-green)" : "var(--p-red)" }}
                 >
                   {up ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />}
@@ -158,7 +181,7 @@ export function PerformanceBoard({ articles, onAddIdea }: PerformanceBoardProps)
                     transition={{ duration: 0.2 }}
                     style={{ overflow: "hidden" }}
                   >
-                    <RowDetail article={a} users={m.users} onAddIdea={() => onAddIdea(a)} />
+                    <RowDetail m={m} onAddIdea={() => onAddIdea(a)} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -180,30 +203,50 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
   );
 }
 
-function RowDetail({ article, users, onAddIdea }: { article: Article; users: number; onAddIdea: () => void }) {
-  // モックの内訳(記事の属性から決定的に算出)。
-  const bounce = 36 + (article.score % 12);
-  const avgRead = Math.max(1, article.readMinutes - 1) + 0.4;
-  const searchShare = 52 + (article.hue % 18);
+function RowDetail({ m, onAddIdea }: { m: RangeMetrics; onAddIdea: () => void }) {
+  const s = m.search;
   return (
     <div className="border-t px-3.5 py-4" style={{ borderColor: "var(--p-border)" }}>
-      <div className="grid grid-cols-4 gap-3">
-        <Stat label="ユーザー" value={fmt(users)} />
-        <Stat label="直帰率" value={`${bounce}%`} />
-        <Stat label="平均読了" value={`${avgRead.toFixed(1)}分`} />
-        <Stat label="検索流入" value={`${searchShare}%`} />
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+        <IconSearch size={13} /> 検索（GSC）
       </div>
+      {s ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Stat label="クリック" value={fmt(s.clicks)} />
+            <Stat label="表示回数" value={fmt(s.impressions)} />
+            <Stat label="CTR" value={`${s.ctr}%`} />
+            <Stat label="平均掲載順位" value={s.position.toFixed(1)} />
+          </div>
+          <div className="mt-2.5">
+            <div className="mb-1 text-[11px]" style={{ color: "var(--p-text-3)" }}>上位クエリ</div>
+            <div className="flex flex-wrap gap-1.5">
+              {s.topQueries.map((q) => (
+                <span
+                  key={q}
+                  className="rounded-full px-2 py-[2px] text-[11.5px]"
+                  style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
+                >
+                  {q}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>検索成績は未計測です。</div>
+      )}
       <div
         className="mt-3 flex items-center gap-2 rounded-[10px] p-3"
         style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
       >
         <IconSparkles size={15} {...{ style: { color: "var(--p-accent)" } }} />
         <span className="flex-1 text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
-          この記事は検索流入が強め。同じ切り口で関連テーマを増やすと伸びやすい傾向です。
+          上位クエリの周辺テーマを増やすと、検索流入が伸びやすい傾向です。
         </span>
         <button
           onClick={onAddIdea}
-          className="flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12.5px] font-semibold"
+          className="proto-btn-primary flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12.5px] font-semibold"
           style={{ background: "var(--p-accent)", color: "#0a0c10" }}
         >
           <IconPlus size={13} /> 似た企画をネタ案に追加

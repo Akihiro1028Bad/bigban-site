@@ -40,6 +40,16 @@ function HeroBanner({ article, compact }: { article: Article; compact: boolean }
       </div>
     );
   }
+  if (article.eyecatchUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- data-URI/objectURL のモック画像
+      <img
+        src={article.eyecatchUrl}
+        alt=""
+        style={{ display: "block", width: "100%", height: h, objectFit: "cover", borderBottom: "1px solid var(--p-border)" }}
+      />
+    );
+  }
   return (
     <div
       style={{

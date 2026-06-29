@@ -11,10 +11,11 @@ import { Kbd } from "./ui";
 interface BulkBarProps {
   count: number;
   onApproveAll: () => void;
+  onRejectAll: () => void;
   onClear: () => void;
 }
 
-export function BulkBar({ count, onApproveAll, onClear }: BulkBarProps) {
+export function BulkBar({ count, onApproveAll, onRejectAll, onClear }: BulkBarProps) {
   return (
     <AnimatePresence>
       {count > 0 && (
@@ -23,7 +24,7 @@ export function BulkBar({ count, onApproveAll, onClear }: BulkBarProps) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.18 }}
-          className="fixed bottom-9 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[12px] py-2 pl-4 pr-2"
+          className="fixed bottom-9 left-1/2 z-40 flex max-w-[calc(100vw-16px)] -translate-x-1/2 items-center gap-2 rounded-[12px] py-2 pl-4 pr-2 sm:gap-3"
           style={{
             background: "var(--p-bg-elevated)",
             border: "1px solid var(--p-border-strong)",
@@ -37,9 +38,12 @@ export function BulkBar({ count, onApproveAll, onClear }: BulkBarProps) {
             >
               {count}
             </span>
-            件を選択中
+            <span className="hidden sm:inline">件を選択中</span>
           </span>
-          <span className="h-5 w-px" style={{ background: "var(--p-border)" }} />
+          <span className="hidden h-5 w-px sm:block" style={{ background: "var(--p-border)" }} />
+          <button onClick={onRejectAll} className="proto-btn-ghost" style={{ color: "var(--p-red)" }}>
+            <IconX size={14} /> まとめて却下
+          </button>
           <button onClick={onApproveAll} className="proto-btn-ghost">
             <IconCheck size={14} /> まとめて承認
           </button>
@@ -52,7 +56,9 @@ export function BulkBar({ count, onApproveAll, onClear }: BulkBarProps) {
           >
             <IconX size={15} />
           </button>
-          <Kbd>esc</Kbd>
+          <span className="hidden sm:inline-flex">
+            <Kbd>esc</Kbd>
+          </span>
         </motion.div>
       )}
     </AnimatePresence>

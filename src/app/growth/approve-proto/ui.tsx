@@ -97,16 +97,31 @@ export function AwaitingDot() {
   );
 }
 
-/** モックのアイキャッチサムネ(色相からフラットに生成)。 */
+/** アイキャッチサムネ。url があれば実画像、無ければ色相からのグラデーション。 */
 export function EyecatchThumb({
   hue,
   size = 40,
   has = true,
+  url,
 }: {
   hue: number;
   size?: number;
   has?: boolean;
+  url?: string;
 }) {
+  if (has && url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- data-URI のモック画像。本番は next/image。
+      <img
+        src={url}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 rounded-[8px] object-cover"
+        style={{ width: size, height: size, border: "1px solid var(--p-border)" }}
+      />
+    );
+  }
   if (!has) {
     return (
       <div

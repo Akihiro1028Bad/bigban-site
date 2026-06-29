@@ -12,6 +12,7 @@ interface ReviseCompareViewProps {
   article: Article;
   onApply: (target: ReviseTarget) => void;
   onDismiss: (target: ReviseTarget) => void;
+  onRetry: () => void;
 }
 
 function InstructionRecap({ article }: { article: Article }) {
@@ -66,8 +67,32 @@ function ApplyRow({
   );
 }
 
-export function ReviseCompareView({ article, onApply, onDismiss }: ReviseCompareViewProps) {
+export function ReviseCompareView({ article, onApply, onDismiss, onRetry }: ReviseCompareViewProps) {
   const status = article.reviseStatus ?? "none";
+
+  if (status === "failed") {
+    return (
+      <div
+        className="flex flex-col items-start gap-3 rounded-[12px] p-4"
+        style={{ background: "var(--p-red-weak)", border: "1px solid rgba(248,113,113,0.25)" }}
+      >
+        <InstructionRecap article={article} />
+        <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: "var(--p-red)" }}>
+          <IconX size={15} /> 修正の生成に失敗しました
+        </div>
+        <div className="text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
+          外部処理が応答しませんでした。同じ指示で再依頼できます。
+        </div>
+        <button
+          onClick={onRetry}
+          className="proto-btn-primary flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12.5px] font-semibold"
+          style={{ background: "var(--p-accent)", color: "#0a0c10" }}
+        >
+          <IconWand size={14} /> 再依頼する
+        </button>
+      </div>
+    );
+  }
 
   if (status === "requested") {
     return (
@@ -127,7 +152,7 @@ export function ReviseCompareView({ article, onApply, onDismiss }: ReviseCompare
               追加・変更箇所
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <BodyColumn label="元" html={proposal.body.from} muted />
             <BodyColumn label="新（提案）" html={proposal.body.to} />
           </div>

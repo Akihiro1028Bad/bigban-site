@@ -4,8 +4,62 @@
  * 「THE PICKLE BANG THEORY」(屋内ピックルボール施設・2026-04-18 開業)の
  * グロース記事を模した、見た目検証用のダミー。外部 I/O は一切しない。
  */
+import { migrateImageHint } from "./imageIntent";
+import { mediaSvgUrl } from "./mediaLibrary";
+import type { MediaKind } from "./mediaLibrary";
 import { proposeBody } from "./reviseMock";
-import type { Advice, Article, ChecklistItem } from "./types";
+import type { Advice, Article, ChecklistItem, ProposalStatus } from "./types";
+
+let propSeq = 0;
+/** 施策(proposal)のモックを作る。stage=idea ＋ proposalStatus で施策ビューに出す。 */
+function prop(
+  title: string,
+  category: string,
+  status: ProposalStatus,
+  evidence: string[],
+  hue: number,
+  rejectNote?: string
+): Article {
+  propSeq += 1;
+  return {
+    id: `p${propSeq}`,
+    title,
+    stage: "idea",
+    score: 60 + propSeq * 3,
+    awaitingYou: false,
+    updatedLabel: `${propSeq}日前`,
+    excerpt: `[${category}] 施策候補`,
+    keyword: title,
+    hue,
+    wordCount: 0,
+    readMinutes: 0,
+    outline: [{ heading: category, summary: "" }],
+    prompt: "(構成案承認後に生成)",
+    refs: [],
+    bodyHtml: "",
+    hasEyecatch: false,
+    bodyImages: 0,
+    decorations: 0,
+    advice: { overall: 0, scores: [], strengths: [], fixes: [] },
+    checklist: [
+      { key: "eyecatch", label: "アイキャッチ", done: false },
+      { key: "body", label: "本文", done: false },
+      { key: "words", label: "文字数 1,200+", done: false },
+      { key: "decoration", label: "装飾", done: false },
+    ],
+    proposalStatus: status,
+    proposalCategory: category,
+    proposalRejectNote: rejectNote,
+    evidence,
+  };
+}
+
+const MOCK_PROPOSALS: Article[] = [
+  prop("梅雨に効く『雨でも濡れない屋内』訴求", "季節・イベント", "pending", ["派生元 表示数 +32%", "『屋内 ピックルボール』掲載順位 ↑3", "CTR 2.1%"], 205),
+  prop("パドルの選び方を比較表で", "比較・選び方", "pending", ["『パドル 選び方』impr 1.8k", "CTR 低 (1.4%)", "競合上位を分析"], 320),
+  prop("法人向け『チームビルディング』切り口", "法人・団体", "considering", ["問い合わせ +5件", "『福利厚生 スポーツ』increasing"], 255),
+  prop("ピックルボールの歴史", "SEO記事", "rejected", ["impr 少", "検索需要 弱"], 30, "検索需要が小さく後回し"),
+];
 
 function checklist(
   eyecatch: boolean,
@@ -86,7 +140,7 @@ const publishedBody = `
 <p>会員登録から予約まで、スマホで数分。当日の受付もスムーズです。</p>
 `;
 
-export const MOCK_ARTICLES: Article[] = [
+const RAW_ARTICLES: Article[] = [
   {
     id: "a1",
     title: "ピックルボールとは？初心者が最初の1時間で知るべきルールと魅力",
@@ -172,6 +226,8 @@ export const MOCK_ARTICLES: Article[] = [
       },
     ]),
     checklist: checklist(true, true, false, true),
+    adviceStatus: "failed",
+    adviceInstruction: "導入の説得力を中心に見てほしい",
   },
   {
     id: "a3",
@@ -275,6 +331,8 @@ export const MOCK_ARTICLES: Article[] = [
     advice: advice(0, []),
     checklist: checklist(false, false, false, false),
     generatingStep: "アイキャッチを生成中",
+    genProgress: 45,
+    stuck: true,
   },
   {
     id: "a7",
@@ -471,3 +529,71 @@ export const MOCK_ARTICLES: Article[] = [
     metrics: { views: 540, users: 430, deltaPct: -14, series: [110, 98, 86, 74, 66, 60, 52] },
   },
 ];
+
+const KINDS: MediaKind[] = ["mascot", "minimal", "diagram", "photo"];
+
+const DISCLAIMER =
+  '<p class="proto-disclaimer">※本記事はAIが作成し、担当者が確認・編集しています。料金・営業時間などの最新情報は公式情報をご確認ください。</p>';
+
+// a2 に「存在しないパスへの内部リンク」を仕込み、公開前チェックの block を見せる。
+const BROKEN_LINK = '<p>くわしくは<a href="/ja/news/removed-old-article">こちらの記事</a>もご覧ください。</p>';
+// a2 に NG語・AI定型を仕込み、文体チェックの検出を見せる。
+const STYLE_SAMPLE = "<p>誰でも簡単に上達できる最高のスポーツです。いかがでしたか？</p>";
+
+function deriveSearch(a: Article) {
+  const m = a.metrics!;
+  const clicks = Math.round(m.users * 0.34);
+  const impressions = Math.round(m.views * 4.2);
+  const head = a.keyword.split(/\s+/);
+  return {
+    clicks,
+    impressions,
+    ctr: Math.round((clicks / impressions) * 1000) / 10,
+    position: Math.round((14 - m.deltaPct / 8) * 10) / 10,
+    topQueries: [a.keyword, `${head[0]} ${head[1] ?? "とは"}`, `${head[0]} 屋内`].filter(Boolean),
+  };
+}
+
+function deriveHypothesis(a: Article): Article["hypothesis"] {
+  const head = a.keyword.split(/\s+/)[0];
+  return {
+    articleType: "単記事（SEO）",
+    targetReader: `「${a.keyword}」を調べる初心者・検討層`,
+    searchIntent: `「${head}」の基本と始め方を知りたい`,
+    winningAngle: "屋内施設ならではの実体験で、具体的に書く",
+    successMetric: "検索流入 ＋ 体験予約への内部リンククリック",
+    plannedCta: "施設紹介 / 体験予約ページへの内部リンク",
+  };
+}
+
+/** mock 記事に画像URL・免責文・仮説・メタ・検索成績などを付与して仕上げる。 */
+function finalize(a: Article): Article {
+  const kind = KINDS[Math.abs(Math.round(a.hue)) % KINDS.length];
+  let bodyHtml = a.bodyHtml;
+  if (bodyHtml) {
+    if (a.id === "a2") bodyHtml += BROKEN_LINK + STYLE_SAMPLE;
+    bodyHtml += DISCLAIMER;
+  }
+  return {
+    ...a,
+    bodyHtml,
+    // 旧 imageHint を新 ImageInstruction へ正規化(欠落・既存指定はそのまま)。
+    outline: a.outline.map((s) =>
+      s.imageInstruction ? s : { ...s, imageInstruction: migrateImageHint(s.imageHint) }
+    ),
+    eyecatchUrl: a.hasEyecatch ? mediaSvgUrl(kind, a.hue) : undefined,
+    bodyImageUrls:
+      a.bodyImages > 0
+        ? Array.from({ length: a.bodyImages }, (_, i) => mediaSvgUrl("diagram", (a.hue + (i + 1) * 50) % 360))
+        : undefined,
+    hypothesis: a.hypothesis ?? deriveHypothesis(a),
+    metaDescription: a.metaDescription ?? a.excerpt,
+    adviceStatus: a.adviceStatus ?? (a.advice.overall > 0 ? "presenting" : "none"),
+    metrics: a.metrics ? { ...a.metrics, search: a.metrics.search ?? deriveSearch(a) } : undefined,
+    publishedDaysAgo:
+      a.publishedDaysAgo ??
+      (a.metrics ? ({ a10: 5, a11: 9, a12: 13, a13: 17, a14: 35 } as Record<string, number>)[a.id] ?? 10 : undefined),
+  };
+}
+
+export const MOCK_ARTICLES: Article[] = [...RAW_ARTICLES, ...MOCK_PROPOSALS].map(finalize);

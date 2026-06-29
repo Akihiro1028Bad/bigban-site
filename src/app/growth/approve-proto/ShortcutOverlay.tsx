@@ -6,6 +6,7 @@
 import { motion } from "framer-motion";
 
 import { Kbd } from "./ui";
+import { useDialog } from "./useDialog";
 
 interface Row {
   keys: string[];
@@ -35,14 +36,17 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "表示",
     rows: [
-      { keys: ["1"], label: "構成案タブ" },
-      { keys: ["2"], label: "プレビュータブ" },
+      { keys: ["1"], label: "構成案" },
+      { keys: ["2"], label: "プレビュー" },
+      { keys: ["3"], label: "校正" },
+      { keys: ["4"], label: "素材" },
       { keys: ["?"], label: "このヘルプ" },
     ],
   },
 ];
 
 export function ShortcutOverlay({ onClose }: { onClose: () => void }) {
+  const dialogRef = useDialog();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -50,6 +54,10 @@ export function ShortcutOverlay({ onClose }: { onClose: () => void }) {
       onMouseDown={onClose}
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="キーボードショートカット"
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.14 }}
@@ -65,7 +73,7 @@ export function ShortcutOverlay({ onClose }: { onClose: () => void }) {
           <span className="text-[14px] font-semibold">キーボードショートカット</span>
           <button onClick={onClose} className="ml-auto"><Kbd>esc</Kbd></button>
         </div>
-        <div className="grid grid-cols-3 gap-5 p-5">
+        <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-3">
           {GROUPS.map((g) => (
             <div key={g.title}>
               <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>

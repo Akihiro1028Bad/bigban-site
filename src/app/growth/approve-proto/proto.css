@@ -304,3 +304,21 @@
   color: var(--p-text-3);
   text-align: center;
 }
+
+/* a11y仕上げ: OSの「視差効果を減らす」設定を尊重し、CSS駆動の演出を抑制する。
+   framer-motion 側は page.tsx の <MotionConfig reducedMotion="user"> が担当。 */
+@media (prefers-reduced-motion: reduce) {
+  .proto-root *,
+  .proto-root *::before,
+  .proto-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* 装飾の脈動は止め、視認性は最大で固定する。 */
+  .proto-root .proto-pulse {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}

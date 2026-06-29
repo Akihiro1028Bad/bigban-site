@@ -111,6 +111,29 @@ export function BoardEmpty() {
   );
 }
 
+/** ポーリング連続失敗のバナー(fail-stale・time-stale とは別)。 */
+export function PollFailBanner({ lastLabel, onRetry }: { lastLabel: string; onRetry: () => void }) {
+  return (
+    <div
+      className="flex items-center gap-2.5 px-4 py-2.5"
+      style={{ background: "var(--p-amber-weak)", borderBottom: "1px solid rgba(249,185,78,0.3)", color: "var(--p-amber)" }}
+      role="status"
+    >
+      <IconRefresh size={15} />
+      <span className="text-[12.5px]">
+        最新情報を取得できていません（最終更新 {lastLabel}）。回線や自宅PCの状態を確認してください。
+      </span>
+      <button
+        onClick={onRetry}
+        className="proto-btn-ghost ml-auto"
+        style={{ borderColor: "var(--p-amber)", color: "var(--p-amber)" }}
+      >
+        再試行
+      </button>
+    </div>
+  );
+}
+
 /** 読み込みエラー＋再試行。 */
 export function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
