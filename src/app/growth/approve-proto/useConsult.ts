@@ -188,27 +188,32 @@ export function useConsult({ activeArticle, setArticles, pushToast }: UseConsult
 
   const applyFix = useCallback(
     (id: string, block: number) => {
-      if (!activeId) return;
+      if (!activeId || !activeArticle) return;
+      const c = findConsult(activeArticle.consults ?? [], id);
+      const fix = c?.result?.sentence?.find((f) => f.block === block);
+      if (!c || !fix) return;
+      const blocks = splitBlocks(activeArticle.bodyHtml);
+      const currentText = blocks[block] ? stripTags(blocks[block].inner) : "";
+      if (currentText !== fix.from) {
+        pushToast("danger", "対象の段落が変わっています（要確認）— 再依頼してください");
+        return;
+      }
       setArticles((prev) =>
         prev.map((a) => {
           if (a.id !== activeId) return a;
-          const c = findConsult(a.consults ?? [], id);
-          const fix = c?.result?.sentence?.find((f) => f.block === block);
-          if (!fix) return a;
-          const blocks = splitBlocks(a.bodyHtml);
-          const currentText = blocks[block] ? stripTags(blocks[block].inner) : "";
-          if (currentText !== fix.from) {
-            pushToast("danger", "対象の段落が変わっています（要確認）— 再依頼してください");
-            return a;
-          }
-          const settled = settleSentenceFix(c!, block);
-          const consults = settled ? upsertConsult(a.consults ?? [], settled) : removeConsult(a.consults ?? [], id);
-          return { ...a, bodyHtml: applyBlockImprovement(a.bodyHtml, block, fix.sentence), consults };
+          const cc = findConsult(a.consults ?? [], id);
+          const ff = cc?.result?.sentence?.find((f) => f.block === block);
+          if (!cc || !ff) return a;
+          const settled = settleSentenceFix(cc, block);
+          const consults = settled
+            ? upsertConsult(a.consults ?? [], settled)
+            : removeConsult(a.consults ?? [], id);
+          return { ...a, bodyHtml: applyBlockImprovement(a.bodyHtml, block, ff.sentence), consults };
         }),
       );
       pushToast("success", "本文に反映しました");
     },
-    [activeId, setArticles, pushToast],
+    [activeId, activeArticle, setArticles, pushToast],
   );
 
   const dismissFix = useCallback(
