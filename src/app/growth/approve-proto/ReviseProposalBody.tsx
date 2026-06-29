@@ -1,0 +1,177 @@
+/**
+ * revise 提示ボディ(#proto・往復統合): 元 vs 新を対象ごとに反映/却下する。
+ * ConsultCard から presenting 時に描画される。枠/指示リキャップ/status は ConsultCard 側。
+ */
+"use client";
+
+import { IconCheck, IconX } from "./icons";
+import { segDiff } from "./reviseMock";
+import type { OutlineSection, ReviseProposal, ReviseTarget } from "./types";
+
+interface ReviseProposalBodyProps {
+  proposal: ReviseProposal;
+  onApply: (target: ReviseTarget) => void;
+  onDismiss: (target: ReviseTarget) => void;
+}
+
+export function ReviseProposalBody({ proposal, onApply, onDismiss }: ReviseProposalBodyProps) {
+  return (
+    <div className="flex flex-col gap-5">
+      {proposal.outline && (
+        <section className="rounded-[12px] p-4" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+            構成案の修正案
+          </div>
+          <OutlineDiff from={proposal.outline.from} to={proposal.outline.to} />
+          <ApplyRow onApply={() => onApply("outline")} onDismiss={() => onDismiss("outline")} />
+        </section>
+      )}
+      {proposal.title && (
+        <section className="rounded-[12px] p-4" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+            タイトルの修正案
+          </div>
+          <TitleDiff from={proposal.title.from} to={proposal.title.to} />
+          <ApplyRow onApply={() => onApply("title")} onDismiss={() => onDismiss("title")} />
+        </section>
+      )}
+      {proposal.body && (
+        <section className="rounded-[12px] p-4" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+              本文の修正案
+            </span>
+            <span className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: "var(--p-text-3)" }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: "var(--p-green-weak)", boxShadow: "inset 2px 0 0 var(--p-green)" }} />
+              追加・変更箇所
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <BodyColumn label="元" html={proposal.body.from} muted />
+            <BodyColumn label="新（提案）" html={proposal.body.to} />
+          </div>
+          <ApplyRow onApply={() => onApply("body")} onDismiss={() => onDismiss("body")} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+// 以下 ApplyRow / TitleDiff / OutlineDiff / BodyColumn は ReviseCompareView.tsx から移植。
+// （ReviseCompareView.tsx の 47-67, 166-257 をそのまま貼り、OutlineSection import を上の行に統合する）
+
+function ApplyRow({
+  onApply,
+  onDismiss,
+}: {
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <button onClick={onDismiss} className="proto-btn-ghost" style={{ color: "var(--p-text-3)" }}>
+        <IconX size={13} /> 却下
+      </button>
+      <button
+        onClick={onApply}
+        className="flex items-center gap-1.5 rounded-[8px] px-3 py-[7px] text-[12.5px] font-semibold"
+        style={{ background: "var(--p-green)", color: "#06140d" }}
+      >
+        <IconCheck size={14} /> この案を反映
+      </button>
+    </div>
+  );
+}
+
+function TitleDiff({ from, to }: { from: string; to: string }) {
+  const d = segDiff(from, to);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <span className="shrink-0 text-[11px]" style={{ color: "var(--p-text-3)" }}>元</span>
+        <span className="text-[14px]" style={{ color: "var(--p-text-3)" }}>
+          {d.prefix}
+          {d.removed && (
+            <span style={{ background: "var(--p-red-weak)", color: "var(--p-red)", borderRadius: 4, padding: "0 3px", textDecoration: "line-through" }}>
+              {d.removed}
+            </span>
+          )}
+          {d.suffix}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="shrink-0 text-[11px]" style={{ color: "var(--p-accent)" }}>新</span>
+        <span className="text-[15px] font-medium">
+          {d.prefix}
+          {d.added && (
+            <span style={{ background: "var(--p-green-weak)", color: "var(--p-green)", borderRadius: 4, padding: "0 3px" }}>
+              {d.added}
+            </span>
+          )}
+          {d.suffix}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function OutlineDiff({ from, to }: { from: OutlineSection[]; to: OutlineSection[] }) {
+  const fromKeys = new Set(from.map((s) => `${s.heading}|${s.summary}`));
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="min-w-0">
+        <div className="mb-1.5 text-[11px] font-medium" style={{ color: "var(--p-text-3)" }}>元</div>
+        <ol className="flex flex-col gap-1.5">
+          {from.map((s, i) => (
+            <li key={i} className="rounded-[8px] px-2.5 py-1.5 text-[12px]" style={{ background: "var(--p-bg-input)", color: "var(--p-text-3)" }}>
+              <div className="font-medium" style={{ color: "var(--p-text-2)" }}>{s.heading}</div>
+              {s.summary && <div className="text-[11.5px]">{s.summary}</div>}
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="min-w-0">
+        <div className="mb-1.5 text-[11px] font-medium" style={{ color: "var(--p-green)" }}>新（提案）</div>
+        <ol className="flex flex-col gap-1.5">
+          {to.map((s, i) => {
+            const changed = !fromKeys.has(`${s.heading}|${s.summary}`);
+            return (
+              <li
+                key={i}
+                className="rounded-[8px] px-2.5 py-1.5 text-[12px]"
+                style={{
+                  background: changed ? "var(--p-green-weak)" : "var(--p-bg-input)",
+                  boxShadow: changed ? "inset 2px 0 0 var(--p-green)" : "none",
+                }}
+              >
+                <div className="font-medium" style={{ color: changed ? "var(--p-green)" : "var(--p-text-2)" }}>{s.heading}</div>
+                {s.summary && <div className="text-[11.5px]" style={{ color: "var(--p-text-3)" }}>{s.summary}</div>}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function BodyColumn({ label, html, muted }: { label: string; html: string; muted?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1.5 text-[11px] font-medium" style={{ color: muted ? "var(--p-text-3)" : "var(--p-green)" }}>
+        {label}
+      </div>
+      <div
+        className="max-h-[320px] overflow-y-auto rounded-[10px] p-3"
+        style={{
+          background: "var(--p-bg-input)",
+          border: "1px solid var(--p-border)",
+          opacity: muted ? 0.75 : 1,
+        }}
+      >
+        {/* mockData/reviseMock 由来の静的HTMLのみ。本番は microCMS をサニタイズして渡す。 */}
+        <div className="proto-article" style={{ fontSize: 12.5 }} dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    </div>
+  );
+}
