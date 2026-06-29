@@ -24,9 +24,6 @@ export default function ReserveHero() {
             {t("subtitle")}
           </p>
           <div className="mx-auto mt-5 w-14 h-[3px] bg-accent" />
-          <p className="mx-auto mt-6 max-w-xl text-sm sm:text-base leading-relaxed text-text-light/80">
-            {t("lead")}
-          </p>
         </motion.div>
       </div>
     </section>

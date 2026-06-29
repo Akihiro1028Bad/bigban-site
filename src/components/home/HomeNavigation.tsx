@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
-import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { RESERVE_PATH } from "@/constants/site";
 import { NAV_ITEMS, SECTION_IDS } from "@/constants/navigation";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
@@ -75,9 +75,8 @@ export default function HomeNavigation() {
 
   const isJa = locale === "ja";
   const isHyrox = pathname === "/hyrox";
-  // labola 設定完了までの暫定: 予約導線は外部予約サービス(RESERVA)に統一。
-  // 復活時は reserveHref(isHyrox ? "hyrox" : "pickleball") に戻す。
-  const reserveTo = RESERVE_URL;
+  // 予約導線は内部の予約案内ページ(/reserve)。7月=RESERVA / 8月以降=labola の二択を案内する。
+  const reserveTo = RESERVE_PATH;
 
   return (
     <>
@@ -143,9 +142,8 @@ export default function HomeNavigation() {
 
           {/* Mobile: 予約ボタン（常時表示・主要コンバージョン導線）。
               右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
-          <a
+          <Link
             href={reserveTo}
-            {...EXTERNAL_LINK_PROPS}
             className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black md:hidden"
           >
             <span className="text-[11px] font-bold tracking-widest">
@@ -154,7 +152,7 @@ export default function HomeNavigation() {
             <span className="text-[8px] font-bold uppercase tracking-widest text-deep-black/60">
               {t("reserve")}
             </span>
-          </a>
+          </Link>
 
           {/* Desktop: Right side */}
           <div className="hidden md:flex items-center gap-4">
@@ -162,9 +160,8 @@ export default function HomeNavigation() {
               isJa={isJa}
               onSwitch={handleSwitchLocale}
             />
-            <a
+            <Link
               href={reserveTo}
-              {...EXTERNAL_LINK_PROPS}
               className="inline-flex items-center gap-1.5 bg-accent text-deep-black px-5 py-2"
             >
               <span className="text-xs font-bold tracking-widest">
@@ -173,7 +170,7 @@ export default function HomeNavigation() {
               <span className="text-[9px] font-bold uppercase tracking-widest text-deep-black/60">
                 {t("reserve")}
               </span>
-            </a>
+            </Link>
           </div>
 
         </div>

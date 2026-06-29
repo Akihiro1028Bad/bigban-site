@@ -12,11 +12,15 @@ export const OG_IMAGE = {
   alt: "THE PICKLE BANG THEORY",
 } as const;
 
-// 外部予約サービス (RESERVA)。labola 設定完了までの暫定で、予約導線はここに戻している。
-// 復活時は各導線を RESERVE_PATH / reserveHref に戻す。
+// 7月までのご予約（現行 RESERVA）。2026年8月のご利用分から labola へ移行する。
 export const RESERVE_URL = "https://reserva.be/tpbt";
 
-// 内部予約ページのパス（next-intl Link 用）
+// 8月以降のご予約（新システム labola 直リンク）。HYROX 予約もこのURL。
+// 7/27 週（8/1 を含む週）・カテゴリ「すべて」で開く。
+export const LABOLA_RESERVE_URL =
+  "https://yoyaku.labola.jp/r/shop/3473/calendar_week/2026/7/27/?&tab_name=%E3%81%99%E3%81%B9%E3%81%A6";
+
+// 内部予約案内ページのパス（next-intl Link 用）。7月=RESERVA / 8月以降=labola の二択を案内する。
 export const RESERVE_PATH = "/reserve";
 
 // labola 予約カレンダー (shop 3473, 一日表示) の埋め込みベース URL。

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, act } from "@testing-library/react";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
+import { LABOLA_RESERVE_URL } from "@/constants/site";
 import HyroxHero from "./HyroxHero";
 
 import type React from "react";
@@ -24,12 +25,12 @@ describe("HyroxHero", () => {
     expect(screen.getByText("ハイロックス")).toBeInTheDocument();
   });
 
-  it("予約は「近日開始」表示で、リンクは張らない", () => {
+  it("予約ボタンが labola へ外部リンクする", () => {
     renderWithIntl(<HyroxHero />);
-    expect(screen.getByText("近日開始")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "今すぐ予約" })
-    ).not.toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "今すぐ予約" });
+    expect(link).toHaveAttribute("href", LABOLA_RESERVE_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("3枚のヒーロー画像をフェード表示する", () => {

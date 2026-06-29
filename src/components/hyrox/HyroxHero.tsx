@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { EASE } from "@/constants/motion";
+import { LABOLA_RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
 const HERO_IMAGES = [
@@ -104,16 +105,20 @@ export default function HyroxHero() {
           </p>
         </motion.div>
 
-        {/* CTA: labola 設定完了までは予約導線を塞ぎ「近日開始」表示 */}
+        {/* CTA: labola へ直接予約（外部リンク） */}
         <motion.div
           className="mt-10 inline-block"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.0, delay: 1.15, ease: EASE }}
         >
-          <span className="inline-block border border-accent/40 px-8 py-3 text-xs font-bold uppercase tracking-widest text-accent/70">
-            {t("comingSoon")}
-          </span>
+          <a
+            href={LABOLA_RESERVE_URL}
+            {...EXTERNAL_LINK_PROPS}
+            className="inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
+          >
+            {t("reserveCta")}
+          </a>
         </motion.div>
       </div>
     </section>

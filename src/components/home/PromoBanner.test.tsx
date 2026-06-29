@@ -69,14 +69,13 @@ describe("PromoBanner", () => {
     expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
   });
 
-  it("外部予約サービスにリンクする", () => {
+  it("予約案内ページ(/reserve)にリンクする", () => {
     vi.useFakeTimers();
     vi.setSystemTime(MAY_JST);
     renderWithIntl(<PromoBanner />, "ja");
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("href", "/reserve");
+    expect(link).not.toHaveAttribute("target", "_blank");
   });
 
   it("exposes an accessible label describing the link destination", () => {

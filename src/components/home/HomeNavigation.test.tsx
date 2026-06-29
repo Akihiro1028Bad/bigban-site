@@ -183,19 +183,19 @@ describe("HomeNavigation", () => {
     expect(enButtons[0].className).toContain("cursor-default");
   });
 
-  it("RESERVEボタンを表示する（外部予約サービス）", () => {
+  it("RESERVEボタンを表示する（予約案内ページ /reserve）", () => {
     renderWithIntl(<HomeNavigation />);
     const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(1);
-    expect(reserveLinks[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(reserveLinks[0]).toHaveAttribute("target", "_blank");
+    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve");
+    expect(reserveLinks[0]).not.toHaveAttribute("target", "_blank");
   });
 
-  it("/hyrox でも RESERVE は外部予約サービスへ向く", () => {
+  it("/hyrox でも RESERVE は予約案内ページ(/reserve)へ向く", () => {
     mockPathname = "/hyrox";
     renderWithIntl(<HomeNavigation />);
     const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
-    expect(reserveLinks[0]).toHaveAttribute("href", "https://reserva.be/tpbt");
+    expect(reserveLinks[0]).toHaveAttribute("href", "/reserve");
     mockPathname = "/";
   });
 
@@ -208,7 +208,7 @@ describe("HomeNavigation", () => {
       link.className.includes("md:hidden")
     );
     expect(mobileReserve).toBeDefined();
-    expect(mobileReserve).toHaveAttribute("href", "https://reserva.be/tpbt");
+    expect(mobileReserve).toHaveAttribute("href", "/reserve");
   });
 
   it("ハンバーガーメニューの開閉", () => {
@@ -346,7 +346,7 @@ describe("HomeNavigation", () => {
     fireEvent.click(screen.getByLabelText("メニューを開く"));
     const dialog = screen.getByRole("dialog");
     const reserveInDialog = dialog.querySelector(
-      "a[href='https://reserva.be/tpbt']",
+      "a[href='/reserve']",
     );
     expect(reserveInDialog).toBeInTheDocument();
     expect(reserveInDialog?.textContent).toContain("RESERVE");

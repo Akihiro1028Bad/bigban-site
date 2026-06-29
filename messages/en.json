@@ -125,8 +125,18 @@
   "Reserve": {
     "hero": {
       "title": "RESERVE",
-      "subtitle": "Book a Court",
-      "lead": "Pick your preferred date and time and book a court online in just a few taps."
+      "subtitle": "Book a Court"
+    },
+    "choice": {
+      "notice": "We're currently switching booking systems. The booking site depends on the month of your visit, so please choose based on your reservation date.",
+      "julyLabel": "Bookings through July",
+      "julyPeriod": "Through July 2026",
+      "julyDesc": "For visits through July 2026.",
+      "julyCta": "Book through July",
+      "augLabel": "Bookings from August",
+      "augPeriod": "From August 2026",
+      "augDesc": "For visits from August 2026 onward.",
+      "augCta": "Book from August"
     },
     "steps": {
       "heading": "How to Book",
@@ -595,6 +605,7 @@
       "titleJa": "",
       "cta": "Reserve now",
       "comingSoon": "Coming soon",
+      "reserveCta": "Book Now",
       "imageAlts": [
         "Athlete taking on the sled pull",
         "HYROX arena with athletes taking on wall balls",
@@ -667,6 +678,7 @@
       "cta": "RESERVE",
       "ctaJa": "予約",
       "comingSoon": "Coming soon",
+      "reserveCta": "Book Now",
       "items": [
         {
           "key": "rental",
@@ -745,9 +757,12 @@
       "title": "PROGRAM",
       "titleJa": "Program & Pricing",
       "rateLabel": "Area Rental",
-      "price": "¥2,980",
-      "unit": "/ hour",
-      "note": "Use the training area equipped for all 8 official HYROX stations, by the hour."
+      "duration": "90 min",
+      "weekday": "Weekday",
+      "weekdayPrice": "¥3,500",
+      "weekend": "Weekend & Holidays",
+      "weekendPrice": "¥4,000",
+      "note": "Use the training area equipped for all 8 official HYROX stations, in 90-minute sessions."
     },
     "coach": {
       "sectionTitle": "CREW",
