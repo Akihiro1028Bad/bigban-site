@@ -15,6 +15,7 @@ import {
   PromptView,
 } from "./DetailViews";
 import { BodyCommentView } from "./BodyCommentView";
+import { CommentableBody } from "./CommentableBody";
 import { countByLevel, qualityChecks } from "./draftQuality";
 import { styleChecks } from "./styleHints";
 import { OutlineView } from "./OutlineView";
@@ -174,6 +175,8 @@ interface DetailPanelProps {
   onSaveMeta: (text: string) => void;
   onRetryRevise: () => void;
   onRetryBodyComment: () => void;
+  /** 「この文」相談モード中=true のとき本文注釈UI(CommentableBody)を前面に出す */
+  consultSentenceMode?: boolean;
 }
 
 export function DetailPanel({
@@ -214,6 +217,7 @@ export function DetailPanel({
   onSaveMeta,
   onRetryRevise,
   onRetryBodyComment,
+  consultSentenceMode,
 }: DetailPanelProps) {
   const [qOpen, setQOpen] = useState(false);
   if (!article) return <EmptyDetail />;
@@ -403,6 +407,15 @@ export function DetailPanel({
             onSave={onSaveEdit}
             onCancel={onCancelEdit}
           />
+        ) : consultSentenceMode && article.bodyHtml ? (
+          <div className="overflow-y-auto px-6 py-4">
+            <CommentableBody
+              bodyHtml={article.bodyHtml}
+              comments={article.bodyComments ?? []}
+              onAddComment={onAddBodyComment}
+              onRemoveComment={onRemoveBodyComment}
+            />
+          </div>
         ) : (
           <AnimatePresence mode="wait">
             <motion.div
