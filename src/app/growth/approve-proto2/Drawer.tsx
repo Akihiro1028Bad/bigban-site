@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 
 import { countByLevel, qualityChecks } from "../approve-proto/draftQuality";
 import type { Article } from "../approve-proto/types";
+import { MaterialsLane, ProofLane } from "./DrawerLanes";
 import { StageChip, StageStepper, STAGE_STEP } from "./parts";
 
 interface DrawerProps {
@@ -195,6 +196,13 @@ export function Drawer({ article, onClose, onApprove, onRevise, onReject, onReve
             </ol>
           ) : (
             <div style={{ color: "var(--p-muted)", fontSize: 13 }}>まだプレビューはありません。</div>
+          )}
+
+          {isDraft && (
+            <>
+              <ProofLane article={article} />
+              <MaterialsLane article={article} />
+            </>
           )}
 
           {article.hypothesis && (

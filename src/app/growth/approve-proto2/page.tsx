@@ -7,10 +7,11 @@
  */
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AnimatePresence } from "framer-motion";
 
+import { countByLevel, qualityChecks } from "../approve-proto/draftQuality";
 import type { Article, Stage } from "../approve-proto/types";
 import { MOCK_ARTICLES } from "../approve-proto/mockData";
 import { Drawer } from "./Drawer";
@@ -62,7 +63,17 @@ function nextAction(a: Article): NextAction {
   }
 }
 
-function ArticleRow({ article, active, onSelect }: { article: Article; active: boolean; onSelect: () => void }) {
+interface RowProps {
+  article: Article;
+  active: boolean;
+  cursor: boolean;
+  selected: boolean;
+  selectable: boolean;
+  onSelect: () => void;
+  onToggleSelect: () => void;
+}
+
+function ArticleRow({ article, active, cursor, selected, selectable, onSelect, onToggleSelect }: RowProps) {
   const na = nextAction(article);
   const returned = hasReturn(article);
   const muted = article.stage === "generating";
@@ -71,21 +82,48 @@ function ArticleRow({ article, active, onSelect }: { article: Article; active: b
   return (
     <button
       onClick={onSelect}
+      data-row={article.id}
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 11,
         width: "100%",
         padding: "11px 13px",
         textAlign: "left",
         borderRadius: 10,
-        background: muted ? "var(--p-surface-2)" : "var(--p-surface)",
+        background: selected ? "var(--p-info-weak)" : muted ? "var(--p-surface-2)" : "var(--p-surface)",
         border: "0.5px solid var(--p-border)",
-        boxShadow: active ? "0 0 0 1px var(--p-border-strong)" : "none",
+        boxShadow: cursor ? "0 0 0 2px var(--p-accent)" : active ? "0 0 0 1px var(--p-border-strong)" : "none",
         opacity: muted ? 0.82 : 1,
-        transition: "background 0.14s cubic-bezier(0.2,0,0,1), border-color 0.14s",
+        transition: "background 0.14s cubic-bezier(0.2,0,0,1), border-color 0.14s, box-shadow 0.1s",
       }}
     >
+      {selectable ? (
+        <span
+          role="checkbox"
+          aria-checked={selected}
+          aria-label="選択"
+          tabIndex={-1}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+          style={{
+            width: 16,
+            height: 16,
+            flexShrink: 0,
+            borderRadius: 5,
+            border: selected ? "none" : "1.5px solid var(--p-border-strong)",
+            background: selected ? "var(--p-accent)" : "transparent",
+            color: "#fff",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+          }}
+        >
+          {selected ? "✓" : ""}
+        </span>
+      ) : (
+        <span style={{ width: 16, flexShrink: 0 }} />
+      )}
       <StageStepper stage={article.stage} />
       <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 8, background: `var(--p-${toneVar}-weak)`, border: "0.5px solid var(--p-border)" }} />
       <span style={{ minWidth: 0, flex: 1 }}>
@@ -129,6 +167,8 @@ export default function ApproveConsoleV2() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [cursorId, setCursorId] = useState<string | null>(null);
 
   const showToast = (m: string) => {
     setToast(m);
@@ -158,6 +198,65 @@ export default function ApproveConsoleV2() {
   const reject = (id: string) => { patch(id, { awaitingYou: false }); showToast("却下しました（取り消し）"); setActiveId(null); };
   const revert = (id: string) => { patch(id, { stage: "outline_review", awaitingYou: true, reviseStatus: "none" }); showToast("構成からやり直します"); setActiveId(null); };
 
+  const selectableOf = (a: Article) => a.awaitingYou && !!NEXT_STAGE[a.stage];
+  const toggleSelect = (id: string) => setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const clearSelect = () => setSelectedIds(new Set());
+
+  // 一括承認の安全境界: 選択中＋承認可＋(下書きはゲート全通過)のみ。block記事は自動除外。
+  const bulkEligible = (a: Article) =>
+    selectedIds.has(a.id) && selectableOf(a) &&
+    !(a.stage === "draft_review" && countByLevel(a.bodyHtml ? qualityChecks(a) : []).block > 0);
+  const eligibleCount = articles.filter(bulkEligible).length;
+
+  const bulkApprove = () => {
+    const ids = new Set(articles.filter(bulkEligible).map((t) => t.id));
+    if (ids.size === 0) return;
+    setArticles((prev) =>
+      prev.map((a) => {
+        if (!ids.has(a.id)) return a;
+        const next = NEXT_STAGE[a.stage];
+        if (!next) return a;
+        if (a.stage === "outline_review") return { ...a, stage: next, awaitingYou: false, genProgress: 8 };
+        if (a.stage === "draft_review") return { ...a, stage: next, awaitingYou: false, scheduledLabel: "明日 09:00" };
+        return { ...a, stage: next, awaitingYou: true };
+      })
+    );
+    showToast(`${ids.size}件を承認しました（取り消し）`);
+    clearSelect();
+  };
+  const bulkReject = () => {
+    const n = selectedIds.size;
+    setArticles((prev) => prev.map((a) => (selectedIds.has(a.id) ? { ...a, awaitingYou: false } : a)));
+    showToast(`${n}件を却下しました（取り消し）`);
+    clearSelect();
+  };
+
+  // キーボード操作(週次バッチ): J/K=カーソル移動・Enter=ドロワー・A=承認・X=選択・Esc=閉/選択解除。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt instanceof HTMLInputElement || tgt instanceof HTMLTextAreaElement) return;
+      if (e.key === "Escape") {
+        if (activeId) setActiveId(null);
+        else if (selectedIds.size) clearSelect();
+        return;
+      }
+      if (activeId) return;
+      const ids = rows.map((r) => r.id);
+      if (ids.length === 0) return;
+      const idx = cursorId ? ids.indexOf(cursorId) : -1;
+      const k = e.key.toLowerCase();
+      if (k === "j" || e.key === "ArrowDown") { e.preventDefault(); setCursorId(ids[Math.min(ids.length - 1, idx + 1)] ?? ids[0]); }
+      else if (k === "k" || e.key === "ArrowUp") { e.preventDefault(); setCursorId(idx <= 0 ? ids[0] : ids[idx - 1]); }
+      else if (e.key === "Enter") { if (cursorId) setActiveId(cursorId); }
+      else if (k === "a") { const a = articles.find((x) => x.id === cursorId); if (a && selectableOf(a)) approve(a.id); }
+      else if (k === "x") { const a = articles.find((x) => x.id === cursorId); if (a && selectableOf(a)) toggleSelect(a.id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, cursorId, activeId, selectedIds, articles]);
+
   return (
     <div className="proto2-root flex flex-col">
       <header style={{ display: "flex", alignItems: "center", gap: 16, height: 48, padding: "0 16px", borderBottom: "0.5px solid var(--p-border)", background: "var(--p-surface)", flexShrink: 0 }}>
@@ -181,7 +280,7 @@ export default function ApproveConsoleV2() {
             return (
               <button
                 key={s.key}
-                onClick={() => { setStationKey(s.key); setActiveId(null); }}
+                onClick={() => { setStationKey(s.key); setActiveId(null); setCursorId(null); clearSelect(); }}
                 style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, width: "100%", height: 34, padding: "0 9px", borderRadius: 7, background: isActive ? "var(--p-surface-2)" : "transparent", color: isActive ? "var(--p-text)" : "var(--p-text-2)", fontSize: 12.5, fontWeight: isActive ? 500 : 400, textAlign: "left" }}
               >
                 {isActive && <span style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 3, background: "var(--p-accent)" }} />}
@@ -209,13 +308,37 @@ export default function ApproveConsoleV2() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {rows.map((a) => (
-                  <ArticleRow key={a.id} article={a} active={a.id === activeId} onSelect={() => setActiveId(a.id)} />
+                  <ArticleRow
+                    key={a.id}
+                    article={a}
+                    active={a.id === activeId}
+                    cursor={a.id === cursorId}
+                    selected={selectedIds.has(a.id)}
+                    selectable={selectableOf(a)}
+                    onSelect={() => setActiveId(a.id)}
+                    onToggleSelect={() => toggleSelect(a.id)}
+                  />
                 ))}
               </div>
             )}
           </div>
         </main>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 45, display: "flex", alignItems: "center", gap: 12, padding: "8px 10px 8px 16px", borderRadius: 12, background: "var(--p-surface)", border: "0.5px solid var(--p-border-strong)", boxShadow: "0 8px 28px rgba(20,22,28,0.14)" }}>
+          <span className="proto2-num" style={{ fontSize: 12.5 }}>
+            <b style={{ fontWeight: 500 }}>{selectedIds.size}</b>件選択中
+            {eligibleCount < selectedIds.size && <span style={{ color: "var(--p-muted)" }}>（承認可 {eligibleCount}）</span>}
+          </span>
+          <span style={{ width: 1, height: 18, background: "var(--p-border)" }} />
+          <button onClick={bulkReject} className="proto2-btn" style={{ color: "var(--p-fail)" }}>まとめて却下</button>
+          <button onClick={bulkApprove} disabled={eligibleCount === 0} className="proto2-btn-ink" style={{ opacity: eligibleCount === 0 ? 0.4 : 1 }}>
+            まとめて承認 {eligibleCount > 0 ? eligibleCount : ""}
+          </button>
+          <button onClick={clearSelect} aria-label="選択解除" className="proto2-btn" style={{ padding: "5px 9px" }}>×</button>
+        </div>
+      )}
 
       <AnimatePresence>
         {activeArticle && (
