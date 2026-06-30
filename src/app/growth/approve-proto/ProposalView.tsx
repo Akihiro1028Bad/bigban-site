@@ -8,13 +8,18 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 import { IconArrowLeft, IconArrowRight, IconCheck, IconChart, IconList, IconPlus, IconX } from "./icons";
-import type { Article, ProposalStatus } from "./types";
+import type { Article, ProposalKind, ProposalStatus } from "./types";
+import { KIND_META, approveOutcomeFor } from "./proposalKind";
+import { ProposalDetailBody, KIND_ICON } from "./ProposalDetailBody";
 
 const STATUS_META: Record<Exclude<ProposalStatus, "adopted">, { label: string; tone: string; order: number }> = {
   pending: { label: "未処理", tone: "var(--p-amber)", order: 0 },
   rejected: { label: "却下", tone: "var(--p-text-3)", order: 1 },
 };
 const ORDER: Exclude<ProposalStatus, "adopted">[] = ["pending", "rejected"];
+
+/** 種別フィルタの選択肢（"all" + 全ProposalKind）。 */
+const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "site", "event", "other"];
 
 interface ProposalViewProps {
   proposals: Article[];
@@ -46,6 +51,8 @@ function EvidenceChips({ items }: { items: string[] }) {
 export function ProposalView({ proposals, activeId, onActivate, onApprove, onReopen, onReject, onOpenForm }: ProposalViewProps) {
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
+  // Step 1: 種別フィルタ state
+  const [kindFilter, setKindFilter] = useState<ProposalKind | "all">("all");
   // 狭幅(lg未満)の1ペイン制御: 一覧で施策を選ぶと詳細へ、戻る/トリアージ完了で一覧へ。lg以上は常に両ペイン。
   const [showDetailMobile, setShowDetailMobile] = useState(false);
   const openDetail = (id: string) => {
@@ -53,7 +60,13 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
     setShowDetailMobile(true);
   };
   const active = proposals.find((p) => p.id === activeId) ?? null;
-  const groups = ORDER.map((s) => ({ status: s, items: proposals.filter((p) => p.proposalStatus === s) })).filter(
+
+  // Step 1: kindFilter を適用してから groups を作成
+  const filteredProposals = kindFilter === "all"
+    ? proposals
+    : proposals.filter((p) => (p.proposalKind ?? "article") === kindFilter);
+
+  const groups = ORDER.map((s) => ({ status: s, items: filteredProposals.filter((p) => p.proposalStatus === s) })).filter(
     (g) => g.items.length > 0
   );
 
@@ -70,6 +83,33 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
             <IconPlus size={13} /> 手動で追加
           </button>
         </div>
+
+        {/* Step 1: 種別フィルタ chip 行 */}
+        <div className="flex flex-wrap gap-1.5 px-4 py-2.5" style={{ borderBottom: "1px solid var(--p-border)" }}>
+          {KIND_FILTER_OPTIONS.map((k) => {
+            const isSelected = kindFilter === k;
+            const count = k === "all"
+              ? proposals.length
+              : proposals.filter((p) => (p.proposalKind ?? "article") === k).length;
+            const label = k === "all" ? "すべて" : KIND_META[k].label;
+            return (
+              <button
+                key={k}
+                onClick={() => setKindFilter(k)}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[11px] font-medium transition-colors"
+                style={{
+                  background: isSelected ? "var(--p-bg-active)" : "transparent",
+                  border: `1px solid ${isSelected ? "var(--p-accent)" : "var(--p-border)"}`,
+                  color: isSelected ? "var(--p-text)" : "var(--p-text-3)",
+                }}
+              >
+                {label}
+                <span className="tabular-nums" style={{ color: "var(--p-text-3)" }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {groups.length === 0 && (
           <div className="px-4 py-10 text-center text-[13px]" style={{ color: "var(--p-text-3)" }}>
             施策はありません。
@@ -86,6 +126,9 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
             </div>
             {g.items.map((p) => {
               const isActive = p.id === activeId;
+              // Step 2: カードの種別chip 用
+              const cardKind = p.proposalKind ?? "article";
+              const CardKindIcon = KIND_ICON[cardKind];
               return (
                 <button
                   key={p.id}
@@ -96,6 +139,10 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
                   onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
                 >
                   {isActive && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full" style={{ background: "var(--p-accent)" }} />}
+                  {/* Step 2: 種別chip（タイトル行の前） */}
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium self-start" style={{ color: KIND_META[cardKind].tone }}>
+                    <CardKindIcon size={12} /> {KIND_META[cardKind].label}
+                  </span>
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[13.5px] font-medium">{p.title}</span>
                   </span>
@@ -126,7 +173,17 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
                   <IconArrowLeft size={14} /> 施策一覧
                 </button>
               </div>
-              <span className="rounded-full px-2.5 py-[3px] text-[12px] font-medium" style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}>
+              {/* Step 3: 詳細ヘッダに種別chip を先頭追加 */}
+              {(() => {
+                const detailKind = active.proposalKind ?? "article";
+                const DetailKindIcon = KIND_ICON[detailKind];
+                return (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: KIND_META[detailKind].tone }}>
+                    <DetailKindIcon size={12} /> {KIND_META[detailKind].label}
+                  </span>
+                );
+              })()}
+              <span className="ml-2 rounded-full px-2.5 py-[3px] text-[12px] font-medium" style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}>
                 {active.proposalCategory}
               </span>
               <h1 className="mt-3 text-[19px] font-semibold leading-snug tracking-tight">{active.title}</h1>
@@ -134,23 +191,8 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              {active.hypothesis && (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
-                  {[
-                    ["記事タイプ", active.hypothesis.articleType],
-                    ["狙う読者", active.hypothesis.targetReader],
-                    ["検索意図", active.hypothesis.searchIntent],
-                    ["勝ち筋", active.hypothesis.winningAngle],
-                    ["成功指標", active.hypothesis.successMetric],
-                    ["想定CTA", active.hypothesis.plannedCta],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <div className="text-[10.5px]" style={{ color: "var(--p-text-3)" }}>{label}</div>
-                      <div className="mt-[1px] text-[12.5px]" style={{ color: "var(--p-text-2)" }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Step 3: hypothesis グリッドを ProposalDetailBody に置換 */}
+              <ProposalDetailBody article={active} />
               {active.proposalStatus === "rejected" && active.proposalRejectNote && (
                 <div className="mt-4 rounded-[10px] p-3 text-[12.5px]" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)", color: "var(--p-text-3)" }}>
                   却下理由: {active.proposalRejectNote}
@@ -181,18 +223,46 @@ export function ProposalView({ proposals, activeId, onActivate, onApprove, onReo
                 </div>
               ) : active.proposalStatus === "rejected" ? (
                 <button onClick={() => { onReopen(active.id); setShowDetailMobile(false); }} className="proto-btn-ghost">未処理に戻す</button>
+              ) : active.proposalStatus === "adopted" ? (
+                /* Step 5: adopted reopen */
+                <div className="flex flex-col gap-2">
+                  {(() => {
+                    const adoptedKind = active.proposalKind ?? "article";
+                    const o = approveOutcomeFor(adoptedKind);
+                    return (
+                      <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-green)" }}>
+                        <IconCheck size={13} /> {o.done}
+                      </div>
+                    );
+                  })()}
+                  <button onClick={() => { onReopen(active.id); setShowDetailMobile(false); }} className="proto-btn-ghost self-start">未処理に戻す</button>
+                </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => setRejecting(true)} className="proto-btn-ghost" style={{ color: "var(--p-red)" }}>
-                    <IconX size={14} /> 却下
-                  </button>
-                  <button
-                    onClick={() => { onApprove(active.id); setShowDetailMobile(false); }}
-                    className="proto-btn-primary ml-auto flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold sm:w-auto sm:justify-start"
-                    style={{ background: "var(--p-accent)", color: "#0a0c10" }}
-                  >
-                    <IconCheck size={15} /> 承認して記事化 <span className="hidden opacity-70 sm:inline">A</span> <IconArrowRight size={14} />
-                  </button>
+                <div className="flex flex-col">
+                  {/* Step 4: 結末プレビュー行 */}
+                  {(() => {
+                    const footerKind = active.proposalKind ?? "article";
+                    const o = approveOutcomeFor(footerKind);
+                    const FooterKindIcon = KIND_ICON[footerKind];
+                    return (
+                      <div className="mb-2.5 flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-text-3)" }}>
+                        <span style={{ color: KIND_META[footerKind].tone, display: "inline-flex" }}><FooterKindIcon size={13} /></span>
+                        承認すると <span style={{ color: KIND_META[footerKind].tone }}>{o.preview}</span> へ
+                      </div>
+                    );
+                  })()}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={() => setRejecting(true)} className="proto-btn-ghost" style={{ color: "var(--p-red)" }}>
+                      <IconX size={14} /> 却下
+                    </button>
+                    <button
+                      onClick={() => { onApprove(active.id); setShowDetailMobile(false); }}
+                      className="proto-btn-primary ml-auto flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold sm:w-auto sm:justify-start"
+                      style={{ background: "var(--p-accent)", color: "#0a0c10" }}
+                    >
+                      <IconCheck size={15} /> {approveOutcomeFor(active.proposalKind ?? "article").buttonLabel} <span className="hidden opacity-70 sm:inline">A</span> <IconArrowRight size={14} />
+                    </button>
+                  </div>
                 </div>
               )}
             </footer>
