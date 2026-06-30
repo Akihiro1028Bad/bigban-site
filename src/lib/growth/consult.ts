@@ -7,6 +7,7 @@
 
 import type { Advice, AdviceStatus, AdviceView } from "@/lib/growth/advise";
 import type { AdviceApplyView } from "@/lib/growth/adviseApply";
+import type { BodyCommentProposalItem, BodyCommentView } from "@/lib/growth/bodyComment";
 
 /** ループ共通のステータス文字列（advise/bodyComment/revise で同一の5値ユニオン）。 */
 type LoopStatus = AdviceStatus;
@@ -107,5 +108,30 @@ export function reviseViewFrom(src: ReviseSource): ReviseConsultView | null {
     outlineProposal: src.reviseProposal ?? "",
     titleProposal: src.reviseTitleProposal ?? "",
     requestedAtMs: src.reviseRequestedAtMs ?? null,
+  };
+}
+
+/** sentence モードの相談ビュー（DraftPreview.bodyComment 由来）。 */
+export interface SentenceConsultView {
+  kind: "sentence";
+  status: ConsultStatus;
+  /** 提示中の before/after 案。 */
+  proposal: BodyCommentProposalItem[];
+  /** 失敗理由などの生テキスト。 */
+  raw: string;
+}
+
+/** DraftPreview.bodyComment → SentenceConsultView。未依頼（なし）は null。 */
+export function sentenceViewFrom(
+  bodyComment: BodyCommentView | undefined,
+): SentenceConsultView | null {
+  if (!bodyComment) return null;
+  const status = mapLoopStatus(bodyComment.status);
+  if (status === null) return null;
+  return {
+    kind: "sentence",
+    status,
+    proposal: bodyComment.proposal,
+    raw: bodyComment.raw,
   };
 }
