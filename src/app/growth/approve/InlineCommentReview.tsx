@@ -10,18 +10,15 @@
  * 純ロジック(文分割・アンカー・スキーマ)は bodyComment.ts でテスト済み。本ファイルは薄い DOM 結線。
  */
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 
 import {
-  applyBodyCommentProposal,
   extractReviewLines,
-  type BodyComment,
   type BodyCommentStatus,
   type BodyCommentView,
 } from "@/lib/growth/bodyComment";
-import { readJsonObject } from "@/lib/growth/safeJson";
 
-import { authHeaders } from "./authHeaders";
+import { useBodyCommentConsult } from "./hooks/useBodyCommentConsult";
 
 interface InlineCommentReviewProps {
   pageId: string;
@@ -56,114 +53,13 @@ export function InlineCommentReview({
   onChanged,
 }: InlineCommentReviewProps) {
   const lines = extractReviewLines(bodyHtml);
-  const [comments, setComments] = useState<Record<string, string[]>>({});
-  const [openFor, setOpenFor] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const ic = useBodyCommentConsult({ pageId, token, bodyHtml, bodyComment, onChanged });
 
   const status: BodyCommentStatus = bodyComment?.status ?? "なし";
   const proposal = bodyComment?.proposal ?? [];
   const canComment = status === "なし";
 
-  const lineKey = (blockIndex: number, excerpt: string): string => `${blockIndex}::${excerpt}`;
-
-  function openComposer(key: string): void {
-    setOpenFor(key);
-    setDraft("");
-  }
-
-  function addComment(key: string): void {
-    const text = draft.trim();
-    if (!text) return;
-    setComments((prev) => ({ ...prev, [key]: [...(prev[key] ?? []), text] }));
-    setDraft("");
-    setOpenFor(null);
-  }
-
-  function removeComment(key: string, idx: number): void {
-    setComments((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((_, i) => i !== idx) }));
-  }
-
-  function buildPayload(): BodyComment[] {
-    const out: BodyComment[] = [];
-    for (const line of lines) {
-      if (!line.commentable || line.excerpt === null) continue;
-      for (const c of comments[lineKey(line.blockIndex, line.excerpt)] ?? []) {
-        out.push({ blockIndex: line.blockIndex, excerpt: line.excerpt, comment: c });
-      }
-    }
-    return out;
-  }
-
-  async function post(path: string, payload: unknown, fallback: string): Promise<boolean> {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify(payload),
-      });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) throw new Error((json.error as string) ?? fallback);
-      onChanged();
-      return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : fallback);
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function requestAi(): Promise<void> {
-    const payload = buildPayload();
-    if (payload.length === 0) return;
-    if (await post("/api/growth/body-comment", { pageId, comments: payload }, "依頼に失敗しました。")) {
-      setComments({});
-    }
-  }
-
-  async function dismiss(): Promise<void> {
-    await post("/api/growth/body-comment/dismiss", { pageId }, "取り消しに失敗しました。");
-  }
-
-  // 提示中の before/after 案を決定的に本文へ反映し、保存→片付け→再取得する。
-  async function applyNow(): Promise<void> {
-    const { html, applied, skipped } = applyBodyCommentProposal(bodyHtml, proposal);
-    if (applied.length === 0) {
-      setError("反映できる案がありませんでした（本文が変わった可能性・要確認）。");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const saveRes = await fetch("/api/growth/draft/edit", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html }),
-      });
-      const saveJson = await readJsonObject(saveRes);
-      if (!saveRes.ok || !saveJson.success) throw new Error((saveJson.error as string) ?? "保存に失敗しました。");
-      // 反映後は依頼状態をクリア(なしに戻す)。
-      await fetch("/api/growth/body-comment/dismiss", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId }),
-      });
-      if (skipped.length > 0) {
-        setError(`${applied.length}件を反映しました（${skipped.length}件は本文不一致でスキップ）。`);
-      }
-      onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "反映に失敗しました。");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const total = buildPayload().length;
+  const total = ic.buildPayload().length;
   const tbBtn =
     "rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40";
 
@@ -185,8 +81,8 @@ export function InlineCommentReview({
           <span role="status">{STATUS_LABEL[status]}</span>
           <button
             type="button"
-            onClick={() => void dismiss()}
-            disabled={busy}
+            onClick={() => void ic.dismiss()}
+            disabled={ic.busy}
             className="shrink-0 rounded border border-gray-300 bg-white/70 px-2 py-0.5 text-[11px] text-gray-700 hover:bg-white disabled:opacity-40"
           >
             取り消し
@@ -214,8 +110,8 @@ export function InlineCommentReview({
           <div className="mt-2 flex justify-end">
             <button
               type="button"
-              onClick={() => void applyNow()}
-              disabled={busy}
+              onClick={() => void ic.applyNow()}
+              disabled={ic.busy}
               className="rounded-md border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
             >
               本文へ反映（{proposal.length}）
@@ -226,8 +122,8 @@ export function InlineCommentReview({
 
       <div className="overflow-hidden rounded-md border border-gray-200">
         {lines.map((line, i) => {
-          const key = line.excerpt !== null ? lineKey(line.blockIndex, line.excerpt) : `nt-${i}`;
-          const thread = line.excerpt !== null ? comments[key] ?? [] : [];
+          const key = line.excerpt !== null ? `${line.blockIndex}::${line.excerpt}` : `nt-${i}`;
+          const thread = line.excerpt !== null ? ic.comments[key] ?? [] : [];
           const isHeading = line.tag === "h2" || line.tag === "h3" || line.tag === "h4";
           return (
             <Fragment key={key}>
@@ -238,7 +134,7 @@ export function InlineCommentReview({
                     <button
                       type="button"
                       aria-label={`${i + 1}行目にコメント`}
-                      onClick={() => openComposer(key)}
+                      onClick={() => ic.openComposer(key)}
                       className="flex h-[18px] w-[18px] items-center justify-center rounded bg-blue-600 text-xs leading-none text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                     >
                       ＋
@@ -268,7 +164,7 @@ export function InlineCommentReview({
                   <button
                     type="button"
                     aria-label="コメントを削除"
-                    onClick={() => removeComment(key, idx)}
+                    onClick={() => ic.removeComment(key, idx)}
                     className="shrink-0 text-[11px] text-gray-400 hover:text-red-600"
                   >
                     削除
@@ -276,23 +172,23 @@ export function InlineCommentReview({
                 </div>
               ))}
 
-              {openFor === key ? (
+              {ic.openFor === key ? (
                 <div className="ml-12 border-t border-gray-200 bg-gray-50 px-3 py-2">
                   <textarea
                     aria-label={`${i + 1}行目へのコメント入力`}
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    value={ic.draft}
+                    onChange={(e) => ic.setDraft(e.target.value)}
                     placeholder="この文への指摘を書く…"
                     className="min-h-12 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
                   />
                   <div className="mt-1.5 flex justify-end gap-2">
-                    <button type="button" onClick={() => setOpenFor(null)} className={tbBtn}>
+                    <button type="button" onClick={() => ic.closeComposer()} className={tbBtn}>
                       キャンセル
                     </button>
                     <button
                       type="button"
-                      onClick={() => addComment(key)}
-                      disabled={!draft.trim()}
+                      onClick={() => ic.addComment(key)}
+                      disabled={!ic.draft.trim()}
                       className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
                     >
                       コメント
@@ -305,9 +201,9 @@ export function InlineCommentReview({
         })}
       </div>
 
-      {error ? (
+      {ic.error ? (
         <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
-          {error}
+          {ic.error}
         </p>
       ) : null}
 
@@ -315,8 +211,8 @@ export function InlineCommentReview({
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            onClick={() => void requestAi()}
-            disabled={busy || total === 0}
+            onClick={() => void ic.requestAi()}
+            disabled={ic.busy || total === 0}
             className="flex items-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
           >
             AIに指摘を依頼（{total}）
