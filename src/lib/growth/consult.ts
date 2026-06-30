@@ -75,3 +75,37 @@ export function overallViewFrom(
     apply: apply ?? null,
   };
 }
+
+/** PendingItem の revise 関連フィールド（重い型を避けるための最小サブセット）。 */
+export interface ReviseSource {
+  reviseStatus?: string;
+  reviseProposal?: string;
+  reviseTitleProposal?: string;
+  outline?: string;
+  reviseRequestedAtMs?: number | null;
+}
+
+/** revise モードの相談ビュー（PendingItem 由来）。 */
+export interface ReviseConsultView {
+  kind: "revise";
+  status: ConsultStatus;
+  currentOutline: string;
+  /** 提示中=新構成案 / 失敗時=理由文字列。 */
+  outlineProposal: string;
+  titleProposal: string;
+  requestedAtMs: number | null;
+}
+
+/** PendingItem の revise 状態 → ReviseConsultView。未依頼（なし）は null。 */
+export function reviseViewFrom(src: ReviseSource): ReviseConsultView | null {
+  const status = mapLoopStatus(src.reviseStatus);
+  if (status === null) return null;
+  return {
+    kind: "revise",
+    status,
+    currentOutline: src.outline ?? "",
+    outlineProposal: src.reviseProposal ?? "",
+    titleProposal: src.reviseTitleProposal ?? "",
+    requestedAtMs: src.reviseRequestedAtMs ?? null,
+  };
+}
