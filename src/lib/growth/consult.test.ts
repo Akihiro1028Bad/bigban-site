@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isConsultBusy, mapLoopStatus, overallViewFrom, STAGE_KINDS } from "./consult";
+import { isConsultBusy, mapLoopStatus, overallViewFrom, reviseViewFrom, STAGE_KINDS } from "./consult";
 import type { AdviceView } from "@/lib/growth/advise";
 
 describe("mapLoopStatus", () => {
@@ -87,5 +87,39 @@ describe("overallViewFrom", () => {
     const view: AdviceView = { status: "提示中", advice, raw: "test" };
     const r = overallViewFrom(view, undefined);
     expect(r?.apply).toBeNull();
+  });
+});
+
+describe("reviseViewFrom", () => {
+  it("提示中: presenting・現構成/構成案/タイトル案を透過", () => {
+    const r = reviseViewFrom({
+      reviseStatus: "提示中",
+      outline: "現構成",
+      reviseProposal: "新構成",
+      reviseTitleProposal: "新タイトル",
+      reviseRequestedAtMs: 2000,
+    });
+    expect(r).toEqual({
+      kind: "revise",
+      status: "presenting",
+      currentOutline: "現構成",
+      outlineProposal: "新構成",
+      titleProposal: "新タイトル",
+      requestedAtMs: 2000,
+    });
+  });
+
+  it("依頼中: requested・欠落フィールドは空文字/null", () => {
+    const r = reviseViewFrom({ reviseStatus: "依頼中" });
+    expect(r?.status).toBe("requested");
+    expect(r?.currentOutline).toBe("");
+    expect(r?.outlineProposal).toBe("");
+    expect(r?.titleProposal).toBe("");
+    expect(r?.requestedAtMs).toBeNull();
+  });
+
+  it("なし/undefined は null（未依頼）", () => {
+    expect(reviseViewFrom({ reviseStatus: "なし" })).toBeNull();
+    expect(reviseViewFrom({})).toBeNull();
   });
 });
