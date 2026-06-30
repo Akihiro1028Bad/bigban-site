@@ -34,6 +34,20 @@ if (hasWindow) {
     configurable: true,
     value: vi.fn(),
   });
+
+  // jsdom は HTMLElement.offsetParent を常に null 返すため、接続済み要素を
+  // 可視扱いにする最小 polyfill（focus-trap の focusables() がブラウザ同様に動くように）。
+  // グローバル適用なのは、useDialog を使う複数のモーダル(ShortcutOverlay 等)の
+  // focus-trap テストが横断的にこれを必要とするため(個別テストスコープでは不足)。
+  // ⚠️ 現状 src 全体で offsetParent を読むのは useDialog のみ(grep 確認済み)。
+  // 将来 offsetParent 依存のライブラリ/コンポーネントを追加する場合は、本 polyfill が
+  // それらを「可視」と誤判定しうるため、その時点で挙動を要再検討。
+  Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+    configurable: true,
+    get(): Element | null {
+      return (this as HTMLElement).parentElement;
+    },
+  });
 }
 
 // jsdom環境だけデフォルト実装へ戻し、呼び出し履歴をクリアする。
