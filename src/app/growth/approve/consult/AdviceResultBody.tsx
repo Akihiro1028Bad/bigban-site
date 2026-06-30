@@ -99,8 +99,8 @@ export function AdviceResultBody({
   return (
     <div className="flex flex-col gap-4">
       {/* 総評(backend: advice.summary テキスト。RingScore は撤去) */}
-      <div className="rounded-[12px] p-3" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
-        <div className="text-[11px] uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+      <div className="rounded-[12px] border border-gray-200 bg-gray-50 p-3">
+        <div className="text-[11px] uppercase tracking-wider text-gray-400">
           総評
         </div>
         <p className="mt-1 text-xs text-gray-800">{advice.summary}</p>
