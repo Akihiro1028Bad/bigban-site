@@ -1,9 +1,9 @@
 /**
  * ReviseSectionView(構成案の手動編集セクション)の挙動テスト(差分B Task 12)。
  *
- * AI修正系を相談ドロワーへ移管した後、手動セクションのコメント編集4コールバック
- * (onStartEditComment/onDeleteComment/onCancelComment/onSaveComment)＋タイトル/セクション編集が
- * 実挙動で到達することを検証する。revise は useReviseEditing 互換のモックを差して exercise する。
+ * コメント収集UIは相談ドロワーへ移管済みのため、詳細パネルは手動編集のみを描画する。
+ * ここではコメント導線が出ないこと＋タイトル/セクション手動編集/画像が実挙動で到達することを検証する。
+ * revise は useReviseEditing 互換のモックを差して exercise する。
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -87,48 +87,17 @@ describe("ReviseSectionView", () => {
     expect(screen.getByText("見出しB")).toBeInTheDocument();
   });
 
-  it("＋コメントで startAddComment(section) を呼ぶ", async () => {
-    const user = userEvent.setup();
-    const startAddComment = vi.fn();
-    render(<ReviseSectionView item={item} revise={makeRevise({ startAddComment })} />);
-    await user.click(screen.getByRole("button", { name: "コメントを追加: 見出しA" }));
-    expect(startAddComment).toHaveBeenCalledWith(0);
-  });
-
-  it("コメント入力欄でキャンセル/保存が cancelComment/saveComment(section) を呼ぶ", async () => {
-    const user = userEvent.setup();
-    const cancelComment = vi.fn();
-    const saveComment = vi.fn();
+  it("詳細パネルにはコメント収集導線(＋コメント)を描画しない", () => {
     render(
       <ReviseSectionView
         item={item}
-        revise={makeRevise({ openCommentFor: 1, cancelComment, saveComment })}
+        revise={makeRevise({ draftComments: { 0: ["コメ1"] } })}
       />
     );
-    await user.click(screen.getByRole("button", { name: "キャンセル" }));
-    expect(cancelComment).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole("button", { name: "コメントを追加" }));
-    expect(saveComment).toHaveBeenCalledWith(1);
-  });
-
-  it("既存コメントの編集/削除が startEditComment(section,idx,text)/deleteComment(section,idx) を呼ぶ", async () => {
-    const user = userEvent.setup();
-    const startEditComment = vi.fn();
-    const deleteComment = vi.fn();
-    render(
-      <ReviseSectionView
-        item={item}
-        revise={makeRevise({
-          draftComments: { 0: ["コメ1", "コメ2"] },
-          startEditComment,
-          deleteComment,
-        })}
-      />
-    );
-    await user.click(screen.getByRole("button", { name: "コメントを編集: 見出しA 2" }));
-    expect(startEditComment).toHaveBeenCalledWith(0, 1, "コメ2");
-    await user.click(screen.getByRole("button", { name: "コメントを削除: 見出しA 1" }));
-    expect(deleteComment).toHaveBeenCalledWith(0, 0);
+    expect(screen.queryByRole("button", { name: "コメントを追加: 見出しA" })).toBeNull();
+    // 既存コメントが渡っていてもスレッド/件数バッジは出さない。
+    expect(screen.queryByText("コメ1")).toBeNull();
+    expect(screen.queryByText("コメント1")).toBeNull();
   });
 
   it("セクション編集ボタンで startEditSection(i, section) を呼ぶ", async () => {

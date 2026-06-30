@@ -3024,7 +3024,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 
-  it("コメント入力中(textarea)の Esc では閉じない", async () => {
+  it("入力欄(タイトル編集)にフォーカス中の Esc では閉じない", async () => {
     mockFetchSequence({
       json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] },
     });
@@ -3032,10 +3032,11 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "コメントを追加: 見出しA" }));
-    const textarea = within(dialog).getByLabelText("コメント入力: 見出しA");
-    // textarea にフォーカスがある状態の Esc はパネルを閉じない(入力中断のみ)。
-    fireEvent.keyDown(textarea, { key: "Escape" });
+    // タイトル直接編集の入力欄(詳細パネルに残る手動編集)を開く。
+    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
+    const input = within(dialog).getByLabelText("タイトルを編集");
+    // input にフォーカスがある状態の Esc はパネルを閉じない(入力中断のみ)。
+    fireEvent.keyDown(input, { key: "Escape" });
     expect(screen.getByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 });

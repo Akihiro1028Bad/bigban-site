@@ -24,10 +24,6 @@ interface ReviseSectionViewProps {
 
 export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
   const {
-    draftComments,
-    openCommentFor,
-    commentText,
-    editingIdx,
     editingSection,
     editHeading,
     editDescription,
@@ -39,17 +35,11 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
     reviseError,
     editingTitle,
     titleInput,
-    setCommentText,
     setEditHeading,
     setEditDescription,
     setImageStyle,
     setImageDesc,
     setTitleInput,
-    startAddComment,
-    startEditComment,
-    cancelComment,
-    saveComment,
-    deleteComment,
     startEditSection,
     cancelEditSection,
     startEditTitle,
@@ -102,7 +92,7 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
     );
   }
 
-  // #53: 1セクション分の本文・件数・既存コメント(スレッド)・入力欄/＋コメント/編集を描画。
+  // #53: 1セクション分の本文・見出し・手動編集/画像のみを描画(コメント収集はドロワー専用)。
   function renderSection(sections: OutlineSection[], i: number) {
     const section = sections[i];
     return (
@@ -110,18 +100,8 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
         key={i}
         heading={section.heading}
         description={section.description}
-        comments={draftComments[i] ?? []}
         editing={editingSection === i}
-        commentOpen={openCommentFor === i}
-        commentText={commentText}
-        onCommentTextChange={setCommentText}
-        editingComment={editingIdx !== null}
         busy={reviseBusy}
-        onStartEditComment={(idx, comment) => startEditComment(i, idx, comment)}
-        onDeleteComment={(idx) => deleteComment(i, idx)}
-        onCancelComment={cancelComment}
-        onSaveComment={() => saveComment(i)}
-        onStartAddComment={() => startAddComment(i)}
         onStartEditSection={() => startEditSection(i, section)}
         editor={renderSectionEditor(sections, i)}
         images={renderSectionImages(sections, i)}
