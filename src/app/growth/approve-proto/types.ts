@@ -169,6 +169,14 @@ export interface Article {
   proposalCategory?: string;
   /** 却下時の理由メモ(学習ループの種地)。 */
   proposalRejectNote?: string;
+  /** 施策の種別。未設定は "article"（ゼロ破壊移行）。 */
+  proposalKind?: ProposalKind;
+  /** proposalKind==="site" のとき。 */
+  siteDetail?: SiteProposalDetail;
+  /** proposalKind==="event" のとき。 */
+  eventDetail?: EventProposalDetail;
+  /** proposalKind==="other" の自由記述。 */
+  freeNote?: string;
   /** 施策の根拠メトリクスchip(派生元の伸び等)。 */
   evidence?: string[];
   advice: Advice;
@@ -192,6 +200,31 @@ export type MainView = "proposal" | "approve" | "prompt" | "performance" | "queu
 
 /** 施策トリアージの状態。 */
 export type ProposalStatus = "pending" | "rejected" | "adopted";
+
+/** 施策の種別＝承認後アウトカムのルーティング先。未設定は "article" 相当（欠落耐性・後方互換）。 */
+export type ProposalKind = "article" | "site" | "event" | "other";
+
+/** proposalKind==="site" の詳細。参考は既存 Article.refs を流用するため新型は足さない。 */
+export interface SiteProposalDetail {
+  /** 何を変えるか。 */
+  whatChange: string;
+  /** どこを（例: ヒーローセクション）。 */
+  whereTarget?: string;
+  /** なぜ。 */
+  whyReason?: string;
+}
+
+/** proposalKind==="event" の詳細。 */
+export interface EventProposalDetail {
+  /** いつ（"7月中旬" 等の自由文・断定しない）。 */
+  whenLabel: string;
+  /** 対象。 */
+  audience?: string;
+  /** 形式。 */
+  format?: string;
+  /** 想定人数（自由文）。 */
+  capacity?: string;
+}
 
 export type DetailTab =
   | "outline"
