@@ -1,3 +1,4 @@
+import "./theme/approveTheme.css";
 import { ApproveClient } from "./ApproveClient";
 import { ApproveProviders } from "./providers";
 
