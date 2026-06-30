@@ -5,7 +5,8 @@
  * 段階（構成案=outline / 下書き=draft）を出し分ける。型専用 import のみ（カバレッジ100%ゲートを波及で壊さない）。
  */
 
-import type { AdviceStatus } from "@/lib/growth/advise";
+import type { Advice, AdviceStatus, AdviceView } from "@/lib/growth/advise";
+import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 
 /** ループ共通のステータス文字列（advise/bodyComment/revise で同一の5値ユニオン）。 */
 type LoopStatus = AdviceStatus;
@@ -43,3 +44,34 @@ export const STAGE_KINDS: Record<ConsultStage, readonly ConsultKind[]> = {
   outline: ["revise"],
   draft: ["overall", "sentence"],
 };
+
+/** overall モードの相談ビュー（DraftPreview.advice/adviceApply 由来）。 */
+export interface OverallConsultView {
+  kind: "overall";
+  status: ConsultStatus;
+  /** 提示中で JSON 妥当時のみ非 null。 */
+  advice: Advice | null;
+  /** 失敗理由などの生テキスト。 */
+  raw: string;
+  /** 依頼時刻（ms）。滞留警告表示用。 */
+  requestedAtMs: number | null;
+  /** #165 採用→反映ビュー。未取得は null。 */
+  apply: AdviceApplyView | null;
+}
+
+/** DraftPreview.advice/adviceApply → OverallConsultView。未依頼（なし）は null。 */
+export function overallViewFrom(
+  advice: AdviceView | undefined,
+  apply: AdviceApplyView | undefined,
+): OverallConsultView | null {
+  const status = mapLoopStatus(advice?.status);
+  if (status === null) return null;
+  return {
+    kind: "overall",
+    status,
+    advice: advice?.advice ?? null,
+    raw: advice?.raw ?? "",
+    requestedAtMs: advice?.requestedAtMs ?? null,
+    apply: apply ?? null,
+  };
+}
