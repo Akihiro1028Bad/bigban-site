@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { isConsultBusy, mapLoopStatus, overallViewFrom, reviseViewFrom, sentenceViewFrom, STAGE_KINDS } from "./consult";
 import type { AdviceView } from "@/lib/growth/advise";
+import type { BodyCommentView } from "@/lib/growth/bodyComment";
 
 describe("mapLoopStatus", () => {
   it("依頼中→requested / 処理中→processing / 提示中→presenting / 失敗→failed", () => {
@@ -156,5 +157,12 @@ describe("sentenceViewFrom", () => {
     expect(r?.status).toBe("requested");
     expect(r?.proposal).toBe(proposal);
     expect(r?.raw).toBe("processing");
+  });
+
+  it("提示中: proposal/raw 欠落は []/'' にフォールバック", () => {
+    const r = sentenceViewFrom({ status: "提示中", comments: [] } as unknown as BodyCommentView);
+    expect(r?.status).toBe("presenting");
+    expect(r?.proposal).toEqual([]);
+    expect(r?.raw).toBe("");
   });
 });
