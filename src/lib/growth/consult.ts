@@ -125,13 +125,12 @@ export interface SentenceConsultView {
 export function sentenceViewFrom(
   bodyComment: BodyCommentView | undefined,
 ): SentenceConsultView | null {
-  if (!bodyComment) return null;
-  const status = mapLoopStatus(bodyComment.status);
+  const status = mapLoopStatus(bodyComment?.status);
   if (status === null) return null;
   return {
     kind: "sentence",
     status,
-    proposal: bodyComment.proposal,
-    raw: bodyComment.raw,
+    proposal: bodyComment?.proposal ?? [],
+    raw: bodyComment?.raw ?? "",
   };
 }
