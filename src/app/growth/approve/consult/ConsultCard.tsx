@@ -18,7 +18,6 @@ import type {
   ReviseConsultView,
   SentenceConsultView,
 } from "@/lib/growth/consult";
-import { isConsultBusy } from "@/lib/growth/consult";
 import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 
 import { AdviceResultBody } from "./AdviceResultBody";

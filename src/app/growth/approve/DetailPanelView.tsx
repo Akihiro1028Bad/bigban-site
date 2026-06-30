@@ -8,13 +8,15 @@
 
 import { choiceButtonClass, SECTION_CARD, SECTION_HEAD } from "./approveStyles";
 import { isReviseBusy, KIND_BADGE } from "./boardItemHelpers";
+import { ConsultComposer } from "./consult/ConsultComposer";
+import { ConsultDrawer } from "./consult/ConsultDrawer";
 import { detailBadge } from "./detailBadge";
 import { DetailHeader } from "./DetailHeader";
 import { DetailPanel } from "./DetailPanel";
 import { DraftChecklist } from "./DraftChecklist";
 import { draftPlainText, draftQuality } from "./draftQuality";
 import { DraftReadyView } from "./DraftReadyView";
-import type { DraftState } from "./draftTypes";
+import type { DraftPreview, DraftState } from "./draftTypes";
 import { ExcerptEditor } from "./ExcerptEditor";
 import { HypothesisCard } from "./HypothesisCard";
 import { MetricChips } from "./MetricChips";
@@ -22,6 +24,7 @@ import type { PreviewDevice } from "./previewDevice";
 import { nextReviewId } from "./reviewNav";
 import { ReviseSectionView } from "./ReviseSectionView";
 import { StyleHints } from "./StyleHints";
+import { useConsult } from "./hooks/useConsult";
 import type { useReviseEditing } from "./hooks/useReviseEditing";
 import type { Choice, PendingItem } from "./types";
 
@@ -73,6 +76,18 @@ export function DetailPanelView({
   // #43: 修正中(依頼中/処理中/提示中)は承認/却下を無効化(古い構成案での承認を防ぐ)。
   const lockedForRevise = isReviseBusy(item.reviseStatus);
   const isIdea = item.kind === "idea";
+
+  // 差分B: AI相談ドロワー。item/draft が揃うこの層で useConsult を生成し、グルー(モード解決・
+  // ビュー絞り込み・classifications/selectable・busy・全コールバック)はオーケストレータに集約する。
+  const draft: DraftPreview | null =
+    draftState.status === "ready" ? draftState.draft : null;
+  const consult = useConsult({
+    item,
+    token,
+    draft,
+    onReloadDraft: () => onReloadDraft(item.id),
+    revise,
+  });
 
   // #127/M8: クリップボードへコピー(本文など)。成否をトーストで明示する(沈黙させない)。
   function copyText(text: string): void {
@@ -256,17 +271,70 @@ export function DetailPanelView({
       </div>
     ) : null;
 
+  // 差分B: 「AIに相談」起点。文体/構成/文章の相談はドロワーへ集約する(記事のみ)。
+  // 手動編集(タイトル/構成案/画像)は ReviseSectionView に残す。
+  const reviseSection = isIdea ? (
+    <>
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={consult.openDrawer}
+          className={choiceButtonClass(
+            "w-full border border-blue-600 bg-blue-600 text-white"
+          )}
+        >
+          AIに相談
+        </button>
+      </div>
+      <ReviseSectionView item={item} revise={revise} />
+    </>
+  ) : null;
+
   return (
-    <DetailPanel
-      isIdea={isIdea}
-      title={item.title}
-      header={header}
-      insight={insight}
-      checklist={checklist}
-      draftPreview={draftPreview}
-      reviseSection={<ReviseSectionView item={item} revise={revise} />}
-      decisionActions={decisionActions}
-      onClose={onClose}
-    />
+    <>
+      <DetailPanel
+        isIdea={isIdea}
+        title={item.title}
+        header={header}
+        insight={insight}
+        checklist={checklist}
+        draftPreview={draftPreview}
+        reviseSection={reviseSection}
+        decisionActions={decisionActions}
+        onClose={onClose}
+      />
+      <ConsultDrawer
+        open={consult.open}
+        stage={consult.stage}
+        mode={consult.mode}
+        views={consult.views}
+        composer={
+          <ConsultComposer
+            mode={consult.mode}
+            item={item}
+            bodyHtml={consult.bodyHtml}
+            advice={consult.advice}
+            bodyCommentConsult={consult.bodyCommentConsult}
+            revise={revise}
+          />
+        }
+        busy={consult.busy}
+        onModeChange={consult.setMode}
+        onClose={consult.closeDrawer}
+        onReload={consult.onReload}
+        onAdviceDismiss={consult.onAdviceDismiss}
+        onAdviceSubmitApply={consult.onAdviceSubmitApply}
+        onAdviceDismissApply={consult.onAdviceDismissApply}
+        onAdviceApplyNow={consult.onAdviceApplyNow}
+        onReviseApply={consult.onReviseApply}
+        onReviseDiscard={consult.onReviseDiscard}
+        onSentenceApplyAll={consult.onSentenceApplyAll}
+        onRetry={consult.onRetry}
+        adopted={consult.adopted}
+        selectable={consult.selectable}
+        classifications={consult.classifications}
+        onToggleAdopt={consult.onToggleAdopt}
+      />
+    </>
   );
 }

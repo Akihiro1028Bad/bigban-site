@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 
+import { classifyFix, FIX_REASON_NO_QUOTE, type FixClassification } from "@/lib/growth/adviseApply";
 import {
   overallViewFrom,
   reviseViewFrom,
@@ -37,14 +38,36 @@ interface UseConsultParams {
 interface UseConsultReturn {
   open: boolean;
   stage: ConsultStage;
+  /** 現在の段階で有効なモード(段階に無い mode は先頭タブへフォールバック済み)。 */
   mode: ConsultKind;
   setMode: (mode: ConsultKind) => void;
   openDrawer: () => void;
   closeDrawer: () => void;
+  /** 表示中モード(mode)に対応する相談結果カードのみ。 */
   views: (OverallConsultView | ReviseConsultView | SentenceConsultView)[];
+  /** 表示中モードの操作(依頼/反映/再読込)が進行中か。 */
+  busy: boolean;
+  /** overall カードの各 fix の反映可否(AdviceResultBody が利用)。 */
+  classifications: FixClassification[];
+  /** overall カードの採用チェック表示可否。 */
+  selectable: boolean;
+  /** ConsultComposer が参照する下書き本文 HTML。 */
+  bodyHtml: string;
   advice: ReturnType<typeof useAdviceConsult>;
   bodyCommentConsult: ReturnType<typeof useBodyCommentConsult>;
   revise: ReturnType<typeof useReviseEditing>;
+  // ── ドロワーのコールバック(オーケストレータが束ねて返す) ──────────────────────
+  onReload: () => void;
+  onRetry: () => void;
+  onAdviceDismiss: () => void;
+  onAdviceSubmitApply: () => void;
+  onAdviceDismissApply: () => void;
+  onAdviceApplyNow: () => void;
+  onReviseApply: () => void;
+  onReviseDiscard: () => void;
+  onSentenceApplyAll: () => void;
+  onToggleAdopt: (index: number) => void;
+  adopted: ReadonlySet<number>;
 }
 
 export function useConsult({
@@ -89,20 +112,81 @@ export function useConsult({
     reviseViewFrom(item),
     sentenceViewFrom(draft?.bodyComment),
   ];
-  const views = rawViews.filter(
+  const allViews = rawViews.filter(
     (v): v is OverallConsultView | ReviseConsultView | SentenceConsultView => v !== null,
   );
+
+  // Task 11 申し送り: mode 初期値は最初の stage で固定されるため、outline→draft 遷移後に
+  // 当該段階のタブに無い mode が残りうる。段階(STAGE_KINDS[stage])に mode が無ければ先頭タブへ。
+  const stageKinds = STAGE_KINDS[stage];
+  const activeMode: ConsultKind = stageKinds.includes(mode) ? mode : stageKinds[0];
+
+  // ドロワーには現在のモードに対応する相談結果カードだけを渡す(単一コールバックと整合させる)。
+  const views = allViews.filter((v) => v.kind === activeMode);
+
+  // overall カードの採用チェック表示(selectable)と各 fix の反映可否(classifications)を、
+  // AdviceCard の判定ロジックに整合させて算出する(ドロワー内 AdviceResultBody が利用)。
+  const overallView = allViews.find((v) => v.kind === "overall");
+  const adviceFixes =
+    overallView && overallView.kind === "overall" && overallView.advice !== null
+      ? overallView.advice.fixes
+      : [];
+  const bodyHtml = draft?.bodyHtml ?? "";
+  const classifications = adviceFixes.map((f) =>
+    bodyHtml ? classifyFix(f, bodyHtml) : { applicable: false as const, reason: FIX_REASON_NO_QUOTE },
+  );
+  const applyStatus =
+    overallView?.kind === "overall" ? overallView.apply?.status ?? "なし" : "なし";
+  const selectable =
+    applyStatus === "なし" && bodyHtml !== "" && classifications.some((c) => c.applicable);
+
+  // 失敗カードの「再依頼」。表示中モードに対応する依頼を呼ぶ(overall/revise/sentence)。
+  function onRetry(): void {
+    if (activeMode === "overall") advice.requestAdvice();
+    else if (activeMode === "revise") void revise.requestRevise(item);
+    else void bodyCommentConsult.requestAi();
+  }
+
+  // 待ち状態カードの「再読み込み」。revise は盤(item の reviseStatus)を、
+  // overall/sentence は下書き(advice/bodyComment)を最新化する。
+  function onReload(): void {
+    if (activeMode === "revise") void revise.refreshItems();
+    else onReloadDraft();
+  }
+
+  // 表示中モードの操作が進行中か(各カードのボタン無効化に使う・フェッチ中で判定)。
+  const busy =
+    activeMode === "overall"
+      ? advice.busy
+      : activeMode === "revise"
+        ? revise.reviseBusy
+        : bodyCommentConsult.busy;
 
   return {
     open,
     stage,
-    mode,
+    mode: activeMode,
     setMode,
     openDrawer,
     closeDrawer,
     views,
+    busy,
+    classifications,
+    selectable,
+    bodyHtml,
     advice,
     bodyCommentConsult,
     revise,
+    onReload,
+    onRetry,
+    onAdviceDismiss: advice.dismiss,
+    onAdviceSubmitApply: advice.submitApply,
+    onAdviceDismissApply: advice.dismissApply,
+    onAdviceApplyNow: () => void advice.applyNow(),
+    onReviseApply: () => void revise.applyRevise(item, "apply"),
+    onReviseDiscard: () => void revise.applyRevise(item, "discard"),
+    onSentenceApplyAll: () => void bodyCommentConsult.applyNow(),
+    onToggleAdopt: advice.toggleAdopt,
+    adopted: advice.adopted,
   };
 }
