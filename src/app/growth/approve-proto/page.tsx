@@ -43,14 +43,18 @@ import { STAGE_ORDER } from "./stages";
 import { ToastStack } from "./ToastStack";
 import { TopBar } from "./TopBar";
 import { useConsult } from "./useConsult";
+import { approveOutcomeFor } from "./proposalKind";
 import type {
   Article,
   ConsultKind,
   DetailTab,
+  EventProposalDetail,
   ImageInstruction,
   MainView,
   OutlineSection,
+  ProposalKind,
   SegmentKey,
+  SiteProposalDetail,
   Stage,
   Toast,
 } from "./types";
@@ -747,9 +751,18 @@ export default function ApproveProtoPage() {
 
   // 手動の施策登録(構造化フォーム) → 施策ビューの「未処理」へ投入(triage を一度通す)。
   const addProposal = useCallback(
-    (data: { title: string; category: string; note: string }) => {
+    (data: {
+      kind?: ProposalKind;
+      title: string;
+      category: string;
+      note: string;
+      siteDetail?: SiteProposalDetail;
+      eventDetail?: EventProposalDetail;
+      freeNote?: string;
+    }) => {
       ideaSeq.current += 1;
       const id = `prop-${ideaSeq.current}`;
+      const kind: ProposalKind = data.kind ?? "article";
       const newProp: Article = {
         id,
         title: data.title,
@@ -778,15 +791,23 @@ export default function ApproveProtoPage() {
         ],
         proposalStatus: "pending",
         proposalCategory: data.category,
+        proposalKind: kind,
         evidence: ["手動追加"],
-        hypothesis: {
-          articleType: "単記事（SEO）",
-          targetReader: data.title,
-          searchIntent: data.note || "—",
-          winningAngle: "—",
-          successMetric: "検索流入 ＋ 体験予約クリック",
-          plannedCta: "施設紹介 / 体験予約への内部リンク",
-        },
+        ...(kind === "article"
+          ? {
+              hypothesis: {
+                articleType: "単記事（SEO）",
+                targetReader: data.title,
+                searchIntent: data.note || "—",
+                winningAngle: "—",
+                successMetric: "検索流入 ＋ 体験予約クリック",
+                plannedCta: "施設紹介 / 体験予約への内部リンク",
+              },
+            }
+          : {}),
+        ...(data.siteDetail !== undefined ? { siteDetail: data.siteDetail } : {}),
+        ...(data.eventDetail !== undefined ? { eventDetail: data.eventDetail } : {}),
+        ...(data.freeNote !== undefined ? { freeNote: data.freeNote } : {}),
       };
       setArticles((prev) => [newProp, ...prev]);
       setProposalOpen(false);
@@ -800,14 +821,16 @@ export default function ApproveProtoPage() {
   // 施策トリアージ: 承認(=記事化) / 保留(検討中) / 却下(理由)。
   const approveProposal = useCallback(
     (id: string) => {
+      const target = articles.find((a) => a.id === id);
+      const kind: ProposalKind = target?.proposalKind ?? "article";
       const goNext = proposals.find((p) => p.id !== id && p.proposalStatus === "pending");
       setArticles((prev) =>
         prev.map((a) => (a.id === id ? { ...a, proposalStatus: "adopted", updatedLabel: "たった今" } : a))
       );
-      pushToast("success", "施策を承認 → ネタ案に追加しました");
+      pushToast("success", approveOutcomeFor(kind).toast);
       if (goNext) setActiveId(goNext.id);
     },
-    [proposals, pushToast]
+    [articles, proposals, pushToast]
   );
   const reopenProposal = useCallback(
     (id: string) => {
