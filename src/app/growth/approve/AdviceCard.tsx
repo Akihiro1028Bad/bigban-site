@@ -1,18 +1,14 @@
 "use client";
 
-import { useState } from "react";
-
 import type { AdviceFix, AdviceView } from "@/lib/growth/advise";
 import {
-  applyAdviceItems,
   classifyFix,
   FIX_REASON_NO_QUOTE,
   type AdviceApplyView,
 } from "@/lib/growth/adviseApply";
-import { readJsonObject } from "@/lib/growth/safeJson";
 
-import { authHeaders } from "./authHeaders";
 import { StaleNotice } from "./StaleNotice";
+import { useAdviceConsult } from "./hooks/useAdviceConsult";
 
 interface AdviceCardProps {
   pageId: string;
@@ -36,10 +32,6 @@ const SEVERITY_CLASS: Record<string, string> = {
   低: "bg-gray-100 text-gray-600",
 };
 
-function errMsg(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
 /**
  * 記事スタイリング・アドバイザー(Epic #146)のカード。
  * 承認画面の下書きプレビューに表示し、AI に文体・構成・読みやすさ(＋見た目の軽い助言)を
@@ -53,99 +45,22 @@ export function AdviceCard({
   bodyHtml,
   onChanged,
 }: AdviceCardProps) {
-  const [instruction, setInstruction] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  // #165: 本文反映で採用する fix の index 集合。
-  const [adopted, setAdopted] = useState<ReadonlySet<number>>(new Set());
+  const {
+    instruction,
+    setInstruction,
+    busy,
+    error,
+    adopted,
+    toggleAdopt,
+    requestAdvice,
+    dismiss,
+    submitApply,
+    dismissApply,
+    applyNow,
+  } = useAdviceConsult({ pageId, token, advice, adviceApply, bodyHtml, onChanged });
 
   const status = advice?.status ?? "なし";
   const applyStatus = adviceApply?.status ?? "なし";
-
-  async function postJson(path: string, body: unknown, fallback: string): Promise<void> {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify(body),
-      });
-      const json = await readJsonObject(res);
-      if (!res.ok || !json.success) throw new Error(json.error ?? fallback);
-      onChanged();
-    } catch (e) {
-      setError(errMsg(e, fallback));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function requestAdvice(): void {
-    void postJson("/api/growth/advise", { pageId, instruction: instruction.trim() }, "アドバイス依頼に失敗しました。");
-  }
-
-  function dismiss(): void {
-    void postJson("/api/growth/advise/dismiss", { pageId }, "アドバイスの片付けに失敗しました。");
-  }
-
-  // ── #165: 採用→本文反映 ──
-  function toggleAdopt(index: number): void {
-    setAdopted((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }
-
-  function submitApply(): void {
-    void postJson(
-      "/api/growth/advise/apply",
-      { pageId, adoptedIndexes: [...adopted] },
-      "反映依頼に失敗しました。"
-    );
-  }
-
-  function dismissApply(): void {
-    void postJson("/api/growth/advise/apply/dismiss", { pageId }, "反映の片付けに失敗しました。");
-  }
-
-  /** 提示された before/after 案を決定的に本文へ反映し、保存→片付け→再取得する。 */
-  async function applyNow(): Promise<void> {
-    if (!bodyHtml || !adviceApply) return;
-    const { html, applied, skipped } = applyAdviceItems(bodyHtml, adviceApply.proposal);
-    if (applied.length === 0) {
-      setError("反映できる案がありませんでした（本文が変わった可能性・要確認）。");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const saveRes = await fetch("/api/growth/draft/edit", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html }),
-      });
-      const saveJson = await readJsonObject(saveRes);
-      if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");
-      const clearRes = await fetch("/api/growth/advise/apply/dismiss", {
-        method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId }),
-      });
-      const clearJson = await readJsonObject(clearRes);
-      if (!clearRes.ok || !clearJson.success) throw new Error(clearJson.error ?? "片付けに失敗しました。");
-      if (skipped.length > 0) {
-        setError(`${applied.length}件を反映しました（${skipped.length}件は本文不一致でスキップ）。`);
-      }
-      onChanged();
-    } catch (e) {
-      setError(errMsg(e, "反映に失敗しました。"));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   function renderError() {
     return error ? (
