@@ -50,8 +50,7 @@ export function ReviseProposalBody({
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <h5 className="text-xs font-bold text-gray-500">元のタイトル</h5>
-              {/* currentOutline から title は親が渡す。ここではタイトル提案のみ表示 */}
-              {/* タイトル提案は WordDiffView で before="" after=titleProposal として差分表示 */}
+              {/* タイトルは提案のみを <p> で表示(元タイトルは親が別途提示)。差分表示はしない */}
               <p className="mt-1 rounded-md bg-blue-50 p-2 text-xs font-medium text-gray-900">
                 {titleProposal}
               </p>
