@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { MotionConfig } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 // useDebouncedValue は useDraftEditing フックへ移設(#H7)。
@@ -28,7 +29,6 @@ import { isEditableTag, moveIndex, resolveShortcut } from "./shortcuts";
 import {
   type Density,
   densityListClass,
-  nextDensity,
   parseDensity,
   pruneSelection,
   toggleId,
@@ -36,9 +36,6 @@ import {
 
 import { fetchBoard, postPublish, postRevert } from "./api";
 import { BoardCard } from "./BoardCard";
-import { BoardTabs } from "./BoardTabs";
-import { BoardToolbar } from "./BoardToolbar";
-import { BulkActionBar } from "./BulkActionBar";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PollStaleBanner } from "./PollStaleBanner";
 import { DetailPanelView } from "./DetailPanelView";
@@ -55,6 +52,14 @@ import { ProposalsView } from "./ProposalsView";
 import { nextReviewId } from "./reviewNav";
 import { decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
+import { deriveShellCounts, syncAgoLabel } from "./boardShellStats";
+import type { ShellSegmentKey } from "./boardShellStats";
+import { matchesSegment, SHELL_SEGMENTS } from "./shellNav";
+import { TopBar } from "./shell/TopBar";
+import { LeftRail } from "./shell/LeftRail";
+import { ShortcutBar } from "./shell/ShortcutBar";
+import { ShortcutOverlay } from "./shell/ShortcutOverlay";
+import { BulkBar } from "./shell/BulkBar";
 import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { shouldWarnPollStale } from "./pollHealth";
@@ -151,6 +156,13 @@ export function ApproveClient() {
   // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
   // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
   const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
+  // #proto P1: TopBar 段階セグメント(approve view のカード絞り込み)。既定は全件。
+  const [segment, setSegment] = useState<ShellSegmentKey>("all");
+  // #proto P1: TopBar 検索(approve/proposal view のカード絞り込み)。`/` キーでフォーカスを移す。
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  // #proto P1: ショートカット一覧オーバーレイ(ボタン到達のみ・`?` キーバインドは P6 へ)。
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [message, setMessage] = useState("");
   // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
   const [busy, setBusy] = useState(authDisabled);
@@ -199,24 +211,35 @@ export function ApproveClient() {
   useEffect(() => {
     if (viewPinned) return;
     if (items.length === 0) return;
-    // 施策は「未処理(承認/却下できる)」があるか、記事は「パイプラインに記事があるか」で判定。
-    // 施策に未処理が無くても記事が動いていれば記事を初期表示する(両方あれば施策優先)。
-    const counts = {
-      proposals: items.filter((i) => i.kind === "proposal" && isActionable(i, decided)).length,
-      articles: items.filter((i) => i.kind === "idea").length,
-    };
-    setView(decideInitialView(null, counts));
+    // #proto P1: proto 既定着地。施策に未処理(あなたのアクション待ち)があれば施策、
+    // 記事に「あなた待ち」があれば記事、どちらも無ければ成績。deriveShellCounts に写像を一本化。
+    const counts = deriveShellCounts(items, decided);
+    setView(
+      decideInitialView(null, {
+        proposalPending: counts.proposalPending,
+        awaiting: counts.awaiting,
+      }),
+    );
     setViewPinned(true);
   }, [items, decided, viewPinned]);
 
-  // #119: タブを切り替える(URL にも反映し、以降の自動切替を止める)。
-  // タブ間でカード件数が異なるため、キーボードフォーカスは未選択(-1)に戻す。
+  // #119/#proto P1: view を切り替える(URL にも反映し、以降の自動切替を止める)。
+  // view 間でカード件数が異なるため、キーボードフォーカスは未選択(-1)に戻す。
   const changeView = useCallback((next: ApproveView): void => {
     setView(next);
     setViewPinned(true);
     setFocusedIndex(-1);
     writeViewParam(next);
   }, []);
+
+  // #proto P1: 段階セグメント変更。非 approve view で段階を選んだら approve view へ遷移しフィルタ適用。
+  const handleSegmentChange = useCallback(
+    (next: ShellSegmentKey): void => {
+      setSegment(next);
+      if (view !== "approve") changeView("approve");
+    },
+    [view, changeView],
+  );
 
   // #108: 記事が生成待ち/生成中に入った時刻を記録し、抜けたら破棄する(滞留検知の基準)。
   useEffect(() => {
@@ -297,6 +320,8 @@ export function ApproveClient() {
       const tag = (event.target as HTMLElement | null)?.tagName ?? "";
       const editable = isEditableTag(tag);
       // 入力欄での単一キーは抑止(検索/編集の妨げにしない)。palette/escape は許可。
+      // search(`/`)は入力欄外からのみ検索フォーカスへ通す(editable のときは抑止=検索欄での
+      // `/` 文字入力を優先する proto 挙動を維持)。
       if (editable && action !== "palette" && action !== "escape") return;
       event.preventDefault();
       dispatchRef.current(action, editable);
@@ -305,18 +330,11 @@ export function ApproveClient() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // #109: 表示密度を localStorage から復元する(初回)。
+  // #109: 表示密度を localStorage から復元する(初回)。proto P1 では密度トグル UI は未移植のため
+  // 復元のみ(保存は P6 以降の密度トグル再導入時)。
   useEffect(() => {
     setDensity(parseDensity(window.localStorage.getItem(DENSITY_KEY)));
   }, []);
-
-  function toggleDensity(): void {
-    setDensity((prev) => {
-      const next = nextDensity(prev);
-      window.localStorage.setItem(DENSITY_KEY, next);
-      return next;
-    });
-  }
 
   // #109: 取得更新で消えた選択を掃除する。
   useEffect(() => {
@@ -528,28 +546,35 @@ export function ApproveClient() {
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
   const openItem = openId ? items.find((item) => item.id === openId) : undefined;
 
+  // #proto P1: シェル統計(段階セグメント件数 / あなた待ち / 公開済み / 施策残 / 公開キュー)。
+  const counts = deriveShellCounts(items, decided);
+  // #proto P1: approve view のカードは段階セグメント＋検索で絞り込んでから段階列に振り分ける。
+  const trimmedQuery = query.trim().toLowerCase();
+  function matchesQuery(item: PendingItem): boolean {
+    if (trimmedQuery === "") return true;
+    const haystack = `${item.title} ${item.subtitle ?? ""}`.toLowerCase();
+    return haystack.includes(trimmedQuery);
+  }
+  const visibleIdeas = ideas.filter(
+    (item) => matchesSegment(item, segment, decided) && matchesQuery(item),
+  );
+  // #proto P1: 施策 view も検索で絞り込む(段階セグメントは記事専用のため施策には適用しない)。
+  const visibleProposals = proposals.filter(matchesQuery);
+
   // #107: 記事をパイプライン段階(#106)ごとの列に振り分ける。承認は生成待ち列へ前進。
-  const articleColumns = groupArticlesByStage(ideas, decided);
+  const articleColumns = groupArticlesByStage(visibleIdeas, decided);
   // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
   const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
-  // #119: 表示中タブ(未確定時は施策を既定描画)。タブの未処理件数バッジも算出。
-  const activeView: ApproveView = view ?? "proposals";
-  const proposalPending = proposals.filter((item) => isActionable(item, decided)).length;
-  const articlePending = ideas.filter((item) => isActionable(item, decided)).length;
-  // prompts は read-only の確認タブで未処理という概念が無いため常に 0。
-  const pendingByView: Record<ApproveView, number> = {
-    proposals: proposalPending,
-    articles: articlePending,
-    prompts: 0,
-  };
+  // #proto P1: 表示中 view(未確定時は施策を既定描画)。
+  const activeView: ApproveView = view ?? "proposal";
 
-  // #109/#119: キーボード操作対象はアクティブタブのカードに限定。パレットは両ストリーム横断。
+  // #109/#proto P1: キーボード操作対象はアクティブ view のカードに限定。パレットは両ストリーム横断。
   const articleNavItems = articleColumns.flatMap((col) => col.items);
-  // prompts タブはカードを持たないのでキー操作対象は空。
+  // prompt/performance/queue view はカードを持たないのでキー操作対象は空。
   const navItems =
-    activeView === "proposals" ? proposals : activeView === "articles" ? articleNavItems : [];
-  const paletteSource = [...proposals, ...articleNavItems];
+    activeView === "proposal" ? visibleProposals : activeView === "approve" ? articleNavItems : [];
+  const paletteSource = [...proposals, ...ideas];
   const focusedItem = focusedIndex >= 0 ? navItems[focusedIndex] : undefined;
   const focusedId = focusedItem?.id;
   const densityClass = densityListClass(density);
@@ -565,10 +590,10 @@ export function ApproveClient() {
     actionable: isBulkActionable(item),
   }));
 
-  // #119: パレットから記事/施策どちらへもジャンプ。対象タブへ自動切替してから詳細を開く。
+  // #119/#proto P1: パレットから記事/施策どちらへもジャンプ。対象 view へ自動切替してから詳細を開く。
   function jumpTo(id: string): void {
     const isIdea = ideas.some((item) => item.id === id);
-    changeView(isIdea ? "articles" : "proposals");
+    changeView(isIdea ? "approve" : "proposal");
     setOpenId(id);
     setPaletteOpen(false);
   }
@@ -582,7 +607,12 @@ export function ApproveClient() {
 
   // #109/#130: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
   dispatchRef.current = (action, editable) => {
-    if (action === "search" || action === "palette") {
+    // #proto P1: `/` は検索欄へフォーカスを移す。⌘K/Ctrl+K のみコマンドパレットを開く。
+    if (action === "search") {
+      searchRef.current?.focus();
+      return;
+    }
+    if (action === "palette") {
       setPaletteOpen(true);
       return;
     }
@@ -690,136 +720,166 @@ export function ApproveClient() {
   }
 
 
+  // #proto P1: 同期ラベル(盤の最終取得時刻からの経過)。dataUpdatedAt は ms epoch(未取得時 0)。
+  const sync = syncAgoLabel(nowTick, boardQuery.dataUpdatedAt || null);
+  const syncing = boardQuery.isRefetching || boardQuery.isFetching;
+  // #proto P1: TopBar の段階セグメント(件数つき)。
+  const topBarSegments = SHELL_SEGMENTS.map((s) => ({
+    ...s,
+    count: counts.segmentCounts[s.key],
+  }));
+  // #proto P1: 各 view の tabpanel a11y ラベル(従来のセクション region と別に panel 全体を識別)。
+  const viewPanelLabel: Record<ApproveView, string> = {
+    proposal: "施策",
+    approve: "記事",
+    prompt: "プロンプト",
+    performance: "成績",
+    queue: "公開キュー",
+  };
+
+  // #proto P1: proto 固定シェル(position:fixed; inset:0)。MotionConfig で OS の motion 設定を尊重。
+  // DraftEditWorkspace は .approve-shell の外(MotionConfig 直下)で全画面オーバーレイとして描画する。
   return (
-    <main className="mx-auto max-w-md p-4 lg:max-w-7xl lg:px-8">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-xl font-bold text-gray-900">今週の提案</h1>
-        <p className="text-sm text-gray-600">
-          処理済み {processed} / {items.length}件
-        </p>
-      </div>
-      <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
-        承認した提案は制作キューに追加されます。この場では公開されません。
-      </p>
-      {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
-      {shouldWarnPollStale(pollFailures) ? (
-        <PollStaleBanner lastBoardSuccessMs={lastBoardSuccessMs} onRetry={() => void pollBoard()} />
-      ) : null}
+    <MotionConfig reducedMotion="user">
+      <div className="approve-shell flex h-full flex-col">
+        <TopBar
+          segment={segment}
+          segments={topBarSegments}
+          query={query}
+          awaitingCount={counts.awaiting}
+          publishedTotal={counts.publishedTotal}
+          onSegmentChange={handleSegmentChange}
+          onQueryChange={setQuery}
+          searchRef={searchRef}
+          syncLabel={sync.label}
+          syncStale={sync.stale}
+          syncing={syncing}
+          onRefresh={() => void pollBoard()}
+          onOpenProposal={() => changeView("proposal")}
+        />
 
-      {/* #119: 施策/記事のタブ切替。各タブに未処理件数バッジを出し残件を可視化する。 */}
-      <BoardTabs activeView={activeView} pendingByView={pendingByView} onChangeView={changeView} />
+        <div className="flex min-h-0 flex-1">
+          <LeftRail
+            view={activeView}
+            awaitingCount={counts.awaiting}
+            proposalCount={counts.proposalPending}
+            queueReadyCount={counts.queueReady}
+            onChange={changeView}
+          />
 
-      {/* #109: 操作ツールバー。コマンドパレット起動と表示密度トグル(キーボード非依存の可視UI)。 */}
-      <BoardToolbar
-        density={density}
-        onToggleDensity={toggleDensity}
-        onOpenPalette={() => setPaletteOpen(true)}
-      />
-      {/* #137: キーボードヒントはPCのみ。スマホにはタッチ向けの一言を出す。 */}
-      <p className="mt-1 hidden text-xs text-gray-400 lg:block">
-        キーボード: j/k 移動・a 承認・r 却下・e 詳細・/ 検索・Esc 解除
-      </p>
-      <p className="mt-1 text-xs text-gray-400 lg:hidden">
-        カードをタップで詳細・承認/却下はカード内のボタンから
-      </p>
+          <main
+            role="tabpanel"
+            id="approve-tabpanel"
+            aria-label={viewPanelLabel[activeView]}
+            className="min-w-0 flex-1 overflow-auto p-4 lg:px-6"
+          >
+            {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
+            {shouldWarnPollStale(pollFailures) ? (
+              <PollStaleBanner
+                lastBoardSuccessMs={lastBoardSuccessMs}
+                onRetry={() => void pollBoard()}
+              />
+            ) : null}
+            {allDone ? (
+              <p className="mb-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
+                🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
+              </p>
+            ) : null}
 
-      {/* #109: 一括選択バー(選択がある時のみ)。一括承認/却下は各カードと同じ即時保存＋取り消し。 */}
-      {selected.size > 0 ? (
-        <BulkActionBar
+            {activeView === "proposal" ? (
+              <>
+                <ProposalsView
+                  proposals={visibleProposals}
+                  renderItem={renderItem}
+                  densityClass={densityClass}
+                  headerClass={columnHeaderClass()}
+                />
+                <AddProposalForm token={token} onAdded={addProposal} />
+              </>
+            ) : activeView === "approve" ? (
+              <ArticlesView
+                columns={articleColumns}
+                renderItem={renderItem}
+                densityClass={densityClass}
+              />
+            ) : activeView === "prompt" ? (
+              <PromptsView token={token} />
+            ) : activeView === "performance" ? (
+              <PerformanceBoard items={ideas} />
+            ) : (
+              <PublishQueue items={ideas} token={token} onChanged={() => void pollBoard()} />
+            )}
+          </main>
+        </div>
+
+        <ShortcutBar onOpenShortcuts={() => setShortcutsOpen(true)} />
+
+        {/* #109/#proto P1: 一括選択バー(fixed フローティング)。内部の count>0 ガードで出し入れする。 */}
+        <BulkBar
           count={selected.size}
-          onApprove={() => bulkDecide("承認")}
-          onReject={() => bulkDecide("却下")}
+          onApproveAll={() => bulkDecide("承認")}
+          onRejectAll={() => bulkDecide("却下")}
           onClear={() => setSelected(new Set())}
         />
-      ) : null}
-      {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
-      {confirmAction ? (
-        <ConfirmActionDialog
-          action={confirmAction}
-          busy={actionBusy}
-          onCancel={() => setConfirmAction(null)}
-          onConfirm={() => void runConfirm(confirmAction)}
-        />
-      ) : null}
-      {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
-      <ToastList toasts={toasts} onDismiss={dismissToast} />
-      {allDone ? (
-        <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
-          🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
-        </p>
-      ) : null}
-      {/* #119: タブで施策/記事を完全分離。施策=トリアージ用リスト、記事=全幅カンバン。 */}
-      <div
-        role="tabpanel"
-        id="approve-tabpanel"
-        aria-labelledby={`approve-tab-${activeView}`}
-        aria-label={
-          activeView === "proposals" ? "施策" : activeView === "articles" ? "記事" : "プロンプト"
-        }
-      >
-        {activeView === "proposals" ? (
-          <>
-            <ProposalsView
-              proposals={proposals}
-              renderItem={renderItem}
-              densityClass={densityClass}
-              headerClass={columnHeaderClass()}
-            />
-            <AddProposalForm token={token} onAdded={addProposal} />
-          </>
-        ) : activeView === "articles" ? (
-          <>
-            <div className="mb-4 space-y-4">
-              <PublishQueue items={ideas} token={token} onChanged={() => void pollBoard()} />
-              <PerformanceBoard items={ideas} />
-            </div>
-            <ArticlesView
-              columns={articleColumns}
-              renderItem={renderItem}
-              densityClass={densityClass}
-            />
-          </>
-        ) : (
-          <PromptsView token={token} />
-        )}
+
+        {/* #proto P1: ショートカット一覧(ボタン到達のみ)。 */}
+        {shortcutsOpen ? <ShortcutOverlay onClose={() => setShortcutsOpen(false)} /> : null}
+
+        {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
+        {confirmAction ? (
+          <ConfirmActionDialog
+            action={confirmAction}
+            busy={actionBusy}
+            onCancel={() => setConfirmAction(null)}
+            onConfirm={() => void runConfirm(confirmAction)}
+          />
+        ) : null}
+
+        {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
+        <ToastList toasts={toasts} onDismiss={dismissToast} />
+
+        {openItem ? (
+          <DetailPanelView
+            item={openItem}
+            choice={decided[openItem.id]}
+            isBusy={savingId === openItem.id}
+            draftState={draftState}
+            token={token}
+            previewDevice={previewDevice}
+            actionBusy={actionBusy}
+            actionError={actionError}
+            reviewOrder={reviewOrder}
+            revise={revise}
+            onDecide={decideFromPanel}
+            onUndo={undoFromPanel}
+            onRevert={(item) => openConfirm(item, "revert")}
+            onOpen={setOpenId}
+            onClose={() => setOpenId(null)}
+            onPreviewDeviceChange={setPreviewDevice}
+            onStartEdit={startEditDraft}
+            onReloadDraft={(pageId) => void loadDraft(pageId)}
+            onConfirm={openConfirm}
+            onToast={pushToast}
+          />
+        ) : null}
+
+        {/* #109/#proto P1: コマンドパレット(⌘K)。両ストリーム横断検索→view 切替＋詳細へジャンプ。 */}
+        {paletteOpen ? (
+          <CommandPalette
+            items={paletteSource.map((item) => ({
+              id: item.id,
+              title: item.title,
+              subtitle: item.subtitle,
+            }))}
+            onJump={jumpTo}
+            onClose={() => setPaletteOpen(false)}
+          />
+        ) : null}
       </div>
-      {openItem ? (
-        <DetailPanelView
-          item={openItem}
-          choice={decided[openItem.id]}
-          isBusy={savingId === openItem.id}
-          draftState={draftState}
-          token={token}
-          previewDevice={previewDevice}
-          actionBusy={actionBusy}
-          actionError={actionError}
-          reviewOrder={reviewOrder}
-          revise={revise}
-          onDecide={decideFromPanel}
-          onUndo={undoFromPanel}
-          onRevert={(item) => openConfirm(item, "revert")}
-          onOpen={setOpenId}
-          onClose={() => setOpenId(null)}
-          onPreviewDeviceChange={setPreviewDevice}
-          onStartEdit={startEditDraft}
-          onReloadDraft={(pageId) => void loadDraft(pageId)}
-          onConfirm={openConfirm}
-          onToast={pushToast}
-        />
-      ) : null}
+
+      {/* #104/#136: 編集は全画面2ペインのワークスペース。position:fixed が祖先 transform に
+          閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
       {renderEditWorkspace()}
-      {/* #109/#119: コマンドパレット(⌘K / /)。両ストリーム横断検索→タブ切替＋詳細へジャンプ。 */}
-      {paletteOpen ? (
-        <CommandPalette
-          items={paletteSource.map((item) => ({
-            id: item.id,
-            title: item.title,
-            subtitle: item.subtitle,
-          }))}
-          onJump={jumpTo}
-          onClose={() => setPaletteOpen(false)}
-        />
-      ) : null}
-    </main>
+    </MotionConfig>
   );
 }
