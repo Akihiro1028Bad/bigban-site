@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isConsultBusy, mapLoopStatus, overallViewFrom, reviseViewFrom, STAGE_KINDS } from "./consult";
+import { isConsultBusy, mapLoopStatus, overallViewFrom, reviseViewFrom, sentenceViewFrom, STAGE_KINDS } from "./consult";
 import type { AdviceView } from "@/lib/growth/advise";
 
 describe("mapLoopStatus", () => {
@@ -121,5 +121,40 @@ describe("reviseViewFrom", () => {
   it("なし/undefined は null（未依頼）", () => {
     expect(reviseViewFrom({ reviseStatus: "なし" })).toBeNull();
     expect(reviseViewFrom({})).toBeNull();
+  });
+});
+
+describe("sentenceViewFrom", () => {
+  const proposal = [{ commentIndex: 0, before: "古い文", after: "新しい文" }];
+
+  it("提示中: presenting・proposal/raw を透過", () => {
+    const r = sentenceViewFrom({ status: "提示中", comments: [], proposal, raw: "" });
+    expect(r).toEqual({ kind: "sentence", status: "presenting", proposal, raw: "" });
+  });
+
+  it("失敗: failed・raw に理由", () => {
+    const r = sentenceViewFrom({ status: "失敗", comments: [], proposal: [], raw: "解釈失敗" });
+    expect(r?.status).toBe("failed");
+    expect(r?.raw).toBe("解釈失敗");
+  });
+
+  it("なし/undefined は null（未依頼）", () => {
+    expect(sentenceViewFrom({ status: "なし", comments: [], proposal: [], raw: "" })).toBeNull();
+    expect(sentenceViewFrom(undefined)).toBeNull();
+  });
+
+  it("処理中: 依頼中・空の proposal/raw でもデフォルト値で生成", () => {
+    const r = sentenceViewFrom({ status: "処理中", comments: [], proposal: [], raw: "" });
+    expect(r?.status).toBe("processing");
+    expect(r?.proposal).toEqual([]);
+    expect(r?.raw).toBe("");
+  });
+
+  it("依頼中: proposal/raw が非空で透過", () => {
+    const proposal = [{ commentIndex: 1, before: "文A", after: "文B" }];
+    const r = sentenceViewFrom({ status: "依頼中", comments: [], proposal, raw: "processing" });
+    expect(r?.status).toBe("requested");
+    expect(r?.proposal).toBe(proposal);
+    expect(r?.raw).toBe("processing");
   });
 });
