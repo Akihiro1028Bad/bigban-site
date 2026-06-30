@@ -7,6 +7,7 @@
  *  - classifications/selectable の算出（bodyHtml 空 / bodyHtml + アンカー一致分岐）
  *  - onRetry/onReload/busy が activeMode に応じて正しく分岐すること
  *  - openDrawer/closeDrawer/setMode の状態遷移
+ *  - 委譲コールバックが実際に対応するメソッドを呼ぶこと（spy で実証）
  *
  * useAdviceConsult・useBodyCommentConsult の fetch は vi.stubGlobal("fetch") で制御する。
  * useReviseEditing は ReturnType<typeof useReviseEditing> を満たす最小モックオブジェクトを渡す。
@@ -90,6 +91,11 @@ const DRAFT_EMPTY_BODY: DraftPreview = {
 };
 
 // ── useReviseEditing の最小モック ────────────────────────────────────────────
+//
+// useReviseEditing は useMutation や内部 state を持つため、完全な型互換オブジェクトを
+// テスト内でインスタンス化するには QueryClientProvider のセットアップが必要になる。
+// useConsult は revise を props として受け取るため、最小スタブを as unknown キャストで
+// ReturnType<typeof useReviseEditing> として渡すことで検証が成立する。
 
 function makeReviseMock(overrides: Partial<ReturnType<typeof useReviseEditing>> = {}): ReturnType<typeof useReviseEditing> {
   return {
@@ -389,7 +395,11 @@ describe("useConsult: onRetry の3分岐", () => {
     const { result } = renderUseConsult({ draft: DRAFT_BASE });
     expect(result.current.mode).toBe("overall");
 
+    // spy で advice.requestAdvice が実際に呼ばれることを実証
+    const spy = vi.spyOn(result.current.advice, "requestAdvice");
     await act(async () => result.current.onRetry());
+    expect(spy).toHaveBeenCalled();
+    // さらに fetch が /api/growth/advise に POST されることで委譲の実動作も確認
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/growth/advise",
       expect.objectContaining({ method: "POST" }),
@@ -405,15 +415,7 @@ describe("useConsult: onRetry の3分岐", () => {
     expect(reviseMock.requestRevise).toHaveBeenCalledWith(BASE_ITEM);
   });
 
-  it("mode='sentence' のとき onRetry → bodyCommentConsult.requestAi を呼ぶ(fetch が '/api/growth/body-comment' に POST)", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ success: true }),
-      text: async () => JSON.stringify({ success: true }),
-    } as unknown as Response);
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("mode='sentence' のとき onRetry → bodyCommentConsult.requestAi を呼ぶ", async () => {
     const { result } = renderUseConsult({
       draft: {
         ...DRAFT_BASE,
@@ -423,11 +425,11 @@ describe("useConsult: onRetry の3分岐", () => {
     act(() => result.current.setMode("sentence"));
     expect(result.current.mode).toBe("sentence");
 
-    // bodyCommentConsult.requestAi はコメントが空のとき fetch しない(buildPayload=[]で早期リターン)
-    // → 呼び出し自体は実行されるが fetch は呼ばれない(正常動作)。
+    // spy で bodyCommentConsult.requestAi が実際に呼ばれることを実証
+    // (buildPayload が空のため内部で早期 return するが、requestAi 自体は呼ばれる)
+    const spy = vi.spyOn(result.current.bodyCommentConsult, "requestAi");
     await act(async () => result.current.onRetry());
-    // requestAi が呼ばれたことを確認(fetch は payload が空のため 0 回)
-    expect(fetchMock).not.toHaveBeenCalledWith("/api/growth/body-comment", expect.anything());
+    expect(spy).toHaveBeenCalled();
   });
 });
 
@@ -492,26 +494,69 @@ describe("useConsult: 透過フィールドの確認", () => {
   });
 });
 
-describe("useConsult: コールバックの委譲確認 (onAdviceApplyNow/onReviseApply/onReviseDiscard/onSentenceApplyAll)", () => {
-  it("onAdviceApplyNow を呼ぶと advice.applyNow が実行される(fetch に /api/growth/draft/edit が来る)", async () => {
-    // DRAFT_WITH_ADVICE には adviceApply={status:'なし'} なのでフォールバック後早期 return
-    // applyNow は bodyHtml か adviceApply が null のとき即 return する(useAdviceConsult参照)。
-    // ここでは「コールバック本体(アロー関数)が呼ばれる」ことを確認する。
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ success: true }),
-      text: async () => JSON.stringify({ success: true }),
-    } as unknown as Response);
-    vi.stubGlobal("fetch", fetchMock);
-
+describe("useConsult: 委譲コールバックの spy 実証", () => {
+  // ── アロー委譲: advice.applyNow ──────────────────────────────────────────
+  it("onAdviceApplyNow → advice.applyNow を呼ぶ (spy で実証)", async () => {
     const { result } = renderUseConsult({ draft: DRAFT_WITH_ADVICE });
-    // adviceApply が "なし" なので applyNow は早期 return → fetch 呼ばれない
+
+    // spy を同一レンダーの result.current.advice に貼り、アロー閉包が intercept される
+    const spy = vi.spyOn(result.current.advice, "applyNow");
     await act(async () => result.current.onAdviceApplyNow());
-    // アロー関数が実行されたこと(=busy が false のまま戻る)を確認
-    expect(result.current.busy).toBe(false);
+    expect(spy).toHaveBeenCalled();
   });
 
+  // ── アロー委譲: bodyCommentConsult.applyNow ──────────────────────────────
+  it("onSentenceApplyAll → bodyCommentConsult.applyNow を呼ぶ (spy で実証)", async () => {
+    const { result } = renderUseConsult({
+      draft: {
+        ...DRAFT_BASE,
+        bodyHtml: "",
+        bodyComment: { status: "提示中", comments: [], proposal: [], raw: "" },
+      },
+    });
+
+    const spy = vi.spyOn(result.current.bodyCommentConsult, "applyNow");
+    await act(async () => result.current.onSentenceApplyAll());
+    expect(spy).toHaveBeenCalled();
+  });
+
+  // ── 直接参照委譲: onAdviceDismiss ──────────────────────────────────────
+  it("onAdviceDismiss は advice.dismiss と同一関数参照 (誤配線を検出)", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    // useConsult は onAdviceDismiss: advice.dismiss と直接参照するため参照一致が成立する
+    expect(result.current.onAdviceDismiss).toBe(result.current.advice.dismiss);
+  });
+
+  // ── 直接参照委譲: onAdviceSubmitApply ───────────────────────────────────
+  it("onAdviceSubmitApply は advice.submitApply と同一関数参照 (誤配線を検出)", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    expect(result.current.onAdviceSubmitApply).toBe(result.current.advice.submitApply);
+  });
+
+  // ── 直接参照委譲: onAdviceDismissApply ──────────────────────────────────
+  it("onAdviceDismissApply は advice.dismissApply と同一関数参照 (誤配線を検出)", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    expect(result.current.onAdviceDismissApply).toBe(result.current.advice.dismissApply);
+  });
+
+  // ── 直接参照委譲: onToggleAdopt ──────────────────────────────────────────
+  //
+  // useConsult は onToggleAdopt: advice.toggleAdopt と直接参照を返すため、
+  // result.current.onToggleAdopt === result.current.advice.toggleAdopt が成立する。
+  // spy を後から貼っても onToggleAdopt は spy 前の参照を閉包しているため intercept 不可。
+  // 直接参照であることを参照同一性で実証し、誤配線（例: dismissApply を指す等）を検出する。
+  it("onToggleAdopt は advice.toggleAdopt と同一関数参照 (誤配線を検出)", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    expect(result.current.onToggleAdopt).toBe(result.current.advice.toggleAdopt);
+  });
+
+  // ── 直接参照委譲: adopted ────────────────────────────────────────────────
+  it("adopted は advice.adopted と同一参照 (advice の Set が透過される)", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    expect(result.current.adopted).toBe(result.current.advice.adopted);
+  });
+
+  // ── revise.applyRevise の引数検証 ───────────────────────────────────────
   it("onReviseApply を呼ぶと revise.applyRevise(item, 'apply') が実行される", async () => {
     const reviseMock = makeReviseMock();
     const { result } = renderUseConsult({ draft: DRAFT_BASE, revise: reviseMock });
@@ -524,27 +569,5 @@ describe("useConsult: コールバックの委譲確認 (onAdviceApplyNow/onRevi
     const { result } = renderUseConsult({ draft: DRAFT_BASE, revise: reviseMock });
     await act(async () => result.current.onReviseDiscard());
     expect(reviseMock.applyRevise).toHaveBeenCalledWith(BASE_ITEM, "discard");
-  });
-
-  it("onSentenceApplyAll を呼ぶと bodyCommentConsult.applyNow が実行される(本文空のため早期 return)", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ success: true }),
-      text: async () => JSON.stringify({ success: true }),
-    } as unknown as Response);
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { result } = renderUseConsult({
-      draft: {
-        ...DRAFT_BASE,
-        bodyHtml: "",
-        bodyComment: { status: "提示中", comments: [], proposal: [], raw: "" },
-      },
-    });
-    // applyNow は proposal が空(applied=0)のとき error を set して return → fetch しない
-    await act(async () => result.current.onSentenceApplyAll());
-    // コールバックが実行され、エラー経路を通ったことを確認(busy=false に戻る)
-    expect(result.current.busy).toBe(false);
   });
 });
