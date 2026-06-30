@@ -107,9 +107,6 @@ export default defineConfig({
         "src/app/growth/approve/consult/ConsultComposer.tsx",
         "src/app/growth/approve/consult/ConsultCard.tsx",
         "src/app/growth/approve/consult/ConsultDrawer.tsx",
-        // 相談ドロワーのオーケストレータ(状態組み立て・透過のみ)。純ロジックは consult.ts、
-        // 各抽出フックは useAdviceConsult/useBodyCommentConsult のテスト経路で計測済み。
-        "src/app/growth/approve/hooks/useConsult.ts",
         // 本文インラインコメント(#182)の薄い fetch/DOM 結線フック。純ロジックは bodyComment.ts でテスト済み。
         "src/app/growth/approve/hooks/useBodyCommentConsult.ts",
       ],
