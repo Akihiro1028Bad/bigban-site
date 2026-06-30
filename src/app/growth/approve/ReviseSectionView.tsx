@@ -1,20 +1,19 @@
 /**
- * 構成案の修正セクション(記事のみ)の描画(#H7 分解)。提示待ち/提示中/失敗/コメント入力＋
- * タイトル編集を revisePhase で振り分ける。状態・操作は useReviseEditing の戻り値を丸ごと受け取る。
+ * 構成案の手動編集セクション(記事のみ)の描画(#H7 分解 / 差分B Task 12)。
+ * タイトル直接編集＋構成案セクションの手動編集(見出し/説明)＋画像指示のみを担う。
+ *
+ * AI修正系(コメント依頼フォーム・提示/失敗/処理中の提示)は相談ドロワー
+ * (ConsultDrawer / ConsultComposer / ConsultCard)へ移管済み。ここからは撤去している。
+ * 状態・操作は useReviseEditing の戻り値を丸ごと受け取る(AI修正系メソッドはドロワー側が呼ぶ)。
  */
 
 "use client";
 
-import { ReviseCommentForm } from "./ReviseCommentForm";
-import { ReviseFailed } from "./ReviseFailed";
-import { RevisePending } from "./RevisePending";
-import { ReviseReady } from "./ReviseReady";
-import { ReviseSection } from "./ReviseSection";
 import { Section } from "./Section";
 import { SectionEditor } from "./SectionEditor";
 import { SectionImages } from "./SectionImages";
 import { outlineSections, type OutlineSection } from "./outline";
-import { revisePhase } from "./revisePhase";
+import { ReviseSection } from "./ReviseSection";
 import type { useReviseEditing } from "./hooks/useReviseEditing";
 import type { PendingItem } from "./types";
 
@@ -25,7 +24,6 @@ interface ReviseSectionViewProps {
 
 export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
   const {
-    refreshItems,
     draftComments,
     openCommentFor,
     commentText,
@@ -41,15 +39,12 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
     reviseError,
     editingTitle,
     titleInput,
-    titleRevisePrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
     setImageStyle,
     setImageDesc,
     setTitleInput,
-    setTitleRevisePrompt,
-    requestRevise,
     startAddComment,
     startEditComment,
     cancelComment,
@@ -66,7 +61,6 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
     cancelImage,
     saveImage,
     deleteImage,
-    applyRevise,
   } = revise;
 
   // #54: セクションの手動編集(見出し＋説明)→ 構成案を直接保存(AI不要)。
@@ -135,68 +129,14 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
     );
   }
 
-  // #42/#43/#52/#53/#54/#139 B: 構成案の修正セクション(記事のみ)。コメント＋タイトル指示＋手動編集。
-  function renderReviseCommentForm(sections: OutlineSection[]) {
-    const total = Object.values(draftComments).reduce((n, list) => n + list.length, 0);
-    return (
-      <ReviseCommentForm
-        itemId={item.id}
-        titlePrompt={titleRevisePrompt}
-        onTitlePromptChange={setTitleRevisePrompt}
-        busy={reviseBusy}
-        sectionCount={sections.length}
-        commentTotal={total}
-        renderSection={(i) => renderSection(sections, i)}
-        onRequestRevise={() => requestRevise(item)}
-      />
-    );
-  }
-
-  function renderRevisePending() {
-    return (
-      <RevisePending
-        requestedAtMs={item.reviseRequestedAtMs ?? null}
-        busy={reviseBusy}
-        onRefresh={() => void refreshItems()}
-      />
-    );
-  }
-
-  function renderReviseReady() {
-    return (
-      <ReviseReady
-        title={item.title}
-        currentOutline={item.outline ?? ""}
-        outlineProposal={item.reviseProposal ?? ""}
-        titleProposal={item.reviseTitleProposal ?? ""}
-        busy={reviseBusy}
-        onApply={() => applyRevise(item, "apply")}
-        onDiscard={() => applyRevise(item, "discard")}
-      />
-    );
-  }
-
-  function renderReviseFailed() {
-    return (
-      <ReviseFailed
-        reason={item.reviseProposal || "理由不明"}
-        busy={reviseBusy}
-        onDiscard={() => applyRevise(item, "discard")}
-      />
-    );
-  }
-
   const sections = outlineSections(item.outline);
-  const phase = revisePhase(item.reviseStatus);
-  if (phase === "idle" && sections.length === 0) return null;
-  const phaseContent =
-    phase === "pending"
-      ? renderRevisePending()
-      : phase === "ready"
-        ? renderReviseReady()
-        : phase === "failed"
-          ? renderReviseFailed()
-          : renderReviseCommentForm(sections);
+  // 構成案(セクション)が無い記事では手動編集セクションを出さない(タイトル編集も含む)。
+  if (sections.length === 0) return null;
+  const manualSections = (
+    <ul className="mt-2 space-y-2">
+      {Array.from({ length: sections.length }, (_, i) => renderSection(sections, i))}
+    </ul>
+  );
   return (
     <ReviseSection
       itemId={item.id}
@@ -208,7 +148,7 @@ export function ReviseSectionView({ item, revise }: ReviseSectionViewProps) {
       onStartEditTitle={() => startEditTitle(item.title)}
       onCancelTitle={cancelEditTitle}
       onSaveTitle={() => saveTitle(item)}
-      phaseContent={phaseContent}
+      phaseContent={manualSections}
       error={reviseError}
     />
   );

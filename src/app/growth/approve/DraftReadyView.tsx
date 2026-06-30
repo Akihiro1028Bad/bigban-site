@@ -8,14 +8,12 @@
 import Image from "next/image";
 import type { PreviewDevice } from "./previewDevice";
 
-import { AdviceCard } from "./AdviceCard";
 import { BodyImagePicker } from "./BodyImagePicker";
 import { choiceButtonClass } from "./approveStyles";
 import { DecorationAssistant } from "./DecorationAssistant";
 import { DraftPreviewPane } from "./DraftPreviewPane";
 import type { DraftPreview } from "./draftTypes";
 import { EyecatchPicker } from "./EyecatchPicker";
-import { InlineCommentReview } from "./InlineCommentReview";
 import { PublishCloseActions } from "./PublishCloseActions";
 
 interface DraftReadyViewProps {
@@ -78,26 +76,11 @@ export function DraftReadyView({
         regenTargetSrc={draft.bodyRegen?.targetSrc}
         regenRequestedAtMs={draft.bodyRegen?.requestedAtMs ?? null}
       />
-      <AdviceCard
-        pageId={pageId}
-        token={token}
-        advice={draft.advice}
-        adviceApply={draft.adviceApply}
-        bodyHtml={draft.bodyHtml}
-        onChanged={onReloadDraft}
-      />
       <DecorationAssistant
         pageId={pageId}
         token={token}
         bodyHtml={draft.bodyHtml}
         decorate={draft.decorate}
-        onChanged={onReloadDraft}
-      />
-      <InlineCommentReview
-        pageId={pageId}
-        token={token}
-        bodyHtml={draft.bodyHtml}
-        bodyComment={draft.bodyComment}
         onChanged={onReloadDraft}
       />
       <DraftPreviewPane

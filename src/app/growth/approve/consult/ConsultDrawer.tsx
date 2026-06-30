@@ -45,6 +45,8 @@ interface ConsultDrawerProps {
   views: (OverallConsultView | ReviseConsultView | SentenceConsultView)[];
   /** ConsultComposer を親が差し込む slot。 */
   composer: ReactNode;
+  /** 表示中モードの操作(依頼/反映/再読込)が進行中か。各カードのボタン無効化に使う。 */
+  busy: boolean;
   onModeChange: (mode: ConsultKind) => void;
   onClose: () => void;
   // ── ConsultCard へのコールバック（Task 11 でオーケストレータが束ねて渡す） ────
@@ -71,6 +73,7 @@ export function ConsultDrawer({
   mode,
   views,
   composer,
+  busy,
   onModeChange,
   onClose,
   onReload,
@@ -170,11 +173,7 @@ export function ConsultDrawer({
                       <ConsultCard
                         key={i}
                         view={view}
-                        busy={
-                          view.status === "requested" ||
-                          view.status === "processing" ||
-                          view.status === "presenting"
-                        }
+                        busy={busy}
                         onReload={onReload}
                         onAdviceDismiss={onAdviceDismiss}
                         onAdviceSubmitApply={onAdviceSubmitApply}

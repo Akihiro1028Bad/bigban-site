@@ -13,11 +13,7 @@
  */
 
 import type { Advice, AdviceFix } from "@/lib/growth/advise";
-import {
-  classifyFix,
-  FIX_REASON_NO_QUOTE,
-  type FixClassification,
-} from "@/lib/growth/adviseApply";
+import type { FixClassification } from "@/lib/growth/adviseApply";
 
 interface AdviceResultBodyProps {
   advice: Advice;

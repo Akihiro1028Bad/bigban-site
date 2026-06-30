@@ -98,6 +98,20 @@ export default defineConfig({
         // pull型の経過時間/滞留警告の薄い DOM+タイマー結線(#C2 UI)。
         // 純ロジックは pullStale.ts でテスト済み。
         "src/app/growth/approve/StaleNotice.tsx",
+        // 差分B AI相談ドロワー(Task 12): 承認画面が render する薄い結線UI。
+        // 純ロジック(ビュー正規化・状態写像・段階出し分け)は consult.ts でテスト済み。
+        "src/app/growth/approve/consult/AdviceResultBody.tsx",
+        "src/app/growth/approve/consult/SentenceFixBody.tsx",
+        "src/app/growth/approve/consult/ReviseProposalBody.tsx",
+        "src/app/growth/approve/consult/CommentableBody.tsx",
+        "src/app/growth/approve/consult/ConsultComposer.tsx",
+        "src/app/growth/approve/consult/ConsultCard.tsx",
+        "src/app/growth/approve/consult/ConsultDrawer.tsx",
+        // 相談ドロワーのオーケストレータ(状態組み立て・透過のみ)。純ロジックは consult.ts、
+        // 各抽出フックは useAdviceConsult/useBodyCommentConsult のテスト経路で計測済み。
+        "src/app/growth/approve/hooks/useConsult.ts",
+        // 本文インラインコメント(#182)の薄い fetch/DOM 結線フック。純ロジックは bodyComment.ts でテスト済み。
+        "src/app/growth/approve/hooks/useBodyCommentConsult.ts",
       ],
       thresholds: {
         statements: 100,
