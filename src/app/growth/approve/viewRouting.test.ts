@@ -3,41 +3,26 @@ import { describe, expect, it } from "vitest";
 import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
 
 describe("parseView", () => {
-  it("妥当な値はそのまま返す", () => {
-    expect(parseView("proposals")).toBe("proposals");
-    expect(parseView("articles")).toBe("articles");
-    expect(parseView("prompts")).toBe("prompts");
-  });
-  it("未知/欠落は null", () => {
-    expect(parseView("foo")).toBeNull();
-    expect(parseView("")).toBeNull();
+  it("5 view を正規化し、未知/欠落は null", () => {
+    expect(APPROVE_VIEWS).toEqual(["proposal", "approve", "prompt", "performance", "queue"]);
+    for (const v of APPROVE_VIEWS) expect(parseView(v)).toBe(v);
+    expect(parseView("articles")).toBeNull(); // 旧値は廃止
     expect(parseView(null)).toBeNull();
     expect(parseView(undefined)).toBeNull();
   });
 });
 
 describe("decideInitialView", () => {
-  it("URL の view が妥当ならそれを最優先で使う", () => {
-    expect(decideInitialView("articles", { proposals: 5, articles: 0 })).toBe("articles");
-    expect(decideInitialView("proposals", { proposals: 0, articles: 5 })).toBe("proposals");
+  it("URL 指定を最優先", () => {
+    expect(decideInitialView("queue", { proposalPending: 5, awaiting: 5 })).toBe("queue");
   });
-  it("view 未指定: 施策に未処理があれば施策(両方あっても施策優先)", () => {
-    expect(decideInitialView(null, { proposals: 2, articles: 3 })).toBe("proposals");
-    expect(decideInitialView(null, { proposals: 2, articles: 0 })).toBe("proposals");
+  it("施策未処理>0 で proposal", () => {
+    expect(decideInitialView(null, { proposalPending: 1, awaiting: 3 })).toBe("proposal");
   });
-  it("view 未指定: 施策ゼロ・記事ありなら記事", () => {
-    expect(decideInitialView(null, { proposals: 0, articles: 3 })).toBe("articles");
+  it("施策0・あなた待ち>0 で approve", () => {
+    expect(decideInitialView(null, { proposalPending: 0, awaiting: 2 })).toBe("approve");
   });
-  it("view 未指定: どちらもゼロなら既定で施策", () => {
-    expect(decideInitialView(null, { proposals: 0, articles: 0 })).toBe("proposals");
-  });
-  it("不正な view 値は無視してフォールバックする", () => {
-    expect(decideInitialView("xxx", { proposals: 0, articles: 1 })).toBe("articles");
-  });
-});
-
-describe("APPROVE_VIEWS", () => {
-  it("施策・記事・プロンプトの3タブ", () => {
-    expect(APPROVE_VIEWS).toEqual(["proposals", "articles", "prompts"]);
+  it("どちらも0で既定 performance", () => {
+    expect(decideInitialView(null, { proposalPending: 0, awaiting: 0 })).toBe("performance");
   });
 });

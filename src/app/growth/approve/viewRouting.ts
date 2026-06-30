@@ -1,34 +1,37 @@
 /**
- * 承認画面のタブ(施策/記事)ルーティングの純ロジック(#119)。DOM/IO 非依存。
- *
- * - `?view=proposals|articles` の解釈
- * - 初期表示タブの決定(URL 指定 > 未処理がある方 > 既定=施策)
+ * 承認画面のナビ(5 view)ルーティングの純ロジック(#proto P1)。DOM/IO 非依存。
+ * proto MainView 語彙へ統一(施策/記事/プロンプト/成績/公開キュー)。旧 proposals|articles|prompts は廃止。
  */
 
-// "prompts" は各フェーズのプロンプト/前提情報を確認する read-only タブ(未処理という概念はない)。
-export type ApproveView = "proposals" | "articles" | "prompts";
+export type ApproveView = "proposal" | "approve" | "prompt" | "performance" | "queue";
 
-export const APPROVE_VIEWS: readonly ApproveView[] = ["proposals", "articles", "prompts"];
+export const APPROVE_VIEWS: readonly ApproveView[] = [
+  "proposal",
+  "approve",
+  "prompt",
+  "performance",
+  "queue",
+];
 
 /** `?view` の生値を ApproveView に正規化する。未知/欠落は null。 */
 export function parseView(raw: string | null | undefined): ApproveView | null {
-  return raw === "proposals" || raw === "articles" || raw === "prompts" ? raw : null;
+  return APPROVE_VIEWS.includes(raw as ApproveView) ? (raw as ApproveView) : null;
 }
 
 /**
- * 初期表示タブを決める。
+ * 初期表示 view を決める(proto 既定着地)。
  * 1. URL の view が妥当ならそれを使う。
- * 2. 施策に未処理があれば施策(両方あっても施策を優先＝ファネル入口)。
- * 3. 記事に未処理があれば記事。
- * 4. どちらも無ければ既定で施策。
+ * 2. 施策に未処理があれば施策。
+ * 3. あなた待ち(記事 actionable)があれば記事。
+ * 4. どちらも無ければ成績。
  */
 export function decideInitialView(
   param: string | null | undefined,
-  counts: { proposals: number; articles: number },
+  counts: { proposalPending: number; awaiting: number },
 ): ApproveView {
   const parsed = parseView(param);
   if (parsed) return parsed;
-  if (counts.proposals > 0) return "proposals";
-  if (counts.articles > 0) return "articles";
-  return "proposals";
+  if (counts.proposalPending > 0) return "proposal";
+  if (counts.awaiting > 0) return "approve";
+  return "performance";
 }
