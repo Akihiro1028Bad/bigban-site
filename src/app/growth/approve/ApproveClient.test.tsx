@@ -585,7 +585,7 @@ describe("ApproveClient 施策の手動追加(#255)", () => {
     mockFetchSequence({ json: { success: true, items: [] } });
     render(<ApproveClient />);
     await login();
-    expect(await screen.findByText(/承認待ちはありません/)).toBeInTheDocument();
+    expect(await screen.findByText(/本日のレビュー完了/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "追加する" })).toBeInTheDocument();
   });
 });
@@ -851,7 +851,7 @@ describe("ApproveClient 空状態/完了(#236)", () => {
     mockFetchSequence({ json: { success: true, items: [] } });
     render(<ApproveClient />);
     await login();
-    expect(await screen.findByText(/承認待ちはありません/)).toBeInTheDocument();
+    expect(await screen.findByText(/本日のレビュー完了/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
   });
 
@@ -866,6 +866,31 @@ describe("ApproveClient 空状態/完了(#236)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
     expect(await screen.findByText(/すべて処理しました/)).toBeInTheDocument();
+  });
+
+  it("検索で一致0件のときは SearchEmpty(該当なし)を出す(#proto P2)", async () => {
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("市川ページ");
+
+    await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "存在しない語句");
+    expect(await screen.findByText("一致する記事がありません")).toBeInTheDocument();
+    // query を反映した補足文を出す(元カードは検索で隠れる)。
+    expect(screen.getByText(/「存在しない語句」/)).toBeInTheDocument();
+    expect(screen.queryByText("市川ページ")).not.toBeInTheDocument();
+  });
+
+  it("記事 view でも検索0件なら SearchEmpty を出す(#proto P2)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await selectView(/記事/);
+
+    await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "該当なし語");
+    expect(await screen.findByText("一致する記事がありません")).toBeInTheDocument();
+    expect(screen.queryByText("猛暑記事")).not.toBeInTheDocument();
   });
 
   it("一部未処理なら完了メッセージは出ない", async () => {
