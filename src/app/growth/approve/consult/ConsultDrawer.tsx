@@ -11,7 +11,7 @@
  * - 状態取得・ポーリング・Notion 依頼書き込みは後続 Task 11 担当。ここは容器のみ。
  *
  * framer-motion AnimatePresence + motion.aside で右から slide-in / slide-out。
- * proto の var(--p-*) カスタムプロパティは本番 Tailwind ユーティリティへ置換。
+ * 見た目は proto ダークへ再スキン。root に `.approve-shell` を付け var(--p-*) トークンを解決する。
  */
 
 import type { ReactNode } from "react";
@@ -26,6 +26,8 @@ import type {
 } from "@/lib/growth/consult";
 import { STAGE_KINDS } from "@/lib/growth/consult";
 
+import { useDialog } from "../hooks/useDialog";
+import { Kbd } from "../ui/primitives";
 import { ConsultCard } from "./ConsultCard";
 
 // ─── タブラベル ─────────────────────────────────────────────────────────────────
@@ -93,13 +95,17 @@ export function ConsultDrawer({
   /** 段階に応じたタブ種別一覧。 */
   const tabs = STAGE_KINDS[stage];
 
+  /** esc 閉じ + フォーカス管理（proto 移植の a11y フック）。esc の close は集中ハンドラ側が担う。 */
+  const dialogRef = useDialog<HTMLElement>();
+
   return (
     <AnimatePresence>
       {open && (
         <>
           {/* モバイルのみ scrim（lg 以上は本文操作を妨げない） */}
           <motion.div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{ background: "rgba(4,6,9,0.5)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -108,6 +114,7 @@ export function ConsultDrawer({
 
           {/* 右レール */}
           <motion.aside
+            ref={dialogRef}
             role="dialog"
             aria-modal={false}
             aria-label="AIに相談"
@@ -115,24 +122,30 @@ export function ConsultDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.2 }}
-            className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
+            className="approve-shell fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col"
+            style={{
+              background: "var(--p-bg-elevated)",
+              borderLeft: "1px solid var(--p-border-strong)",
+              boxShadow: "-18px 0 50px rgba(0,0,0,0.4)",
+            }}
           >
             {/* ヘッダー */}
-            <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 px-5 py-3.5">
-              <span className="text-[14px] font-semibold text-gray-900">AIに相談</span>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="閉じる"
-                className="ml-auto rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50"
-              >
-                閉じる
+            <div
+              className="flex shrink-0 items-center gap-2 px-5 py-3.5"
+              style={{ borderBottom: "1px solid var(--p-border)" }}
+            >
+              <span className="text-[14px] font-semibold" style={{ color: "var(--p-text)" }}>
+                AIに相談
+              </span>
+              <button type="button" onClick={onClose} aria-label="閉じる" className="ml-auto">
+                <Kbd>esc</Kbd>
               </button>
             </div>
 
             {/* タブ（段階出し分け: STAGE_KINDS[stage]） */}
             <div
-              className="flex shrink-0 items-center gap-1 border-b border-gray-200 px-4 py-2.5"
+              className="flex shrink-0 items-center gap-1 px-4 py-2.5"
+              style={{ borderBottom: "1px solid var(--p-border)" }}
               role="tablist"
               aria-label="相談モード"
             >
@@ -144,12 +157,11 @@ export function ConsultDrawer({
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => onModeChange(tabKey)}
-                    className={[
-                      "rounded-[8px] px-2.5 py-1.5 text-[12px] font-medium transition-colors",
-                      isActive
-                        ? "bg-gray-100 text-gray-900"
-                        : "bg-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700",
-                    ].join(" ")}
+                    className="rounded-[8px] px-2.5 py-1.5 text-[12px] font-medium transition-colors"
+                    style={{
+                      background: isActive ? "var(--p-bg-active)" : "transparent",
+                      color: isActive ? "var(--p-text)" : "var(--p-text-3)",
+                    }}
                   >
                     {KIND_LABEL[tabKey]}
                   </button>
@@ -165,7 +177,10 @@ export function ConsultDrawer({
               {/* 相談の結果リスト（views は既に kind=mode でフィルタ済みを想定、全件表示） */}
               {views.length > 0 && (
                 <>
-                  <div className="my-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                  <div
+                    className="my-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+                    style={{ color: "var(--p-text-3)" }}
+                  >
                     相談の結果
                   </div>
                   <div className="flex flex-col gap-3">
