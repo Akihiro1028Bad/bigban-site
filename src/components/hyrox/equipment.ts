@@ -17,9 +17,15 @@ export const HYROX_EQUIPMENT: readonly HyroxEquipment[] = [
   { key: "sandbag", quantity: "set", brand: "Centr" },
 ];
 
-// 施設写真カルーセルの画像（空間・器具レーン等の雰囲気カット）。
+// 施設写真カルーセルの画像（空間・器具レーン等の雰囲気カット＋各器具のクローズアップ）。
 export const FACILITY_PHOTOS: readonly string[] = [
   "/images/hyrox/facility-1.jpg",
   "/images/hyrox/facility-2.jpg",
   "/images/hyrox/facility-3.jpg",
+  "/images/hyrox/facility-4.jpg",
+  "/images/hyrox/facility-5.jpg",
+  "/images/hyrox/facility-6.jpg",
+  "/images/hyrox/facility-7.jpg",
+  "/images/hyrox/facility-8.jpg",
+  "/images/hyrox/facility-9.jpg",
 ];
