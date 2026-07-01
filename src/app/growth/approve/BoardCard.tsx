@@ -93,7 +93,13 @@ export function BoardCard({
       ) : null}
 
       <div className="flex items-start gap-3">
-        <EyecatchThumb hue={cardHue(item.id)} has={cardHasEyecatch(item)} size={38} alt="" />
+        <EyecatchThumb
+          hue={cardHue(item.id)}
+          has={cardHasEyecatch(item)}
+          url={item.eyecatchUrl || undefined}
+          size={38}
+          alt=""
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {awaitingYou ? <AwaitingDot /> : null}

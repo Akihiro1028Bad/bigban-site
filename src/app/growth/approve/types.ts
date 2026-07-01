@@ -28,6 +28,9 @@ export interface PendingItem {
   reviseRequestedAtMs?: number | null;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
   contentId?: string;
+  // #proto P2: アイキャッチ画像URL(Notion ミラー由来・盤データに既存)。カードのサムネ表示に使う。
+  // 空/無=画像未生成→サムネはグラデーション/プレースホルダにフォールバック。
+  eyecatchUrl?: string;
   // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
   isDraftReady?: boolean;
   // #106/#107: パイプライン段階。盤の列分け・段階インジケータに使う。
