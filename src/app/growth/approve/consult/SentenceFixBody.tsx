@@ -10,13 +10,14 @@
  * - 反映は「本文へ反映（n）」1本のみ(onApplyAll)
  * - before/after はタグ除去して表示(InlineCommentReview L99-100 踏襲)
  * - structureNote ヘルパーは InlineCommentReview L39-46 より移植し、装飾変化を可視化(#M5)
+ * - 配色は proto ダークトークン(--p-*)。before=line-through/--p-text-3・after=--p-green-weak 強調・一括反映=approve-btn-primary+IconCheck
  *
  * status 管理・依頼フォーム・閉じる操作は持たない(親が担う)。
  */
 
 import type { BodyCommentProposalItem } from "@/lib/growth/bodyComment";
 
-import { choiceButtonClass } from "../approveStyles";
+import { IconCheck } from "../ui/icons";
 
 interface SentenceFixBodyProps {
   proposal: BodyCommentProposalItem[];
@@ -37,13 +38,19 @@ export function SentenceFixBody({ proposal, busy, onApplyAll }: SentenceFixBodyP
   return (
     <section
       aria-label="指摘への修正案"
-      className="rounded-lg border border-gray-200 bg-white p-3"
+      className="rounded-[12px] p-4"
+      style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-sm font-bold text-gray-700">AIの修正案（元 → 新）</h4>
+      <div className="mb-3 flex items-center justify-between">
+        <h4
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--p-text-3)" }}
+        >
+          AIの修正案（元 → 新）
+        </h4>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="flex flex-col gap-2">
         {proposal.map((item) => {
           const beforeText = item.before.replace(/<[^>]*>/g, "");
           const afterText = item.after.replace(/<[^>]*>/g, "");
@@ -51,13 +58,28 @@ export function SentenceFixBody({ proposal, busy, onApplyAll }: SentenceFixBodyP
           return (
             <li
               key={item.commentIndex}
-              className="rounded border border-gray-200 bg-gray-50 p-2 text-xs"
+              className="rounded-[10px] p-3 text-[12.5px] leading-relaxed"
+              style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
             >
-              <p className="text-gray-400 line-through">{beforeText}</p>
-              <p className="mt-0.5 text-gray-900">{afterText}</p>
+              <p className="line-through" style={{ color: "var(--p-text-3)" }}>
+                {beforeText}
+              </p>
+              <p
+                className="mt-1"
+                style={{
+                  background: "var(--p-green-weak)",
+                  color: "var(--p-text)",
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                }}
+              >
+                {afterText}
+              </p>
               {/* #M5: タグ除去で見えなくなる装飾/構造の追加(aside・リンク等)を明示する。 */}
               {note ? (
-                <p className="mt-0.5 text-[10px] font-medium text-amber-700">{note}</p>
+                <p className="mt-1 text-[10px] font-medium" style={{ color: "var(--p-green)" }}>
+                  {note}
+                </p>
               ) : null}
             </li>
           );
@@ -69,9 +91,9 @@ export function SentenceFixBody({ proposal, busy, onApplyAll }: SentenceFixBodyP
           type="button"
           onClick={onApplyAll}
           disabled={busy}
-          className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+          className="approve-btn-primary flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
         >
-          本文へ反映（{proposal.length}）
+          <IconCheck size={13} /> 本文へ反映（{proposal.length}）
         </button>
       </div>
     </section>
