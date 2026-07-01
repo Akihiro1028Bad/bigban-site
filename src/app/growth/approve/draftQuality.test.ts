@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countByLevel,
   detectDoNotWrite,
   draftPlainText,
   draftQuality,
@@ -9,6 +10,7 @@ import {
   hasBlockingCheck,
   QUALITY_THRESHOLDS,
 } from "./draftQuality";
+import type { QualityCheck } from "./draftQuality";
 
 const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
@@ -162,5 +164,22 @@ describe("hasBlockingCheck", () => {
   });
   it("warn/ok だけなら false", () => {
     expect(hasBlockingCheck([{ label: "x", value: "", level: "warn" }, { label: "y", value: "", level: "ok" }])).toBe(false);
+  });
+});
+
+describe("countByLevel", () => {
+  const checks: QualityCheck[] = [
+    { label: "a", value: "", level: "block" },
+    { label: "b", value: "", level: "warn" },
+    { label: "c", value: "", level: "warn" },
+    { label: "d", value: "", level: "ok" },
+  ];
+
+  it("レベルごとの件数を集計する", () => {
+    expect(countByLevel(checks)).toEqual({ block: 1, warn: 2, ok: 1 });
+  });
+
+  it("空配列は全て 0", () => {
+    expect(countByLevel([])).toEqual({ block: 0, warn: 0, ok: 0 });
   });
 });
