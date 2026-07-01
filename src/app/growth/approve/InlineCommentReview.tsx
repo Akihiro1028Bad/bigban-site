@@ -19,6 +19,7 @@ import {
 } from "@/lib/growth/bodyComment";
 
 import { useBodyCommentConsult } from "./hooks/useBodyCommentConsult";
+import { IconMessage, IconPlus, IconSparkles, IconX } from "./ui/icons";
 
 interface InlineCommentReviewProps {
   pageId: string;
@@ -60,30 +61,40 @@ export function InlineCommentReview({
   const canComment = status === "なし";
 
   const total = ic.buildPayload().length;
-  const tbBtn =
-    "rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40";
 
   return (
-    <section aria-label="本文インラインコメント" className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+    <section
+      aria-label="本文インラインコメント"
+      className="mt-4 rounded-[12px] p-3"
+      style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+    >
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+        <h3
+          className="flex items-center gap-1.5 text-sm font-semibold"
+          style={{ color: "var(--p-text)" }}
+        >
           インラインコメント
         </h3>
-        <span className="text-[11px] text-gray-500">行（文）ごとに ＋ でコメント → AIに指摘を依頼</span>
+        <span className="text-[11px]" style={{ color: "var(--p-text-3)" }}>
+          行（文）ごとに ＋ でコメント → AIに指摘を依頼
+        </span>
       </div>
 
       {status !== "なし" ? (
         <div
-          className={`mb-2 flex items-center justify-between gap-2 rounded-md px-3 py-2 text-xs ${
-            status === "失敗" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
-          }`}
+          className="mb-2 flex items-center justify-between gap-2 rounded-[8px] px-3 py-2 text-xs"
+          style={{
+            background: status === "失敗" ? "var(--p-amber-weak)" : "var(--p-accent-weak)",
+            color: status === "失敗" ? "var(--p-amber)" : "var(--p-accent-ink)",
+          }}
         >
           <span role="status">{STATUS_LABEL[status]}</span>
           <button
             type="button"
             onClick={() => void ic.dismiss()}
             disabled={ic.busy}
-            className="shrink-0 rounded border border-gray-300 bg-white/70 px-2 py-0.5 text-[11px] text-gray-700 hover:bg-white disabled:opacity-40"
+            className="shrink-0 rounded-[6px] px-2 py-0.5 text-[11px] disabled:opacity-40"
+            style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
           >
             取り消し
           </button>
@@ -91,16 +102,29 @@ export function InlineCommentReview({
       ) : null}
 
       {status === "提示中" && proposal.length > 0 ? (
-        <div className="mb-3 rounded-md border border-blue-200 bg-blue-50/40 p-2">
-          <h4 className="mb-1.5 text-[11px] font-bold text-blue-800">AIの修正案（元 → 新）</h4>
+        <div
+          className="mb-3 rounded-[8px] p-2"
+          style={{ background: "var(--p-purple-weak)", border: "1px solid var(--p-border)" }}
+        >
+          <h4 className="mb-1.5 text-[11px] font-bold" style={{ color: "var(--p-purple)" }}>
+            AIの修正案（元 → 新）
+          </h4>
           <ul className="space-y-1.5">
             {proposal.map((item, idx) => (
-              <li key={idx} className="rounded border border-gray-200 bg-white p-2 text-xs">
-                <p className="text-gray-400 line-through">{item.before.replace(/<[^>]*>/g, "")}</p>
-                <p className="mt-0.5 text-gray-900">{item.after.replace(/<[^>]*>/g, "")}</p>
+              <li
+                key={idx}
+                className="rounded-[8px] p-2 text-xs"
+                style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
+              >
+                <p className="line-through" style={{ color: "var(--p-text-3)" }}>
+                  {item.before.replace(/<[^>]*>/g, "")}
+                </p>
+                <p className="mt-0.5" style={{ color: "var(--p-text)" }}>
+                  {item.after.replace(/<[^>]*>/g, "")}
+                </p>
                 {/* #M5: タグ除去で見えなくなる装飾/構造の追加(aside・リンク等)を明示する。 */}
                 {structureNote(item.before, item.after) ? (
-                  <p className="mt-0.5 text-[10px] font-medium text-amber-700">
+                  <p className="mt-0.5 text-[10px] font-medium" style={{ color: "var(--p-amber)" }}>
                     {structureNote(item.before, item.after)}
                   </p>
                 ) : null}
@@ -112,7 +136,7 @@ export function InlineCommentReview({
               type="button"
               onClick={() => void ic.applyNow()}
               disabled={ic.busy}
-              className="rounded-md border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
+              className="approve-btn-primary rounded-[8px] px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
             >
               本文へ反映（{proposal.length}）
             </button>
@@ -120,31 +144,36 @@ export function InlineCommentReview({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-md border border-gray-200">
+      <div className="approve-article overflow-hidden rounded-[8px]" style={{ border: "1px solid var(--p-border)" }}>
         {lines.map((line, i) => {
           const key = line.excerpt !== null ? `${line.blockIndex}::${line.excerpt}` : `nt-${i}`;
           const thread = line.excerpt !== null ? ic.comments[key] ?? [] : [];
           const isHeading = line.tag === "h2" || line.tag === "h3" || line.tag === "h4";
           return (
             <Fragment key={key}>
-              <div className="group flex items-start hover:bg-gray-50">
+              <div className="group/row flex items-start transition-colors hover:bg-[var(--p-bg-active)]">
                 <div className="flex w-12 shrink-0 select-none items-center justify-end gap-1 px-1.5 pt-1.5">
-                  <span className="font-mono text-[11px] text-gray-400">{i + 1}</span>
+                  <span className="font-mono text-[11px]" style={{ color: "var(--p-text-3)" }}>
+                    {i + 1}
+                  </span>
                   {canComment && line.commentable ? (
                     <button
                       type="button"
                       aria-label={`${i + 1}行目にコメント`}
                       onClick={() => ic.openComposer(key)}
-                      className="flex h-[18px] w-[18px] items-center justify-center rounded bg-blue-600 text-xs leading-none text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                      className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100"
+                      style={{ background: "var(--p-bg-active)", color: "var(--p-text-3)" }}
                     >
-                      ＋
+                      <IconPlus size={12} />
                     </button>
                   ) : null}
                 </div>
                 <div
-                  className={`flex-1 px-2 py-1.5 text-sm leading-relaxed ${
-                    line.commentable ? "text-gray-800" : "text-gray-400"
-                  } ${isHeading ? "font-bold" : ""} ${thread.length > 0 ? "bg-blue-50/40" : ""}`}
+                  className={`flex-1 px-2 py-1.5 text-sm leading-relaxed ${isHeading ? "font-bold" : ""}`}
+                  style={{
+                    color: line.commentable ? "var(--p-text-2)" : "var(--p-text-3)",
+                    background: thread.length > 0 ? "var(--p-amber-weak)" : undefined,
+                  }}
                 >
                   {line.text}
                 </div>
@@ -153,43 +182,54 @@ export function InlineCommentReview({
               {thread.map((c, idx) => (
                 <div
                   key={idx}
-                  className="ml-12 flex items-start justify-between gap-2 border-t border-gray-100 bg-gray-50 px-3 py-2"
+                  className="ml-12 flex items-start justify-between gap-2 px-3 py-2"
+                  style={{ background: "var(--p-amber-weak)", borderTop: "1px solid var(--p-border)" }}
                 >
                   <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
-                      あ
+                    <IconMessage size={13} style={{ color: "var(--p-amber)", marginTop: 2 }} />
+                    <span className="text-xs" style={{ color: "var(--p-text-2)" }}>
+                      {c}
                     </span>
-                    <span className="text-xs text-gray-700">{c}</span>
                   </div>
                   <button
                     type="button"
                     aria-label="コメントを削除"
                     onClick={() => ic.removeComment(key, idx)}
-                    className="shrink-0 text-[11px] text-gray-400 hover:text-red-600"
+                    className="shrink-0"
+                    style={{ color: "var(--p-text-3)" }}
                   >
-                    削除
+                    <IconX size={13} />
                   </button>
                 </div>
               ))}
 
               {ic.openFor === key ? (
-                <div className="ml-12 border-t border-gray-200 bg-gray-50 px-3 py-2">
+                <div
+                  className="ml-12 px-3 py-2"
+                  style={{ background: "var(--p-bg-input)", borderTop: "1px solid var(--p-border)" }}
+                >
                   <textarea
                     aria-label={`${i + 1}行目へのコメント入力`}
                     value={ic.draft}
                     onChange={(e) => ic.setDraft(e.target.value)}
                     placeholder="この文への指摘を書く…"
-                    className="min-h-12 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+                    className="min-h-12 w-full rounded-[8px] p-2 text-sm outline-none"
+                    style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)", color: "var(--p-text)" }}
                   />
                   <div className="mt-1.5 flex justify-end gap-2">
-                    <button type="button" onClick={() => ic.closeComposer()} className={tbBtn}>
+                    <button
+                      type="button"
+                      onClick={() => ic.closeComposer()}
+                      className="rounded-[6px] px-2 py-1 text-xs disabled:opacity-40"
+                      style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
+                    >
                       キャンセル
                     </button>
                     <button
                       type="button"
                       onClick={() => ic.addComment(key)}
                       disabled={!ic.draft.trim()}
-                      className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
+                      className="approve-btn-primary rounded-[6px] px-2 py-1 text-xs font-semibold disabled:opacity-40"
                     >
                       コメント
                     </button>
@@ -202,7 +242,11 @@ export function InlineCommentReview({
       </div>
 
       {ic.error ? (
-        <p role="alert" className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+        <p
+          role="alert"
+          className="mt-2 rounded-[6px] px-2 py-1 text-[11px]"
+          style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
+        >
           {ic.error}
         </p>
       ) : null}
@@ -213,8 +257,9 @@ export function InlineCommentReview({
             type="button"
             onClick={() => void ic.requestAi()}
             disabled={ic.busy || total === 0}
-            className="flex items-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-40"
+            className="approve-btn-primary flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
           >
+            <IconSparkles size={13} />
             AIに指摘を依頼（{total}）
           </button>
         </div>
