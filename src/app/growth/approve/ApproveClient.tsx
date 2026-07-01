@@ -667,15 +667,18 @@ export function ApproveClient() {
   };
 
   // #275/#proto P3a: 高密度な一覧行。詳細は右ペインへ寄せ、行では承認/却下/詳細だけを出す。
-  // BoardList の renderRow(item, isActive) にも施策 view の renderItem(item) にも共用する
-  // (isActive は BoardList 側の layoutId レール/背景で表現するため本関数では未使用)。
-  function renderItem(item: PendingItem) {
+  // ProposalsView は `<ul>` 直下に置くため `<li>`(既定)。map(renderItem) の第2引数(index)を
+  // 誤って as に渡さないよう、要素種別は明示引数 as で受ける(既定 "li")。
+  // BoardList は自前で `<li role="listitem">` を持つため、その中で描画する行は as="div"
+  // で `<li>` の入れ子(不正 HTML・jsdom クラッシュ)を避ける。
+  function renderItem(item: PendingItem, as: "li" | "div" = "li") {
     const choice = decided[item.id];
     const isIdea = item.kind === "idea";
     const failure = failures[item.id];
     return (
       <BoardCard
         key={item.id}
+        as={as}
         item={item}
         choice={choice}
         isBusy={savingId === item.id}
@@ -707,6 +710,36 @@ export function ApproveClient() {
     );
   }
 
+
+  // #275/#proto P3a: 詳細パネル本体。記事(idea)は approve view の右ペイン内に、
+  // 施策(proposal)は proposal view のモーダルドロワーとして描画する(共通の DetailPanelView)。
+  // 内部の DetailPanel が isIdea で全画面モーダル(記事)/右ドロワー(施策)を出し分ける。
+  function renderDetailPanel(item: PendingItem) {
+    return (
+      <DetailPanelView
+        item={item}
+        choice={decided[item.id]}
+        isBusy={savingId === item.id}
+        draftState={draftState}
+        token={token}
+        previewDevice={previewDevice}
+        actionBusy={actionBusy}
+        actionError={actionError}
+        reviewOrder={reviewOrder}
+        revise={revise}
+        onDecide={decideFromPanel}
+        onUndo={undoFromPanel}
+        onRevert={(target) => openConfirm(target, "revert")}
+        onOpen={setActiveId}
+        onClose={() => setActiveId(null)}
+        onPreviewDeviceChange={setPreviewDevice}
+        onStartEdit={startEditDraft}
+        onReloadDraft={(pageId) => void loadDraft(pageId)}
+        onConfirm={openConfirm}
+        onToast={pushToast}
+      />
+    );
+  }
 
   // #104/#136: 編集は全画面2ペインのワークスペース(オーバーレイ)で行う。route 遷移しない。
   // 詳細パネル(Framer の transform・sticky を持つ)の内側にネストすると position:fixed が
@@ -823,7 +856,7 @@ export function ApproveClient() {
                       decided={decided}
                       densityClass={densityClass}
                       onActivate={setActiveId}
-                      renderRow={renderItem}
+                      renderRow={(item) => renderItem(item, "div")}
                     />
                   )}
                 </section>
@@ -842,30 +875,7 @@ export function ApproveClient() {
                       >
                         ← 一覧
                       </button>
-                      <div className="p-4 lg:px-6">
-                        <DetailPanelView
-                          item={activeItem}
-                          choice={decided[activeItem.id]}
-                          isBusy={savingId === activeItem.id}
-                          draftState={draftState}
-                          token={token}
-                          previewDevice={previewDevice}
-                          actionBusy={actionBusy}
-                          actionError={actionError}
-                          reviewOrder={reviewOrder}
-                          revise={revise}
-                          onDecide={decideFromPanel}
-                          onUndo={undoFromPanel}
-                          onRevert={(item) => openConfirm(item, "revert")}
-                          onOpen={setActiveId}
-                          onClose={() => setActiveId(null)}
-                          onPreviewDeviceChange={setPreviewDevice}
-                          onStartEdit={startEditDraft}
-                          onReloadDraft={(pageId) => void loadDraft(pageId)}
-                          onConfirm={openConfirm}
-                          onToast={pushToast}
-                        />
-                      </div>
+                      <div className="p-4 lg:px-6">{renderDetailPanel(activeItem)}</div>
                     </>
                   ) : (
                     <div
@@ -883,7 +893,7 @@ export function ApproveClient() {
               <>
                 <ProposalsView
                   proposals={visibleProposals}
-                  renderItem={renderItem}
+                  renderItem={(item) => renderItem(item)}
                   densityClass={densityClass}
                   headerClass={columnHeaderClass()}
                 />
@@ -938,6 +948,11 @@ export function ApproveClient() {
           />
         ) : null}
       </div>
+
+      {/* #275/#proto P3a: 記事(approve view)は右ペインで詳細を出すが、施策など右ペインを持たない
+          view ではモーダルドロワー(DetailPanel isIdea=false)として詳細を出す。position:fixed が
+          祖先 transform に閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
+      {activeItem && activeView !== "approve" ? renderDetailPanel(activeItem) : null}
 
       {/* #104/#136: 編集は全画面2ペインのワークスペース。position:fixed が祖先 transform に
           閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
