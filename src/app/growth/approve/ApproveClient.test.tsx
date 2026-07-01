@@ -116,6 +116,20 @@ async function selectView(name: RegExp): Promise<void> {
   await userEvent.click(within(nav).getByRole("button", { name }));
 }
 
+// #proto P3a: 記事の単一リスト(BoardList)は段階ごとに <section>(sticky ヘッダにラベル＋件数)を
+// 並べる。段階ラベルから所属セクションを取り、その中でカード到達を検証する。
+function sectionForStage(label: string): HTMLElement {
+  // 段階ラベルは (a) TopBar の段階フィルタ、(b) BoardList セクションの sticky ヘッダ、
+  // (c) 各カードの StageChip/状態バッジ に出る。sticky ヘッダ = セクション直下だが listitem の外、
+  // なので「section 内かつ listitem の外」のラベルを選ぶ。
+  const section = screen
+    .getAllByText(label)
+    .find((el) => el.closest("section") && !el.closest('[role="listitem"]'))
+    ?.closest("section");
+  if (!section) throw new Error(`段階セクションが見つかりません: ${label}`);
+  return section as HTMLElement;
+}
+
 // #proto P1: 旧「処理済み X / Y件」進捗表示は TopBar の統計ピルへ置き換わった。
 // 未処理(あなたのアクション待ち)残件は TopBar の「あなた待ち」ピルで確認する。
 function expectAwaitingCount(n: number): void {
@@ -670,15 +684,16 @@ describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
     await screen.findByText("高スコア施策");
 
     // #119: 施策と記事はタブで分離。既定(未処理がある施策)タブでは施策レーンのみ。
+    // #proto P3a: 記事は単一リスト(記事リスト region)へ移行したため、施策 view では出ない。
     expect(screen.getByRole("region", { name: "施策レーン" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "記事パイプライン" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "記事リスト" })).not.toBeInTheDocument();
     const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
     expect(titles).toEqual(["高スコア施策", "低スコア施策"]); // 優先度降順
 
-    // 記事 view へ切替えると記事パイプラインが出て、施策レーンは消える。
+    // 記事 view へ切替えると記事リスト(単一リスト)が出て、施策レーンは消える。
     await selectView(/記事/);
-    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
-    expect(screen.getByText("記事A")).toBeInTheDocument();
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(within(list).getByText("記事A")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "施策レーン" })).not.toBeInTheDocument();
   });
 
@@ -706,12 +721,13 @@ describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
     await login();
     await screen.findByText("記事のみ");
     expect(screen.queryByRole("region", { name: "施策レーン" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
+    // #proto P3a: 記事は単一リスト(記事リスト region)へ移行。
+    expect(screen.getByRole("region", { name: "記事リスト" })).toBeInTheDocument();
   });
 });
 
 describe("ApproveClient パイプライン盤(#107)", () => {
-  it("記事は段階ごとの列に並ぶ(提案中/下書き)", async () => {
+  it("記事は段階セクションごとに単一リストで並ぶ(構成案レビュー/下書きレビュー)", async () => {
     mockFetchSequence({
       json: {
         success: true,
@@ -723,12 +739,17 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     });
     render(<ApproveClient />);
     await login();
+    // #proto P3a: 既定(未処理=あなた待ちの記事)は記事 view。単一リスト(段階セクション)で並ぶ。
     await screen.findByText("提案中記事");
 
-    const proposed = screen.getByRole("region", { name: "列: 提案中" });
-    const drafted = screen.getByRole("region", { name: "列: 下書き" });
-    expect(within(proposed).getByText("提案中記事")).toBeInTheDocument();
-    expect(within(drafted).getByText("下書き記事")).toBeInTheDocument();
+    // 各記事は自身の段階セクション(sticky ヘッダ＋件数)の <section> 内に入る。
+    const outline = sectionForStage("構成案レビュー");
+    const draftReview = sectionForStage("下書きレビュー");
+    expect(within(outline).getByText("提案中記事")).toBeInTheDocument();
+    expect(within(draftReview).getByText("下書き記事")).toBeInTheDocument();
+    // 段階ヘッダには件数(1)が併記される。
+    expect(within(outline).getByText("1")).toBeInTheDocument();
+    expect(within(draftReview).getByText("1")).toBeInTheDocument();
   });
 
   it("列ヘッダに件数バッジを表示する(#107)", async () => {
@@ -748,7 +769,7 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     expect(within(lane).getByText("2件")).toBeInTheDocument();
   });
 
-  it("生成待ち列の記事は承認/却下を出さず生成待ち表示にする(#107)", async () => {
+  it("生成待ちの記事は承認/却下を出さず生成待ち表示にする(#107)", async () => {
     mockFetchSequence({
       json: { success: true, items: [ideaItem({ id: "i1", title: "承認済み記事", stage: "queued" })] },
     });
@@ -757,9 +778,9 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     // #proto P1: 生成待ち(queued)は「あなた待ち」ではないため既定は成績 view。記事 view へ遷移。
     await selectView(/記事/);
     await screen.findByText("承認済み記事");
-    const queued = screen.getByRole("region", { name: "列: 生成待ち" });
-    // 列ヘッダ＋カードバッジの両方に「生成待ち」が出る(=カードが状態表示になっている)。
-    expect(within(queued).getAllByText("生成待ち").length).toBeGreaterThanOrEqual(2);
+    // #proto P3a: 列は廃止。記事リスト内でカードが「生成待ち」バッジになり、承認/却下は出ない。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(within(list).getByText("生成待ち")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "承認: 承認済み記事" })).not.toBeInTheDocument();
   });
 
@@ -772,7 +793,8 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     // #proto P1: 生成中(generating)は「あなた待ち」ではないため既定は成績 view。記事 view へ遷移。
     await selectView(/記事/);
     await screen.findByText("執筆中記事");
-    const generating = screen.getByRole("region", { name: "列: 生成中" });
+    // #proto P3a: 生成中セクション(ヘッダ)とカードバッジの両方に「生成中」が出る。
+    const generating = sectionForStage("生成中");
     expect(within(generating).getAllByText("生成中").length).toBeGreaterThanOrEqual(2);
   });
 
@@ -793,7 +815,7 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     expect(screen.queryByRole("button", { name: "承認: 承認済み施策" })).not.toBeInTheDocument();
   });
 
-  it("承認するとカードが生成待ち列へ移動し、取り消せる(#107)", async () => {
+  it("承認するとカードが決定済み表示になり、取り消せる(#107)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ id: "i1", title: "前進記事", stage: "proposed" })] } },
       { json: { success: true, updated: 1 } }
@@ -804,11 +826,11 @@ describe("ApproveClient パイプライン盤(#107)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 前進記事" }));
 
-    // 生成待ち列へ移り、決定済みカード(取り消し導線)が出る。消えない。
-    const queued = screen.getByRole("region", { name: "列: 生成待ち" });
-    expect(await within(queued).findByText("承認しました")).toBeInTheDocument();
+    // #proto P3a: 列は廃止。承認後もカードは記事リストに残り、決定済み(取り消し導線)になる。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(await within(list).findByText("承認しました")).toBeInTheDocument();
     expect(
-      within(queued).getByRole("button", { name: "取り消す: 前進記事" })
+      within(list).getByRole("button", { name: "取り消す: 前進記事" })
     ).toBeInTheDocument();
   });
 });
@@ -1077,6 +1099,29 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
   });
 });
 
+describe("ApproveClient 記事2ペイン master-detail(#proto P3a)", () => {
+  it("記事を選択すると右ペインに詳細が出て、モバイルの『← 一覧』で選択解除して閉じる", async () => {
+    // 未処理(あなた待ち)の記事1件 → 既定で記事 view。右ペインは既定で未選択プレースホルダ。
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ title: "選択記事" })] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("選択記事");
+    // 未選択のあいだは右ペインにプレースホルダ、モバイル戻るボタンは出ない。
+    expect(screen.getByText("記事を選択すると詳細が表示されます")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "← 一覧" })).not.toBeInTheDocument();
+
+    // 行の詳細ボタンで activeId を立て、右ペインに詳細(dialog)が出る。
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 選択記事" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("選択記事")).toBeInTheDocument();
+
+    // モバイル用「← 一覧」で選択解除し、右ペインはプレースホルダへ戻る(activeId=null)。
+    await userEvent.click(screen.getByRole("button", { name: "← 一覧" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("記事を選択すると詳細が表示されます")).toBeInTheDocument();
+  });
+});
+
 describe("ApproveClient 下書きタブ(#87)", () => {
   function draftIdea(over: Partial<Record<string, unknown>> = {}) {
     return ideaItem({
@@ -1089,16 +1134,16 @@ describe("ApproveClient 下書きタブ(#87)", () => {
     });
   }
 
-  it("下書き作成済みは「下書き」列に入る(#107)", async () => {
+  it("下書き作成済みは「下書きレビュー」セクションに入る(#107/#proto P3a)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem(), draftIdea()] } });
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    // 提案中記事は提案中列、下書き記事は下書き列。
-    const proposed = screen.getByRole("region", { name: "列: 提案中" });
-    const drafted = screen.getByRole("region", { name: "列: 下書き" });
-    expect(within(proposed).getByText("猛暑記事")).toBeInTheDocument();
-    expect(within(drafted).getByText("下書き記事")).toBeInTheDocument();
+    // #proto P3a: 提案中記事は構成案レビュー、下書き記事は下書きレビューの各段階セクションへ。
+    const outline = sectionForStage("構成案レビュー");
+    const draftReview = sectionForStage("下書きレビュー");
+    expect(within(outline).getByText("猛暑記事")).toBeInTheDocument();
+    expect(within(draftReview).getByText("下書き記事")).toBeInTheDocument();
   });
 
   it("下書き行は承認/却下を出さず、詳細のみ表示する", async () => {
@@ -2900,8 +2945,8 @@ describe("ApproveClient タブ分離/ルーティング(#119)", () => {
     await login();
     await screen.findByText("施策X");
     await selectView(/記事/);
-    expect(screen.getByText("記事Y")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(within(list).getByText("記事Y")).toBeInTheDocument();
     expect(window.location.search).toContain("view=approve");
     expect(railButton(/記事/)).toHaveAttribute("aria-current", "page");
   });
@@ -3013,7 +3058,8 @@ describe("ApproveClient ナビ/段階フィルタの a11y(#119/#proto P1)", () =
     expect(within(tablist).getByRole("tab", { name: /あなた待ち/ })).toHaveAttribute("aria-selected", "true");
     const nav = screen.getByRole("navigation", { name: "情報源" });
     expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
+    // #proto P3a: 記事は単一リスト(記事リスト region)。
+    expect(screen.getByRole("region", { name: "記事リスト" })).toBeInTheDocument();
   });
 });
 
