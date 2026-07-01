@@ -711,9 +711,9 @@ export function ApproveClient() {
   }
 
 
-  // #275/#proto P3a: 詳細パネル本体。記事(idea)は approve view の右ペイン内に、
-  // 施策(proposal)は proposal view のモーダルドロワーとして描画する(共通の DetailPanelView)。
-  // 内部の DetailPanel が isIdea で全画面モーダル(記事)/右ドロワー(施策)を出し分ける。
+  // #275/#proto P3a: 詳細パネル本体。記事(idea)は approve view の右ペイン内(region・親を満たす
+  // 常設パネル)に、施策(proposal)は proposal view のモーダルドロワー(dialog)として描画する
+  // (共通の DetailPanelView / 内部 DetailPanel が isIdea で出し分け)。記事は「← 一覧」(親)で閉じる。
   function renderDetailPanel(item: PendingItem) {
     return (
       <DetailPanelView
