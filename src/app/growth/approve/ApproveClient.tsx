@@ -771,6 +771,7 @@ export function ApproveClient() {
             role="tabpanel"
             id="approve-tabpanel"
             aria-label={viewPanelLabel[activeView]}
+            aria-labelledby={`approve-seg-${segment}`}
             className="min-w-0 flex-1 overflow-auto p-4 lg:px-6"
           >
             {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
