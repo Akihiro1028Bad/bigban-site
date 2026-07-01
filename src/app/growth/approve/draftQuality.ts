@@ -188,3 +188,14 @@ function brokenLinkChecks(input: DraftQualityInput): QualityCheck[] {
 export function hasBlockingCheck(checks: readonly QualityCheck[]): boolean {
   return checks.some((c) => c.level === "block");
 }
+
+/** チェックをレベル別に集計する(proto QualityChecklist の件数ピル用・#proto P3b)。 */
+export function countByLevel(checks: readonly QualityCheck[]): Record<CheckLevel, number> {
+  return checks.reduce(
+    (acc, c) => {
+      acc[c.level] += 1;
+      return acc;
+    },
+    { ok: 0, warn: 0, block: 0 } as Record<CheckLevel, number>,
+  );
+}
