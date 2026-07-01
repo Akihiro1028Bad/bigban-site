@@ -19,6 +19,7 @@ import { ReviseCommentForm } from "../ReviseCommentForm";
 import { Section } from "../Section";
 import { SectionEditor } from "../SectionEditor";
 import { SectionImages } from "../SectionImages";
+import { IconWand } from "../ui/icons";
 import type { useAdviceConsult } from "../hooks/useAdviceConsult";
 import type { useBodyCommentConsult } from "../hooks/useBodyCommentConsult";
 import type { useReviseEditing } from "../hooks/useReviseEditing";
@@ -44,11 +45,15 @@ interface OverallComposerProps {
 function OverallComposer({ advice }: OverallComposerProps) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-gray-500">
+      <p className="text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
         文体・構成・具体性・内部リンク導線の観点で、下書き全体をAIに見てもらえます。
       </p>
       <div>
-        <label htmlFor="overall-instruction" className="block text-xs font-medium text-gray-600">
+        <label
+          htmlFor="overall-instruction"
+          className="block text-xs font-medium"
+          style={{ color: "var(--p-text-2)" }}
+        >
           特に見てほしい点（任意）
         </label>
         <textarea
@@ -59,14 +64,19 @@ function OverallComposer({ advice }: OverallComposerProps) {
           rows={2}
           maxLength={500}
           disabled={advice.busy}
-          className="mt-1 w-full resize-none rounded-md border border-gray-300 p-2 text-sm text-gray-900 disabled:opacity-60"
+          className="mt-1 w-full resize-none rounded-[9px] p-2.5 text-[13px] outline-none disabled:opacity-60"
+          style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)", color: "var(--p-text)" }}
         />
-        <p className="mt-0.5 text-right text-[10px] text-gray-400">
+        <p className="mt-0.5 text-right text-[10px]" style={{ color: "var(--p-text-3)" }}>
           {advice.instruction.length} / 500
         </p>
       </div>
       {advice.error ? (
-        <p role="alert" className="rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+        <p
+          role="alert"
+          className="rounded-[9px] px-3 py-2 text-[11.5px]"
+          style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+        >
           {advice.error}
         </p>
       ) : null}
@@ -74,9 +84,10 @@ function OverallComposer({ advice }: OverallComposerProps) {
         type="button"
         onClick={advice.requestAdvice}
         disabled={advice.busy}
-        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+        className="approve-btn-primary flex w-full items-center justify-center gap-1.5 rounded-[10px] py-2.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ background: "var(--p-accent)", color: "#0a0c10" }}
       >
-        相談する
+        <IconWand size={15} /> 相談する
       </button>
     </div>
   );
@@ -195,14 +206,20 @@ function ReviseComposer({ item, revise }: ReviseComposerProps) {
 
   if (sections.length === 0) {
     return (
-      <p className="text-xs text-gray-400">構成案がありません。まず構成案を作成してください。</p>
+      <p className="text-xs" style={{ color: "var(--p-text-3)" }}>
+        構成案がありません。まず構成案を作成してください。
+      </p>
     );
   }
 
   return (
     <div>
       {reviseError ? (
-        <p role="alert" className="mb-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+        <p
+          role="alert"
+          className="mb-2 rounded-[9px] px-3 py-2 text-[11.5px]"
+          style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+        >
           {reviseError}
         </p>
       ) : null}
