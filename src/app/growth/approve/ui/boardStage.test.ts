@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { STAGE_META, STAGE_ORDER, toneVar, toneWeakVar } from "./boardStage";
+import { STAGE_META, STAGE_ORDER, deriveBoardStage, toneVar, toneWeakVar } from "./boardStage";
+
+import type { PendingItem } from "../types";
+
+function pi(over: Partial<PendingItem> & Pick<PendingItem, "id" | "kind" | "stage">): PendingItem {
+  return { title: "t", subtitle: "", ...over } as PendingItem;
+}
 
 describe("boardStage", () => {
   it("6 ステージの label/tone/order を持つ", () => {
@@ -28,5 +34,31 @@ describe("boardStage", () => {
   it("toneWeakVar は gray を白6%、他は -weak トークン", () => {
     expect(toneWeakVar("gray")).toBe("rgba(255,255,255,0.06)");
     expect(toneWeakVar("amber")).toBe("var(--p-amber-weak)");
+  });
+});
+
+describe("deriveBoardStage", () => {
+  it("施策(proposal)は idea", () => {
+    expect(deriveBoardStage(pi({ id: "p1", kind: "proposal", stage: "proposed" }))).toBe("idea");
+  });
+  it("published は published", () => {
+    expect(deriveBoardStage(pi({ id: "a1", kind: "idea", stage: "published" }))).toBe("published");
+  });
+  it("generating は generating", () => {
+    expect(deriveBoardStage(pi({ id: "a2", kind: "idea", stage: "generating" }))).toBe("generating");
+  });
+  it("drafted は draft_review", () => {
+    expect(deriveBoardStage(pi({ id: "a3", kind: "idea", stage: "drafted" }))).toBe("draft_review");
+  });
+  it("isDraftReady=true は stage に依らず draft_review", () => {
+    expect(deriveBoardStage(pi({ id: "a4", kind: "idea", stage: "queued", isDraftReady: true }))).toBe("draft_review");
+  });
+  it("proposed/queued(下書き未) は outline_review", () => {
+    expect(deriveBoardStage(pi({ id: "a5", kind: "idea", stage: "proposed" }))).toBe("outline_review");
+    expect(deriveBoardStage(pi({ id: "a6", kind: "idea", stage: "queued" }))).toBe("outline_review");
+  });
+  it("scheduled は返さない(縮約=drafted系は draft_review へ寄る)", () => {
+    // scheduledAtMs 未 surface のため scheduled 判定はしない。drafted は draft_review。
+    expect(deriveBoardStage(pi({ id: "a7", kind: "idea", stage: "drafted" }))).not.toBe("scheduled");
   });
 });

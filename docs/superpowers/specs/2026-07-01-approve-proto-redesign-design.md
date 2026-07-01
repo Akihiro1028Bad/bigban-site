@@ -48,6 +48,7 @@ proto の以下は本番バックエンドに無いか形が違う。**各項目
 4. **generating の genProgress（0→100%）**: 本番 stage=generating に進捗%が無い → 当面は `.proto-indeterminate` 不定進捗で表示、進捗% は backend が surface できれば差し替え。
 5. **DevicePreview のタブレット**: 本番は PC/モバイル → タブレット幅追加はフロントのみ。
 6. **MediaLibraryModal 統一**: 本番 `/media` で充足。proto の統一モーダルへ集約。
+7. **ボードステージ scheduled（予約公開）**: 本番 PendingItem に scheduledAtMs が無いため P2 では `scheduled` を写像しない（drafted 系は draft_review へ寄せる）。予約公開時刻を Notion/派生で surface できるようになった時点で deriveBoardStage に分岐追加。
 
 ## 3. proto ⇄ 本番 コンポーネント対応（disposition）
 凡例: **再スキン**=本番に対応物あり・見た目を proto へ / **新規移植**=proto から持ち込み / **BE**=バックエンド改修を伴う
