@@ -1,23 +1,21 @@
 /**
- * 盤の1カード(#H7 分解 / #107・#119・#137)。記事=段階インジケータ＋スコアバー、
- * 決定済み/下書き/下流待ち/未処理で操作を出し分ける。派生値は親が計算して渡す(表示専用)。
+ * 盤の1カード(#H7 分解 / #107・#119・#137 / #proto P2 T4 再スキン)。
+ * 見た目は proto 由来のプリミティブ(EyecatchThumb/StageChip/ScoreBar/AwaitingDot)へ寄せる。
+ * 分岐(決定済み/下書き完了/下流待ち/未決定)と承認/却下/取消/編集の操作ロジックは現行維持。
+ * 派生表示値(hue/抜粋/hasEyecatch/stage)は表示専用の純ロジックから決定的に導出する。
  */
 
 "use client";
 
-import { STAGE_STEPS } from "./board";
 import { choiceButtonClass, TAP_TARGET } from "./approveStyles";
-
-interface BoardCardItem {
-  id: string;
-  title: string;
-  kind: "proposal" | "idea";
-  stage: string;
-  isDraftReady?: boolean;
-}
+import { cardExcerpt, cardHasEyecatch, cardHue } from "./boardCardView";
+import type { PendingItem } from "./types";
+import { EyecatchThumb } from "./ui/eyecatchThumb";
+import { deriveBoardStage } from "./ui/boardStage";
+import { AwaitingDot, ScoreBar, StageChip } from "./ui/primitives";
 
 interface BoardCardProps {
-  item: BoardCardItem;
+  item: PendingItem;
   choice: string | undefined;
   isBusy: boolean;
   lockedForRevise: boolean;
@@ -51,9 +49,6 @@ export function BoardCard({
   isFocused,
   bulkSelectable,
   selected,
-  isIdea,
-  step,
-  scoreBarWidth,
   stageAccentClass,
   stuck,
   rowClassName,
@@ -67,6 +62,9 @@ export function BoardCard({
   onApprove,
   onReject,
 }: BoardCardProps) {
+  // 「あなた待ち」= 未決定 & 未下書き & 下流待ちでない(isActionable と同義。decided は choice が担う)。
+  const awaitingYou = !choice && !item.isDraftReady && !awaitingDownstream;
+  const excerpt = cardExcerpt(item);
   const detailButton = (
     <button
       type="button"
@@ -83,7 +81,7 @@ export function BoardCard({
       data-decision={choice ?? ""}
     >
       {bulkSelectable ? (
-        <label className="mb-1 flex items-center gap-2 text-xs text-gray-500">
+        <label className="mb-1 flex items-center gap-2 text-xs" style={{ color: "var(--p-text-3)" }}>
           <input
             type="checkbox"
             aria-label={`一括選択: ${item.title}`}
@@ -93,35 +91,36 @@ export function BoardCard({
           選択
         </label>
       ) : null}
-      {isIdea ? (
-        <div className="mb-2">
-          <div aria-label="進捗" className="flex items-center gap-1">
-            {STAGE_STEPS.map((label, i) => (
-              <span
-                key={label}
-                aria-current={i === step ? "step" : undefined}
-                className={`h-1.5 w-1.5 rounded-full ${i <= step ? "bg-blue-600" : "bg-gray-300"}`}
-              />
-            ))}
-            <span className="ml-1 text-xs text-gray-500">{STAGE_STEPS[step]}</span>
+
+      <div className="flex items-start gap-3">
+        <EyecatchThumb hue={cardHue(item.id)} has={cardHasEyecatch(item)} size={38} alt="" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {awaitingYou ? <AwaitingDot /> : null}
+            <button
+              type="button"
+              onClick={onOpen}
+              className="min-w-0 flex-1 line-clamp-2 text-left text-[14px] font-semibold leading-snug"
+              style={{ color: choice ? "var(--p-text-2)" : "var(--p-text)" }}
+            >
+              {item.title}
+            </button>
           </div>
-          <div className="mt-1 h-1 w-full rounded-full bg-gray-200">
-            <div className="h-1 rounded-full bg-blue-500" style={{ width: `${scoreBarWidth}%` }} />
+          {excerpt ? (
+            <p className="mt-[3px] truncate text-[12px] leading-snug" style={{ color: "var(--p-text-3)" }}>
+              {excerpt}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <StageChip stage={deriveBoardStage(item)} small />
+            {item.score != null ? <ScoreBar score={item.score} /> : null}
           </div>
         </div>
-      ) : null}
-      <button
-        type="button"
-        onClick={onOpen}
-        className={`w-full text-left line-clamp-2 text-[15px] font-semibold leading-snug ${
-          choice ? "text-gray-600" : "text-gray-900"
-        }`}
-      >
-        {item.title}
-      </button>
+      </div>
+
       {choice ? (
         <div className="mt-2 flex items-center gap-2">
-          <span className="text-sm text-gray-700">
+          <span className="text-sm" style={{ color: "var(--p-text-2)" }}>
             ✓ <span className="font-semibold">{choice}しました</span>
           </span>
           <div className="ml-auto flex gap-2">
@@ -140,9 +139,6 @@ export function BoardCard({
         </div>
       ) : item.isDraftReady ? (
         <div className="mt-2 flex items-center gap-2">
-          <span className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
-            📝 下書き
-          </span>
           <div className="ml-auto flex gap-2">
             {detailButton}
             <button
@@ -160,59 +156,67 @@ export function BoardCard({
         <div>
           <div className="mt-2 flex items-center gap-2">
             <span
-              className={`shrink-0 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white ${
-                item.stage === "generating" ? "motion-safe:animate-pulse" : ""
+              className={`shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium ${
+                item.stage === "generating" ? "approve-pulse" : ""
               }`}
+              style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
             >
               {item.kind === "proposal" ? "承認済み" : item.stage === "generating" ? "生成中" : "生成待ち"}
             </span>
             <div className="ml-auto">{detailButton}</div>
           </div>
           {item.stage === "generating" ? (
-            <div className="mt-2 text-xs text-gray-500">
-              <span className="motion-safe:animate-pulse">🖊 自宅PCで執筆中…</span>
+            <div className="mt-2 text-xs" style={{ color: "var(--p-text-3)" }}>
+              <span className="approve-pulse">🖊 自宅PCで執筆中…</span>
               <span className="ml-2">{generatingStepsText}</span>
             </div>
           ) : null}
           {stuck ? (
-            <p role="status" className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            <p
+              role="status"
+              className="mt-2 rounded-md px-2 py-1 text-xs"
+              style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
+            >
               時間がかかっています。自宅PCの巡回が動いているか確認してください。
             </p>
           ) : null}
         </div>
       ) : (
         <>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="shrink-0 rounded bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
-              {kindLabel}
-            </span>
-          </div>
-          <div
-            role="group"
-            aria-label={`承認または却下: ${item.title}`}
-            className="mt-2 flex flex-col gap-2 sm:flex-row"
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className="shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium"
+            style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
           >
-            <button
-              type="button"
-              id={`approve-${item.id}`}
-              aria-label={`承認: ${item.title}`}
-              onClick={onApprove}
-              disabled={isBusy || lockedForRevise}
-              className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
-            >
-              承認
-            </button>
-            <button
-              type="button"
-              aria-label={`却下: ${item.title}`}
-              onClick={onReject}
-              disabled={isBusy || lockedForRevise}
-              className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
-            >
-              却下
-            </button>
-            {detailButton}
-          </div>
+            {kindLabel}
+          </span>
+        </div>
+        <div
+          role="group"
+          aria-label={`承認または却下: ${item.title}`}
+          className="mt-2 flex flex-col gap-2 sm:flex-row"
+        >
+          <button
+            type="button"
+            id={`approve-${item.id}`}
+            aria-label={`承認: ${item.title}`}
+            onClick={onApprove}
+            disabled={isBusy || lockedForRevise}
+            className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+          >
+            承認
+          </button>
+          <button
+            type="button"
+            aria-label={`却下: ${item.title}`}
+            onClick={onReject}
+            disabled={isBusy || lockedForRevise}
+            className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+          >
+            却下
+          </button>
+          {detailButton}
+        </div>
         </>
       )}
       {failure ? (
