@@ -3,6 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ImagesView, PreviewView, PromptView } from "./DetailViews";
+import type { DraftState } from "./draftTypes";
+
+// #75: draftState を組み立てる小ヘルパ(ready は最小フィールドのみ)。
+function ready(bodyHtml: string, body = ""): DraftState {
+  return { status: "ready", draft: { title: "T", displayMode: "html", bodyHtml, body } };
+}
 
 beforeAll(() => {
   // DevicePreview が使う ResizeObserver は jsdom 未実装のため no-op モックを注入する。
@@ -33,7 +39,7 @@ describe("PromptView", () => {
 describe("PreviewView", () => {
   it("generating は shimmer と段階ラベルを出す(進捗%は出さない)", () => {
     render(
-      <PreviewView stage="generating" generatingStep="本文を生成中" bodyHtml="" slug="a1" onSaveMeta={vi.fn()} />,
+      <PreviewView stage="generating" generatingStep="本文を生成中" draftState={{ status: "idle" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />,
     );
     expect(screen.getByText("本文を生成中")).toBeInTheDocument();
     expect(screen.queryByText(/%$/)).not.toBeInTheDocument();
@@ -41,18 +47,43 @@ describe("PreviewView", () => {
 
   it("generating で stuck バナーを出す", () => {
     render(
-      <PreviewView stage="generating" stuck bodyHtml="" slug="a1" onSaveMeta={vi.fn()} />,
+      <PreviewView stage="generating" stuck draftState={{ status: "idle" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />,
     );
     expect(screen.getByText(/生成が滞留しています/)).toBeInTheDocument();
   });
 
-  it("本文なし(draft_review)は空状態を出す", () => {
-    render(<PreviewView stage="draft_review" bodyHtml="" slug="a1" onSaveMeta={vi.fn()} />);
-    expect(screen.getByText("本文はまだ生成されていません")).toBeInTheDocument();
+  it("未作成(idle)は空状態を出す", () => {
+    render(<PreviewView stage="draft_review" draftState={{ status: "idle" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
+    expect(screen.getByText("まだ下書きは生成されていません")).toBeInTheDocument();
+  });
+
+  it("loading はローディングを出す", () => {
+    render(<PreviewView stage="draft_review" draftState={{ status: "loading" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
+    expect(screen.getByText("読み込み中…")).toBeInTheDocument();
+  });
+
+  it("empty は見つかりませんでしたを出す", () => {
+    render(<PreviewView stage="draft_review" draftState={{ status: "empty" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
+    expect(screen.getByText(/見つかりませんでした/)).toBeInTheDocument();
+  });
+
+  it("error はメッセージと再読み込みを出し、押すと onReloadDraft を呼ぶ", async () => {
+    const onReloadDraft = vi.fn();
+    render(
+      <PreviewView stage="draft_review" draftState={{ status: "error", error: "取得NG" }} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={onReloadDraft} />,
+    );
+    expect(screen.getByText("取得NG")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onReloadDraft).toHaveBeenCalled();
+  });
+
+  it("bodyHtml が空でも body にフォールバックしてプレビューへ渡す", () => {
+    render(<PreviewView stage="draft_review" draftState={ready("", "<p>リッチ本文</p>")} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
+    expect(screen.getByTitle("公開後プレビュー")).toHaveAttribute("data-preview-html", "<p>リッチ本文</p>");
   });
 
   it("ready はメタ編集＋デバイスプレビューを出す", () => {
-    render(<PreviewView stage="draft_review" bodyHtml="<p>本文</p>" slug="a1" onSaveMeta={vi.fn()} />);
+    render(<PreviewView stage="draft_review" draftState={ready("<p>本文</p>")} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
     expect(screen.getByText(/メタディスクリプション/)).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "プレビュー端末" })).toBeInTheDocument();
   });
@@ -62,10 +93,11 @@ describe("PreviewView", () => {
     render(
       <PreviewView
         stage="draft_review"
-        bodyHtml="<p>本文</p>"
+        draftState={ready("<p>本文</p>")}
         slug="a1"
         metaDescription={"あ".repeat(121)}
         onSaveMeta={onSaveMeta}
+        onReloadDraft={vi.fn()}
       />,
     );
     expect(screen.getByText(/120字を超えると/)).toBeInTheDocument();
@@ -79,9 +111,10 @@ describe("PreviewView", () => {
     render(
       <PreviewView
         stage="draft_review"
-        bodyHtml={`<p>${"本文テキスト".repeat(40)}</p>`}
+        draftState={ready(`<p>${"本文テキスト".repeat(40)}</p>`)}
         slug="a1"
         onSaveMeta={vi.fn()}
+        onReloadDraft={vi.fn()}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: /本文から自動生成/ }));

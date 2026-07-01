@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -34,7 +34,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { fetchBoard, postPublish, postRevert } from "./api";
+import { fetchBoard, postRevert } from "./api";
 import { authHeaders } from "./authHeaders";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import { BoardCard } from "./BoardCard";
@@ -46,6 +46,7 @@ import { ConsultComposer } from "./consult/ConsultComposer";
 import { ConsultDrawer } from "./consult/ConsultDrawer";
 import { InlineCommentReview } from "./InlineCommentReview";
 import { deriveBoardStage } from "./ui/boardStage";
+import { detailBadge } from "./detailBadge";
 import { outlineSections } from "./outline";
 import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
@@ -183,13 +184,11 @@ export function ApproveClient() {
   // #275/#proto P3a: master-detail。右詳細ペインでアクティブにしている項目 id。
   const [activeId, setActiveId] = useState<string | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
-  // decisionMutation はクローズ操作でも共用するため公開分を受け取る。
   const {
     decided,
     failures,
     savingId,
     setDecided,
-    decisionMutation,
     decide,
     undo,
     decideFromPanel,
@@ -483,46 +482,13 @@ export function ApproveClient() {
     void loadPending();
   }, [authDisabled, loadPending]);
 
-  // #H7: 公開の更新を useMutation 化(fetch ロジックは api.ts)。承認/却下/復帰の
-  // decisionMutation は useApproveDecisions から受け取る(クローズで共用)。
-  const publishMutation = useMutation({
-    mutationFn: (id: string) => postPublish(token, id),
-  });
-
-  // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
+  // #proto P3b: 構成やり直し(revert)の確認ダイアログ状態。公開/クローズ(#167)は proto 厳密優先で
+  // 詳細パネルから撤去したため、確認ダイアログは "revert" 専用に縮約した(公開キューは PublishQueue へ)。
   const [actionBusy, setActionBusy] = useState(false);
-  // #167/H2: 公開・クローズ・構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
+  // #167/H2: 構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
   const [confirmAction, setConfirmAction] = useState<
-    { kind: "publish" | "close" | "revert"; id: string; title: string } | null
+    { kind: "revert"; id: string; title: string } | null
   >(null);
-
-  // #proto P3b: 公開/クローズの失敗表示先(旧 DetailPanelView 内の inline 表示)が撤去されたため、
-  // 成否はトーストで明示する(沈黙させない・revert と同じ扱い)。
-  async function publishArticle(id: string): Promise<void> {
-    setActionBusy(true);
-    try {
-      await publishMutation.mutateAsync(id);
-      // 挙動保存(#H7): 盤が最新化されてからトーストを出す(公開反映を確認できてから通知)。
-      await pollBoard();
-      pushToast("記事を公開しました。");
-    } catch (error) {
-      pushToast(toMessage(error, "公開に失敗しました。"), "error");
-    } finally {
-      setActionBusy(false);
-    }
-  }
-
-  async function closeTask(id: string): Promise<void> {
-    setActionBusy(true);
-    try {
-      await decisionMutation.mutateAsync({ id, decision: "クローズ" });
-      await pollBoard();
-    } catch (error) {
-      pushToast(toMessage(error, "クローズに失敗しました。"), "error");
-    } finally {
-      setActionBusy(false);
-    }
-  }
 
   /**
    * 下書き作成済みを提案中に戻す(構成からやり直す)。成功で盤を最新化しパネルを閉じる。
@@ -543,17 +509,15 @@ export function ApproveClient() {
     }
   }
 
-  /** 公開/クローズ/構成やり直しの確認ダイアログを開く(対象タイトルを明示)。 */
-  function openConfirm(item: PendingItem, kind: "publish" | "close" | "revert"): void {
-    setConfirmAction({ kind, id: item.id, title: item.title });
+  /** 構成やり直しの確認ダイアログを開く(対象タイトルを明示)。 */
+  function openConfirm(item: PendingItem): void {
+    setConfirmAction({ kind: "revert", id: item.id, title: item.title });
   }
 
-  /** 確認ダイアログで「確定」したときに実行する(対象はダイアログ表示中の confirmAction)。 */
-  async function runConfirm(action: { kind: "publish" | "close" | "revert"; id: string }): Promise<void> {
+  /** 確認ダイアログで「確定」したときに実行する(構成やり直し専用)。 */
+  async function runConfirm(action: { kind: "revert"; id: string }): Promise<void> {
     setConfirmAction(null);
-    if (action.kind === "publish") await publishArticle(action.id);
-    else if (action.kind === "revert") await revertArticle(action.id);
-    else await closeTask(action.id);
+    await revertArticle(action.id);
   }
 
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
@@ -825,11 +789,16 @@ export function ApproveClient() {
   // 親が配置する。2段タブ DetailPanel(proto 移植)へ本番データ・主操作・相談導線を結線する。
   function renderDetailPanel(item: PendingItem) {
     const stage = deriveBoardStage(item);
-    const draftReady = draftState.status === "ready";
+    // 本文編集の起点(下書きを編集)は draft ready のときだけ DetailPanel が描画する。
+    // ready でないときは空文字(この経路は UI 到達しない)。
+    const readyBodyHtml = draftState.status === "ready" ? draftState.draft.bodyHtml : "";
     return (
       <DetailPanel
         item={item}
         stage={stage}
+        badgeLabel={detailBadge(item, decided[item.id]).label}
+        kindLabel={KIND_BADGE[item.kind]}
+        details={item.details}
         tab={detailTab}
         editing={editingDraft}
         draftState={draftState}
@@ -838,10 +807,12 @@ export function ApproveClient() {
         onApprove={() => decideFromPanel(item, "承認")}
         onRevise={consult.openDrawer}
         onReject={() => decideFromPanel(item, "却下")}
-        onRevert={() => openConfirm(item, "revert")}
-        onEdit={() => {
-          if (draftReady) startEditDraft(draftState.draft.bodyHtml);
-        }}
+        onRevert={() => openConfirm(item)}
+        revertDisabled={isReviseBusy(item.reviseStatus)}
+        decisionsDisabled={isReviseBusy(item.reviseStatus)}
+        decision={decided[item.id]}
+        onUndo={() => void undo(item)}
+        onEdit={() => startEditDraft(readyBodyHtml)}
         prompt={item.subtitle || "この記事の生成メモはまだありません。"}
         hue={200}
         slug={item.id}
@@ -850,20 +821,15 @@ export function ApproveClient() {
           pushToast("アイキャッチの差し替えは下書きプレビューのメディアから行えます。")
         }
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
-        onPickBodyImage={() =>
-          pushToast("本文画像の差し替えは下書きプレビューのメディアから行えます。")
-        }
-        onRegenBodyImage={() =>
-          pushToast("本文画像の差し替えは下書きプレビューのメディアから行えます。")
-        }
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
         imageInstructions={imageInstructions}
         revising={revise.reviseBusy}
         onAddComment={(sectionIndex, text) => {
+          // OutlineView は入力欄の text を直接渡す。setCommentText→saveComment を同一 tick で
+          // 呼ぶと state 反映前の stale("")を掴んで取りこぼすため、明示引数でそのまま確定する(#proto P3b)。
           revise.startAddComment(sectionIndex);
-          revise.setCommentText(text);
-          revise.saveComment(sectionIndex);
+          revise.saveComment(sectionIndex, text);
         }}
         onRemoveComment={(sectionIndex, commentIndex) =>
           revise.deleteComment(sectionIndex, commentIndex)
@@ -871,8 +837,9 @@ export function ApproveClient() {
         onUpdateImage={updateImageInstruction}
         onRequestOutlineRevise={() => void revise.requestRevise(item)}
         onSaveMeta={(text) => void saveMeta(item.id, text)}
+        onReloadDraft={() => void loadDraft(item.id)}
         inlineComments={
-          draftReady ? (
+          draftState.status === "ready" ? (
             <InlineCommentReview
               pageId={item.id}
               token={token}
@@ -1068,7 +1035,7 @@ export function ApproveClient() {
         {/* #proto P1: ショートカット一覧(ボタン到達のみ)。 */}
         {shortcutsOpen ? <ShortcutOverlay onClose={() => setShortcutsOpen(false)} /> : null}
 
-        {/* #167/H2: 公開・クローズの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。 */}
+        {/* #167/H2: 構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。公開/クローズは撤去。 */}
         {confirmAction ? (
           <ConfirmActionDialog
             action={confirmAction}

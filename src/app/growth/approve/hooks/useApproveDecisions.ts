@@ -1,8 +1,7 @@
 /**
  * 承認/却下/承認待ちに戻す(即時保存モデル)を担うカスタムフック(#H7 分解)。
  * decided(保存済みの選択)・failures(失敗＋再試行)・savingId と、承認/却下/取り消しの
- * mutation を集約する。decisionMutation はクローズ操作でも共用するため公開する。
- * 挙動は ApproveClient 内に直書きしていた頃と同一(純リファクタ)。
+ * mutation を集約する。挙動は ApproveClient 内に直書きしていた頃と同一(純リファクタ)。
  */
 
 "use client";
@@ -36,7 +35,7 @@ export function useApproveDecisions({ token, onFocus, onClosePanel }: UseApprove
   const [failures, setFailures] = useState<Record<string, Failure>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // #H7: 承認/却下/クローズ/復帰の更新を useMutation 化(fetch ロジックは api.ts)。
+  // #H7: 承認/却下/取り消しの更新を useMutation 化(fetch ロジックは api.ts)。
   const decisionMutation = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: string }) =>
       postDecision(token, id, decision),
@@ -84,20 +83,13 @@ export function useApproveDecisions({ token, onFocus, onClosePanel }: UseApprove
     onClosePanel();
   }
 
-  function undoFromPanel(item: PendingItem): void {
-    void undo(item);
-    onClosePanel();
-  }
-
   return {
     decided,
     failures,
     savingId,
     setDecided,
-    decisionMutation,
     decide,
     undo,
     decideFromPanel,
-    undoFromPanel,
   };
 }

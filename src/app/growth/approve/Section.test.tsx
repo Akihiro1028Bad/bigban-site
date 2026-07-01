@@ -24,11 +24,11 @@ const baseProps = {
 
 describe("Section", () => {
   it("コメント props を渡さない(詳細パネル経路)とコメント導線を描画しない", () => {
-    render(<Section {...baseProps} comments={["残コメ"]} />);
+    // comments 自体も省略し、既定([])フォールバック分岐も exercise する。
+    render(<Section {...baseProps} />);
     // ＋コメント・件数バッジ・スレッドは出さず、編集導線のみ。
     expect(screen.queryByRole("button", { name: "コメントを追加: 見出しA" })).toBeNull();
     expect(screen.queryByText("コメント1")).toBeNull();
-    expect(screen.queryByText("残コメ")).toBeNull();
     expect(screen.getByRole("button", { name: "セクションを編集: 見出しA" })).toBeInTheDocument();
   });
 

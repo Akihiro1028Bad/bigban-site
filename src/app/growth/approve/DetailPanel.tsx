@@ -126,6 +126,12 @@ function scheduledLabelOf(item: PendingItem): string | null {
 export interface DetailPanelProps {
   item: PendingItem;
   stage: BoardStage;
+  /** ヘッダー段階バッジのラベル(#124・detailBadge の純ロジック結果)。 */
+  badgeLabel: string;
+  /** 種別バッジ(📝 記事 / 📋 施策)。 */
+  kindLabel: string;
+  /** 判断根拠のメトリクスチップ(#226/#227・ラベル＋値)。 */
+  details?: { label: string; value: string }[];
   tab: DetailTab;
   editing: boolean;
   /** preview/quality の入力源。 */
@@ -138,6 +144,14 @@ export interface DetailPanelProps {
   onRevise: () => void;
   onReject: () => void;
   onRevert: () => void;
+  /** 修正ループ処理中は「構成からやり直す」を無効化する(#43)。 */
+  revertDisabled?: boolean;
+  /** 修正ループ処理中は承認/却下を無効化する(#43)。 */
+  decisionsDisabled?: boolean;
+  /** この記事の決定(承認/却下)。決定済みなら「承認待ちに戻す」を出す(#130)。 */
+  decision?: "承認" | "却下";
+  /** 決定を取り消して承認待ちへ戻す(#130)。 */
+  onUndo: () => void;
   onEdit: () => void;
   // プロンプト・参照タブ。
   prompt: string;
@@ -149,8 +163,9 @@ export interface DetailPanelProps {
   regenKeys: Set<string>;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
-  onPickBodyImage: (index: number) => void;
-  onRegenBodyImage: (index: number) => void;
+  // 本文画像の差し替え/再生成は現行の詳細パネルでは常に本文画像0のため到達不可(#proto P3b で撤去)。
+  onPickBodyImage?: (index: number) => void;
+  onRegenBodyImage?: (index: number) => void;
   // 構成案タブ(OutlineView)。
   sections: OutlineViewSection[];
   hypothesis?: ArticleHypothesis;
@@ -162,6 +177,8 @@ export interface DetailPanelProps {
   onRequestOutlineRevise: () => void;
   // プレビュータブのメタ保存。
   onSaveMeta: (text: string) => void;
+  /** 下書き取得失敗からの再読み込み(#75)。 */
+  onReloadDraft: () => void;
   /** 本文行コメント(再スキンした InlineCommentReview)を差し込む slot。親が注入。 */
   inlineComments?: ReactNode;
   /** 「この文」相談モード中=true のとき本文注釈 UI(inlineComments)を前面に出す。 */
@@ -171,6 +188,9 @@ export interface DetailPanelProps {
 export function DetailPanel({
   item,
   stage,
+  badgeLabel,
+  kindLabel,
+  details,
   tab,
   editing,
   draftState,
@@ -180,6 +200,10 @@ export function DetailPanel({
   onRevise,
   onReject,
   onRevert,
+  revertDisabled,
+  decisionsDisabled,
+  decision,
+  onUndo,
   onEdit,
   prompt,
   refs,
@@ -199,6 +223,7 @@ export function DetailPanel({
   onUpdateImage,
   onRequestOutlineRevise,
   onSaveMeta,
+  onReloadDraft,
   inlineComments,
   consultSentenceMode,
 }: DetailPanelProps) {
@@ -218,7 +243,9 @@ export function DetailPanel({
     subTabs.length > 1 ? `approve-sub-${safeTab}` : `approve-cluster-${activeCluster.key}`;
 
   const decided = stage === "scheduled" || stage === "published";
-  const isReviewable = stage === "draft_review" || stage === "outline_review";
+  // 本番差分: proto に無い `idea`(施策=kind:proposal)も承認/却下できる「最初のトリアージ」ゲート。
+  // proto の記事段階(outline_review/draft_review)に加えて idea をレビュー可能にする。
+  const isReviewable = stage === "draft_review" || stage === "outline_review" || stage === "idea";
 
   // フッターの公開前チェックは本番 draftQuality のみ(ready 時)。styleLint 合流は将来拡張。
   const checks =
@@ -238,7 +265,7 @@ export function DetailPanel({
   const scheduledLabel = scheduledLabelOf(item);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" role="region" aria-label={`詳細: ${item.title}`}>
       <div className="shrink-0 px-6 pt-5 pb-3" style={{ borderBottom: "1px solid var(--p-border)" }}>
         {onBack && (
           // approve-btn-ghost の display 指定が Tailwind の hidden を上書きするため、ラッパ div 側で lg 以上は非表示にする。
@@ -250,6 +277,12 @@ export function DetailPanel({
         )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <StageChip stage={stage} />
+          {/* #124: 実効段階(楽観反映)ラベル。BoardStage チップと別に detailBadge の段階名を出す。 */}
+          <span className="text-[12px] font-medium" style={{ color: "var(--p-text-2)" }}>
+            {badgeLabel}
+          </span>
+          {/* #226/#227: 種別バッジ(記事/施策)。 */}
+          <span className="text-[11.5px]" style={{ color: "var(--p-text-3)" }}>{kindLabel}</span>
           {scheduledLabel && (
             <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-teal)" }}>
               <IconCalendar size={13} /> {scheduledLabel}
@@ -257,7 +290,7 @@ export function DetailPanel({
           )}
           {!editing && bodyHtml && (
             <button onClick={onEdit} className="approve-btn-ghost ml-auto" title="リッチエディタで本文を編集">
-              <IconEdit size={13} /> 本文を編集
+              <IconEdit size={13} /> 下書きを編集
             </button>
           )}
           {editing && (
@@ -280,6 +313,24 @@ export function DetailPanel({
             {readMinutes > 0 ? `約${readMinutes}分` : "—"}
           </MetaStat>
         </div>
+
+        {/* #226/#227: 判断根拠(details)はメトリクスチップ(ラベル＋値)で出す。 */}
+        {details && details.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {details.map((d) => (
+              <span
+                key={d.label}
+                className="inline-flex items-center gap-1.5 rounded-[8px] px-2.5 py-[3px] text-[11.5px]"
+                style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+              >
+                <span style={{ color: "var(--p-text-3)" }}>{d.label}</span>
+                <span className="font-medium tabular-nums" style={{ color: "var(--p-text)" }}>
+                  {d.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <nav
@@ -393,7 +444,13 @@ export function DetailPanel({
               )}
               {safeTab === "prompt" && <PromptView prompt={prompt} refs={refs} />}
               {safeTab === "preview" && (
-                <PreviewView stage={stage} bodyHtml={bodyHtml} slug={slug} onSaveMeta={onSaveMeta} />
+                <PreviewView
+                  stage={stage}
+                  draftState={draftState}
+                  slug={slug}
+                  onSaveMeta={onSaveMeta}
+                  onReloadDraft={onReloadDraft}
+                />
               )}
               {safeTab === "images" && (
                 <ImagesView
@@ -427,7 +484,21 @@ export function DetailPanel({
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {decided ? (
+          {decision ? (
+            // #130: パネルから決定した直後は、その場で「承認待ちに戻す」で取り消せる。
+            <div className="flex w-full items-center gap-2">
+              <span
+                className="flex items-center gap-1.5 text-[13px] font-medium"
+                style={{ color: decision === "承認" ? "var(--p-green)" : "var(--p-red)" }}
+              >
+                <IconCheckCircle size={15} />
+                {decision === "承認" ? "承認しました" : "却下しました"}
+              </span>
+              <button onClick={onUndo} className="approve-btn-ghost ml-auto">
+                承認待ちに戻す
+              </button>
+            </div>
+          ) : decided ? (
             <div
               className="flex w-full items-center justify-center gap-2 rounded-[10px] py-2.5 text-[13px] font-medium"
               style={{ background: "var(--p-green-weak)", color: "var(--p-green)" }}
@@ -440,14 +511,20 @@ export function DetailPanel({
               {stage === "draft_review" && (
                 <button
                   onClick={onRevert}
-                  className="approve-btn-ghost"
+                  disabled={revertDisabled}
+                  className="approve-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ color: "var(--p-amber)" }}
                   title="下書きを破棄して構成案レビューに戻す"
                 >
                   <IconWand size={14} /> 構成からやり直す
                 </button>
               )}
-              <button onClick={onReject} className="approve-btn-ghost" style={{ color: "var(--p-red)" }}>
+              <button
+                onClick={onReject}
+                disabled={decisionsDisabled}
+                className="approve-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ color: "var(--p-red)" }}
+              >
                 <IconX size={14} /> 却下
               </button>
               <button onClick={onRevise} className="approve-btn-ghost">
@@ -465,13 +542,17 @@ export function DetailPanel({
                 )}
                 <button
                   onClick={onApprove}
-                  disabled={!isReviewable || hasBlock}
+                  disabled={!isReviewable || hasBlock || decisionsDisabled}
                   className="approve-btn-primary flex flex-1 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:justify-start"
                   style={{ background: "var(--p-accent)", color: "#0a0c10" }}
                   title={hasBlock ? "公開不可の項目を直すと承認できます" : undefined}
                 >
                   <IconCheck size={15} />
-                  {stage === "outline_review" ? "構成案を承認" : "承認して公開予約"}
+                  {stage === "idea"
+                    ? "承認"
+                    : stage === "outline_review"
+                      ? "構成案を承認"
+                      : "承認して公開予約"}
                   <span className="hidden sm:inline-flex"><Kbd>A</Kbd></span>
                   <IconArrowRight size={14} />
                 </button>

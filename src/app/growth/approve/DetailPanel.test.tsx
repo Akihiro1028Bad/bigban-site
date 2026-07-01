@@ -44,6 +44,8 @@ function setup(over: Partial<Parameters<typeof DetailPanel>[0]> = {}) {
   const props = {
     item: pi(),
     stage: "draft_review" as const,
+    badgeLabel: "下書き",
+    kindLabel: "📝 記事",
     tab: "preview" as const,
     editing: false,
     draftState: draftReady,
@@ -60,6 +62,7 @@ function setup(over: Partial<Parameters<typeof DetailPanel>[0]> = {}) {
     onRevise: vi.fn(),
     onReject: vi.fn(),
     onRevert: vi.fn(),
+    onUndo: vi.fn(),
     onEdit: vi.fn(),
     onPickEyecatch: vi.fn(),
     onRegenEyecatch: vi.fn(),
@@ -70,6 +73,7 @@ function setup(over: Partial<Parameters<typeof DetailPanel>[0]> = {}) {
     onUpdateImage: vi.fn(),
     onRequestOutlineRevise: vi.fn(),
     onSaveMeta: vi.fn(),
+    onReloadDraft: vi.fn(),
     ...over,
   };
   render(<DetailPanel {...props} />);

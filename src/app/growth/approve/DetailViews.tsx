@@ -9,6 +9,7 @@ import { useState } from "react";
 import { EXCERPT_MAX, autoExcerpt, isExcerptTooLong } from "@/lib/growth/excerptDraft";
 
 import { DevicePreview } from "./DevicePreview";
+import type { DraftState } from "./draftTypes";
 import type { BoardStage } from "./ui/boardStage";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
 import { IconCheck, IconFileText, IconImage, IconSparkles } from "./ui/icons";
@@ -78,21 +79,30 @@ interface PreviewViewProps {
   stage: BoardStage;
   generatingStep?: string;
   stuck?: boolean;
-  bodyHtml: string;
+  /** 下書き取得状態(#75)。ローディング/取得失敗/未作成/見つからない/実プレビューを出し分ける。 */
+  draftState: DraftState;
   metaDescription?: string;
   slug: string;
   onSaveMeta: (text: string) => void;
+  /** 取得失敗からの再読み込み(#75)。 */
+  onReloadDraft: () => void;
 }
 
 export function PreviewView({
   stage,
   generatingStep,
   stuck,
-  bodyHtml,
+  draftState,
   metaDescription,
   slug,
   onSaveMeta,
+  onReloadDraft,
 }: PreviewViewProps) {
+  // #75: bodyHtml が空でも body にフォールバックしてプレビューへ渡す(#100)。
+  const bodyHtml =
+    draftState.status === "ready"
+      ? draftState.draft.bodyHtml || draftState.draft.body
+      : "";
   if (stage === "generating") {
     // 本番 stage=generating に進捗% は無いため、進捗バーは不定 shimmer ＋ 段階ラベルへ縮約(AD5-4)。
     return (
@@ -119,20 +129,76 @@ export function PreviewView({
       </div>
     );
   }
-  if (!bodyHtml) {
+  // #75: 下書き取得状態の出し分け(ローディング/取得失敗/見つからない/未作成)。
+  if (draftState.status === "loading") {
+    return (
+      <div className="py-16 text-center text-[13px]" style={{ color: "var(--p-text-3)" }}>
+        読み込み中…
+      </div>
+    );
+  }
+  if (draftState.status === "error") {
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-3 rounded-[12px] py-16 text-center"
+        style={{ border: "1px dashed var(--p-border-strong)", color: "var(--p-text-3)" }}
+      >
+        <IconFileText size={22} />
+        <div className="text-[13px]" style={{ color: "var(--p-red)" }}>{draftState.error}</div>
+        <button onClick={onReloadDraft} className="approve-btn-ghost">
+          再読み込み
+        </button>
+      </div>
+    );
+  }
+  if (draftState.status === "empty") {
     return (
       <div
         className="flex flex-col items-center justify-center gap-2 rounded-[12px] py-16 text-center"
         style={{ border: "1px dashed var(--p-border-strong)", color: "var(--p-text-3)" }}
       >
         <IconFileText size={22} />
-        <div className="text-[13px]">本文はまだ生成されていません</div>
+        <div className="text-[13px]">下書きが見つかりませんでした</div>
+      </div>
+    );
+  }
+  if (draftState.status === "idle" || !bodyHtml) {
+    // #75: contentId が無い記事(idle)は未作成扱い。ready だが本文空(通常は起きない)も同文言で受ける。
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-2 rounded-[12px] py-16 text-center"
+        style={{ border: "1px dashed var(--p-border-strong)", color: "var(--p-text-3)" }}
+      >
+        <IconFileText size={22} />
+        <div className="text-[13px]">まだ下書きは生成されていません</div>
         <div className="text-[12px]">構成案を承認すると生成が始まります</div>
       </div>
     );
   }
+  const draft = draftState.status === "ready" ? draftState.draft : null;
+  const eyecatch = draft?.eyecatch;
+  // #166: AI再生成(アイキャッチ/本文画像)が依頼中/処理中の間、プレビュー上部に状態を出す。
+  const regenBusy = (s?: string): boolean => s === "依頼中" || s === "処理中";
+  const regenStatus = regenBusy(draft?.eyecatchRegen?.status)
+    ? draft?.eyecatchRegen?.status
+    : regenBusy(draft?.bodyRegen?.status)
+      ? draft?.bodyRegen?.status
+      : undefined;
   return (
     <div className="flex flex-col gap-4">
+      {regenStatus ? (
+        <div
+          className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-[12px] font-medium"
+          style={{ background: "var(--p-purple-weak, rgba(155,135,245,0.12))", color: "var(--p-purple)" }}
+        >
+          <IconSparkles size={14} className="approve-pulse" />
+          AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
+        </div>
+      ) : null}
+      {eyecatch ? (
+        // #141: アイキャッチの表示のみ(差し替えは撤去)。設定済みのときプレビュー上部に画像を出す。
+        <EyecatchThumb hue={0} has url={eyecatch} size={96} alt="アイキャッチ" />
+      ) : null}
       <MetaEditor bodyHtml={bodyHtml} metaDescription={metaDescription} onSave={onSaveMeta} />
       <DevicePreview html={bodyHtml} slug={slug} />
     </div>
@@ -197,14 +263,15 @@ interface ImageFrameProps {
   hue: number;
   has?: boolean;
   url?: string;
+  alt?: string;
   size: number;
   regenerating: boolean;
 }
 
-function ImageFrame({ hue, has, url, size, regenerating }: ImageFrameProps) {
+function ImageFrame({ hue, has, url, alt, size, regenerating }: ImageFrameProps) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <EyecatchThumb hue={hue} has={has} url={url} size={size} />
+      <EyecatchThumb hue={hue} has={has} url={url} size={size} alt={alt} />
       {regenerating && (
         <div
           className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-[8px]"
@@ -229,8 +296,8 @@ interface ImagesViewProps {
   itemId: string;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
-  onPickBodyImage: (index: number) => void;
-  onRegenBodyImage: (index: number) => void;
+  onPickBodyImage?: (index: number) => void;
+  onRegenBodyImage?: (index: number) => void;
 }
 
 export function ImagesView({
@@ -295,7 +362,7 @@ export function ImagesView({
                     <button
                       className="approve-tool"
                       style={{ height: 26 }}
-                      onClick={() => onPickBodyImage(i)}
+                      onClick={() => onPickBodyImage?.(i)}
                       disabled={regen}
                       title="差し替え"
                     >
@@ -304,7 +371,7 @@ export function ImagesView({
                     <button
                       className="approve-tool"
                       style={{ height: 26 }}
-                      onClick={() => onRegenBodyImage(i)}
+                      onClick={() => onRegenBodyImage?.(i)}
                       disabled={regen}
                       title="AIで再生成"
                     >

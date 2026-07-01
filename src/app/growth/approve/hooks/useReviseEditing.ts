@@ -46,9 +46,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
   const [imageDesc, setImageDesc] = useState("");
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
-  // #139 A: 記事タイトルの直接編集(構成案修正パネル内のインライン編集)。
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleInput, setTitleInput] = useState("");
   // #139 B: タイトルへの AI 修正指示(構成案コメントとは別レーン)。
   const [titleRevisePrompt, setTitleRevisePrompt] = useState("");
 
@@ -87,8 +84,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setEditingImageIdx(null);
     setImageDesc("");
     setReviseError("");
-    setEditingTitle(false);
-    setTitleInput("");
     setTitleRevisePrompt("");
   }, [openId]);
 
@@ -142,8 +137,12 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setCommentText("");
   }
 
-  function saveComment(section: number): void {
-    const text = commentText.trim();
+  // #proto P3b: `explicitText` を渡すと state(commentText)ではなくその値を確定する。
+  // ApproveClient の onAddComment は setCommentText→saveComment を同一 tick で呼ぶため、
+  // state 反映前の stale("")を掴んでコメントを取りこぼす。明示引数でこの取りこぼしを防ぐ
+  // (UI 起点の ConsultComposer は従来どおり引数なしで state を確定する)。
+  function saveComment(section: number, explicitText?: string): void {
+    const text = (explicitText ?? commentText).trim();
     if (!text) {
       cancelComment();
       return;
@@ -206,24 +205,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     nextSections: OutlineSection[]
   ): Promise<boolean> {
     return submitReviseEdit(item, { outline: serializeOutlineSections(nextSections) });
-  }
-
-  // #139 A: 記事タイトルを直接上書き保存する(AI不要)。空は弾く。
-  function startEditTitle(title: string): void {
-    setEditingTitle(true);
-    setTitleInput(title);
-  }
-  function cancelEditTitle(): void {
-    setEditingTitle(false);
-    setTitleInput("");
-  }
-  async function saveTitle(item: PendingItem): Promise<void> {
-    const title = titleInput.trim();
-    if (!title) {
-      setReviseError("タイトルは空にできません。");
-      return;
-    }
-    if (await submitReviseEdit(item, { title })) cancelEditTitle();
   }
 
   async function saveSection(
@@ -335,15 +316,12 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     imageDesc,
     reviseBusy,
     reviseError,
-    editingTitle,
-    titleInput,
     titleRevisePrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
     setImageStyle,
     setImageDesc,
-    setTitleInput,
     setTitleRevisePrompt,
     requestRevise,
     startAddComment,
@@ -353,9 +331,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     deleteComment,
     startEditSection,
     cancelEditSection,
-    startEditTitle,
-    cancelEditTitle,
-    saveTitle,
     saveSection,
     startAddImage,
     startEditImage,
