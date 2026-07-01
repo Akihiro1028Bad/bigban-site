@@ -44,13 +44,15 @@ export function toneWeakVar(tone: StageTone): string {
 
 /**
  * 本番 PendingItem を proto の BoardStage へ写像する(AD4)。
- * 縮約(AD5): `scheduled` は scheduledAtMs が本番型に無いため返さない。予約公開が surface
- * できるようになったら drafted 系から分岐して復活させる。`idea` は施策トリアージ(kind=proposal)用。
+ * P3a で `scheduled` を un-縮約(AD5-7): drafted/isDraftReady かつ scheduledAtMs!=null を
+ * scheduled に写像する(予約済み下書きは draft_review より優先)。`idea` は施策トリアージ(kind=proposal)用。
  */
 export function deriveBoardStage(item: PendingItem): BoardStage {
   if (item.kind === "proposal") return "idea";
   if (item.stage === "published") return "published";
+  const draftish = item.stage === "drafted" || item.isDraftReady === true;
+  if (draftish && item.scheduledAtMs != null) return "scheduled";
   if (item.stage === "generating") return "generating";
-  if (item.stage === "drafted" || item.isDraftReady === true) return "draft_review";
+  if (draftish) return "draft_review";
   return "outline_review";
 }
