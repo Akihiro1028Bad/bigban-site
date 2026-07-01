@@ -35,10 +35,22 @@ import {
 } from "./boardPrefs";
 
 import { fetchBoard, postPublish, postRevert } from "./api";
+import { authHeaders } from "./authHeaders";
+import { readJsonObject } from "@/lib/growth/safeJson";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PollStaleBanner } from "./PollStaleBanner";
-import { DetailPanelView } from "./DetailPanelView";
+import { DetailPanel } from "./DetailPanel";
+import type { DetailTab } from "./DetailPanel";
+import { ConsultComposer } from "./consult/ConsultComposer";
+import { ConsultDrawer } from "./consult/ConsultDrawer";
+import { InlineCommentReview } from "./InlineCommentReview";
+import { deriveBoardStage } from "./ui/boardStage";
+import { outlineSections } from "./outline";
+import type { OutlineViewSection } from "./OutlineView";
+import type { ImageInstruction } from "./imageIntentTypes";
+import type { DraftPreview } from "./draftTypes";
+import { useConsult } from "./hooks/useConsult";
 import { EmptyGate, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
@@ -181,7 +193,6 @@ export function ApproveClient() {
     decide,
     undo,
     decideFromPanel,
-    undoFromPanel,
   } = useApproveDecisions({
     token,
     onFocus: setFocusId,
@@ -374,9 +385,7 @@ export function ApproveClient() {
     draftSaveError,
     confirmDiscard,
     livePreviewHtml,
-    previewDevice,
     setEditedHtml,
-    setPreviewDevice,
     setConfirmDiscard,
     startEditDraft,
     openCardEditor,
@@ -384,6 +393,47 @@ export function ApproveClient() {
     exitEditDraft,
     saveDraft,
   } = useDraftEditing({ token, openId: activeId, draftState, loadDraft, onOpen: setActiveId });
+
+  // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
+  // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
+  const [detailTab, setDetailTab] = useState<DetailTab>("preview");
+  const [imageInstructions, setImageInstructions] = useState<Record<number, ImageInstruction>>({});
+  useEffect(() => {
+    setDetailTab("preview");
+    setImageInstructions({});
+  }, [activeId]);
+
+  // 画像指示のセッション merge(immutable)。既定は「おまかせ(auto)」。
+  const updateImageInstruction = useCallback(
+    (index: number, patch: Partial<ImageInstruction>): void => {
+      setImageInstructions((prev) => ({
+        ...prev,
+        [index]: { ...(prev[index] ?? { mode: "auto" }), ...patch },
+      }));
+    },
+    [],
+  );
+
+  // 差分B(#proto P3b で DetailPanelView から移設): AI相談ドロワー。DetailPanelView 撤去に伴い、
+  // useConsult を ApproveClient で生成し ConsultDrawer/ConsultComposer もここで描画する(相談フロー不変)。
+  // フックは早期 return より前で無条件に呼ぶ必要があるため、開いている項目(polledItem)を渡す。
+  // 未選択時は安定したプレースホルダ item を渡す(相談は開かないため副作用なし)。
+  const consultItem: PendingItem = polledItem ?? {
+    id: "",
+    kind: "idea",
+    title: "",
+    subtitle: "",
+    stage: "proposed",
+  };
+  const consultDraft: DraftPreview | null =
+    draftState.status === "ready" ? draftState.draft : null;
+  const consult = useConsult({
+    item: consultItem,
+    token,
+    draft: consultDraft,
+    onReloadDraft: () => void loadDraft(consultItem.id),
+    revise,
+  });
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -441,22 +491,22 @@ export function ApproveClient() {
 
   // #167: 公開・クローズ(取り消しづらい外向き操作のため確認ダイアログを必ず挟む)。
   const [actionBusy, setActionBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
   // #167/H2: 公開・クローズ・構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。
   const [confirmAction, setConfirmAction] = useState<
     { kind: "publish" | "close" | "revert"; id: string; title: string } | null
   >(null);
 
+  // #proto P3b: 公開/クローズの失敗表示先(旧 DetailPanelView 内の inline 表示)が撤去されたため、
+  // 成否はトーストで明示する(沈黙させない・revert と同じ扱い)。
   async function publishArticle(id: string): Promise<void> {
     setActionBusy(true);
-    setActionError("");
     try {
       await publishMutation.mutateAsync(id);
       // 挙動保存(#H7): 盤が最新化されてからトーストを出す(公開反映を確認できてから通知)。
       await pollBoard();
       pushToast("記事を公開しました。");
     } catch (error) {
-      setActionError(toMessage(error, "公開に失敗しました。"));
+      pushToast(toMessage(error, "公開に失敗しました。"), "error");
     } finally {
       setActionBusy(false);
     }
@@ -464,12 +514,11 @@ export function ApproveClient() {
 
   async function closeTask(id: string): Promise<void> {
     setActionBusy(true);
-    setActionError("");
     try {
       await decisionMutation.mutateAsync({ id, decision: "クローズ" });
       await pollBoard();
     } catch (error) {
-      setActionError(toMessage(error, "クローズに失敗しました。"));
+      pushToast(toMessage(error, "クローズに失敗しました。"), "error");
     } finally {
       setActionBusy(false);
     }
@@ -510,6 +559,25 @@ export function ApproveClient() {
   // #255: 手動追加した施策(承認待ち)を一覧の先頭に差し込み、通常フローに乗せる。
   function addProposal(item: PendingItem): void {
     setBoardData((prev) => [item, ...prev]);
+  }
+
+  // #proto P3b: プレビュータブのメタディスクリプション保存。ExcerptEditor と同じ実経路
+  // (/api/growth/draft/excerpt・CONTENT キー)へ薄く結線する(no-op ではない)。成否をトーストで明示。
+  async function saveMeta(pageId: string, text: string): Promise<void> {
+    try {
+      const res = await fetch("/api/growth/draft/excerpt", {
+        method: "POST",
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ pageId, excerpt: text }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) {
+        throw new Error(typeof json.error === "string" ? json.error : "保存に失敗しました。");
+      }
+      pushToast("メタディスクリプションを保存しました。");
+    } catch (error) {
+      pushToast(toMessage(error, "メタディスクリプションの保存に失敗しました。"), "error");
+    }
   }
 
 
@@ -711,32 +779,110 @@ export function ApproveClient() {
   }
 
 
-  // #275/#proto P3a: 詳細パネル本体。記事(idea)は approve view の右ペイン内(region・親を満たす
-  // 常設パネル)に、施策(proposal)は proposal view のモーダルドロワー(dialog)として描画する
-  // (共通の DetailPanelView / 内部 DetailPanel が isIdea で出し分け)。記事は「← 一覧」(親)で閉じる。
+  // #proto P3b: アイキャッチの AI 再生成(おまかせ)を実経路(/api/growth/eyecatch/regen)へ結線する。
+  // 差し替え(メディア選択)UI は P5 の媒体ピッカーで担うため、ここでは「差し替えは既存の下書きプレビュー
+  // 側で行う」ことをトーストで案内する縮約(no-op ではなく実導線へ誘導)。
+  async function requestEyecatchRegen(pageId: string): Promise<void> {
+    try {
+      const res = await fetch("/api/growth/eyecatch/regen", {
+        method: "POST",
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ pageId, instruction: "" }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) {
+        throw new Error(typeof json.error === "string" ? json.error : "再生成の依頼に失敗しました。");
+      }
+      pushToast("アイキャッチの再生成を依頼しました。PCが処理して数分で反映されます。");
+    } catch (error) {
+      pushToast(toMessage(error, "アイキャッチの再生成に失敗しました。"), "error");
+    }
+  }
+
+  // #proto P3b: draft の再生成ステータスから「生成中」の regenKey を導出する(ImagesView の生成中表示用)。
+  // 依頼中/処理中を生成中扱いにし、`${id}:eyecatch` / `${id}:body:<index>` の集合にする。
+  function deriveRegenKeys(item: PendingItem): Set<string> {
+    const keys = new Set<string>();
+    if (draftState.status !== "ready") return keys;
+    const { eyecatchRegen, bodyRegen } = draftState.draft;
+    const busy = (status?: string) => status === "依頼中" || status === "処理中";
+    if (busy(eyecatchRegen?.status)) keys.add(`${item.id}:eyecatch`);
+    if (busy(bodyRegen?.status)) keys.add(`${item.id}:body:0`);
+    return keys;
+  }
+
+  // #proto P3b: 現行 outline(文字列)を parse し、useReviseEditing の下書きコメント(draftComments)を
+  // 合成した OutlineView 用セクションにする。
+  function detailSections(item: PendingItem): OutlineViewSection[] {
+    return outlineSections(item.outline).map((s, i) => ({
+      heading: s.heading,
+      summary: s.description || undefined,
+      comments: revise.draftComments[i],
+    }));
+  }
+
+  // #275/#proto P3b: 詳細パネル本体。記事は approve view の右ペイン内、施策は proposal view のドロワーとして
+  // 親が配置する。2段タブ DetailPanel(proto 移植)へ本番データ・主操作・相談導線を結線する。
   function renderDetailPanel(item: PendingItem) {
+    const stage = deriveBoardStage(item);
+    const draftReady = draftState.status === "ready";
     return (
-      <DetailPanelView
+      <DetailPanel
         item={item}
-        choice={decided[item.id]}
-        isBusy={savingId === item.id}
+        stage={stage}
+        tab={detailTab}
+        editing={editingDraft}
         draftState={draftState}
-        token={token}
-        previewDevice={previewDevice}
-        actionBusy={actionBusy}
-        actionError={actionError}
-        reviewOrder={reviewOrder}
-        revise={revise}
-        onDecide={decideFromPanel}
-        onUndo={undoFromPanel}
-        onRevert={(target) => openConfirm(target, "revert")}
-        onOpen={setActiveId}
-        onClose={() => setActiveId(null)}
-        onPreviewDeviceChange={setPreviewDevice}
-        onStartEdit={startEditDraft}
-        onReloadDraft={(pageId) => void loadDraft(pageId)}
-        onConfirm={openConfirm}
-        onToast={pushToast}
+        onBack={() => setActiveId(null)}
+        onTabChange={setDetailTab}
+        onApprove={() => decideFromPanel(item, "承認")}
+        onRevise={consult.openDrawer}
+        onReject={() => decideFromPanel(item, "却下")}
+        onRevert={() => openConfirm(item, "revert")}
+        onEdit={() => {
+          if (draftReady) startEditDraft(draftState.draft.bodyHtml);
+        }}
+        prompt={item.subtitle || "この記事の生成メモはまだありません。"}
+        hue={200}
+        slug={item.id}
+        regenKeys={deriveRegenKeys(item)}
+        onPickEyecatch={() =>
+          pushToast("アイキャッチの差し替えは下書きプレビューのメディアから行えます。")
+        }
+        onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
+        onPickBodyImage={() =>
+          pushToast("本文画像の差し替えは下書きプレビューのメディアから行えます。")
+        }
+        onRegenBodyImage={() =>
+          pushToast("本文画像の差し替えは下書きプレビューのメディアから行えます。")
+        }
+        sections={detailSections(item)}
+        hypothesis={item.hypothesis}
+        imageInstructions={imageInstructions}
+        revising={revise.reviseBusy}
+        onAddComment={(sectionIndex, text) => {
+          revise.startAddComment(sectionIndex);
+          revise.setCommentText(text);
+          revise.saveComment(sectionIndex);
+        }}
+        onRemoveComment={(sectionIndex, commentIndex) =>
+          revise.deleteComment(sectionIndex, commentIndex)
+        }
+        onUpdateImage={updateImageInstruction}
+        onRequestOutlineRevise={() => void revise.requestRevise(item)}
+        onSaveMeta={(text) => void saveMeta(item.id, text)}
+        inlineComments={
+          draftReady ? (
+            <InlineCommentReview
+              pageId={item.id}
+              token={token}
+              bodyHtml={draftState.draft.bodyHtml}
+              bodyComment={draftState.draft.bodyComment}
+              onChanged={() => void loadDraft(item.id)}
+            />
+          ) : undefined
+        }
+        consultSentenceMode={consult.mode === "sentence" && consult.open}
       />
     );
   }
@@ -949,10 +1095,65 @@ export function ApproveClient() {
         ) : null}
       </div>
 
-      {/* #275/#proto P3a: 記事(approve view)は右ペインで詳細を出すが、施策など右ペインを持たない
-          view ではモーダルドロワー(DetailPanel isIdea=false)として詳細を出す。position:fixed が
+      {/* #275/#proto P3a/P3b: 記事(approve view)は右ペインで詳細を出すが、施策など右ペインを持たない
+          view ではモーダルドロワー(dialog)として 2段タブ DetailPanel を出す。position:fixed が
           祖先 transform に閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
-      {activeItem && activeView !== "approve" ? renderDetailPanel(activeItem) : null}
+      {activeItem && activeView !== "approve" ? (
+        <div className="approve-shell fixed inset-0 z-50 flex">
+          <button
+            type="button"
+            aria-label="オーバーレイを閉じる"
+            onClick={() => setActiveId(null)}
+            className="flex-1 bg-black/40"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`詳細: ${activeItem.title}`}
+            className="ml-auto flex h-full w-full max-w-md flex-col overflow-hidden shadow-xl sm:w-[28rem]"
+            style={{ background: "var(--p-bg)" }}
+          >
+            {renderDetailPanel(activeItem)}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 差分B(#proto P3b で DetailPanelView から移設): AI相談ドロワー。ConsultDrawer/ConsultComposer は
+          ApproveClient から描画する(相談フロー不変)。開いている項目が記事のときのみ意味を持つ。 */}
+      {activeItem ? (
+        <ConsultDrawer
+          open={consult.open}
+          stage={consult.stage}
+          mode={consult.mode}
+          views={consult.views}
+          composer={
+            <ConsultComposer
+              mode={consult.mode}
+              item={activeItem}
+              bodyHtml={consult.bodyHtml}
+              advice={consult.advice}
+              bodyCommentConsult={consult.bodyCommentConsult}
+              revise={revise}
+            />
+          }
+          busy={consult.busy}
+          onModeChange={consult.setMode}
+          onClose={consult.closeDrawer}
+          onReload={consult.onReload}
+          onAdviceDismiss={consult.onAdviceDismiss}
+          onAdviceSubmitApply={consult.onAdviceSubmitApply}
+          onAdviceDismissApply={consult.onAdviceDismissApply}
+          onAdviceApplyNow={consult.onAdviceApplyNow}
+          onReviseApply={consult.onReviseApply}
+          onReviseDiscard={consult.onReviseDiscard}
+          onSentenceApplyAll={consult.onSentenceApplyAll}
+          onRetry={consult.onRetry}
+          adopted={consult.adopted}
+          selectable={consult.selectable}
+          classifications={consult.classifications}
+          onToggleAdopt={consult.onToggleAdopt}
+        />
+      ) : null}
 
       {/* #104/#136: 編集は全画面2ペインのワークスペース。position:fixed が祖先 transform に
           閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
