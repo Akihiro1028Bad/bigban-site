@@ -12,7 +12,6 @@ import { ConsultComposer } from "./consult/ConsultComposer";
 import { ConsultDrawer } from "./consult/ConsultDrawer";
 import { detailBadge } from "./detailBadge";
 import { DetailHeader } from "./DetailHeader";
-import { DetailPanel } from "./DetailPanel";
 import { DraftChecklist } from "./DraftChecklist";
 import { draftPlainText, draftQuality } from "./draftQuality";
 import { DraftReadyView } from "./DraftReadyView";
@@ -290,19 +289,28 @@ export function DetailPanelView({
     </>
   ) : null;
 
+  // #proto P3b 移行: 詳細パネル本体は新 DetailPanel(2段タブ)＋ApproveClient 結線へ移設済み。
+  // 本コンポーネント(旧 DetailPanelView)は未使用となり、Task 9 で物理削除する。移行途中の tsc を
+  // 通すため、旧 DetailPanel(外枠)呼び出しはインラインの等価レイアウトに置換している(挙動は据え置き)。
   return (
     <>
-      <DetailPanel
-        isIdea={isIdea}
-        title={item.title}
-        header={header}
-        insight={insight}
-        checklist={checklist}
-        draftPreview={draftPreview}
-        reviseSection={reviseSection}
-        decisionActions={decisionActions}
-        onClose={onClose}
-      />
+      <div
+        role={isIdea ? "region" : "dialog"}
+        aria-label={`詳細: ${item.title}`}
+        className="relative flex h-full w-full flex-col overflow-hidden"
+      >
+        <div className="shrink-0 border-b border-gray-200 bg-white px-4 pb-2">{header}</div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {insight}
+          {checklist}
+          {draftPreview}
+          {reviseSection}
+          <div className="mt-4 flex gap-2">{decisionActions}</div>
+          <button type="button" aria-label="閉じる" onClick={onClose} className="sr-only">
+            閉じる
+          </button>
+        </div>
+      </div>
       <ConsultDrawer
         open={consult.open}
         stage={consult.stage}

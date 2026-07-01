@@ -37,6 +37,18 @@ if (hasWindow) {
       return (this as HTMLElement).parentElement;
     },
   });
+
+  // jsdom には ResizeObserver が存在しないため no-op モックを定義する。
+  // DevicePreview 等がマウント時に生成し、未定義だと passive effect 内で
+  // ReferenceError を投げてテストワーカーが連鎖失敗するため、グローバルに補う。
+  if (!("ResizeObserver" in globalThis)) {
+    class ResizeObserverMock {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+  }
 }
 
 // 各テスト後に window.matchMedia をデフォルト実装にリセット
