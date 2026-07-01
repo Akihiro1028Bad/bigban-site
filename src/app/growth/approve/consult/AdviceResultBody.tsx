@@ -59,7 +59,7 @@ function renderFix(
 ) {
   const severityStyle = SEVERITY_STYLE[fix.severity] ?? SEVERITY_STYLE["低"];
   return (
-    <div
+    <li
       key={index}
       className="rounded-[10px] p-3"
       style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
@@ -117,7 +117,7 @@ function renderFix(
         <IconChart size={13} style={{ marginTop: 2, color: "var(--p-accent)" }} />
         {fix.suggestion}
       </p>
-    </div>
+    </li>
   );
 }
 
@@ -148,9 +148,9 @@ export function AdviceResultBody({
 
       {/* 観点別スコア(axis・score/5・note) */}
       {advice.scores.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2.5" aria-label="観点別スコア">
+        <ul className="m-0 grid list-none grid-cols-2 gap-2.5 p-0" aria-label="観点別スコア">
           {advice.scores.map((s, i) => (
-            <div
+            <li
               key={i}
               className="rounded-[10px] p-3"
               style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
@@ -178,9 +178,9 @@ export function AdviceResultBody({
                   {s.note}
                 </div>
               ) : null}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
 
       {/* 強み */}
@@ -211,7 +211,7 @@ export function AdviceResultBody({
           >
             <IconArrowDown size={14} /> 直すべき点
           </div>
-          <div className="flex flex-col gap-2.5">
+          <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
             {advice.fixes.map((fix, i) => {
               const c = classifications[i] as FixClassification | undefined;
               const applicable = c?.applicable ?? false;
@@ -228,7 +228,7 @@ export function AdviceResultBody({
                 onToggleAdopt
               );
             })}
-          </div>
+          </ul>
         </div>
       ) : null}
     </div>
