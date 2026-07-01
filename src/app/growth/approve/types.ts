@@ -28,6 +28,8 @@ export interface PendingItem {
   reviseRequestedAtMs?: number | null;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。
   contentId?: string;
+  // #H24/#proto P3a: 予約公開時刻(ms)。サーバ @/lib/growth/approve の PendingItem のミラー由来。未予約は null/未設定。
+  scheduledAtMs?: number | null;
   // #proto P2: アイキャッチ画像URL(Notion ミラー由来・盤データに既存)。カードのサムネ表示に使う。
   // 空/無=画像未生成→サムネはグラデーション/プレースホルダにフォールバック。
   eyecatchUrl?: string;

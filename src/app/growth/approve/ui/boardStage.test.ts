@@ -57,8 +57,17 @@ describe("deriveBoardStage", () => {
     expect(deriveBoardStage(pi({ id: "a5", kind: "idea", stage: "proposed" }))).toBe("outline_review");
     expect(deriveBoardStage(pi({ id: "a6", kind: "idea", stage: "queued" }))).toBe("outline_review");
   });
-  it("scheduled は返さない(縮約=drafted系は draft_review へ寄る)", () => {
-    // scheduledAtMs 未 surface のため scheduled 判定はしない。drafted は draft_review。
-    expect(deriveBoardStage(pi({ id: "a7", kind: "idea", stage: "drafted" }))).not.toBe("scheduled");
+  it("drafted かつ scheduledAtMs があれば scheduled", () => {
+    expect(deriveBoardStage(pi({ id: "s1", kind: "idea", stage: "drafted", scheduledAtMs: 1_000 }))).toBe("scheduled");
+  });
+  it("isDraftReady かつ scheduledAtMs があれば scheduled", () => {
+    expect(deriveBoardStage(pi({ id: "s2", kind: "idea", stage: "queued", isDraftReady: true, scheduledAtMs: 1_000 }))).toBe("scheduled");
+  });
+  it("scheduledAtMs が null/未設定なら draft_review 側に寄る", () => {
+    expect(deriveBoardStage(pi({ id: "s3", kind: "idea", stage: "drafted", scheduledAtMs: null }))).toBe("draft_review");
+    expect(deriveBoardStage(pi({ id: "s4", kind: "idea", stage: "drafted" }))).toBe("draft_review");
+  });
+  it("published は scheduledAtMs があっても published", () => {
+    expect(deriveBoardStage(pi({ id: "s5", kind: "idea", stage: "published", scheduledAtMs: 1_000 }))).toBe("published");
   });
 });
