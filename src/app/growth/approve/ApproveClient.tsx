@@ -39,7 +39,7 @@ import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PollStaleBanner } from "./PollStaleBanner";
 import { DetailPanelView } from "./DetailPanelView";
-import { EmptyGate, LoadErrorGate, LoadingGate } from "./GateScreens";
+import { EmptyGate, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -569,6 +569,13 @@ export function ApproveClient() {
   // #proto P1: 表示中 view(未確定時は施策を既定描画)。
   const activeView: ApproveView = view ?? "proposal";
 
+  // #proto P2: 検索絞り込みで active view が0件になったら SearchEmpty を出す
+  // (元データはあるのに検索で消えた状態を「該当なし」として明示する)。
+  const searchEmpty =
+    trimmedQuery !== "" &&
+    ((activeView === "proposal" && visibleProposals.length === 0 && proposals.length > 0) ||
+      (activeView === "approve" && visibleIdeas.length === 0 && ideas.length > 0));
+
   // #109/#proto P1: キーボード操作対象はアクティブ view のカードに限定。パレットは両ストリーム横断。
   const articleNavItems = articleColumns.flatMap((col) => col.items);
   // prompt/performance/queue view はカードを持たないのでキー操作対象は空。
@@ -787,7 +794,9 @@ export function ApproveClient() {
               </p>
             ) : null}
 
-            {activeView === "proposal" ? (
+            {searchEmpty ? (
+              <SearchEmpty query={query} />
+            ) : activeView === "proposal" ? (
               <>
                 <ProposalsView
                   proposals={visibleProposals}
