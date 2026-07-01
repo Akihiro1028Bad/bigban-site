@@ -20,6 +20,8 @@ import type {
 } from "@/lib/growth/consult";
 import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 
+import { IconWand, IconX } from "../ui/icons";
+
 import { AdviceResultBody } from "./AdviceResultBody";
 import { ReviseProposalBody } from "./ReviseProposalBody";
 import { SentenceFixBody } from "./SentenceFixBody";
@@ -95,16 +97,20 @@ function AdviceApplySection({
 
   if (selectable) {
     return (
-      <div className="mt-2 rounded-md border border-blue-100 bg-blue-50 p-2">
-        <p className="text-[11px] text-blue-800">
+      <div
+        className="mt-2 rounded-[10px] p-2.5"
+        style={{ background: "var(--p-accent-weak)", border: "1px solid var(--p-border)" }}
+      >
+        <p className="text-[11px]" style={{ color: "var(--p-accent-ink)" }}>
           文体・読みやすさ・構成の修正案は本文へ反映できます（採用→差分確認→反映）。
         </p>
-        <div className="mt-1 flex justify-end">
+        <div className="mt-1.5 flex justify-end">
           <button
             type="button"
             disabled={busy || adopted.size === 0}
             onClick={onSubmitApply}
-            className="rounded border border-blue-600 bg-blue-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="approve-btn-primary rounded-[8px] px-3 py-1 text-[11px] font-semibold"
+            style={{ background: "var(--p-accent)", color: "#0a0c10" }}
           >
             採用分を反映依頼（{adopted.size}）
           </button>
@@ -116,15 +122,18 @@ function AdviceApplySection({
   if (applyStatus === "依頼中" || applyStatus === "処理中") {
     return (
       <div
-        className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+        className="mt-2 flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 text-[11px]"
+        style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)" }}
         aria-busy="true"
       >
+        <IconWand size={13} className="approve-pulse" />
         <span>反映案を作成中です。数分後に再読み込みしてください。</span>
         <button
           type="button"
           disabled={busy}
           onClick={onReload}
-          className="rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="approve-btn-ghost ml-auto"
+          style={{ padding: "3px 8px" }}
         >
           再読み込み
         </button>
@@ -134,15 +143,18 @@ function AdviceApplySection({
 
   if (applyStatus === "提示中") {
     return (
-      <div className="mt-2 rounded-md border border-blue-200 bg-white p-2">
-        <h5 className="text-[11px] font-bold text-blue-700">反映案（元 → 新）</h5>
+      <div
+        className="mt-2 rounded-[10px] p-2.5"
+        style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+      >
+        <h5 className="text-[11px] font-bold" style={{ color: "var(--p-accent-ink)" }}>反映案（元 → 新）</h5>
         <ul className="mt-1 space-y-2">
           {proposal.map((item, i) => (
-            <li key={i} className="rounded border border-gray-200 p-1.5">
-              <p className="text-[10px] text-gray-400">元</p>
-              <p className="text-[11px] text-gray-500 line-through">{item.before}</p>
-              <p className="mt-1 text-[10px] text-gray-400">新</p>
-              <p className="text-[11px] text-gray-800">{item.after}</p>
+            <li key={i} className="rounded-[8px] p-1.5" style={{ border: "1px solid var(--p-border)" }}>
+              <p className="text-[10px]" style={{ color: "var(--p-text-3)" }}>元</p>
+              <p className="text-[11px] line-through" style={{ color: "var(--p-text-3)" }}>{item.before}</p>
+              <p className="mt-1 text-[10px]" style={{ color: "var(--p-text-3)" }}>新</p>
+              <p className="text-[11px]" style={{ color: "var(--p-text)" }}>{item.after}</p>
             </li>
           ))}
         </ul>
@@ -151,7 +163,8 @@ function AdviceApplySection({
             type="button"
             disabled={busy}
             onClick={onDismissApply}
-            className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="approve-btn-ghost"
+            style={{ padding: "3px 10px" }}
           >
             反映を閉じる
           </button>
@@ -159,7 +172,8 @@ function AdviceApplySection({
             type="button"
             disabled={busy}
             onClick={() => void onApplyNow()}
-            className="rounded border border-blue-600 bg-blue-600 px-3 py-0.5 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="approve-btn-primary rounded-[8px] px-3 py-1 text-[11px] font-semibold"
+            style={{ background: "var(--p-accent)", color: "#0a0c10" }}
           >
             本文に反映する
           </button>
@@ -170,13 +184,17 @@ function AdviceApplySection({
 
   if (applyStatus === "失敗") {
     return (
-      <div className="mt-2 rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-700">
+      <div
+        className="mt-2 flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 text-[11px]"
+        style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+      >
         <span>反映に失敗しました。{applyRaw ? `（${applyRaw}）` : ""}</span>
         <button
           type="button"
           disabled={busy}
           onClick={onDismissApply}
-          className="ml-2 rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="approve-btn-ghost ml-auto"
+          style={{ padding: "3px 8px" }}
         >
           反映を閉じる
         </button>
@@ -209,28 +227,32 @@ export function ConsultCard({
   return (
     <section
       aria-label={`AI相談: ${KIND_LABEL[view.kind]}`}
-      className="rounded-lg border border-gray-200 bg-gray-50 p-3.5"
+      className="rounded-[12px] p-3.5"
+      style={{ background: "var(--p-bg-elevated)", border: "1px solid var(--p-border)" }}
     >
       {/* ヘッダー: モードラベル */}
       <div className="mb-3 flex items-center gap-2">
-        <span className="rounded-full bg-gray-200 px-2 py-[2px] text-[11px] font-medium text-gray-700">
+        <span
+          className="rounded-full px-2 py-[2px] text-[11px] font-medium"
+          style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
+        >
           {KIND_LABEL[view.kind]}
         </span>
-        <span className="text-[11px] text-gray-500">{view.status}</span>
+        <span className="text-[11px]" style={{ color: "var(--p-text-3)" }}>{view.status}</span>
       </div>
 
       {/* 待ち (requested / processing) */}
       {(view.status === "requested" || view.status === "processing") && (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-[12.5px] text-purple-600" aria-busy="true">
-            <span className="animate-pulse">●</span>
+          <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--p-purple)" }} aria-busy="true">
+            <IconWand size={15} className="approve-pulse" />
             <span>AIが処理中です。数分後に再読み込みしてください。</span>
           </div>
           {/* スケルトン */}
           {[88, 72, 94, 60].map((w, i) => (
             <div
               key={i}
-              className="h-[13px] animate-pulse rounded-[5px] bg-gray-200"
+              className="approve-shimmer h-[13px] rounded-[5px]"
               style={{ width: `${w}%` }}
             />
           ))}
@@ -239,7 +261,8 @@ export function ConsultCard({
               type="button"
               disabled={busy}
               onClick={onReload}
-              className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="approve-btn-ghost"
+              style={{ padding: "3px 10px" }}
             >
               再読み込み
             </button>
@@ -249,11 +272,14 @@ export function ConsultCard({
 
       {/* 失敗 */}
       {view.status === "failed" && (
-        <div className="flex flex-col items-start gap-3 rounded-[12px] border border-red-200 bg-red-50 p-4">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-red-600">
-            <span aria-hidden="true">✕</span> 生成に失敗しました
+        <div
+          className="flex flex-col items-start gap-3 rounded-[12px] p-4"
+          style={{ background: "var(--p-red-weak)", border: "1px solid rgba(248,113,113,0.25)" }}
+        >
+          <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: "var(--p-red)" }}>
+            <IconX size={15} /> 生成に失敗しました
           </div>
-          <div className="text-[12.5px] text-gray-600">
+          <div className="text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
             {/* overall/sentence は raw、revise は outlineProposal に失敗理由が入る */}
             {view.kind === "revise"
               ? (view.outlineProposal || "外部処理が応答しませんでした。")
@@ -265,9 +291,10 @@ export function ConsultCard({
             type="button"
             disabled={busy}
             onClick={onRetry}
-            className="flex items-center gap-1.5 rounded-[9px] border border-blue-600 bg-blue-600 px-3 py-2 text-[12.5px] font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+            className="approve-btn-primary flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12.5px] font-semibold"
+            style={{ background: "var(--p-accent)", color: "#0a0c10" }}
           >
-            再依頼する
+            <IconWand size={14} /> 再依頼する
           </button>
         </div>
       )}
@@ -284,7 +311,7 @@ export function ConsultCard({
               onToggleAdopt={onToggleAdopt}
             />
           ) : (
-            <p className="text-xs text-gray-600">
+            <p className="text-xs" style={{ color: "var(--p-text-2)" }}>
               アドバイスを解釈できませんでした。もう一度依頼してください。
             </p>
           )}
@@ -303,7 +330,8 @@ export function ConsultCard({
               type="button"
               disabled={busy}
               onClick={onAdviceDismiss}
-              className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="approve-btn-ghost"
+              style={{ padding: "3px 10px" }}
             >
               閉じる
             </button>
