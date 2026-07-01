@@ -67,6 +67,19 @@ function renderCard({ item, props }: Overrides = {}) {
   return { ...handlers, item: merged };
 }
 
+describe("BoardCard アイキャッチ(#proto P2 結線修正)", () => {
+  it("eyecatchUrl があれば実画像を表示する(グラデーションにフォールバックしない)", () => {
+    renderCard({ item: { contentId: "c1", eyecatchUrl: "https://example.com/eye.png" } });
+    const img = document.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toContain("eye.png");
+  });
+  it("eyecatchUrl が無ければ実画像は出さない(グラデーション/プレースホルダ)", () => {
+    renderCard({ item: { contentId: "c1" } });
+    expect(document.querySelector("img")).toBeNull();
+  });
+});
+
 describe("BoardCard 操作ロジック(不変)", () => {
   it("未決定カードは承認/却下ボタンを出し click でハンドラを呼ぶ", async () => {
     const { onApprove, onReject } = renderCard();
