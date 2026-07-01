@@ -142,7 +142,8 @@ function expectAwaitingCount(n: number): void {
 // AI修正(構成案/タイトル)・アドバイス・文章相談はドロワー内に集約されたため、
 // それらの検証は詳細ダイアログではなくドロワー内で行う。
 async function openConsultDrawer(detailDialog: HTMLElement): Promise<HTMLElement> {
-  await userEvent.click(within(detailDialog).getByRole("button", { name: "AIに相談" }));
+  // 新 DetailPanel の「AIに相談」フッターボタンは Kbd "R" ラベルを内包するため部分一致で拾う。
+  await userEvent.click(within(detailDialog).getByRole("button", { name: /AIに相談/ }));
   return screen.findByRole("dialog", { name: "AIに相談" });
 }
 
@@ -947,15 +948,16 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     expect(screen.getByRole("button", { name: "詳細: 市川ページ" })).toBeInTheDocument();
   });
 
-  it("詳細ボタンでパネルを開き、閉じるボタンで閉じる", async () => {
+  it("詳細ボタンでパネルを開き、モバイルの『一覧』で閉じる", async () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("市川ページ")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+    expect(within(dialog).getByRole("heading", { name: "市川ページ" })).toBeInTheDocument();
+    // 新 DetailPanel は独立した「閉じる」ボタンを持たず、モバイル用の戻る(記事一覧へ戻る)で選択解除する。
+    await userEvent.click(within(dialog).getByRole("button", { name: "記事一覧へ戻る" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -981,7 +983,7 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     await showAll();
     await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "承認" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /^承認/ }));
 
     expect(await screen.findByText("承認しました")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -1009,27 +1011,8 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     });
   });
 
-  it("処理済みの詳細パネルから承認待ちへ戻せる", async () => {
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [proposalItem()] } },
-      { json: { success: true, updated: 1 } },
-      { json: { success: true, updated: 1 } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await screen.findByText("市川ページ");
-    await showAll();
-    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
-    await screen.findByText("承認しました");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 市川ページ" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "承認待ちに戻す" }));
-
-    expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
-    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
-      decisions: [{ id: "p1", decision: "未処理" }],
-    });
-  });
+  // REMOVE(#proto P3b・proto厳密): back-to-pending(処理済み→承認待ち)は decided 表示(バッジのみ)に
+  // 反するため撤去。undoFromPanel ハンドラも useApproveDecisions から削除済み。
 
   it("詳細パネルから『準備中』の下書き生成・AI壁打ちプレースホルダを削除した(#124)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
@@ -1067,9 +1050,12 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    expect(within(dialog).getByText("記事の仮説")).toBeInTheDocument();
+    // #proto P3b: 仮説は構成案タブ(OutlineView)の「この記事の狙い（仮説）」カードに出す。
+    await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
+    expect(within(dialog).getByText("この記事の狙い（仮説）")).toBeInTheDocument();
     expect(within(dialog).getByText("本八幡近隣の初心者")).toBeInTheDocument();
-    expect(within(dialog).getByText("予約")).toBeInTheDocument();
+    // 想定CTA は " / " 連結で表示する(予約 / LINE)。
+    expect(within(dialog).getByText("予約 / LINE")).toBeInTheDocument();
   });
 
   it("施策の詳細パネルにも準備中プレースホルダは無い(#124)", async () => {
@@ -1158,20 +1144,9 @@ describe("ApproveClient 下書きタブ(#87)", () => {
     expect(screen.getByRole("button", { name: "詳細: 下書き記事" })).toBeInTheDocument();
   });
 
-  it("下書きの詳細パネルには承認/却下を出さない", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [draftIdea()] } },
-      { json: { success: true, exists: false } }
-    );
-    render(<ApproveClient />);
-    await login();
-    await selectView(/記事/);
-    await screen.findByText("下書き記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 下書き記事" }));
-    const dialog = await screen.findByRole("region", { name: "詳細: 下書き記事" });
-    expect(within(dialog).queryByRole("button", { name: "承認" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "却下" })).not.toBeInTheDocument();
-  });
+  // REMOVE(#proto P3b・proto厳密): 旧仕様「下書きの詳細パネルには承認/却下を出さない」は無効化。
+  // 新 DetailPanel は draft_review でも proto 準拠で承認(承認して公開予約)/却下を出す。
+  // 新挙動は DetailPanel.test.tsx と移設した #128/#275 でカバーする。
 });
 
 describe("ApproveClient 構成案修正(#42/#53)", () => {
@@ -1237,6 +1212,8 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       },
     });
     const dialog = await openIdeaPanel();
+    // #proto P3b: 構成案の見出し＋1行説明は詳細パネルの構成案タブ(OutlineView)で表示する。
+    await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
     expect(within(dialog).getByText("市川でできる場所は3つ")).toBeInTheDocument();
     expect(within(dialog).getByText("屋外/体育館/屋内専用を整理")).toBeInTheDocument();
   });
@@ -1372,19 +1349,21 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       { json: { success: true, items: [ideaItem({ outline: "## A改\n新説明\n\n## B\n別説明" })] } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
-    const heading = within(dialog).getByLabelText("見出しを編集: A");
+    // #proto P3b: 手動編集は AI相談ドロワー(構成案を直す)の ConsultComposer に集約された。
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "セクションを編集: A" }));
+    const heading = within(drawer).getByLabelText("見出しを編集: A");
     await userEvent.clear(heading);
     await userEvent.type(heading, "A改");
-    const desc = within(dialog).getByLabelText("説明を編集: A");
+    const desc = within(drawer).getByLabelText("説明を編集: A");
     await userEvent.clear(desc);
     await userEvent.type(desc, "新説明");
-    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "この行を保存" }));
 
-    expect(await within(dialog).findByText("A改")).toBeInTheDocument();
-    expect(within(dialog).getByText("新説明")).toBeInTheDocument();
+    expect(await within(drawer).findByText("A改")).toBeInTheDocument();
+    expect(within(drawer).getByText("新説明")).toBeInTheDocument();
     // 他セクション(B)は保持される
-    expect(within(dialog).getByText("B")).toBeInTheDocument();
+    expect(within(drawer).getByText("B")).toBeInTheDocument();
     const post = fn.mock.calls[1];
     expect(post[0]).toBe("/api/growth/revise/edit");
     expect(JSON.parse(post[1].body)).toEqual({
@@ -1398,10 +1377,11 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       json: { success: true, items: [ideaItem({ outline: "## A" })] },
     });
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
-    await userEvent.clear(within(dialog).getByLabelText("見出しを編集: A"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
-    expect(await within(dialog).findByText(/見出しは空にできません/)).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.clear(within(drawer).getByLabelText("見出しを編集: A"));
+    await userEvent.click(within(drawer).getByRole("button", { name: "この行を保存" }));
+    expect(await within(drawer).findByText(/見出しは空にできません/)).toBeInTheDocument();
     expect(fn).toHaveBeenCalledTimes(1); // login のみ・POST なし
   });
 
@@ -1411,9 +1391,10 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       { ok: false, status: 409, json: { success: false, error: "x" } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
-    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "この行を保存" }));
+    expect(await within(drawer).findByText(/AI修正処理中/)).toBeInTheDocument();
   });
 
   it("手動保存の失敗(error付き/なし)を表示する(#54)", async () => {
@@ -1423,92 +1404,43 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       { json: { success: false } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
-    expect(await within(dialog).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "セクションを編集: A" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "この行を保存" }));
+    expect(await within(drawer).findByText("保存中にエラーが発生しました")).toBeInTheDocument();
     // 2回目: error なし → 既定メッセージ
-    await userEvent.click(within(dialog).getByRole("button", { name: "この行を保存" }));
-    expect(await within(dialog).findByText("保存に失敗しました。")).toBeInTheDocument();
+    await userEvent.click(within(drawer).getByRole("button", { name: "この行を保存" }));
+    expect(await within(drawer).findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
   it("手動編集をキャンセルできる(#54)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "セクションを編集: A" }));
-    expect(within(dialog).getByLabelText("見出しを編集: A")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
-    expect(within(dialog).queryByLabelText("見出しを編集: A")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("A")).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "セクションを編集: A" }));
+    expect(within(drawer).getByLabelText("見出しを編集: A")).toBeInTheDocument();
+    await userEvent.click(within(drawer).getByRole("button", { name: "キャンセル" }));
+    expect(within(drawer).queryByLabelText("見出しを編集: A")).not.toBeInTheDocument();
+    expect(within(drawer).getByText("A")).toBeInTheDocument();
   });
 
-  it("構成案が無い記事では修正セクションを出さない", async () => {
+  it("構成案が無い記事では相談ドロワーに修正セクションを出さない", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const dialog = await openIdeaPanel();
+    const drawer = await openConsultDrawer(dialog);
+    // 構成案を直すタブへ切り替えても、構成案が無ければ修正依頼ボタンは出ない。
+    await selectConsultTab(drawer, "構成案を直す");
     expect(
-      within(dialog).queryByRole("button", { name: /修正を依頼/ })
+      within(drawer).queryByRole("button", { name: /修正を依頼/ })
     ).not.toBeInTheDocument();
   });
 
-  // #139 A: 記事タイトルの直接編集。
-  it("タイトルを直接編集して保存できる(#139 A)", async () => {
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
-      { json: { success: true } }, // POST /revise/edit
-      { json: { success: true, items: [ideaItem({ outline: "## A", title: "新タイトル" })] } }
-    );
-    const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
-    const input = within(dialog).getByLabelText("タイトルを編集");
-    await userEvent.clear(input);
-    await userEvent.type(input, "新タイトル");
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
+  // #139 A: 記事タイトルの直接編集(相談ドロワーの構成案を直すタブ内)。
+  // #proto P3b(Task 9): タイトルの直接編集(#139 A)は proto 到達 UI に無い(ReviseSection/TitleEditor は
+  // 未使用となり撤去)。独断で復活実装しない方針のため、当該テスト群を削除した。
+  // ※タイトルの AI 修正(#139 B・titleInstruction)は相談ドロワーに残存・維持。
 
-    // 反映: ヘッダー・タイトル行とも新タイトルに更新され、編集フォームは閉じる。
-    expect((await within(dialog).findAllByText("新タイトル")).length).toBeGreaterThan(0);
-    expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
-    const post = fn.mock.calls[1];
-    expect(post[0]).toBe("/api/growth/revise/edit");
-    expect(JSON.parse(post[1].body)).toEqual({ pageId: "i1", title: "新タイトル" });
-  });
-
-  it("タイトルを空にすると保存できない(#139 A)", async () => {
-    const fn = mockFetchSequence({
-      json: { success: true, items: [ideaItem({ outline: "## A" })] },
-    });
-    const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
-    await userEvent.clear(within(dialog).getByLabelText("タイトルを編集"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
-    expect(await within(dialog).findByText(/タイトルは空にできません/)).toBeInTheDocument();
-    expect(fn).toHaveBeenCalledTimes(1); // login のみ・POST なし
-  });
-
-  it("タイトル編集をキャンセルできる(#139 A)", async () => {
-    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
-    const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
-    expect(within(dialog).getByLabelText("タイトルを編集")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトル編集をキャンセル" }));
-    expect(within(dialog).queryByLabelText("タイトルを編集")).not.toBeInTheDocument();
-  });
-
-  it("タイトル保存が失敗(AI修正処理中=409)なら編集フォームを保持する(#139 A)", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ outline: "## A" })] } },
-      { ok: false, status: 409, json: { success: false, error: "x" } }
-    );
-    const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
-    const input = within(dialog).getByLabelText("タイトルを編集");
-    await userEvent.clear(input);
-    await userEvent.type(input, "新T");
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを保存" }));
-    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
-    // false 分岐: 保存失敗時は編集フォームを閉じない。
-    expect(within(dialog).getByLabelText("タイトルを編集")).toBeInTheDocument();
-  });
-
-  // #61: 画像指示エディタ(スタイル選択＋説明・チップ・追加/編集/削除)。
+  // #61: 画像指示エディタ(スタイル選択＋説明・チップ・追加/編集/削除)。相談ドロワー内。
   it("構成案の画像指示をスタイルバッジ＋説明のチップで表示する", async () => {
     mockFetchSequence({
       json: {
@@ -1517,11 +1449,12 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       },
     });
     const dialog = await openIdeaPanel();
-    expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
-    expect(within(dialog).getByText("コート図")).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    expect(within(drawer).getByText("詳しい図解")).toBeInTheDocument();
+    expect(within(drawer).getByText("コート図")).toBeInTheDocument();
     // 1枚あるので ＋画像 ボタンは「1 / 3」を表示
     expect(
-      within(dialog).getByRole("button", { name: "画像を追加: A" })
+      within(drawer).getByRole("button", { name: "画像を追加: A" })
     ).toHaveTextContent("1 / 3");
   });
 
@@ -1539,13 +1472,14 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
-    await userEvent.selectOptions(within(dialog).getByLabelText("スタイル"), "diagram");
-    await userEvent.type(within(dialog).getByLabelText("画像の説明: A"), "コート図");
-    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.selectOptions(within(drawer).getByLabelText("スタイル"), "diagram");
+    await userEvent.type(within(drawer).getByLabelText("画像の説明: A"), "コート図");
+    await userEvent.click(within(drawer).getByRole("button", { name: "追加" }));
 
-    expect(await within(dialog).findByText("コート図")).toBeInTheDocument();
-    expect(within(dialog).getByText("詳しい図解")).toBeInTheDocument();
+    expect(await within(drawer).findByText("コート図")).toBeInTheDocument();
+    expect(within(drawer).getByText("詳しい図解")).toBeInTheDocument();
     const post = fn.mock.calls[1];
     expect(post[0]).toBe("/api/growth/revise/edit");
     // 追加したセクション(A)だけにトークンが入り、他セクション(B)は保持される
@@ -1572,13 +1506,14 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を編集: A 1" }));
-    const desc = within(dialog).getByLabelText("画像の説明: A");
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を編集: A 1" }));
+    const desc = within(drawer).getByLabelText("画像の説明: A");
     await userEvent.clear(desc);
     await userEvent.type(desc, "新1");
-    await userEvent.click(within(dialog).getByRole("button", { name: "更新" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "更新" }));
 
-    expect(await within(dialog).findByText("新1")).toBeInTheDocument();
+    expect(await within(drawer).findByText("新1")).toBeInTheDocument();
     // 2枚目(旧2)は保持される
     expect(JSON.parse(fn.mock.calls[1][1].body).outline).toBe(
       "## A\n[画像:ミニマル図解: 新1]\n[画像:詳しい図解: 旧2]"
@@ -1597,11 +1532,12 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       { json: { success: true, items: [ideaItem({ outline: "## A\n\n## B\n別" })] } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を削除: A 1" }));
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を削除: A 1" }));
 
     // 反映後はチップが消える
-    await within(dialog).findByRole("button", { name: "画像を追加: A" });
-    expect(within(dialog).queryByText("図")).not.toBeInTheDocument();
+    await within(drawer).findByRole("button", { name: "画像を追加: A" });
+    expect(within(drawer).queryByText("図")).not.toBeInTheDocument();
     expect(JSON.parse(fn.mock.calls[1][1].body).outline).toBe("## A\n\n## B\n別");
   });
 
@@ -1610,9 +1546,10 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       json: { success: true, items: [ideaItem({ outline: "## A" })] },
     });
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
-    expect(await within(dialog).findByText(/画像の説明を入力してください/)).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "追加" }));
+    expect(await within(drawer).findByText(/画像の説明を入力してください/)).toBeInTheDocument();
     expect(fn).toHaveBeenCalledTimes(1); // login のみ
   });
 
@@ -1629,7 +1566,8 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       },
     });
     const dialog = await openIdeaPanel();
-    const addBtn = within(dialog).getByRole("button", { name: "画像を追加: A" });
+    const drawer = await openConsultDrawer(dialog);
+    const addBtn = within(drawer).getByRole("button", { name: "画像を追加: A" });
     expect(addBtn).toHaveTextContent("3 / 3");
     expect(addBtn).toBeDisabled();
   });
@@ -1640,21 +1578,23 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
       { ok: false, status: 409, json: { success: false, error: "x" } }
     );
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
-    await userEvent.type(within(dialog).getByLabelText("画像の説明: A"), "図");
-    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
-    expect(await within(dialog).findByText(/AI修正処理中/)).toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を追加: A" }));
+    await userEvent.type(within(drawer).getByLabelText("画像の説明: A"), "図");
+    await userEvent.click(within(drawer).getByRole("button", { name: "追加" }));
+    expect(await within(drawer).findByText(/AI修正処理中/)).toBeInTheDocument();
     // 失敗時はフォームを閉じない(入力をやり直せる)
-    expect(within(dialog).getByLabelText("画像の説明: A")).toBeInTheDocument();
+    expect(within(drawer).getByLabelText("画像の説明: A")).toBeInTheDocument();
   });
 
   it("画像追加フォームをキャンセルできる", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
     const dialog = await openIdeaPanel();
-    await userEvent.click(within(dialog).getByRole("button", { name: "画像を追加: A" }));
-    expect(within(dialog).getByLabelText("画像の説明: A")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
-    expect(within(dialog).queryByLabelText("画像の説明: A")).not.toBeInTheDocument();
+    const drawer = await openConsultDrawer(dialog);
+    await userEvent.click(within(drawer).getByRole("button", { name: "画像を追加: A" }));
+    expect(within(drawer).getByLabelText("画像の説明: A")).toBeInTheDocument();
+    await userEvent.click(within(drawer).getByRole("button", { name: "キャンセル" }));
+    expect(within(drawer).queryByLabelText("画像の説明: A")).not.toBeInTheDocument();
   });
 });
 
@@ -1816,10 +1756,10 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     await screen.findByText("猛暑記事");
     // 一覧の承認ボタンが無効
     expect(screen.getByRole("button", { name: "承認: 猛暑記事" })).toBeDisabled();
-    // パネルでも無効
+    // パネルでも無効(段階により承認ラベルは「構成案を承認」等になるため部分一致で拾う)。
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    expect(within(dialog).getByRole("button", { name: "承認" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: /承認/ })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "却下" })).toBeDisabled();
   });
 
@@ -1840,8 +1780,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
       await screen.findByText("猛暑記事");
       await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-      await userEvent.click(within(dialog).getByRole("button", { name: "AIに相談" }));
-      const drawer = await screen.findByRole("dialog", { name: "AIに相談" });
+      const drawer = await openConsultDrawer(dialog);
       await vi.advanceTimersByTimeAsync(5100);
       expect(await within(drawer).findByText("## A 改")).toBeInTheDocument();
     } finally {
@@ -2010,7 +1949,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     );
     const dialog = await openIdeaPanel();
     // #100: 本文は iframe(本番テーマ)内で描画されるため、観測点 data-preview-html を検証する。
-    const frame = await within(dialog).findByTitle("本番プレビュー");
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>下書き本文です</p>");
     // 取得APIに pageId+token 付きで GET している
     expect(String(fn.mock.calls[1][0])).toContain("/api/growth/draft?pageId=i1");
@@ -2042,6 +1981,29 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
   });
 
+  it("『この文』相談モードでは詳細パネル本体に本文注釈UIを出し、依頼で再取得する(#182 パネル slot)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      draftReady("<p>一文目です。</p>"),
+      { json: { success: true } }, // POST /api/growth/body-comment
+      draftReady("<p>一文目です。</p>"), // onChanged 後の再取得
+    );
+    const dialog = await openIdeaPanel();
+    const drawer = await openConsultDrawer(dialog);
+    // この文モードに切替えると、詳細パネル本体(region)が InlineCommentReview に差し替わる。
+    await selectConsultTab(drawer, "この文を直す");
+    const inline = await within(dialog).findByRole("region", { name: "本文インラインコメント" });
+    await userEvent.click(within(inline).getByRole("button", { name: "1行目にコメント" }));
+    await userEvent.type(within(inline).getByLabelText("1行目へのコメント入力"), "やわらかく");
+    await userEvent.click(within(inline).getByRole("button", { name: "コメント" }));
+    await userEvent.click(within(inline).getByRole("button", { name: /AIに指摘を依頼/ }));
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/body-comment"))).toBe(true),
+    );
+    // onChanged → 下書き再取得(GET)まで到達する。
+    await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
+  });
+
   it("bodyHtml が空でも body にフォールバックしてプレビューへ渡す(#100)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
@@ -2054,7 +2016,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
       }
     );
     const dialog = await openIdeaPanel();
-    const frame = await within(dialog).findByTitle("本番プレビュー");
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>リッチ本文</p>");
   });
 
@@ -2083,7 +2045,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     const dialog = await openIdeaPanel();
     expect(await within(dialog).findByText("下書きの取得に失敗しました")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "再読み込み" }));
-    const frame = await within(dialog).findByTitle("本番プレビュー");
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>復活しました</p>");
   });
 
@@ -2216,7 +2178,7 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
     // 保存後に再取得したプレビュー(iframe)が出る
-    const frame = await within(dialog).findByTitle("本番プレビュー");
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>保存後の本文</p>");
     // 編集モード(ワークスペース)は閉じる
     expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
@@ -2875,7 +2837,7 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
     );
-    const frame = await screen.findByTitle("本番プレビュー");
+    const frame = await screen.findByTitle("公開後プレビュー");
     expect(frame).toHaveAttribute("data-preview-html", "<p>保存後</p>");
   });
 
@@ -3094,7 +3056,7 @@ describe("ApproveClient カードのタイトル視認性(#119 follow-up)", () =
 });
 
 describe("ApproveClient 詳細パネルのレイアウト(#127)", () => {
-  it("記事の詳細は右ペイン内に収まる(親を満たす region・fixed 全画面/背景オーバーレイ無し)＋プレビューは中央ゾーン追従", async () => {
+  it("記事の詳細は右ペイン内に収まる(親を満たす region・fixed 全画面/背景オーバーレイ無し)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
@@ -3102,7 +3064,6 @@ describe("ApproveClient 詳細パネルのレイアウト(#127)", () => {
     const pane = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // #proto P3a: 2ペインの常設パネル。親(右ペイン)を満たし、全画面モーダル(fixed/vw/vh)は無し。
     expect(pane).toHaveClass("h-full");
-    expect(pane).toHaveClass("w-full");
     expect(pane).not.toHaveClass("fixed");
     expect(pane).not.toHaveClass("w-[95vw]");
     expect(pane).not.toHaveClass("h-[94vh]");
@@ -3110,9 +3071,8 @@ describe("ApproveClient 詳細パネルのレイアウト(#127)", () => {
     expect(pane).not.toHaveAttribute("aria-modal");
     // 背景オーバーレイ(閉じるボタン)は廃止(閉じるはモバイルの「← 一覧」が担う)。
     expect(screen.queryByRole("button", { name: "オーバーレイを閉じる" })).not.toBeInTheDocument();
-    // 本番プレビューは中央ゾーン(sticky 追従)に配置される。
-    const preview = within(pane).getByRole("region", { name: "下書きプレビュー" });
-    expect(preview.parentElement).toHaveClass("lg:sticky");
+    // #proto P3b: プレビューはタブ(preview)内に描画される(中央ゾーン sticky 追従は proto 再設計で廃止)。
+    expect(within(pane).getByRole("tab", { name: /プレビュー/ })).toBeInTheDocument();
   });
 
   it("施策の詳細はモーダル化せずコンパクトな右ドロワーのまま", async () => {
@@ -3150,7 +3110,7 @@ describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "承認" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /承認/ }));
     // パネルは閉じるので、盤側の段階前進は別テスト。ここではヘッダーの楽観反映を
     // 開き直して確認する。
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
@@ -3177,105 +3137,12 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
-  it("「なぜこの記事か」カードに根拠(subtitle)を出す", async () => {
-    mockFetchSequence({ json: { success: true, items: [ideaItem({ subtitle: "SEO機会あり" })] } });
-    render(<ApproveClient />);
-    await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
-    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    expect(within(dialog).getByText("なぜこの記事か")).toBeInTheDocument();
-    expect(within(dialog).getByText("SEO機会あり")).toBeInTheDocument();
-  });
-
-  it("本文コピーでクリップボードに body を書き込む", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    const dialog = await openIdeaWithDraft("コピー対象の本文");
-    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
-    expect(writeText).toHaveBeenCalledWith("コピー対象の本文");
-    // M8: 成功トーストを出す(沈黙させない)。
-    expect(await screen.findByText("本文をコピーしました。")).toBeInTheDocument();
-  });
-
-  it("コピーが拒否(reject)されても握り込んで壊れない", async () => {
-    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    const dialog = await openIdeaWithDraft("本文");
-    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
-    expect(dialog).toBeInTheDocument();
-    expect(await screen.findByText("コピーに失敗しました。")).toBeInTheDocument();
-  });
-
-  it("クリップボード非対応でもコピーで壊れない", async () => {
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-    const dialog = await openIdeaWithDraft("本文");
-    await userEvent.click(await within(dialog).findByRole("button", { name: "本文をコピー" }));
-    // 例外で落ちずパネルは開いたまま。
-    expect(dialog).toBeInTheDocument();
-    expect(await screen.findByText("このブラウザではコピーできません。")).toBeInTheDocument();
-  });
-
-  it("下書きプレビューにアイキャッチ差し替え導線(#143)を出す", async () => {
-    const dialog = await openIdeaWithDraft("本文");
-    expect(
-      await within(dialog).findByRole("button", { name: "アイキャッチを差し替え" }),
-    ).toBeInTheDocument();
-  });
-
-  it("差し替え→反映で下書きを再取得する(#143 結線)", async () => {
-    const asset = "https://images.microcms-assets.io/a/1.png";
-    const draft = { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" };
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
-      { json: { success: true, exists: true, draft } },
-      { json: { success: true, media: [{ url: asset }] } }, // メディア一覧
-      { json: { success: true } }, // eyecatch 差し替え
-      { json: { success: true, exists: true, draft: { ...draft, eyecatch: asset } } }, // 再取得
-    );
-    render(<ApproveClient />);
-    await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
-    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-
-    await userEvent.click(await within(dialog).findByRole("button", { name: "アイキャッチを差し替え" }));
-    await userEvent.click(await within(dialog).findByRole("button", { name: "アイキャッチに設定 1" }));
-
-    // onReplaced → loadDraft 再取得(/api/growth/draft? が2回呼ばれる)
-    await waitFor(() => {
-      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
-      expect(draftCalls.length).toBe(2);
-    });
-  });
-
-  it("本文画像があれば差し替えパネルを出し、保存で下書きを再取得する(#145 結線)", async () => {
-    const img = "https://images.microcms-assets.io/a/1.png";
-    const media = "https://images.microcms-assets.io/c/new.png";
-    const draft = {
-      title: "T",
-      displayMode: "html",
-      bodyHtml: `<figure><img src="${img}" alt="図1"></figure>`,
-      body: "x",
-    };
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
-      { json: { success: true, exists: true, draft } },
-      { json: { success: true, media: [{ url: media }] } }, // メディア一覧
-      { json: { success: true } }, // draft/edit 保存
-      { json: { success: true, exists: true, draft } }, // 再取得
-    );
-    render(<ApproveClient />);
-    await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
-    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-
-    await userEvent.click(await within(dialog).findByRole("button", { name: "本文画像1を差し替え" }));
-    await userEvent.click(await within(dialog).findByRole("button", { name: "この画像に差し替え 1" }));
-
-    await waitFor(() => {
-      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
-      expect(draftCalls.length).toBe(2);
-    });
-  });
+  // #proto P3b(Task 9): 撤去に伴い当該テストを削除。
+  // - 「なぜこの記事か」カード(subtitle callout)は proto 到達 UI に無い。
+  // - 「本文をコピー」(#127, ×3)は proto 到達 UI に無い。
+  // - アイキャッチ/本文画像 差し替え導線(#143/#145)は proto 到達 UI に無い(公開キュー/メディアピッカーへ)。
+  // - 「装飾を提案」(#147)は proto 到達 UI に無い。
+  // ※アイキャッチ/本文画像の AI 再生成(#144/#156)・アドバイス(#146)は維持。
 
   it("スタイリング・アドバイスを依頼すると下書きを再取得する(#146 結線)", async () => {
     const draft = { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" };
@@ -3302,28 +3169,6 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/advise"))).toBe(true);
   });
 
-  it("装飾を提案すると下書きを再取得する(#147 結線)", async () => {
-    const draft = { title: "T", displayMode: "html", bodyHtml: "<p>本文</p>", body: "x" };
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
-      { json: { success: true, exists: true, draft } },
-      { json: { success: true } }, // decorate 依頼
-      { json: { success: true, exists: true, draft } }, // 再取得
-    );
-    render(<ApproveClient />);
-    await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
-    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-
-    await userEvent.click(await within(dialog).findByRole("button", { name: "装飾を提案" }));
-
-    await waitFor(() => {
-      const draftCalls = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?"));
-      expect(draftCalls.length).toBe(2);
-    });
-    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/decorate"))).toBe(true);
-  });
-
   it("Esc で詳細パネルを閉じる", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
@@ -3345,7 +3190,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     expect(screen.getByRole("region", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 
-  it("入力欄(タイトル編集)にフォーカス中の Esc では閉じない", async () => {
+  it("入力欄(構成案コメント)にフォーカス中の Esc では閉じない", async () => {
     mockFetchSequence({
       json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] },
     });
@@ -3353,9 +3198,10 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    // タイトル直接編集の入力欄(詳細パネルに残る手動編集)を開く。
-    await userEvent.click(within(dialog).getByRole("button", { name: "タイトルを編集: 猛暑記事" }));
-    const input = within(dialog).getByLabelText("タイトルを編集");
+    // #proto P3b: 構成案タブのセクション行コメント入力欄を開く(詳細パネルに残る入力)。
+    await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /コメント/ }));
+    const input = within(dialog).getByPlaceholderText("このセクションへの指示…");
     // input にフォーカスがある状態の Esc はパネルを閉じない(入力中断のみ)。
     fireEvent.keyDown(input, { key: "Escape" });
     expect(screen.getByRole("region", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
@@ -3384,7 +3230,9 @@ describe("ApproveClient 公開前チェックリスト(#128)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     const checklist = await within(dialog).findByRole("region", { name: "公開前チェック" });
-    expect(within(checklist).getByText("文字数")).toBeInTheDocument();
+    // #proto P3b: チェック項目はサマリー行のクリックで展開する。展開して各項目を検証する。
+    await userEvent.click(within(checklist).getByText("公開前チェック"));
+    expect(await within(checklist).findByText("文字数")).toBeInTheDocument();
     expect(within(checklist).getByText("見出し")).toBeInTheDocument();
     expect(within(checklist).getByText("画像")).toBeInTheDocument();
   });
@@ -3417,22 +3265,28 @@ describe("ApproveClient プレビューPC/モバイル切替(#129)", () => {
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
-  it("モバイルに切替えるとプレビュー枠が〜390pxに、PCで全幅に戻る", async () => {
+  it("端末(スマホ/タブレット/PC)を切替えるとプレビュー端末が変わる(#proto DevicePreview)", async () => {
     const dialog = await openReadyPreview();
-    const group = await within(dialog).findByRole("group", { name: "プレビュー幅" });
-    // 既定は PC(全幅)。
-    const frame = within(dialog).getByTitle("本番プレビュー").parentElement as HTMLElement;
-    expect(frame).not.toHaveClass("max-w-[390px]");
-    // モバイルへ。
-    await userEvent.click(within(group).getByRole("button", { name: "モバイル" }));
-    expect(frame).toHaveClass("max-w-[390px]");
-    expect(within(group).getByRole("button", { name: "モバイル" })).toHaveAttribute(
-      "aria-pressed",
+    // #proto P3b: プレビュー枠は DevicePreview の端末切替(tablist)で真のビューポート幅を切替える。
+    const tablist = await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
+    // 既定はスマホ(mobile)。
+    expect(within(tablist).getByRole("tab", { name: /スマホ/ })).toHaveAttribute(
+      "aria-selected",
       "true",
     );
-    // PC へ戻す。
-    await userEvent.click(within(group).getByRole("button", { name: "PC" }));
-    expect(frame).not.toHaveClass("max-w-[390px]");
+    // PC へ。
+    await userEvent.click(within(tablist).getByRole("tab", { name: /PC/ }));
+    expect(within(tablist).getByRole("tab", { name: /PC/ })).toHaveAttribute("aria-selected", "true");
+    expect(within(tablist).getByRole("tab", { name: /スマホ/ })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    // スマホへ戻す。
+    await userEvent.click(within(tablist).getByRole("tab", { name: /スマホ/ }));
+    expect(within(tablist).getByRole("tab", { name: /スマホ/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 });
 
@@ -3459,12 +3313,8 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     return screen.findByRole("region", { name: "詳細: 記事1" });
   }
 
-  it("「次へ」で閉じずに次の未処理記事へ移動、末尾では無効", async () => {
-    const dialog = await openFirst();
-    await userEvent.click(within(dialog).getByRole("button", { name: "次へ →" }));
-    expect(await screen.findByRole("region", { name: "詳細: 記事2" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "次へ →" })).toBeDisabled();
-  });
+  // #proto P3b(Task 9): 可視「次へ →」連続レビュー(#275)は proto 到達 UI に無いため撤去。
+  // キーボード j/k による前後移動(次の対象へ)は維持する。
 
   it("キーボード j/k でレビュー対象を移動", async () => {
     await openFirst();
@@ -3528,7 +3378,7 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    await within(dialog).findByRole("button", { name: "本文をコピー" }); // draft ready の目印
+    await within(dialog).findByRole("button", { name: "下書きを編集" }); // draft ready の目印
     fireEvent.keyDown(document.body, { key: "e" });
     expect(await screen.findByRole("dialog", { name: "記事を編集" })).toBeInTheDocument();
   });
@@ -3612,7 +3462,8 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    await within(dialog).findByRole("button", { name: "本文をコピー" });
+    // プレビューが描画されるまで待つ(端末切替 tablist を同期点にする)。
+    await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
     expect(within(dialog).queryByAltText(/アイキャッチ/)).not.toBeInTheDocument();
   });
 });
@@ -3729,152 +3580,8 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
   });
 });
 
-describe("ApproveClient 公開・クローズ(#167)", () => {
-  // #H4: 公開前チェックが全て緑になる妥当な下書き(免責文あり・断定なし・十分な分量/見出し/画像/内部リンク)。
-  const VALID_DRAFT_HTML =
-    "<h2>見出し1</h2><h2>見出し2</h2>" +
-    "<figure><img src='x' alt='図'></figure>" +
-    '<a href="/ja/news/a">関連記事</a>' +
-    `<p>${"あ".repeat(1500)}</p>` +
-    "<p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>";
-  const DRAFT = {
-    json: {
-      success: true,
-      exists: true,
-      draft: {
-        title: "T",
-        displayMode: "html",
-        bodyHtml: VALID_DRAFT_HTML,
-        body: "",
-        knownNewsPaths: ["/ja/news/a"],
-      },
-    },
-  };
-
-  async function openPanel(stage: string, ...after: Array<{ json?: unknown; ok?: boolean; status?: number }>) {
-    const fn = mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc", stage })] } },
-      DRAFT,
-      ...after
-    );
-    flags.authEnabled = false;
-    render(<ApproveClient />);
-    // #proto P1: 公開済みなど未処理でない段階は既定成績 view。記事 view へ遷移して開く。
-    await selectView(/記事/);
-    await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
-    await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    return fn;
-  }
-
-  async function confirmDialogButton(name: string): Promise<HTMLElement> {
-    const cd = await screen.findByRole("dialog", { name: "公開・クローズの確認" });
-    return within(cd).getByRole("button", { name });
-  }
-
-  it("下書き段階: 公開ボタンを出し、確認ダイアログ確定で /api/growth/publish に POST する", async () => {
-    const fn = await openPanel(
-      "drafted",
-      { json: { success: true } }, // publish
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc", stage: "published" })] } } // pollBoard
-    );
-    await userEvent.click(screen.getByRole("button", { name: "公開する" }));
-    await userEvent.click(await confirmDialogButton("公開を確定"));
-    await waitFor(() =>
-      expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(true)
-    );
-    const call = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/publish"))!;
-    expect(JSON.parse(call[1].body).pageId).toBe("i1");
-    // H2: 公開成功でトーストを出す。
-    expect(await screen.findByText("記事を公開しました。")).toBeInTheDocument();
-  });
-
-  it("公開: 確認ダイアログをキャンセルすると POST しない", async () => {
-    const fn = await openPanel("drafted");
-    await userEvent.click(screen.getByRole("button", { name: "公開する" }));
-    await userEvent.click(await confirmDialogButton("キャンセル"));
-    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(false);
-  });
-
-  it("公開前チェックに赤(§5免責欠落)があると公開ボタンを無効化し赤ヒントを出す(#H4)", async () => {
-    mockFetchSequence(
-      { json: { success: true, items: [ideaItem({ contentId: "g-abc", stage: "drafted" })] } },
-      {
-        json: {
-          success: true,
-          exists: true,
-          draft: { title: "T", displayMode: "html", bodyHtml: "<p>短い本文(免責なし)</p>", body: "" },
-        },
-      }
-    );
-    flags.authEnabled = false;
-    render(<ApproveClient />);
-    await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
-    await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    expect(screen.getByRole("button", { name: "公開する" })).toBeDisabled();
-    expect(screen.getByText(/公開前チェックに赤/)).toBeInTheDocument();
-  });
-
-  it("公開: 失敗するとエラーを表示する", async () => {
-    await openPanel("drafted", { ok: false, status: 502, json: { success: false, error: "公開NG" } });
-    await userEvent.click(screen.getByRole("button", { name: "公開する" }));
-    await userEvent.click(await confirmDialogButton("公開を確定"));
-    expect(await screen.findByText("公開NG")).toBeInTheDocument();
-  });
-
-  it("公開: error が無い失敗はフォールバック文言", async () => {
-    await openPanel("drafted", { ok: false, status: 502, json: { success: false } });
-    await userEvent.click(screen.getByRole("button", { name: "公開する" }));
-    await userEvent.click(await confirmDialogButton("公開を確定"));
-    expect(await screen.findByText("公開に失敗しました。")).toBeInTheDocument();
-  });
-
-  it("公開済み段階: 公開バッジを出し公開ボタンは出さない", async () => {
-    await openPanel("published");
-    const group = screen.getByRole("group", { name: "公開・クローズ" });
-    expect(within(group).getByText("公開済み")).toBeInTheDocument();
-    expect(within(group).queryByRole("button", { name: "公開する" })).not.toBeInTheDocument();
-    expect(within(group).getByRole("button", { name: "クローズ（盤から非表示）" })).toBeInTheDocument();
-  });
-
-  it("クローズ: 確認ダイアログ確定で decision=クローズ を POST する", async () => {
-    const fn = await openPanel(
-      "drafted",
-      { json: { success: true } }, // close decision
-      { json: { success: true, items: [] } } // pollBoard
-    );
-    await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
-    await userEvent.click(await confirmDialogButton("クローズを確定"));
-    await waitFor(() =>
-      expect(
-        fn.mock.calls.some(
-          (c) => String(c[0]).includes("/api/growth/approve") && c[1]?.method === "POST"
-        )
-      ).toBe(true)
-    );
-    const call = fn.mock.calls.find(
-      (c) => String(c[0]).includes("/api/growth/approve") && c[1]?.method === "POST"
-    )!;
-    expect(JSON.parse(call[1].body).decisions[0].decision).toBe("クローズ");
-  });
-
-  it("クローズ: 失敗するとエラーを表示する", async () => {
-    await openPanel("drafted", { ok: false, status: 502, json: { success: false, error: "クローズNG" } });
-    await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
-    await userEvent.click(await confirmDialogButton("クローズを確定"));
-    expect(await screen.findByText("クローズNG")).toBeInTheDocument();
-  });
-
-  it("クローズ: 確認ダイアログをキャンセルすると POST しない", async () => {
-    const fn = await openPanel("drafted");
-    await userEvent.click(screen.getByRole("button", { name: "クローズ（盤から非表示）" }));
-    await userEvent.click(await confirmDialogButton("キャンセル"));
-    expect(
-      fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/approve") && c[1]?.method === "POST")
-    ).toBe(false);
-  });
-});
+// #proto P3b(Task 9): 公開・クローズ(#167)群は proto 厳密優先で詳細パネルから撤去。
+// 公開は公開キュー(#H23/#H24, PublishQueue)へ一本化したため、当該テスト群は丸ごと削除した。
 
 describe("ApproveClient 構成からやり直す(下書き→提案中)", () => {
   const REVERT_URL = "/api/growth/approve/revert";
@@ -4010,5 +3717,150 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
         fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/approve")).length
       ).toBeGreaterThanOrEqual(2)
     );
+  });
+});
+
+describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
+  const READY_DRAFT = {
+    json: {
+      success: true,
+      exists: true,
+      draft: { title: "T", displayMode: "html", bodyHtml: "<p>本文です</p>", body: "" },
+    },
+  };
+
+  async function openReady(...after: Array<{ json?: unknown; ok?: boolean; status?: number }>) {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      READY_DRAFT,
+      ...after,
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await within(dialog).findByRole("tablist", { name: "プレビュー端末" }); // ready 待ち
+    return { fn, dialog };
+  }
+
+  // 素材(画像)タブへ切り替える。クラスタ「素材」→ 子タブ「画像」。
+  async function gotoImages(dialog: HTMLElement) {
+    await userEvent.click(within(dialog).getByRole("tab", { name: /素材/ }));
+    await userEvent.click(within(dialog).getByRole("tab", { name: /画像/ }));
+  }
+
+  it("プレビュータブでメタディスクリプションを保存できる(成功トースト)", async () => {
+    const { fn, dialog } = await openReady({ json: { success: true } });
+    const ta = within(dialog).getByPlaceholderText(/検索結果に出る説明文/);
+    await userEvent.type(ta, "検索スニペット");
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存/ }));
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/draft/excerpt"))).toBe(true),
+    );
+    expect(await screen.findByText("メタディスクリプションを保存しました。")).toBeInTheDocument();
+  });
+
+  it("メタ保存の失敗はエラートースト(error付き)", async () => {
+    const { dialog } = await openReady({ ok: false, status: 502, json: { success: false, error: "保存NG" } });
+    await userEvent.type(within(dialog).getByPlaceholderText(/検索結果に出る説明文/), "x");
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存/ }));
+    expect(await screen.findByText("保存NG")).toBeInTheDocument();
+  });
+
+  it("メタ保存の失敗(error無し)は既定文言", async () => {
+    const { dialog } = await openReady({ ok: false, status: 502, json: { success: false } });
+    await userEvent.type(within(dialog).getByPlaceholderText(/検索結果に出る説明文/), "x");
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存/ }));
+    expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("画像タブ: アイキャッチのメディア差し替えは案内トーストを出す(差し替えUIは撤去)", async () => {
+    const { dialog } = await openReady();
+    await gotoImages(dialog);
+    await userEvent.click(within(dialog).getByRole("button", { name: /メディアから選ぶ/ }));
+    expect(
+      await screen.findByText("アイキャッチの差し替えは下書きプレビューのメディアから行えます。"),
+    ).toBeInTheDocument();
+  });
+
+  it("画像タブ: アイキャッチをAIで再生成すると /eyecatch/regen に POST し成功トースト", async () => {
+    const { fn, dialog } = await openReady({ json: { success: true } });
+    await gotoImages(dialog);
+    await userEvent.click(within(dialog).getByRole("button", { name: /AIで再生成/ }));
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/eyecatch/regen"))).toBe(true),
+    );
+    expect(
+      await screen.findByText(/アイキャッチの再生成を依頼しました/),
+    ).toBeInTheDocument();
+  });
+
+  it("画像タブ: 再生成の失敗はエラートースト(error付き/無し)", async () => {
+    const { dialog } = await openReady({ ok: false, status: 502, json: { success: false, error: "再生成NG" } });
+    await gotoImages(dialog);
+    await userEvent.click(within(dialog).getByRole("button", { name: /AIで再生成/ }));
+    expect(await screen.findByText("再生成NG")).toBeInTheDocument();
+  });
+
+  it("画像タブ: 再生成の失敗(error無し)は既定文言", async () => {
+    const { dialog } = await openReady({ ok: false, status: 502, json: { success: false } });
+    await gotoImages(dialog);
+    await userEvent.click(within(dialog).getByRole("button", { name: /AIで再生成/ }));
+    expect(await screen.findByText("再生成の依頼に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("構成案タブ: セクションにコメントを追加・削除できる(OutlineView 経由)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
+    // コメント追加
+    await userEvent.click(within(dialog).getByRole("button", { name: /コメント/ }));
+    await userEvent.type(within(dialog).getByPlaceholderText("このセクションへの指示…"), "箇条書きに");
+    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+    expect(await within(dialog).findByText("箇条書きに")).toBeInTheDocument();
+    // コメント削除
+    await userEvent.click(within(dialog).getByRole("button", { name: "コメント削除" }));
+    expect(within(dialog).queryByText("箇条書きに")).not.toBeInTheDocument();
+  });
+
+  it("構成案タブ: 画像指示を『おまかせ』に切替え、まとめて修正を依頼できる", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] } },
+      { json: { success: true } }, // /revise
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
+    // 画像指示トグル(おまかせ)を押して onUpdateImage を発火する。
+    await userEvent.click(within(dialog).getByRole("radio", { name: "おまかせ" }));
+    // コメントを1件足して「構成案の修正を依頼」を有効化→依頼(onRequestOutlineRevise)。
+    await userEvent.click(within(dialog).getByRole("button", { name: /コメント/ }));
+    await userEvent.type(within(dialog).getByPlaceholderText("このセクションへの指示…"), "直して");
+    await userEvent.click(within(dialog).getByRole("button", { name: "追加" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "構成案の修正を依頼" }));
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]) === "/api/growth/revise")).toBe(true),
+    );
+  });
+
+  it("却下後に『承認待ちに戻す』で取り消せる(onUndo)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem()] } },
+      { json: { success: true, updated: 1 } }, // 却下 POST
+      { json: { success: true, updated: 1 } }, // undo POST
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    fireEvent.keyDown(document.body, { key: "r" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "承認待ちに戻す" }));
+    // 取り消し後は決定バッジが消え、却下ボタンが戻る。
+    expect(await within(dialog).findByRole("button", { name: "却下" })).toBeInTheDocument();
   });
 });

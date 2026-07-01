@@ -34,7 +34,7 @@ export function QualityChecklist({ checks, open, onToggle }: QualityChecklistPro
   const sorted = [...checks].sort((a, b) => ORDER.indexOf(a.level) - ORDER.indexOf(b.level));
 
   return (
-    <div>
+    <div role="region" aria-label="公開前チェック">
       <button onClick={onToggle} className="flex w-full items-center gap-2.5">
         <span className="text-[11px] font-medium" style={{ color: "var(--p-text-3)" }}>
           公開前チェック

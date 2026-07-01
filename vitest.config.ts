@@ -84,8 +84,6 @@ export default defineConfig({
         "src/app/growth/approve/DraftEditor.tsx",
         // 本文インラインコメント(#182)の薄い DOM 結線。純ロジックは bodyComment.ts でテスト済み。
         "src/app/growth/approve/InlineCommentReview.tsx",
-        // メタディスクリプション編集(#H20)の薄い fetch/DOM 結線。純ロジックは excerptDraft.ts でテスト済み。
-        "src/app/growth/approve/ExcerptEditor.tsx",
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
         // 受信側描画は DraftFrameClient.test.tsx でテスト済み。
         "src/app/growth/approve/DraftPreviewFrame.tsx",
@@ -109,6 +107,15 @@ export default defineConfig({
         "src/app/growth/approve/consult/ConsultDrawer.tsx",
         // 本文インラインコメント(#182)の薄い fetch/DOM 結線フック。純ロジックは bodyComment.ts でテスト済み。
         "src/app/growth/approve/hooks/useBodyCommentConsult.ts",
+        // #proto P3b(Task 9): 詳細パネルの proto プレゼンテーション5ファイル。
+        // 承認画面が render する薄い見た目レイヤ(2段タブ/タブ別ビュー/構成案/品質/デバイスプレビュー)。
+        // 純ロジック(段階写像・品質判定・画像意図・プレビュー端末・アウトライン parse)は
+        // boardStage/detailBadge/draftQuality/imageIntent/previewDevice/outline 等でテスト済み。
+        "src/app/growth/approve/DetailPanel.tsx",
+        "src/app/growth/approve/DetailViews.tsx",
+        "src/app/growth/approve/OutlineView.tsx",
+        "src/app/growth/approve/QualityChecklist.tsx",
+        "src/app/growth/approve/DevicePreview.tsx",
       ],
       thresholds: {
         statements: 100,

@@ -49,6 +49,15 @@ proto の以下は本番バックエンドに無いか形が違う。**各項目
 5. **DevicePreview のタブレット**: 本番は PC/モバイル → タブレット幅追加はフロントのみ。
 6. **MediaLibraryModal 統一**: 本番 `/media` で充足。proto の統一モーダルへ集約。
 7. **ボードステージ scheduled（予約公開）**: **P3a で un-縮約済**。P2-fix1 の調査でサーバ `@/lib/growth/approve` の PendingItem に `scheduledAtMs` が既に存在（実行時データあり）と判明したため、BE 改修不要。クライアント型 `types.ts` に `scheduledAtMs?: number | null` を宣言し、`deriveBoardStage` が `drafted`/`isDraftReady` かつ `scheduledAtMs != null` を `scheduled` に写像する（draft_review より優先）。`null`/未設定は「未予約」として draft_review 側へ寄る。
+8. **P3b（Task 9）で撤去した本番固有操作（proto 厳密優先・全撤去）**: T8 の proto DetailPanel 再スキンで到達 UI から消えた以下の本番固有操作を、proto 厳密優先の裁定に基づき**撤去**した（新サーフェスへ再結線しない）。
+   - **本文をコピー（#127）**: proto 到達 UI に無い → 撤去。
+   - **アイキャッチ／本文画像の差し替え（#143/#145）**: proto 到達 UI に無い → 撤去（メディアからの差し替えは将来の公開キュー／メディアピッカーへ）。※アイキャッチ／本文画像の **AI 再生成（#144/#156）は維持**。
+   - **装飾を提案（#147）**: proto 到達 UI に無い → 撤去。
+   - **「なぜこの記事か」カード（subtitle callout）**: proto 到達 UI に無い → 撤去（根拠 subtitle は相談導線／メトリクスチップへ）。
+   - **連続レビューの可視「次へ →」ボタン（#275）**: proto 到達 UI に無い → 撤去。キーボード j/k による前後移動は維持。
+   - **タイトルの直接編集（#139 A・ReviseSection/TitleEditor）**: proto 到達 UI に無い → 撤去（タイトルの **AI 修正 #139 B は相談ドロワーに維持**）。
+   - **詳細パネルの公開／クローズ操作群（#167）**: proto 厳密優先で撤去し、**公開は公開キュー #H23/#H24（PublishQueue）へ一本化**。詳細パネル footer の主操作は proto 準拠（承認／却下／構成やり直す／AIに相談）のみ。
+   - 上記に伴い orphan 化した本番専用コンポーネント（DecorationAssistant / EyecatchPicker / BodyImagePicker / ExcerptEditor / ReviseSectionView / ReviseSection / TitleEditor）と純ロジック `bodyImageEdit.ts` を削除。proto プレゼンテーション5ファイル（DetailPanel/DetailViews/OutlineView/QualityChecklist/DevicePreview）を coverage.exclude に追加。
 
 ## 3. proto ⇄ 本番 コンポーネント対応（disposition）
 凡例: **再スキン**=本番に対応物あり・見た目を proto へ / **新規移植**=proto から持ち込み / **BE**=バックエンド改修を伴う
