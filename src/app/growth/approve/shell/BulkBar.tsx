@@ -20,6 +20,8 @@ export function BulkBar({ count, onApproveAll, onRejectAll, onClear }: BulkBarPr
     <AnimatePresence>
       {count > 0 && (
         <motion.div
+          role="group"
+          aria-label="一括操作"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}

@@ -108,9 +108,20 @@ async function showAll(): Promise<void> {
   // 盤レイアウトでは決定済みカードが常時表示されるため何もしない。
 }
 
-// #119: 施策/記事はタブで分離。指定タブをクリックして切り替える。
-async function selectTab(name: RegExp): Promise<void> {
-  await userEvent.click(screen.getByRole("tab", { name }));
+// #proto P1: 5 view は LeftRail(nav aria-label="情報源")のボタンで切り替える。
+// TopBar にも「施策」追加ボタンがあるため、ナビ内に限定して曖昧さを避ける。
+// 盤ロードが完了してシェル(nav)が描画されるまで待ってからクリックする。
+async function selectView(name: RegExp): Promise<void> {
+  const nav = await screen.findByRole("navigation", { name: "情報源" });
+  await userEvent.click(within(nav).getByRole("button", { name }));
+}
+
+// #proto P1: 旧「処理済み X / Y件」進捗表示は TopBar の統計ピルへ置き換わった。
+// 未処理(あなたのアクション待ち)残件は TopBar の「あなた待ち」ピルで確認する。
+function expectAwaitingCount(n: number): void {
+  const banner = screen.getByRole("banner");
+  const stat = within(banner).getByTitle("あなたのアクション待ち");
+  expect(stat).toHaveTextContent(new RegExp(`あなた待ち\\s*${n}`));
 }
 
 // 差分B: 詳細パネルの「AIに相談」起点ボタンから相談ドロワーを開き、ドロワー要素を返す。
@@ -197,8 +208,8 @@ describe("ApproveClient 合言葉画面", () => {
     render(<ApproveClient />);
     await login();
     expect(await screen.findByText("市川ページ")).toBeInTheDocument();
-    // #90: 既定は施策タブ。記事は記事タブへ切り替えると見える。
-    await selectTab(/記事/);
+    // #proto P1: 既定は施策 view。記事は記事 view へ切り替えると見える。
+    await selectView(/記事/);
     expect(screen.getByText("猛暑記事")).toBeInTheDocument();
     expect(fn.mock.calls[0][0]).toBe(TOKEN_URL);
   });
@@ -210,7 +221,7 @@ describe("ApproveClient 合言葉画面", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
-    await selectTab(/プロンプト/);
+    await selectView(/プロンプト/);
     expect(screen.getByText(/プロンプト確認スタブ/)).toBeInTheDocument();
     expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-label", "プロンプト");
   });
@@ -224,9 +235,9 @@ describe("ApproveClient 合言葉画面", () => {
     await screen.findByText("市川ページ");
     // バッジは一覧の各行に出る(#90: タブごとに該当カテゴリの行のみ表示)
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
-    await selectTab(/記事/);
+    await selectView(/記事/);
     expect(screen.getByText("📝 記事")).toBeInTheDocument();
-    await selectTab(/施策/);
+    await selectView(/施策/);
     // 数値根拠は一覧には出さず、詳細パネルに入れる(#275 高密度化)
     expect(screen.queryByText("優先度スコア")).not.toBeInTheDocument();
 
@@ -243,7 +254,11 @@ describe("ApproveClient 合言葉画面", () => {
     });
     render(<ApproveClient />);
     await login();
-    expect(await screen.findByText("A")).toBeInTheDocument();
+    // #proto P1: stage 未指定の施策は proposalPending に数え既定で施策 view。念のため施策 view を明示。
+    await selectView(/施策/);
+    // ShortcutBar のキーヒント <kbd>A</kbd> と衝突するため、施策レーン内に限定して照合する。
+    const lane = await screen.findByRole("region", { name: "施策レーン" });
+    expect(within(lane).getByText("A")).toBeInTheDocument();
     expect(screen.getByText("📋 施策")).toBeInTheDocument();
   });
 
@@ -303,7 +318,8 @@ describe("ApproveClient 即時保存(#235)", () => {
     await login();
     await screen.findByText("市川ページ");
     expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
-    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+    // #proto P1: 進捗は TopBar の「あなた待ち」ピル(未処理1件)で表示する。
+    expectAwaitingCount(1);
   });
 
   it("承認を押すとその場で1件保存し、保存済み表示と取り消すを出す", async () => {
@@ -321,7 +337,8 @@ describe("ApproveClient 即時保存(#235)", () => {
     expect(await screen.findByText("承認しました")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "取り消す: 市川ページ" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "承認: 市川ページ" })).not.toBeInTheDocument();
-    expect(screen.getByText("処理済み 1 / 1件")).toBeInTheDocument();
+    // 承認後は未処理が 0 件に減る。
+    expectAwaitingCount(0);
 
     const post = fn.mock.calls[1];
     expect(post[0]).toBe(TOKEN_URL);
@@ -362,7 +379,8 @@ describe("ApproveClient 即時保存(#235)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 市川ページ" }));
 
     expect(await screen.findByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
-    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+    // 取り消しで未処理が 1 件に戻る。
+    expectAwaitingCount(1);
     expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({
       decisions: [{ id: "p1", decision: "未処理" }],
     });
@@ -402,7 +420,8 @@ describe("ApproveClient 即時保存(#235)", () => {
     expect(await screen.findByText("保存エラー")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行: 市川ページ" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "承認: 市川ページ" })).toBeInTheDocument();
-    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+    // 保存失敗時は決定が確定しないため未処理は 1 件のまま。
+    expectAwaitingCount(1);
   });
 
   it("error の無い保存失敗は既定メッセージ(success:false)", async () => {
@@ -474,7 +493,8 @@ describe("ApproveClient 即時保存(#235)", () => {
 
     expect(await screen.findByText("承認しました")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行: 市川ページ" })).toBeInTheDocument();
-    expect(screen.getByText("処理済み 1 / 2件")).toBeInTheDocument();
+    // 他カード(p2)は承認成功・市川ページ(p1)は失敗のまま → 未処理は 1 件。
+    expectAwaitingCount(1);
   });
 
   it("取り消し失敗時はカードに赤エラーを出し、保存済みのまま残す(#239)", async () => {
@@ -550,13 +570,15 @@ describe("ApproveClient 施策の手動追加(#255)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
-    expect(screen.getByText("処理済み 0 / 1件")).toBeInTheDocument();
+    // #proto P1: 残件は TopBar「あなた待ち」ピルで確認する(未処理1件)。
+    expectAwaitingCount(1);
 
     await userEvent.type(screen.getByLabelText("施策名"), "手動の施策");
     await userEvent.click(screen.getByRole("button", { name: "追加する" }));
 
     expect(await screen.findByText("手動の施策")).toBeInTheDocument();
-    expect(screen.getByText("処理済み 0 / 2件")).toBeInTheDocument();
+    // 追加後は承認待ちが 2 件に増える。
+    expectAwaitingCount(2);
   });
 
   it("0件の空状態からも施策を追加できる", async () => {
@@ -653,8 +675,8 @@ describe("ApproveClient タブ分割/ソート(#242/#90)", () => {
     const titles = screen.getAllByText(/スコア施策/).map((el) => el.textContent);
     expect(titles).toEqual(["高スコア施策", "低スコア施策"]); // 優先度降順
 
-    // 記事タブへ切替えると記事パイプラインが出て、施策レーンは消える。
-    await selectTab(/記事/);
+    // 記事 view へ切替えると記事パイプラインが出て、施策レーンは消える。
+    await selectView(/記事/);
     expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
     expect(screen.getByText("記事A")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "施策レーン" })).not.toBeInTheDocument();
@@ -732,6 +754,8 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     });
     render(<ApproveClient />);
     await login();
+    // #proto P1: 生成待ち(queued)は「あなた待ち」ではないため既定は成績 view。記事 view へ遷移。
+    await selectView(/記事/);
     await screen.findByText("承認済み記事");
     const queued = screen.getByRole("region", { name: "列: 生成待ち" });
     // 列ヘッダ＋カードバッジの両方に「生成待ち」が出る(=カードが状態表示になっている)。
@@ -745,6 +769,8 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     });
     render(<ApproveClient />);
     await login();
+    // #proto P1: 生成中(generating)は「あなた待ち」ではないため既定は成績 view。記事 view へ遷移。
+    await selectView(/記事/);
     await screen.findByText("執筆中記事");
     const generating = screen.getByRole("region", { name: "列: 生成中" });
     expect(within(generating).getAllByText("生成中").length).toBeGreaterThanOrEqual(2);
@@ -759,6 +785,8 @@ describe("ApproveClient パイプライン盤(#107)", () => {
     });
     render(<ApproveClient />);
     await login();
+    // #proto P1: 承認済み(approved)施策は未処理でないため既定は成績 view。施策 view へ遷移。
+    await selectView(/施策/);
     await screen.findByText("承認済み施策");
     const lane = screen.getByRole("region", { name: "施策レーン" });
     expect(within(lane).getByText("承認済み")).toBeInTheDocument();
@@ -786,12 +814,22 @@ describe("ApproveClient パイプライン盤(#107)", () => {
 });
 
 describe("ApproveClient 公開タイミングの明示(#237)", () => {
-  it("承認＝制作キュー追加・この場では非公開の補足を表示する", async () => {
-    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+  // #proto P1: 旧「常時表示の非公開注記」はシェル移植で撤去。承認＝制作キュー追加・この場では
+  // 非公開であることは、承認操作が publish API を呼ばず完了メッセージで明示する形で維持する。
+  it("承認しても publish API は呼ばず、この場では公開しない", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, updated: 1 } }
+    );
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
-    expect(screen.getByText(/この場では公開されません/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "承認: 市川ページ" }));
+    await screen.findByText("承認しました");
+    // 承認は決定保存(/api/growth/approve)のみで、公開(/api/growth/publish)は呼ばない。
+    expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/publish"))).toBe(false);
+    expect(fn.mock.calls[1][0]).toBe(TOKEN_URL);
   });
 
   it("完了表示に公開タイミングの注記を含む", async () => {
@@ -1006,7 +1044,9 @@ describe("ApproveClient master-detail/詳細パネル(#275)", () => {
     });
     render(<ApproveClient />);
     await login();
-    await screen.findByText("A");
+    // #proto P1: stage 未指定の施策は proposalPending に数え既定で施策 view。念のため施策 view を明示。
+    await selectView(/施策/);
+    await screen.findByRole("button", { name: "詳細: A" });
     await userEvent.click(screen.getByRole("button", { name: "詳細: A" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
@@ -1040,7 +1080,8 @@ describe("ApproveClient 下書きタブ(#87)", () => {
     mockFetchSequence({ json: { success: true, items: [draftIdea()] } });
     render(<ApproveClient />);
     await login();
-    // 下書きのみ → 既定タブが無く下書きタブへフォールバック
+    // #proto P1: 下書き(drafted)のみは未処理でないため既定は成績 view。記事 view へ遷移。
+    await selectView(/記事/);
     await screen.findByText("下書き記事");
     expect(screen.queryByRole("button", { name: "承認: 下書き記事" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "却下: 下書き記事" })).not.toBeInTheDocument();
@@ -1054,6 +1095,7 @@ describe("ApproveClient 下書きタブ(#87)", () => {
     );
     render(<ApproveClient />);
     await login();
+    await selectView(/記事/);
     await screen.findByText("下書き記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 下書き記事" }));
     const dialog = await screen.findByRole("dialog");
@@ -2193,6 +2235,8 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
 describe("ApproveClient 生成中の可視化(#108)", () => {
   it("生成中カードは『自宅PCで執筆中…』と進捗ステップを出す", async () => {
     flags.authEnabled = false;
+    // #proto P1: 生成中は「あなた待ち」でないため、記事 view を URL 指定で初期表示する。
+    window.history.replaceState(null, "", "/?view=approve");
     mockFetchSequence({
       json: { success: true, items: [ideaItem({ id: "i1", title: "執筆中記事", stage: "generating" })] },
     });
@@ -2204,6 +2248,7 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
 
   it("生成が完了(下書き作成済み)するとトーストを出し、閉じられる", async () => {
     flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       mockFetchSequence(
@@ -2235,6 +2280,7 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
 
   it("ポーリングが連続失敗すると『最新化できていません』バナーを出し、再試行で消える(#H5)", async () => {
     flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       mockFetchSequence(
@@ -2268,6 +2314,7 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
     vi.useFakeTimers({
       toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"],
     });
+    window.history.replaceState(null, "", "/?view=approve");
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
     try {
       mockFetchSequence(
@@ -2294,6 +2341,7 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
 
   it("生成中の記事が継続したまま別の記事が増えても滞留基準を二重記録しない", async () => {
     flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
     vi.useFakeTimers({
       toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"],
     });
@@ -2329,6 +2377,7 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
 
   it("ポーリングの取得失敗は握りつぶし、盤は前回値を保つ", async () => {
     flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       mockFetchSequence(
@@ -2348,24 +2397,25 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
 });
 
 describe("ApproveClient 操作性(#109)", () => {
-  it("表示密度トグルが効き、localStorage に保存される", async () => {
+  // #proto P1: 密度トグル UI は未移植(P6 予定)。既定(comfortable)は space-y-2 を適用する。
+  it("既定の表示密度(comfortable)ではリストに space-y-2 を適用する", async () => {
     flags.authEnabled = false;
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
-    const toggle = screen.getByRole("button", { name: "標準" });
-    await userEvent.click(toggle);
-    expect(screen.getByRole("button", { name: "コンパクト" })).toBeInTheDocument();
-    expect(window.localStorage.getItem("growth-approve-density")).toBe("compact");
+    const lane = screen.getByRole("region", { name: "施策レーン" });
+    expect(within(lane).getByRole("list").className).toContain("space-y-2");
   });
 
-  it("密度は localStorage から復元する", async () => {
+  // #proto P1: 密度は localStorage から復元し、compact なら space-y-1 を適用する。
+  it("密度は localStorage から復元する(compact→space-y-1)", async () => {
     flags.authEnabled = false;
     window.localStorage.setItem("growth-approve-density", "compact");
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
-    expect(screen.getByRole("button", { name: "コンパクト" })).toBeInTheDocument();
+    const lane = screen.getByRole("region", { name: "施策レーン" });
+    expect(within(lane).getByRole("list").className).toContain("space-y-1");
     window.localStorage.clear();
   });
 
@@ -2394,7 +2444,8 @@ describe("ApproveClient 操作性(#109)", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
   });
 
-  it("/ でコマンドパレットが開き、検索してジャンプできる", async () => {
+  // #proto P1(確定#1): `/` は TopBar の検索欄へフォーカスを移す(パレットは開かない)。
+  it("/ で TopBar の検索欄へフォーカスが移る", async () => {
     flags.authEnabled = false;
     mockFetchSequence({
       json: { success: true, items: [proposalItem(), ideaItem({ title: "猛暑記事" })] },
@@ -2402,18 +2453,18 @@ describe("ApproveClient 操作性(#109)", () => {
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
     fireEvent.keyDown(document.body, { key: "/" });
-    const palette = await screen.findByRole("dialog", { name: "コマンドパレット" });
-    await userEvent.type(within(palette).getByLabelText("コマンド検索"), "猛暑");
-    await userEvent.click(within(palette).getByRole("button", { name: /猛暑記事/ }));
-    expect(await screen.findByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("記事を検索…")).toHaveFocus();
+    // `/` ではコマンドパレットは開かない。
+    expect(screen.queryByRole("dialog", { name: "コマンドパレット" })).not.toBeInTheDocument();
   });
 
-  it("ツールバーの検索ボタンで開き、背景クリックで閉じられる(キーボード非依存)", async () => {
+  // #proto P1(確定#1): コマンドパレットは ⌘K のみで開き、背景クリックで閉じる。
+  it("⌘K でコマンドパレットが開き、背景クリックで閉じられる", async () => {
     flags.authEnabled = false;
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
-    await userEvent.click(screen.getByRole("button", { name: /検索・ジャンプ/ }));
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
     expect(await screen.findByRole("dialog", { name: "コマンドパレット" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "コマンドパレットを閉じる" }));
     expect(screen.queryByRole("dialog", { name: "コマンドパレット" })).not.toBeInTheDocument();
@@ -2435,20 +2486,25 @@ describe("ApproveClient 操作性(#109)", () => {
     await screen.findByText("市川ページ");
     await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
     await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 他施策" }));
-    expect(screen.getByText("2件 選択中")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "一括承認" }));
+    // #proto P1: BulkBar は件数バッジ({count})＋「件を選択中」ラベルの分割表示。
+    const bulkBar = screen.getByRole("group", { name: "一括操作" });
+    expect(within(bulkBar).getByText("2")).toBeInTheDocument();
+    expect(within(bulkBar).getByText("件を選択中")).toBeInTheDocument();
+    await userEvent.click(within(bulkBar).getByRole("button", { name: /まとめて承認/ }));
     expect(await screen.findAllByText("承認しました")).toHaveLength(2);
   });
 
-  it("一括選択を『解除』ボタンでクリアできる", async () => {
+  it("一括選択を『選択解除』ボタンでクリアできる", async () => {
     flags.authEnabled = false;
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
     await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
-    expect(screen.getByText("1件 選択中")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "解除" }));
-    expect(screen.queryByText(/件 選択中/)).not.toBeInTheDocument();
+    const bulkBar = screen.getByRole("group", { name: "一括操作" });
+    expect(within(bulkBar).getByText("1")).toBeInTheDocument();
+    expect(within(bulkBar).getByText("件を選択中")).toBeInTheDocument();
+    await userEvent.click(within(bulkBar).getByRole("button", { name: "選択解除" }));
+    expect(screen.queryByText("件を選択中")).not.toBeInTheDocument();
   });
 
   it("一括却下もできる", async () => {
@@ -2460,7 +2516,8 @@ describe("ApproveClient 操作性(#109)", () => {
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
     await userEvent.click(screen.getByRole("checkbox", { name: "一括選択: 市川ページ" }));
-    await userEvent.click(screen.getByRole("button", { name: "一括却下" }));
+    const bulkBar = screen.getByRole("group", { name: "一括操作" });
+    await userEvent.click(within(bulkBar).getByRole("button", { name: /まとめて却下/ }));
     expect(await screen.findByText("却下しました")).toBeInTheDocument();
   });
 
@@ -2544,6 +2601,157 @@ describe("ApproveClient 操作性(#109)", () => {
   });
 });
 
+describe("ApproveClient シェル操作(#proto P1)", () => {
+  it("TopBar 検索で施策 view のカードを絞り込む", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [proposalItem(), proposalItem({ id: "p2", title: "他施策" })],
+      },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    // 検索前は両方表示される。
+    expect(screen.getByText("他施策")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "市川");
+    // 一致しない「他施策」は消え、一致する「市川ページ」は残る。
+    await waitFor(() => expect(screen.queryByText("他施策")).not.toBeInTheDocument());
+    expect(screen.getByText("市川ページ")).toBeInTheDocument();
+  });
+
+  it("TopBar 検索は記事 view のカードにも効く(subtitle 一致含む)", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          ideaItem({ id: "i1", title: "猛暑記事", subtitle: "夏の集客", stage: "proposed" }),
+          ideaItem({ id: "i2", title: "冬記事", subtitle: "別テーマ", stage: "proposed" }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    // subtitle「夏の集客」に一致する検索で冬記事が消える。
+    await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "夏の集客");
+    await waitFor(() => expect(screen.queryByText("冬記事")).not.toBeInTheDocument());
+    expect(screen.getByText("猛暑記事")).toBeInTheDocument();
+  });
+
+  it("更新ボタンで盤を再取得する", async () => {
+    flags.authEnabled = false;
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [proposalItem()] } },
+      { json: { success: true, items: [proposalItem()] } } // refetch
+    );
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    const before = fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/approve")).length;
+    await userEvent.click(screen.getByRole("button", { name: "データを更新" }));
+    await waitFor(() =>
+      expect(
+        fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/approve")).length
+      ).toBeGreaterThan(before)
+    );
+  });
+
+  it("ShortcutBar のヘルプからショートカット一覧を開閉できる", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    const footer = screen.getByRole("contentinfo");
+    await userEvent.click(within(footer).getByRole("button"));
+    const overlay = await screen.findByRole("dialog", { name: "キーボードショートカット" });
+    expect(overlay).toBeInTheDocument();
+    // 背景クリックで閉じる。
+    await userEvent.click(overlay.parentElement as HTMLElement);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "キーボードショートカット" })).not.toBeInTheDocument()
+    );
+  });
+
+  it("TopBar の施策追加ボタンで施策 view を開く", async () => {
+    flags.authEnabled = false;
+    // 既定が施策以外(公開済みのみ→成績 view)になるデータで、施策ボタンから施策 view へ遷移する。
+    window.history.replaceState(null, "", "/?view=performance");
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "公開済み記事", stage: "published" })] },
+    });
+    render(<ApproveClient />);
+    const banner = await screen.findByRole("banner");
+    await userEvent.click(within(banner).getByRole("button", { name: "施策" }));
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    expect(within(nav).getByRole("button", { name: /施策/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("approve view 上で段階セグメントを切り替えても view は記事のまま", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ id: "i1", title: "公開済み記事", stage: "published" })],
+      },
+    });
+    render(<ApproveClient />);
+    await screen.findByRole("navigation", { name: "情報源" });
+    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
+    await userEvent.click(within(tablist).getByRole("tab", { name: /公開済み/ }));
+    // 段階は「公開済み」に、view は記事のまま。
+    expect(within(tablist).getByRole("tab", { name: /公開済み/ })).toHaveAttribute("aria-selected", "true");
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("公開済み記事")).toBeInTheDocument();
+  });
+
+  it("subtitle 無しのカードも検索(タイトル一致)で残る", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=approve");
+    mockFetchSequence({
+      json: {
+        success: true,
+        // subtitle 未指定(undefined)の記事。matchesQuery の subtitle フォールバックを通す。
+        items: [
+          ideaItem({ id: "i1", title: "特集記事", subtitle: undefined, stage: "proposed" }),
+          ideaItem({ id: "i2", title: "別記事", subtitle: undefined, stage: "proposed" }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("特集記事");
+    await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "特集");
+    await waitFor(() => expect(screen.queryByText("別記事")).not.toBeInTheDocument());
+    expect(screen.getByText("特集記事")).toBeInTheDocument();
+  });
+
+  it("パレットから記事(idea)へジャンプすると記事 view へ切替えて詳細を開く", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem(), // 既定は施策 view
+          ideaItem({ id: "i1", title: "猛暑記事", stage: "proposed" }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
+    const palette = await screen.findByRole("dialog", { name: "コマンドパレット" });
+    await userEvent.type(within(palette).getByLabelText("コマンド検索"), "猛暑");
+    await userEvent.click(within(palette).getByRole("button", { name: /猛暑記事/ }));
+    // 記事 view へ自動切替して詳細を開く。
+    expect(await screen.findByRole("dialog", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
+  });
+});
+
 describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
   const draftReady110 = (bodyHtml: string) => ({
     json: {
@@ -2565,6 +2773,8 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
       draftReady110("<p>本文A</p>")
     );
     render(<ApproveClient />);
+    // #proto P1: 下書き(drafted)のみは既定成績 view。記事 view へ遷移。
+    await selectView(/記事/);
     await screen.findByText("下書きA");
     await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
     // 下書き取得後にワークスペース(別dialog)が自動で開く。
@@ -2586,6 +2796,7 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
       draftReady110("<p>保存後</p>")
     );
     render(<ApproveClient />);
+    await selectView(/記事/);
     await screen.findByText("下書きA");
     await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
     const ws = await screen.findByRole("dialog", { name: "記事を編集" });
@@ -2614,6 +2825,7 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110)", () => {
     vi.stubGlobal("fetch", fn);
 
     render(<ApproveClient />);
+    await selectView(/記事/);
     await screen.findByText("下書きA");
     await userEvent.click(screen.getByRole("button", { name: "編集: 下書きA" }));
     // 取得中にドロワーを閉じる。
@@ -2639,58 +2851,64 @@ describe("ApproveClient タブ分離/ルーティング(#119)", () => {
     });
   }
 
-  it("施策/記事タブを表示し、未処理件数バッジを出す", async () => {
+  // #proto P1: view ナビは LeftRail(nav)。選択中は aria-current="page"、未処理件数はバッジ。
+  function railButton(name: RegExp): HTMLElement {
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    return within(nav).getByRole("button", { name });
+  }
+
+  it("施策/記事ナビを表示し、未処理件数バッジを出す", async () => {
     mockMixed();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X");
-    // 未処理がある施策が既定タブ
-    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
-    const propTab = screen.getByRole("tab", { name: /施策/ });
-    expect(within(propTab).getByText("1")).toBeInTheDocument(); // 施策の未処理1件バッジ
+    // 未処理がある施策が既定 view
+    expect(railButton(/施策/)).toHaveAttribute("aria-current", "page");
+    expect(within(railButton(/施策/)).getByText("1")).toBeInTheDocument(); // 施策の未処理1件バッジ
     // 既定では記事パイプラインは出ない
     expect(screen.queryByRole("region", { name: "記事パイプライン" })).not.toBeInTheDocument();
   });
 
-  it("タブ切替で記事タブへ移り、URL に ?view=articles を書く", async () => {
+  it("view 切替で記事 view へ移り、URL に ?view=approve を書く", async () => {
     mockMixed();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X");
-    await selectTab(/記事/);
+    await selectView(/記事/);
     expect(screen.getByText("記事Y")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
-    expect(window.location.search).toContain("view=articles");
+    expect(window.location.search).toContain("view=approve");
+    expect(railButton(/記事/)).toHaveAttribute("aria-current", "page");
   });
 
-  it("URL に ?view=articles があれば記事タブを初期表示する", async () => {
-    window.history.replaceState(null, "", "/?view=articles");
+  it("URL に ?view=approve があれば記事 view を初期表示する", async () => {
+    window.history.replaceState(null, "", "/?view=approve");
     mockMixed();
     render(<ApproveClient />);
     await login();
-    // 未処理は施策側だが、URL 指定で記事タブが開く
+    // 未処理は施策側だが、URL 指定で記事 view が開く
     expect(await screen.findByText("記事Y")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+    expect(railButton(/記事/)).toHaveAttribute("aria-current", "page");
   });
 
-  it("パレットから施策へジャンプすると施策タブへ自動切替して詳細を開く", async () => {
-    window.history.replaceState(null, "", "/?view=articles");
+  it("パレットから施策へジャンプすると施策 view へ自動切替して詳細を開く", async () => {
+    window.history.replaceState(null, "", "/?view=approve");
     mockMixed();
     render(<ApproveClient />);
     await login();
-    await screen.findByText("記事Y"); // 記事タブから開始
-    fireEvent.keyDown(document.body, { key: "/" });
+    await screen.findByText("記事Y"); // 記事 view から開始
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
     const palette = await screen.findByRole("dialog", { name: "コマンドパレット" });
     await userEvent.type(within(palette).getByLabelText("コマンド検索"), "施策X");
     await userEvent.click(within(palette).getByRole("button", { name: /施策X/ }));
     expect(await screen.findByRole("dialog", { name: "詳細: 施策X" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+    expect(railButton(/施策/)).toHaveAttribute("aria-current", "page");
   });
 });
 
-describe("ApproveClient タブ初期化の同期(#119)", () => {
-  it("URL=記事タブの初回描画で生成中カードを表示する(滞留基準が未記録の経路)", async () => {
-    window.history.replaceState(null, "", "/?view=articles");
+describe("ApproveClient view 初期化の同期(#119)", () => {
+  it("URL=記事 view の初回描画で生成中カードを表示する(滞留基準が未記録の経路)", async () => {
+    window.history.replaceState(null, "", "/?view=approve");
     mockFetchSequence({
       json: {
         success: true,
@@ -2701,11 +2919,12 @@ describe("ApproveClient タブ初期化の同期(#119)", () => {
     await login();
     // 初回描画時点では firstSeen 未記録 → 滞留扱いにならず通常表示される。
     expect(await screen.findByText("生成中の記事")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
   });
 });
 
-describe("ApproveClient タブのキーボード/a11y(#119)", () => {
+describe("ApproveClient ナビ/段階フィルタの a11y(#119/#proto P1)", () => {
   function mockMixed2() {
     return mockFetchSequence({
       json: {
@@ -2718,37 +2937,58 @@ describe("ApproveClient タブのキーボード/a11y(#119)", () => {
     });
   }
 
-  it("← → でタブを移動でき、その他キーは無視する", async () => {
+  // #proto P1: LeftRail ナビには ←→ 移動は無い。ナビ click で view が切り替わり aria-current が反映される。
+  it("ナビ click で view を切り替え、aria-current が反映される", async () => {
     mockMixed2();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X");
-    const tablist = screen.getByRole("tablist", { name: "表示切替" });
+    const nav = screen.getByRole("navigation", { name: "情報源" });
 
-    // 既定は施策。→ で記事へ。
-    fireEvent.keyDown(tablist, { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: /記事/ })).toHaveAttribute("aria-selected", "true");
+    // 既定は施策。記事ボタンで記事 view へ。
+    await userEvent.click(within(nav).getByRole("button", { name: /記事/ }));
+    expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("button", { name: /施策/ })).not.toHaveAttribute("aria-current");
     expect(screen.getByText("記事Y")).toBeInTheDocument();
 
-    // ← で施策へ戻る。
-    fireEvent.keyDown(tablist, { key: "ArrowLeft" });
-    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
-
-    // 対象外キーは何もしない(施策のまま)。
-    fireEvent.keyDown(tablist, { key: "Enter" });
-    expect(screen.getByRole("tab", { name: /施策/ })).toHaveAttribute("aria-selected", "true");
+    // 施策ボタンで施策 view へ戻る。
+    await userEvent.click(within(nav).getByRole("button", { name: /施策/ }));
+    expect(within(nav).getByRole("button", { name: /施策/ })).toHaveAttribute("aria-current", "page");
   });
 
-  it("tab と tabpanel が aria-controls/labelledby で紐付く", async () => {
+  // #proto P1: TopBar 段階フィルタ(tablist/tab)と本文パネル(tabpanel)が aria-controls/labelledby で紐付く。
+  it("段階フィルタ tab と tabpanel が aria-controls/labelledby で紐付く", async () => {
     mockMixed2();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X");
+
+    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
+    // 既定は「すべて」段階が選択中。
+    const allTab = within(tablist).getByRole("tab", { name: /すべて/ });
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(allTab).toHaveAttribute("aria-controls", "approve-tabpanel");
+
     const panel = screen.getByRole("tabpanel");
     expect(panel).toHaveAttribute("id", "approve-tabpanel");
-    expect(panel).toHaveAttribute("aria-labelledby", "approve-tab-proposals");
-    const propTab = screen.getByRole("tab", { name: /施策/ });
-    expect(propTab).toHaveAttribute("aria-controls", "approve-tabpanel");
+    expect(panel).toHaveAttribute("aria-labelledby", allTab.getAttribute("id"));
+  });
+
+  // #proto P1: 非 approve view で段階 tab を click すると approve view へ遷移してフィルタが適用される。
+  it("段階フィルタ tab の click で approve view へ遷移し、選択段階が反映される", async () => {
+    mockMixed2();
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("施策X"); // 既定は施策 view
+
+    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
+    await userEvent.click(within(tablist).getByRole("tab", { name: /あなた待ち/ }));
+
+    // approve view へ切り替わり、選択段階が aria-selected に反映される。
+    expect(within(tablist).getByRole("tab", { name: /あなた待ち/ })).toHaveAttribute("aria-selected", "true");
+    const nav = screen.getByRole("navigation", { name: "情報源" });
+    expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("region", { name: "記事パイプライン" })).toBeInTheDocument();
   });
 });
 
@@ -2759,6 +2999,8 @@ describe("ApproveClient カードのタイトル視認性(#119 follow-up)", () =
     mockFetchSequence({ json: { success: true, items: [ideaItem({ title: LONG, ...over })] } });
     render(<ApproveClient />);
     await login();
+    // #proto P1: 記事はすべて記事 view に表示される(生成待ち/生成中/下書きは既定 view が異なるため明示遷移)。
+    await selectView(/記事/);
     return screen.findByText(LONG);
   }
 
@@ -3183,6 +3425,8 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     });
     render(<ApproveClient />);
     await login();
+    // #proto P1: 生成待ち(queued)は既定成績 view。記事 view へ遷移してからカードを開く。
+    await selectView(/記事/);
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 生成待ち記事" }));
     const dialog = await screen.findByRole("dialog", { name: "詳細: 生成待ち記事" });
     fireEvent.keyDown(document.body, { key: "a" });
@@ -3232,15 +3476,20 @@ describe("ApproveClient スマホ操作性(#137)", () => {
     ).toBeInTheDocument();
   });
 
-  it("キーボードヒントはデスクトップ限定で、モバイルにはタッチ向け案内を出す", async () => {
+  // #proto P1: キーヒントは ShortcutBar(footer)へ移動。タッチ中心の狭幅では隠す(hidden md:flex)。
+  // 旧「カードをタップ…」のモバイル向け文言はシェル移植で撤去(proto に無い)。
+  it("キーヒントはデスクトップ限定(hidden md:flex)で ShortcutBar に出る", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
     await screen.findByRole("button", { name: "猛暑記事" });
-    const kbd = screen.getByText(/キーボード:/);
-    expect(kbd).toHaveClass("hidden");
-    expect(kbd).toHaveClass("lg:block");
-    expect(screen.getByText(/カードをタップ/)).toBeInTheDocument();
+    const footer = screen.getByRole("contentinfo");
+    // 「移動」ヒントを内包する行が md 以上でのみ表示される。
+    const hints = within(footer).getByText("移動").closest("div");
+    expect(hints).toHaveClass("hidden");
+    expect(hints).toHaveClass("md:flex");
+    // ヘルプ(?)ボタンは常時到達可能。
+    expect(within(footer).getByRole("button")).toBeInTheDocument();
   });
 });
 
@@ -3431,6 +3680,8 @@ describe("ApproveClient 公開・クローズ(#167)", () => {
     );
     flags.authEnabled = false;
     render(<ApproveClient />);
+    // #proto P1: 公開済みなど未処理でない段階は既定成績 view。記事 view へ遷移して開く。
+    await selectView(/記事/);
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     await screen.findByRole("dialog");
@@ -3556,6 +3807,8 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     );
     flags.authEnabled = false;
     render(<ApproveClient />);
+    // #proto P1: 下書き済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
+    await selectView(/記事/);
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
@@ -3568,6 +3821,8 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     });
     flags.authEnabled = false;
     render(<ApproveClient />);
+    // #proto P1: 生成中/公開済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
+    await selectView(/記事/);
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
@@ -3616,6 +3871,8 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     });
     flags.authEnabled = false;
     render(<ApproveClient />);
+    // #proto P1: 下書き済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
+    await selectView(/記事/);
     await screen.findByText("猛暑記事");
     await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
     await screen.findByRole("dialog", { name: "詳細: 猛暑記事" });
@@ -3657,10 +3914,13 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
       { json: { success: true, items: [] } }, // pollBoard 再取得
     );
     render(<ApproveClient />);
-    await screen.findByRole("tab", { name: /記事/ });
-    await selectTab(/記事/);
-    await userEvent.click(await screen.findByRole("button", { name: /公開キュー/ }));
-    await userEvent.click(screen.getByRole("button", { name: /今すぐ公開/ }));
+    // #proto P1: 公開キューは LeftRail の独立 view。ナビで開き、キュー本体を展開してから公開する。
+    const nav = await screen.findByRole("navigation", { name: "情報源" });
+    await userEvent.click(within(nav).getByRole("button", { name: /公開キュー/ }));
+    // PublishQueue は折りたたみ既定。トグルボタン(公開キュー…)を開いてから今すぐ公開を押す。
+    const queueSection = await screen.findByRole("region", { name: "公開キュー" });
+    await userEvent.click(within(queueSection).getByRole("button", { name: /公開キュー/ }));
+    await userEvent.click(within(queueSection).getByRole("button", { name: /今すぐ公開/ }));
 
     await waitFor(() =>
       expect(fn.mock.calls.some((c) => String(c[0]) === "/api/growth/publish")).toBe(true)

@@ -78,8 +78,10 @@ export function TopBar({
           return (
             <button
               key={s.key}
+              id={`approve-seg-${s.key}`}
               role="tab"
               aria-selected={active}
+              aria-controls="approve-tabpanel"
               onClick={() => onSegmentChange(s.key)}
               className="flex items-center gap-1.5 rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-medium transition-colors"
               style={{
