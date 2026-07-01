@@ -10,13 +10,13 @@ import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 
 import {
   effectiveStage,
-  groupArticlesByStage,
   isActionable,
   isAwaitingDownstream,
   reconcileDecided,
   scoreBarPct,
   stageStepIndex,
 } from "./board";
+import { groupByBoardStage } from "./boardGroups";
 import { stageTheme } from "./boardColors";
 import {
   GENERATING_STEPS,
@@ -44,7 +44,7 @@ import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { AddProposalForm } from "./AddProposalForm";
-import { ArticlesView } from "./ArticlesView";
+import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { PromptsView } from "./PromptsView";
@@ -168,8 +168,8 @@ export function ApproveClient() {
   const [busy, setBusy] = useState(authDisabled);
   // #240: 操作後に次の操作対象へフォーカスを移すための一時ターゲット(要素 id)。
   const [focusId, setFocusId] = useState<string | null>(null);
-  // #275: master-detail。詳細パネルを開いている項目 id(クライアントのオーバーレイ)。
-  const [openId, setOpenId] = useState<string | null>(null);
+  // #275/#proto P3a: master-detail。右詳細ペインでアクティブにしている項目 id。
+  const [activeId, setActiveId] = useState<string | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   // decisionMutation はクローズ操作でも共用するため公開分を受け取る。
   const {
@@ -185,11 +185,12 @@ export function ApproveClient() {
   } = useApproveDecisions({
     token,
     onFocus: setFocusId,
-    onClosePanel: () => setOpenId(null),
+    onClosePanel: () => setActiveId(null),
   });
   // #H7: 構成案の修正(AI依頼/手動編集/画像指示/タイトル/提示反映)はカスタムフックへ集約し、
   // 戻り値を丸ごと ReviseSectionView へ渡す。refreshItems(最新化)のみ提示待ちポーリングで共用。
-  const revise = useReviseEditing({ token, openId, setBoardData });
+  // #proto P3a: フック側 prop 名は openId のまま、値はアクティブ項目 id(activeId)を渡す。
+  const revise = useReviseEditing({ token, openId: activeId, setBoardData });
   // 提示待ちポーリングの依存に使う安定参照(useCallback)。
   const { refreshItems } = revise;
   const passphraseRef = useRef<HTMLInputElement>(null);
@@ -204,7 +205,7 @@ export function ApproveClient() {
     setFocusId(null);
   }, [focusId]);
 
-  // フォーム状態のリセット(openId 変化)は useDraftEditing / useReviseEditing 各フックが担う(#H7)。
+  // フォーム状態のリセット(activeId 変化)は useDraftEditing / useReviseEditing 各フックが担う(#H7)。
 
   // #119: 初期表示タブの確定。URL の ?view 指定はマウント時に同期確定済み。ここでは未確定時に
   // 一覧読込後、未処理がある方(両方あれば施策)を自動選択する。確定後は自動上書きしない。
@@ -346,7 +347,7 @@ export function ApproveClient() {
   }
 
   // #43: 開いている記事が提示待ち(依頼中/処理中)かどうか。
-  const polledItem = openId ? items.find((it) => it.id === openId) : undefined;
+  const polledItem = activeId ? items.find((it) => it.id === activeId) : undefined;
   const isRevisePending = polledItem
     ? revisePhase(polledItem.reviseStatus) === "pending"
     : false;
@@ -363,7 +364,7 @@ export function ApproveClient() {
 
   // #75/#166: 下書きプレビューの取得・ポーリングはカスタムフックへ集約(#H7 分解)。
   const openHasDraft = polledItem?.kind === "idea" && Boolean(polledItem.contentId);
-  const { draftState, loadDraft } = useDraftPreview({ token, openId, openHasDraft });
+  const { draftState, loadDraft } = useDraftPreview({ token, openId: activeId, openHasDraft });
 
   // #77/#98/#110/#129: 下書きの手動リッチ編集はカスタムフックへ集約(#H7 分解)。
   const {
@@ -382,7 +383,7 @@ export function ApproveClient() {
     cancelEditDraft,
     exitEditDraft,
     saveDraft,
-  } = useDraftEditing({ token, openId, draftState, loadDraft, onOpen: setOpenId });
+  } = useDraftEditing({ token, openId: activeId, draftState, loadDraft, onOpen: setActiveId });
 
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
@@ -484,7 +485,7 @@ export function ApproveClient() {
     try {
       await postRevert(token, id);
       await pollBoard();
-      setOpenId(null);
+      setActiveId(null);
       pushToast("提案中に戻しました。構成・タイトルを直して再承認してください。");
     } catch (error) {
       pushToast(toMessage(error, "提案中に戻せませんでした。"), "error");
@@ -544,7 +545,7 @@ export function ApproveClient() {
   // #242: 施策/記事をセクション分割し、各セクション内を優先度スコア降順に並べる。
   const proposals = items.filter((item) => item.kind === "proposal").sort(byScoreDesc);
   const ideas = items.filter((item) => item.kind === "idea").sort(byScoreDesc);
-  const openItem = openId ? items.find((item) => item.id === openId) : undefined;
+  const activeItem = activeId ? items.find((item) => item.id === activeId) : undefined;
 
   // #proto P1: シェル統計(段階セグメント件数 / あなた待ち / 公開済み / 施策残 / 公開キュー)。
   const counts = deriveShellCounts(items, decided);
@@ -561,8 +562,8 @@ export function ApproveClient() {
   // #proto P1: 施策 view も検索で絞り込む(段階セグメントは記事専用のため施策には適用しない)。
   const visibleProposals = proposals.filter(matchesQuery);
 
-  // #107: 記事をパイプライン段階(#106)ごとの列に振り分ける。承認は生成待ち列へ前進。
-  const articleColumns = groupArticlesByStage(visibleIdeas, decided);
+  // #proto P3a: 記事を BoardStage ごとの単一縦リスト(段階セクション)へ分ける。
+  const boardGroups = groupByBoardStage(visibleIdeas);
   // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
   const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
@@ -576,8 +577,9 @@ export function ApproveClient() {
     ((activeView === "proposal" && visibleProposals.length === 0 && proposals.length > 0) ||
       (activeView === "approve" && visibleIdeas.length === 0 && ideas.length > 0));
 
-  // #109/#proto P1: キーボード操作対象はアクティブ view のカードに限定。パレットは両ストリーム横断。
-  const articleNavItems = articleColumns.flatMap((col) => col.items);
+  // #109/#proto P1/P3a: キーボード操作対象はアクティブ view のカードに限定。パレットは両ストリーム横断。
+  // 記事は段階セクションを跨いで並んだ順(リスト表示順)を連続レビューの並びに使う。
+  const articleNavItems = boardGroups.flatMap((group) => group.items);
   // prompt/performance/queue view はカードを持たないのでキー操作対象は空。
   const navItems =
     activeView === "proposal" ? visibleProposals : activeView === "approve" ? articleNavItems : [];
@@ -601,7 +603,7 @@ export function ApproveClient() {
   function jumpTo(id: string): void {
     const isIdea = ideas.some((item) => item.id === id);
     changeView(isIdea ? "approve" : "proposal");
-    setOpenId(id);
+    setActiveId(id);
     setPaletteOpen(false);
   }
 
@@ -628,24 +630,24 @@ export function ApproveClient() {
       // ただし下書き編集中・入力欄(コメント等)での Esc は、そちらの操作を優先して閉じない。
       setPaletteOpen(false);
       setFocusedIndex(-1);
-      if (openId && !editingDraft && !editable) setOpenId(null);
+      if (activeId && !editingDraft && !editable) setActiveId(null);
       return;
     }
-    // #130: 詳細パネル表示中はパネル操作を優先(連続レビュー)。a承認/r却下/e編集/j次・k前。
-    if (openItem) {
+    // #130: 詳細ペイン表示中はペイン操作を優先(連続レビュー)。a承認/r却下/e編集/j次・k前。
+    if (activeItem) {
       if (action === "approve") {
-        if (isBulkActionable(openItem)) void decide(openItem, "承認");
+        if (isBulkActionable(activeItem)) void decide(activeItem, "承認");
       } else if (action === "reject") {
-        if (isBulkActionable(openItem)) void decide(openItem, "却下");
+        if (isBulkActionable(activeItem)) void decide(activeItem, "却下");
       } else if (action === "edit") {
         if (draftState.status === "ready") startEditDraft(draftState.draft.bodyHtml);
       } else if (action === "next") {
-        const id = nextReviewId(reviewOrder, openItem.id, 1);
-        if (id) setOpenId(id);
+        const id = nextReviewId(reviewOrder, activeItem.id, 1);
+        if (id) setActiveId(id);
       } else {
         // prev
-        const id = nextReviewId(reviewOrder, openItem.id, -1);
-        if (id) setOpenId(id);
+        const id = nextReviewId(reviewOrder, activeItem.id, -1);
+        if (id) setActiveId(id);
       }
       return;
     }
@@ -660,11 +662,13 @@ export function ApproveClient() {
       if (focusedItem && isBulkActionable(focusedItem)) void decide(focusedItem, "却下");
     } else {
       // edit
-      if (focusedItem) setOpenId(focusedItem.id);
+      if (focusedItem) setActiveId(focusedItem.id);
     }
   };
 
-  // #275: 高密度な一覧行。詳細はパネルへ寄せ、行では承認/却下/詳細だけを出す。
+  // #275/#proto P3a: 高密度な一覧行。詳細は右ペインへ寄せ、行では承認/却下/詳細だけを出す。
+  // BoardList の renderRow(item, isActive) にも施策 view の renderItem(item) にも共用する
+  // (isActive は BoardList 側の layoutId レール/背景で表現するため本関数では未使用)。
   function renderItem(item: PendingItem) {
     const choice = decided[item.id];
     const isIdea = item.kind === "idea";
@@ -693,7 +697,7 @@ export function ApproveClient() {
         kindLabel={KIND_BADGE[item.kind]}
         generatingStepsText={GENERATING_STEPS.join(" → ")}
         awaitingDownstream={isAwaitingDownstream(item.stage)}
-        onOpen={() => setOpenId(item.id)}
+        onOpen={() => setActiveId(item.id)}
         onUndo={() => void undo(item)}
         onEdit={() => openCardEditor(item.id)}
         onToggleSelect={() => toggleSelect(item.id)}
@@ -708,14 +712,14 @@ export function ApproveClient() {
   // 詳細パネル(Framer の transform・sticky を持つ)の内側にネストすると position:fixed が
   // 祖先に閉じ込められ全画面オーバーレイが崩れるため、トップレベルで描画する。
   function renderEditWorkspace() {
-    if (!editingDraft || !openItem || draftState.status !== "ready") return null;
+    if (!editingDraft || !activeItem || draftState.status !== "ready") return null;
     return (
       <DraftEditWorkspace
         title={draftState.draft.title}
         initialHtml={draftOriginalHtml}
         livePreviewHtml={livePreviewHtml}
         onChange={setEditedHtml}
-        onSave={() => saveDraft(openItem.id)}
+        onSave={() => saveDraft(activeItem.id)}
         onCancel={cancelEditDraft}
         saving={draftSaving}
         saveError={draftSaveError}
@@ -779,7 +783,11 @@ export function ApproveClient() {
             id="approve-tabpanel"
             aria-label={viewPanelLabel[activeView]}
             aria-labelledby={`approve-seg-${segment}`}
-            className="min-w-0 flex-1 overflow-auto p-4 lg:px-6"
+            className={
+              activeView === "approve"
+                ? "flex min-w-0 flex-1 flex-col"
+                : "min-w-0 flex-1 overflow-auto p-4 lg:px-6"
+            }
           >
             {/* #H5: ポーリング連続失敗を可視化(古いデータを最新のように見せない・沈黙させない)。 */}
             {shouldWarnPollStale(pollFailures) ? (
@@ -788,13 +796,88 @@ export function ApproveClient() {
                 onRetry={() => void pollBoard()}
               />
             ) : null}
-            {allDone ? (
+            {allDone && activeView !== "approve" ? (
               <p className="mb-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
                 🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
               </p>
             ) : null}
 
-            {searchEmpty ? (
+            {activeView === "approve" ? (
+              // #proto P3a: approve view は「単一リスト(左)＋詳細ペイン(右)」の2ペイン。
+              // 狭幅(lg未満)は master-detail の1ペイン: activeId!=null は右詳細のみ、
+              // null は左リストのみを見せ、右ペイン先頭の「← 一覧」で戻る。
+              <div className="flex min-h-0 flex-1">
+                <section
+                  aria-label="記事リスト"
+                  className={`${
+                    activeId != null ? "hidden lg:block" : "block"
+                  } w-full overflow-y-auto lg:w-[38%] lg:min-w-[330px] lg:max-w-[480px]`}
+                  style={{ borderRight: "1px solid var(--p-border)" }}
+                >
+                  {searchEmpty ? (
+                    <SearchEmpty query={query} />
+                  ) : (
+                    <BoardList
+                      groups={boardGroups}
+                      activeId={activeId}
+                      decided={decided}
+                      densityClass={densityClass}
+                      onActivate={setActiveId}
+                      renderRow={renderItem}
+                    />
+                  )}
+                </section>
+                <section
+                  aria-label="記事の詳細"
+                  className={`${activeId != null ? "block" : "hidden lg:block"} min-w-0 flex-1 overflow-y-auto`}
+                  style={{ background: "var(--p-bg)" }}
+                >
+                  {activeItem ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setActiveId(null)}
+                        className="approve-back sticky top-0 z-10 flex items-center gap-1 px-4 py-3 text-[13px] font-medium lg:hidden"
+                        style={{ color: "var(--p-text-2)", background: "var(--p-bg)" }}
+                      >
+                        ← 一覧
+                      </button>
+                      <div className="p-4 lg:px-6">
+                        <DetailPanelView
+                          item={activeItem}
+                          choice={decided[activeItem.id]}
+                          isBusy={savingId === activeItem.id}
+                          draftState={draftState}
+                          token={token}
+                          previewDevice={previewDevice}
+                          actionBusy={actionBusy}
+                          actionError={actionError}
+                          reviewOrder={reviewOrder}
+                          revise={revise}
+                          onDecide={decideFromPanel}
+                          onUndo={undoFromPanel}
+                          onRevert={(item) => openConfirm(item, "revert")}
+                          onOpen={setActiveId}
+                          onClose={() => setActiveId(null)}
+                          onPreviewDeviceChange={setPreviewDevice}
+                          onStartEdit={startEditDraft}
+                          onReloadDraft={(pageId) => void loadDraft(pageId)}
+                          onConfirm={openConfirm}
+                          onToast={pushToast}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      className="hidden h-full flex-col items-center justify-center gap-2 px-6 text-center lg:flex"
+                      style={{ color: "var(--p-text-3)" }}
+                    >
+                      <span className="text-[13px]">記事を選択すると詳細が表示されます</span>
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : searchEmpty ? (
               <SearchEmpty query={query} />
             ) : activeView === "proposal" ? (
               <>
@@ -806,12 +889,6 @@ export function ApproveClient() {
                 />
                 <AddProposalForm token={token} onAdded={addProposal} />
               </>
-            ) : activeView === "approve" ? (
-              <ArticlesView
-                columns={articleColumns}
-                renderItem={renderItem}
-                densityClass={densityClass}
-              />
             ) : activeView === "prompt" ? (
               <PromptsView token={token} />
             ) : activeView === "performance" ? (
@@ -847,31 +924,6 @@ export function ApproveClient() {
 
         {/* #108: 下書き完成トースト(LINE通知と二重化)。閉じるまで残す。 */}
         <ToastList toasts={toasts} onDismiss={dismissToast} />
-
-        {openItem ? (
-          <DetailPanelView
-            item={openItem}
-            choice={decided[openItem.id]}
-            isBusy={savingId === openItem.id}
-            draftState={draftState}
-            token={token}
-            previewDevice={previewDevice}
-            actionBusy={actionBusy}
-            actionError={actionError}
-            reviewOrder={reviewOrder}
-            revise={revise}
-            onDecide={decideFromPanel}
-            onUndo={undoFromPanel}
-            onRevert={(item) => openConfirm(item, "revert")}
-            onOpen={setOpenId}
-            onClose={() => setOpenId(null)}
-            onPreviewDeviceChange={setPreviewDevice}
-            onStartEdit={startEditDraft}
-            onReloadDraft={(pageId) => void loadDraft(pageId)}
-            onConfirm={openConfirm}
-            onToast={pushToast}
-          />
-        ) : null}
 
         {/* #109/#proto P1: コマンドパレット(⌘K)。両ストリーム横断検索→view 切替＋詳細へジャンプ。 */}
         {paletteOpen ? (
