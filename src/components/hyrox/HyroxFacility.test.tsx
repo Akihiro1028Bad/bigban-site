@@ -81,10 +81,10 @@ describe("HyroxFacility", () => {
     ).toBeInTheDocument();
   });
 
-  it("施設写真3枚とドット3つを表示する", () => {
+  it("施設写真9枚とドット9つを表示する", () => {
     renderFacility();
     const dots = screen.getAllByRole("button", { name: /施設写真を表示/ });
-    expect(dots).toHaveLength(3);
+    expect(dots).toHaveLength(9);
     expect(
       screen.getByAltText(
         "スキーエルゴとローイングマシンが並ぶHYROXトレーニングエリアの走行レーン"
