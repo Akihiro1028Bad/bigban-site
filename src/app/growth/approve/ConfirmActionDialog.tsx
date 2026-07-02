@@ -9,6 +9,7 @@
 
 import { IconWand } from "./ui/icons";
 import { Kbd } from "./ui/primitives";
+import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
 
 export interface ConfirmActionState {
@@ -50,6 +51,7 @@ export function ConfirmActionDialog({ action, busy, onCancel, onConfirm }: Confi
         aria-modal="true"
         aria-label={REVERT_CONFIG.ariaLabel}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => handleOverlayKeyDown(e, onCancel)}
         className="w-full max-w-[440px] overflow-hidden rounded-[14px]"
         style={{
           background: "var(--p-bg-elevated)",

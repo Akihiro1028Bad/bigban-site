@@ -694,6 +694,13 @@ export function ApproveClient() {
       return;
     }
     if (action === "escape") {
+      // #proto P6: 相談ドロワー(ConsultDrawer)は aria-modal=false の非モーダルのため、
+      // 各 fixed モーダルの自前 Esc ではなくこの中央処理が担う。開いていれば最優先で閉じ、
+      // 詳細パネル/フォーカスは維持する(proto の「1つずつ閉じる」優先順)。
+      if (consult.open) {
+        consult.closeDrawer();
+        return;
+      }
       // パレット→フォーカス解除に加え、詳細パネルが開いていれば閉じる(#127)。
       // ただし下書き編集中・入力欄(コメント等)での Esc は、そちらの操作を優先して閉じない。
       setPaletteOpen(false);

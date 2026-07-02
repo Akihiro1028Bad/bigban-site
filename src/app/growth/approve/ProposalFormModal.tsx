@@ -25,6 +25,7 @@ import { KIND_META } from "@/lib/growth/proposalKind";
 import type { AddedProposal } from "./AddProposalForm";
 import { authHeaders } from "./authHeaders";
 import { toMessage } from "./errorMessage";
+import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
 import type { ProposalKind } from "./types";
 import { IconPlus } from "./ui/icons";
@@ -104,6 +105,7 @@ export function ProposalFormModal({ token, onClose, onAdded }: ProposalFormModal
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => handleOverlayKeyDown(e, onClose)}
         className="w-full max-w-[480px] overflow-hidden rounded-[14px]"
         style={{
           background: "var(--p-bg-elevated)",

@@ -129,6 +129,16 @@ describe("PublishQueue", () => {
     expect(fetchMock.mock.calls.filter((c) => c[0] === "/api/growth/publish/schedule")).toHaveLength(0);
   });
 
+  // #proto P6: 公開予約ピッカーは自前 Esc(handleOverlayKeyDown)で閉じる。
+  it("公開予約ピッカーは Esc で schedule せずに閉じる", () => {
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /^予約$/ }));
+    const dialog = screen.getByRole("dialog", { name: "公開日時を予約" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "公開日時を予約" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter((c) => c[0] === "/api/growth/publish/schedule")).toHaveLength(0);
+  });
+
   it("予約済み記事は予約時刻＋解除を出し、解除で schedule null を呼ぶ", async () => {
     const onChanged = vi.fn();
     const ms = Date.parse("2099-01-01T09:30:00.000Z");
@@ -450,6 +460,27 @@ describe("PublishQueue", () => {
       const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
       // esc ボタン(閉じる)。
       fireEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: /メディアライブラリ/ })).not.toBeInTheDocument()
+      );
+      expect(onChanged).not.toHaveBeenCalled();
+      expect(fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch")).toBeUndefined();
+    });
+
+    // #proto P6: メディアライブラリは自前 Esc(handleOverlayKeyDown)で閉じる(反映せず)。
+    it("メディアライブラリは Esc でモーダルを閉じる(反映せず)", async () => {
+      wireMediaFetch({});
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      fireEvent.keyDown(dialog, { key: "Escape" });
       await waitFor(() =>
         expect(screen.queryByRole("dialog", { name: /メディアライブラリ/ })).not.toBeInTheDocument()
       );

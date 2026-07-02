@@ -37,6 +37,24 @@ describe("ShortcutOverlay", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("ダイアログ本体で Esc を押すと onClose を呼ぶ(自前 Esc)", async () => {
+    const onClose = vi.fn();
+    render(<ShortcutOverlay onClose={onClose} />);
+    const dialog = screen.getByRole("dialog", { name: "キーボードショートカット" });
+    dialog.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("ダイアログ内の修飾なし単一キーは onClose を呼ばない(キー漏れ防止)", async () => {
+    const onClose = vi.fn();
+    render(<ShortcutOverlay onClose={onClose} />);
+    const dialog = screen.getByRole("dialog", { name: "キーボードショートカット" });
+    dialog.focus();
+    await userEvent.keyboard("a");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("移動/操作/表示の全グループの項目を表示する", () => {
     render(<ShortcutOverlay onClose={vi.fn()} />);
     expect(screen.getByText("移動")).toBeInTheDocument();
