@@ -22,10 +22,11 @@ import {
   type DraftFlexItem,
   type DraftNotifyItem,
 } from "./draft-notify";
+import { growthEndpoint } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 
 interface InputItem {
   title: string;

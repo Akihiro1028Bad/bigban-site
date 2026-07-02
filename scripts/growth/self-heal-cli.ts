@@ -12,6 +12,7 @@
 import "dotenv/config";
 
 import { slugToContentId } from "./content";
+import { growthEndpoint } from "./endpoint";
 import { defaultFetch } from "./http";
 import {
   deleteContent,
@@ -21,7 +22,7 @@ import {
   type SelfHealHttpOptions,
 } from "./self-heal";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);

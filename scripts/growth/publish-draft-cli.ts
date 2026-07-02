@@ -41,6 +41,7 @@ import {
   classifyDraftFailure,
 } from "./draft-notify";
 import { fetchDraftKey } from "./draft-meta";
+import { growthEndpoint } from "./endpoint";
 import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
@@ -59,7 +60,7 @@ import {
 import { runStages, type Stage } from "./pipeline";
 import { evaluatePublishGate } from "./publishGate";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REF = path.join(here, "assets", "mascot-alien.png");
 

@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
+import { growthEndpoint } from "@/lib/growth/endpoint";
 import {
   buildBodyMirrorProps,
   defaultFetch,
@@ -25,7 +26,7 @@ import { sanitizeNewsHtml, STRICT_HTML_CONFIG } from "@/lib/news/sanitize";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 // microCMS contentId の許可文字(slugToContentId と同じ)。不正値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 // 本文HTMLの上限(記事本文として十分・過大入力を境界で弾く)。

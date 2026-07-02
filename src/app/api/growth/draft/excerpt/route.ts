@@ -12,13 +12,14 @@ import { NextResponse } from "next/server";
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
+import { growthEndpoint } from "@/lib/growth/endpoint";
 import { EXCERPT_HARD_MAX } from "@/lib/growth/excerptDraft";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
 import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 
 function badRequest(message: string): Response {
