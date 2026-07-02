@@ -27,7 +27,6 @@ interface BoardCardProps {
   bulkSelectable: boolean;
   selected: boolean;
   stuck: boolean;
-  stageAccentClass: string;
   rowClassName: string;
   awaitingDownstream: boolean;
   /**
@@ -47,7 +46,6 @@ export function BoardCard({
   bulkSelectable,
   selected,
   stuck,
-  stageAccentClass,
   rowClassName,
   awaitingDownstream,
   as: Root = "li",
@@ -67,7 +65,7 @@ export function BoardCard({
 
   return (
     <Root
-      className={`${rowClassName} ${stageAccentClass} ${isFocused ? "ring-2 ring-[var(--p-ring)]" : ""}`}
+      className={`${rowClassName} ${isFocused ? "ring-2 ring-[var(--p-ring)]" : ""}`}
       data-decision={choice ?? ""}
     >
       {bulkSelectable ? (

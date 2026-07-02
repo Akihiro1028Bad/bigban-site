@@ -8,14 +8,8 @@ import type { FormEvent } from "react";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
 
-import {
-  effectiveStage,
-  isActionable,
-  isAwaitingDownstream,
-  reconcileDecided,
-} from "./board";
+import { isActionable, isAwaitingDownstream, reconcileDecided } from "./board";
 import { groupByBoardStage } from "./boardGroups";
-import { stageTheme } from "./boardColors";
 import {
   isInFlight,
   isStuck,
@@ -762,12 +756,11 @@ export function ApproveClient() {
         isFocused={item.id === focusedId}
         bulkSelectable={isBulkActionable(item)}
         selected={selected.has(item.id)}
-        stageAccentClass={`border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}`}
         stuck={
           isInFlight(item.stage) &&
           isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS)
         }
-        rowClassName={rowClass(choice)}
+        rowClassName={rowClass()}
         awaitingDownstream={isAwaitingDownstream(item.stage)}
         onOpen={() => setActiveId(item.id)}
         onToggleSelect={() => toggleSelect(item.id)}
