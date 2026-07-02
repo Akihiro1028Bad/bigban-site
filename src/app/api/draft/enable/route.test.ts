@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const getNewsDetailMock = vi.fn();
 const getNewsByContentIdMock = vi.fn();
+const getColumnDetailMock = vi.fn();
+const getColumnByContentIdMock = vi.fn();
 const redirectMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -14,6 +16,10 @@ vi.mock("@/lib/microcms/queries", () => ({
   getNewsDetail: (args: unknown) => getNewsDetailMock(args),
   getNewsByContentId: (args: unknown) => getNewsByContentIdMock(args),
 }));
+vi.mock("@/lib/microcms/columnsQueries", () => ({
+  getColumnDetail: (args: unknown) => getColumnDetailMock(args),
+  getColumnByContentId: (args: unknown) => getColumnByContentIdMock(args),
+}));
 
 function makeReq(url: string) {
   return new Request(url);
@@ -23,6 +29,8 @@ describe("/api/draft/enable GET", () => {
   beforeEach(() => {
     getNewsDetailMock.mockReset();
     getNewsByContentIdMock.mockReset();
+    getColumnDetailMock.mockReset();
+    getColumnByContentIdMock.mockReset();
     redirectMock.mockClear();
     vi.stubEnv("MICROCMS_DRAFT_SECRET", "ds3cret");
     vi.stubEnv("MICROCMS_DRAFT_ALLOWED_ORIGINS", "");
@@ -237,6 +245,94 @@ describe("/api/draft/enable GET", () => {
         ),
       );
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe("endpoint=columns (コラムプレビュー出し分け)", () => {
+    it("endpoint 未指定は news (後方互換): getNewsDetail を使う", async () => {
+      getNewsDetailMock.mockResolvedValue({ slug: "a", id: "n-1" });
+      const { GET } = await import("./route");
+      await expect(
+        GET(
+          makeReq(
+            "http://localhost/api/draft/enable?secret=ds3cret&slug=a&draftKey=dk&locale=ja",
+          ),
+        ),
+      ).rejects.toThrow(/NEXT_REDIRECT/);
+      expect(getNewsDetailMock).toHaveBeenCalled();
+      expect(getColumnDetailMock).not.toHaveBeenCalled();
+      expect(redirectMock).toHaveBeenCalledWith(
+        "/news/a?draftKey=dk&contentId=n-1",
+      );
+    });
+
+    it("endpoint=columns (slug+locale): /columns/{slug} へ redirect し getColumnDetail を使う", async () => {
+      getColumnDetailMock.mockResolvedValue({ slug: "a", id: "c-1" });
+      const { GET } = await import("./route");
+      await expect(
+        GET(
+          makeReq(
+            "http://localhost/api/draft/enable?secret=ds3cret&slug=a&draftKey=dk&locale=ja&endpoint=columns",
+          ),
+        ),
+      ).rejects.toThrow(/NEXT_REDIRECT/);
+      expect(getColumnDetailMock).toHaveBeenCalledWith({
+        locale: "ja",
+        slug: "a",
+      });
+      expect(getNewsDetailMock).not.toHaveBeenCalled();
+      expect(redirectMock).toHaveBeenCalledWith(
+        "/columns/a?draftKey=dk&contentId=c-1",
+      );
+    });
+
+    it("endpoint=columns locale=en は /en/columns/... へ redirect", async () => {
+      getColumnDetailMock.mockResolvedValue({ slug: "a", id: "c-1" });
+      const { GET } = await import("./route");
+      await expect(
+        GET(
+          makeReq(
+            "http://localhost/api/draft/enable?secret=ds3cret&slug=a&draftKey=dk&locale=en&endpoint=columns",
+          ),
+        ),
+      ).rejects.toThrow(/NEXT_REDIRECT/);
+      expect(redirectMock).toHaveBeenCalledWith(
+        "/en/columns/a?draftKey=dk&contentId=c-1",
+      );
+    });
+
+    it("endpoint=columns contentId 経由: getColumnByContentId で逆引きして /columns/... へ", async () => {
+      getColumnByContentIdMock.mockResolvedValue({
+        slug: "how-to-start",
+        locale: "ja",
+      });
+      const { GET } = await import("./route");
+      await expect(
+        GET(
+          makeReq(
+            "http://localhost/api/draft/enable?secret=ds3cret&contentId=c-abc&draftKey=dk&endpoint=columns",
+          ),
+        ),
+      ).rejects.toThrow(/NEXT_REDIRECT/);
+      expect(getColumnByContentIdMock).toHaveBeenCalledWith({
+        id: "c-abc",
+        draftKey: "dk",
+      });
+      expect(redirectMock).toHaveBeenCalledWith(
+        "/columns/how-to-start?draftKey=dk&contentId=c-abc",
+      );
+    });
+
+    it("endpoint 許可リスト外 (誤値) は401", async () => {
+      const { GET } = await import("./route");
+      const res = await GET(
+        makeReq(
+          "http://localhost/api/draft/enable?secret=ds3cret&slug=a&draftKey=dk&endpoint=evil",
+        ),
+      );
+      expect(res.status).toBe(401);
+      expect(getNewsDetailMock).not.toHaveBeenCalled();
+      expect(getColumnDetailMock).not.toHaveBeenCalled();
     });
   });
 });

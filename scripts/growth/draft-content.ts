@@ -14,8 +14,9 @@ import { readFile } from "node:fs/promises";
 
 import { defaultFetch } from "./http";
 import { createDraft, patchDraft, type ContentApiOptions } from "./content";
+import { growthEndpoint } from "./endpoint";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 
 async function main(): Promise<void> {
   const [mode] = process.argv.slice(2);

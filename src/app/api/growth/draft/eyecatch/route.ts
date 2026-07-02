@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
+import { growthEndpoint } from "@/lib/growth/endpoint";
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import {
   buildEyecatchMirrorProps,
@@ -26,7 +27,7 @@ import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 // contentId は Notion 由来(攻撃者制御外)だが、異常値のフェイルセーフとして上限長も課す。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 
