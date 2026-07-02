@@ -73,7 +73,7 @@ describe("/api/revalidate POST", () => {
     });
   });
 
-  it("api!=news はスキップ", async () => {
+  it("api!=許可リスト はスキップ", async () => {
     const { POST } = await import("./route");
     const res = await POST(makeRequest({ api: "other" }));
     expect(res.status).toBe(200);
@@ -81,6 +81,37 @@ describe("/api/revalidate POST", () => {
       expect.objectContaining({ skipped: true }),
     );
     expect(revalidateTagMock).not.toHaveBeenCalled();
+  });
+
+  it("columns+id で columns/columns-{id}-ja/columns-{id}-en を即時無効化", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest({ api: "columns", id: "abc" }));
+    expect(res.status).toBe(200);
+    expect(revalidateTagMock).toHaveBeenCalledWith("columns", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("columns-abc-ja", {
+      expire: 0,
+    });
+    expect(revalidateTagMock).toHaveBeenCalledWith("columns-abc-en", {
+      expire: 0,
+    });
+    // columns 更新は news タグに触れない (相互干渉なし)。
+    expect(revalidateTagMock).not.toHaveBeenCalledWith("news", { expire: 0 });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("column-categories は自タグと columns タグを連鎖 expire する (§5.3)", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest({ api: "column-categories", id: "start" }));
+    expect(res.status).toBe(200);
+    // カテゴリ名/色の変更を一覧へ反映するため columns も連鎖無効化する。
+    expect(revalidateTagMock).toHaveBeenCalledWith("column-categories", {
+      expire: 0,
+    });
+    expect(revalidateTagMock).toHaveBeenCalledWith("columns", { expire: 0 });
+    // カテゴリ更新に id 別の columns-{id} タグは無関係なので触らない。
+    expect(revalidateTagMock).not.toHaveBeenCalledWith("columns-start-ja", {
+      expire: 0,
+    });
   });
 
   it("id無しでも news タグが即時無効化プロファイルで呼ばれる", async () => {
