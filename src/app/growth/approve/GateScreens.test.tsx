@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  BoardEmpty,
   EmptyGate,
   ErrorState,
   LoadErrorGate,
@@ -22,11 +21,6 @@ describe("GateScreens(P2 再スキン)", () => {
   it("SkeletonBoard は読み込み中を明示する(aria-busy)", () => {
     render(<SkeletonBoard />);
     expect(screen.getByLabelText("読み込み中")).toHaveAttribute("aria-busy", "true");
-  });
-
-  it("BoardEmpty は空メッセージを出す", () => {
-    render(<BoardEmpty />);
-    expect(screen.getByText("記事がありません")).toBeInTheDocument();
   });
 
   it("ReviewDoneEmpty は達成メッセージを出す", () => {

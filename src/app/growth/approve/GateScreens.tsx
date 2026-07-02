@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 
 import { AddProposalForm } from "./AddProposalForm";
-import { IconCheckCircle, IconInbox, IconRefresh, IconSearch } from "./ui/icons";
+import { IconCheckCircle, IconRefresh, IconSearch } from "./ui/icons";
 
 function Bar({ w, h = 13 }: { w: string; h?: number }) {
   return <div className="approve-shimmer rounded-[5px]" style={{ width: w, height: h }} />;
@@ -69,13 +69,6 @@ export function EmptyState({ icon, title, sub, tone = "neutral" }: EmptyStatePro
         )}
       </div>
     </div>
-  );
-}
-
-/** 該当0件の盤(条件に合う記事・施策がない)の空状態。 */
-export function BoardEmpty() {
-  return (
-    <EmptyState icon={<IconInbox size={24} />} title="記事がありません" sub="この条件に該当する記事はありません。" />
   );
 }
 

@@ -4,7 +4,7 @@
  * 見た目系(EyecatchThumb/StageChip/ScoreBar/AwaitingDot/抜粋・生成中 approve-pulse)を新構造で検証。
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -228,9 +228,8 @@ describe("BoardCard 見た目(proto プリミティブ)", () => {
   });
 
   it("subtitle/details 無しは抜粋段落を出さない", () => {
-    const { container } = { container: document.body };
     renderCard({ item: { subtitle: "", details: [] } });
-    expect(container.querySelector("p.truncate")).toBeNull();
+    expect(document.body.querySelector("p.truncate")).toBeNull();
   });
 
   it("score があれば ScoreBar(数値)を出す", () => {
@@ -260,9 +259,8 @@ describe("BoardCard 見た目(proto プリミティブ)", () => {
   });
 
   it("contentId ありは EyecatchThumb 画像プレースホルダにならない(has=true)", () => {
-    const { container } = { container: document.body };
     renderCard({ item: { contentId: "g-1" } });
-    expect(within(container).queryByText("無")).toBeNull();
+    expect(screen.queryByText("無")).toBeNull();
   });
 
   it("contentId 無しは EyecatchThumb プレースホルダ(無)を出す", () => {
