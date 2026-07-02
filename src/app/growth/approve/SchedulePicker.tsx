@@ -16,6 +16,7 @@ import { formatSchedule, schedulePresets } from "@/lib/growth/publishQueueView";
 
 import { IconCalendar, IconClock } from "./ui/icons";
 import { Kbd } from "./ui/primitives";
+import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
 
 interface SchedulePickerProps {
@@ -62,6 +63,7 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => handleOverlayKeyDown(e, onClose)}
         className="w-full max-w-[440px] overflow-hidden rounded-[14px]"
         style={{
           background: "var(--p-bg-elevated)",

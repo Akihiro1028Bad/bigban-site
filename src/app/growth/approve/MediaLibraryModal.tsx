@@ -21,6 +21,7 @@ import Image from "next/image";
 import { MEDIA_ALLOWED_MIME, validateUpload } from "@/lib/growth/media";
 
 import { authHeaders } from "./authHeaders";
+import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
 import { IconCheck, IconUpload } from "./ui/icons";
 import { Kbd } from "./ui/primitives";
@@ -177,6 +178,7 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.14 }}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => handleOverlayKeyDown(e, onClose)}
         className="w-full max-w-[600px] overflow-hidden rounded-[14px]"
         style={{
           background: "var(--p-bg-elevated)",

@@ -5,6 +5,7 @@
 
 import { motion } from "framer-motion";
 
+import { handleOverlayKeyDown } from "@/app/growth/approve/hooks/overlayKeyDown";
 import { useDialog } from "@/app/growth/approve/hooks/useDialog";
 import { Kbd } from "@/app/growth/approve/ui/primitives";
 
@@ -64,6 +65,7 @@ export function ShortcutOverlay({ onClose }: ShortcutOverlayProps) {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.14 }}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => handleOverlayKeyDown(e, onClose)}
         className="w-full max-w-[560px] overflow-hidden rounded-[14px]"
         style={{
           background: "var(--p-bg-elevated)",

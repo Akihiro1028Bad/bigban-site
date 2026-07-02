@@ -2845,6 +2845,38 @@ describe("ApproveClient 操作性(#109)", () => {
     expect(screen.getByRole("dialog", { name: "施策を追加" })).toBeInTheDocument();
   });
 
+  // #proto P6: 施策フォームモーダルは自前 Esc で閉じる(handleOverlayKeyDown)。
+  it("施策フォームは Esc で閉じる", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=proposal");
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: /手動で追加/ }));
+    const modal = await screen.findByRole("dialog", { name: "施策を追加" });
+    // ダイアログ本体で Esc → 自前 Esc(handleOverlayKeyDown)が onClose を呼び閉じる。
+    fireEvent.keyDown(modal, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "施策を追加" })).not.toBeInTheDocument()
+    );
+  });
+
+  // #proto P6: モーダル内で押した単一キーは stopPropagation で window の中央 keydown へ漏れない。
+  it("施策フォーム内で押した a は盤の承認へ漏れない(stopPropagation 層)", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=proposal");
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: /手動で追加/ }));
+    const modal = await screen.findByRole("dialog", { name: "施策を追加" });
+    // ダイアログ本体で a を押す → 伝播が止まり中央 keydown に届かない(盤の承認が飛ばない)。
+    fireEvent.keyDown(modal, { key: "a" });
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+    // モーダルは開いたまま(a では閉じない)。
+    expect(screen.getByRole("dialog", { name: "施策を追加" })).toBeInTheDocument();
+  });
+
   // #proto P6: ヘルプ(ShortcutOverlay)開放中も単一キーが盤へ漏れない。
   it("ショートカット一覧の開放中は a が盤に作用しない", async () => {
     flags.authEnabled = false;
@@ -3421,6 +3453,40 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "詳細: 猛暑記事" })).not.toBeInTheDocument()
+    );
+  });
+
+  it("Esc で相談ドロワーが閉じる(詳細は開いたまま・優先順)", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await openConsultDrawer(dialog);
+    // #proto P6: 相談ドロワーが開いていれば Esc は最優先でドロワーを閉じ、詳細は残す。
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "AIに相談" })).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole("region", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
+  });
+
+  it("相談ドロワーを閉じたあと、もう一度 Esc で詳細が閉じる", async () => {
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await openConsultDrawer(dialog);
+    // 1度目: ドロワーを閉じる。
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "AIに相談" })).not.toBeInTheDocument()
+    );
+    // 2度目: 詳細パネルを閉じる。
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("region", { name: "詳細: 猛暑記事" })).not.toBeInTheDocument()

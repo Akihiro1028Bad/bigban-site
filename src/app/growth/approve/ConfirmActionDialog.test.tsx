@@ -85,6 +85,38 @@ describe("ConfirmActionDialog", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("ダイアログ本体で Esc を押すと onCancel を呼ぶ(自前 Esc)", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ConfirmActionDialog
+        action={{ kind: "revert", id: "i1", title: "記事A" }}
+        busy={false}
+        onCancel={onCancel}
+        onConfirm={vi.fn()}
+      />
+    );
+    const dialog = screen.getByRole("dialog", { name: "構成からやり直すの確認" });
+    dialog.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("ダイアログ内の修飾なし単一キーでは onCancel を呼ばない(キー漏れ防止)", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ConfirmActionDialog
+        action={{ kind: "revert", id: "i1", title: "記事A" }}
+        busy={false}
+        onCancel={onCancel}
+        onConfirm={vi.fn()}
+      />
+    );
+    const dialog = screen.getByRole("dialog", { name: "構成からやり直すの確認" });
+    dialog.focus();
+    await userEvent.keyboard("a");
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it("詳細パネル(z-50)より前面の z-index を持つ(裏に隠れない回帰防止)", () => {
     render(
       <ConfirmActionDialog
