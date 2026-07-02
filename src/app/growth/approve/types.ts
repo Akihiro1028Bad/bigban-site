@@ -49,3 +49,37 @@ export interface Failure {
   message: string;
   retry: () => void;
 }
+
+/** 施策トリアージの状態。 */
+export type ProposalStatus = "pending" | "rejected" | "adopted";
+
+/**
+ * 施策の種別＝承認後アウトカムのルーティング先。未設定は "article" 相当(欠落耐性・後方互換)。
+ * Notion に persist せず、既存 category から kindFromCategory で決定的に派生する(#P5a)。
+ */
+export type ProposalKind = "article" | "site" | "event" | "other";
+
+/**
+ * proposalKind==="site" の詳細(将来/UI 用の optional)。
+ * 本番データには通常存在せず、参考は既存 refs を流用するため新型は足さない。
+ */
+export interface SiteProposalDetail {
+  /** 何を変えるか。 */
+  whatChange: string;
+  /** どこを(例: ヒーローセクション)。 */
+  whereTarget?: string;
+  /** なぜ。 */
+  whyReason?: string;
+}
+
+/** proposalKind==="event" の詳細(将来/UI 用の optional。本番データには通常存在しない)。 */
+export interface EventProposalDetail {
+  /** いつ("7月中旬" 等の自由文・断定しない)。 */
+  whenLabel: string;
+  /** 対象。 */
+  audience?: string;
+  /** 形式。 */
+  format?: string;
+  /** 想定人数(自由文)。 */
+  capacity?: string;
+}
