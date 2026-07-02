@@ -51,6 +51,8 @@
 
 3. **投入スペックをステージする**(エージェントはここまで)。記事ごとに `<output_schema>` の JSON を一時ファイル(例 `.growth-tmp/<slug>.json`)に書く。**この時点では create も画像生成もしない**(投入は手順4のスクリプトに任せ、エージェントが重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。
    - `payload.title` は Notion `タイトル案` をそのまま使う(#176)。良くしたい場合は承認画面のタイトル修正ループ(#139 B)で行う。`タイトル案` が空のときだけネタの主旨に沿って付ける。
+   - **`payload.articleType`(コラム分離 #columns)**: Notion `記事タイプ`(獲得/不安解消/資産/比較/イベント)の値を**そのまま日本語で**入れる(microCMS 側は日本語ラベルセレクト運用)。`記事タイプ` が空/欠落なら `articleType` フィールド自体を省略する(欠落耐性)。内部計測軸(#C4)。
+   - **`payload.category`(コラム分離 #columns)**: `記事タイプ` から次の既定マッピングで**読者向けカテゴリの content ID(文字列1件)**を解決して入れる: 獲得→`start` / 不安解消→`start` / 資産→`rules` / 比較→`compare` / イベント→`event`。`記事タイプ` が空/未知なら `category` フィールド自体を省略する(人が承認時 or microCMS で後付け)。`資産` の既定は `rules` だが、明らかに上達系なら `improve`・健康系なら `health` に差し替えてよい(最終分類は人が microCMS で調整可)。参照は content ID 文字列で書けば足りる(column-categories を同 ID で seed 済み)。
    - `eyecatchAction` は **§9「宇宙人マスコット × コスミック」**(固定キャラ=`scripts/growth/assets/mascot-alien.png`・記事ごとに行為だけ変える)に沿って英語1フレーズで作る。
    - **本文画像(#62)**: 構成案に画像指示 `[画像:<スタイル表示名>: <説明>]` があれば、本文HTMLの該当セクションの自然な位置にプレースホルダ `{{IMG:1}}`(以降 `{{IMG:2}}`…)を置き、`images[]` に対応する `{ index, style, description }` を入れる。スタイル表示名→キーは `マスコット・コスミック→mascot` / `ミニマル図解→minimal` / `詳しい図解→diagram`。指示が無ければ `images` は省略(または空配列)で、本文に `{{IMG:n}}` を入れない。
    - **上限3枚**。指示が4件以上あっても先頭3件までを `images[]`・`{{IMG:n}}` にし、超過分は本文に入れず**スキップした旨を報告**(#24)。
@@ -67,7 +69,9 @@
 記事ごとに次の JSON を一時ファイルに書く(末尾に AI 免責文を必ず含める):
 ```json
 {
-  "payload": { "title": "...", "slug": "...", "locale": ["ja"], "category": ["..."],
+  "payload": { "title": "...", "slug": "...", "locale": ["ja"],
+               "articleType": "獲得|不安解消|資産|比較|イベント(記事タイプ。空/欠落なら省略)",
+               "category": "start|rules|improve|health|compare|event(記事タイプから既定マッピング。空/未知なら省略)",
                "excerpt": "...", "displayMode": ["html"], "bodyHtml": "...(末尾に『※この記事はAIが作成した下書きです。公開前に内容をご確認ください。』)" },
   "eyecatchAction": "<§9の宇宙人の行為を英語1フレーズで>",
   "imagePath": "/tmp/growth-eyecatch-<slug>.png",
