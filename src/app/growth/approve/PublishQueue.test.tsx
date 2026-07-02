@@ -162,11 +162,11 @@ describe("PublishQueue", () => {
     expect(JSON.parse(call![1].body)).toEqual({ pageId: "a" });
   });
 
-  it("要対応行の「修正する」で onFix(id) を呼ぶ", () => {
+  it("要対応行(本文が空)の「修正する」で onFix(id) を呼ぶ", () => {
     const onFix = vi.fn();
     render(
       <PublishQueue
-        items={[article({ id: "x", title: "画像なし", eyecatchUrl: "" })]}
+        items={[article({ id: "x", title: "本文なし", hasDraftBody: false })]}
         token="t"
         onChanged={() => {}}
         onFix={onFix}
@@ -179,7 +179,7 @@ describe("PublishQueue", () => {
   it("onFix 未指定でも修正するボタンで例外を投げない", () => {
     render(
       <PublishQueue
-        items={[article({ id: "x", title: "画像なし", eyecatchUrl: "" })]}
+        items={[article({ id: "x", title: "本文なし", hasDraftBody: false })]}
         token="t"
         onChanged={() => {}}
       />
@@ -210,5 +210,251 @@ describe("PublishQueue", () => {
     expect(within(region).getByText("アイキャッチ未設定")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /件を今すぐ公開/ })).not.toBeInTheDocument();
     expect(within(region).getByText("公開できる記事はありません。")).toBeInTheDocument();
+  });
+
+  describe("アイキャッチ未設定→メディアライブラリ結線(#143後継)", () => {
+    const MEDIA_URL = "https://images.microcms-assets.io/assets/x/a.png";
+
+    // URL/オプションに応じて GET(一覧)/POST(eyecatch)などの応答を出し分ける fetch モック。
+    function wireMediaFetch(over: {
+      list?: { ok: boolean; media?: unknown };
+      eyecatch?: { ok: boolean; status?: number; error?: string };
+      upload?: { ok: boolean; status?: number; url?: string; error?: string };
+    }): void {
+      const list = over.list ?? { ok: true, media: [{ url: MEDIA_URL }] };
+      const eyecatch = over.eyecatch ?? { ok: true };
+      const upload = over.upload ?? { ok: true, url: MEDIA_URL };
+      fetchMock.mockReset().mockImplementation((url: string, init?: { method?: string }) => {
+        if (typeof url === "string" && url.startsWith("/api/growth/media")) {
+          if (init?.method === "POST") {
+            return Promise.resolve({
+              ok: upload.ok,
+              status: upload.status ?? (upload.ok ? 200 : 502),
+              json: () => Promise.resolve(upload.ok ? { success: true, url: upload.url } : { success: false, error: upload.error }),
+            });
+          }
+          return Promise.resolve({
+            ok: list.ok,
+            status: list.ok ? 200 : 502,
+            json: () => Promise.resolve({ success: list.ok, media: list.media }),
+          });
+        }
+        if (url === "/api/growth/draft/eyecatch") {
+          return Promise.resolve({
+            ok: eyecatch.ok,
+            status: eyecatch.status ?? (eyecatch.ok ? 200 : 502),
+            json: () => Promise.resolve(eyecatch.ok ? { success: true } : { success: false, error: eyecatch.error }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+      });
+    }
+
+    it("要対応行(アイキャッチ未設定)は「画像を選ぶ」でメディアライブラリを開き、一覧を GET する", async () => {
+      wireMediaFetch({});
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={() => {}}
+        />
+      );
+      // アイキャッチ未設定行は onFix ではなく「画像を選ぶ」を出す。
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ: 画像なし記事/ });
+      expect(dialog).toBeInTheDocument();
+      // 一覧を authHeaders 付きで GET する。
+      await waitFor(() => {
+        const listCall = fetchMock.mock.calls.find(
+          (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method !== "POST"
+        );
+        expect(listCall).toBeTruthy();
+        expect(listCall![1].headers.Authorization).toBe("Bearer tok");
+      });
+      // グリッドにサムネ(next/image=jsdomでは img・空 alt は presentation)＋選択ボタンが出る。
+      const thumb = await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+      expect(thumb.querySelector("img")).not.toBeNull();
+    });
+
+    it("サムネ選択で /api/growth/draft/eyecatch へ pageId/eyecatchUrl を POST し、onChanged を呼ぶ", async () => {
+      wireMediaFetch({});
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "page-1", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      // サムネのボタンをクリック(選択→反映)。
+      const thumb = await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+      fireEvent.click(thumb);
+
+      await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+      const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
+      expect(applyCall).toBeTruthy();
+      expect(applyCall![1].method).toBe("POST");
+      expect(applyCall![1].headers.Authorization).toBe("Bearer tok");
+      expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-1", eyecatchUrl: MEDIA_URL });
+      // 反映成功でモーダルは閉じる。
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: /メディアライブラリ/ })).not.toBeInTheDocument()
+      );
+    });
+
+    it("反映失敗時はサーバのエラー文言を alert で可視化し、onChanged せずモーダルを保持する", async () => {
+      wireMediaFetch({ eyecatch: { ok: false, status: 502, error: "公開ターゲット(microCMS)への同期に失敗しました。" } });
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "page-1", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      const thumb = await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+      fireEvent.click(thumb);
+
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert).toHaveTextContent("公開ターゲット(microCMS)への同期に失敗しました。");
+      expect(onChanged).not.toHaveBeenCalled();
+      // 失敗時はモーダルを閉じない(再試行できる)。
+      expect(screen.getByRole("dialog", { name: /メディアライブラリ/ })).toBeInTheDocument();
+    });
+
+    it("一覧取得に失敗すると alert を表示し、空状態文言は出さない", async () => {
+      wireMediaFetch({ list: { ok: false } });
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={() => {}}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert).toHaveTextContent("メディア一覧の取得に失敗しました");
+    });
+
+    it("クライアント事前検証(サイズ超過)はアップロードを送らず alert を出す", async () => {
+      wireMediaFetch({});
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={() => {}}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+
+      // 5MB 超の PNG(中身検証はサーバ側・クライアントはサイズ/MIME のみ)。
+      const big = new File([new Uint8Array(6 * 1024 * 1024)], "big.png", { type: "image/png" });
+      const input = within(dialog).getByLabelText("画像をアップロード");
+      fireEvent.change(input, { target: { files: [big] } });
+
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert).toHaveTextContent("上限");
+      // アップロード POST は送られない。
+      expect(
+        fetchMock.mock.calls.filter(
+          (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method === "POST"
+        )
+      ).toHaveLength(0);
+    });
+
+    it("アップロード成功→そのままアイキャッチへ反映し onChanged を呼ぶ", async () => {
+      const UPLOADED = "https://images.microcms-assets.io/assets/x/up.png";
+      wireMediaFetch({ upload: { ok: true, url: UPLOADED } });
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "page-9", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+
+      const good = new File([new Uint8Array(1024)], "up.png", { type: "image/png" });
+      const input = within(dialog).getByLabelText("画像をアップロード");
+      fireEvent.change(input, { target: { files: [good] } });
+
+      await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+      const uploadCall = fetchMock.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method === "POST"
+      );
+      expect(uploadCall).toBeTruthy();
+      expect(uploadCall![1].headers.Authorization).toBe("Bearer tok");
+      const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
+      expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-9", eyecatchUrl: UPLOADED });
+    });
+
+    it("アップロード失敗時はサーバのエラー文言を alert で可視化する", async () => {
+      wireMediaFetch({ upload: { ok: false, status: 400, error: "対応していない画像形式です(JPEG/PNG/WebP/GIF/AVIF)。" } });
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
+
+      const good = new File([new Uint8Array(1024)], "up.gif", { type: "image/gif" });
+      const input = within(dialog).getByLabelText("画像をアップロード");
+      fireEvent.change(input, { target: { files: [good] } });
+
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert).toHaveTextContent("対応していない画像形式です");
+      // 反映(eyecatch)へは進まない。
+      expect(fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch")).toBeUndefined();
+    });
+
+    it("メディアが 0 件なら空状態文言を出す", async () => {
+      wireMediaFetch({ list: { ok: true, media: [] } });
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={() => {}}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      expect(await within(dialog).findByText(/メディアがありません/)).toBeInTheDocument();
+    });
+
+    it("背景クリックと esc ボタンでモーダルを閉じる(反映せず)", async () => {
+      wireMediaFetch({});
+      const onChanged = vi.fn();
+      render(
+        <PublishQueue
+          items={[article({ id: "x", title: "画像なし記事", eyecatchUrl: "" })]}
+          token="tok"
+          onChanged={onChanged}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
+      const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ/ });
+      // esc ボタン(閉じる)。
+      fireEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: /メディアライブラリ/ })).not.toBeInTheDocument()
+      );
+      expect(onChanged).not.toHaveBeenCalled();
+      expect(fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch")).toBeUndefined();
+    });
   });
 });

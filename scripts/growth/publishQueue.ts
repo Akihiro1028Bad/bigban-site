@@ -22,9 +22,15 @@ export interface PublishReadiness {
   hasDraftBody?: boolean;
 }
 
+/**
+ * アイキャッチ未設定の要対応理由。承認画面の公開キューが「メディアライブラリで差し替える」
+ * 導線(#143 後継)を出す行の判別に使うため、文字列を単一ソース化する。
+ */
+export const EYECATCH_MISSING_REASON = "アイキャッチ未設定";
+
 /** 下書き済み記事が公開できない理由(=例外)。公開可能なら null。 */
 export function publishBlockReason(item: PublishReadiness): string | null {
-  if (!item.eyecatchUrl) return "アイキャッチ未設定";
+  if (!item.eyecatchUrl) return EYECATCH_MISSING_REASON;
   if (!item.hasDraftBody) return "本文が空";
   return null;
 }
