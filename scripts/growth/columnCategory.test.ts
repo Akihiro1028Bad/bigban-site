@@ -39,4 +39,8 @@ describe("columnCategoryIdForArticleType", () => {
   it("前後の空白を無視する", () => {
     expect(columnCategoryIdForArticleType("  獲得  ")).toBe("start");
   });
+
+  it("空白のみ(trim で空になる)は undefined", () => {
+    expect(columnCategoryIdForArticleType("   ")).toBeUndefined();
+  });
 });

@@ -181,3 +181,83 @@ describe("news sitemap entries", () => {
     expect(jaEntry?.alternates?.languages).toBeUndefined();
   });
 });
+
+describe("columns sitemap entries (flag 連動)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", PROD_URL);
+    vi.doMock("@/lib/microcms/queries", () => ({
+      getNewsSlugs: async () => [],
+    }));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.doUnmock("@/lib/microcms/queries");
+    vi.doUnmock("@/lib/microcms/columnsQueries");
+    vi.doUnmock("@/config/featureFlags");
+  });
+
+  it("flag OFF では columns URL を出さない", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => false,
+    }));
+    const getColumnSlugs = vi.fn(async () => []);
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({ getColumnSlugs }));
+    const { default: sitemap } = await import("./sitemap");
+    const urls = (await sitemap()).map((e) => e.url);
+    expect(urls.some((u) => u.includes("/columns"))).toBe(false);
+    // flag OFF のときは columns の取得すら行わない。
+    expect(getColumnSlugs).not.toHaveBeenCalled();
+  });
+
+  it("flag ON で columns 一覧と詳細(offset 反復の全 slug)を含む", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => [
+        { locale: "ja", slug: "c1" },
+        { locale: "en", slug: "c2" },
+      ],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const urls = (await sitemap()).map((e) => e.url);
+    expect(urls).toContain(`${PROD_URL}/columns`);
+    expect(urls).toContain(`${PROD_URL}/columns/c1`);
+    expect(urls).toContain(`${PROD_URL}/en/columns/c2`);
+  });
+
+  it("flag ON: 両 locale 揃った columns slug は alternates を出力", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => [
+        { locale: "ja", slug: "both" },
+        { locale: "en", slug: "both" },
+      ],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+    const jaEntry = entries.find((e) => e.url === `${PROD_URL}/columns/both`);
+    expect(jaEntry?.alternates?.languages?.en).toBe(
+      `${PROD_URL}/en/columns/both`,
+    );
+  });
+
+  it("flag ON: columns 取得失敗でも news 側は壊さない(防御)", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => {
+        throw new Error("down");
+      },
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const urls = (await sitemap()).map((e) => e.url);
+    // 一覧 URL は入るが、詳細は空(取得失敗のフォールバック)。
+    expect(urls).toContain(`${PROD_URL}/columns`);
+    expect(urls.some((u) => /\/columns\/.+/.test(u))).toBe(false);
+  });
+});

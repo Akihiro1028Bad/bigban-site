@@ -478,6 +478,9 @@
     "close": "閉じる",
     "imageAlt": "THE PICKLE BANG THEORY クラウドファンディング"
   },
+  "Columns": {
+    "heading": "コラム"
+  },
   "News": {
     "heading": "ニュース",
     "embed": {

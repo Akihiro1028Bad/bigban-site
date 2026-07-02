@@ -106,10 +106,25 @@ describe("columnItemSchema", () => {
     expect(r.articleType).toBeUndefined();
   });
 
+  it("articleType 内部ID(英語)直接入力も受理する(後方互換)", () => {
+    const r = columnItemSchema.parse({ ...baseItem, articleType: ["asset"] });
+    expect(r.articleType).toBe("asset");
+  });
+
   it("articleType 未知ラベルは拒否する", () => {
     expect(() =>
       columnItemSchema.parse({ ...baseItem, articleType: ["不明"] }),
     ).toThrow();
+  });
+
+  it("bodyHtml/body 未設定(null)は空文字に正規化する", () => {
+    const r = columnItemSchema.parse({
+      ...baseItem,
+      bodyHtml: null,
+      body: null,
+    });
+    expect(r.bodyHtml).toBe("");
+    expect(r.body).toBe("");
   });
 
   it("category 未設定(参照先が下書き/削除で null)でも通る(nullish 耐性)", () => {
