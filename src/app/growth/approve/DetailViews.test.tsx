@@ -34,6 +34,20 @@ describe("PromptView", () => {
     render(<PromptView prompt="狙いのみ" />);
     expect(screen.getByText("狙いのみ")).toBeInTheDocument();
   });
+
+  it("Markdown の生成メモは整形表示する(#212)", () => {
+    const { container } = render(<PromptView prompt={"## 見出し\n\n- **A**\n- B"} />);
+    // 生成メモ本体(prose コンテナ)の中だけを検証する(冒頭の説明ボックスと混ざらないように)。
+    const memo = container.querySelector(".prose");
+    if (!memo) throw new Error("memo container not found");
+    // 見出し・箇条書き・強調が HTML 要素として整形される(リテラルの ## / ** は残らない)。
+    expect(memo.querySelector("h2")).toHaveTextContent("見出し");
+    expect(memo.querySelector("ul")).toBeInTheDocument();
+    expect(memo.querySelectorAll("li").length).toBe(2);
+    expect(memo.querySelector("strong")).toHaveTextContent("A");
+    expect(screen.queryByText(/##/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
+  });
 });
 
 describe("PreviewView", () => {

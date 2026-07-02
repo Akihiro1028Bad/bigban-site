@@ -10,6 +10,7 @@ import { EXCERPT_MAX, autoExcerpt, isExcerptTooLong } from "@/lib/growth/excerpt
 
 import { DevicePreview } from "./DevicePreview";
 import { buildPreviewHtml } from "./previewHtml";
+import { renderPromptMarkdown } from "./promptMarkdown";
 import type { DraftState } from "./draftTypes";
 import type { BoardStage } from "./ui/boardStage";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
@@ -49,10 +50,14 @@ export function PromptView({ prompt, refs }: PromptViewProps) {
           この記事の生成メモ
         </div>
         <div
-          className="rounded-[10px] p-3 text-[12.5px] leading-relaxed"
-          style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)", color: "var(--p-text-3)" }}
+          className="rounded-[10px] p-3"
+          style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
         >
-          {prompt}
+          {/* #212: 生成メモも左ペインと同じ Markdown 整形で表示する(プレーンは段落として描画)。 */}
+          <div
+            className="prose prose-invert prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: renderPromptMarkdown(prompt) }}
+          />
         </div>
         {refs && refs.length > 0 && (
           <div className="mt-1.5 flex flex-col gap-1.5">
