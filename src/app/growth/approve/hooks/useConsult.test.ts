@@ -218,6 +218,60 @@ describe("useConsult: openDrawer/closeDrawer", () => {
   });
 });
 
+describe("useConsult: 記事切替(item.id 変化)での state リセット", () => {
+  it("item.id 変化で open が閉じ mode が既定へ戻る(相談ドロワーを持ち越さない)", () => {
+    const ITEM_A: PendingItem = { ...BASE_ITEM, id: "page-A" };
+    const ITEM_B: PendingItem = { ...BASE_ITEM, id: "page-B" };
+    const draft: DraftPreview = {
+      ...DRAFT_BASE,
+      bodyComment: { status: "依頼中", comments: [], proposal: [], raw: "" },
+    };
+    const { result, rerender } = renderHook(
+      ({ item }: { item: PendingItem }) =>
+        useConsult({ item, token: "test-token", draft, onReloadDraft: vi.fn(), revise: makeReviseMock() }),
+      { initialProps: { item: ITEM_A } },
+    );
+
+    // 記事Aでドロワーを開き、mode を既定(overall)から sentence へ切り替える。
+    act(() => result.current.openDrawer());
+    act(() => result.current.setMode("sentence"));
+    expect(result.current.open).toBe(true);
+    expect(result.current.mode).toBe("sentence");
+
+    // 記事Bへ切替 → open=false・mode が draft 段階の既定(overall)へ戻る。
+    rerender({ item: ITEM_B });
+    expect(result.current.open).toBe(false);
+    expect(result.current.mode).toBe("overall");
+  });
+
+  it("outline 段階で記事切替すると mode は先頭 revise へ戻る(リテラル overall→activeMode 昇格)", () => {
+    const ITEM_A: PendingItem = { ...ITEM_WITH_REVISE, id: "out-A" };
+    const ITEM_B: PendingItem = { ...ITEM_WITH_REVISE, id: "out-B" };
+    const { result, rerender } = renderHook(
+      ({ item }: { item: PendingItem }) =>
+        useConsult({ item, token: "test-token", draft: null, onReloadDraft: vi.fn(), revise: makeReviseMock() }),
+      { initialProps: { item: ITEM_A } },
+    );
+    act(() => result.current.openDrawer());
+    expect(result.current.open).toBe(true);
+    expect(result.current.mode).toBe("revise");
+
+    rerender({ item: ITEM_B });
+    // リセットで raw mode="overall" → outline 段階に無いため activeMode が先頭 "revise" へ昇格。
+    expect(result.current.open).toBe(false);
+    expect(result.current.mode).toBe("revise");
+  });
+
+  it("同一 item.id の再レンダーでは open を持ち越す(不要な close を起こさない)", () => {
+    const { result, rerender } = renderUseConsult({ draft: DRAFT_BASE });
+    act(() => result.current.openDrawer());
+    expect(result.current.open).toBe(true);
+    // 同じ item で再レンダー → prevItemId 一致でリセットブロックに入らない。
+    rerender();
+    expect(result.current.open).toBe(true);
+  });
+});
+
 describe("useConsult: setMode と views フィルタ", () => {
   it("draft 段階で setMode('sentence') → mode='sentence' / views が sentence カードのみ", () => {
     const { result } = renderUseConsult({

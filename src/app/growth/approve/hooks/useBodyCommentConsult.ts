@@ -61,6 +61,17 @@ export function useBodyCommentConsult({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // 記事切替(pageId 変化)で前記事の行コメント下書き・入力欄状態を持ち越さない(別記事への
+  // 誤送信を防ぐ)。React 公式「prop 変化時の state 調整」パターン(effect ではなく描画中に是正)。
+  // prevPageId 初期値=現在の pageId のため初回マウントでは入らない。
+  const [prevPageId, setPrevPageId] = useState(pageId);
+  if (pageId !== prevPageId) {
+    setPrevPageId(pageId);
+    setComments({});
+    setOpenFor(null);
+    setDraft("");
+  }
+
   const proposal = bodyComment?.proposal ?? [];
 
   function lineKey(blockIndex: number, excerpt: string): string {

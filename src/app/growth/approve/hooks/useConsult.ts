@@ -82,6 +82,20 @@ export function useConsult({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ConsultKind>(() => STAGE_KINDS[stage][0]);
 
+  // 記事切替(item.id 変化)で相談ドロワーの表示状態を持ち越さない(兄弟フック useReviseEditing の
+  // openId 変化リセットと対称)。開きっぱなし・前記事の mode 残りを防ぐため、記事が変わったら
+  // レンダー中に open=false・mode を既定へ戻す(React 公式「prop 変化時の state 調整」パターン。
+  // effect ではなく描画中に是正するため cascading render を起こさない)。
+  // mode は既定 "overall"(リテラル)へ戻す。現在の stage に無ければ後段の activeMode が先頭タブへ
+  // 昇格するため(例: outline 段階なら "revise")、ここでは stage 非依存のリテラルで十分。
+  // prevItemId 初期値=現在の id のため、初回マウントではこのブロックに入らない(不要な close なし)。
+  const [prevItemId, setPrevItemId] = useState(item.id);
+  if (item.id !== prevItemId) {
+    setPrevItemId(item.id);
+    setOpen(false);
+    setMode("overall");
+  }
+
   function openDrawer(): void {
     setOpen(true);
   }

@@ -130,6 +130,39 @@ describe("toggleAdopt", () => {
   });
 });
 
+describe("pageId 変化での state リセット(記事跨ぎ持ち越し防止)", () => {
+  it("pageId が変わると instruction と adopted が初期化される(別記事への誤送信を防ぐ)", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ pageId }: { pageId: string }) =>
+        useAdviceConsult({ pageId, token: TOKEN, onChanged }),
+      { initialProps: { pageId: "page-A" } },
+    );
+    // 記事Aで指示文を書き、採用チェックを付ける。
+    act(() => view.result.current.setInstruction("記事Aの指示"));
+    act(() => view.result.current.toggleAdopt(0));
+    expect(view.result.current.instruction).toBe("記事Aの指示");
+    expect([...view.result.current.adopted]).toEqual([0]);
+
+    // 記事Bへ切替 → instruction は空、adopted は空集合へリセット。
+    view.rerender({ pageId: "page-B" });
+    expect(view.result.current.instruction).toBe("");
+    expect([...view.result.current.adopted]).toEqual([]);
+  });
+
+  it("同じ pageId の再レンダーでは instruction を持ち越す(不要なリセットを起こさない)", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ pageId }: { pageId: string }) =>
+        useAdviceConsult({ pageId, token: TOKEN, onChanged }),
+      { initialProps: { pageId: "page-A" } },
+    );
+    act(() => view.result.current.setInstruction("保持される"));
+    view.rerender({ pageId: "page-A" });
+    expect(view.result.current.instruction).toBe("保持される");
+  });
+});
+
 describe("applyNow", () => {
   const APPLY_VIEW: AdviceApplyView = {
     status: "提示中",
