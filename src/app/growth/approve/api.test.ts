@@ -9,7 +9,6 @@ import {
   fetchBoard,
   fetchPrompts,
   postDecision,
-  postPublish,
   postRevert,
   postRevise,
   postReviseApply,
@@ -75,30 +74,6 @@ describe("postDecision", () => {
     await expect(postDecision("t", "i1", "承認")).rejects.toThrow("NG");
     server.use(http.post(BOARD_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
     await expect(postDecision("t", "i1", "承認")).rejects.toThrow("保存に失敗しました。");
-  });
-});
-
-describe("postPublish", () => {
-  it("pageId で POST し Authorization ヘッダを送る", async () => {
-    let auth: string | null = null;
-    let body: unknown;
-    server.use(
-      http.post("/api/growth/publish", async ({ request }) => {
-        auth = request.headers.get("authorization");
-        body = await request.json();
-        return HttpResponse.json({ success: true });
-      })
-    );
-    await postPublish("tok", "p1");
-    expect(body).toEqual({ pageId: "p1" });
-    expect(auth).toBe("Bearer tok");
-  });
-
-  it("失敗は error 文言、無ければ既定文言", async () => {
-    server.use(http.post("/api/growth/publish", () => HttpResponse.json({ success: false, error: "PUBNG" }, { status: 409 })));
-    await expect(postPublish("t", "p1")).rejects.toThrow("PUBNG");
-    server.use(http.post("/api/growth/publish", () => HttpResponse.json({ success: false }, { status: 500 })));
-    await expect(postPublish("t", "p1")).rejects.toThrow("公開に失敗しました。");
   });
 });
 

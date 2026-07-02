@@ -1,12 +1,18 @@
 /**
- * 公開・クローズ・構成やり直しの確認ダイアログ(#H7 分解 / #167・H2 / 構成からやり直す)。
- * 取り消しづらい/破棄を伴う操作の前に必ず挟み、対象タイトルを明示する。
+ * 構成やり直しの確認ダイアログ(#167/H2 / 構成からやり直す)。
+ * 取り消しづらい/破棄を伴う操作(下書き・手動編集・アイキャッチ・本文画像の作り直し)の前に
+ * 必ず挟み、対象タイトルを明示する。見た目は proto(#proto ConfirmActionDialog)ダークへ再スキン。
+ * #167 で公開/クローズは詳細パネルから撤去済みのため revert 専用へ narrow 化した。
  */
 
 "use client";
 
+import { IconWand } from "./ui/icons";
+import { Kbd } from "./ui/primitives";
+import { useDialog } from "./hooks/useDialog";
+
 export interface ConfirmActionState {
-  kind: "publish" | "close" | "revert";
+  kind: "revert";
   id: string;
   title: string;
 }
@@ -18,72 +24,76 @@ interface ConfirmActionDialogProps {
   onConfirm: () => void;
 }
 
-// 種別ごとの文言とボタン体裁。publish/close はダイアログ aria-label を従来どおり共有する。
-const DIALOG_CONFIG: Record<
-  ConfirmActionState["kind"],
-  {
-    ariaLabel: string;
-    heading: string;
-    body: (title: string) => string;
-    confirmLabel: string;
-    confirmClass: string;
-  }
-> = {
-  publish: {
-    ariaLabel: "公開・クローズの確認",
-    heading: "記事を本番公開します",
-    body: (title) => `「${title}」を公開すると一般に表示されます。よろしいですか？`,
-    confirmLabel: "公開を確定",
-    confirmClass:
-      "border-green-700 bg-green-700 hover:bg-green-800",
-  },
-  close: {
-    ariaLabel: "公開・クローズの確認",
-    heading: "タスクをクローズします",
-    body: (title) => `「${title}」を盤から非表示にします。よろしいですか？`,
-    confirmLabel: "クローズを確定",
-    confirmClass: "border-gray-700 bg-gray-700 hover:bg-gray-800",
-  },
-  revert: {
-    ariaLabel: "構成からやり直すの確認",
-    heading: "提案中に戻して構成からやり直します",
-    body: (title) =>
-      `「${title}」を提案中に戻します。再承認すると、現在の下書き・手動編集・アイキャッチ・本文画像は作り直されます。よろしいですか？`,
-    confirmLabel: "提案中に戻す",
-    confirmClass: "border-amber-700 bg-amber-700 hover:bg-amber-800",
-  },
-};
+// revert 単一設定。aria-label は #167 以前から不変(既存テスト・回帰防止)。
+const REVERT_CONFIG = {
+  ariaLabel: "構成からやり直すの確認",
+  heading: "構成からやり直しますか？",
+  body: "提案中（構成案レビュー）に戻します。再承認すると、現在の下書き・手動編集・アイキャッチ・本文画像は作り直されます。",
+  confirmLabel: "提案中に戻す",
+} as const;
 
 export function ConfirmActionDialog({ action, busy, onCancel, onConfirm }: ConfirmActionDialogProps) {
-  const config = DIALOG_CONFIG[action.kind];
+  const dialogRef = useDialog();
   return (
+    // approve-shell: fixed overlay は .approve-shell 配下の外に出るため、root 自身に付けて
+    // var(--p-*) トークンを解決する(ConsultDrawer 方式)。
+    // z-[80]: 詳細パネル(z-50)・編集ワークスペース(z-60)・コマンドパレット(z-70)より上に出す。
+    // 確認は詳細パネル内のボタンから開くため、パネルより前面でないと裏に隠れて操作できない。
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={config.ariaLabel}
-      // z-[80]: 詳細パネル(z-50)・編集ワークスペース(z-60)・コマンドパレット(z-70)より上に出す。
-      // 公開/クローズ/構成やり直しの確認は詳細パネル内のボタンから開くため、パネルより前面でないと
-      // ダイアログがパネルの裏に隠れて操作できない(同 z-index だと後勝ちの DOM=パネルが前面になる)。
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+      className="approve-shell z-[80] flex items-start justify-center px-4 pt-[18vh]"
+      style={{ background: "rgba(4,6,9,0.6)", backdropFilter: "blur(3px)" }}
+      onMouseDown={onCancel}
     >
-      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl">
-        <h2 className="text-sm font-semibold text-gray-900">{config.heading}</h2>
-        <p className="mt-1 text-xs text-gray-600">{config.body(action.title)}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={REVERT_CONFIG.ariaLabel}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-full max-w-[440px] overflow-hidden rounded-[14px]"
+        style={{
+          background: "var(--p-bg-elevated)",
+          border: "1px solid var(--p-border-strong)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+        }}
+      >
+        <div className="flex items-start gap-3 p-5">
+          <span
+            className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[10px]"
+            style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
           >
+            <IconWand size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold" style={{ color: "var(--p-text)" }}>
+              {REVERT_CONFIG.heading}
+            </div>
+            <div className="mt-0.5 truncate text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+              {action.title}
+            </div>
+            <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--p-text-2)" }}>
+              {REVERT_CONFIG.body}
+            </p>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-2 px-5 py-3.5"
+          style={{ borderTop: "1px solid var(--p-border)" }}
+        >
+          <span className="mr-auto">
+            <Kbd>esc</Kbd>
+          </span>
+          <button type="button" onClick={onCancel} className="approve-btn-ghost">
             キャンセル
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`rounded border px-3 py-1 text-xs font-bold text-white disabled:opacity-50 ${config.confirmClass}`}
+            className="approve-btn-primary flex items-center gap-1.5 rounded-[9px] px-4 py-2 text-[13px] font-semibold disabled:opacity-50"
+            style={{ background: "var(--p-amber)", color: "#1a1305" }}
           >
-            {config.confirmLabel}
+            {REVERT_CONFIG.confirmLabel}
           </button>
         </div>
       </div>

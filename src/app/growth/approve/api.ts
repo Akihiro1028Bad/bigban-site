@@ -71,19 +71,6 @@ export async function postDecision(token: string, id: string, decision: string):
   }
 }
 
-/** 記事を公開する。失敗時は表示用 Error を投げる。 */
-export async function postPublish(token: string, pageId: string): Promise<void> {
-  const res = await fetch("/api/growth/publish", {
-    method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ pageId }),
-  });
-  const json = await readJsonObject(res);
-  if (!res.ok || !json.success) {
-    throw new Error(json.error ?? "公開に失敗しました。");
-  }
-}
-
 async function postJson(token: string, url: string, body: unknown): Promise<{ status: number; ok: boolean; error?: string }> {
   const res = await fetch(url, {
     method: "POST",
