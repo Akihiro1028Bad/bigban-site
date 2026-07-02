@@ -46,6 +46,21 @@ describe("renderPromptMarkdown", () => {
     expect(html).toContain('src="a.png"');
   });
 
+  it("<role> で囲まれたブロック内の Markdown も整形しつつタグはリテラル表示する", () => {
+    const html = renderPromptMarkdown("<role>\n手順:\n\n- **A**\n- B\n</role>\n\n## 次\n");
+    // 内部の箇条書き・強調が整形される
+    expect(html).toContain("<ul>");
+    expect(html).toContain("<li>");
+    expect(html).toContain("<strong>A</strong>");
+    // ブロック外の見出しも整形される
+    expect(html).toContain("<h2>次</h2>");
+    // 構造タグはエスケープされてリテラル表示(除去もされない)
+    expect(html).toContain("&lt;role&gt;");
+    expect(html).toContain("&lt;/role&gt;");
+    expect(html).not.toContain("<role>");
+    expect(html).not.toContain("</role>");
+  });
+
   it("リンクを a 要素に整形する", () => {
     const html = renderPromptMarkdown("[t](http://x)");
     expect(html).toContain('<a href="http://x"');
