@@ -116,7 +116,7 @@ export function ProposalView({
         <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--p-border)" }}>
           <IconList size={16} style={{ color: "var(--p-accent)" }} />
           <span className="text-[14px] font-semibold">施策</span>
-          <button type="button" onClick={onOpenForm} className="proto-btn-ghost ml-auto">
+          <button type="button" onClick={onOpenForm} className="approve-btn-ghost ml-auto">
             <IconPlus size={13} /> 手動で追加
           </button>
         </div>
@@ -177,6 +177,7 @@ export function ProposalView({
                   key={p.id}
                   type="button"
                   onClick={() => openDetail(p.id)}
+                  aria-current={isActive ? "true" : undefined}
                   className="relative flex w-full flex-col gap-1.5 px-4 py-[11px] text-left transition-colors"
                   style={{ background: isActive ? "var(--p-bg-raised)" : "transparent" }}
                 >
@@ -267,7 +268,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
     >
       <div className="px-6 pt-5 pb-3" style={{ borderBottom: "1px solid var(--p-border)" }}>
         <div className="mb-2.5 lg:hidden">
-          <button type="button" onClick={onBack} className="proto-btn-ghost" aria-label="施策一覧へ戻る">
+          <button type="button" onClick={onBack} className="approve-btn-ghost" aria-label="施策一覧へ戻る">
             <IconArrowLeft size={14} /> 施策一覧
           </button>
         </div>
@@ -298,7 +299,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
         style={{ borderTop: "1px solid var(--p-border)", background: "var(--p-bg-elevated)" }}
       >
         {status === "rejected" ? (
-          <button type="button" onClick={onReopen} className="proto-btn-ghost">
+          <button type="button" onClick={onReopen} className="approve-btn-ghost">
             未処理に戻す
           </button>
         ) : status === "adopted" ? (
@@ -306,7 +307,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
             <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-green)" }}>
               <IconCheck size={13} /> {outcome.done}
             </div>
-            <button type="button" onClick={onReopen} className="proto-btn-ghost self-start">
+            <button type="button" onClick={onReopen} className="approve-btn-ghost self-start">
               未処理に戻す
             </button>
           </div>
@@ -323,7 +324,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
               <button
                 type="button"
                 onClick={onReject}
-                className="proto-btn-ghost"
+                className="approve-btn-ghost"
                 style={{ color: "var(--p-red)" }}
                 aria-label={`却下: ${item.title}`}
               >
@@ -333,7 +334,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
                 type="button"
                 onClick={onApprove}
                 aria-label={`承認: ${item.title}`}
-                className="proto-btn-primary ml-auto flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold sm:w-auto sm:justify-start"
+                className="approve-btn-primary ml-auto flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold sm:w-auto sm:justify-start"
                 style={{ background: "var(--p-accent)", color: "var(--p-accent-ink)" }}
               >
                 <IconCheck size={15} /> {outcome.buttonLabel} <IconArrowRight size={14} />
