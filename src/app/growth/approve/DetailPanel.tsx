@@ -5,8 +5,9 @@
  * proto DetailPanel を本番データ(PendingItem / DraftState / BoardStage)へ束ね直したもの。
  * 差分(設計判断):
  * - 記事未選択(EmptyDetail)は親(ApproveClient)が「記事を選択」プレースホルダで担うため移植しない。
- * - 本文行コメント(proto CommentableBody)は本番 InlineCommentReview を親が注入する `inlineComments`
- *   slot で受ける。`consultSentenceMode && inlineComments` のとき本文注釈 UI を前面に出す。
+ * - 本文行コメント(proto CommentableBody)はドロワー(ConsultComposer sentence → CommentableBody)に
+ *   一本化した。詳細パネルは「この文を直す」相談中も常に通常タブ(プレビュー/構成案/素材)を表示する
+ *   (左プレビューは維持・コメントはドロワーだけ / F7)。
  * - 手動リッチ編集(TipTap)は親の全画面 overlay(renderEditWorkspace)が担うため、DetailPanel の
  *   `editing` はヘッダの「編集中」バッジ表示のみに縮約する(body の tabpanel は通常表示のまま)。
  * - フッターの公開前チェックは本番 draftQuality(...) のみ(styleLint/StyleHints の合流は将来拡張)。
@@ -179,10 +180,6 @@ export interface DetailPanelProps {
   onSaveMeta: (text: string) => void;
   /** 下書き取得失敗からの再読み込み(#75)。 */
   onReloadDraft: () => void;
-  /** 本文行コメント(再スキンした InlineCommentReview)を差し込む slot。親が注入。 */
-  inlineComments?: ReactNode;
-  /** 「この文」相談モード中=true のとき本文注釈 UI(inlineComments)を前面に出す。 */
-  consultSentenceMode?: boolean;
 }
 
 export function DetailPanel({
@@ -224,8 +221,6 @@ export function DetailPanel({
   onRequestOutlineRevise,
   onSaveMeta,
   onReloadDraft,
-  inlineComments,
-  consultSentenceMode,
 }: DetailPanelProps) {
   const [qOpen, setQOpen] = useState(false);
 
@@ -418,61 +413,59 @@ export function DetailPanel({
         tabIndex={0}
         className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
       >
-        {consultSentenceMode && inlineComments ? (
-          inlineComments
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={item.id + safeTab}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16 }}
-            >
-              {safeTab === "outline" && (
-                <OutlineView
-                  sections={sections}
-                  hypothesis={hypothesis}
-                  hue={hue}
-                  imageInstructions={imageInstructions}
-                  revising={revising}
-                  onAddComment={onAddComment}
-                  onRemoveComment={onRemoveComment}
-                  onUpdateImage={onUpdateImage}
-                  onRequestOutlineRevise={onRequestOutlineRevise}
-                />
-              )}
-              {safeTab === "prompt" && <PromptView prompt={prompt} refs={refs} />}
-              {safeTab === "preview" && (
-                // 縮約: 既存 excerpt(メタディスクリプション)は /api/growth/draft が返さないため
-                // MetaEditor へ metaDescription をプリフィルできない(常に空から編集開始)。
-                // DraftPreview 型・route.ts に excerpt 相当のフィールドが無く、BE 変更はしない方針のため
-                // ここでは metaDescription を渡さない(F1 事実確認済み・2026-07-02)。
-                <PreviewView
-                  stage={stage}
-                  draftState={draftState}
-                  slug={slug}
-                  onSaveMeta={onSaveMeta}
-                  onReloadDraft={onReloadDraft}
-                />
-              )}
-              {safeTab === "images" && (
-                <ImagesView
-                  hue={hue}
-                  hasEyecatch={Boolean(item.eyecatchUrl) || Boolean(draft?.eyecatch)}
-                  eyecatchUrl={item.eyecatchUrl ?? draft?.eyecatch}
-                  bodyImages={0}
-                  regenKeys={regenKeys}
-                  itemId={item.id}
-                  onPickEyecatch={onPickEyecatch}
-                  onRegenEyecatch={onRegenEyecatch}
-                  onPickBodyImage={onPickBodyImage}
-                  onRegenBodyImage={onRegenBodyImage}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        )}
+        {/* F7: 「この文を直す」相談中も詳細パネルは常に通常タブ(プレビュー/構成案/素材)を表示する。
+            本文行コメント UI はドロワー(ConsultComposer sentence → CommentableBody)に一本化した。 */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={item.id + safeTab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16 }}
+          >
+            {safeTab === "outline" && (
+              <OutlineView
+                sections={sections}
+                hypothesis={hypothesis}
+                hue={hue}
+                imageInstructions={imageInstructions}
+                revising={revising}
+                onAddComment={onAddComment}
+                onRemoveComment={onRemoveComment}
+                onUpdateImage={onUpdateImage}
+                onRequestOutlineRevise={onRequestOutlineRevise}
+              />
+            )}
+            {safeTab === "prompt" && <PromptView prompt={prompt} refs={refs} />}
+            {safeTab === "preview" && (
+              // 縮約: 既存 excerpt(メタディスクリプション)は /api/growth/draft が返さないため
+              // MetaEditor へ metaDescription をプリフィルできない(常に空から編集開始)。
+              // DraftPreview 型・route.ts に excerpt 相当のフィールドが無く、BE 変更はしない方針のため
+              // ここでは metaDescription を渡さない(F1 事実確認済み・2026-07-02)。
+              <PreviewView
+                stage={stage}
+                draftState={draftState}
+                slug={slug}
+                onSaveMeta={onSaveMeta}
+                onReloadDraft={onReloadDraft}
+              />
+            )}
+            {safeTab === "images" && (
+              <ImagesView
+                hue={hue}
+                hasEyecatch={Boolean(item.eyecatchUrl) || Boolean(draft?.eyecatch)}
+                eyecatchUrl={item.eyecatchUrl ?? draft?.eyecatch}
+                bodyImages={0}
+                regenKeys={regenKeys}
+                itemId={item.id}
+                onPickEyecatch={onPickEyecatch}
+                onRegenEyecatch={onRegenEyecatch}
+                onPickBodyImage={onPickBodyImage}
+                onRegenBodyImage={onRegenBodyImage}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <footer

@@ -1,7 +1,7 @@
 /**
  * DetailPanel(2段タブ・#proto P3b 本番移植)のテスト。
  * クラスタ tablist(構成案/プレビュー/素材)・素材の内訳(画像/プロンプト)・フッター主操作・
- * block チェックでの承認無効・公開済みバッジ・編集中バッジ・行コメント slot・モバイル戻る を担保する。
+ * block チェックでの承認無効・公開済みバッジ・編集中バッジ・相談モードでも通常タブ維持(F7)・モバイル戻る を担保する。
  * Task 9 で本 file は exclude するため、主要分岐が壊れていないことの担保として残す。
  */
 import { render, screen } from "@testing-library/react";
@@ -130,9 +130,11 @@ describe("DetailPanel(2段タブ)", () => {
     expect(screen.getByText("編集中")).toBeInTheDocument();
   });
 
-  it("consultSentenceMode で inlineComments を前面に出す", () => {
-    setup({ consultSentenceMode: true, inlineComments: <div>行コメントUI</div> });
-    expect(screen.getByText("行コメントUI")).toBeInTheDocument();
+  it("相談モードに関わらず常に通常タブ(プレビュー)を描画する(F7・乗っ取り撤去)", () => {
+    // F7: sentence 相談用の inlineComments / consultSentenceMode props は撤去済み。
+    // 詳細パネルは preview タブでは常に DevicePreview(プレビュー端末 tablist)を描画する。
+    setup({ tab: "preview" });
+    expect(screen.getByRole("tablist", { name: "プレビュー端末" })).toBeInTheDocument();
   });
 
   it("onBack で一覧へ戻る(モバイル)", async () => {
