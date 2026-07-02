@@ -2092,6 +2092,57 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
   });
 
+  // ── F6 回帰: プレビュー表示中の「AIに相談」で本文注釈 UI が焼き付かないこと ──────────
+  it("下書き ready でプレビュー中に AIに相談 → プレビューは残り本文注釈UIは出ない(F6)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      draftReady("<p>一文目です。</p>"),
+    );
+    const dialog = await openIdeaPanel();
+    // 前提: プレビュータブが選択され、本文注釈 UI は出ていない。
+    await within(dialog).findByTitle("公開後プレビュー");
+    expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
+
+    // フッター「AIに相談」でドロワーを開く。既定モードは overall(この文モードではない)。
+    const drawer = await openConsultDrawer(dialog);
+    expect(within(drawer).getByRole("tab", { name: "全体を見てもらう" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // 詳細パネル本体はプレビューのまま。本文注釈 UI は前面に出ない。
+    expect(within(dialog).getByTitle("公開後プレビュー")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
+  });
+
+  it("この文を直すを選ぶと本文注釈UIへ切替、閉じて再度AIに相談するとプレビューへ復帰する(F6)", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      draftReady("<p>一文目です。</p>"),
+    );
+    const dialog = await openIdeaPanel();
+    await within(dialog).findByTitle("公開後プレビュー");
+
+    // 1) ドロワーを開き「この文を直す」へ切替 → 詳細パネル本体が本文注釈 UI に化ける(正の挙動)。
+    let drawer = await openConsultDrawer(dialog);
+    await selectConsultTab(drawer, "この文を直す");
+    await within(dialog).findByRole("region", { name: "本文インラインコメント" });
+    expect(within(dialog).queryByTitle("公開後プレビュー")).toBeNull();
+
+    // 2) ドロワーを閉じる → 本体はプレビューへ戻る(consult.open=false)。
+    await userEvent.click(within(drawer).getByRole("button", { name: "閉じる" }));
+    await within(dialog).findByTitle("公開後プレビュー");
+    expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
+
+    // 3) 再び「AIに相談」→ mode は overall へリセットされ、プレビューが維持される(焼き付き無し)。
+    drawer = await openConsultDrawer(dialog);
+    expect(within(drawer).getByRole("tab", { name: "全体を見てもらう" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(within(dialog).getByTitle("公開後プレビュー")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
+  });
+
   it("bodyHtml が空でも body にフォールバックしてプレビューへ渡す(#100)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
