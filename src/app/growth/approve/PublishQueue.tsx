@@ -1,43 +1,54 @@
 /**
- * 公開キュー(#H23 例外管理型 + #H24 予約公開)。
- * 下書き済み記事を「公開OK(green)」と「要対応(例外)」に分け、green を一括公開/一括予約できる。
+ * 公開キュー(#H23 例外管理型 + #H24 予約公開・#proto P5b 再スキン)。
+ * 下書き済み記事を proto の 3サマリカード(公開OK/予約済み/要対応)＋3セクションで表示し、
+ * ready を一括公開/一括予約できる。個別行でも公開/予約/解除/修正できる。
  *
+ * - 3分割は `splitPublishQueue`(純ロジック)へ委譲。ready/scheduled/blocked。
  * - 公開は既存 `/api/growth/publish`(冪等)を ready 件数ぶん順次呼ぶ。
- * - 予約は `/api/growth/publish/schedule`(Notion に時刻を書くだけ)。実際の公開は PC の publish-due。
- * 振り分け・到来判定の純ロジックは publishQueue.ts でテスト済み。
+ * - 予約は `/api/growth/publish/schedule`(Notion に時刻を書くだけ・実公開は PC の publish-due)。
+ *   予約は SchedulePicker(プリセット/日時指定)で時刻を選び、atMs→ISO で POST する。
+ * - 要対応行は onFix で詳細パネルへ遷移(親 ApproveClient が activeId/view を設定)。
+ * 振り分け・到来判定の純ロジックは publishQueue.ts / publishQueueView.ts でテスト済み。
  */
 
 "use client";
 
 import { useState } from "react";
 
-import { partitionPublishQueue, type PublishQueueItem } from "@/lib/growth/publishQueue";
+import { splitPublishQueue, formatSchedule } from "@/lib/growth/publishQueueView";
 
-import { formatScheduledAt } from "./articleMetricsView";
 import { authHeaders } from "./authHeaders";
-
-interface QueueArticle extends PublishQueueItem {
-  title: string;
-}
+import { SchedulePicker } from "./SchedulePicker";
+import { cardHue } from "./boardCardView";
+import type { PendingItem } from "./types";
+import { EyecatchThumb } from "./ui/eyecatchThumb";
+import {
+  IconArrowRight,
+  IconBolt,
+  IconCalendar,
+  IconCheck,
+  IconCheckCircle,
+  IconClock,
+  IconX,
+} from "./ui/icons";
 
 interface PublishQueueProps {
-  items: readonly QueueArticle[];
+  items: readonly PendingItem[];
   token: string;
   /** 公開/予約後に盤を更新するためのコールバック。 */
   onChanged: () => void;
+  /** 要対応行の「修正する」から詳細パネルへ遷移する(親が activeId/view を設定)。 */
+  onFix?: (id: string) => void;
 }
 
-// 折りたたみ本体の id(トグルの aria-controls と対応・a11y)。
-const CONTENT_ID = "publish-queue-content";
-
-export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
-  const { ready, blocked } = partitionPublishQueue(items);
-  const [open, setOpen] = useState(false);
-  const [scheduledLocal, setScheduledLocal] = useState("");
+export function PublishQueue({ items, token, onChanged, onFix }: PublishQueueProps) {
+  const { ready, scheduled, blocked } = splitPublishQueue(items);
+  // 予約ピッカーの対象 id 群(null=閉)。まとめて/個別の両方で使う。
+  const [scheduleFor, setScheduleFor] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (ready.length === 0 && blocked.length === 0) return null;
+  if (ready.length === 0 && scheduled.length === 0 && blocked.length === 0) return null;
 
   async function post(url: string, body: unknown): Promise<void> {
     const res = await fetch(url, {
@@ -62,21 +73,20 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
     }
   }
 
-  function handlePublishNow(): void {
+  function handlePublishNow(ids: readonly string[]): void {
     void run(async () => {
-      for (const article of ready) {
-        await post("/api/growth/publish", { pageId: article.id });
+      for (const id of ids) {
+        await post("/api/growth/publish", { pageId: id });
       }
     });
   }
 
-  function handleSchedule(): void {
-    // parse は run() 内に置く。不正値で toISOString() が throw しても run() の catch が拾う
-    // (ボタンは空欄で disabled・datetime-local は基本 valid/空のみ。防御として内側に置く)。
+  function handleSchedule(ids: readonly string[], atMs: number): void {
+    // atMs→ISO 変換は run() 内に置く。不正値で toISOString() が throw しても catch が拾う。
     void run(async () => {
-      const iso = new Date(scheduledLocal).toISOString();
-      for (const article of ready) {
-        await post("/api/growth/publish/schedule", { pageId: article.id, scheduledAt: iso });
+      const iso = new Date(atMs).toISOString();
+      for (const id of ids) {
+        await post("/api/growth/publish/schedule", { pageId: id, scheduledAt: iso });
       }
     });
   }
@@ -87,93 +97,217 @@ export function PublishQueue({ items, token, onChanged }: PublishQueueProps) {
     });
   }
 
+  const nextLabel = scheduled[0]?.scheduledAtMs != null
+    ? formatSchedule(new Date(scheduled[0].scheduledAtMs))
+    : undefined;
+
   return (
-    <section aria-label="公開キュー" className="rounded-lg ring-1 ring-gray-200 bg-white p-4">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-controls={CONTENT_ID}
-        className="flex w-full items-center justify-between text-sm font-bold text-gray-900"
+    <section aria-label="公開キュー" className="mx-auto max-w-[860px] px-6 py-7">
+      <div className="mb-5 flex items-center gap-2">
+        <IconCalendar size={18} style={{ color: "var(--p-accent)" }} />
+        <h2 className="text-[16px] font-semibold">公開キュー</h2>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SummaryCard color="var(--p-green)" label="公開OK" value={ready.length} />
+        <SummaryCard
+          color="var(--p-teal)"
+          label="予約済み"
+          value={scheduled.length}
+          sub={nextLabel ? `次: ${nextLabel}` : undefined}
+        />
+        <SummaryCard color="var(--p-amber)" label="要対応" value={blocked.length} />
+      </div>
+
+      <Section
+        dot="var(--p-green)"
+        title="公開OK"
+        count={ready.length}
+        empty="公開できる記事はありません。"
+        action={
+          ready.length > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setScheduleFor(ready.map((a) => a.id))}
+                disabled={busy}
+                className="approve-btn-ghost flex items-center gap-1.5 text-[12.5px] disabled:opacity-50"
+              >
+                <IconCalendar size={13} /> まとめて予約
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePublishNow(ready.map((a) => a.id))}
+                disabled={busy}
+                className="flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
+                style={{ background: "var(--p-accent)", color: "#0a0c10" }}
+              >
+                <IconCheck size={14} /> 公開OK {ready.length} 件を今すぐ公開
+              </button>
+            </>
+          ) : null
+        }
       >
-        <span>公開キュー（公開OK {ready.length} 件 / 要対応 {blocked.length} 件）</span>
-        <span aria-hidden className="text-gray-400">{open ? "▲" : "▼"}</span>
-      </button>
-
-      {open ? (
-        <div id={CONTENT_ID}>
-      {blocked.length > 0 ? (
-        <div className="mt-3">
-          <p className="text-xs font-semibold text-rose-700">要対応（公開できない例外）</p>
-          <ul className="mt-1 space-y-1">
-            {blocked.map(({ item, reason }) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 flex-1 truncate text-gray-900">{item.title}</span>
-                <span className="text-xs font-semibold text-rose-700">{reason}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {ready.length > 0 ? (
-        <div className="mt-3">
-          <p className="text-xs font-semibold text-emerald-700">公開OK</p>
-          <ul className="mt-1 space-y-1">
-            {ready.map((article) => (
-              <li key={article.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 flex-1 truncate text-gray-900">{article.title}</span>
-                {typeof article.scheduledAtMs === "number" ? (
-                  <span className="flex items-center gap-2 text-xs text-gray-600">
-                    予約 {formatScheduledAt(article.scheduledAtMs)}
-                    <button
-                      type="button"
-                      onClick={() => handleUnschedule(article.id)}
-                      disabled={busy}
-                      aria-label={`予約を解除: ${article.title}`}
-                      className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-700 disabled:opacity-50"
-                    >
-                      解除
-                    </button>
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+        {ready.map((a) => (
+          <Row key={a.id} id={a.id} title={a.title} url={a.eyecatchUrl}>
+            <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-green)" }}>
+              <IconCheckCircle size={13} /> 公開可能
+            </span>
             <button
               type="button"
-              onClick={handlePublishNow}
+              onClick={() => setScheduleFor([a.id])}
               disabled={busy}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="approve-tool disabled:opacity-50"
+              style={{ height: 28 }}
             >
-              公開OK {ready.length} 件を今すぐ公開
+              <IconCalendar size={13} /> 予約
             </button>
-            <label className="flex items-center gap-1 text-xs text-gray-600">
-              予約時刻
-              <input
-                type="datetime-local"
-                value={scheduledLocal}
-                onChange={(event) => setScheduledLocal(event.target.value)}
-                className="rounded border border-gray-300 px-2 py-1 text-sm"
-              />
-            </label>
             <button
               type="button"
-              onClick={handleSchedule}
-              disabled={busy || scheduledLocal === ""}
-              className="rounded-md border border-emerald-600 px-3 py-1.5 text-sm font-semibold text-emerald-700 disabled:opacity-50"
+              onClick={() => handlePublishNow([a.id])}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-[8px] px-3 py-[6px] text-[12px] font-semibold disabled:opacity-50"
+              style={{ background: "var(--p-accent)", color: "#0a0c10" }}
             >
-              この時刻に予約
+              <IconBolt size={13} /> 公開
             </button>
+          </Row>
+        ))}
+      </Section>
+
+      {scheduled.length > 0 ? (
+        <Section dot="var(--p-teal)" title="予約済み" count={scheduled.length} empty="">
+          <div className="px-4 pt-2 pb-1 text-[11px]" style={{ color: "var(--p-text-3)" }}>
+            プル型: 時刻になると常時稼働PCが公開します（予約はNotionに時刻を書くだけ）。
           </div>
-        </div>
+          {scheduled.map((a) => (
+            <Row key={a.id} id={a.id} title={a.title} url={a.eyecatchUrl}>
+              <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-teal)" }}>
+                {/* scheduled は splitPublishQueue が scheduledAtMs!=null のものだけを分類する(常に非 null)。 */}
+                <IconClock size={13} /> 予約 {formatSchedule(new Date(a.scheduledAtMs!))}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleUnschedule(a.id)}
+                disabled={busy}
+                aria-label={`予約を解除: ${a.title}`}
+                className="approve-tool disabled:opacity-50"
+                style={{ height: 28 }}
+              >
+                <IconX size={13} /> 解除
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePublishNow([a.id])}
+                disabled={busy}
+                className="flex items-center gap-1.5 rounded-[8px] px-3 py-[6px] text-[12px] font-semibold disabled:opacity-50"
+                style={{ background: "var(--p-accent)", color: "#0a0c10" }}
+              >
+                <IconBolt size={13} /> 今すぐ
+              </button>
+            </Row>
+          ))}
+        </Section>
       ) : null}
 
-      {error ? <p className="mt-2 text-sm text-rose-700">{error}</p> : null}
-        </div>
+      <Section dot="var(--p-amber)" title="要対応" count={blocked.length} empty="要対応の記事はありません。">
+        {blocked.map(({ item, reason }) => (
+          <Row key={item.id} id={item.id} title={item.title} url={item.eyecatchUrl}>
+            <span
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-medium"
+              style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+            >
+              <IconX size={12} /> {reason}
+            </span>
+            <button
+              type="button"
+              onClick={() => onFix?.(item.id)}
+              className="approve-tool"
+              style={{ height: 28 }}
+            >
+              修正する <IconArrowRight size={13} />
+            </button>
+          </Row>
+        ))}
+      </Section>
+
+      {error ? <p className="mt-2 text-[13px]" style={{ color: "var(--p-red)" }}>{error}</p> : null}
+
+      {scheduleFor ? (
+        <SchedulePicker
+          count={scheduleFor.length}
+          onClose={() => setScheduleFor(null)}
+          onConfirm={(_label, atMs) => {
+            handleSchedule(scheduleFor, atMs);
+            setScheduleFor(null);
+          }}
+        />
       ) : null}
     </section>
+  );
+}
+
+interface SummaryCardProps {
+  color: string;
+  label: string;
+  value: number;
+  sub?: string;
+}
+
+function SummaryCard({ color, label, value, sub }: SummaryCardProps) {
+  return (
+    <div className="rounded-[12px] p-3.5" style={{ background: "var(--p-bg-elevated)", border: "1px solid var(--p-border)" }}>
+      <div className="flex items-center gap-1.5">
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: color }} />
+        <span className="text-[12px]" style={{ color: "var(--p-text-2)" }}>{label}</span>
+      </div>
+      <div className="mt-1.5 text-[22px] font-semibold tabular-nums">{value}</div>
+      {sub ? <div className="mt-0.5 truncate text-[11px]" style={{ color: "var(--p-text-3)" }}>{sub}</div> : null}
+    </div>
+  );
+}
+
+interface SectionProps {
+  dot: string;
+  title: string;
+  count: number;
+  empty: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+function Section({ dot, title, count, empty, action, children }: SectionProps) {
+  return (
+    <div className="mb-5 rounded-[12px]" style={{ background: "var(--p-bg-elevated)", border: "1px solid var(--p-border)" }}>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--p-border)" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />
+        <span className="text-[13px] font-medium">{title}</span>
+        <span className="tabular-nums text-[12px]" style={{ color: "var(--p-text-3)" }}>{count}</span>
+        {action ? <div className="ml-auto flex items-center gap-2">{action}</div> : null}
+      </div>
+      <div className="flex flex-col">
+        {count === 0 && empty ? (
+          <div className="px-4 py-5 text-[12.5px]" style={{ color: "var(--p-text-3)" }}>{empty}</div>
+        ) : null}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+interface RowProps {
+  id: string;
+  title: string;
+  url?: string;
+  children: React.ReactNode;
+}
+
+function Row({ id, title, url, children }: RowProps) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: "1px solid var(--p-border)" }}>
+      <EyecatchThumb hue={cardHue(id)} has={Boolean(url)} url={url} size={36} />
+      <span className="min-w-0 flex-1 truncate text-[13px]">{title}</span>
+      {children}
+    </div>
   );
 }
