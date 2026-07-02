@@ -40,7 +40,7 @@ export function ConfirmActionDialog({ action, busy, onCancel, onConfirm }: Confi
     // z-[80]: 詳細パネル(z-50)・編集ワークスペース(z-60)・コマンドパレット(z-70)より上に出す。
     // 確認は詳細パネル内のボタンから開くため、パネルより前面でないと裏に隠れて操作できない。
     <div
-      className="approve-shell z-[80] flex items-start justify-center px-4 pt-[18vh]"
+      className="approve-shell fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[18vh]"
       style={{ background: "rgba(4,6,9,0.6)", backdropFilter: "blur(3px)" }}
       onMouseDown={onCancel}
     >
