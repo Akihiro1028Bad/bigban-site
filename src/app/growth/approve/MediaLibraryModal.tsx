@@ -6,7 +6,8 @@
  *  - 追加 : `POST /api/growth/media`(multipart `file`)→ 返却 URL を先頭へ挿入し即選択候補に。
  *  - 反映 : `POST /api/growth/draft/eyecatch { pageId, eyecatchUrl }`(`authHeaders`)→ 成功で `onApplied`。
  *
- * proto の `MOCK_MEDIA`/`mediaSvgUrl`/種別フィルタ chip は**モック用のため不使用**。
+ * proto の `MOCK_MEDIA`(モックデータ)/種別フィルタ chip はこのモーダルでは不使用
+ * (実データは API 経由で取得)。`mediaSvgUrl` は別途 HouseStylePreview / ImageSlot が使用中。
  * 実データ(microCMS メディア)にフィルタ軸が無いためフィルタは縮約(非表示)。
  * MANAGEMENT キーは server-only のため一覧/アップロードは API ルート経由のみ(鍵はクライアントへ出さない)。
  * クライアント事前検証は `media.ts` の純関数 `validateUpload`(client-safe)を再利用する(重複実装しない)。

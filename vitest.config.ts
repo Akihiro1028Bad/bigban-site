@@ -93,9 +93,6 @@ export default defineConfig({
         // コマンドパレットの dialog/フォーカストラップ薄結線(#109)。
         // 絞り込みの純ロジックは boardPrefs.ts でテスト済み。
         "src/app/growth/approve/CommandPalette.tsx",
-        // pull型の経過時間/滞留警告の薄い DOM+タイマー結線(#C2 UI)。
-        // 純ロジックは pullStale.ts でテスト済み。
-        "src/app/growth/approve/StaleNotice.tsx",
         // 差分B AI相談ドロワー(Task 12): 承認画面が render する薄い結線UI。
         // 純ロジック(ビュー正規化・状態写像・段階出し分け)は consult.ts でテスト済み。
         "src/app/growth/approve/consult/AdviceResultBody.tsx",

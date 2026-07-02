@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MEDIA_KIND_LABEL, MOCK_MEDIA, mediaSvgUrl } from "./mediaLibrary";
+import { MEDIA_KIND_LABEL, mediaSvgUrl } from "./mediaLibrary";
 import type { MediaKind } from "./mediaLibrary";
 
 describe("mediaSvgUrl", () => {
@@ -38,20 +38,11 @@ describe("mediaSvgUrl", () => {
   });
 });
 
-describe("MEDIA_KIND_LABEL / MOCK_MEDIA", () => {
+describe("MEDIA_KIND_LABEL", () => {
   it("全 kind に日本語ラベルがある", () => {
     expect(MEDIA_KIND_LABEL.mascot).toBe("マスコット");
     expect(MEDIA_KIND_LABEL.minimal).toBe("ミニマル");
     expect(MEDIA_KIND_LABEL.diagram).toBe("図解");
     expect(MEDIA_KIND_LABEL.photo).toBe("イメージ");
-  });
-
-  it("MOCK_MEDIA は data-URI 付きの一覧", () => {
-    expect(MOCK_MEDIA.length).toBeGreaterThan(0);
-    for (const m of MOCK_MEDIA) {
-      expect(m.url.startsWith("data:image/svg+xml,")).toBe(true);
-      expect(m.id).toBeTruthy();
-      expect(m.label).toBeTruthy();
-    }
   });
 });

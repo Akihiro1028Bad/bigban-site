@@ -1,22 +1,13 @@
 /**
- * メディアライブラリのモック(#proto P3b・本番移植・画像)。
+ * メディアプレビュー用の SVG 生成(#proto P3b・本番移植・画像)。
  *
- * 実機は microCMS のメディア(MANAGEMENT API)から url 付きで一覧するが、ここでは
- * 実画像の代わりに data-URI の SVG イラストを生成して「実サムネを見て選ぶ」体験を再現する。
- * 色矩形ではなく、スタイル別(マスコット/ミニマル/図解/イメージ)に描き分ける。
+ * 実画像の代わりに data-URI の SVG イラストを生成し、スタイル別(マスコット/ミニマル/
+ * 図解/イメージ)に描き分ける。`mediaSvgUrl` は HouseStylePreview / ImageSlot が
+ * ハウススタイルのサンプル表示に使う(実データの一覧は MediaLibraryModal が API 経由で行う)。
  *
  * data-URI 生成は DOM 非依存の純ロジックのため、coverage.exclude しない(100% 対象)。
  */
 export type MediaKind = "mascot" | "minimal" | "diagram" | "photo";
-
-export interface MediaItem {
-  id: string;
-  label: string;
-  hue: number;
-  kind: MediaKind;
-  /** data-URI の SVG(実 <img> として描画できる)。 */
-  url: string;
-}
 
 export const MEDIA_KIND_LABEL: Record<MediaKind, string> = {
   mascot: "マスコット",
@@ -45,20 +36,3 @@ export function mediaSvgUrl(kind: MediaKind, hue: number): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">${svgBody(kind, hue)}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
-
-function item(id: string, label: string, hue: number, kind: MediaKind): MediaItem {
-  return { id, label, hue, kind, url: mediaSvgUrl(kind, hue) };
-}
-
-export const MOCK_MEDIA: MediaItem[] = [
-  item("m1", "宇宙人マスコット・コート", 218, "mascot"),
-  item("m2", "宇宙人マスコット・笑顔", 268, "mascot"),
-  item("m3", "ミニマル幾何・ブルー", 205, "minimal"),
-  item("m4", "ミニマル幾何・グリーン", 150, "minimal"),
-  item("m5", "コートの広さ図解", 40, "diagram"),
-  item("m6", "パドル比較図", 320, "diagram"),
-  item("m7", "ナイター照明イメージ", 230, "photo"),
-  item("m8", "カフェカウンター", 28, "photo"),
-  item("m9", "宇宙人マスコット・サーブ", 290, "mascot"),
-  item("m10", "ミニマル幾何・アンバー", 48, "minimal"),
-];
