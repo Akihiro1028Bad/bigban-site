@@ -177,7 +177,7 @@ export function OutlineView({
                 <div className="min-w-0 flex-1">
                   <div className="text-[13.5px] font-medium">{s.heading}</div>
                   {s.summary && (
-                    <div className="mt-[2px] text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+                    <div className="mt-[2px] text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
                       {s.summary}
                     </div>
                   )}

@@ -116,7 +116,7 @@ export function CommandPalette({ items, onJump, onClose }: CommandPaletteProps) 
               </li>
             ))
           ) : (
-            <li className="px-4 py-3 text-sm" style={{ color: "var(--p-text-3)" }}>
+            <li className="px-4 py-3 text-sm" style={{ color: "var(--p-text-2)" }}>
               一致する項目がありません。
             </li>
           )}

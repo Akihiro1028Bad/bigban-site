@@ -75,7 +75,7 @@ export function InlineCommentReview({
         >
           インラインコメント
         </h3>
-        <span className="text-[11px]" style={{ color: "var(--p-text-3)" }}>
+        <span className="text-[11px]" style={{ color: "var(--p-text-2)" }}>
           行（文）ごとに ＋ でコメント → AIに指摘を依頼
         </span>
       </div>
@@ -116,7 +116,7 @@ export function InlineCommentReview({
                 className="rounded-[8px] p-2 text-xs"
                 style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
               >
-                <p className="line-through" style={{ color: "var(--p-text-3)" }}>
+                <p className="line-through" style={{ color: "var(--p-text-2)" }}>
                   {item.before.replace(/<[^>]*>/g, "")}
                 </p>
                 <p className="mt-0.5" style={{ color: "var(--p-text)" }}>
@@ -171,7 +171,7 @@ export function InlineCommentReview({
                 <div
                   className={`flex-1 px-2 py-1.5 text-sm leading-relaxed ${isHeading ? "font-bold" : ""}`}
                   style={{
-                    color: line.commentable ? "var(--p-text-2)" : "var(--p-text-3)",
+                    color: "var(--p-text-2)",
                     background: thread.length > 0 ? "var(--p-amber-weak)" : undefined,
                   }}
                 >
