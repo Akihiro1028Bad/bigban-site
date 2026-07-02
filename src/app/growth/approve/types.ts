@@ -33,6 +33,9 @@ export interface PendingItem {
   // #proto P2: アイキャッチ画像URL(Notion ミラー由来・盤データに既存)。カードのサムネ表示に使う。
   // 空/無=画像未生成→サムネはグラデーション/プレースホルダにフォールバック。
   eyecatchUrl?: string;
+  // #H23/#proto P5b: 下書き本文が空でないか(サーバ PendingItem のミラー由来)。
+  // 公開キューの blocked 判定(publishBlockReason「本文が空」)が読む。未設定=false 扱い。
+  hasDraftBody?: boolean;
   // #87: 下書き作成済み(承認後に下書き生成完了)。下書きタブへ振り分け、承認/却下を出さない。
   isDraftReady?: boolean;
   // #106/#107: パイプライン段階。盤の列分け・段階インジケータに使う。
