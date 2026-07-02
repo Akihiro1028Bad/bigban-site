@@ -21,11 +21,12 @@ import {
   STATUS_PROP,
 } from "@/lib/growth/approve";
 import { patchDraft, publishContent } from "@/lib/growth/content";
+import { growthEndpoint } from "@/lib/growth/endpoint";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 

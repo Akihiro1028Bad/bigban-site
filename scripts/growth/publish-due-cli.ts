@@ -12,6 +12,7 @@
 import "dotenv/config";
 
 import { patchDraft, publishContent, resolveRetryConfig } from "./content";
+import { growthEndpoint } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import {
@@ -29,7 +30,7 @@ import {
 } from "./notion";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
 const DRAFTED_STATUS = "下書き作成済み";

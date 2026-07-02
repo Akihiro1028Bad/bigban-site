@@ -15,6 +15,7 @@
 import "dotenv/config";
 
 import { patchDraft } from "./content";
+import { growthEndpoint } from "./endpoint";
 import {
   buildRegenDoneProps,
   buildRegenFailProps,
@@ -40,7 +41,7 @@ import {
 } from "./notion";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
-const ENDPOINT = "news";
+const ENDPOINT = growthEndpoint();
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。もう一度再生成を依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
