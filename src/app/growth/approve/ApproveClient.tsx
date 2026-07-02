@@ -56,12 +56,12 @@ import { EmptyGate, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreen
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
-import { AddProposalForm } from "./AddProposalForm";
 import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { PromptsView } from "./PromptsView";
-import { ProposalsView } from "./ProposalsView";
+import { ProposalView } from "./ProposalView";
+import { ProposalFormModal } from "./ProposalFormModal";
 import { nextReviewId } from "./reviewNav";
 import { decideInitialView, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
@@ -77,7 +77,7 @@ import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
 import { shouldWarnPollStale } from "./pollHealth";
 import { toMessage } from "./errorMessage";
-import { columnHeaderClass, isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
+import { isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
 import type { Choice, PendingItem } from "./types";
 import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
@@ -176,6 +176,8 @@ export function ApproveClient() {
   const searchRef = useRef<HTMLInputElement>(null);
   // #proto P1: ショートカット一覧オーバーレイ(ボタン到達のみ・`?` キーバインドは P6 へ)。
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // #P5a: 施策作成モーダル(proto ProposalFormModal)の開閉。旧 AddProposalForm(inline details)を置換。
+  const [proposalFormOpen, setProposalFormOpen] = useState(false);
   const [message, setMessage] = useState("");
   // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
   const [busy, setBusy] = useState(authDisabled);
@@ -698,14 +700,12 @@ export function ApproveClient() {
     }
   };
 
-  // #275/#proto P3a: 高密度な一覧行。詳細は右ペインへ寄せ、行では承認/却下/詳細だけを出す。
-  // ProposalsView は `<ul>` 直下に置くため `<li>`(既定)。map(renderItem) の第2引数(index)を
-  // 誤って as に渡さないよう、要素種別は明示引数 as で受ける(既定 "li")。
-  // BoardList は自前で `<li role="listitem">` を持つため、その中で描画する行は as="div"
-  // で `<li>` の入れ子(不正 HTML・jsdom クラッシュ)を避ける。
-  function renderItem(item: PendingItem, as: "li" | "div" = "li") {
+  // #275/#proto P3a/#P5a: 記事(idea)一覧の高密度行。施策は proto ProposalView へ移植したため、
+  // renderItem は記事(idea)専用になった(BoardList の renderRow からのみ・常に as="div")。
+  // BoardList は自前で `<li role="listitem">` を持つため、行は as="div" で `<li>` の入れ子
+  // (不正 HTML・jsdom クラッシュ)を避ける。
+  function renderItem(item: PendingItem, as: "li" | "div") {
     const choice = decided[item.id];
-    const isIdea = item.kind === "idea";
     const failure = failures[item.id];
     return (
       <BoardCard
@@ -719,12 +719,11 @@ export function ApproveClient() {
         isFocused={item.id === focusedId}
         bulkSelectable={isBulkActionable(item)}
         selected={selected.has(item.id)}
-        isIdea={isIdea}
-        step={isIdea ? stageStepIndex(effectiveStage(item, choice)) : -1}
+        isIdea
+        step={stageStepIndex(effectiveStage(item, choice))}
         scoreBarWidth={scoreBarPct(item.score ?? 0, ideaMaxScore)}
-        stageAccentClass={isIdea ? `border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}` : ""}
+        stageAccentClass={`border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}`}
         stuck={
-          isIdea &&
           isInFlight(item.stage) &&
           isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS)
         }
@@ -930,7 +929,7 @@ export function ApproveClient() {
             aria-label={viewPanelLabel[activeView]}
             aria-labelledby={`approve-seg-${segment}`}
             className={
-              activeView === "approve"
+              activeView === "approve" || activeView === "proposal"
                 ? "flex min-w-0 flex-1 flex-col"
                 : "min-w-0 flex-1 overflow-auto p-4 lg:px-6"
             }
@@ -1003,15 +1002,16 @@ export function ApproveClient() {
             ) : searchEmpty ? (
               <SearchEmpty query={query} />
             ) : activeView === "proposal" ? (
-              <>
-                <ProposalsView
-                  proposals={visibleProposals}
-                  renderItem={(item) => renderItem(item)}
-                  densityClass={densityClass}
-                  headerClass={columnHeaderClass()}
-                />
-                <AddProposalForm token={token} onAdded={addProposal} />
-              </>
+              <ProposalView
+                proposals={visibleProposals}
+                decided={decided}
+                activeId={activeId}
+                onActivate={setActiveId}
+                onApprove={(item) => void decide(item, "承認")}
+                onReopen={(item) => void undo(item)}
+                onReject={(item) => void decide(item, "却下")}
+                onOpenForm={() => setProposalFormOpen(true)}
+              />
             ) : activeView === "prompt" ? (
               <PromptsView token={token} />
             ) : activeView === "performance" ? (
@@ -1034,6 +1034,16 @@ export function ApproveClient() {
 
         {/* #proto P1: ショートカット一覧(ボタン到達のみ)。 */}
         {shortcutsOpen ? <ShortcutOverlay onClose={() => setShortcutsOpen(false)} /> : null}
+
+        {/* #P5a: 施策作成モーダル(proto ProposalFormModal)。dialog overlay は CSS 変数(--p-*)を
+            継承するため .approve-shell 配下で描画する。作成成功時は addProposal で一覧先頭へ差し込む。 */}
+        {proposalFormOpen ? (
+          <ProposalFormModal
+            token={token}
+            onClose={() => setProposalFormOpen(false)}
+            onAdded={addProposal}
+          />
+        ) : null}
 
         {/* #167/H2: 構成やり直しの確認ダイアログ(window.confirm を置換・対象タイトルを明示)。公開/クローズは撤去。 */}
         {confirmAction ? (
@@ -1062,32 +1072,13 @@ export function ApproveClient() {
         ) : null}
       </div>
 
-      {/* #275/#proto P3a/P3b: 記事(approve view)は右ペインで詳細を出すが、施策など右ペインを持たない
-          view ではモーダルドロワー(dialog)として 2段タブ DetailPanel を出す。position:fixed が
-          祖先 transform に閉じ込められないよう .approve-shell の外(MotionConfig 直下)で描画する。 */}
-      {activeItem && activeView !== "approve" ? (
-        <div className="approve-shell fixed inset-0 z-50 flex">
-          <button
-            type="button"
-            aria-label="オーバーレイを閉じる"
-            onClick={() => setActiveId(null)}
-            className="flex-1 bg-black/40"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`詳細: ${activeItem.title}`}
-            className="ml-auto flex h-full w-full max-w-md flex-col overflow-hidden shadow-xl sm:w-[28rem]"
-            style={{ background: "var(--p-bg)" }}
-          >
-            {renderDetailPanel(activeItem)}
-          </div>
-        </div>
-      ) : null}
+      {/* #P5a: 施策(proposal view)は ProposalView 内の右ペインで詳細(ProposalDetailBody)を出すため、
+          旧「非 approve view の DetailPanel ドロワー」は撤去した。記事(approve view)は右ペインで
+          renderDetailPanel を出す(2ペイン)。他 view(prompt/performance/queue)はカードを持たない。 */}
 
       {/* 差分B(#proto P3b で DetailPanelView から移設): AI相談ドロワー。ConsultDrawer/ConsultComposer は
-          ApproveClient から描画する(相談フロー不変)。開いている項目が記事のときのみ意味を持つ。 */}
-      {activeItem ? (
+          ApproveClient から描画する(相談フロー不変)。記事(approve view)を開いているときのみ意味を持つ。 */}
+      {activeItem && activeView === "approve" ? (
         <ConsultDrawer
           open={consult.open}
           stage={consult.stage}

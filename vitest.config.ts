@@ -116,6 +116,14 @@ export default defineConfig({
         "src/app/growth/approve/OutlineView.tsx",
         "src/app/growth/approve/QualityChecklist.tsx",
         "src/app/growth/approve/DevicePreview.tsx",
+        // #P5a(Task 4): 施策ビューの proto プレゼンテーション3ファイル。承認画面が render する
+        // 薄い見た目レイヤ(master-detail/種別フィルタ/結末プレビュー・作成モーダル・詳細本体)。
+        // 純ロジック(種別派生 kindFromCategory・承認アウトカム approveOutcomeFor・作成フォーム検証
+        // validateProposalForm)は proposalKind/proposalForm でテスト済み。結線挙動(承認/却下/作成/
+        // 種別フィルタ)は ApproveClient.test.tsx で検証する。
+        "src/app/growth/approve/ProposalView.tsx",
+        "src/app/growth/approve/ProposalDetailBody.tsx",
+        "src/app/growth/approve/ProposalFormModal.tsx",
       ],
       thresholds: {
         statements: 100,
