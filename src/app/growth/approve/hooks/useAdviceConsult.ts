@@ -48,6 +48,16 @@ export function useAdviceConsult({
   // #165: 本文反映で採用する fix の index 集合。
   const [adopted, setAdopted] = useState<ReadonlySet<number>>(new Set());
 
+  // 記事切替(pageId 変化)で前記事の指示文・採用チェックを持ち越さない(別記事への誤送信を防ぐ)。
+  // React 公式「prop 変化時の state 調整」パターン(effect ではなく描画中に是正)。
+  // prevPageId 初期値=現在の pageId のため初回マウントでは入らない。
+  const [prevPageId, setPrevPageId] = useState(pageId);
+  if (pageId !== prevPageId) {
+    setPrevPageId(pageId);
+    setInstruction("");
+    setAdopted(new Set());
+  }
+
   async function postJson(path: string, body: unknown, fallback: string): Promise<void> {
     setBusy(true);
     setError("");
