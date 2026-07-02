@@ -9,13 +9,6 @@
  */
 export type MediaKind = "mascot" | "minimal" | "diagram" | "photo";
 
-export const MEDIA_KIND_LABEL: Record<MediaKind, string> = {
-  mascot: "マスコット",
-  minimal: "ミニマル",
-  diagram: "図解",
-  photo: "イメージ",
-};
-
 function svgBody(kind: MediaKind, hue: number): string {
   const h2 = (hue + 40) % 360;
   const acc = (hue + 180) % 360;
