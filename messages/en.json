@@ -596,6 +596,9 @@
     "close": "Close",
     "imageAlt": "THE PICKLE BANG THEORY Crowdfunding"
   },
+  "Columns": {
+    "heading": "COLUMN"
+  },
   "News": {
     "heading": "News",
     "embed": {
