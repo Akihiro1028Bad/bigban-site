@@ -1,9 +1,12 @@
 /**
  * プロンプト確認タブ(read-only)。各フェーズで AI に渡している静的プロンプトと、全フェーズ
- * 共通の前提情報(facility-context)を master-detail で確認する。データは GET /api/growth/prompts。
+ * 共通の前提情報(facility-context)を proto ダーク master-detail で確認する。
+ * データは GET /api/growth/prompts。
  *
- * - 左: 前提情報をピン留め＋フェーズをパイプライン順(グループ)で一覧。
- * - 右: 選択中の全文(等幅)＋「いつ動くか」＋コピー。表示はデプロイ時点のリポジトリ内容。
+ * - 左 nav: 前提情報をピン留め＋フェーズをパイプライン順(グループ)で一覧。
+ *   アクティブ項目は左バー(w-[3px])＋ raised 背景で示す。
+ * - 右 section: 選択中の全文(等幅)＋「いつ動くか」＋コピー。表示はデプロイ時点のリポジトリ内容。
+ * - モバイル(lg 未満)は 1 ペイン: 項目を選ぶと詳細へ、戻るで一覧へ(showDetailMobile)。
  * - 編集はしない(将来対応を見据え、右ペインを差し替えられる構造にしている)。
  */
 
@@ -13,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { fetchPrompts } from "./api";
+import { IconArrowLeft, IconFileText } from "./ui/icons";
 
 // 前提情報(facility-context)を選択中であることを表す擬似キー(フェーズのファイル名とは衝突しない)。
 const FACILITY_KEY = "__facility__";
@@ -35,17 +39,23 @@ export function PromptsView({ token }: PromptsViewProps) {
   });
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // 狭幅(lg未満)の1ペイン制御: 一覧で項目を選ぶと詳細へ、戻るで一覧へ。lg以上は常に両ペイン。
+  const [showDetailMobile, setShowDetailMobile] = useState(false);
 
   if (status === "pending") {
     return (
-      <p role="status" className="mt-4 text-sm text-gray-500">
+      <p role="status" className="mt-4 px-4 text-[13px]" style={{ color: "var(--p-text-3)" }}>
         プロンプトを読み込み中…
       </p>
     );
   }
   if (status === "error") {
     return (
-      <p role="alert" className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <p
+        role="alert"
+        className="mt-4 mx-4 rounded-[10px] px-3 py-2 text-[13px]"
+        style={{ background: "var(--p-red-weak)", color: "var(--p-red)" }}
+      >
         {error instanceof Error ? error.message : "取得に失敗しました。"}
       </p>
     );
@@ -74,11 +84,18 @@ export function PromptsView({ token }: PromptsViewProps) {
 
   if (allItems.length === 0) {
     return (
-      <p className="mt-4 text-sm text-gray-500">表示できるプロンプトがありません。</p>
+      <p className="mt-4 px-4 text-[13px]" style={{ color: "var(--p-text-3)" }}>
+        表示できるプロンプトがありません。
+      </p>
     );
   }
 
   const selected = allItems.find((i) => i.key === selectedKey) ?? allItems[0];
+
+  function select(key: string): void {
+    setSelectedKey(key);
+    setShowDetailMobile(true);
+  }
 
   function handleCopy(): void {
     // 成功した時だけ「コピー済み」にする(失敗時に成功表示を出さない)。
@@ -89,61 +106,109 @@ export function PromptsView({ token }: PromptsViewProps) {
   }
 
   return (
-    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[230px_minmax(0,1fr)]">
-      <nav aria-label="プロンプト一覧" className="flex flex-col gap-1">
+    <div className="flex h-full min-h-0">
+      <nav
+        aria-label="プロンプト一覧"
+        className={`${showDetailMobile ? "hidden lg:block" : "block"} w-full overflow-y-auto lg:w-[34%] lg:min-w-[280px] lg:max-w-[420px]`}
+        style={{ borderRight: "1px solid var(--p-border)" }}
+      >
+        <div
+          className="flex items-center gap-2 px-4 py-3"
+          style={{ borderBottom: "1px solid var(--p-border)" }}
+        >
+          <IconFileText size={16} style={{ color: "var(--p-accent)" }} />
+          <span className="text-[14px] font-semibold">プロンプト</span>
+          <span className="ml-auto text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
+            実テンプレ全文
+          </span>
+        </div>
         {facilityItem ? (
-          <ListButton
-            item={facilityItem}
-            isActive={selected.key === facilityItem.key}
-            onSelect={() => setSelectedKey(facilityItem.key)}
-            pinned
-          />
+          <section className="py-1">
+            <div
+              className="px-4 py-[7px] text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--p-text-2)" }}
+            >
+              前提情報（ピン留め）
+            </div>
+            <ListButton
+              item={facilityItem}
+              isActive={selected.key === facilityItem.key}
+              onSelect={() => select(facilityItem.key)}
+            />
+          </section>
         ) : null}
         {data.groups.map((group) => (
-          <div key={group.group} className="mt-2">
-            <p className="px-1 pb-1 text-xs font-medium text-gray-400">{group.group}</p>
-            <div className="flex flex-col gap-1">
-              {group.phases.map((phase) => (
-                <ListButton
-                  key={phase.filename}
-                  item={{
-                    key: phase.filename,
-                    label: phase.label,
-                    content: phase.content,
-                    meta: phase.whenItRuns,
-                  }}
-                  isActive={selected.key === phase.filename}
-                  onSelect={() => setSelectedKey(phase.filename)}
-                />
-              ))}
+          <section key={group.group} className="py-1">
+            <div
+              className="px-4 py-[7px] text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--p-text-2)" }}
+            >
+              {group.group}
             </div>
-          </div>
+            {group.phases.map((phase) => (
+              <ListButton
+                key={phase.filename}
+                item={{
+                  key: phase.filename,
+                  label: phase.label,
+                  content: phase.content,
+                  meta: phase.whenItRuns,
+                }}
+                isActive={selected.key === phase.filename}
+                onSelect={() => select(phase.filename)}
+              />
+            ))}
+          </section>
         ))}
       </nav>
 
       <section
         aria-label="プロンプト本文"
-        className="rounded-lg border border-gray-200 bg-white p-4"
+        className={`${showDetailMobile ? "block" : "hidden lg:block"} min-w-0 flex-1 overflow-y-auto`}
+        style={{ background: "var(--p-bg)" }}
       >
-        <div className="flex items-start gap-2">
-          <div>
-            <h3 className="text-base font-medium text-gray-900">{selected.label}</h3>
-            <p className="mt-1 text-xs text-gray-500">{selected.meta}</p>
-          </div>
+        {/* approve-btn-ghost の display 指定が Tailwind の hidden を上書きするため、ラッパ div 側で lg 以上は非表示にする。 */}
+        <div className="px-6 pt-4 lg:hidden">
           <button
             type="button"
-            onClick={handleCopy}
-            className="ml-auto min-h-11 shrink-0 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            onClick={() => setShowDetailMobile(false)}
+            className="approve-btn-ghost"
+            aria-label="プロンプト一覧へ戻る"
           >
-            {copiedKey === selected.key ? "コピー済み" : "コピー"}
+            <IconArrowLeft size={14} /> 一覧
           </button>
         </div>
-        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-gray-700">
-          {selected.content}
-        </pre>
-        <p className="mt-3 text-xs text-gray-400">
-          読み取り専用 ・ デプロイ時点のリポジトリ内容です
-        </p>
+        <div className="px-6 py-5">
+          <div className="mb-2 flex items-start gap-2">
+            <div className="min-w-0">
+              <h3 className="text-[16px] font-semibold">{selected.label}</h3>
+              <p className="mt-1 text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+                {selected.meta}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="approve-btn-ghost ml-auto shrink-0"
+            >
+              {copiedKey === selected.key ? "コピー済み" : "コピー"}
+            </button>
+          </div>
+          <pre
+            className="mt-3 whitespace-pre-wrap break-words rounded-[12px] p-4 text-[12.5px] leading-relaxed"
+            style={{
+              background: "var(--p-bg-input)",
+              border: "1px solid var(--p-border)",
+              color: "var(--p-text-2)",
+              fontFamily: "var(--p-mono)",
+            }}
+          >
+            {selected.content}
+          </pre>
+          <p className="mt-3 text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
+            読み取り専用 ・ デプロイ時点のリポジトリ内容です
+          </p>
+        </div>
       </section>
     </div>
   );
@@ -153,25 +218,27 @@ interface ListButtonProps {
   item: SelectableItem;
   isActive: boolean;
   onSelect: () => void;
-  pinned?: boolean;
 }
 
-function ListButton({ item, isActive, onSelect, pinned = false }: ListButtonProps) {
-  const base =
-    "min-h-11 rounded-md px-3 text-left text-sm transition-colors flex items-center gap-2";
-  const tone = isActive
-    ? "bg-white font-medium text-gray-900 ring-1 ring-gray-300"
-    : pinned
-      ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
-      : "text-gray-600 hover:bg-gray-100";
+function ListButton({ item, isActive, onSelect }: ListButtonProps) {
   return (
     <button
       type="button"
       aria-pressed={isActive}
       onClick={onSelect}
-      className={`${base} ${tone}`}
+      className="relative flex w-full flex-col gap-[2px] px-4 py-2.5 text-left transition-colors"
+      style={{ background: isActive ? "var(--p-bg-raised)" : "transparent" }}
     >
-      {item.label}
+      {isActive && (
+        <span
+          className="absolute inset-y-1 left-0 w-[3px] rounded-full"
+          style={{ background: "var(--p-accent)" }}
+        />
+      )}
+      <span className="text-[13px] font-medium">{item.label}</span>
+      <span className="truncate text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
+        {item.meta}
+      </span>
     </button>
   );
 }
