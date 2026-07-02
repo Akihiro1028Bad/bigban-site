@@ -70,7 +70,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (parsed.data.api !== "news") {
+  const api = parsed.data.api;
+  // 許可リスト外 (news / columns / column-categories 以外) はスキップ。
+  if (api !== "news" && api !== "columns" && api !== "column-categories") {
     return NextResponse.json({ ok: true, skipped: true });
   }
 
@@ -79,14 +81,25 @@ export async function POST(request: Request): Promise<Response> {
   // "default" / "max" は stale-while-revalidate 系の挙動に解釈されうるため
   // 採用しない。
   // https://nextjs.org/docs/app/api-reference/functions/revalidateTag
-  const tags: string[] = ["news"];
-  revalidateTag("news", { expire: 0 });
-  if (parsed.data.id) {
-    const jaTag = `news-${parsed.data.id}-ja`;
-    const enTag = `news-${parsed.data.id}-en`;
-    revalidateTag(jaTag, { expire: 0 });
-    revalidateTag(enTag, { expire: 0 });
-    tags.push(jaTag, enTag);
+  const tags: string[] = [];
+
+  function expire(tag: string): void {
+    revalidateTag(tag, { expire: 0 });
+    tags.push(tag);
+  }
+
+  if (api === "column-categories") {
+    // カテゴリマスタの更新は自タグに加え、名/色を焼き込む一覧側 (columns) も
+    // 連鎖 expire する (§5.3)。id 別 (columns-{id}) は無関係なので触らない。
+    expire("column-categories");
+    expire("columns");
+  } else {
+    // news / columns: 全体タグ + (id があれば) 記事別タグを即時無効化する。
+    expire(api);
+    if (parsed.data.id) {
+      expire(`${api}-${parsed.data.id}-ja`);
+      expire(`${api}-${parsed.data.id}-en`);
+    }
   }
 
   // タグ依存が Full Route Cache に記録されていないページ
