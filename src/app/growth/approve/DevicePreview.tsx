@@ -68,9 +68,11 @@ export function DevicePreview({ html, slug }: DevicePreviewProps) {
             return (
               <button
                 key={d.key}
+                id={`device-preview-tab-${d.key}`}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-controls="device-preview-panel"
                 onClick={() => setDevice(d.key)}
                 className="flex items-center gap-1.5 rounded-[7px] px-2.5 py-[5px] text-[12px] font-medium transition-colors"
                 style={{
@@ -91,7 +93,12 @@ export function DevicePreview({ html, slug }: DevicePreviewProps) {
         </span>
       </div>
 
-      <div className="flex justify-center pb-2">
+      <div
+        id="device-preview-panel"
+        role="tabpanel"
+        aria-labelledby={`device-preview-tab-${device}`}
+        className="flex justify-center pb-2"
+      >
         <div
           className="overflow-hidden rounded-[12px]"
           style={{

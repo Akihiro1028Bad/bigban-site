@@ -12,8 +12,13 @@
  * Playwright + @axe-core/playwright による E2E で担う(将来項目・本リポジトリ未導入)。
  * ここでは jsdom で確実に評価できる構造系ルール(role/aria/name/landmark/list 等)に絞る。
  *
- * セットアップ idiom は ApproveClient.test.tsx を流用(featureFlags/DraftEditor/PromptsView
- * のモック・mockFetchSequence・login・selectView)。
+ * 監査対象は実コンポーネント: ⑥プロンプト view は PromptsView 実体を描画して axe にかける
+ * (fetchPrompts を PromptsView.test.tsx と同じ idiom で MSW 代わりに mock する)。
+ * 下書きリッチエディタ(DraftEditor/TipTap)は編集オーバーレイ専用で本 6 状態のどれにも
+ * 描画されないため、本テストの監査対象ではない(モックは念のための保険で、実際には未使用)。
+ *
+ * セットアップ idiom は ApproveClient.test.tsx を流用(featureFlags のモック・
+ * mockFetchSequence・login・selectView)。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
@@ -62,7 +67,9 @@ vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: () => false,
 }));
 
-// TipTap 本体はカバレッジ除外・jsdom で重いため textarea スタブに差し替える。
+// TipTap 本体はカバレッジ除外・jsdom で重いため textarea スタブに差し替える(保険)。
+// ただし DraftEditor は編集オーバーレイ専用で、本テストの 6 状態のどれにも描画されない
+// (=このスタブは実際には未使用。監査しているのは実コンポーネント側)。
 vi.mock("./DraftEditor", () => ({
   DraftEditor: ({
     initialHtml,
@@ -79,10 +86,32 @@ vi.mock("./DraftEditor", () => ({
   ),
 }));
 
-// プロンプト確認タブは自前 fetch のため、軽量スタブに差し替える。
-vi.mock("./PromptsView", () => ({
-  PromptsView: ({ token }: { token: string }) => <div>プロンプト確認スタブ:{token}</div>,
-}));
+// ⑥ プロンプト view は PromptsView 実体を axe にかける(偽緑を避ける)。データ取得の
+// fetchPrompts のみ mock し、PromptsView.test.tsx と同じ idiom でサンプルを返す。
+import { fetchPrompts, type PromptsData } from "./api";
+vi.mock("./api", async () => {
+  const actual = await vi.importActual<typeof import("./api")>("./api");
+  return { ...actual, fetchPrompts: vi.fn() };
+});
+
+const PROMPTS_SAMPLE: PromptsData = {
+  facilityContext: '{"open":false}',
+  groups: [
+    {
+      group: "分析",
+      phases: [
+        {
+          filename: "weekly.md",
+          label: "週次分析",
+          group: "分析",
+          order: 1,
+          whenItRuns: "週次の分析をするとき",
+          content: "週次の指示本文",
+        },
+      ],
+    },
+  ],
+};
 
 import { ApproveClient } from "./ApproveClient";
 
@@ -113,6 +142,7 @@ const PASS = "ビックマン";
 
 beforeEach(() => {
   flags.authEnabled = true;
+  vi.mocked(fetchPrompts).mockReset();
   window.history.replaceState(null, "", "/");
 });
 
@@ -220,12 +250,14 @@ describe("承認画面 a11y 監査(axe・jsdom 構造系のみ)", () => {
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
-  it("⑥プロンプト view に重大な a11y 違反がない", async () => {
+  it("⑥プロンプト view(PromptsView 実体)に重大な a11y 違反がない", async () => {
+    vi.mocked(fetchPrompts).mockResolvedValue(PROMPTS_SAMPLE);
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const { container } = render(<ApproveClient />);
     await login();
     await selectView(/プロンプト/);
-    await screen.findByText(/プロンプト確認スタブ/);
+    // PromptsView 実体が描画されたことを確認してから監査する(スタブではない)。
+    await screen.findByRole("navigation", { name: "プロンプト一覧" });
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });
