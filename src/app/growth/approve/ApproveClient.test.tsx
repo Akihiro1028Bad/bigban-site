@@ -3811,13 +3811,11 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
       { json: { success: true, items: [] } }, // pollBoard 再取得
     );
     render(<ApproveClient />);
-    // #proto P1: 公開キューは LeftRail の独立 view。ナビで開き、キュー本体を展開してから公開する。
+    // #proto P1/P5b: 公開キューは LeftRail の独立 view。ナビで開き、公開OK 一括公開を押す。
     const nav = await screen.findByRole("navigation", { name: "情報源" });
     await userEvent.click(within(nav).getByRole("button", { name: /公開キュー/ }));
-    // PublishQueue は折りたたみ既定。トグルボタン(公開キュー…)を開いてから今すぐ公開を押す。
     const queueSection = await screen.findByRole("region", { name: "公開キュー" });
-    await userEvent.click(within(queueSection).getByRole("button", { name: /公開キュー/ }));
-    await userEvent.click(within(queueSection).getByRole("button", { name: /今すぐ公開/ }));
+    await userEvent.click(within(queueSection).getByRole("button", { name: /件を今すぐ公開/ }));
 
     await waitFor(() =>
       expect(fn.mock.calls.some((c) => String(c[0]) === "/api/growth/publish")).toBe(true)
@@ -3828,6 +3826,37 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
         fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/approve")).length
       ).toBeGreaterThanOrEqual(2)
     );
+  });
+
+  it("#proto P5b: 要対応行の「修正する」で approve view の詳細パネルへ遷移する(onFix)", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          ideaItem({
+            id: "i1",
+            title: "猛暑記事",
+            stage: "drafted",
+            isDraftReady: true,
+            contentId: "g-1",
+            // アイキャッチ未設定 → 公開キューの要対応(blocked)行になる。
+            eyecatchUrl: "",
+            hasDraftBody: true,
+          }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+    // 公開キュー view を開き、要対応行の「修正する」を押す。
+    const nav = await screen.findByRole("navigation", { name: "情報源" });
+    await userEvent.click(within(nav).getByRole("button", { name: /公開キュー/ }));
+    const queueSection = await screen.findByRole("region", { name: "公開キュー" });
+    expect(within(queueSection).getByText("アイキャッチ未設定")).toBeInTheDocument();
+    await userEvent.click(within(queueSection).getByRole("button", { name: /修正する/ }));
+
+    // onFix → changeView("approve")＋setActiveId(id): approve view の詳細パネルが開く。
+    expect(await screen.findByRole("region", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
   });
 });
 

@@ -1017,7 +1017,16 @@ export function ApproveClient() {
             ) : activeView === "performance" ? (
               <PerformanceBoard items={ideas} />
             ) : (
-              <PublishQueue items={ideas} token={token} onChanged={() => void pollBoard()} />
+              <PublishQueue
+                items={ideas}
+                token={token}
+                onChanged={() => void pollBoard()}
+                onFix={(id) => {
+                  // #proto P5b: 要対応行の修正導線。既存の詳細遷移(approve view へ切替＋activeId 設定)を再利用する。
+                  changeView("approve");
+                  setActiveId(id);
+                }}
+              />
             )}
           </main>
         </div>
