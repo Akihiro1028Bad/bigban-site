@@ -25,10 +25,11 @@ export function useDialog<T extends HTMLElement = HTMLDivElement>(): RefObject<T
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
-    // jsdom polyfill では offsetParent が常に truthy になり `||` 右辺
-    // (`el === document.activeElement`) は未評価。istanbul は個別オペランドの
-    // 分岐を抑止できないため宣言全体に ignore を付与する。
-    /* istanbul ignore next -- @preserve || 右辺は jsdom では未評価 */
+    // jsdom はレイアウトを持たず offsetParent が常に null になるため、実ブラウザの
+    // 「表示中の要素」判定(offsetParent !== null)がテストでは全て false になる。
+    // 可視要素を拾うために `|| el === document.activeElement` を併記する。istanbul は
+    // `||` 個別オペランドの分岐を抑止できないため宣言全体に ignore を付与する。
+    /* istanbul ignore next -- @preserve || 右辺は jsdom(offsetParent が null)でのみ効く */
     const focusables = () =>
       [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
         (el) => el.offsetParent !== null || el === document.activeElement

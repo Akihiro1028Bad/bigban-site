@@ -85,7 +85,29 @@ describe("TopBar", () => {
 
   it("syncStale が false のとき更新ボタンは通常配色・syncLabel をそのまま表示", () => {
     setup({ syncStale: false });
-    expect(screen.getByRole("button", { name: /データを更新/ })).toHaveTextContent("3分前");
+    const button = screen.getByRole("button", { name: /データを更新/ });
+    expect(button).toHaveTextContent("3分前");
+    // 通常配色: input 背景・text-3 文字色（警告色を使わない）。
+    expect(button).toHaveStyle({
+      background: "var(--p-bg-input)",
+      color: "var(--p-text-3)",
+    });
+    // border は CSS 変数を含む shorthand で jsdom が解決しないため、
+    // インライン style 文字列で通常 border を直接確認する。
+    expect(button.getAttribute("style")).toContain("1px solid var(--p-border)");
+  });
+
+  it("syncStale が true のとき更新ボタンは警告配色（amber）で強調する", () => {
+    setup({ syncStale: true });
+    const button = screen.getByRole("button", { name: /データを更新/ });
+    // 警告配色: amber-weak 背景・amber 文字色。
+    expect(button).toHaveStyle({
+      background: "var(--p-amber-weak)",
+      color: "var(--p-amber)",
+    });
+    // border は amber 半透明で強調する（shorthand なので style 文字列で確認）。
+    // DOM は rgba を正規化(値間に空白)するため、正規化後の表記で照合する。
+    expect(button.getAttribute("style")).toContain("1px solid rgba(249, 185, 78, 0.3)");
   });
 
   it("syncLabel が null のとき更新ボタンは — を表示", () => {

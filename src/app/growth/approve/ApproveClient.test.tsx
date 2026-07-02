@@ -338,6 +338,8 @@ describe("ApproveClient 即時保存(#235)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("市川ページ");
+    // #235: 一括「確定」導線は廃止(即時保存)。ActionInput の「確定」ボタン(decorate 用)は
+    // 施策一覧の初期状態では描画されないため、ここでは確定系ボタンが一切出ないことを確認する。
     expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
     // #proto P1: 進捗は TopBar の「あなた待ち」ピル(未処理1件)で表示する。
     expectAwaitingCount(1);
@@ -906,6 +908,7 @@ describe("ApproveClient 空状態/完了(#236)", () => {
     render(<ApproveClient />);
     await login();
     expect(await screen.findByText(/本日のレビュー完了/)).toBeInTheDocument();
+    // 空状態では ActionInput(decorate 用「確定」ボタン)も含め操作系を一切出さない。
     expect(screen.queryByRole("button", { name: /確定/ })).not.toBeInTheDocument();
   });
 
@@ -2171,7 +2174,11 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     const lane = screen.getByRole("region", { name: "施策レーン" });
     await userEvent.click(within(lane).getByText("市川ページ"));
     await screen.findByRole("heading", { name: "市川ページ" });
-    expect(screen.queryByText("下書きプレビュー")).not.toBeInTheDocument();
+    // 施策詳細は ProposalDetailBody で、記事の DetailPanel が持つ 2 段タブ
+    // (構成案/プレビュー/素材)を一切描画しない。実 UI のタブラベルで検証する。
+    expect(screen.queryByRole("tab", { name: /プレビュー/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /構成案/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /素材/ })).not.toBeInTheDocument();
   });
 });
 
@@ -2461,9 +2468,11 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
   it("生成中の記事が継続したまま別の記事が増えても滞留基準を二重記録しない", async () => {
     flags.authEnabled = false;
     window.history.replaceState(null, "", "/?view=approve");
+    // Date は spy で制御し、タイマだけ偽装する(#108 の firstSeen=Date.now() を検証するため)。
     vi.useFakeTimers({
       toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"],
     });
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
     try {
       mockFetchSequence(
         { json: { success: true, items: [ideaItem({ id: "i1", title: "継続中", stage: "generating" })] } },
@@ -2478,18 +2487,38 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
         }
       );
       render(<ApproveClient />);
+      // マウント取得を flush(i1 の firstSeen=0 で記録される)。
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1);
       });
       expect(screen.getByText("継続中")).toBeInTheDocument();
-      // poll で i2 が増えて盤の参照が変わり firstSeen 効果が再実行されるが、
-      // 既に在中の i1 は seen 済みで再記録しない(滞留基準=最初に在中した時刻を保つ)。
+      // 現在時刻を閾値超へ進めてから再ポーリング。i2 が増えて盤の参照が変わり
+      // firstSeen 効果(#108)が再実行される。冪等ガード if(!seen.has(id)) により、
+      // 既に在中の i1 は初回記録時刻(0)を保ち、新着 i2 だけが今(閾値超)で記録される。
+      nowSpy.mockReturnValue(STUCK_THRESHOLD_MS + 1);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5100);
       });
       expect(screen.getByText("新着")).toBeInTheDocument();
       expect(screen.getByText("継続中")).toBeInTheDocument();
+
+      // 実挙動の検証: i1 は初回記録(0)基準で経過が閾値超のため滞留警告が出る。
+      // i2 は再ポーリング時(閾値超)に初めて記録されたため経過ゼロ→滞留しない。
+      // → 滞留警告はちょうど 1 件(i1 のみ)。冪等ガードが無ければ i1 も再記録され
+      //   経過ゼロで警告が消える(=0 件)ため、この本数が二重記録しない証拠になる。
+      const stallWarnings = screen.getAllByText(
+        /時間がかかっています。自宅PCの巡回が動いているか確認してください。/,
+      );
+      expect(stallWarnings).toHaveLength(1);
+      // 警告は live region(role="status")として通知される。
+      expect(stallWarnings[0]).toHaveAttribute("role", "status");
+      // 警告が付いているカード(li)は i1(継続中)であって i2(新着)ではないことを確認する。
+      const stallCard = stallWarnings[0].closest("li");
+      expect(stallCard).not.toBeNull();
+      expect(within(stallCard as HTMLElement).getByText("継続中")).toBeInTheDocument();
+      expect(within(stallCard as HTMLElement).queryByText("新着")).not.toBeInTheDocument();
     } finally {
+      nowSpy.mockRestore();
       vi.useRealTimers();
     }
   });
@@ -2880,13 +2909,25 @@ describe("ApproveClient 操作性(#109)", () => {
   // #proto P6: ヘルプ(ShortcutOverlay)開放中も単一キーが盤へ漏れない。
   it("ショートカット一覧の開放中は a が盤に作用しない", async () => {
     flags.authEnabled = false;
-    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    const fn = mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await screen.findByText("猛暑記事");
     fireEvent.keyDown(document.body, { key: "j" }); // 先頭へフォーカス
     fireEvent.keyDown(document.body, { key: "?" }); // ヘルプを開く
     await screen.findByRole("dialog", { name: "キーボードショートカット" });
+    // 抑止前の POST(承認保存)件数を記録。抑止が効けば増えないはず。
+    const postsBefore = fn.mock.calls.filter((c) => c[1] && (c[1] as RequestInit).method === "POST")
+      .length;
     fireEvent.keyDown(document.body, { key: "a" }); // 開放中の承認は抑止
+    // 実挙動の検証: 承認保存 POST(postDecision→BOARD_URL)が発火しないこと。
+    // toast「承認しました」は decided 状態(POST 成功後)にしか出ないため、
+    // POST 件数が増えていないことで「a が盤に届いていない」を直接示す。
+    await waitFor(() => {
+      const postsAfter = fn.mock.calls.filter(
+        (c) => c[1] && (c[1] as RequestInit).method === "POST",
+      ).length;
+      expect(postsAfter).toBe(postsBefore);
+    });
     expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
   });
 });
