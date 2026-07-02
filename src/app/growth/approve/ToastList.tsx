@@ -2,6 +2,7 @@
  * 承認画面の通知トースト一覧(#H7 分解 / #proto P5b)。完成通知・コピー通知等。
  * proto ToastStack の見た目へ再スキン: 右下 fixed スタック＋AnimatePresence。
  * 契約は不変(tone 2値 / dismiss ボタン維持 / role=status / aria-label=お知らせ / useToasts 不変)。
+ * #P6: コンテナは role="region"(aria-label を許可する landmark)を明示し、aria-prohibited-attr を解消。
  */
 
 "use client";
@@ -45,7 +46,10 @@ export function ToastList({ toasts, onDismiss }: ToastListProps) {
     // z-index: 既存モーダル群(詳細z-50/編集z-60/パレットz-70/確認z-80)より上の z-[90] を採る。
     // トーストは操作結果の通知であり、確認ダイアログ表示中でも見えるべきなので最前面に置く。
     // pointer-events-none で下層の操作を邪魔せず、閉じるボタンだけ pointer-events-auto にする。
+    // role="region": aria-label 単独の <div> は無効 ARIA(aria-prohibited-attr)になるため、
+    // ラベルを許可する landmark ロールを明示する。中の各トーストは role="status" で個別に通知する。
     <div
+      role="region"
       aria-label="お知らせ"
       className="pointer-events-none fixed bottom-5 right-5 z-[90] flex flex-col gap-2"
     >

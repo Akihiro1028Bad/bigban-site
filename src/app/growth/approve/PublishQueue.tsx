@@ -318,7 +318,7 @@ function Section({ dot, title, count, empty, action, children }: SectionProps) {
       </div>
       <div className="flex flex-col">
         {count === 0 && empty ? (
-          <div className="px-4 py-5 text-[12.5px]" style={{ color: "var(--p-text-3)" }}>{empty}</div>
+          <div className="px-4 py-5 text-[12.5px]" style={{ color: "var(--p-text-2)" }}>{empty}</div>
         ) : null}
         {children}
       </div>
