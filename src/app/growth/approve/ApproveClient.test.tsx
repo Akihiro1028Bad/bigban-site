@@ -1075,7 +1075,7 @@ describe("ApproveClient 施策 master-detail(#275/#P5a)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(
       within(dialog).queryByRole("button", { name: "下書きを生成" })
@@ -1104,7 +1104,7 @@ describe("ApproveClient 施策 master-detail(#275/#P5a)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // #proto P3b: 仮説は構成案タブ(OutlineView)の「この記事の狙い（仮説）」カードに出す。
     await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
@@ -1154,7 +1154,7 @@ describe("ApproveClient 記事2ペイン master-detail(#proto P3a)", () => {
     expect(screen.queryByRole("button", { name: "← 一覧" })).not.toBeInTheDocument();
 
     // 行の詳細ボタンで activeId を立て、右ペインに詳細(dialog)が出る。
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 選択記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "選択記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 選択記事" });
     expect(within(dialog).getByText("選択記事")).toBeInTheDocument();
 
@@ -1169,7 +1169,7 @@ describe("ApproveClient 記事2ペイン master-detail(#proto P3a)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("選択記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 選択記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "選択記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 選択記事" });
     // DetailPanel 自身の戻る(onBack=setActiveId(null))で選択解除する。
     await userEvent.click(within(dialog).getByRole("button", { name: "記事一覧へ戻る" }));
@@ -1184,7 +1184,7 @@ describe("ApproveClient 記事2ペイン master-detail(#proto P3a)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("選択記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 選択記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "選択記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 選択記事" });
     // DetailPanel の却下ボタン → decideFromPanel(item,"却下") → 保存してパネルを閉じる。
     await userEvent.click(within(dialog).getByRole("button", { name: "却下" }));
@@ -1241,7 +1241,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -1690,7 +1690,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -1844,7 +1844,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     // 一覧の承認ボタンが無効
     expect(screen.getByRole("button", { name: "承認: 猛暑記事" })).toBeDisabled();
     // パネルでも無効(段階により承認ラベルは「構成案を承認」等になるため部分一致で拾う)。
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(within(dialog).getByRole("button", { name: /承認/ })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "却下" })).toBeDisabled();
@@ -1865,7 +1865,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
       flags.authEnabled = false; // 自動取得(ログイン不要)
       render(<ApproveClient />);
       await screen.findByText("猛暑記事");
-      await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       const drawer = await openConsultDrawer(dialog);
       await vi.advanceTimersByTimeAsync(5100);
@@ -1883,7 +1883,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
     });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     return openConsultDrawer(dialog);
   }
@@ -1896,7 +1896,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     const drawer = await openConsultDrawer(dialog);
 
@@ -1938,7 +1938,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 元タイトル" }));
+    await userEvent.click(await screen.findByRole("button", { name: "元タイトル" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 元タイトル" });
     const drawer = await openConsultDrawer(dialog);
 
@@ -2018,7 +2018,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -2254,7 +2254,7 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await within(dialog).findByRole("button", { name: "下書きを編集" });
     return dialog;
@@ -2318,7 +2318,7 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
@@ -2404,7 +2404,7 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     render(<ApproveClient />);
     await login();
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
     await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
@@ -2843,7 +2843,7 @@ describe("ApproveClient 操作性(#109)", () => {
     render(<ApproveClient />);
     await screen.findByText("猛暑記事");
     // 行クリックで詳細を開く(activeId をセット・focusedId は付かない)。
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     fireEvent.keyDown(document.body, { key: "x" }); // activeId 側でトグル
     const bulkBar = await screen.findByRole("group", { name: "一括操作" });
@@ -3443,7 +3443,7 @@ describe("ApproveClient 詳細パネルのレイアウト(#127)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const pane = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // #proto P3a: 2ペインの常設パネル。親(右ペイン)を満たし、全画面モーダル(fixed/vw/vh)は無し。
     expect(pane).toHaveClass("h-full");
@@ -3478,7 +3478,7 @@ describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // 段階チップ(提案中)＋種別バッジ
     expect(within(dialog).getByText("提案中")).toBeInTheDocument();
@@ -3494,7 +3494,7 @@ describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
     });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // 2段タブ: 「素材」クラスタ→「プロンプト・参照」リーフへ。subtitle 空 → 既定の生成メモ文が出る
     // (prompt の || フォールバック)。
@@ -3510,12 +3510,12 @@ describe("ApproveClient 詳細パネルのリッチ化(#124)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(within(dialog).getByRole("button", { name: /承認/ }));
     // パネルは閉じるので、盤側の段階前進は別テスト。ここではヘッダーの楽観反映を
     // 開き直して確認する。
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const reopened = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(within(reopened).getByText("生成待ち")).toBeInTheDocument();
   });
@@ -3535,7 +3535,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -3556,7 +3556,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     const drawer = await openConsultDrawer(dialog);
 
@@ -3575,7 +3575,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
@@ -3587,7 +3587,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await openConsultDrawer(dialog);
     // #proto P6: 相談ドロワーが開いていれば Esc は最優先でドロワーを閉じ、詳細は残す。
@@ -3602,7 +3602,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await openConsultDrawer(dialog);
     // 1度目: ドロワーを閉じる。
@@ -3632,7 +3632,7 @@ describe("ApproveClient レビューワークスペース土台(#127)", () => {
     });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // #proto P3b: 構成案タブのセクション行コメント入力欄を開く(詳細パネルに残る入力)。
     await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
@@ -3663,7 +3663,7 @@ describe("ApproveClient 公開前チェックリスト(#128)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     const checklist = await within(dialog).findByRole("region", { name: "公開前チェック" });
     // #proto P3b: チェック項目はサマリー行のクリックで展開する。展開して各項目を検証する。
@@ -3677,7 +3677,7 @@ describe("ApproveClient 公開前チェックリスト(#128)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(within(dialog).queryByRole("region", { name: "公開前チェック" })).not.toBeInTheDocument();
   });
@@ -3697,7 +3697,7 @@ describe("ApproveClient プレビューPC/モバイル切替(#129)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     return screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -3745,7 +3745,7 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     mockTwoIdeas();
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 記事1" }));
+    await userEvent.click(await screen.findByRole("button", { name: "記事1" }));
     return screen.findByRole("region", { name: "詳細: 記事1" });
   }
 
@@ -3792,7 +3792,7 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     await login();
     // #proto P1: 生成待ち(queued)は既定成績 view。記事 view へ遷移してからカードを開く。
     await selectView(/記事/);
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 生成待ち記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "生成待ち記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 生成待ち記事" });
     fireEvent.keyDown(document.body, { key: "a" });
     fireEvent.keyDown(document.body, { key: "r" });
@@ -3812,7 +3812,7 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await within(dialog).findByRole("button", { name: "下書きを編集" }); // draft ready の目印
     fireEvent.keyDown(document.body, { key: "e" });
@@ -3823,7 +3823,7 @@ describe("ApproveClient 連続レビュー＋キーボード(#130)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     fireEvent.keyDown(document.body, { key: "e" });
     expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument();
@@ -3878,7 +3878,7 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(await within(dialog).findByAltText(/アイキャッチ/)).toBeInTheDocument();
   });
@@ -3896,7 +3896,7 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     // プレビューが描画されるまで待つ(端末切替 tablist を同期点にする)。
     await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
@@ -3936,7 +3936,7 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
     flags.authEnabled = false; // 自動取得(ログイン不要)
     render(<ApproveClient />);
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
   }
 
   it("本文画像が処理中の間はポーリングし、完了でバッジが消える", async () => {
@@ -4032,7 +4032,7 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     // #proto P1: 下書き済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
     await selectView(/記事/);
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     return fn;
   }
@@ -4046,7 +4046,7 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     // #proto P1: 生成中/公開済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
     await selectView(/記事/);
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
   }
 
@@ -4096,7 +4096,7 @@ describe("ApproveClient 構成からやり直す(下書き→提案中)", () => 
     // #proto P1: 下書き済み(未処理でない)は既定成績 view。記事 view へ遷移して開く。
     await selectView(/記事/);
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     expect(screen.getByRole("button", { name: "構成からやり直す" })).toBeDisabled();
   });
@@ -4203,7 +4203,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await within(dialog).findByRole("tablist", { name: "プレビュー端末" }); // ready 待ち
     return { fn, dialog };
@@ -4308,7 +4308,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] } });
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
     // コメント追加
@@ -4328,7 +4328,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
     // 画像指示トグル(おまかせ)を押して onUpdateImage を発火する。
@@ -4351,7 +4351,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     );
     render(<ApproveClient />);
     await login();
-    await userEvent.click(await screen.findByRole("button", { name: "詳細: 猛暑記事" }));
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     fireEvent.keyDown(document.body, { key: "r" });
     await userEvent.click(await within(dialog).findByRole("button", { name: "承認待ちに戻す" }));
