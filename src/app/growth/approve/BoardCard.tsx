@@ -1,15 +1,21 @@
 /**
- * 盤の1カード(#H7 分解 / #107・#119・#137 / #proto P2 T4 再スキン)。
- * 見た目は proto 由来のプリミティブ(EyecatchThumb/StageChip/ScoreBar/AwaitingDot)へ寄せる。
- * 分岐(決定済み/下書き完了/下流待ち/未決定)と承認/却下/取消/編集の操作ロジックは現行維持。
+ * 盤の1行(#213/#211 proto 対話モデルへ一本化)。
+ * 行は「開く / 選ぶ」だけを担い、決定操作(承認/却下/編集/取消/詳細)は撤去した。
+ * 決定は詳細パネル(フッター/ヘッダ)・ProposalView・BulkBar が担う。
+ * 見た目は proto `approve-proto/Board.tsx` の行に合わせる:
+ *  - 控えめ 18px チェック(hover で出現・選択時 accent 塗り + IconCheck)。
+ *  - タイトルはボタン(13.5px medium truncate)で onOpen。
+ *  - 抜粋 + メタ行(StageChip / 滞留・修正中バッジ / ScoreBar)。
+ * 状態は決定操作ではなく情報チップ(✓承認 / 生成中 / 生成待ち / 承認済み)として最小表示する。
  * 派生表示値(hue/抜粋/hasEyecatch/stage)は表示専用の純ロジックから決定的に導出する。
  */
 
 "use client";
 
-import { choiceButtonClass, TAP_TARGET } from "./approveStyles";
 import { cardExcerpt, cardHasEyecatch, cardHue } from "./boardCardView";
+import { isReviseBusy } from "./boardItemHelpers";
 import type { PendingItem } from "./types";
+import { IconCheck } from "./ui/icons";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
 import { deriveBoardStage } from "./ui/boardStage";
 import { AwaitingDot, ScoreBar, StageChip } from "./ui/primitives";
@@ -17,238 +23,154 @@ import { AwaitingDot, ScoreBar, StageChip } from "./ui/primitives";
 interface BoardCardProps {
   item: PendingItem;
   choice: string | undefined;
-  isBusy: boolean;
-  lockedForRevise: boolean;
-  failure: { message: string; retry: () => void } | undefined;
   isFocused: boolean;
   bulkSelectable: boolean;
   selected: boolean;
-  isIdea: boolean;
-  step: number;
-  scoreBarWidth: number;
-  stageAccentClass: string;
   stuck: boolean;
+  stageAccentClass: string;
   rowClassName: string;
-  kindLabel: string;
-  generatingStepsText: string;
   awaitingDownstream: boolean;
   /**
    * 行のルート要素。既定は `<li>`(単体で `<ul>` 直下に置くとき用)。
    * BoardList は自前で `<li role="listitem">` を持つため、その中では `"div"` を渡して
-   * `<li>` の入れ子(不正 HTML)を避ける。操作系・表示系の中身は as に依存せず不変。
+   * `<li>` の入れ子(不正 HTML)を避ける。表示系の中身は as に依存せず不変。
    */
   as?: "li" | "div";
   onOpen: () => void;
-  onUndo: () => void;
-  onEdit: () => void;
   onToggleSelect: () => void;
-  onApprove: () => void;
-  onReject: () => void;
 }
 
 export function BoardCard({
   item,
   choice,
-  isBusy,
-  lockedForRevise,
-  failure,
   isFocused,
   bulkSelectable,
   selected,
-  stageAccentClass,
   stuck,
+  stageAccentClass,
   rowClassName,
-  kindLabel,
-  generatingStepsText,
   awaitingDownstream,
   as: Root = "li",
   onOpen,
-  onUndo,
-  onEdit,
   onToggleSelect,
-  onApprove,
-  onReject,
 }: BoardCardProps) {
   // 「あなた待ち」= 未決定 & 未下書き & 下流待ちでない(isActionable と同義。decided は choice が担う)。
   const awaitingYou = !choice && !item.isDraftReady && !awaitingDownstream;
   const excerpt = cardExcerpt(item);
-  const detailButton = (
-    <button
-      type="button"
-      aria-label={`詳細: ${item.title}`}
-      onClick={onOpen}
-      className={`${TAP_TARGET} approve-btn-ghost`}
-    >
-      詳細
-    </button>
-  );
+  const reviseBusy = isReviseBusy(item.reviseStatus);
+  const downstreamLabel =
+    item.kind === "proposal"
+      ? "承認済み"
+      : item.stage === "generating"
+        ? "生成中"
+        : "生成待ち";
+
   return (
     <Root
       className={`${rowClassName} ${stageAccentClass} ${isFocused ? "ring-2 ring-[var(--p-ring)]" : ""}`}
       data-decision={choice ?? ""}
     >
       {bulkSelectable ? (
-        <label className="mb-1 flex items-center gap-2 text-xs" style={{ color: "var(--p-text-3)" }}>
-          <input
-            type="checkbox"
-            aria-label={`一括選択: ${item.title}`}
-            checked={selected}
-            onChange={onToggleSelect}
-          />
-          選択
-        </label>
+        <span
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={`一括選択: ${item.title}`}
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSelect();
+            }
+          }}
+          className={`mt-[2px] flex h-[18px] w-[18px] shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-opacity ${
+            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
+          style={{
+            backgroundColor: selected ? "var(--p-accent)" : "transparent",
+            borderColor: selected ? "var(--p-accent)" : "var(--p-border-strong)",
+          }}
+        >
+          {selected ? <IconCheck size={13} style={{ color: "#0a0c10" }} /> : null}
+        </span>
       ) : null}
 
-      <div className="flex items-start gap-3">
-        <EyecatchThumb
-          hue={cardHue(item.id)}
-          has={cardHasEyecatch(item)}
-          url={item.eyecatchUrl || undefined}
-          size={38}
-          alt=""
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {awaitingYou ? <AwaitingDot /> : null}
-            <button
-              type="button"
-              onClick={onOpen}
-              className="min-w-0 flex-1 line-clamp-2 text-left text-[14px] font-semibold leading-snug"
-              style={{ color: choice ? "var(--p-text-2)" : "var(--p-text)" }}
-            >
-              {item.title}
-            </button>
-          </div>
-          {excerpt ? (
-            <p className="mt-[3px] truncate text-[12px] leading-snug" style={{ color: "var(--p-text-3)" }}>
-              {excerpt}
-            </p>
-          ) : null}
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <StageChip stage={deriveBoardStage(item)} small />
-            {item.score != null ? <ScoreBar score={item.score} /> : null}
-          </div>
-        </div>
-      </div>
+      <EyecatchThumb
+        hue={cardHue(item.id)}
+        has={cardHasEyecatch(item)}
+        url={item.eyecatchUrl || undefined}
+        size={38}
+        alt=""
+      />
 
-      {choice ? (
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-sm" style={{ color: "var(--p-text-2)" }}>
-            ✓ <span className="font-semibold">{choice}しました</span>
-          </span>
-          <div className="ml-auto flex gap-2">
-            {detailButton}
-            <button
-              type="button"
-              id={`undo-${item.id}`}
-              aria-label={`取り消す: ${item.title}`}
-              onClick={onUndo}
-              disabled={isBusy}
-              className={choiceButtonClass("approve-btn-ghost shrink-0")}
-            >
-              取り消す
-            </button>
-          </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          {awaitingYou ? <AwaitingDot /> : null}
+          <button
+            type="button"
+            id={`open-${item.id}`}
+            onClick={onOpen}
+            className="min-w-0 flex-1 truncate text-left text-[13.5px] font-medium leading-snug"
+            style={{ color: choice ? "var(--p-text-2)" : "var(--p-text)" }}
+          >
+            {item.title}
+          </button>
         </div>
-      ) : item.isDraftReady ? (
-        <div className="mt-2 flex items-center gap-2">
-          <div className="ml-auto flex gap-2">
-            {detailButton}
-            <button
-              type="button"
-              id={`card-edit-${item.id}`}
-              aria-label={`編集: ${item.title}`}
-              onClick={onEdit}
-              className={`${TAP_TARGET} approve-btn-primary border border-transparent bg-[var(--p-accent)] text-[#0a0c10]`}
-            >
-              編集
-            </button>
-          </div>
-        </div>
-      ) : awaitingDownstream ? (
-        <div>
-          <div className="mt-2 flex items-center gap-2">
+
+        {excerpt ? (
+          <p
+            className="mt-[3px] truncate text-[12px] leading-snug"
+            style={{ color: "var(--p-text-3)" }}
+          >
+            {excerpt}
+          </p>
+        ) : null}
+
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <StageChip stage={deriveBoardStage(item)} small />
+          {stuck ? (
             <span
-              className={`shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium ${
+              className="approve-pulse rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+              style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
+              title="生成が滞留しています"
+            >
+              滞留
+            </span>
+          ) : null}
+          {reviseBusy ? (
+            <span
+              className="approve-pulse rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+              style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)" }}
+              title="AI が修正中です"
+            >
+              修正中
+            </span>
+          ) : null}
+          {choice ? (
+            <span
+              className="rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+              style={{ color: "var(--p-text-2)" }}
+            >
+              ✓{choice}
+            </span>
+          ) : null}
+          {awaitingDownstream ? (
+            <span
+              className={`rounded-full px-1.5 py-[1px] text-[10px] font-medium ${
                 item.stage === "generating" ? "approve-pulse" : ""
               }`}
               style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
             >
-              {item.kind === "proposal" ? "承認済み" : item.stage === "generating" ? "生成中" : "生成待ち"}
+              {downstreamLabel}
             </span>
-            <div className="ml-auto">{detailButton}</div>
-          </div>
-          {item.stage === "generating" ? (
-            <div className="mt-2 text-xs" style={{ color: "var(--p-text-3)" }}>
-              <span className="approve-pulse">🖊 自宅PCで執筆中…</span>
-              <span className="ml-2">{generatingStepsText}</span>
-            </div>
           ) : null}
-          {stuck ? (
-            <p
-              role="status"
-              className="mt-2 rounded-md px-2 py-1 text-xs"
-              style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
-            >
-              時間がかかっています。自宅PCの巡回が動いているか確認してください。
-            </p>
-          ) : null}
+          {item.score != null ? <ScoreBar score={item.score} /> : null}
         </div>
-      ) : (
-        <>
-        <div className="mt-2 flex items-center gap-2">
-          <span
-            className="shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium"
-            style={{ background: "var(--p-bg-active)", color: "var(--p-text-2)" }}
-          >
-            {kindLabel}
-          </span>
-        </div>
-        <div
-          role="group"
-          aria-label={`承認または却下: ${item.title}`}
-          className="mt-2 flex flex-col gap-2 sm:flex-row"
-        >
-          <button
-            type="button"
-            id={`approve-${item.id}`}
-            aria-label={`承認: ${item.title}`}
-            onClick={onApprove}
-            disabled={isBusy || lockedForRevise}
-            className={choiceButtonClass("approve-btn-primary flex-1 border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
-          >
-            承認
-          </button>
-          <button
-            type="button"
-            aria-label={`却下: ${item.title}`}
-            onClick={onReject}
-            disabled={isBusy || lockedForRevise}
-            className={choiceButtonClass("approve-btn-ghost flex-1")}
-          >
-            却下
-          </button>
-          {detailButton}
-        </div>
-        </>
-      )}
-      {failure ? (
-        <div
-          role="alert"
-          className="mt-2 flex items-center justify-between gap-2 rounded-md bg-[var(--p-red-weak)] px-3 py-2 text-sm text-[var(--p-red)]"
-        >
-          <span>{failure.message}</span>
-          <button
-            type="button"
-            aria-label={`再試行: ${item.title}`}
-            onClick={failure.retry}
-            disabled={isBusy}
-            className={choiceButtonClass("approve-btn-primary shrink-0 border border-transparent bg-[var(--p-red)] text-[#0a0c10]")}
-          >
-            再試行
-          </button>
-        </div>
-      ) : null}
+      </div>
     </Root>
   );
 }

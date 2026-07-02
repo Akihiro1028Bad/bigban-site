@@ -13,13 +13,10 @@ import {
   isActionable,
   isAwaitingDownstream,
   reconcileDecided,
-  scoreBarPct,
-  stageStepIndex,
 } from "./board";
 import { groupByBoardStage } from "./boardGroups";
 import { stageTheme } from "./boardColors";
 import {
-  GENERATING_STEPS,
   isInFlight,
   isStuck,
   newlyDraftedIds,
@@ -198,8 +195,6 @@ export function ApproveClient() {
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   const {
     decided,
-    failures,
-    savingId,
     setDecided,
     decide,
     undo,
@@ -407,11 +402,10 @@ export function ApproveClient() {
     setEditedHtml,
     setConfirmDiscard,
     startEditDraft,
-    openCardEditor,
     cancelEditDraft,
     exitEditDraft,
     saveDraft,
-  } = useDraftEditing({ token, openId: activeId, draftState, loadDraft, onOpen: setActiveId });
+  } = useDraftEditing({ token, openId: activeId, loadDraft });
 
   // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
   // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
@@ -616,8 +610,6 @@ export function ApproveClient() {
 
   // #proto P3a: 記事を BoardStage ごとの単一縦リスト(段階セクション)へ分ける。
   const boardGroups = groupByBoardStage(visibleIdeas);
-  // 段階インジケータ/スコアバーの分母(記事の最大スコア)。
-  const ideaMaxScore = ideas.reduce((max, item) => Math.max(max, item.score ?? 0), 0);
 
   // #proto P1: 表示中 view(未確定時は施策を既定描画)。
   const activeView: ApproveView = view ?? "proposal";
@@ -761,37 +753,24 @@ export function ApproveClient() {
   // (不正 HTML・jsdom クラッシュ)を避ける。
   function renderItem(item: PendingItem, as: "li" | "div") {
     const choice = decided[item.id];
-    const failure = failures[item.id];
     return (
       <BoardCard
         key={item.id}
         as={as}
         item={item}
         choice={choice}
-        isBusy={savingId === item.id}
-        lockedForRevise={isReviseBusy(item.reviseStatus)}
-        failure={failure}
         isFocused={item.id === focusedId}
         bulkSelectable={isBulkActionable(item)}
         selected={selected.has(item.id)}
-        isIdea
-        step={stageStepIndex(effectiveStage(item, choice))}
-        scoreBarWidth={scoreBarPct(item.score ?? 0, ideaMaxScore)}
         stageAccentClass={`border-l-4 ${stageTheme(effectiveStage(item, choice)).accent}`}
         stuck={
           isInFlight(item.stage) &&
           isStuck(nowTick - (firstSeenRef.current.get(item.id) ?? nowTick), STUCK_THRESHOLD_MS)
         }
-        rowClassName={rowClass(choice, Boolean(failure))}
-        kindLabel={KIND_BADGE[item.kind]}
-        generatingStepsText={GENERATING_STEPS.join(" → ")}
+        rowClassName={rowClass(choice)}
         awaitingDownstream={isAwaitingDownstream(item.stage)}
         onOpen={() => setActiveId(item.id)}
-        onUndo={() => void undo(item)}
-        onEdit={() => openCardEditor(item.id)}
         onToggleSelect={() => toggleSelect(item.id)}
-        onApprove={() => void decide(item, "承認")}
-        onReject={() => void decide(item, "却下")}
       />
     );
   }

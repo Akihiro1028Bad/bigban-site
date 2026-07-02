@@ -210,7 +210,8 @@ describe("承認画面 a11y 監査(axe・jsdom 構造系のみ)", () => {
     await login();
     await selectView(/記事/);
     await screen.findByText("猛暑記事");
-    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    // #213: 一覧行に「詳細」ボタンは無い。タイトル(開く起点)をクリックして詳細を開く。
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await within(dialog).findByTitle("公開後プレビュー");
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
