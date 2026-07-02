@@ -208,6 +208,8 @@ export function ApproveClient() {
     token,
     onFocus: setFocusId,
     onClosePanel: () => setActiveId(null),
+    // #213: 決定/取消の保存失敗をトーストで可視化(カード失敗アラート撤去に先行)。
+    onError: (message) => pushToast(message, "error"),
   });
   // #H7: 構成案の修正(AI依頼/手動編集/画像指示/タイトル/提示反映)はカスタムフックへ集約し、
   // 戻り値を丸ごと ReviseSectionView へ渡す。refreshItems(最新化)のみ提示待ちポーリングで共用。
