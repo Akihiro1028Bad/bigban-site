@@ -4143,13 +4143,42 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
-  it("画像タブ: アイキャッチのメディア差し替えは案内トーストを出す(差し替えUIは撤去)", async () => {
-    const { dialog } = await openReady();
+  it("画像タブ: 『メディアから選ぶ』でメディアライブラリを開き、選択→反映で下書き再取得＋成功トースト(#143)", async () => {
+    const { fn, dialog } = await openReady(
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/pick.png" }] } }, // メディア一覧
+      { json: { success: true } }, // /api/growth/draft/eyecatch
+      READY_DRAFT, // onApplied → loadDraft の再取得
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } }, // onApplied → pollBoard の再取得
+    );
     await gotoImages(dialog);
+    // 起点ボタン(素材タブ)→ メディアライブラリを開く。
     await userEvent.click(within(dialog).getByRole("button", { name: /メディアから選ぶ/ }));
-    expect(
-      await screen.findByText("アイキャッチの差し替えは下書きプレビューのメディアから行えます。"),
-    ).toBeInTheDocument();
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    // 一覧 fetch(GET /api/growth/media)。
+    await waitFor(() =>
+      expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/media"))).toBe(true),
+    );
+    // サムネイルを選択 → /api/growth/draft/eyecatch へ pageId/eyecatchUrl を POST。
+    await userEvent.click(await within(media).findByRole("button", { name: "この画像をアイキャッチに設定" }));
+    await waitFor(() => {
+      const call = fn.mock.calls.find((c) => String(c[0]) === "/api/growth/draft/eyecatch");
+      expect(call).toBeDefined();
+      const body = JSON.parse(String((call?.[1] as RequestInit)?.body));
+      expect(body).toEqual({
+        pageId: "i1",
+        eyecatchUrl: "https://images.microcms-assets.io/pick.png",
+      });
+    });
+    // onApplied → 成功トースト＋モーダルクローズ＋下書き再取得(loadDraft の /api/growth/draft? 再ヒット)。
+    expect(await screen.findByText("アイキャッチを差し替えました。")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(
+        fn.mock.calls.filter((c) => String(c[0]).includes("/api/growth/draft?")).length,
+      ).toBeGreaterThanOrEqual(2),
+    );
   });
 
   it("画像タブ: アイキャッチをAIで再生成すると /eyecatch/regen に POST し成功トースト", async () => {

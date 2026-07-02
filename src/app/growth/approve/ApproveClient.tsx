@@ -66,6 +66,7 @@ import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
+import { MediaLibraryModal } from "./MediaLibraryModal";
 import { PromptsView } from "./PromptsView";
 import { ProposalView } from "./ProposalView";
 import { ProposalFormModal } from "./ProposalFormModal";
@@ -192,6 +193,9 @@ export function ApproveClient() {
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275/#proto P3a: master-detail。右詳細ペインでアクティブにしている項目 id。
   const [activeId, setActiveId] = useState<string | null>(null);
+  // #proto P6/#143: 詳細パネル素材タブの「メディアから選ぶ」で開くメディアライブラリの対象記事。
+  // null で閉じ、非 null で MediaLibraryModal を描画する(P5b と同じ pull 型導線)。
+  const [mediaFor, setMediaFor] = useState<PendingItem | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   const {
     decided,
@@ -792,9 +796,8 @@ export function ApproveClient() {
   }
 
 
-  // #proto P3b: アイキャッチの AI 再生成(おまかせ)を実経路(/api/growth/eyecatch/regen)へ結線する。
-  // 差し替え(メディア選択)UI は P5 の媒体ピッカーで担うため、ここでは「差し替えは既存の下書きプレビュー
-  // 側で行う」ことをトーストで案内する縮約(no-op ではなく実導線へ誘導)。
+  // #proto P3b/P6: アイキャッチの AI 再生成(おまかせ)を実経路(/api/growth/eyecatch/regen)へ結線する。
+  // 差し替え(メディア選択)は #143 で MediaLibraryModal へ実結線済み(onPickEyecatch → setMediaFor)。
   async function requestEyecatchRegen(pageId: string): Promise<void> {
     try {
       const res = await fetch("/api/growth/eyecatch/regen", {
@@ -866,9 +869,7 @@ export function ApproveClient() {
         hue={200}
         slug={item.id}
         regenKeys={deriveRegenKeys(item)}
-        onPickEyecatch={() =>
-          pushToast("アイキャッチの差し替えは下書きプレビューのメディアから行えます。")
-        }
+        onPickEyecatch={() => setMediaFor(item)}
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
@@ -1168,6 +1169,24 @@ export function ApproveClient() {
           selectable={consult.selectable}
           classifications={consult.classifications}
           onToggleAdopt={consult.onToggleAdopt}
+        />
+      ) : null}
+
+      {/* #proto P6/#143: 詳細パネル素材タブ「メディアから選ぶ」→ メディアライブラリ。反映成功で下書き再取得＋盤再取得。
+          PublishQueue の結線例と同形(token/pageId/onClose/onApplied)。失敗系は modal 内で可視化済み(P5b)。 */}
+      {mediaFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={mediaFor.id}
+          heading={mediaFor.title}
+          onClose={() => setMediaFor(null)}
+          onApplied={() => {
+            // 反映成功→下書きを再取得(既存 loadDraft)＋盤を再取得(pollBoard)。モーダルは自身で閉じる。
+            void loadDraft(mediaFor.id);
+            void pollBoard();
+            pushToast("アイキャッチを差し替えました。");
+            setMediaFor(null);
+          }}
         />
       ) : null}
 
