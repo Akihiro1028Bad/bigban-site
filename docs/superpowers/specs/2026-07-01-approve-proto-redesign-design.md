@@ -47,7 +47,7 @@ proto の以下は本番バックエンドに無いか形が違う。**各項目
 3. **成績の期間切替（7/28/90日）＋GSC 行展開**: 本番 `ArticleMetrics` は単一期間。多期間・GSC は backend 改修が大きい → 当面は実データで出せる範囲（現行 metrics）に縮約し、proto の UI 骨格で表示。将来拡張は別サブスペック。
 4. **generating の genProgress（0→100%）**: 本番 stage=generating に進捗%が無い → 当面は `.proto-indeterminate` 不定進捗で表示、進捗% は backend が surface できれば差し替え。
 5. **DevicePreview のタブレット**: 本番は PC/モバイル → タブレット幅追加はフロントのみ。
-6. **MediaLibraryModal 統一**: 本番 `/media` で充足。proto の統一モーダルへ集約。
+6. **MediaLibraryModal 統一**: 本番 `/media` で充足。proto の統一モーダルへ集約。**P5b（Task 6）で un-縮約済**: P3b（AD5-8）で撤去したアイキャッチ差し替え（#143）の受け皿として、**公開キュー「要対応（アイキャッチ未設定）」行 → MediaLibraryModal 実結線**を実装。一覧/アップロードは `GET|POST /api/growth/media`（`authHeaders`・MANAGEMENT キーは server-only のため API ルート経由のみ）、反映は `POST /api/growth/draft/eyecatch { pageId, eyecatchUrl }`（`isMicrocmsAssetUrl` 検証・成功で `onChanged()` 盤再取得）。proto の `MOCK_MEDIA`/`mediaSvgUrl`/種別フィルタ chip は**モック用のため不使用**＝実データにフィルタ軸が無いためフィルタは縮約（非表示）。クライアント事前検証は `media.ts` の純関数 `validateUpload` を再利用（重複実装しない）。モーダルは presentation として coverage.exclude、結線フローは `PublishQueue.test.tsx` で担保。
 7. **ボードステージ scheduled（予約公開）**: **P3a で un-縮約済**。P2-fix1 の調査でサーバ `@/lib/growth/approve` の PendingItem に `scheduledAtMs` が既に存在（実行時データあり）と判明したため、BE 改修不要。クライアント型 `types.ts` に `scheduledAtMs?: number | null` を宣言し、`deriveBoardStage` が `drafted`/`isDraftReady` かつ `scheduledAtMs != null` を `scheduled` に写像する（draft_review より優先）。`null`/未設定は「未予約」として draft_review 側へ寄る。
 8. **P3b（Task 9）で撤去した本番固有操作（proto 厳密優先・全撤去）**: T8 の proto DetailPanel 再スキンで到達 UI から消えた以下の本番固有操作を、proto 厳密優先の裁定に基づき**撤去**した（新サーフェスへ再結線しない）。
    - **本文をコピー（#127）**: proto 到達 UI に無い → 撤去。

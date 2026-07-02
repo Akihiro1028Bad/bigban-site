@@ -3840,9 +3840,10 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
             stage: "drafted",
             isDraftReady: true,
             contentId: "g-1",
-            // アイキャッチ未設定 → 公開キューの要対応(blocked)行になる。
-            eyecatchUrl: "",
-            hasDraftBody: true,
+            // 本文が空 → 公開キューの要対応(blocked)行。アイキャッチはメディア導線へ分岐するため、
+            // onFix(詳細遷移)を検証する行は本文空を使う。
+            eyecatchUrl: "https://images.microcms-assets.io/x.png",
+            hasDraftBody: false,
           }),
         ],
       },
@@ -3852,7 +3853,7 @@ describe("ApproveClient 公開キュー(#H23/#H24)", () => {
     const nav = await screen.findByRole("navigation", { name: "情報源" });
     await userEvent.click(within(nav).getByRole("button", { name: /公開キュー/ }));
     const queueSection = await screen.findByRole("region", { name: "公開キュー" });
-    expect(within(queueSection).getByText("アイキャッチ未設定")).toBeInTheDocument();
+    expect(within(queueSection).getByText("本文が空")).toBeInTheDocument();
     await userEvent.click(within(queueSection).getByRole("button", { name: /修正する/ }));
 
     // onFix → changeView("approve")＋setActiveId(id): approve view の詳細パネルが開く。

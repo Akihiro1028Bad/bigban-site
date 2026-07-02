@@ -15,9 +15,11 @@
 
 import { useState } from "react";
 
+import { EYECATCH_MISSING_REASON } from "@/lib/growth/publishQueue";
 import { splitPublishQueue, formatSchedule } from "@/lib/growth/publishQueueView";
 
 import { authHeaders } from "./authHeaders";
+import { MediaLibraryModal } from "./MediaLibraryModal";
 import { SchedulePicker } from "./SchedulePicker";
 import { cardHue } from "./boardCardView";
 import type { PendingItem } from "./types";
@@ -29,6 +31,7 @@ import {
   IconCheck,
   IconCheckCircle,
   IconClock,
+  IconImage,
   IconX,
 } from "./ui/icons";
 
@@ -45,6 +48,8 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
   const { ready, scheduled, blocked } = splitPublishQueue(items);
   // 予約ピッカーの対象 id 群(null=閉)。まとめて/個別の両方で使う。
   const [scheduleFor, setScheduleFor] = useState<string[] | null>(null);
+  // メディアライブラリ(アイキャッチ差し替え #143後継)の対象記事(null=閉)。
+  const [mediaFor, setMediaFor] = useState<{ id: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,14 +224,26 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
             >
               <IconX size={12} /> {reason}
             </span>
-            <button
-              type="button"
-              onClick={() => onFix?.(item.id)}
-              className="approve-tool"
-              style={{ height: 28 }}
-            >
-              修正する <IconArrowRight size={13} />
-            </button>
+            {reason === EYECATCH_MISSING_REASON ? (
+              // #143後継: アイキャッチ未設定はメディアライブラリで選択/アップロードして反映する。
+              <button
+                type="button"
+                onClick={() => setMediaFor({ id: item.id, title: item.title })}
+                className="approve-tool"
+                style={{ height: 28 }}
+              >
+                <IconImage size={13} /> 画像を選ぶ
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onFix?.(item.id)}
+                className="approve-tool"
+                style={{ height: 28 }}
+              >
+                修正する <IconArrowRight size={13} />
+              </button>
+            )}
           </Row>
         ))}
       </Section>
@@ -240,6 +257,20 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
           onConfirm={(_label, atMs) => {
             handleSchedule(scheduleFor, atMs);
             setScheduleFor(null);
+          }}
+        />
+      ) : null}
+
+      {mediaFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={mediaFor.id}
+          heading={mediaFor.title}
+          onClose={() => setMediaFor(null)}
+          onApplied={() => {
+            // 反映成功→盤を再取得(要対応→公開OKへ移動)。モーダルは自身で閉じる。
+            setMediaFor(null);
+            onChanged();
           }}
         />
       ) : null}

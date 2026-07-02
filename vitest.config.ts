@@ -129,6 +129,12 @@ export default defineConfig({
         // 日時ロジック(プリセット schedulePresets・表示 formatSchedule)は publishQueueView で
         // 100% テスト済み。結線挙動は T5(PublishQueue)以降の ApproveClient.test.tsx で検証する。
         "src/app/growth/approve/SchedulePicker.tsx",
+        // #proto P5b(Task 6): メディアライブラリの proto プレゼンテーション。承認画面(公開キュー)が
+        // render する薄い見た目レイヤ(モーダル/フォーカストラップ/一覧グリッド/アップロード input の
+        // 薄い fetch 結線)。アップロード事前検証・アセット URL 判定の純ロジックは media.ts で 100%
+        // テスト済み。結線フロー(要対応→開く→選択/アップロード→eyecatch 反映→onChanged)は
+        // PublishQueue.test.tsx で実挙動を検証する。
+        "src/app/growth/approve/MediaLibraryModal.tsx",
       ],
       thresholds: {
         statements: 100,
