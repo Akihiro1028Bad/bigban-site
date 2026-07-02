@@ -6,8 +6,8 @@ import { ImagesView, PreviewView, PromptView } from "./DetailViews";
 import type { DraftState } from "./draftTypes";
 
 // #75: draftState を組み立てる小ヘルパ(ready は最小フィールドのみ)。
-function ready(bodyHtml: string, body = ""): DraftState {
-  return { status: "ready", draft: { title: "T", displayMode: "html", bodyHtml, body } };
+function ready(bodyHtml: string, body = "", eyecatch?: string): DraftState {
+  return { status: "ready", draft: { title: "T", displayMode: "html", bodyHtml, body, eyecatch } };
 }
 
 beforeAll(() => {
@@ -86,6 +86,39 @@ describe("PreviewView", () => {
     render(<PreviewView stage="draft_review" draftState={ready("<p>本文</p>")} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
     expect(screen.getByText(/メタディスクリプション/)).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "プレビュー端末" })).toBeInTheDocument();
+  });
+
+  it("アイキャッチ有りは端末プレビューの html にヒーロー img を含める", () => {
+    render(
+      <PreviewView
+        stage="draft_review"
+        draftState={ready("<p>本文</p>", "", "https://img.example/hero.webp")}
+        slug="a1"
+        onSaveMeta={vi.fn()}
+        onReloadDraft={vi.fn()}
+      />,
+    );
+    const html = screen.getByTitle("公開後プレビュー").getAttribute("data-preview-html") ?? "";
+    expect(html).toContain('<img src="https://img.example/hero.webp"');
+    expect(html.indexOf("<img")).toBeLessThan(html.indexOf("<p>本文</p>"));
+  });
+
+  it("アイキャッチ無しは html がそのまま(ヒーロー無し)", () => {
+    render(<PreviewView stage="draft_review" draftState={ready("<p>本文</p>")} slug="a1" onSaveMeta={vi.fn()} onReloadDraft={vi.fn()} />);
+    expect(screen.getByTitle("公開後プレビュー")).toHaveAttribute("data-preview-html", "<p>本文</p>");
+  });
+
+  it("独立した96pxサムネはプレビュータブに描画しない", () => {
+    render(
+      <PreviewView
+        stage="draft_review"
+        draftState={ready("<p>本文</p>", "", "https://img.example/hero.webp")}
+        slug="a1"
+        onSaveMeta={vi.fn()}
+        onReloadDraft={vi.fn()}
+      />,
+    );
+    expect(screen.queryByAltText("アイキャッチ")).not.toBeInTheDocument();
   });
 
   it("メタが120字超で警告を出し、保存で onSaveMeta を呼ぶ", async () => {

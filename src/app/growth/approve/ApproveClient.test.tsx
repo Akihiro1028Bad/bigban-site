@@ -3921,8 +3921,8 @@ describe("ApproveClient スマホ操作性(#137)", () => {
   });
 });
 
-describe("ApproveClient アイキャッチ表示(#141)", () => {
-  it("下書きにアイキャッチがあればプレビューに画像を表示する", async () => {
+describe("ApproveClient アイキャッチ表示(#141/#210)", () => {
+  it("下書きにアイキャッチがあれば端末プレビューにヒーローとして差し込む", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
       {
@@ -3943,10 +3943,13 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    expect(await within(dialog).findByAltText(/アイキャッチ/)).toBeInTheDocument();
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
+    const html = frame.getAttribute("data-preview-html") ?? "";
+    expect(html).toContain('<img src="https://images.microcms-assets.io/x.png"');
+    expect(html.indexOf("<img")).toBeLessThan(html.indexOf("<p>本文</p>"));
   });
 
-  it("アイキャッチが無ければ画像は出さない", async () => {
+  it("アイキャッチが無ければ端末プレビューはヒーローを差し込まない", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
       {
@@ -3961,9 +3964,8 @@ describe("ApproveClient アイキャッチ表示(#141)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    // プレビューが描画されるまで待つ(端末切替 tablist を同期点にする)。
-    await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
-    expect(within(dialog).queryByAltText(/アイキャッチ/)).not.toBeInTheDocument();
+    const frame = await within(dialog).findByTitle("公開後プレビュー");
+    expect(frame).toHaveAttribute("data-preview-html", "<p>本文</p>");
   });
 });
 

@@ -9,6 +9,7 @@ import { useState } from "react";
 import { EXCERPT_MAX, autoExcerpt, isExcerptTooLong } from "@/lib/growth/excerptDraft";
 
 import { DevicePreview } from "./DevicePreview";
+import { buildPreviewHtml } from "./previewHtml";
 import type { DraftState } from "./draftTypes";
 import type { BoardStage } from "./ui/boardStage";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
@@ -195,12 +196,9 @@ export function PreviewView({
           AI再生成 {regenStatus}…（PCが処理し、完了したら自動で反映されます）
         </div>
       ) : null}
-      {eyecatch ? (
-        // #141: アイキャッチの表示のみ(差し替えは撤去)。設定済みのときプレビュー上部に画像を出す。
-        <EyecatchThumb hue={0} has url={eyecatch} size={96} alt="アイキャッチ" />
-      ) : null}
       <MetaEditor bodyHtml={bodyHtml} metaDescription={metaDescription} onSave={onSaveMeta} />
-      <DevicePreview html={bodyHtml} slug={slug} />
+      {/* #210: 端末プレビューは body のみ描画するため、公開ページ同様アイキャッチをヒーローとして先頭に合成する。 */}
+      <DevicePreview html={buildPreviewHtml(bodyHtml, eyecatch)} slug={slug} />
     </div>
   );
 }
