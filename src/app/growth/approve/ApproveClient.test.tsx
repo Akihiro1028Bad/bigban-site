@@ -238,7 +238,7 @@ describe("ApproveClient 合言葉画面", () => {
     await screen.findByText("市川ページ");
     await selectView(/プロンプト/);
     expect(screen.getByText(/プロンプト確認スタブ/)).toBeInTheDocument();
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-label", "プロンプト");
+    expect(screen.getByRole("main")).toHaveAttribute("aria-label", "プロンプト");
   });
 
   it("施策の一覧に種別 chip と category を出し、判断根拠は詳細で見る(#226/#227/#P5a)", async () => {
@@ -2989,10 +2989,10 @@ describe("ApproveClient シェル操作(#proto P1)", () => {
     });
     render(<ApproveClient />);
     await screen.findByRole("navigation", { name: "情報源" });
-    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
-    await userEvent.click(within(tablist).getByRole("tab", { name: /公開済み/ }));
+    const group = screen.getByRole("group", { name: "段階フィルタ" });
+    await userEvent.click(within(group).getByRole("button", { name: /公開済み/ }));
     // 段階は「公開済み」に、view は記事のまま。
-    expect(within(tablist).getByRole("tab", { name: /公開済み/ })).toHaveAttribute("aria-selected", "true");
+    expect(within(group).getByRole("button", { name: /公開済み/ })).toHaveAttribute("aria-pressed", "true");
     const nav = screen.getByRole("navigation", { name: "情報源" });
     expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("公開済み記事")).toBeInTheDocument();
@@ -3247,40 +3247,67 @@ describe("ApproveClient ナビ/段階フィルタの a11y(#119/#proto P1)", () =
     expect(within(nav).getByRole("button", { name: /施策/ })).toHaveAttribute("aria-current", "page");
   });
 
-  // #proto P1: TopBar 段階フィルタ(tablist/tab)と本文パネル(tabpanel)が aria-controls/labelledby で紐付く。
-  it("段階フィルタ tab と tabpanel が aria-controls/labelledby で紐付く", async () => {
+  // #proto P6: 段階フィルタは group + aria-pressed の絞り込みで、本文パネル(<main>)は view 名で識別される。
+  it("段階フィルタは group+aria-pressed で表され、main は view 名を aria-label に持つ", async () => {
     mockMixed2();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X");
 
-    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
-    // 既定は「すべて」段階が選択中。
-    const allTab = within(tablist).getByRole("tab", { name: /すべて/ });
-    expect(allTab).toHaveAttribute("aria-selected", "true");
-    expect(allTab).toHaveAttribute("aria-controls", "approve-tabpanel");
+    const group = screen.getByRole("group", { name: "段階フィルタ" });
+    // 既定は「すべて」段階が押下状態。
+    expect(within(group).getByRole("button", { name: /すべて/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
-    const panel = screen.getByRole("tabpanel");
-    expect(panel).toHaveAttribute("id", "approve-tabpanel");
-    expect(panel).toHaveAttribute("aria-labelledby", allTab.getAttribute("id"));
+    // <main> のアクセシブル名は現在の view 名(既定=施策)。段階フィルタでは上書きされない。
+    expect(screen.getByRole("main")).toHaveAttribute("aria-label", "施策");
   });
 
-  // #proto P1: 非 approve view で段階 tab を click すると approve view へ遷移してフィルタが適用される。
-  it("段階フィルタ tab の click で approve view へ遷移し、選択段階が反映される", async () => {
+  // #proto P6: 非 approve view で段階ボタンを click すると approve view へ遷移してフィルタが適用される。
+  it("段階フィルタの click で approve view へ遷移し、選択段階が反映される", async () => {
     mockMixed2();
     render(<ApproveClient />);
     await login();
     await screen.findByText("施策X"); // 既定は施策 view
 
-    const tablist = screen.getByRole("tablist", { name: "段階フィルタ" });
-    await userEvent.click(within(tablist).getByRole("tab", { name: /あなた待ち/ }));
+    const group = screen.getByRole("group", { name: "段階フィルタ" });
+    await userEvent.click(within(group).getByRole("button", { name: /あなた待ち/ }));
 
-    // approve view へ切り替わり、選択段階が aria-selected に反映される。
-    expect(within(tablist).getByRole("tab", { name: /あなた待ち/ })).toHaveAttribute("aria-selected", "true");
+    // approve view へ切り替わり、選択段階が aria-pressed に反映される。
+    expect(within(group).getByRole("button", { name: /あなた待ち/ })).toHaveAttribute("aria-pressed", "true");
     const nav = screen.getByRole("navigation", { name: "情報源" });
     expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
     // #proto P3a: 記事は単一リスト(記事リスト region)。
     expect(screen.getByRole("region", { name: "記事リスト" })).toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient 表示密度トグル(#proto P6/#109)", () => {
+  it("トグルで行間クラスが切り替わり localStorage に保存される", async () => {
+    flags.authEnabled = false;
+    window.localStorage.removeItem("growth-approve-density");
+    window.history.replaceState(null, "", "/?view=approve");
+    mockFetchSequence({
+      json: { success: true, items: [ideaItem({ id: "i1", title: "猛暑記事", stage: "proposed" })] },
+    });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+
+    // 既定は comfortable=space-y-2。
+    const row = () => document.querySelector('[data-row-id="i1"]') as HTMLElement;
+    expect(row()).toHaveClass("space-y-2");
+
+    // トグルで compact=space-y-1 に切り替わり、localStorage へ保存される。
+    await userEvent.click(screen.getByRole("button", { name: "表示密度を切り替え" }));
+    await waitFor(() => expect(row()).toHaveClass("space-y-1"));
+    expect(window.localStorage.getItem("growth-approve-density")).toBe("compact");
+
+    // もう一度トグルで comfortable へ戻る。
+    await userEvent.click(screen.getByRole("button", { name: "表示密度を切り替え" }));
+    await waitFor(() => expect(row()).toHaveClass("space-y-2"));
+    expect(window.localStorage.getItem("growth-approve-density")).toBe("comfortable");
   });
 });
 
