@@ -25,7 +25,13 @@ import {
   newlyDraftedIds,
   STUCK_THRESHOLD_MS,
 } from "./generating";
-import { isEditableTag, moveIndex, resolveShortcut } from "./shortcuts";
+import {
+  isEditableTag,
+  moveIndex,
+  resolveShortcut,
+  shouldBlockSingleKeys,
+} from "./shortcuts";
+import type { ShortcutAction } from "./shortcuts";
 import {
   type Density,
   densityListClass,
@@ -319,9 +325,7 @@ export function ApproveClient() {
   }, [boardQuery.isError, boardQuery.errorUpdatedAt]);
 
   // #109: キーボード操作の最新ハンドラを ref に保持(早期 return より前で document に結線するため)。
-  const dispatchRef = useRef<
-    (action: ReturnType<typeof resolveShortcut>, editable: boolean) => void
-  >(
+  const dispatchRef = useRef<(action: ShortcutAction, editable: boolean) => void>(
     /* istanbul ignore next -- @preserve 初期値はレンダリングで即上書きされるため未実行 */
     () => {}
   );
@@ -650,6 +654,16 @@ export function ApproveClient() {
 
   // #109/#130: キーボードショートカットの実処理(毎レンダリングで最新化し ref 経由で呼ぶ)。
   dispatchRef.current = (action, editable) => {
+    // #proto P6: モーダル/オーバーレイ開放中は単一キー操作を盤へ漏らさない(proto page.tsx:908 相当)。
+    // palette/escape は抑止対象外(shouldBlockSingleKeys 内で判定)。
+    const hasOpenOverlay =
+      paletteOpen ||
+      shortcutsOpen ||
+      proposalFormOpen ||
+      confirmAction !== null ||
+      consult.open ||
+      editingDraft;
+    if (shouldBlockSingleKeys(hasOpenOverlay, action)) return;
     // #proto P1: `/` は検索欄へフォーカスを移す。⌘K/Ctrl+K のみコマンドパレットを開く。
     if (action === "search") {
       searchRef.current?.focus();
@@ -657,6 +671,26 @@ export function ApproveClient() {
     }
     if (action === "palette") {
       setPaletteOpen(true);
+      return;
+    }
+    // #proto P6: ? はショートカット一覧(ShortcutOverlay)を開く。
+    if (action === "help") {
+      setShortcutsOpen(true);
+      return;
+    }
+    // #proto P6: 1/2/3 は詳細タブを切替(詳細パネルが開いている記事があるときのみ)。
+    // 3=素材クラスタの既定リーフ(DetailPanel の clusterTargetLeaf: 素材の先頭リーフ=images)。
+    if (action === "tab-outline" || action === "tab-preview" || action === "tab-material") {
+      if (!activeItem) return;
+      setDetailTab(
+        action === "tab-outline" ? "outline" : action === "tab-preview" ? "preview" : "images",
+      );
+      return;
+    }
+    // #proto P6: x はフォーカス行/アクティブ行の選択をトグル(既存 bulk 選択ハンドラ)。
+    if (action === "select-toggle") {
+      const id = activeId ?? focusedId;
+      if (id) toggleSelect(id);
       return;
     }
     if (action === "escape") {
