@@ -58,7 +58,7 @@ export function LeftRail({ view, awaitingCount, proposalCount, queueReadyCount, 
               <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full" style={{ background: "var(--p-accent)" }} />
             )}
             <span style={{ color: active ? "var(--p-accent)" : "var(--p-text-3)" }}>{it.icon}</span>
-            <span className="hidden text-[13px] font-medium sm:inline">{it.label}</span>
+            <span className="hidden whitespace-nowrap text-[13px] font-medium sm:inline">{it.label}</span>
             {it.badge ? (
               <span
                 className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10.5px] font-semibold tabular-nums sm:static sm:ml-auto"

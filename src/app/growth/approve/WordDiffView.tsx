@@ -14,20 +14,20 @@ export function WordDiffView({ before, after }: WordDiffViewProps) {
   return (
     <pre
       aria-label="元と新の差分"
-      className="mt-1 whitespace-pre-wrap rounded-md bg-white p-2 text-xs text-gray-800 ring-1 ring-gray-200"
+      className="mt-1 whitespace-pre-wrap rounded-md bg-[var(--p-bg-input)] p-2 text-xs text-[var(--p-text-2)] ring-1 ring-[var(--p-border)]"
     >
       {segs.map((s, i) => {
         if (s.type === "same") return <span key={i}>{s.text}</span>;
         if (s.type === "add") {
           return (
-            <span key={i} className="rounded bg-green-100 text-green-800 underline decoration-green-600">
+            <span key={i} className="rounded bg-[var(--p-green-weak)] text-[var(--p-green)] underline decoration-[var(--p-green)]">
               {s.text}
               <span className="sr-only">（追加）</span>
             </span>
           );
         }
         return (
-          <span key={i} className="rounded bg-red-100 text-red-800 line-through">
+          <span key={i} className="rounded bg-[var(--p-red-weak)] text-[var(--p-red)] line-through">
             {s.text}
             <span className="sr-only">（削除）</span>
           </span>

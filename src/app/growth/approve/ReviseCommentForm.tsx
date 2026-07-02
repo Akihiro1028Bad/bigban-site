@@ -34,11 +34,11 @@ export function ReviseCommentForm({
   const hasTitlePrompt = titlePrompt.trim() !== "";
   return (
     <MotionConfig reducedMotion="user">
-      <p className="mt-1 text-xs text-gray-500">
+      <p className="mt-1 text-xs text-[var(--p-text-2)]">
         見出しの「＋ コメント」でAIに修正を依頼、「編集」で自分で直せます。
       </p>
       <div className="mt-2">
-        <label htmlFor={`title-revise-${itemId}`} className="block text-xs font-medium text-gray-500">
+        <label htmlFor={`title-revise-${itemId}`} className="block text-xs font-medium text-[var(--p-text-2)]">
           タイトルについて（AIに修正を依頼）
         </label>
         <textarea
@@ -48,7 +48,7 @@ export function ReviseCommentForm({
           disabled={busy}
           rows={2}
           placeholder="例: 市川という地名を入れて、もっと具体的に"
-          className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+          className="mt-1 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm text-[var(--p-text)]"
         />
       </div>
       <ul className="mt-2 space-y-2">
@@ -58,7 +58,7 @@ export function ReviseCommentForm({
         type="button"
         onClick={onRequestRevise}
         disabled={busy || (commentTotal === 0 && !hasTitlePrompt)}
-        className={choiceButtonClass("mt-3 w-full border border-blue-600 bg-blue-600 text-white")}
+        className={choiceButtonClass("approve-btn-primary mt-3 w-full border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
       >
         修正を依頼{commentTotal > 0 ? `（コメント${commentTotal}件）` : ""}
       </button>

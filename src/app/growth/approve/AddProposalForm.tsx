@@ -29,7 +29,8 @@ interface AddProposalFormProps {
   onAdded: (item: AddedProposal) => void;
 }
 
-const FIELD = "min-h-11 w-full rounded-md border border-gray-300 px-3 text-base text-gray-900";
+const FIELD =
+  "min-h-11 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] px-3 text-base text-[var(--p-text)]";
 
 function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : "追加に失敗しました。";
@@ -73,11 +74,11 @@ export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
   }
 
   return (
-    <details className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-      <summary className="cursor-pointer text-sm font-bold text-gray-700">施策を追加</summary>
+    <details className="mt-4 rounded-lg border border-[var(--p-border)] bg-[var(--p-bg-raised)] p-4">
+      <summary className="cursor-pointer text-sm font-bold text-[var(--p-text)]">施策を追加</summary>
       <form onSubmit={submit} className="mt-3 space-y-3">
         <div className="space-y-1">
-          <label htmlFor="proposal-name" className="block text-sm font-medium text-gray-800">
+          <label htmlFor="proposal-name" className="block text-sm font-medium text-[var(--p-text-2)]">
             施策名
           </label>
           <input
@@ -88,7 +89,7 @@ export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="proposal-category" className="block text-sm font-medium text-gray-800">
+          <label htmlFor="proposal-category" className="block text-sm font-medium text-[var(--p-text-2)]">
             カテゴリ
           </label>
           <select
@@ -106,26 +107,26 @@ export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
           </select>
         </div>
         <div className="space-y-1">
-          <label htmlFor="proposal-note" className="block text-sm font-medium text-gray-800">
+          <label htmlFor="proposal-note" className="block text-sm font-medium text-[var(--p-text-2)]">
             想定アクション / メモ
           </label>
           <textarea
             id="proposal-note"
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-base text-gray-900"
+            className="w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] px-3 py-2 text-base text-[var(--p-text)]"
             rows={2}
           />
         </div>
         <button
           type="submit"
           disabled={busy}
-          className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="approve-btn-primary min-h-11 w-full rounded-md border border-transparent bg-[var(--p-accent)] px-4 text-sm font-medium text-[#0a0c10] disabled:opacity-50"
         >
           追加する
         </button>
         {error ? (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-[var(--p-red)]">
             {error}
           </p>
         ) : null}
