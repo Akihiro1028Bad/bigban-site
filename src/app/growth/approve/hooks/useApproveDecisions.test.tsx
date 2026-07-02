@@ -4,7 +4,7 @@
  * 対象分岐:
  *  - decide(承認)失敗時に onError がエラーメッセージ付きで呼ばれること
  *  - undo(取消)失敗時に onError がエラーメッセージ付きで呼ばれること
- *  - いずれも failures[id] を設定する既存挙動が保たれること(加算・非破壊)
+ *  - #213: カードの失敗アラート撤去に伴い failures/savingId は撤去。失敗の可視化は onError のみ。
  *
  * postDecision は vi.mock で reject させ、fetch を介さず catch 分岐へ確実に入れる。
  * useMutation を含むため QueryClientProvider でラップする。
@@ -60,7 +60,7 @@ beforeEach(() => {
 });
 
 describe("useApproveDecisions 失敗時トースト(#213)", () => {
-  it("承認(decide)失敗で onError がエラーメッセージ付きで呼ばれ、failures も設定される", async () => {
+  it("承認(decide)失敗で onError がエラーメッセージ付きで呼ばれる", async () => {
     postDecisionMock.mockRejectedValue(new Error("保存NG"));
     const onError = vi.fn();
     const { result } = renderDecisions(onError);
@@ -70,10 +70,11 @@ describe("useApproveDecisions 失敗時トースト(#213)", () => {
     });
 
     expect(onError).toHaveBeenCalledWith("保存NG");
-    expect(result.current.failures[ITEM.id]?.message).toBe("保存NG");
+    // 失敗しても decided は未確定のまま(行に決定チップは出ない)。
+    expect(result.current.decided[ITEM.id]).toBeUndefined();
   });
 
-  it("取消(undo)失敗で onError がエラーメッセージ付きで呼ばれ、failures も設定される", async () => {
+  it("取消(undo)失敗で onError がエラーメッセージ付きで呼ばれる", async () => {
     postDecisionMock.mockRejectedValue(new Error("取消NG"));
     const onError = vi.fn();
     const { result } = renderDecisions(onError);
@@ -83,6 +84,5 @@ describe("useApproveDecisions 失敗時トースト(#213)", () => {
     });
 
     expect(onError).toHaveBeenCalledWith("取消NG");
-    expect(result.current.failures[ITEM.id]?.message).toBe("取消NG");
   });
 });

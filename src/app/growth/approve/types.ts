@@ -47,12 +47,6 @@ export interface PendingItem {
 // 即時保存モデルでのカードごとの選択(承認/却下)。
 export type Choice = "承認" | "却下";
 
-// 保存失敗時の状態(メッセージ＋再試行)。
-export interface Failure {
-  message: string;
-  retry: () => void;
-}
-
 /** 施策トリアージの状態。 */
 export type ProposalStatus = "pending" | "rejected" | "adopted";
 
