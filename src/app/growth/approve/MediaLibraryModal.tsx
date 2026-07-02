@@ -119,7 +119,8 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
         body: form,
       });
       const body = (await res.json().catch(() => ({}))) as UploadResponse;
-      if (!res.ok || typeof body.url !== "string") {
+      // 他の呼び出し(api.ts postDecision 等)と揃え、HTTP 200 でも success:false は失敗扱いにする。
+      if (!res.ok || body.success === false || typeof body.url !== "string") {
         setError(pickError(body, "アップロードに失敗しました。もう一度お試しください。"));
         return;
       }
@@ -144,7 +145,8 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
         body: JSON.stringify({ pageId, eyecatchUrl: url }),
       });
       const body = (await res.json().catch(() => ({}))) as EyecatchResponse;
-      if (!res.ok) {
+      // 他の呼び出しと揃え、HTTP 200 でも success:false は失敗扱いにする(防御的整合)。
+      if (!res.ok || body.success === false) {
         setError(pickError(body, "アイキャッチの反映に失敗しました。もう一度お試しください。"));
         return;
       }
