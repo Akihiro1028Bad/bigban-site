@@ -447,7 +447,9 @@ describe("ApproveClient 即時保存(#235)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
 
-    expect(await screen.findByText("保存エラー")).toBeInTheDocument();
+    // #213: 失敗はトーストにも出る(純追加)。ここではカードの赤エラーを list 内に限定して検証する。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(await within(list).findByText("保存エラー")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行: 猛暑記事" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "承認: 猛暑記事" })).toBeInTheDocument();
     // 保存失敗時は決定が確定しないため未処理は 1 件のまま。
@@ -464,7 +466,9 @@ describe("ApproveClient 即時保存(#235)", () => {
     await screen.findByText("猛暑記事");
 
     await userEvent.click(screen.getByRole("button", { name: "却下: 猛暑記事" }));
-    expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
+    // #213: 失敗はトーストにも出るため、カードの赤エラーは list 内に限定して検証する。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(await within(list).findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
   it("保存中の例外(非Error)は既定メッセージ", async () => {
@@ -477,7 +481,9 @@ describe("ApproveClient 即時保存(#235)", () => {
     await screen.findByText("猛暑記事");
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
-    expect(await screen.findByText("保存に失敗しました。")).toBeInTheDocument();
+    // #213: 失敗はトーストにも出るため、カードの赤エラーは list 内に限定して検証する。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(await within(list).findByText("保存に失敗しました。")).toBeInTheDocument();
   });
 
   it("再試行で保存をやり直せる(#239)", async () => {
@@ -543,7 +549,9 @@ describe("ApproveClient 即時保存(#235)", () => {
     await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 猛暑記事" }));
 
-    expect(await screen.findByText("戻せませんでした")).toBeInTheDocument();
+    // #213: 失敗はトーストにも出るため、カードの赤エラーは list 内に限定して検証する。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    expect(await within(list).findByText("戻せませんでした")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "取り消す: 猛暑記事" })).toBeInTheDocument();
   });
 
@@ -561,7 +569,9 @@ describe("ApproveClient 即時保存(#235)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "承認: 猛暑記事" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り消す: 猛暑記事" }));
-    await screen.findByText("戻せませんでした");
+    // #213: 失敗はトーストにも出るため、カードの赤エラーは list 内に限定して待機する。
+    const list = screen.getByRole("region", { name: "記事リスト" });
+    await within(list).findByText("戻せませんでした");
     await userEvent.click(screen.getByRole("button", { name: "再試行: 猛暑記事" }));
 
     expect(await screen.findByRole("button", { name: "承認: 猛暑記事" })).toBeInTheDocument();

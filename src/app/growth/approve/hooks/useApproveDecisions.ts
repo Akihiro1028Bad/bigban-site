@@ -27,9 +27,16 @@ interface UseApproveDecisionsParams {
   onFocus: (id: string) => void;
   // 詳細パネルからの操作後にパネルを閉じる。
   onClosePanel: () => void;
+  // #213: 決定/取消の保存失敗をトーストで可視化する(カード失敗アラート撤去に先行・純追加)。
+  onError: (message: string) => void;
 }
 
-export function useApproveDecisions({ token, onFocus, onClosePanel }: UseApproveDecisionsParams) {
+export function useApproveDecisions({
+  token,
+  onFocus,
+  onClosePanel,
+  onError,
+}: UseApproveDecisionsParams) {
   // 即時保存モデル: カードごとに保存済みの選択(承認/却下)と失敗状態を持つ。確定ボタンは無い。
   const [decided, setDecided] = useState<Record<string, Choice>>({});
   const [failures, setFailures] = useState<Record<string, Failure>>({});
@@ -54,6 +61,7 @@ export function useApproveDecisions({ token, onFocus, onClosePanel }: UseApprove
         ...prev,
         [item.id]: { message: text, retry: () => decide(item, choice) },
       }));
+      onError(text);
     } finally {
       setSavingId(null);
     }
@@ -72,6 +80,7 @@ export function useApproveDecisions({ token, onFocus, onClosePanel }: UseApprove
         ...prev,
         [item.id]: { message: text, retry: () => undo(item) },
       }));
+      onError(text);
     } finally {
       setSavingId(null);
     }
