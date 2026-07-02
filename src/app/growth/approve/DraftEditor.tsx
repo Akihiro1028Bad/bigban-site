@@ -69,12 +69,13 @@ function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
     >
       {/* #180: ドラッグの掴み所。TipTap は draggable:true に加え data-drag-handle が必須
           (これが無いと #161 で内側 img の draggable=false にした結果、移動手段が消えていた)。
-          ドラッグ経路をこのハンドル経由の ProseMirror ノード移動の1本に絞る。 */}
+          ドラッグ経路をこのハンドル経由の ProseMirror ノード移動の1本に絞る。
+          #F5: マウス専用機能でキーボード代替が無いため role="button"/aria-label は付けず
+          aria-hidden の装飾ハンドルにする(支援技術に「操作可能なボタン」と嘘をつかない)。 */}
       <span
         data-drag-handle
         contentEditable={false}
-        role="button"
-        aria-label="ドラッグして移動"
+        aria-hidden="true"
         title="ドラッグして移動"
         className="mt-0.5 shrink-0 cursor-grab select-none px-1 leading-none text-gray-400 hover:text-gray-600 active:cursor-grabbing"
       >

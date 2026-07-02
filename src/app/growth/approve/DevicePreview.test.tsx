@@ -44,6 +44,20 @@ describe("DevicePreview", () => {
     );
   });
 
+  it("tab と tabpanel を aria で結ぶ(aria-controls / role=tabpanel / aria-labelledby)", async () => {
+    render(<DevicePreview html="<p>本文</p>" slug="a1" />);
+    const panel = screen.getByRole("tabpanel");
+    // 既定(スマホ)選択時は tabpanel がスマホタブに結ばれる。
+    const mobileTab = screen.getByRole("tab", { name: /スマホ/ });
+    expect(mobileTab).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", mobileTab.id);
+    // タブ切替で tabpanel の参照元(aria-labelledby)も追随する。
+    await userEvent.click(screen.getByRole("tab", { name: /PC/ }));
+    const pcTab = screen.getByRole("tab", { name: /PC/ });
+    expect(pcTab).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", pcTab.id);
+  });
+
   it("本番プレビュー frame(iframe)を描画し、URL に slug を出す", () => {
     render(<DevicePreview html="<p>本文</p>" slug="a1" />);
     expect(screen.getByTitle("公開後プレビュー")).toBeInTheDocument();
