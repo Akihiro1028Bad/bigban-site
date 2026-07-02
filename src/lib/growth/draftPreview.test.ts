@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildDraftReadyMessage,
   buildPreviewMessage,
+  DRAFT_READY_MESSAGE_TYPE,
   isAllowedPreviewOrigin,
+  isDraftReadyMessage,
   MAX_PREVIEW_HTML_LENGTH,
   parsePreviewMessage,
   PREVIEW_MESSAGE_TYPE,
@@ -14,6 +17,30 @@ describe("buildPreviewMessage", () => {
       type: PREVIEW_MESSAGE_TYPE,
       html: "<p>x</p>",
     });
+  });
+});
+
+describe("buildDraftReadyMessage", () => {
+  it("ready タグのメッセージを組み立てる", () => {
+    expect(buildDraftReadyMessage()).toEqual({ type: DRAFT_READY_MESSAGE_TYPE });
+  });
+});
+
+describe("isDraftReadyMessage", () => {
+  it("正規の ready メッセージは true", () => {
+    expect(isDraftReadyMessage({ type: DRAFT_READY_MESSAGE_TYPE })).toBe(true);
+  });
+
+  it("object でない(文字列)は false", () => {
+    expect(isDraftReadyMessage("ready")).toBe(false);
+  });
+
+  it("null は false", () => {
+    expect(isDraftReadyMessage(null)).toBe(false);
+  });
+
+  it("type 不一致は false", () => {
+    expect(isDraftReadyMessage({ type: PREVIEW_MESSAGE_TYPE })).toBe(false);
   });
 });
 
