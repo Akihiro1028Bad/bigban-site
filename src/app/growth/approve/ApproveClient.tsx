@@ -51,7 +51,6 @@ import { DetailPanel } from "./DetailPanel";
 import type { DetailTab } from "./DetailPanel";
 import { ConsultComposer } from "./consult/ConsultComposer";
 import { ConsultDrawer } from "./consult/ConsultDrawer";
-import { InlineCommentReview } from "./InlineCommentReview";
 import { deriveBoardStage } from "./ui/boardStage";
 import { detailBadge } from "./detailBadge";
 import { outlineSections } from "./outline";
@@ -888,18 +887,6 @@ export function ApproveClient() {
         onRequestOutlineRevise={() => void revise.requestRevise(item)}
         onSaveMeta={(text) => void saveMeta(item.id, text)}
         onReloadDraft={() => void loadDraft(item.id)}
-        inlineComments={
-          draftState.status === "ready" ? (
-            <InlineCommentReview
-              pageId={item.id}
-              token={token}
-              bodyHtml={draftState.draft.bodyHtml}
-              bodyComment={draftState.draft.bodyComment}
-              onChanged={() => void loadDraft(item.id)}
-            />
-          ) : undefined
-        }
-        consultSentenceMode={consult.mode === "sentence" && consult.open}
       />
     );
   }

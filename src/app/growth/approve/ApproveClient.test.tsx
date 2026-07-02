@@ -2069,7 +2069,7 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
   });
 
-  it("『この文』相談モードでは詳細パネル本体に本文注釈UIを出し、依頼で再取得する(#182 パネル slot)", async () => {
+  it("『この文』相談モードでは行コメントUIはドロワー側だけに出て詳細パネルはプレビューのまま(F7)", async () => {
     const fn = mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
       draftReady("<p>一文目です。</p>"),
@@ -2077,14 +2077,19 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
       draftReady("<p>一文目です。</p>"), // onChanged 後の再取得
     );
     const dialog = await openIdeaPanel();
+    // 前提: 詳細パネルはプレビューを表示している。
+    await within(dialog).findByTitle("公開後プレビュー");
     const drawer = await openConsultDrawer(dialog);
-    // この文モードに切替えると、詳細パネル本体(region)が InlineCommentReview に差し替わる。
+    // 「この文を直す」へ切替えても、行コメント UI が出るのはドロワー内だけ。
     await selectConsultTab(drawer, "この文を直す");
-    const inline = await within(dialog).findByRole("region", { name: "本文インラインコメント" });
-    await userEvent.click(within(inline).getByRole("button", { name: "1行目にコメント" }));
-    await userEvent.type(within(inline).getByLabelText("1行目へのコメント入力"), "やわらかく");
-    await userEvent.click(within(inline).getByRole("button", { name: "コメント" }));
-    await userEvent.click(within(inline).getByRole("button", { name: /AIに指摘を依頼/ }));
+    await within(drawer).findByRole("button", { name: "1行目にコメント" });
+    // 詳細パネルはプレビューのまま(乗っ取られない)。
+    expect(within(dialog).getByTitle("公開後プレビュー")).toBeInTheDocument();
+    // 行コメント入力・依頼はドロワー内で完結する。
+    await userEvent.click(within(drawer).getByRole("button", { name: "1行目にコメント" }));
+    await userEvent.type(within(drawer).getByLabelText("1行目へのコメント入力"), "やわらかく");
+    await userEvent.click(within(drawer).getByRole("button", { name: "コメント" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: /AIに指摘を依頼/ }));
     await waitFor(() =>
       expect(fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/body-comment"))).toBe(true),
     );
@@ -2092,16 +2097,15 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     await waitFor(() => expect(fn.mock.calls.length).toBeGreaterThanOrEqual(4));
   });
 
-  // ── F6 回帰: プレビュー表示中の「AIに相談」で本文注釈 UI が焼き付かないこと ──────────
-  it("下書き ready でプレビュー中に AIに相談 → プレビューは残り本文注釈UIは出ない(F6)", async () => {
+  // ── F7 回帰: 詳細パネルは相談モードに関わらず常に通常タブ(プレビュー等)を表示する ──────────
+  it("下書き ready でプレビュー中に AIに相談 → プレビューは残り詳細パネルは乗っ取られない(F7)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
       draftReady("<p>一文目です。</p>"),
     );
     const dialog = await openIdeaPanel();
-    // 前提: プレビュータブが選択され、本文注釈 UI は出ていない。
+    // 前提: プレビュータブが選択されている。
     await within(dialog).findByTitle("公開後プレビュー");
-    expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
 
     // フッター「AIに相談」でドロワーを開く。既定モードは overall(この文モードではない)。
     const drawer = await openConsultDrawer(dialog);
@@ -2109,12 +2113,12 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
       "aria-selected",
       "true",
     );
-    // 詳細パネル本体はプレビューのまま。本文注釈 UI は前面に出ない。
+    // 詳細パネル本体はプレビューのまま。旧・本文注釈 UI(乗っ取り)は出ない。
     expect(within(dialog).getByTitle("公開後プレビュー")).toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
   });
 
-  it("この文を直すを選ぶと本文注釈UIへ切替、閉じて再度AIに相談するとプレビューへ復帰する(F6)", async () => {
+  it("この文を直すを選んでも詳細パネルはプレビューを維持し、閉じ→再開でも変わらない(F7)", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
       draftReady("<p>一文目です。</p>"),
@@ -2122,18 +2126,19 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     const dialog = await openIdeaPanel();
     await within(dialog).findByTitle("公開後プレビュー");
 
-    // 1) ドロワーを開き「この文を直す」へ切替 → 詳細パネル本体が本文注釈 UI に化ける(正の挙動)。
+    // 1) ドロワーを開き「この文を直す」へ切替 → 行コメント UI はドロワー内。詳細パネルはプレビュー維持。
     let drawer = await openConsultDrawer(dialog);
     await selectConsultTab(drawer, "この文を直す");
-    await within(dialog).findByRole("region", { name: "本文インラインコメント" });
-    expect(within(dialog).queryByTitle("公開後プレビュー")).toBeNull();
-
-    // 2) ドロワーを閉じる → 本体はプレビューへ戻る(consult.open=false)。
-    await userEvent.click(within(drawer).getByRole("button", { name: "閉じる" }));
-    await within(dialog).findByTitle("公開後プレビュー");
+    await within(drawer).findByRole("button", { name: "1行目にコメント" });
+    expect(within(dialog).getByTitle("公開後プレビュー")).toBeInTheDocument();
+    // 旧・詳細パネルへの本文注釈 UI 乗っ取りは起きない。
     expect(within(dialog).queryByRole("region", { name: "本文インラインコメント" })).toBeNull();
 
-    // 3) 再び「AIに相談」→ mode は overall へリセットされ、プレビューが維持される(焼き付き無し)。
+    // 2) ドロワーを閉じる → 詳細パネルはプレビューのまま。
+    await userEvent.click(within(drawer).getByRole("button", { name: "閉じる" }));
+    await within(dialog).findByTitle("公開後プレビュー");
+
+    // 3) 再び「AIに相談」→ mode は overall へリセットされ、プレビューが維持される。
     drawer = await openConsultDrawer(dialog);
     expect(within(drawer).getByRole("tab", { name: "全体を見てもらう" })).toHaveAttribute(
       "aria-selected",
