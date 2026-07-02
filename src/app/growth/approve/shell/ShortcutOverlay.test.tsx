@@ -50,8 +50,8 @@ describe("ShortcutOverlay", () => {
     expect(screen.getByText("閉じる / 選択解除")).toBeInTheDocument();
     expect(screen.getByText("構成案")).toBeInTheDocument();
     expect(screen.getByText("プレビュー")).toBeInTheDocument();
-    expect(screen.getByText("校正")).toBeInTheDocument();
     expect(screen.getByText("素材")).toBeInTheDocument();
+    expect(screen.queryByText("校正")).not.toBeInTheDocument();
     expect(screen.getByText("このヘルプ")).toBeInTheDocument();
   });
 });

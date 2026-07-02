@@ -2690,7 +2690,7 @@ describe("ApproveClient 操作性(#109)", () => {
     mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
     render(<ApproveClient />);
     await screen.findByText("市川ページ");
-    fireEvent.keyDown(document.body, { key: "x" }); // 未対応
+    fireEvent.keyDown(document.body, { key: "z" }); // 未対応
     expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
   });
 
@@ -2721,6 +2721,141 @@ describe("ApproveClient 操作性(#109)", () => {
     fireEvent.keyDown(document.body, { key: "k" }); // prev(先頭で頭打ち)
     fireEvent.keyDown(document.body, { key: "k", metaKey: true }); // パレット
     expect(await screen.findByRole("dialog", { name: "コマンドパレット" })).toBeInTheDocument();
+  });
+
+  // #proto P6: x はフォーカス行の選択をトグルする(既存 bulk 選択と同じ state)。
+  it("x でフォーカス行の選択をトグルする", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    // まだ何も選択されていない。
+    expect(screen.queryByText("件を選択中")).not.toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "j" }); // 先頭へフォーカス
+    fireEvent.keyDown(document.body, { key: "x" }); // 選択トグル(ON)
+    const bulkBar = await screen.findByRole("group", { name: "一括操作" });
+    expect(within(bulkBar).getByText("1")).toBeInTheDocument();
+    expect(within(bulkBar).getByText("件を選択中")).toBeInTheDocument();
+    // もう一度 x で解除。
+    fireEvent.keyDown(document.body, { key: "x" });
+    await waitFor(() => expect(screen.queryByText("件を選択中")).not.toBeInTheDocument());
+  });
+
+  // #proto P6: フォーカスもアクティブ行も無いときの x は no-op。
+  it("フォーカス無しの x は何もしない", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    fireEvent.keyDown(document.body, { key: "x" }); // フォーカス無し
+    expect(screen.queryByText("件を選択中")).not.toBeInTheDocument();
+  });
+
+  // #proto P6: 詳細パネル(activeId)が開いていれば x はアクティブ行の選択をトグルする。
+  it("詳細パネル表示中は x でアクティブ行を選択する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    // 行クリックで詳細を開く(activeId をセット・focusedId は付かない)。
+    await userEvent.click(screen.getByRole("button", { name: "詳細: 猛暑記事" }));
+    await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    fireEvent.keyDown(document.body, { key: "x" }); // activeId 側でトグル
+    const bulkBar = await screen.findByRole("group", { name: "一括操作" });
+    expect(within(bulkBar).getByText("件を選択中")).toBeInTheDocument();
+  });
+
+  // #proto P6: 1/2/3 は詳細タブ(構成案/プレビュー/素材)を切り替える。
+  it("1/2/3 で詳細タブを構成案/プレビュー/素材へ切り替える", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    // e で詳細を開く(既定タブ=プレビュー)。
+    fireEvent.keyDown(document.body, { key: "j" });
+    fireEvent.keyDown(document.body, { key: "e" });
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    expect(within(dialog).getByRole("tab", { name: /プレビュー/ })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    // 1=構成案。
+    fireEvent.keyDown(document.body, { key: "1" });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("tab", { name: /構成案/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      )
+    );
+    // 3=素材(クラスタ既定リーフ=images)。
+    fireEvent.keyDown(document.body, { key: "3" });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("tab", { name: /素材/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      )
+    );
+    // 2=プレビューに戻る。
+    fireEvent.keyDown(document.body, { key: "2" });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("tab", { name: /プレビュー/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      )
+    );
+  });
+
+  // #proto P6: 詳細パネルが開いていない(activeItem 無し)ときの 1/2/3 は no-op。
+  it("詳細パネル未表示のときは 1/2/3 は何もしない", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    fireEvent.keyDown(document.body, { key: "1" }); // 詳細未表示
+    expect(screen.queryByRole("region", { name: "詳細: 猛暑記事" })).not.toBeInTheDocument();
+  });
+
+  // #proto P6: ? はショートカット一覧(ShortcutOverlay)を開く。
+  it("? でショートカット一覧を開く", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    fireEvent.keyDown(document.body, { key: "?" });
+    expect(
+      await screen.findByRole("dialog", { name: "キーボードショートカット" })
+    ).toBeInTheDocument();
+  });
+
+  // #proto P6: 施策フォームモーダル開放中は単一キー(a/j)が盤へ漏れない。
+  it("施策フォーム開放中は a/j が盤に作用しない", async () => {
+    flags.authEnabled = false;
+    // proposal view で「手動で追加」→ ProposalFormModal(proposalFormOpen)を開く。
+    window.history.replaceState(null, "", "/?view=proposal");
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await userEvent.click(screen.getByRole("button", { name: /手動で追加/ }));
+    await screen.findByRole("dialog", { name: "施策を追加" });
+    // モーダル開放中に j(フォーカス移動)→a(承認)を document へ送っても盤に作用しない。
+    fireEvent.keyDown(document.body, { key: "j" });
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
+    // モーダルは開いたまま(a/j は盤に漏れずモーダルを閉じもしない)。
+    expect(screen.getByRole("dialog", { name: "施策を追加" })).toBeInTheDocument();
+  });
+
+  // #proto P6: ヘルプ(ShortcutOverlay)開放中も単一キーが盤へ漏れない。
+  it("ショートカット一覧の開放中は a が盤に作用しない", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("猛暑記事");
+    fireEvent.keyDown(document.body, { key: "j" }); // 先頭へフォーカス
+    fireEvent.keyDown(document.body, { key: "?" }); // ヘルプを開く
+    await screen.findByRole("dialog", { name: "キーボードショートカット" });
+    fireEvent.keyDown(document.body, { key: "a" }); // 開放中の承認は抑止
+    expect(screen.queryByText("承認しました")).not.toBeInTheDocument();
   });
 });
 

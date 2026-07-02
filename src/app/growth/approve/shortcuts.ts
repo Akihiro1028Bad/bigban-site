@@ -13,10 +13,16 @@ export type ShortcutAction =
   | "prev" // k: 前のカードへ
   | "search" // /: 検索へフォーカス
   | "palette" // ⌘K / Ctrl+K: コマンドパレット
-  | "escape"; // Esc: 閉じる/解除
+  | "escape" // Esc: 閉じる/解除
+  | "select-toggle" // x: フォーカス/アクティブ行の選択トグル
+  | "tab-outline" // 1: 詳細タブを構成案へ
+  | "tab-preview" // 2: 詳細タブをプレビューへ
+  | "tab-material" // 3: 詳細タブを素材(クラスタ既定リーフ)へ
+  | "help"; // ?: ショートカット一覧を開く
 
 /**
  * キー入力を操作に解決する。修飾キー付きは ⌘/Ctrl+K のみ palette、他は無視(null)。
+ * `?` は Shift+/ 由来で event.key が "?" として届くため、修飾キー扱いにはしない。
  */
 export function resolveShortcut(
   key: string,
@@ -37,13 +43,38 @@ export function resolveShortcut(
       return "reject";
     case "e":
       return "edit";
+    case "x":
+      return "select-toggle";
     case "/":
       return "search";
+    case "1":
+      return "tab-outline";
+    case "2":
+      return "tab-preview";
+    case "3":
+      return "tab-material";
+    case "?":
+      return "help";
     case "Escape":
       return "escape";
     default:
       return null;
   }
+}
+
+/**
+ * モーダル/オーバーレイ開放中に単一キー操作を盤へ漏らさないためのガード純関数。
+ * proto(`approve-proto/page.tsx:908`) の「モーダル開放中は単一キーを全抑止」相当。
+ *
+ * palette と escape は抑止しない(パレット自体の操作/Esc での閉じるを妨げないため)。
+ * それ以外の action は、いずれかのオーバーレイが開いている間は true(=抑止)を返す。
+ */
+export function shouldBlockSingleKeys(
+  hasOpenOverlay: boolean,
+  action: ShortcutAction,
+): boolean {
+  if (action === "palette" || action === "escape") return false;
+  return hasOpenOverlay;
 }
 
 /** 入力欄(input/textarea/select)か。編集中は単一キーのショートカットを抑止する。 */

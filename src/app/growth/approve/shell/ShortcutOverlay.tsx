@@ -37,8 +37,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       { keys: ["1"], label: "構成案" },
       { keys: ["2"], label: "プレビュー" },
-      { keys: ["3"], label: "校正" },
-      { keys: ["4"], label: "素材" },
+      { keys: ["3"], label: "素材" },
       { keys: ["?"], label: "このヘルプ" },
     ],
   },
