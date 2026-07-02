@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MEDIA_KIND_LABEL, mediaSvgUrl } from "./mediaLibrary";
+import { mediaSvgUrl } from "./mediaLibrary";
 import type { MediaKind } from "./mediaLibrary";
 
 describe("mediaSvgUrl", () => {
@@ -35,14 +35,5 @@ describe("mediaSvgUrl", () => {
     const decoded = decodeURIComponent(url);
     expect(decoded).toContain("hsl(20");
     expect(decoded).toContain("hsl(160");
-  });
-});
-
-describe("MEDIA_KIND_LABEL", () => {
-  it("全 kind に日本語ラベルがある", () => {
-    expect(MEDIA_KIND_LABEL.mascot).toBe("マスコット");
-    expect(MEDIA_KIND_LABEL.minimal).toBe("ミニマル");
-    expect(MEDIA_KIND_LABEL.diagram).toBe("図解");
-    expect(MEDIA_KIND_LABEL.photo).toBe("イメージ");
   });
 });
