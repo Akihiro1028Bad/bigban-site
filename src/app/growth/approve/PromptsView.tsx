@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { fetchPrompts } from "./api";
+import { renderPromptMarkdown } from "./promptMarkdown";
 import { IconArrowLeft, IconFileText } from "./ui/icons";
 
 // 前提情報(facility-context)を選択中であることを表す擬似キー(フェーズのファイル名とは衝突しない)。
@@ -30,6 +31,8 @@ interface SelectableItem {
   label: string;
   content: string;
   meta: string;
+  // 前提情報(facility-context.json)は JSON なので生表示、フェーズプロンプト(*.md)は Markdown 整形。
+  kind: "markdown" | "json";
 }
 
 export function PromptsView({ token }: PromptsViewProps) {
@@ -68,6 +71,7 @@ export function PromptsView({ token }: PromptsViewProps) {
           label: "前提情報",
           content: data.facilityContext,
           meta: "全フェーズ共通の前提(facility-context.json)。下書きの冒頭で正典として注入されます。",
+          kind: "json",
         }
       : null;
 
@@ -77,6 +81,7 @@ export function PromptsView({ token }: PromptsViewProps) {
       label: p.label,
       content: p.content,
       meta: p.whenItRuns,
+      kind: "markdown",
     })),
   );
 
@@ -153,6 +158,7 @@ export function PromptsView({ token }: PromptsViewProps) {
                   label: phase.label,
                   content: phase.content,
                   meta: phase.whenItRuns,
+                  kind: "markdown",
                 }}
                 isActive={selected.key === phase.filename}
                 onSelect={() => select(phase.filename)}
@@ -194,17 +200,25 @@ export function PromptsView({ token }: PromptsViewProps) {
               {copiedKey === selected.key ? "コピー済み" : "コピー"}
             </button>
           </div>
-          <pre
-            className="mt-3 whitespace-pre-wrap break-words rounded-[12px] p-4 text-[12.5px] leading-relaxed"
-            style={{
-              background: "var(--p-bg-input)",
-              border: "1px solid var(--p-border)",
-              color: "var(--p-text-2)",
-              fontFamily: "var(--p-mono)",
-            }}
-          >
-            {selected.content}
-          </pre>
+          {selected.kind === "json" ? (
+            <pre
+              className="mt-3 whitespace-pre-wrap break-words rounded-[12px] p-4 text-[12.5px] leading-relaxed"
+              style={{
+                background: "var(--p-bg-input)",
+                border: "1px solid var(--p-border)",
+                color: "var(--p-text-2)",
+                fontFamily: "var(--p-mono)",
+              }}
+            >
+              {selected.content}
+            </pre>
+          ) : (
+            <div
+              className="prose prose-invert prose-sm mt-3 max-w-none"
+              // Markdown を整形表示。生 HTML タグはエスケープ済み(promptMarkdown で DOMPurify 通し済み)。
+              dangerouslySetInnerHTML={{ __html: renderPromptMarkdown(selected.content) }}
+            />
+          )}
           <p className="mt-3 text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
             読み取り専用 ・ デプロイ時点のリポジトリ内容です
           </p>
