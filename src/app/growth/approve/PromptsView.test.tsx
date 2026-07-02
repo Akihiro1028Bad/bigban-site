@@ -20,7 +20,7 @@ const SAMPLE: PromptsData = {
           group: "分析",
           order: 1,
           whenItRuns: "週次の分析をするとき",
-          content: "週次の指示本文",
+          content: "## 週次見出し\n\n- 週次の指示本文",
         },
       ],
     },
@@ -33,7 +33,7 @@ const SAMPLE: PromptsData = {
           group: "執筆",
           order: 1,
           whenItRuns: "下書きを作るとき",
-          content: "下書きの指示本文",
+          content: "## 下書き見出し\n\n下書きの指示本文",
         },
       ],
     },
@@ -78,16 +78,31 @@ describe("PromptsView", () => {
     expect(screen.getByText('{"open":false}')).toBeInTheDocument();
   });
 
-  it("フェーズを選ぶと本文と「いつ動くか」を表示し、前提情報へ戻れる", async () => {
+  it("フェーズ(Markdown)を選ぶと整形表示になり「いつ動くか」も表示、前提情報へ戻れる", async () => {
     vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
-    renderWithClient(<PromptsView token="t" />);
+    const { container } = renderWithClient(<PromptsView token="t" />);
     fireEvent.click(await screen.findByRole("button", { name: /下書き生成/ }));
+    // Markdown は整形表示: 見出しは h2、本文は生の "## " を含む pre ではない
+    const heading = screen.getByRole("heading", { level: 2, name: "下書き見出し" });
+    expect(heading).toBeInTheDocument();
     expect(screen.getByText("下書きの指示本文")).toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
     // meta「下書きを作るとき」は右ペインとボタンの両方に出るため getAllByText で確認
     expect(screen.getAllByText("下書きを作るとき").length).toBeGreaterThan(0);
-    // 前提情報へ戻すと中身が切り替わる(ピンの onSelect / 選択解決を網羅)
+    // 前提情報(JSON)へ戻すと生表示の pre に切り替わる(ピンの onSelect / 選択解決を網羅)
     fireEvent.click(screen.getByRole("button", { name: /前提情報/ }));
     expect(screen.getByText('{"open":false}')).toBeInTheDocument();
+    expect(container.querySelector("pre")).not.toBeNull();
+  });
+
+  it("フェーズ(Markdown)の箇条書きも整形表示になる", async () => {
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    const { container } = renderWithClient(<PromptsView token="t" />);
+    fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
+    expect(container.querySelector("ul li")).not.toBeNull();
+    expect(screen.getByText("週次の指示本文")).toBeInTheDocument();
+    // 生 Markdown の "## " や "- " が pre で露出しない
+    expect(container.querySelector("pre")).toBeNull();
   });
 
   it("モバイル: 項目選択で詳細ペインへ切替、戻るで一覧へ戻る", async () => {
@@ -110,12 +125,14 @@ describe("PromptsView", () => {
     expect(detail.className).toContain("hidden lg:block");
   });
 
-  it("前提情報が無ければピンは出さず、先頭フェーズを初期選択する", async () => {
+  it("前提情報が無ければピンは出さず、先頭フェーズを整形表示で初期選択する", async () => {
     vi.mocked(fetchPrompts).mockResolvedValue({ ...SAMPLE, facilityContext: null });
-    renderWithClient(<PromptsView token="t" />);
+    const { container } = renderWithClient(<PromptsView token="t" />);
     await screen.findByRole("button", { name: /週次分析/ });
     expect(screen.queryByRole("button", { name: /前提情報/ })).not.toBeInTheDocument();
-    expect(screen.getByText("週次の指示本文")).toBeInTheDocument();
+    // 先頭フェーズ(Markdown)は整形表示: 見出しは h2 で pre ではない
+    expect(screen.getByRole("heading", { level: 2, name: "週次見出し" })).toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
   });
 
   it("表示できるものが無ければ空メッセージ", async () => {
@@ -135,6 +152,16 @@ describe("PromptsView", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "コピー済み" })).toBeInTheDocument()
     );
+  });
+
+  it("Markdown フェーズでもコピーは生の本文(未整形)を書き込む", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    renderWithClient(<PromptsView token="t" />);
+    fireEvent.click(await screen.findByRole("button", { name: /下書き生成/ }));
+    fireEvent.click(screen.getByRole("button", { name: "コピー" }));
+    expect(writeText).toHaveBeenCalledWith("## 下書き見出し\n\n下書きの指示本文");
   });
 
   it("コピーに失敗したら『コピー済み』表示にしない", async () => {
