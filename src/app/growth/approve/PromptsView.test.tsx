@@ -70,10 +70,10 @@ describe("PromptsView", () => {
   it("前提情報をピン留めし、初期表示は前提情報の中身", async () => {
     vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
     renderWithClient(<PromptsView token="t" />);
-    expect(await screen.findByRole("button", { name: "前提情報" })).toBeInTheDocument();
-    // グループ見出しとフェーズ
-    expect(screen.getByRole("button", { name: "週次分析" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "下書き生成" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /前提情報/ })).toBeInTheDocument();
+    // グループ見出しとフェーズ(ボタンは label＋meta の2行なので前方一致で照合)
+    expect(screen.getByRole("button", { name: /週次分析/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /下書き生成/ })).toBeInTheDocument();
     // 初期選択=前提情報の中身が右ペインに出る
     expect(screen.getByText('{"open":false}')).toBeInTheDocument();
   });
@@ -81,19 +81,40 @@ describe("PromptsView", () => {
   it("フェーズを選ぶと本文と「いつ動くか」を表示し、前提情報へ戻れる", async () => {
     vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
     renderWithClient(<PromptsView token="t" />);
-    fireEvent.click(await screen.findByRole("button", { name: "下書き生成" }));
+    fireEvent.click(await screen.findByRole("button", { name: /下書き生成/ }));
     expect(screen.getByText("下書きの指示本文")).toBeInTheDocument();
-    expect(screen.getByText("下書きを作るとき")).toBeInTheDocument();
+    // meta「下書きを作るとき」は右ペインとボタンの両方に出るため getAllByText で確認
+    expect(screen.getAllByText("下書きを作るとき").length).toBeGreaterThan(0);
     // 前提情報へ戻すと中身が切り替わる(ピンの onSelect / 選択解決を網羅)
-    fireEvent.click(screen.getByRole("button", { name: "前提情報" }));
+    fireEvent.click(screen.getByRole("button", { name: /前提情報/ }));
     expect(screen.getByText('{"open":false}')).toBeInTheDocument();
+  });
+
+  it("モバイル: 項目選択で詳細ペインへ切替、戻るで一覧へ戻る", async () => {
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    renderWithClient(<PromptsView token="t" />);
+    const nav = await screen.findByRole("navigation", { name: "プロンプト一覧" });
+    const detail = screen.getByRole("region", { name: "プロンプト本文" });
+    // 初期(showDetailMobile=false): 一覧は表示・詳細はモバイル非表示
+    expect(nav.className).toContain("block");
+    expect(nav.className).not.toContain("hidden lg:block");
+    expect(detail.className).toContain("hidden lg:block");
+    // フェーズ選択でモバイルは詳細ペインへ
+    fireEvent.click(screen.getByRole("button", { name: /週次分析/ }));
+    expect(nav.className).toContain("hidden lg:block");
+    expect(detail.className).toContain("block");
+    expect(detail.className).not.toContain("hidden lg:block");
+    // 戻るで一覧ペインへ
+    fireEvent.click(screen.getByRole("button", { name: "プロンプト一覧へ戻る" }));
+    expect(nav.className).not.toContain("hidden lg:block");
+    expect(detail.className).toContain("hidden lg:block");
   });
 
   it("前提情報が無ければピンは出さず、先頭フェーズを初期選択する", async () => {
     vi.mocked(fetchPrompts).mockResolvedValue({ ...SAMPLE, facilityContext: null });
     renderWithClient(<PromptsView token="t" />);
-    await screen.findByRole("button", { name: "週次分析" });
-    expect(screen.queryByRole("button", { name: "前提情報" })).not.toBeInTheDocument();
+    await screen.findByRole("button", { name: /週次分析/ });
+    expect(screen.queryByRole("button", { name: /前提情報/ })).not.toBeInTheDocument();
     expect(screen.getByText("週次の指示本文")).toBeInTheDocument();
   });
 
