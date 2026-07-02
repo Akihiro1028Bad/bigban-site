@@ -35,6 +35,7 @@ import type { ShortcutAction } from "./shortcuts";
 import {
   type Density,
   densityListClass,
+  nextDensity,
   parseDensity,
   pruneSelection,
   toggleId,
@@ -347,10 +348,18 @@ export function ApproveClient() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // #109: 表示密度を localStorage から復元する(初回)。proto P1 では密度トグル UI は未移植のため
-  // 復元のみ(保存は P6 以降の密度トグル再導入時)。
+  // #109: 表示密度を localStorage から復元する(初回)。
   useEffect(() => {
     setDensity(parseDensity(window.localStorage.getItem(DENSITY_KEY)));
+  }, []);
+
+  // #proto P6: 表示密度トグル(TopBar)。切替後に localStorage へ保存し、次回マウントで復元する。
+  const handleToggleDensity = useCallback(() => {
+    setDensity((prev) => {
+      const next = nextDensity(prev);
+      window.localStorage.setItem(DENSITY_KEY, next);
+      return next;
+    });
   }, []);
 
   // #109: 取得更新で消えた選択を掃除する。
@@ -953,6 +962,8 @@ export function ApproveClient() {
           syncing={syncing}
           onRefresh={() => void pollBoard()}
           onOpenProposal={() => changeView("proposal")}
+          density={density}
+          onToggleDensity={handleToggleDensity}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -965,10 +976,7 @@ export function ApproveClient() {
           />
 
           <main
-            role="tabpanel"
-            id="approve-tabpanel"
             aria-label={viewPanelLabel[activeView]}
-            aria-labelledby={`approve-seg-${segment}`}
             className={
               activeView === "approve" || activeView === "proposal"
                 ? "flex min-w-0 flex-1 flex-col"

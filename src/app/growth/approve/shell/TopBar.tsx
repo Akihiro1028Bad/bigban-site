@@ -5,8 +5,9 @@
 
 import type { RefObject } from "react";
 
-import { IconInbox, IconPlus, IconRefresh, IconSearch } from "@/app/growth/approve/ui/icons";
+import { IconInbox, IconLayout, IconPlus, IconRefresh, IconSearch } from "@/app/growth/approve/ui/icons";
 import { Kbd } from "@/app/growth/approve/ui/primitives";
+import type { Density } from "@/app/growth/approve/boardPrefs";
 import type { ShellSegmentKey } from "@/app/growth/approve/boardShellStats";
 
 interface Segment {
@@ -29,6 +30,8 @@ interface TopBarProps {
   syncing: boolean;
   onRefresh: () => void;
   onOpenProposal: () => void;
+  density: Density;
+  onToggleDensity: () => void;
 }
 
 export function TopBar({
@@ -45,6 +48,8 @@ export function TopBar({
   syncing,
   onRefresh,
   onOpenProposal,
+  density,
+  onToggleDensity,
 }: TopBarProps) {
   return (
     <header
@@ -70,7 +75,7 @@ export function TopBar({
       <div
         className="hidden items-center gap-[2px] rounded-[9px] p-[3px] md:flex"
         style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
-        role="tablist"
+        role="group"
         aria-label="段階フィルタ"
       >
         {segments.map((s) => {
@@ -78,10 +83,7 @@ export function TopBar({
           return (
             <button
               key={s.key}
-              id={`approve-seg-${s.key}`}
-              role="tab"
-              aria-selected={active}
-              aria-controls="approve-tabpanel"
+              aria-pressed={active}
               onClick={() => onSegmentChange(s.key)}
               className="flex items-center gap-1.5 rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-medium transition-colors"
               style={{
@@ -152,6 +154,21 @@ export function TopBar({
         style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)", color: "var(--p-text-2)" }}
       >
         <IconPlus size={14} /> <span className="hidden sm:inline">施策</span>
+      </button>
+
+      <button
+        onClick={onToggleDensity}
+        title="表示密度を切り替え"
+        aria-label="表示密度を切り替え"
+        aria-pressed={density === "compact"}
+        className="approve-tool flex items-center rounded-[9px] px-2.5 py-[6px] text-[12px] transition-colors hover:brightness-125"
+        style={{
+          background: density === "compact" ? "var(--p-bg-active)" : "var(--p-bg-input)",
+          border: "1px solid var(--p-border)",
+          color: density === "compact" ? "var(--p-text)" : "var(--p-text-3)",
+        }}
+      >
+        <IconLayout size={14} />
       </button>
 
       <button
