@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { BoardCard } from "./BoardCard";
+import { rowClass } from "./boardItemHelpers";
 import type { PendingItem } from "./types";
 
 function makeItem(over: Partial<PendingItem> = {}): PendingItem {
@@ -45,7 +46,6 @@ function renderCard({ item, props }: Overrides = {}) {
         bulkSelectable={false}
         selected={false}
         stuck={false}
-        stageAccentClass=""
         rowClassName="row"
         awaitingDownstream={false}
         {...handlers}
@@ -266,6 +266,21 @@ describe("BoardCard 見た目(proto プリミティブ)", () => {
     const li = document.querySelector("li");
     expect(li?.className).toContain("my-row");
     expect(li?.getAttribute("data-decision")).toBe("承認");
+  });
+
+  it("Root は proto のフラット横並びで、箱・段階アクセント境界を持たない", () => {
+    renderCard({ props: { rowClassName: rowClass() } });
+    const li = document.querySelector("li");
+    const cls = li?.className ?? "";
+    // フラット横並び(外側 li と同じ骨格)
+    expect(cls).toContain("flex");
+    expect(cls).toContain("items-start");
+    expect(cls).toContain("gap-3");
+    // 箱・段階アクセント境界は撤去済み
+    expect(cls).not.toContain("border");
+    expect(cls).not.toContain("rounded-lg");
+    expect(cls).not.toContain("bg-[var(--p-bg-raised)]");
+    expect(cls).not.toContain("border-l-4");
   });
 
   it("未決定 li の data-decision は空", () => {
