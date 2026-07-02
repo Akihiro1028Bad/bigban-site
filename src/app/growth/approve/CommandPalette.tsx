@@ -57,12 +57,18 @@ export function CommandPalette({ items, onJump, onClose }: CommandPaletteProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 pt-24">
+    // approve-shell: fixed overlay は .approve-shell 配下の外に出るため root 自身に付け
+    // var(--p-*) トークンを解決する(ConfirmActionDialog / MediaLibraryModal 方式)。
+    // z-[70]: 詳細(50)・編集(60)より前面、確認(80)・トースト(90)より背面(既存の重なり順を維持)。
+    <div
+      className="approve-shell fixed inset-0 z-[70] flex items-start justify-center p-4 pt-24"
+    >
       <button
         type="button"
         aria-label="コマンドパレットを閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0"
+        style={{ background: "rgba(4,6,9,0.6)", backdropFilter: "blur(3px)" }}
       />
       <div
         ref={dialogRef}
@@ -70,7 +76,12 @@ export function CommandPalette({ items, onJump, onClose }: CommandPaletteProps) 
         aria-modal="true"
         aria-label="コマンドパレット"
         onKeyDown={handleKeyDown}
-        className="relative w-full max-w-md overflow-hidden rounded-lg bg-white shadow-2xl"
+        className="relative w-full max-w-md overflow-hidden rounded-[14px]"
+        style={{
+          background: "var(--p-bg-elevated)",
+          border: "1px solid var(--p-border-strong)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+        }}
       >
         <input
           ref={inputRef}
@@ -79,7 +90,12 @@ export function CommandPalette({ items, onJump, onClose }: CommandPaletteProps) 
           placeholder="記事/施策を検索してジャンプ…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="w-full border-b border-gray-200 px-4 py-3 text-sm outline-none"
+          className="w-full px-4 py-3 text-sm outline-none"
+          style={{
+            background: "var(--p-bg-input)",
+            color: "var(--p-text)",
+            borderBottom: "1px solid var(--p-border)",
+          }}
         />
         <ul className="max-h-72 overflow-y-auto">
           {results.length > 0 ? (
@@ -88,15 +104,21 @@ export function CommandPalette({ items, onJump, onClose }: CommandPaletteProps) 
                 <button
                   type="button"
                   onClick={() => onJump(item.id)}
-                  className="flex w-full flex-col items-start px-4 py-2 text-left hover:bg-gray-50"
+                  className="flex w-full flex-col items-start px-4 py-2 text-left transition-colors hover:[background:var(--p-bg-active)]"
                 >
-                  <span className="text-sm font-medium text-gray-900">{item.title}</span>
-                  <span className="text-xs text-gray-500">{item.subtitle}</span>
+                  <span className="text-sm font-medium" style={{ color: "var(--p-text)" }}>
+                    {item.title}
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--p-text-3)" }}>
+                    {item.subtitle}
+                  </span>
                 </button>
               </li>
             ))
           ) : (
-            <li className="px-4 py-3 text-sm text-gray-500">一致する項目がありません。</li>
+            <li className="px-4 py-3 text-sm" style={{ color: "var(--p-text-3)" }}>
+              一致する項目がありません。
+            </li>
           )}
         </ul>
       </div>
