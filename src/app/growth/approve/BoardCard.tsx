@@ -33,7 +33,7 @@ interface BoardCardProps {
   generatingStepsText: string;
   awaitingDownstream: boolean;
   /**
-   * 行のルート要素。既定は `<li>`(ProposalsView の `<ul>` 直下用)。
+   * 行のルート要素。既定は `<li>`(単体で `<ul>` 直下に置くとき用)。
    * BoardList は自前で `<li role="listitem">` を持つため、その中では `"div"` を渡して
    * `<li>` の入れ子(不正 HTML)を避ける。操作系・表示系の中身は as に依存せず不変。
    */

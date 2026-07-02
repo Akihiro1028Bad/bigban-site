@@ -23,8 +23,3 @@ export function rowClass(choice: Choice | undefined, failed: boolean): string {
   if (choice) return `${base} border-gray-200 bg-gray-50 px-3 py-2`;
   return `${base} border-gray-200 bg-white p-3`;
 }
-
-// #107: 盤の列ヘッダ用スタイル。件数バッジ付きの淡色ヘッダ。
-export function columnHeaderClass(): string {
-  return "flex items-center justify-between rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700";
-}
