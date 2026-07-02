@@ -77,14 +77,14 @@ export function BoardCard({
       type="button"
       aria-label={`詳細: ${item.title}`}
       onClick={onOpen}
-      className={`${TAP_TARGET} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}
+      className={`${TAP_TARGET} approve-btn-ghost`}
     >
       詳細
     </button>
   );
   return (
     <Root
-      className={`${rowClassName} ${stageAccentClass} ${isFocused ? "ring-2 ring-blue-500" : ""}`}
+      className={`${rowClassName} ${stageAccentClass} ${isFocused ? "ring-2 ring-[var(--p-ring)]" : ""}`}
       data-decision={choice ?? ""}
     >
       {bulkSelectable ? (
@@ -144,7 +144,7 @@ export function BoardCard({
               aria-label={`取り消す: ${item.title}`}
               onClick={onUndo}
               disabled={isBusy}
-              className={choiceButtonClass("shrink-0 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+              className={choiceButtonClass("approve-btn-ghost shrink-0")}
             >
               取り消す
             </button>
@@ -159,7 +159,7 @@ export function BoardCard({
               id={`card-edit-${item.id}`}
               aria-label={`編集: ${item.title}`}
               onClick={onEdit}
-              className={`${TAP_TARGET} border border-blue-600 bg-blue-600 text-white`}
+              className={`${TAP_TARGET} approve-btn-primary border border-transparent bg-[var(--p-accent)] text-[#0a0c10]`}
             >
               編集
             </button>
@@ -215,7 +215,7 @@ export function BoardCard({
             aria-label={`承認: ${item.title}`}
             onClick={onApprove}
             disabled={isBusy || lockedForRevise}
-            className={choiceButtonClass("flex-1 border border-blue-600 bg-blue-600 text-white")}
+            className={choiceButtonClass("approve-btn-primary flex-1 border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
           >
             承認
           </button>
@@ -224,7 +224,7 @@ export function BoardCard({
             aria-label={`却下: ${item.title}`}
             onClick={onReject}
             disabled={isBusy || lockedForRevise}
-            className={choiceButtonClass("flex-1 border border-gray-700 bg-gray-700 text-white")}
+            className={choiceButtonClass("approve-btn-ghost flex-1")}
           >
             却下
           </button>
@@ -235,7 +235,7 @@ export function BoardCard({
       {failure ? (
         <div
           role="alert"
-          className="mt-2 flex items-center justify-between gap-2 rounded-md bg-red-100 px-3 py-2 text-sm text-red-800"
+          className="mt-2 flex items-center justify-between gap-2 rounded-md bg-[var(--p-red-weak)] px-3 py-2 text-sm text-[var(--p-red)]"
         >
           <span>{failure.message}</span>
           <button
@@ -243,7 +243,7 @@ export function BoardCard({
             aria-label={`再試行: ${item.title}`}
             onClick={failure.retry}
             disabled={isBusy}
-            className={choiceButtonClass("shrink-0 border border-red-600 bg-red-600 text-white")}
+            className={choiceButtonClass("approve-btn-primary shrink-0 border border-transparent bg-[var(--p-red)] text-[#0a0c10]")}
           >
             再試行
           </button>

@@ -52,24 +52,24 @@ export function SectionImages({
   onSave,
 }: SectionImagesProps) {
   return (
-    <div className="mt-2 border-t border-gray-100 pt-2">
+    <div className="mt-2 border-t border-[var(--p-border)] pt-2">
       {images.length > 0 ? (
         <ul className="space-y-1">
           {images.map((image, idx) => (
             <li
               key={idx}
-              className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1"
+              className="flex items-center gap-2 rounded-md border border-[var(--p-border)] bg-[var(--p-bg-raised)] px-2 py-1"
             >
-              <span className="shrink-0 rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+              <span className="shrink-0 rounded bg-[var(--p-purple-weak)] px-2 py-0.5 text-xs font-medium text-[var(--p-purple)]">
                 {STYLE_LABEL[image.style]}
               </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-gray-700">{image.description}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-[var(--p-text-2)]">{image.description}</span>
               <button
                 type="button"
                 aria-label={`画像を編集: ${heading} ${idx + 1}`}
                 onClick={() => onStartEdit(idx, image)}
                 disabled={busy}
-                className="shrink-0 text-xs text-gray-500 hover:text-gray-800 disabled:opacity-40"
+                className="shrink-0 text-xs text-[var(--p-text-3)] hover:text-[var(--p-text)] disabled:opacity-40"
               >
                 編集
               </button>
@@ -78,7 +78,7 @@ export function SectionImages({
                 aria-label={`画像を削除: ${heading} ${idx + 1}`}
                 onClick={() => onDelete(idx)}
                 disabled={busy}
-                className="shrink-0 text-xs text-gray-500 hover:text-red-700 disabled:opacity-40"
+                className="shrink-0 text-xs text-[var(--p-text-3)] hover:text-[var(--p-red)] disabled:opacity-40"
               >
                 削除
               </button>
@@ -92,14 +92,14 @@ export function SectionImages({
           animate={{ opacity: 1, height: "auto" }}
           className="mt-2 overflow-hidden"
         >
-          <label htmlFor={`image-style-${sectionIndex}`} className="block text-xs font-medium text-gray-600">
+          <label htmlFor={`image-style-${sectionIndex}`} className="block text-xs font-medium text-[var(--p-text-2)]">
             スタイル
           </label>
           <select
             id={`image-style-${sectionIndex}`}
             value={imageStyle}
             onChange={(event) => onImageStyleChange(event.target.value as ImageStyleKey)}
-            className="mt-0.5 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+            className="mt-0.5 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm text-[var(--p-text)]"
           >
             {IMAGE_STYLES.map((s) => (
               <option key={s.key} value={s.key}>
@@ -112,16 +112,16 @@ export function SectionImages({
             value={imageDesc}
             onChange={(event) => onImageDescChange(event.target.value)}
             placeholder="何を描くか（例: 宇宙人がパドルを構える）"
-            className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+            className="mt-1 h-14 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm text-[var(--p-text)]"
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-[var(--p-text-3)]">
             alt・キャプションは執筆AIが補完します。図解は「イメージ図」として下書きに入り、公開前に確認できます。
           </p>
           <div className="mt-1 flex justify-end gap-2">
             <button
               type="button"
               onClick={onCancel}
-              className={choiceButtonClass("border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+              className={choiceButtonClass("approve-btn-ghost")}
             >
               キャンセル
             </button>
@@ -129,7 +129,7 @@ export function SectionImages({
               type="button"
               onClick={onSave}
               disabled={busy}
-              className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+              className={choiceButtonClass("approve-btn-primary border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
             >
               {editing ? "更新" : "追加"}
             </button>
@@ -141,7 +141,7 @@ export function SectionImages({
           aria-label={`画像を追加: ${heading}`}
           onClick={onStartAdd}
           disabled={busy || images.length >= MAX_SECTION_IMAGES}
-          className="text-xs text-indigo-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
+          className="text-xs text-[var(--p-purple)] opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
         >
           ＋画像（{images.length} / {MAX_SECTION_IMAGES}）
         </button>

@@ -138,11 +138,15 @@ export function ErrorState({ onRetry, message }: { onRetry: () => void; message?
   );
 }
 
-/** 後方互換: 自動取得の読み込み中ゲート。中身は SkeletonBoard。 */
+/** 後方互換: 自動取得の読み込み中ゲート。中身は SkeletonBoard。
+ * 外側 approve-shell(theme が fixed inset-0 を注入)＋内側センタリングで画面中央に置く
+ * (inset-0 と max-w の競合で左上に張り付くのを構造で回避)。 */
 export function LoadingGate() {
   return (
-    <main className="approve-shell mx-auto h-full max-w-md">
-      <SkeletonBoard />
+    <main className="approve-shell flex items-center justify-center">
+      <div className="mx-auto w-full max-w-md">
+        <SkeletonBoard />
+      </div>
     </main>
   );
 }
@@ -150,8 +154,10 @@ export function LoadingGate() {
 /** 後方互換: 自動取得の失敗ゲート。実エラー(message)を明示し再試行できる。 */
 export function LoadErrorGate({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <main className="approve-shell mx-auto h-full max-w-md">
-      <ErrorState onRetry={onRetry} message={message} />
+    <main className="approve-shell flex items-center justify-center">
+      <div className="mx-auto w-full max-w-md">
+        <ErrorState onRetry={onRetry} message={message} />
+      </div>
     </main>
   );
 }
@@ -168,10 +174,12 @@ export function EmptyGate({
   onAdded: Parameters<typeof AddProposalForm>[0]["onAdded"];
 }) {
   return (
-    <main className="approve-shell mx-auto max-w-md px-4 py-6">
-      <ReviewDoneEmpty />
-      <div className="mx-auto mt-2 max-w-md text-left">
-        <AddProposalForm token={token} onAdded={onAdded} />
+    <main className="approve-shell flex items-center justify-center overflow-y-auto">
+      <div className="mx-auto w-full max-w-md px-4 py-6">
+        <ReviewDoneEmpty />
+        <div className="mx-auto mt-2 max-w-md text-left">
+          <AddProposalForm token={token} onAdded={onAdded} />
+        </div>
       </div>
     </main>
   );

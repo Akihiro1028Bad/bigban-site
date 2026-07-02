@@ -58,34 +58,34 @@ export function Section({
   const commentList = comments ?? [];
 
   return (
-    <li className="group rounded-md border border-gray-200 p-2 hover:border-gray-300">
+    <li className="group rounded-md border border-[var(--p-border)] p-2 hover:border-[var(--p-border-strong)]">
       {editing ? (
         editor
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{heading}</p>
+            <p className="min-w-0 flex-1 text-sm font-medium text-[var(--p-text)]">{heading}</p>
             {commentsEnabled && commentList.length > 0 ? (
-              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+              <span className="shrink-0 rounded-full bg-[var(--p-accent-weak)] px-2 py-0.5 text-xs font-medium text-[var(--p-accent-ink)]">
                 コメント{commentList.length}
               </span>
             ) : null}
           </div>
-          {description ? <p className="mt-0.5 text-xs text-gray-500">{description}</p> : null}
+          {description ? <p className="mt-0.5 text-xs text-[var(--p-text-2)]">{description}</p> : null}
 
           {commentsEnabled && commentList.length > 0 ? (
             <ul className="mt-2 space-y-1">
               {commentList.map((comment, idx) => (
                 <li
                   key={idx}
-                  className="flex items-start gap-2 border-l-2 border-blue-200 pl-2 text-sm text-gray-700"
+                  className="flex items-start gap-2 border-l-2 border-[var(--p-accent)] pl-2 text-sm text-[var(--p-text-2)]"
                 >
                   <span className="min-w-0 flex-1 whitespace-pre-wrap">{comment}</span>
                   <button
                     type="button"
                     aria-label={`コメントを編集: ${heading} ${idx + 1}`}
                     onClick={() => onStartEditComment?.(idx, comment)}
-                    className="shrink-0 text-xs text-gray-500 hover:text-gray-800"
+                    className="shrink-0 text-xs text-[var(--p-text-3)] hover:text-[var(--p-text)]"
                   >
                     編集
                   </button>
@@ -93,7 +93,7 @@ export function Section({
                     type="button"
                     aria-label={`コメントを削除: ${heading} ${idx + 1}`}
                     onClick={() => onDeleteComment?.(idx)}
-                    className="shrink-0 text-xs text-gray-500 hover:text-red-700"
+                    className="shrink-0 text-xs text-[var(--p-text-3)] hover:text-[var(--p-red)]"
                   >
                     削除
                   </button>
@@ -113,20 +113,20 @@ export function Section({
                 value={commentText ?? ""}
                 onChange={(event) => onCommentTextChange?.(event.target.value)}
                 placeholder="この見出しへの修正指示を書く…"
-                className="h-16 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-900"
+                className="h-16 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm text-[var(--p-text)]"
               />
               <div className="mt-1 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={onCancelComment}
-                  className={choiceButtonClass("border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+                  className={choiceButtonClass("approve-btn-ghost")}
                 >
                   キャンセル
                 </button>
                 <button
                   type="button"
                   onClick={onSaveComment}
-                  className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+                  className={choiceButtonClass("approve-btn-primary border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
                 >
                   {editingComment ? "更新" : "コメントを追加"}
                 </button>
@@ -140,7 +140,7 @@ export function Section({
                   aria-label={`コメントを追加: ${heading}`}
                   onClick={onStartAddComment}
                   disabled={busy}
-                  className="text-xs text-blue-700 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
+                  className="text-xs text-[var(--p-accent)] opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
                 >
                   ＋ コメント
                 </button>
@@ -150,7 +150,7 @@ export function Section({
                 aria-label={`セクションを編集: ${heading}`}
                 onClick={onStartEditSection}
                 disabled={busy}
-                className="text-xs text-gray-600 opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
+                className="text-xs text-[var(--p-text-2)] opacity-70 transition-opacity hover:opacity-100 disabled:opacity-40"
               >
                 編集
               </button>

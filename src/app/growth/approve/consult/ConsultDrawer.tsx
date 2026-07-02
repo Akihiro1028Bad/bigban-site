@@ -112,7 +112,9 @@ export function ConsultDrawer({
             onMouseDown={onClose}
           />
 
-          {/* 右レール */}
+          {/* 右レール。外側 approve-shell(theme が fixed inset-0 を注入)は当たり判定を透過し、
+              内側 aside を ml-auto で右アンカーする(inset-0 と right-0 の競合で左に張り付くのを構造で回避)。 */}
+          <div className="approve-shell pointer-events-none z-50 flex" style={{ background: "transparent" }}>
           <motion.aside
             ref={dialogRef}
             role="dialog"
@@ -122,7 +124,7 @@ export function ConsultDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.2 }}
-            className="approve-shell fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col"
+            className="pointer-events-auto ml-auto flex h-full w-full max-w-[440px] flex-col"
             style={{
               background: "var(--p-bg-elevated)",
               borderLeft: "1px solid var(--p-border-strong)",
@@ -209,6 +211,7 @@ export function ConsultDrawer({
               )}
             </div>
           </motion.aside>
+          </div>
         </>
       )}
     </AnimatePresence>

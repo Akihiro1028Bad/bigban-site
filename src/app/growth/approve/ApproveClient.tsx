@@ -992,7 +992,7 @@ export function ApproveClient() {
               />
             ) : null}
             {allDone && activeView !== "approve" ? (
-              <p className="mb-3 rounded-md bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
+              <p className="mb-3 rounded-md bg-[var(--p-green-weak)] px-3 py-2 text-sm font-semibold text-[var(--p-green)]">
                 🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
               </p>
             ) : null}

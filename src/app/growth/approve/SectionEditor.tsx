@@ -36,20 +36,20 @@ export function SectionEditor({
         aria-label={`見出しを編集: ${heading}`}
         value={editHeading}
         onChange={(event) => onHeadingChange(event.target.value)}
-        className="w-full rounded-md border border-gray-300 p-2 text-sm font-medium text-gray-900"
+        className="w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm font-medium text-[var(--p-text)]"
       />
       <textarea
         aria-label={`説明を編集: ${heading}`}
         value={editDescription}
         onChange={(event) => onDescriptionChange(event.target.value)}
         placeholder="このセクションの内容(1行)"
-        className="mt-1 h-14 w-full rounded-md border border-gray-300 p-2 text-sm text-gray-700"
+        className="mt-1 h-14 w-full rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-input)] p-2 text-sm text-[var(--p-text-2)]"
       />
       <div className="mt-1 flex justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className={choiceButtonClass("border border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}
+          className={choiceButtonClass("approve-btn-ghost")}
         >
           キャンセル
         </button>
@@ -57,7 +57,7 @@ export function SectionEditor({
           type="button"
           onClick={onSave}
           disabled={busy}
-          className={choiceButtonClass("border border-blue-600 bg-blue-600 text-white")}
+          className={choiceButtonClass("approve-btn-primary border border-transparent bg-[var(--p-accent)] text-[#0a0c10]")}
         >
           この行を保存
         </button>
