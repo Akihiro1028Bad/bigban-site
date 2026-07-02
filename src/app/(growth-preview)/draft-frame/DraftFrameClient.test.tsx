@@ -1,7 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PREVIEW_MESSAGE_TYPE } from "@/lib/growth/draftPreview";
+import {
+  DRAFT_READY_MESSAGE_TYPE,
+  PREVIEW_MESSAGE_TYPE,
+} from "@/lib/growth/draftPreview";
 
 import { DraftFrameClient } from "./DraftFrameClient";
 
@@ -10,9 +13,22 @@ function dispatchMessage(data: unknown, origin: string): void {
 }
 
 describe("DraftFrameClient", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("初期表示は空(本文がありません)", () => {
     render(<DraftFrameClient />);
     expect(screen.getByText("本文がありません。")).toBeInTheDocument();
+  });
+
+  it("マウント時に親へ ready(handshake)を送る", () => {
+    const postSpy = vi.spyOn(window.parent, "postMessage");
+    render(<DraftFrameClient />);
+    expect(postSpy).toHaveBeenCalledWith(
+      { type: DRAFT_READY_MESSAGE_TYPE },
+      window.location.origin,
+    );
   });
 
   it("自オリジンからの正規メッセージを本番スタイルで描画する", async () => {
