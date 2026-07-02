@@ -97,6 +97,11 @@ export function useConsult({
   }
 
   function openDrawer(): void {
+    // proto の openConsult("revise") と同じく、開くたびにモードを段階の先頭へ戻す。
+    // これをしないと、前回「この文を直す」(sentence)を選んで閉じた mode が残り、次に
+    // フッター「AIに相談」で開いた瞬間に本文注釈 UI が前面に出てプレビュー等のタブが
+    // 隠れてしまう(F6 のユーザー報告バグ)。段階の先頭 = draft:"overall" / outline:"revise"。
+    setMode(STAGE_KINDS[stage][0]);
     setOpen(true);
   }
 

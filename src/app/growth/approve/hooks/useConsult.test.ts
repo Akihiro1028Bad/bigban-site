@@ -218,6 +218,53 @@ describe("useConsult: openDrawer/closeDrawer", () => {
   });
 });
 
+describe("useConsult: openDrawer はモードを段階の先頭へ戻す(F6・本文注釈の焼き付き防止)", () => {
+  // ── F6 バグ回帰固定 ──────────────────────────────────────────────────────
+  // 「下書き ready 記事でプレビュー表示中に AIに相談 → プレビューが本文インライン
+  //  コメント UI(sentence)に化ける」の根因は、前回 sentence を選んで閉じた mode が
+  //  残ったまま次の openDrawer で焼き付くこと。openDrawer が段階先頭(draft:"overall")へ
+  //  戻すことを実証する。ApproveClient 側の consultSentenceMode は mode==="sentence"
+  //  で判定するため、mode が overall に戻れば本文注釈 UI は前面に出ない。
+  const DRAFT_WITH_SENTENCE: DraftPreview = {
+    ...DRAFT_BASE,
+    bodyComment: { status: "依頼中", comments: [], proposal: [], raw: "" },
+  };
+
+  it("draft 段階: sentence を選んで閉じた後 openDrawer すると mode が overall へ戻る", () => {
+    const { result } = renderUseConsult({ draft: DRAFT_WITH_SENTENCE });
+
+    // 1) 相談を開き「この文を直す」(sentence)へ切り替える → 本文注釈 UI が前面に出る条件。
+    act(() => result.current.openDrawer());
+    act(() => result.current.setMode("sentence"));
+    expect(result.current.mode).toBe("sentence");
+
+    // 2) 閉じる。mode は sentence のまま残る(従来はここで焼き付いていた)。
+    act(() => result.current.closeDrawer());
+    expect(result.current.open).toBe(false);
+
+    // 3) 再度「AIに相談」で開く → mode が段階先頭 overall へ戻り、本文注釈 UI は出ない。
+    act(() => result.current.openDrawer());
+    expect(result.current.open).toBe(true);
+    expect(result.current.mode).toBe("overall");
+  });
+
+  it("outline 段階: openDrawer で mode は段階先頭 revise になる", () => {
+    const { result } = renderUseConsult({ item: ITEM_WITH_REVISE, draft: null });
+    act(() => result.current.openDrawer());
+    expect(result.current.mode).toBe("revise");
+  });
+
+  it("sentence を選んだまま同一ドロワーを閉じずに setMode すれば sentence を維持する(明示切替は尊重)", () => {
+    // 明示的に sentence を選ぶ操作は openDrawer を挟まない限り尊重されること
+    // (openDrawer のリセットが setMode 由来の切替まで潰さないことの確認)。
+    const { result } = renderUseConsult({ draft: DRAFT_WITH_SENTENCE });
+    act(() => result.current.openDrawer());
+    act(() => result.current.setMode("sentence"));
+    expect(result.current.mode).toBe("sentence");
+    expect(result.current.views.every((v) => v.kind === "sentence")).toBe(true);
+  });
+});
+
 describe("useConsult: 記事切替(item.id 変化)での state リセット", () => {
   it("item.id 変化で open が閉じ mode が既定へ戻る(相談ドロワーを持ち越さない)", () => {
     const ITEM_A: PendingItem = { ...BASE_ITEM, id: "page-A" };
