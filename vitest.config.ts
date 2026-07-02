@@ -124,6 +124,11 @@ export default defineConfig({
         "src/app/growth/approve/ProposalView.tsx",
         "src/app/growth/approve/ProposalDetailBody.tsx",
         "src/app/growth/approve/ProposalFormModal.tsx",
+        // #proto P5b(Task 4): 公開予約ピッカーの proto プレゼンテーション。承認画面が render する
+        // 薄い見た目レイヤ(モーダル/フォーカストラップ/datetime-local の入力→atMs 薄結線)。
+        // 日時ロジック(プリセット schedulePresets・表示 formatSchedule)は publishQueueView で
+        // 100% テスト済み。結線挙動は T5(PublishQueue)以降の ApproveClient.test.tsx で検証する。
+        "src/app/growth/approve/SchedulePicker.tsx",
       ],
       thresholds: {
         statements: 100,
