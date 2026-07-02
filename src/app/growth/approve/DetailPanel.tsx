@@ -444,6 +444,10 @@ export function DetailPanel({
               )}
               {safeTab === "prompt" && <PromptView prompt={prompt} refs={refs} />}
               {safeTab === "preview" && (
+                // 縮約: 既存 excerpt(メタディスクリプション)は /api/growth/draft が返さないため
+                // MetaEditor へ metaDescription をプリフィルできない(常に空から編集開始)。
+                // DraftPreview 型・route.ts に excerpt 相当のフィールドが無く、BE 変更はしない方針のため
+                // ここでは metaDescription を渡さない(F1 事実確認済み・2026-07-02)。
                 <PreviewView
                   stage={stage}
                   draftState={draftState}

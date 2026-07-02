@@ -19,7 +19,8 @@ function article(over: Partial<PendingItem> & { id: string; title: string }): Pe
 const fetchMock = vi.fn();
 
 beforeEach(() => {
-  fetchMock.mockReset().mockResolvedValue({ ok: true });
+  // post() は res.json() を読み success:false を失敗扱いにする(防御的整合)。既定は成功エンベロープ。
+  fetchMock.mockReset().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -198,13 +199,37 @@ describe("PublishQueue", () => {
   });
 
   it("失敗時はエラーを表示しつつ、盤は再取得する(部分公開の反映)", async () => {
-    fetchMock.mockResolvedValue({ ok: false, status: 502 });
+    fetchMock.mockResolvedValue({ ok: false, status: 502, json: async () => ({ success: false, error: "publish failed" }) });
     const onChanged = vi.fn();
     render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
     await waitFor(() => expect(screen.getByText(/処理中にエラーが発生しました/)).toBeInTheDocument());
     // 一括公開が途中失敗しても、既に公開済みの分を盤へ反映するため onChanged は呼ぶ。
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("本文が空/非JSONでも例外にせず success 扱いにする(catch 経路)", async () => {
+    // res.json() が reject(空ボディ/非JSON相当)しても post() は catch で {} に握り、
+    // res.ok=true のため成功扱い。onChanged が呼ばれる。
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => Promise.reject(new Error("empty")) });
+    const onChanged = vi.fn();
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(screen.queryByText(/処理中にエラーが発生しました/)).not.toBeInTheDocument();
+  });
+
+  it("HTTP 200 でも success:false なら失敗扱いにする(防御的整合)", async () => {
+    // res.ok は true だが API エンベロープが success:false のケース。post() が例外にし、
+    // run() がエラー表示へ落とす。他の呼び出し(api.ts postDecision 等)と挙動を揃える。
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: false }) });
+    const onChanged = vi.fn();
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    await waitFor(() => expect(screen.getByText(/処理中にエラーが発生しました/)).toBeInTheDocument());
     expect(onChanged).toHaveBeenCalled();
   });
 

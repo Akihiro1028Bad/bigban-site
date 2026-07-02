@@ -61,7 +61,10 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
       headers: authHeaders(token, { "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(String(res.status));
+    // 他の呼び出し(api.ts postDecision 等)と揃え、HTTP 200 でも success:false は失敗扱いにする
+    // (防御的整合)。本文が空/非JSONでも例外にしないよう catch で握る。
+    const json = (await res.json().catch(() => ({}))) as { success?: boolean };
+    if (!res.ok || json.success === false) throw new Error(String(res.status));
   }
 
   async function run(task: () => Promise<void>): Promise<void> {
