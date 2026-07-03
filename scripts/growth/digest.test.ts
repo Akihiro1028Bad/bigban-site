@@ -103,6 +103,23 @@ describe("buildDigestMessage", () => {
   });
 });
 
+describe("buildDigestMessage の実行 SHA(#219)", () => {
+  it("sha があれば末尾にスキュー確認用の実行 SHA を載せる", () => {
+    const msg = buildDigestMessage(baseInput({ sha: "a1b2c3d" }));
+    expect(msg).toContain("実行 SHA: a1b2c3d");
+  });
+
+  it("sha 未指定なら SHA 行を出さない", () => {
+    const msg = buildDigestMessage(baseInput());
+    expect(msg).not.toContain("実行 SHA");
+  });
+
+  it("sha が空文字なら SHA 行を出さない(取得失敗時に余計な行を足さない)", () => {
+    const msg = buildDigestMessage(baseInput({ sha: "  " }));
+    expect(msg).not.toContain("実行 SHA");
+  });
+});
+
 describe("buildFailureMessage", () => {
   it("自動実行の失敗とログの場所を伝える", () => {
     const msg = buildFailureMessage("data/weekly-cron.log");

@@ -12,7 +12,7 @@
  * Windows の claude.cmd 起動でも安定させるため)。
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   readFileSync,
   writeFileSync,
@@ -220,6 +220,76 @@ function runNpm(scriptName, env = {}) {
   });
 }
 
+/** 現在の HEAD 短縮 SHA。取得失敗時は空文字(通知側で「取得できませんでした」を出す)。 */
+function currentShortSha() {
+  const res = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" });
+  return res.status === 0 ? (res.stdout || "").trim() : "";
+}
+
+/** 現在のブランチ名。detached など取得できない場合は "HEAD"。 */
+function currentBranch() {
+  const res = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
+  const name = res.status === 0 ? (res.stdout || "").trim() : "";
+  return name || "HEAD";
+}
+
+/** この工程を再開するためのコマンド(mode → npm script)。loop 系は *-loop に対応付ける。 */
+const RESUME_COMMANDS = {
+  weekly: "npm run growth:weekly",
+  drafts: "npm run growth:drafts",
+  initiatives: "npm run growth:initiatives",
+  revise: "npm run growth:revise-loop",
+  regen: "npm run growth:regen-loop",
+  "regen-body": "npm run growth:regen-body-loop",
+  advise: "npm run growth:advise-loop",
+  decorate: "npm run growth:decorate-loop",
+  apply: "npm run growth:advise-apply-loop",
+  "comment-revise": "npm run growth:comment-revise-loop",
+};
+
+/**
+ * 実行前に最新を取り込む(#219 / P1⑤): git fetch → git pull --ff-only(現在ブランチ)。
+ * 失敗(非 ff・conflict・ネットワーク断)は工程を中断し、工程名・再開コマンド・原因を
+ * LINE 通知して exit≠0 で抜ける(旧版のまま走り続けるのを防ぐ・沈黙させない)。
+ * GROWTH_DRYRUN / GROWTH_SKIP_PULL 指定時は no-op(動作確認を壊さない)。push/commit の DISALLOW は不変。
+ */
+function pullLatestOrAbort() {
+  // ⚠️ この skip 判定と exit-code 成否判定は gitPull.ts(PULL_SKIP_ENV_VARS /
+  // shouldSkipPull / classifyPullResult)のミラー実装(run.mjs は .ts を import 不可)。
+  // env 名や判定を変更する時は gitPull.ts と両方を必ず同時に更新すること。
+  if (process.env.GROWTH_DRYRUN || process.env.GROWTH_SKIP_PULL) return;
+  const branch = currentBranch();
+  // fetch は best-effort(オフラインでも pull --ff-only 側で確実に失敗を拾う)。
+  spawnSync("git", ["fetch", "--quiet"], { stdio: ["ignore", "inherit", "inherit"] });
+  const pull = spawnSync("git", ["pull", "--ff-only"], { encoding: "utf-8" });
+  const detail = `${pull.stdout ?? ""}${pull.stderr ?? ""}`.trim().split("\n").slice(-3).join(" ");
+  if ((pull.status ?? 1) !== 0) {
+    const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
+    process.stderr.write(
+      `git pull --ff-only に失敗しました(${mode})。工程を中断します。再開: ${resumeCommand}\n`
+    );
+    // 失敗を沈黙させない: LINE へ通知する(本文は gitPull.ts、送信は notify-pull-fail CLI)。
+    spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-pull-fail"], {
+      stdio: ["ignore", "inherit", "inherit"],
+      shell: isWin,
+      env: {
+        ...process.env,
+        GROWTH_PULL_MODE: mode,
+        GROWTH_PULL_BRANCH: branch,
+        GROWTH_PULL_RESUME: resumeCommand,
+        GROWTH_PULL_DETAIL: detail,
+      },
+    });
+    process.exit(1);
+  }
+}
+
+// 各モードは最新を取り込んでから起動する(dry-run/skip は no-op・失敗時はここで中断)。
+pullLatestOrAbort();
+
+// pull 後の実行 SHA(週次通知に載せてデプロイ側とのスキュー確認を可能にする=#219)。
+const runSha = currentShortSha();
+
 // revise は高頻度起動。多重起動を lockfile で防ぎ、1日上限で暴走を止める(dry-run後・spawn前)。
 if (cfg.lock) {
   if (!acquireReviseLock()) {
@@ -231,6 +301,27 @@ if (cfg.lock) {
     process.stdout.write(`${mode}: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
     process.exit(0);
   }
+}
+
+/**
+ * loop/実行モードの失敗を LINE 通知する(#220 / P1⑥)。weekly は独自の notify-line 経路を持つため対象外。
+ * 送信は notify-loop-fail CLI(本文は loopFailure.ts)。spawnSync で確実に完了させてから exit する。
+ */
+function notifyLoopFail(kind, { exitCode, detail } = {}) {
+  if (mode === "weekly") return; // weekly は notify-line 側で通知済み
+  const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
+  spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-loop-fail"], {
+    stdio: ["ignore", "inherit", "inherit"],
+    shell: isWin,
+    env: {
+      ...process.env,
+      GROWTH_LOOP_MODE: mode,
+      GROWTH_LOOP_RESUME: resumeCommand,
+      GROWTH_LOOP_KIND: kind,
+      ...(exitCode !== undefined ? { GROWTH_LOOP_EXIT: String(exitCode) } : {}),
+      ...(detail ? { GROWTH_LOOP_DETAIL: detail } : {}),
+    },
+  });
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
@@ -249,16 +340,29 @@ child.on("exit", async (code) => {
   if (mode === "weekly") {
     const env =
       exitCode === 0
-        ? {}
+        ? { GROWTH_RUN_SHA: runSha }
         : { GROWTH_NOTIFY_ERROR: "1", GROWTH_WEEKLY_EXIT_CODE: String(exitCode) };
     const notifyCode = await runNpm("growth:notify-line", env);
     // 異常終了時は元の失敗を握り潰さないよう、weekly の終了コードを優先する。
     process.exit(exitCode !== 0 ? exitCode : notifyCode);
+  }
+  // loop/実行モードの非0 exit も沈黙させない(#220): reap/next が回らない障害を LINE 通知。
+  if (exitCode !== 0) {
+    notifyLoopFail("nonzero-exit", { exitCode });
   }
   process.exit(exitCode);
 });
 child.on("error", (err) => {
   if (cfg.lock) releaseReviseLock();
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
+  // claude 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
+  if (mode === "weekly") {
+    runNpm("growth:notify-line", {
+      GROWTH_NOTIFY_ERROR: "1",
+      GROWTH_WEEKLY_EXIT_CODE: "1",
+    }).finally(() => process.exit(1));
+    return;
+  }
+  notifyLoopFail("spawn-error", { detail: err.message });
   process.exit(1);
 });

@@ -118,6 +118,8 @@ async function main(): Promise<void> {
     reportUrl,
     approveUrl,
     warnings: tokenWarnings(),
+    // 実行時 SHA(#219): run.mjs が pull 後に渡す。デプロイ側 SHA とのスキュー確認用。
+    sha: process.env.GROWTH_RUN_SHA,
   };
   // テキストは Flex 非対応環境向けの altText(フォールバック)として活用する。
   const altText = buildDigestMessage(digestInput);

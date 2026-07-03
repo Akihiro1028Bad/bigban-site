@@ -29,6 +29,8 @@ export interface DigestInput {
   approveUrl: string | null;
   /** 先頭に表示する警告行(トークン失効間近など)。省略可。 */
   warnings?: string[];
+  /** 実行時の短縮 SHA(#219)。デプロイ側 SHA とのスキュー確認用。空/未指定なら非表示。 */
+  sha?: string;
 }
 
 const MAX_TOP_ACTIONS = 3;
@@ -83,6 +85,9 @@ export function buildDigestMessage(input: DigestInput): string {
   lines.push("", `承認待ち ${input.pendingCount}件`);
   if (input.reportUrl) lines.push(`レポートを見る → ${input.reportUrl}`);
   if (input.approveUrl) lines.push(`承認する → ${input.approveUrl}`);
+
+  const sha = input.sha?.trim();
+  if (sha) lines.push("", `実行 SHA: ${sha}`);
 
   return lines.join("\n");
 }

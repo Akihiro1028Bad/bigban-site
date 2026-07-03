@@ -127,6 +127,18 @@ OAuth 同意画面のステータスが **「テスト」のままだと、付�
 
 ## 6. 毎週木曜の朝に自動実行(タスクスケジューラ)
 
+> **実行前 git pull は run.mjs に一本化済み(#219 / P1⑤)**。`npm run growth:*`(weekly / drafts / *-loop)は
+> 起動時に自動で `git fetch` + `git pull --ff-only`(現在ブランチ)を行うため、**`.bat` に pull を書く必要はない**。
+> pull に失敗(非 ff・conflict・ネットワーク断)した場合は「旧版のまま走り続ける」のを防ぐため工程を中断し、
+> 工程名・再開コマンドを出力して LINE 通知する。動作確認(`GROWTH_DRYRUN=1`)や明示 opt-out(`GROWTH_SKIP_PULL=1`)では
+> pull を skip する。成功時は週次通知に実行 SHA を載せ、承認画面(Vercel デプロイ)側 SHA とのスキュー確認ができる。
+> push / commit は引き続き headless からは不可(DISALLOW 維持)。
+>
+> **設計判断**: pull 前置は **run.mjs 経由の生成モードのみ**(weekly / drafts / initiatives / *-loop)。
+> tsx 直呼びの消費 CLI(`growth:publish-due` / `growth:metrics` / `growth:review-due` / `growth:stall-check` 等)は
+> 対象外とする(ロジック skew は許容・必要なら手動 pull)。生成モードが数時間おきに pull するため実質的な
+> 鮮度は保たれ、消費 CLI にまで pull を入れると 5〜15分間隔の cron が git 操作を高頻度で叩き合うため。
+
 ### 6-1. 起動用バッチを作成
 
 `scripts\growth\run-weekly.bat` を作成(PATH 差異に強いよう絶対パス推奨。`<...>` は自分の環境に置換):
@@ -190,6 +202,36 @@ call npm run growth:revise-loop >> "%USERPROFILE%\dev\bigban\data\revise-cron.lo
 
 承認画面で構成案にコメント→「修正を依頼」した後、`growth-revise` を「実行する」。
 `data\revise-cron.log` を確認し、Notion の当該行が「提示中」になり、LINE に修正案の通知が届けば成功。
+
+---
+
+## 6.6. 滞留検知(15分間隔・#220-3/#220-4)
+
+drafts は行ごとの依頼時刻を持たないため、`生成中`/`生成待ち`のまま自宅PCが落ちても reaper が回収できず無期限に
+wedge する。これを **cron 側の滞留通知**で沈黙させない。`git pull`/`失敗を沈黙させない` と同じ思想。
+
+- **生成待ち/生成中の滞留(#220-3)**: Notion 最終更新時刻から15分超のまま止まっている記事を検知して LINE 通知(reaper で
+  失敗化はしない=次回 drafts が冪等に拾い直すため)。
+- **wedge 行(#220-4)**: 構成案修正が `処理中`/`依頼中` なのに依頼時刻が無く、時間で reap できない行を検知して通知。
+
+### 6.6-1. 起動バッチ
+
+`scripts\growth\run-stall-check.bat` を作成:
+
+```bat
+@echo off
+cd /d "%USERPROFILE%\dev\bigban"
+call npm run growth:stall-check >> "%USERPROFILE%\dev\bigban\data\stall-check-cron.log" 2>&1
+```
+
+### 6.6-2. タスク登録
+
+1. 「タスク スケジューラ」→「タスクの作成」。名前=`growth-stall-check`。
+2. **トリガー**: 新規 →「1回」開始 → **詳細設定で「繰り返し間隔=15分」「継続時間=無期限」**。
+3. **操作**: `scripts\growth\run-stall-check.bat` のフルパス。
+4. **設定**: 「既に実行中の場合は新しいインスタンスを開始しない」。
+
+> 滞留・wedge が無ければ即終了(空振り)。動作確認は `GROWTH_DRYRUN=1 npm run growth:stall-check` で送信せず対象だけ表示。
 
 ---
 
