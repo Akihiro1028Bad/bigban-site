@@ -1,7 +1,25 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { growthEndpoint } from "@/lib/growth/endpoint";
+import { growthArticleSegment, growthEndpoint } from "@/lib/growth/endpoint";
+
+describe("growthArticleSegment", () => {
+  it("env 未設定なら news(現行互換)", () => {
+    expect(growthArticleSegment({})).toBe("news");
+  });
+
+  it("endpoint=columns なら columns セグメント", () => {
+    expect(
+      growthArticleSegment({ GROWTH_MICROCMS_ENDPOINT: "columns" }),
+    ).toBe("columns");
+  });
+
+  it("未知 endpoint は news にフォールバック(URL 破損を避ける)", () => {
+    expect(
+      growthArticleSegment({ GROWTH_MICROCMS_ENDPOINT: "blog" }),
+    ).toBe("news");
+  });
+});
 
 describe("growthEndpoint", () => {
   it("env 未設定なら news(現行互換)にフォールバックする", () => {

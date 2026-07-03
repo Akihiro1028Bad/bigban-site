@@ -35,11 +35,19 @@ function row(
 }
 
 describe("articlePagePath", () => {
-  it("ja は /news/{slug}", () => {
-    expect(articlePagePath("spring-open", "ja")).toBe("/news/spring-open");
+  it("ja は /news/{slug}(env 未設定=現行互換)", () => {
+    expect(articlePagePath("spring-open", "ja", {})).toBe("/news/spring-open");
   });
   it("ja 以外(en)は /en/news/{slug}", () => {
-    expect(articlePagePath("spring-open", "en")).toBe("/en/news/spring-open");
+    expect(articlePagePath("spring-open", "en", {})).toBe("/en/news/spring-open");
+  });
+  it("endpoint=columns なら /columns/{slug}", () => {
+    expect(
+      articlePagePath("spring-open", "ja", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+    ).toBe("/columns/spring-open");
+    expect(
+      articlePagePath("spring-open", "en", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+    ).toBe("/en/columns/spring-open");
   });
 });
 

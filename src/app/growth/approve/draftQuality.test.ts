@@ -122,6 +122,15 @@ describe("findBrokenInternalLinks", () => {
       '<a href="/ja/about">施設</a>';
     expect(findBrokenInternalLinks(html, known)).toEqual(["/ja/news/missing"]);
   });
+  it("columns 記事リンクも検査対象(#columns: 公開先が columns の場合)", () => {
+    const knownCols = new Set(["/ja/columns/exists"]);
+    const html =
+      '<a href="/ja/columns/exists">ok</a>' +
+      '<a href="/ja/columns/missing">壊れ</a>';
+    expect(findBrokenInternalLinks(html, knownCols)).toEqual([
+      "/ja/columns/missing",
+    ]);
+  });
 });
 
 describe("draftQuality: 内部リンク先(#H19)", () => {

@@ -16,8 +16,11 @@ vi.mock("@/config/featureFlags", () => ({
 
 // #H19: 公開記事 slug 取得をモック(壊れ内部リンク検査の既知集合)。
 vi.mock("@/lib/microcms/queries", () => ({ getNewsSlugs: vi.fn() }));
+// #columns: 公開先が columns のときは columns の slug を見る。
+vi.mock("@/lib/microcms/columnsQueries", () => ({ getColumnSlugs: vi.fn() }));
 
 import { getPage } from "@/lib/growth/notion";
+import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 import { GET } from "./route";
 
@@ -54,11 +57,15 @@ beforeEach(() => {
   vi.mocked(getPage).mockReset();
   vi.mocked(getNewsSlugs).mockReset();
   vi.mocked(getNewsSlugs).mockResolvedValue([]);
+  vi.mocked(getColumnSlugs).mockReset();
+  vi.mocked(getColumnSlugs).mockResolvedValue([]);
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 afterEach(() => {
   delete process.env.NOTION_TOKEN;
   delete process.env.APPROVE_SECRET;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 describe("GET /api/growth/draft", () => {
@@ -97,6 +104,21 @@ describe("GET /api/growth/draft", () => {
       draft: { knownNewsPaths: string[] };
     };
     expect(json.draft.knownNewsPaths).toEqual(["/ja/news/a"]);
+    expect(getColumnSlugs).not.toHaveBeenCalled();
+  });
+
+  it("#columns: 公開先が columns なら columns の slug を /ja/columns/<slug> にする", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
+    vi.mocked(getColumnSlugs).mockResolvedValue([
+      { locale: "ja", slug: "guide" },
+      { locale: "en", slug: "guide-en" },
+    ]);
+    const json = (await (await GET(getRequest(null, PAGE_ID))).json()) as {
+      draft: { knownNewsPaths: string[] };
+    };
+    expect(json.draft.knownNewsPaths).toEqual(["/ja/columns/guide"]);
+    expect(getNewsSlugs).not.toHaveBeenCalled();
   });
 
   it("#H19: slug 取得に失敗しても本文は返し knownNewsPaths は undefined(検査スキップ)", async () => {
