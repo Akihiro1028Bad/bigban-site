@@ -254,6 +254,9 @@ const RESUME_COMMANDS = {
  * GROWTH_DRYRUN / GROWTH_SKIP_PULL 指定時は no-op(動作確認を壊さない)。push/commit の DISALLOW は不変。
  */
 function pullLatestOrAbort() {
+  // ⚠️ この skip 判定と exit-code 成否判定は gitPull.ts(PULL_SKIP_ENV_VARS /
+  // shouldSkipPull / classifyPullResult)のミラー実装(run.mjs は .ts を import 不可)。
+  // env 名や判定を変更する時は gitPull.ts と両方を必ず同時に更新すること。
   if (process.env.GROWTH_DRYRUN || process.env.GROWTH_SKIP_PULL) return;
   const branch = currentBranch();
   // fetch は best-effort(オフラインでも pull --ff-only 側で確実に失敗を拾う)。

@@ -6,8 +6,9 @@
  *
  * drafts は行ごとの依頼時刻を持たないため reaper で失敗化はしない(次回 drafts が冪等に拾い直す)。
  * ここは Notion の最終更新時刻を時計にして「止まっている」ことだけを検知し、沈黙させない=通知する。
- * pull 型ループの wedge(依頼時刻なしで時間 reap 不能)も同じ巡回で拾う。
- * 抽出の純ロジックは staleJob.ts、本文は stallNotify.ts でテスト済み。薄い I/O 配線のため対象外。
+ * pull 型ループの wedge(依頼時刻なしで時間 reap 不能)は WEDGE_LOOPS(全7ループの正典レジストリ)を
+ * 回して横断的に拾う(revise 限定にしない=レビュー MEDIUM-2)。
+ * 抽出の純ロジックは staleJob.ts / wedgeLoops.ts、本文は stallNotify.ts でテスト済み。薄い I/O 配線のため対象外。
  */
 
 import "dotenv/config";
@@ -15,7 +16,6 @@ import "dotenv/config";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { queryDataSource, type NotionApiOptions, type NotionPage } from "./notion";
-import { REVISE_PROPS } from "./revise";
 import { buildStallMessage } from "./stallNotify";
 import {
   selectStalledGeneratingIds,
@@ -23,6 +23,7 @@ import {
   type GeneratingRow,
   type StaleJobRow,
 } from "./staleJob";
+import { formatWedgeTitle, WEDGE_LOOPS } from "./wedgeLoops";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -89,16 +90,20 @@ async function main(): Promise<void> {
   }));
   const stalledIds = selectStalledGeneratingIds(generatingRows, Date.now(), STALL_TIMEOUT_MS);
 
-  // #220-4: 構成案修正が busy なのに依頼時刻が無く時間 reap できない wedge 行。
-  const reviseRows: (StaleJobRow & { id: string })[] = pages.map((p) => ({
-    id: p.id,
-    status: selectOf(p, REVISE_PROPS.status),
-    requestedAtMs: dateMsOf(p, REVISE_PROPS.requestedAt),
-  }));
-  const wedgeIds = selectWedgeJobIds(reviseRows);
+  // #220-4: 全 pull 型ループを横断し、busy なのに依頼時刻が無く時間 reap できない wedge 行を拾う。
+  const wedgeTitles: string[] = [];
+  for (const loop of WEDGE_LOOPS) {
+    const rows: (StaleJobRow & { id: string })[] = pages.map((p) => ({
+      id: p.id,
+      status: selectOf(p, loop.statusProp),
+      requestedAtMs: dateMsOf(p, loop.requestedAtProp),
+    }));
+    for (const id of selectWedgeJobIds(rows)) {
+      wedgeTitles.push(formatWedgeTitle(titleOf(byId.get(id) as NotionPage), loop.label));
+    }
+  }
 
   const generatingTitles = stalledIds.map((id) => titleOf(byId.get(id) as NotionPage));
-  const wedgeTitles = wedgeIds.map((id) => titleOf(byId.get(id) as NotionPage));
 
   const message = buildStallMessage({
     generatingTitles,

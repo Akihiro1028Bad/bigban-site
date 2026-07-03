@@ -1,11 +1,23 @@
+/**
+ * ⚠️ このテストが守る skip/成否判定は run.mjs の `pullLatestOrAbort()` のミラーである
+ * (run.mjs は .ts を import できないための二重実装)。乖離させないこと:
+ * gitPull.ts(特に PULL_SKIP_ENV_VARS)を変更したら run.mjs 側も必ず同時に更新する。
+ */
 import { describe, expect, it } from "vitest";
 
 import {
   buildPullFailureMessage,
   classifyPullResult,
   formatShaLine,
+  PULL_SKIP_ENV_VARS,
   shouldSkipPull,
 } from "./gitPull";
+
+describe("PULL_SKIP_ENV_VARS(run.mjs とのミラー正典)", () => {
+  it("skip 判定に使う env 名を正典として公開する(変更時は run.mjs も更新)", () => {
+    expect(PULL_SKIP_ENV_VARS).toEqual(["GROWTH_DRYRUN", "GROWTH_SKIP_PULL"]);
+  });
+});
 
 describe("shouldSkipPull", () => {
   it("GROWTH_DRYRUN 指定時は pull を skip する(動作確認を壊さない)", () => {
