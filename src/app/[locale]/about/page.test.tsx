@@ -21,6 +21,7 @@ vi.mock("@/lib/structured-data", () => ({
 const isCmsNewsEnabledMock = vi.fn(() => false);
 vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: () => isCmsNewsEnabledMock(),
+  isCmsColumnsEnabled: () => false,
 }));
 const getNewsListMock = vi.fn().mockResolvedValue({
   contents: [],

@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 
 import StructuredData from "@/components/StructuredData";
-import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
 import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
@@ -83,7 +83,11 @@ export default async function AboutPage({ params }: AboutPageProps) {
       <StructuredData
         data={buildBreadcrumb(locale, [{ name: "About", path: "/about" }])}
       />
-      <AboutContent newsItems={newsItems} locale={locale} />
+      <AboutContent
+        newsItems={newsItems}
+        locale={locale}
+        showColumns={isCmsColumnsEnabled()}
+      />
     </>
   );
 }

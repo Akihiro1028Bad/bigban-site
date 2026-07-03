@@ -146,7 +146,7 @@ export default async function ColumnDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
           <Link

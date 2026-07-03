@@ -29,12 +29,19 @@ const HREF_MAP: Readonly<Record<string, string>> = {
   website: "https://rstagency.com",
 };
 
-export default function TokushohoContent() {
+interface TokushohoContentProps {
+  /** COLUMN ナビリンク表示フラグ(server で isCmsColumnsEnabled() を渡す)。既定 false。 */
+  showColumns?: boolean;
+}
+
+export default function TokushohoContent({
+  showColumns = false,
+}: TokushohoContentProps = {}) {
   const t = useTranslations("Tokushoho");
 
   return (
     <>
-      <HomeNavigation />
+      <HomeNavigation showColumns={showColumns} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))]">
         <div className="mx-auto max-w-3xl px-6 lg:px-12 py-16 lg:py-20">
           <h1 className="text-2xl lg:text-3xl font-bold tracking-wide mb-12">

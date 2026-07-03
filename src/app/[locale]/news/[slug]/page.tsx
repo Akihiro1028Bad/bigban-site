@@ -9,7 +9,7 @@ import HomeNavigation from "@/components/home/HomeNavigation";
 import { NewsArticleJsonLd } from "@/components/news/NewsArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
-import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
 import { EXTERNAL_LINK_PROPS, SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
 import {
@@ -157,7 +157,7 @@ export default async function NewsDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <NewsArticleJsonLd item={item} locale={locale} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
