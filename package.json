@@ -39,6 +39,7 @@
     "growth:metrics": "tsx scripts/growth/metrics-cli.ts",
     "growth:publish-due": "tsx scripts/growth/publish-due-cli.ts",
     "growth:review-due": "tsx scripts/growth/review-due-cli.ts",
+    "growth:proposal-review-due": "tsx scripts/growth/proposal-review-due-cli.ts",
     "growth:notify-pull-fail": "tsx scripts/growth/notify-pull-fail-cli.ts",
     "growth:notify-loop-fail": "tsx scripts/growth/notify-loop-fail-cli.ts",
     "growth:stall-check": "tsx scripts/growth/stall-check-cli.ts",
