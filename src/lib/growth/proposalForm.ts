@@ -18,8 +18,12 @@ export const DEFAULT_ARTICLE_CATEGORY = "コンテンツ";
 /** site 種別を写像する既定カテゴリ。 */
 const SITE_CATEGORY = "サイトデザイン";
 
-/** other 種別を写像する既定カテゴリ。 */
-const OTHER_CATEGORY = "コンテンツ";
+/**
+ * other 種別を写像する既定カテゴリ(#214)。
+ * `kindFromCategory("MEO") === "other"` と対称にし、種別の往復(other→MEO→other)を保つ。
+ * 以前は "コンテンツ" で、往復時に article へ戻り other が失われていた。
+ */
+const OTHER_CATEGORY = "MEO";
 
 /** event 種別を写像する既定カテゴリ。 */
 const EVENT_CATEGORY = "イベント";
@@ -54,7 +58,7 @@ function isKnownCategory(value: string): boolean {
  * - article: フォームで選んだ 6値をそのまま。未指定/空/未知は DEFAULT_ARTICLE_CATEGORY。
  * - event : "イベント"
  * - site  : "サイトデザイン"
- * - other : "コンテンツ"
+ * - other : "MEO"(#214・kindFromCategory と往復整合)
  */
 export function categoryForKind(kind: ProposalKind, selected?: string): string {
   switch (kind) {

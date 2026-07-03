@@ -283,10 +283,10 @@ describe("ApproveClient 合言葉画面", () => {
     await screen.findByText("市川ページ");
     // #P5a: 施策 view(ProposalView)は各カードに種別 chip(記事/イベント 等)＋カテゴリ(subtitle)を出す。
     const lane = screen.getByRole("region", { name: "施策レーン" });
-    // subtitle="サイト表示内容" は "イベント" でないため種別は「記事」に派生する。
-    // "記事" は種別フィルタchipにも出るため、カード(タイトルを含む button)内に限定して照合する。
+    // #214: subtitle="サイト表示内容" は実装タスク系のため種別は「サイト」(site)に派生する。
+    // "サイト" は種別フィルタchipにも出るため、カード(タイトルを含む button)内に限定して照合する。
     const card = within(lane).getByText("市川ページ").closest("button") as HTMLElement;
-    expect(within(card).getByText("記事")).toBeInTheDocument();
+    expect(within(card).getByText("サイト")).toBeInTheDocument();
     expect(within(card).getByText("サイト表示内容")).toBeInTheDocument();
     // #213: 記事 view の一覧行は種別ラベル(📝 記事)を撤去し、タイトル+メタに絞った。
     await selectView(/記事/);
@@ -1020,8 +1020,8 @@ describe("ApproveClient 空状態/完了(#236)", () => {
     const lane = screen.getByRole("region", { name: "施策レーン" });
     await userEvent.click(within(lane).getByText("市川ページ"));
     await userEvent.click(await screen.findByRole("button", { name: "承認: 市川ページ" }));
-    // 承認済みフッター(結末=記事生成パイプラインへ送出済み)が出るまで待って状態確定を確認する。
-    await screen.findByText("記事生成パイプラインへ送出済み");
+    // #214: proposalItem の subtitle="サイト表示内容" は site 種別のため結末は「実装タスクとして起票済み」。
+    await screen.findByText("実装タスクとして起票済み");
     expect(screen.queryByText(/すべて処理しました/)).not.toBeInTheDocument();
   });
 });
@@ -1069,8 +1069,8 @@ describe("ApproveClient 施策 master-detail(#275/#P5a)", () => {
     await userEvent.click(within(lane).getByText("市川ページ"));
     await userEvent.click(await screen.findByRole("button", { name: "承認: 市川ページ" }));
 
-    // 承認済みフッター(結末=記事生成パイプラインへ送出済み)へ移る。
-    expect(await screen.findByText("記事生成パイプラインへ送出済み")).toBeInTheDocument();
+    // #214: proposalItem の subtitle="サイト表示内容" は site 種別のため結末は「実装タスクとして起票済み」へ移る。
+    expect(await screen.findByText("実装タスクとして起票済み")).toBeInTheDocument();
     expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({
       decisions: [{ id: "p1", decision: "承認" }],
     });

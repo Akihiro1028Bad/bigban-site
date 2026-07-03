@@ -45,10 +45,28 @@ export function approveOutcomeFor(kind: ProposalKind = "article"): ApproveOutcom
 }
 
 /**
- * 既存 category から種別を決定的に派生(#P5a・実データ橋渡し)。
- * "イベント" → "event"。それ以外の既存カテゴリ(コンテンツ/MEO/サイトデザイン/
- * サイト表示内容/追加機能)→ "article"。未知/空 → "article"(欠落耐性)。
+ * 既存 category(6値)→ 種別を決定的に派生(#214・`categoryForKind` と往復整合)。
+ *
+ * `proposalForm.ts` の `categoryForKind`(種別→カテゴリ)と対称になるよう写像する:
+ * - `コンテンツ` → article(記事化)
+ * - `イベント` → event(開催準備)
+ * - `サイトデザイン`/`サイト表示内容`/`追加機能` → site(実装タスク化)
+ * - `MEO` → other(タスク化)
+ * - 未知/空 → article(欠落耐性)
+ *
+ * 以前は「イベント以外を全て article」に落としており、MEO・サイト系・追加機能の施策が
+ * すべて「記事」種別へ誤分類されていた(#214)。`site`/`other` 種別で作った施策が
+ * 表示時に article へ戻る往復破綻を、この 6→4 写像で解消する。
  */
+const CATEGORY_TO_KIND: Readonly<Record<string, ProposalKind>> = {
+  コンテンツ: "article",
+  イベント: "event",
+  サイトデザイン: "site",
+  サイト表示内容: "site",
+  追加機能: "site",
+  MEO: "other",
+};
+
 export function kindFromCategory(category: string): ProposalKind {
-  return category.trim() === "イベント" ? "event" : "article";
+  return CATEGORY_TO_KIND[category.trim()] ?? "article";
 }

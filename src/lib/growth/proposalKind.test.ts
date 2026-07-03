@@ -1,21 +1,41 @@
 import { describe, expect, it } from "vitest";
 
+import type { ProposalKind } from "@/app/growth/approve/types";
+
+import { categoryForKind } from "./proposalForm";
 import { KIND_META, approveOutcomeFor, kindFromCategory } from "./proposalKind";
 
 describe("kindFromCategory", () => {
+  it("コンテンツは article", () => {
+    expect(kindFromCategory("コンテンツ")).toBe("article");
+  });
   it("イベントは event", () => {
     expect(kindFromCategory("イベント")).toBe("event");
   });
-  it("コンテンツ等の記事系カテゴリは article", () => {
-    expect(kindFromCategory("コンテンツ")).toBe("article");
-    expect(kindFromCategory("MEO")).toBe("article");
-    expect(kindFromCategory("サイトデザイン")).toBe("article");
-    expect(kindFromCategory("サイト表示内容")).toBe("article");
-    expect(kindFromCategory("追加機能")).toBe("article");
+  it("実装タスク系カテゴリ(サイトデザイン/サイト表示内容/追加機能)は site (#214)", () => {
+    expect(kindFromCategory("サイトデザイン")).toBe("site");
+    expect(kindFromCategory("サイト表示内容")).toBe("site");
+    expect(kindFromCategory("追加機能")).toBe("site");
   });
-  it("未知/空は article へフォールバック", () => {
+  it("MEO は other (#214)", () => {
+    expect(kindFromCategory("MEO")).toBe("other");
+  });
+  it("前後の空白を無視して写像する", () => {
+    expect(kindFromCategory("  サイトデザイン  ")).toBe("site");
+    expect(kindFromCategory(" MEO ")).toBe("other");
+  });
+  it("未知/空は article へフォールバック(欠落耐性)", () => {
     expect(kindFromCategory("")).toBe("article");
     expect(kindFromCategory("不明カテゴリ")).toBe("article");
+  });
+});
+
+describe("kindFromCategory × categoryForKind 往復整合(#214)", () => {
+  it("4種別すべてが categoryForKind→kindFromCategory で元の種別に戻る", () => {
+    (["article", "site", "event", "other"] as const).forEach((kind: ProposalKind) => {
+      const category = categoryForKind(kind);
+      expect(kindFromCategory(category)).toBe(kind);
+    });
   });
 });
 
