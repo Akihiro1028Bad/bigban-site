@@ -10,6 +10,9 @@ const messages = {
       youtube: {
         iframeTitle: "YouTube プレイヤー",
       },
+      instagram: {
+        iframeTitle: "Instagram 投稿",
+      },
       fallbackLabel: "外部サイトで開く",
     },
   },

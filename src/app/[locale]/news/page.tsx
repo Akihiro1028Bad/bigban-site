@@ -15,6 +15,9 @@ import {
 } from "@/constants/news";
 import { parseLocale, routing } from "@/i18n/routing";
 import { getNewsList } from "@/lib/microcms/queries";
+import { buildBreadcrumb } from "@/lib/structured-data";
+import StructuredData from "@/components/StructuredData";
+import { SITE_URL, OG_IMAGE } from "@/constants/site";
 
 // searchParams (?category=&page=) は generateStaticParams で静的生成された
 // ロケール別ページと矛盾するため、ページ全体を動的レンダリングに固定する。
@@ -48,15 +51,36 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const title =
-    locale === "ja"
-      ? "ニュース | THE PICKLE BANG THEORY"
-      : "News | THE PICKLE BANG THEORY";
+  const title = locale === "ja" ? "ニュース" : "News";
   const description =
     locale === "ja"
       ? "最新のお知らせ・メディア掲載・イベント情報"
       : "Latest announcements, media coverage, and event information";
-  return { title, description };
+  const canonicalUrl =
+    locale === "ja" ? `${SITE_URL}/news` : `${SITE_URL}/${locale}/news`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      locale: locale === "ja" ? "ja_JP" : "en_US",
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [OG_IMAGE.url],
+    },
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        ja: `${SITE_URL}/news`,
+        en: `${SITE_URL}/en/news`,
+        "x-default": `${SITE_URL}/news`,
+      },
+    },
+  };
 }
 
 export default async function NewsPage({
@@ -98,6 +122,9 @@ export default async function NewsPage({
 
   return (
     <>
+      <StructuredData
+        data={buildBreadcrumb(locale, [{ name: "News", path: "/news" }])}
+      />
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-12 py-8 lg:py-12">

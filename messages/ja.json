@@ -34,7 +34,7 @@
       ]
     },
     "about": {
-      "title": "ABOUT US|THE PICKLE BANG THEORY",
+      "title": "ABOUT US",
       "description": "THE PICKLE BANG THEORYを運営するRST Agency株式会社の会社概要、代表挨拶、選手・スタッフ紹介。",
       "keywords": [
         "西村昭彦",
@@ -58,7 +58,7 @@
       ]
     },
     "tokushoho": {
-      "title": "特定商取引法に基づく表記|THE PICKLE BANG THEORY",
+      "title": "特定商取引法に基づく表記",
       "description": "THE PICKLE BANG THEORYの特定商取引法に基づく表記ページです。",
       "keywords": [
         "特定商取引法",
@@ -79,8 +79,28 @@
         "ティザー"
       ]
     },
+    "reserve": {
+      "title": "予約",
+      "description": "THE PICKLE BANG THEORY のコート予約ページ。ご希望の日時を選んでオンラインでかんたんに予約できます。本八幡駅徒歩1分、6:00–23:00営業。"
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
+    },
+    "hyrox": {
+      "title": "HYROX トレーニングエリア",
+      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアがオープン。",
+      "keywords": [
+        "HYROX",
+        "ハイロックス",
+        "HYROX 市川",
+        "HYROX 本八幡",
+        "HYROX 千葉",
+        "HYROX ジム",
+        "HYROX トレーニング",
+        "HYROX 体験",
+        "ファンクショナルフィットネス",
+        "機能性トレーニング"
+      ]
     }
   },
   "Navigation": {
@@ -93,15 +113,125 @@
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
+    "reserveJa": "予約",
     "contact": "CONTACT",
+    "hyrox": "HYROX",
+    "conceptJa": "コンセプト",
+    "facilityJa": "施設",
+    "servicesJa": "サービス",
+    "hyroxJa": "ハイロックス",
+    "pricingJa": "料金",
+    "newsJa": "ニュース",
+    "columnsJa": "コラム",
+    "aboutJa": "私たちについて",
+    "accessJa": "アクセス",
     "mainNav": "メインナビゲーション",
     "openMenu": "メニューを開く",
-    "closeMenu": "メニューを閉じる"
+    "closeMenu": "メニューを閉じる",
+    "mobileMenuAria": "モバイルメニュー",
+    "menuAccess": "本八幡駅 徒歩1分・24時間利用可",
+    "instagramAria": "THE PICKLE BANG THEORY の Instagram",
+    "followUs": "フォローはこちら"
   },
   "PromoBanner": {
-    "text": "🈹\uFE0F コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
+    "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
     "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します"
+  },
+  "Reserve": {
+    "hero": {
+      "title": "RESERVE",
+      "subtitle": "コート予約"
+    },
+    "choice": {
+      "notice": "現在、予約システムの切り替えを行っております。ご利用になる月によって予約サイトが異なりますので、予約日を基準にお選びください。",
+      "pickleballKicker": "PICKLEBALL COURT",
+      "pickleballHeading": "ピックルボールコート",
+      "julyLabel": "〜7月のご予約",
+      "julyPeriod": "〜2026年7月",
+      "julyDesc": "2026年7月までのご利用分はこちらから。",
+      "julyCta": "7月末までの予約",
+      "augLabel": "8月以降のご予約",
+      "augPeriod": "2026年8月〜",
+      "augDesc": "2026年8月以降のご利用分はこちらから。",
+      "augCta": "8月以降の予約",
+      "hyroxKicker": "HYROX AREA",
+      "hyroxHeading": "HYROXエリア",
+      "hyroxDesc": "HYROXエリアのご予約はこちらから。",
+      "hyroxCta": "HYROXの予約"
+    },
+    "steps": {
+      "heading": "予約の流れ",
+      "headingEn": "HOW TO BOOK",
+      "swipeHint": "← スワイプで確認 →",
+      "goToStep": "ステップ{num}へ",
+      "step01": { "title": "日時を選ぶ", "description": "カレンダーから空き枠を選択します。", "imageAlt": "予約カレンダーで日時を選ぶ操作画面" },
+      "step02": { "title": "予約内容を入力", "description": "予約フォームに従って、予約情報、予約者情報を入力してください。", "imageAlt": "ご予約内容の確認画面" },
+      "step03": { "title": "予約完了（決済）", "description": "お支払い情報を入力して予約を確定します。", "imageAlt": "予約完了の画面" }
+    },
+    "calendar": {
+      "title": "BOOK A COURT",
+      "subtitle": "カレンダーから予約",
+      "iframeTitle": "予約カレンダー",
+      "scrollHint": "上下にスクロールして全時間帯を表示",
+      "tablistLabel": "予約カテゴリ",
+      "tabs": {
+        "pickleball": "ピックルボールコート",
+        "hyrox": "H Y R O X"
+      }
+    },
+    "info": {
+      "heading": "INFORMATION",
+      "hoursLabel": "営業時間",
+      "hoursValue": "6:00 – 23:00（不定休）",
+      "accessLabel": "アクセス",
+      "accessStation": "本八幡駅 徒歩1分",
+      "accessAddress": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階"
+    },
+    "notes": {
+      "heading": "ご利用にあたって",
+      "headingEn": "NOTES",
+      "items": [
+        "ご予約は予約システム上の受付時間に従います。",
+        "キャンセル・変更は予約システムの規定に従います。詳細は予約時にご確認ください。",
+        "開始時刻に遅れた場合も、ご予約枠の時間内でのご利用となります。",
+        "レンタルパドルは1本 ¥500（1コートにつき6本まで）でご利用いただけます。",
+        "レンタルシューズの貸出はございません。"
+      ]
+    },
+    "faq": {
+      "heading": "よくある質問",
+      "items": [
+        {
+          "question": "営業時間は？",
+          "answer": "早朝6:00から深夜23:00まで営業しています。"
+        },
+        {
+          "question": "予約方法を教えてください",
+          "answer": "予約ページからご希望の日時を選び、オンラインでコート・HYROXエリアを予約できます。"
+        },
+        {
+          "question": "コートレンタルの料金は？",
+          "answer": "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。"
+        },
+        {
+          "question": "HYROXエリアは利用できますか？料金は？",
+          "answer": "ご利用いただけます。エリア利用料は1時間 ¥2,980 です。"
+        },
+        {
+          "question": "最寄り駅・アクセスは？",
+          "answer": "本八幡駅から徒歩1分です。"
+        },
+        {
+          "question": "初心者でも大丈夫ですか？",
+          "answer": "はい。初めての方向けの体験・トライアルや少人数制レッスンをご用意し、コーチが基礎から丁寧にご案内します。"
+        },
+        {
+          "question": "支払い方法は？",
+          "answer": "現金・クレジットカードがご利用いただけます。"
+        }
+      ]
+    }
   },
   "HomeHero": {
     "headline1": "ピックルボールの",
@@ -222,11 +352,12 @@
     "weekend": "週末・祝日",
     "trainingArea": "TRAINING AREA",
     "trainingAreaJa": "トレーニングエリア",
-    "preparing": "準備中",
+    "trainingAreaPrice": "¥2,980",
+    "trainingAreaUnit": "1時間あたり",
     "membership": "MEMBERSHIP",
     "membershipJa": "会員制度",
     "comingSoon": "近日公開",
-    "rentalPaddleNote": "イベント利用もしくは貸切のみレンタルパドルあり",
+    "rentalPaddleNote": "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません",
     "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切をご希望、法人利用ご希望の場合は",
     "contactUs": "お問い合わせ",
     "pleaseContact": "ください。",
@@ -493,5 +624,247 @@
       },
       "fallbackLabel": "外部サイトで開く"
     }
+  },
+  "HyroxPage": {
+    "hero": {
+      "title": "HYROX",
+      "titleJa": "ハイロックス",
+      "reserveCta": "今すぐ予約",
+      "imageAlts": [
+        "スレッドプルに挑むアスリート",
+        "HYROX大会会場とウォールボールに挑む選手たち",
+        "HYROXのスタートゲートを駆け抜けるアスリート"
+      ]
+    },
+    "concept": {
+      "words": [
+        "走る。",
+        "鍛える。",
+        "挑戦する。"
+      ],
+      "body": "すべてを出し切るための舞台が、ここにある。世界が熱狂する究極の持久力レース、<accent>HYROX</accent>。その本格トレーニングエリアが、<strong>本八幡</strong>に登場。"
+    },
+    "facility": {
+      "title": "FACILITY",
+      "titleJa": "設備・配置",
+      "lead": "HYROX公式8種目に対応した本格器具を完備。実際のレースと同じ動線で、8つのステーションを巡るようにトレーニングできます。",
+      "equipmentTitle": "設置器具",
+      "officialLabel": "公式",
+      "equipment": {
+        "skierg": {
+          "name": "SkiErg",
+          "nameJa": "スキーエルゴ",
+          "spec": "Concept2 SkiErg"
+        },
+        "rowing": {
+          "name": "Rowing Machine",
+          "nameJa": "ローイングマシン",
+          "spec": "Concept2 RowErg"
+        },
+        "sled": {
+          "name": "Weight Sled",
+          "nameJa": "スレッド",
+          "spec": "プレート負荷調整式・最大202kg（HYROX全クラス対応／オモリは市販プレート）"
+        },
+        "kettlebell": {
+          "name": "Kettlebell",
+          "nameJa": "ケトルベル",
+          "spec": "16 / 24 / 32kg（HYROX全クラス対応）"
+        },
+        "wallball": {
+          "name": "Wall Ball",
+          "nameJa": "ウォールボール",
+          "spec": "メディシンボール 4 / 6 / 9kg（ターゲットは非公式）"
+        },
+        "sandbag": {
+          "name": "Sandbag",
+          "nameJa": "サンドバッグ",
+          "spec": "10–30kg"
+        }
+      },
+      "carousel": {
+        "regionLabel": "施設写真カルーセル",
+        "prev": "前の写真",
+        "next": "次の写真",
+        "showPhoto": "{index}枚目の施設写真を表示"
+      },
+      "photos": [
+        "スキーエルゴとローイングマシンが並ぶHYROXトレーニングエリアの走行レーン",
+        "Concept2 のスキーエルゴとローイングマシンが並ぶHYROX設置器具",
+        "ローイングマシンやウォールボールを備えたHYROXトレーニングエリア全景",
+        "壁沿いにスキーエルゴ・ローイングマシン・そり・ケトルベルが並ぶHYROXトレーニングエリア",
+        "16〜32kgのHYROX仕様コンペティションケトルベル",
+        "CENTRのウォールボール（メディシンボール）一式",
+        "CENTR×HYROXのトレーニングサンドバッグ",
+        "XMASTERプレートを載せたCENTRのHYROX公式スレッド（そり）",
+        "真上から見たCENTRのHYROX公式スレッド"
+      ],
+      "fullSet": "一式"
+    },
+    "services": {
+      "title": "SERVICES",
+      "titleJa": "サービス",
+      "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
+      "reserveCta": "予約する",
+      "items": [
+        {
+          "key": "rental",
+          "titleEn": "AREA RENTAL",
+          "titleJa": "時間制レンタル",
+          "description": "HYROXエリアを時間単位でレンタル。設置器具を使い、自分のペースで自由にトレーニング。早朝6:00から深夜23:00まで利用できます。",
+          "imageAlt": "スレッドプッシュに挑むアスリート"
+        },
+        {
+          "key": "trial",
+          "titleEn": "TRIAL",
+          "titleJa": "体験・トライアル",
+          "description": "初めての方向けの体験セッション。コーチがHYROX8種目の動きを一から丁寧にガイドします。手ぶらでも気軽に参加できます。",
+          "imageAlt": "ウォールボールに取り組むアスリート"
+        },
+        {
+          "key": "group",
+          "titleEn": "GROUP SESSION",
+          "titleJa": "グループセッション",
+          "description": "少人数制のコーチングクラス。各種目のポイントやコツ、レースに向けたアドバイス等、本格メニューに仲間と挑戦。参加者のレベルに合わせた内容となり、初心者の方も安心です。",
+          "imageAlt": "仲間とトレーニングするアスリートたち"
+        }
+      ]
+    },
+    "whatIs": {
+      "title": "WHAT IS HYROX",
+      "titleJa": "ハイロックスとは",
+      "lead": "HYROX（ハイロックス）は、1kmのランニングと1種目のワークアウトを交互に8セット行うフィットネスレースです。合計8kmを走り抜きながら8つのワークアウトをこなす持久力勝負。初心者からトップアスリートまで、誰もが同じ条件でタイムに挑戦できます。"
+    },
+    "film": {
+      "kicker": "OFFICIAL FILM"
+    },
+    "stations": {
+      "station01": {
+        "name": "SkiErg",
+        "nameJa": "スキーエルゴ",
+        "description": "スキーの動きを模したマシンで1,000mを漕ぐ。広背筋と体幹を総動員する、レース最初の関門。"
+      },
+      "station02": {
+        "name": "Sled Push",
+        "nameJa": "スレッドプッシュ",
+        "description": "重いソリを50m押して進む。低い姿勢を保ち、脚と体幹の力で止まらず押し切る。"
+      },
+      "station03": {
+        "name": "Sled Pull",
+        "nameJa": "スレッドプル",
+        "description": "ロープを手繰り、ソリを50m引き寄せる。足を広く構え、背中と腕の力で一気に引き切る。"
+      },
+      "station04": {
+        "name": "Burpee Broad Jumps",
+        "nameJa": "バーピーブロードジャンプ",
+        "description": "バーピーと立ち幅跳びを繰り返し、80m進む。一定のリズムを保てるかが攻略のカギ。"
+      },
+      "station05": {
+        "name": "Rowing",
+        "nameJa": "ローイング",
+        "description": "ローイングマシンで1,000mを漕ぐ。脚から背中、腕へと力を伝え、力強いストロークで漕ぎ切る。"
+      },
+      "station06": {
+        "name": "Farmers Carry",
+        "nameJa": "ファーマーズキャリー",
+        "description": "両手に重りを持ち、200mを歩く。胸を張った姿勢のまま、握力と体幹の持久力で運び切る。"
+      },
+      "station07": {
+        "name": "Sandbag Lunges",
+        "nameJa": "サンドバッグランジ",
+        "description": "サンドバッグを担ぎ、ランジで100m進む。脚への負担が最も大きい、レース後半の難所。"
+      },
+      "station08": {
+        "name": "Wall Balls",
+        "nameJa": "ウォールボール",
+        "description": "メディシンボールを、スクワットの勢いで壁の的へ100回投げる。レースを締めくくる最後の種目。"
+      }
+    },
+    "program": {
+      "title": "PROGRAM",
+      "titleJa": "プログラム・料金",
+      "rateLabel": "エリア利用料",
+      "duration": "90分",
+      "weekday": "平日",
+      "weekdayPrice": "¥3,500",
+      "weekend": "土日祝",
+      "weekendPrice": "¥4,000",
+      "note": "HYROX公式8種目に対応したトレーニングエリアを1回90分制でご利用いただけます。"
+    },
+    "coach": {
+      "sectionTitle": "CREW",
+      "sectionTitleJa": "クルー",
+      "name": "関吉大亮",
+      "nameKana": "せきよし だいすけ",
+      "nameEn": "DAISUKE SEKIYOSHI",
+      "intro": "日本におけるHYROXの先駆者であり、現HYROX日本代表。スパルタンレース初代日本王者、トライアスロンでも日本一に輝いた、日本屈指のハイブリッドアスリート。",
+      "profile": "1985年6月25日生・千葉県出身",
+      "achievementsTitle": "ACHIEVEMENTS",
+      "achievementsTitleJa": "実績",
+      "achievements": [
+        {
+          "discipline": "HYROX",
+          "disciplineJa": "ハイロックス",
+          "note": "日本代表 2024〜",
+          "items": [
+            "ワールドチャンピオンシップ2026　mix doubles age40〜44 世界7位",
+            "アジアチャンピオンシップ2026　mix doubles over40 1位",
+            "アジアチャンピオンシップ2025　mix relay overall 2位",
+            "アジアチャンピオンシップ2024　single overall 4位 / age 2位",
+            "HYROX香港2023　Single pro　日本人男子初表彰台（3位）",
+            "その他、表彰台多数"
+          ]
+        },
+        {
+          "discipline": "SPARTAN RACE",
+          "disciplineJa": "スパルタンレース",
+          "note": "日本代表 2017〜2023",
+          "items": [
+            "初代日本チャンピオン",
+            "2018 日韓シリーズ総合優勝",
+            "エリートカテゴリー優勝5回",
+            "その他、表彰台多数"
+          ]
+        },
+        {
+          "discipline": "TRIATHLON",
+          "disciplineJa": "トライアスロン",
+          "note": "",
+          "items": [
+            "2022 エイジグループ JAPANナショナルチャンピオンシップ スプリント 年間ランキング1位",
+            "その他、表彰台多数"
+          ]
+        }
+      ],
+      "careerTitle": "CAREER",
+      "careerTitleJa": "経歴",
+      "career": [
+        "千葉県警察官として22年間勤務",
+        "2026年に退職。現在は会社員として、フィットネス事業を担当。"
+      ],
+      "instagram": "@tac_monk",
+      "instagramAria": "関吉大亮のInstagramを開く（新しいタブ）",
+      "portraitAlt": "HYROX担当コーチ 関吉大亮",
+      "apacAlt": "HYROX APAC選手権での関吉大亮"
+    },
+    "picklePromo": {
+      "kicker": "MAIN FACILITY",
+      "kickerJa": "メイン施設",
+      "title": "PICKLEBALL",
+      "titleJa": "ピックルボール",
+      "description": "THE PICKLE BANG THEORY は、本八幡駅から徒歩1分のプレミアム・インドアピックルボール施設。プロ仕様のコートで、本格的なピックルボールも楽しめます。",
+      "cta": "ピックルボールを見る",
+      "courtImageAlt": "THE PICKLE BANG THEORY のピックルボールコート"
+    }
+  },
+  "HomeHyroxPromo": {
+    "kicker": "TRAINING AREA",
+    "kickerJa": "トレーニングエリア",
+    "title": "HYROX",
+    "titleJa": "ハイロックス",
+    "tagline": "走る。鍛える。挑戦する。",
+    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY にオープン。",
+    "cta": "詳しく見る",
+    "imageAlt": "HYROXのサンドバッグを担ぐ女性アスリート"
   }
 }

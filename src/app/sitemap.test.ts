@@ -16,16 +16,27 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ3つ + ニュース一覧1つ = 4エントリ（slugなし時）", async () => {
+  it("静的ページ5つ + ニュース一覧1つ = 6エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(6);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
+    expect(urls).toContain(`${PROD_URL}/reserve`);
+    expect(urls).toContain(`${PROD_URL}/hyrox`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
     expect(urls).toContain(`${PROD_URL}/news`);
+  });
+
+  it("/hyrox を ja/en alternates 付きで含む", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+
+    const hyrox = entries.find((e) => e.url === `${PROD_URL}/hyrox`);
+    expect(hyrox).toBeDefined();
+    expect(hyrox?.alternates?.languages?.en).toBe(`${PROD_URL}/en/hyrox`);
   });
 
   it("/teaser / /facility / /services は sitemap に含まれない", async () => {
@@ -179,6 +190,19 @@ describe("news sitemap entries", () => {
       (e) => e.url === `${PROD_URL}/news/only-ja`,
     );
     expect(jaEntry?.alternates?.languages).toBeUndefined();
+  });
+
+  it("updatedAt があれば news 詳細に lastModified を出力する", async () => {
+    vi.doMock("@/lib/microcms/queries", () => ({
+      getNewsSlugs: async () => [
+        { locale: "ja", slug: "s1", updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const entry = (await sitemap()).find(
+      (e) => e.url === `${PROD_URL}/news/s1`,
+    );
+    expect(entry?.lastModified).toBe("2026-05-01T00:00:00.000Z");
   });
 });
 

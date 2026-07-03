@@ -13,8 +13,8 @@ import { StarfieldWarpIntro } from "@/components/intro/StarfieldWarpIntro";
 
 import type { AnimationPhase } from "@/components/teaser/types";
 import type { ReactNode } from "react";
+import { EASE } from "@/constants/motion";
 
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 const SESSION_KEY = "bigban-intro-played";
 // ロゴ表示時間 (入場 0.5s + hold 0.3s 相当)。content 受信から unmount までの遅延。
 const LOGO_HOLD_MS = 800;

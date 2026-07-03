@@ -1,14 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 
 import HomeFooter from "./HomeFooter";
 
+let mockPathname = "/";
+
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ href, children, ...props }: Record<string, unknown>) => (
     <a href={href as string} {...props}>{children as React.ReactNode}</a>
   ),
+  usePathname: () => mockPathname,
 }));
 
 vi.mock("next/image", () => ({
@@ -46,6 +49,45 @@ describe("HomeFooter", () => {
     ).toBeInTheDocument();
   });
 
+  it("ロゴがホーム(/)へのリンクである", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logoLink = screen.getByAltText("THE PICKLE BANG THEORY").closest("a");
+    expect(logoLink).toHaveAttribute("href", "/");
+  });
+
+  it("ホームでロゴクリックするとページ最上部にスクロールする", () => {
+    mockPathname = "/";
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logo = screen.getByAltText("THE PICKLE BANG THEORY");
+    fireEvent.click(logo);
+    expect(scrollSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+    scrollSpy.mockRestore();
+  });
+
+  it("他ページでロゴクリックしてもscrollToは呼ばれない", () => {
+    mockPathname = "/about";
+    const scrollSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const logo = screen.getByAltText("THE PICKLE BANG THEORY");
+    fireEvent.click(logo);
+    expect(scrollSpy).not.toHaveBeenCalled();
+    scrollSpy.mockRestore();
+    mockPathname = "/";
+  });
+
   it("ブランド名（英語＋日本語）を表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -57,7 +99,7 @@ describe("HomeFooter", () => {
     ).toBeInTheDocument();
   });
 
-  it("6つのナビリンクを表示する", () => {
+  it("8つのナビリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFooter />
@@ -67,9 +109,11 @@ describe("HomeFooter", () => {
       { name: "CONCEPT", href: "/#concept" },
       { name: "FACILITY", href: "/#facility" },
       { name: "SERVICES", href: "/#services" },
+      { name: "HYROX", href: "/hyrox" },
       { name: "PRICING", href: "/#pricing" },
+      { name: "NEWS", href: "/news" },
+      { name: "ABOUT", href: "/about" },
       { name: "ACCESS", href: "/#access" },
-      { name: "ABOUT", href: "/#about" },
     ];
 
     for (const link of links) {
@@ -108,6 +152,16 @@ describe("HomeFooter", () => {
     const link = screen.getByRole("link", { name: "特定商取引法に基づく表記" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/tokushoho");
+  });
+
+  it("フッターに HYROX ページへのリンクがある", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: "HYROX" });
+    expect(link).toHaveAttribute("href", "/hyrox");
   });
 
   it("アクセントセパレーターを持つ", () => {

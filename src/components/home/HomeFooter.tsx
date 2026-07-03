@@ -1,15 +1,28 @@
+"use client";
+
+import { useCallback } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { NAV_ITEMS } from "@/constants/navigation";
 
 import FooterNewsletter from "./FooterNewsletter";
-
-const NAV_KEYS = ["concept", "facility", "services", "pricing", "access", "about"] as const;
 
 export default function HomeFooter() {
   const t = useTranslations("Navigation");
   const tFooter = useTranslations("HomeFooter");
   const tCommon = useTranslations("Common");
+  const pathname = usePathname();
+
+  const handleLogoClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (pathname === "/") {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [pathname]
+  );
 
   return (
     <footer className="bg-deep-black">
@@ -25,29 +38,49 @@ export default function HomeFooter() {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
           {/* Left: Logo + Brand display */}
           <div>
-            <Image
-              src="/logos/yoko-neon.png"
-              alt={tCommon("logoAlt")}
-              width={200}
-              height={32}
-              className="h-8 w-auto"
-            />
+            <Link href="/" onClick={handleLogoClick} className="inline-block">
+              <Image
+                src="/logos/yoko-neon.png"
+                alt={tCommon("logoAlt")}
+                width={200}
+                height={32}
+                className="h-8 w-auto"
+              />
+            </Link>
             <p className="mt-3 text-xs tracking-[0.2em] text-text-gray">
               {tFooter("brandJa")}
             </p>
           </div>
 
           {/* Center: Nav links */}
-          <nav className="flex flex-wrap gap-x-6 gap-y-3 lg:justify-center">
-            {NAV_KEYS.map((key) => (
-              <a
-                key={key}
-                href={`/#${key}`}
-                className="text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors"
-              >
-                {t(key)}
-              </a>
-            ))}
+          <nav className="flex flex-wrap gap-x-6 gap-y-3 justify-center lg:justify-center">
+            {NAV_ITEMS.map((item) => {
+              const ja = t(`${item.id}Ja`);
+              const className =
+                "flex flex-col items-center leading-tight text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors";
+              const label = (
+                <>
+                  <span>{t(item.id)}</span>
+                  {ja ? (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[9px] font-normal normal-case tracking-normal text-text-gray"
+                    >
+                      {ja}
+                    </span>
+                  ) : null}
+                </>
+              );
+              return item.kind === "page" ? (
+                <Link key={item.id} href={item.href} className={className}>
+                  {label}
+                </Link>
+              ) : (
+                <a key={item.id} href={item.href} className={className}>
+                  {label}
+                </a>
+              );
+            })}
           </nav>
 
         </div>

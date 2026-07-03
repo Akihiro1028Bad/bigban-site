@@ -61,3 +61,6 @@ tsconfig.tsbuildinfo
 
 # growth loop: ステージ用一時ファイル・revise の lockfile / 実行カウント(管理外)
 /.growth-tmp/
+
+# playwright-mcp artifacts (screenshots, snapshots, logs)
+.playwright-mcp/

@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { setMockUseInView } from "../../../__mocks__/framer-motion";
 import jaMessages from "../../../messages/ja.json";
 import HomeFacility from "./HomeFacility";
+
+import type React from "react";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>{children as React.ReactNode}</a>
+  ),
+}));
 
 const { mockAutoplay } = vi.hoisted(() => ({ mockAutoplay: vi.fn() }));
 
@@ -112,14 +120,24 @@ describe("HomeFacility", () => {
     expect(screen.getByText("ショーコート1面に変更可能")).toBeInTheDocument();
   });
 
-  it("トレーニングエリアとラウンジスペースに準備中の注記を表示する", () => {
+  it("ラウンジスペースに準備中の注記を表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFacility />
       </NextIntlClientProvider>
     );
     const notes = screen.getAllByText("準備中");
-    expect(notes).toHaveLength(2);
+    expect(notes).toHaveLength(1);
+  });
+
+  it("trainingArea 機能が /hyrox へリンクしている", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: /トレーニングエリア/ });
+    expect(link).toHaveAttribute("href", "/hyrox");
   });
 
   it("FACILITY タイトルを表示する", () => {
@@ -202,7 +220,9 @@ describe("HomeFacility", () => {
     const selectCallback = selectCall?.[1] as (() => void) | undefined;
     expect(selectCallback).toBeDefined();
     mockSelectedScrollSnap.mockReturnValue(2);
-    selectCallback!();
+    act(() => {
+      selectCallback!();
+    });
     expect(mockSelectedScrollSnap).toHaveBeenCalled();
   });
 

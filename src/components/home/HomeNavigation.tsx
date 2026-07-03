@@ -4,47 +4,15 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
-import { RESERVE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { RESERVE_PATH } from "@/constants/site";
+import { SECTION_IDS, navItemsFor } from "@/constants/navigation";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
-
-const SECTION_IDS = ["concept", "facility", "services", "pricing", "about", "access"];
-
-interface NavItem {
-  id: string;
-  kind: "anchor" | "page";
-  href: string;
-}
-
-const NAV_ITEMS_BASE: readonly NavItem[] = [
-  { id: "concept", kind: "anchor", href: "/#concept" },
-  { id: "facility", kind: "anchor", href: "/#facility" },
-  { id: "services", kind: "anchor", href: "/#services" },
-  { id: "pricing", kind: "anchor", href: "/#pricing" },
-  { id: "news", kind: "page", href: "/news" },
-  { id: "about", kind: "anchor", href: "/#about" },
-  { id: "access", kind: "anchor", href: "/#access" },
-];
-
-/** COLUMN リンク(コラム分離 P1⑦)。USE_CMS_COLUMNS 有効時のみ NEWS の直後に挿入する。 */
-const COLUMNS_NAV_ITEM: NavItem = { id: "columns", kind: "page", href: "/columns" };
-
-/**
- * NEWS の直後に COLUMN リンクを差し込んだ配列を返す(showColumns 有効時のみ)。
- * 既定(false)は現行の 7 項目のまま = USE_CMS_COLUMNS 未有効デプロイと整合。
- */
-function navItemsFor(showColumns: boolean): readonly NavItem[] {
-  if (!showColumns) return NAV_ITEMS_BASE;
-  const newsIdx = NAV_ITEMS_BASE.findIndex((item) => item.id === "news");
-  return [
-    ...NAV_ITEMS_BASE.slice(0, newsIdx + 1),
-    COLUMNS_NAV_ITEM,
-    ...NAV_ITEMS_BASE.slice(newsIdx + 1),
-  ];
-}
+import MobileMenu from "./MobileMenu";
+import MenuToggleButton from "./MenuToggleButton";
+import LanguageToggle from "./LanguageToggle";
 
 interface HomeNavigationProps {
   /** コラム機能(USE_CMS_COLUMNS)有効時に COLUMN リンクを出す。既定 false=非表示。 */
@@ -90,12 +58,12 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleOpenMenu = useCallback(() => {
-    setIsMobileMenuOpen(true);
-  }, []);
-
   const handleCloseMenu = useCallback(() => {
     setIsMobileMenuOpen(false);
+  }, []);
+
+  const handleToggleMenu = useCallback(() => {
+    setIsMobileMenuOpen((prev) => !prev);
   }, []);
 
   const handleMobileLinkClick = useCallback(() => {
@@ -112,13 +80,22 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
   );
 
   const isJa = locale === "ja";
+  const isHyrox = pathname === "/hyrox";
+  // 予約導線は内部の予約案内ページ(/reserve)。7月=RESERVA / 8月以降=labola の二択を案内する。
+  const reserveTo = RESERVE_PATH;
 
   return (
     <>
-    <PromoBanner />
+    {!isHyrox && <PromoBanner />}
     <header
-      className={`fixed top-[var(--promo-banner-h)] left-0 w-full z-50 transition-transform duration-300 ${
-        isNavVisible ? "translate-y-0" : "translate-y-0 md:-translate-y-[calc(100%+var(--promo-banner-h))]"
+      className={`fixed left-0 w-full z-50 transition-transform duration-300 ${
+        isHyrox ? "top-0" : "top-[var(--promo-banner-h)]"
+      } ${
+        isNavVisible
+          ? "translate-y-0"
+          : isHyrox
+            ? "translate-y-0 md:-translate-y-full"
+            : "translate-y-0 md:-translate-y-[calc(100%+var(--promo-banner-h))]"
       }`}
     >
       <div className="site-header-bg backdrop-blur-md bg-deep-black/80">
@@ -143,17 +120,45 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
               const className = `text-sm uppercase tracking-widest transition-colors hover:text-text-light ${
                 activeSection === item.id ? "text-accent" : "text-text-gray"
               }`;
+              const ja = t(`${item.id}Ja`);
+              const label = (
+                <span className="flex flex-col items-center leading-tight">
+                  <span>{t(item.id)}</span>
+                  {ja ? (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[9px] font-normal normal-case tracking-normal text-text-gray"
+                    >
+                      {ja}
+                    </span>
+                  ) : null}
+                </span>
+              );
               return item.kind === "page" ? (
                 <Link key={item.id} href={item.href} className={className}>
-                  {t(item.id)}
+                  {label}
                 </Link>
               ) : (
                 <a key={item.id} href={item.href} className={className}>
-                  {t(item.id)}
+                  {label}
                 </a>
               );
             })}
           </nav>
+
+          {/* Mobile: 予約ボタン（常時表示・主要コンバージョン導線）。
+              右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
+          <Link
+            href={reserveTo}
+            className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black md:hidden"
+          >
+            <span className="text-[11px] font-bold tracking-widest">
+              {t("reserveJa")}
+            </span>
+            <span className="text-[8px] font-bold uppercase tracking-widest text-deep-black/60">
+              {t("reserve")}
+            </span>
+          </Link>
 
           {/* Desktop: Right side */}
           <div className="hidden md:flex items-center gap-4">
@@ -161,125 +166,48 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
               isJa={isJa}
               onSwitch={handleSwitchLocale}
             />
-            <a
-              href={RESERVE_URL}
-              {...EXTERNAL_LINK_PROPS}
-              className="bg-accent text-deep-black px-5 py-2 text-xs font-bold uppercase tracking-widest"
+            <Link
+              href={reserveTo}
+              className="inline-flex items-center gap-1.5 bg-accent text-deep-black px-5 py-2"
             >
-              {t("reserve")}
-            </a>
+              <span className="text-xs font-bold tracking-widest">
+                {t("reserveJa")}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-deep-black/60">
+                {t("reserve")}
+              </span>
+            </Link>
           </div>
 
-          {/* Mobile: Right side */}
-          <div className="flex md:hidden items-center gap-4">
-            <LanguageToggle
-              isJa={isJa}
-              onSwitch={handleSwitchLocale}
-            />
-            <button
-              aria-label={t("openMenu")}
-              onClick={handleOpenMenu}
-              className="text-text-light"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
 
     </header>
 
+    {/* Mobile: フローティングのメニュートグル（モーフィング、オーバーレイより前面） */}
+    <MenuToggleButton
+      isOpen={isMobileMenuOpen}
+      onClick={handleToggleMenu}
+      labelOpen={t("openMenu")}
+      labelClose={t("closeMenu")}
+      className={`fixed right-4 z-[70] md:hidden ${
+        isHyrox ? "top-2.5" : "top-[calc(var(--promo-banner-h)+0.5rem)]"
+      }`}
+    />
+
     {/* Mobile menu overlay - outside header to avoid stacking context issues */}
-    <AnimatePresence>
-      {isMobileMenuOpen && (
-        <motion.div
-          role="dialog"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center"
-        >
-          <button
-            aria-label={t("closeMenu")}
-            onClick={handleCloseMenu}
-            className="absolute top-6 right-6 text-text-light"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-
-          <nav className="flex flex-col items-center gap-8">
-            {navItems.map((item) => {
-              const className = `text-2xl uppercase tracking-widest transition-colors ${
-                activeSection === item.id ? "text-accent" : "text-text-light"
-              }`;
-              return item.kind === "page" ? (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  onClick={handleMobileLinkClick}
-                  className={className}
-                >
-                  {t(item.id)}
-                </Link>
-              ) : (
-                <a
-                  key={item.id}
-                  href={item.href}
-                  onClick={handleMobileLinkClick}
-                  className={className}
-                >
-                  {t(item.id)}
-                </a>
-              );
-            })}
-          </nav>
-
-          <a
-            href={RESERVE_URL}
-            {...EXTERNAL_LINK_PROPS}
-            className="mt-12 bg-accent text-deep-black px-8 py-3 text-sm font-bold uppercase tracking-widest"
-          >
-            {t("reserve")}
-          </a>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <MobileMenu
+      isOpen={isMobileMenuOpen}
+      onClose={handleCloseMenu}
+      onLinkClick={handleMobileLinkClick}
+      activeSection={activeSection}
+      isJa={isJa}
+      onSwitchLocale={handleSwitchLocale}
+      reserveHref={reserveTo}
+      showColumns={showColumns}
+    />
 
     <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />
     </>
-  );
-}
-
-interface LanguageToggleProps {
-  isJa: boolean;
-  onSwitch: (locale: "ja" | "en") => void;
-}
-
-function LanguageToggle({ isJa, onSwitch }: LanguageToggleProps) {
-  return (
-    <div className="flex items-center gap-1 text-xs">
-      <button
-        onClick={() => onSwitch("ja")}
-        aria-pressed={isJa}
-        className={isJa ? "text-text-light cursor-default" : "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer"}
-      >
-        JP
-      </button>
-      <span className="text-text-gray">/</span>
-      <button
-        onClick={() => onSwitch("en")}
-        aria-pressed={!isJa}
-        className={isJa ? "text-text-gray hover:text-accent motion-safe:transition-colors cursor-pointer" : "text-text-light cursor-default"}
-      >
-        EN
-      </button>
-    </div>
   );
 }
