@@ -82,12 +82,22 @@ describe("draftQuality", () => {
     const base = { bodyHtml: "", title: "t" } as const;
     expect(pick(draftQuality({ ...base, body: `月額5,000円${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
     expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩5分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `徒歩10分の距離${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `駅から徒歩 3 分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
   });
 
   it("#217: 公表済み事実(営業時間6:00-23:00・3面)は block しない", () => {
     const base = { bodyHtml: "", title: "t" } as const;
     expect(pick(draftQuality({ ...base, body: `営業時間は6:00-23:00です${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
     expect(pick(draftQuality({ ...base, body: `コート3面を完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+  });
+
+  it("#218レビュー対応: 確定値「徒歩1分」(CTA必須文)は block しない", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩1分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    expect(pick(draftQuality({ ...base, body: `徒歩１分でアクセス${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    // 「1」で始まる複数桁(徒歩11分)は先読みが「1分」に一致しないため従来どおり block
+    expect(pick(draftQuality({ ...base, body: `徒歩11分ほど${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
   });
 
   it("body が空なら bodyHtml からタグを除いて判定する", () => {
@@ -169,6 +179,14 @@ describe("detectDoNotWrite", () => {
   });
   it("#217: 公表済みの面数・営業時間は検出しない", () => {
     expect(detectDoNotWrite("コート3面・営業時間6:00-23:00")).toEqual([]);
+  });
+  it("#218レビュー対応: 確定値「徒歩1分」は検出しない(全角１も)", () => {
+    expect(detectDoNotWrite("本八幡駅から徒歩1分")).toEqual([]);
+    expect(detectDoNotWrite("徒歩１分")).toEqual([]);
+  });
+  it("#218レビュー対応: 徒歩10分・駅から3分は従来どおり検出する", () => {
+    expect(detectDoNotWrite("徒歩10分")).toEqual(["所要時間"]);
+    expect(detectDoNotWrite("駅から3分")).toEqual(["所要時間"]);
   });
   it("該当なしは空", () => {
     expect(detectDoNotWrite("市川の屋内コートで打てる")).toEqual([]);
