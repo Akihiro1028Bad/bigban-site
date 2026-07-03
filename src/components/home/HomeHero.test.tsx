@@ -1,10 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
+import { forwardRef } from "react";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeHero from "./HomeHero";
 
 import type { ReactElement } from "react";
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: forwardRef<HTMLAnchorElement, Record<string, unknown>>(
+    ({ children, href, ...props }, ref) => (
+      <a ref={ref} href={href as string} {...props}>
+        {children as React.ReactNode}
+      </a>
+    )
+  ),
+}));
 
 vi.mock("@/hooks/useMagneticButton", () => ({
   useMagneticButton: () => ({
@@ -44,13 +55,12 @@ describe("HomeHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("CTAボタン（RESERVE A COURT）を表示する", () => {
+  it("CTAボタン（RESERVE A COURT）が予約案内ページ(/reserve)にリンクする", () => {
     renderWithProvider(<HomeHero />);
     const cta = screen.getByRole("link", { name: /RESERVE A COURT/ });
     expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute("href", "https://reserva.be/tpbt");
-    expect(cta).toHaveAttribute("target", "_blank");
-    expect(cta).toHaveAttribute("rel", "noopener noreferrer");
+    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).not.toHaveAttribute("target", "_blank");
   });
 
   it("スクロールインジケーター（SCROLL）を表示する", () => {

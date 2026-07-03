@@ -9,6 +9,9 @@ import { getNewsSlugs } from "@/lib/microcms/queries";
 interface LocaleSlug {
   locale: "ja" | "en";
   slug: string;
+  // 詳細ページの最終更新日時 (microCMS updatedAt)。news は必ず持つが、
+  // columns 等 updatedAt を返さないソースでは undefined になりうる。
+  updatedAt?: string;
 }
 
 /** `/news` or `/columns` 等のセグメントについて ja/en の URL を組み立てる。 */
@@ -32,7 +35,7 @@ function detailEntries(
     slugLocales.get(slug)?.add(locale);
   }
 
-  return slugs.map(({ locale, slug }) => {
+  return slugs.map(({ locale, slug, updatedAt }) => {
     /* istanbul ignore next -- @preserve slugLocales は事前に populate するため必ず存在 (defensive) */
     const localesForSlug = slugLocales.get(slug) ?? new Set([locale]);
     const hasBoth = localesForSlug.has("ja") && localesForSlug.has("en");
@@ -40,6 +43,7 @@ function detailEntries(
       url: localizedUrl(segment, locale, slug),
       changeFrequency: "monthly",
       priority: 0.6,
+      ...(updatedAt ? { lastModified: updatedAt } : {}),
       ...(hasBoth
         ? {
             alternates: {

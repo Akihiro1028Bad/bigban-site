@@ -24,6 +24,18 @@ if (hasWindow) {
     value: vi.fn().mockImplementation(matchMediaImpl),
   });
 
+  // jsdom は scrollTo / scrollIntoView を未実装で「Not implemented」警告を出すため no-op でスタブ
+  Object.defineProperty(window, "scrollTo", {
+    writable: true,
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    writable: true,
+    configurable: true,
+    value: vi.fn(),
+  });
+
   // jsdom は HTMLElement.offsetParent を常に null 返すため、接続済み要素を
   // 可視扱いにする最小 polyfill（focus-trap の focusables() がブラウザ同様に動くように）。
   // グローバル適用なのは、useDialog を使う複数のモーダル(ShortcutOverlay 等)の
@@ -51,11 +63,13 @@ if (hasWindow) {
   }
 }
 
-// 各テスト後に window.matchMedia をデフォルト実装にリセット
+// 各テスト後に window.matchMedia をデフォルト実装にリセットし、スクロール系スタブの呼び出し履歴をクリア
 afterEach(() => {
   if (hasWindow) {
     (window.matchMedia as ReturnType<typeof vi.fn>).mockImplementation(
       matchMediaImpl
     );
+    (window.scrollTo as ReturnType<typeof vi.fn>).mockClear?.();
+    (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear?.();
   }
 });

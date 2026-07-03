@@ -59,6 +59,12 @@ export async function generateMetadata({
 
   return {
     metadataBase: new URL(SITE_URL),
+    // 各ページは固有名のみ設定し、ブランド名はテンプレートで付与（表記ゆれ防止）。
+    // home / teaser はブランド名を含む完成形を title.absolute で渡し二重付与を回避する。
+    title: {
+      template: "%s | THE PICKLE BANG THEORY",
+      default: "THE PICKLE BANG THEORY",
+    },
     openGraph: {
       type: "website",
       siteName: t("og.siteName"),

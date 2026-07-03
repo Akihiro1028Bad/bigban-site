@@ -339,7 +339,7 @@ bat. Leave clean negative space on one side for text. No text, no logos.
 | 実名(正確な表記) | 使ってよい肩書き・実績(出典の範囲) | 出典 | 注意 |
 |---|---|---|---|
 | **西村昭彦**(にしむら あきひこ) | クロスミントン世界王者。世界選手権ミックスダブルス4連覇・シングルス2連覇を含む**通算6度の優勝**。THE PICKLE BANG THEORY 代表(RST Agency 株式会社 代表取締役) | PR TIMES(prtimes.jp/main/html/rd/p/000000003.000179043.html)・PJ 連盟公式 X(x.com/pjf_official) | 「6冠」と略さず「通算6度の優勝」等の正確な表記で。ピックルボールの成績(2025 PPA World Championship Men's Skill 5.0 Doubles 4位)を出す場合も出典の範囲で |
-| **吉田祐太**(よしだ ゆうた) | THE PICKLE BANG THEORY サポート選手。Pickleball X(Sansan)1期生。**Pickleball X Championship 2025 男子優勝**(2025-09-27) | CAMPFIRE(camp-fire.jp/projects/926247/view)・Sansan Pickleball X 公式(jp.corp-sansan.com/pickleball/pickleball-x/news/20250927.html) | 漢字は**祐太**(悠太・裕太は誤り)。「賞金王」は一次出典で未確認のため使わない。「コーチ」でなく「サポート選手」 |
+| **吉田祐太**(よしだ ゆうた) | THE PICKLE BANG THEORY サポート選手。Pickleball X(Sansan)1期生。**Pickleball X Championship 2025 男子優勝**(2025-09-27) | CAMPFIRE(camp-fire.jp/projects/926247/view)・Sansan Pickleball X 公式(jp.corp-sansan.com/pickleball/pickleball-x/news/20250927.html) | 名の漢字は必ず**祐太**(しめすへん)。同音の「ゆうた」を「悠太」や、ころもへん(裕福の裕)で書くのは誤り。「賞金王」は一次出典で未確認のため使わない。「コーチ」でなく「サポート選手」 |
 | **勝間田靖子**(かつまた やすこ) | 施設クルー(広報・マーケティング担当) | 公式 about(thepicklebang.com/about)・PR TIMES | コーチ・監修者としては出さない(役割は運営・広報) |
 
 - **署名にはしない**(§11)。上記は「施設に世界王者がいる」「実施済みイベントに世界大会優勝の選手が関わった」といった**施設の権威を事実として1文で述べる**時に使う。監修者欄・プロフィール欄は設けない(§11 運用方針)。

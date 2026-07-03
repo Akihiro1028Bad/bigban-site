@@ -130,7 +130,7 @@ describe("AboutPage", () => {
 
   it("ニュースセクションを表示する", () => {
     renderWithIntl(<AboutPage />);
-    expect(screen.getByText("ニュース")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ニュース" })).toBeInTheDocument();
     expect(screen.getByText("クラウドファンディング実施中！")).toBeInTheDocument();
     const campfireLink = screen.getByRole("link", { name: /CAMP-FIRE/ });
     expect(campfireLink).toHaveAttribute(

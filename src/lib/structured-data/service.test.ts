@@ -12,10 +12,19 @@ describe("buildServices", () => {
     vi.unstubAllEnvs();
   });
 
-  it("HomeServicesの5サービスすべてを返す", async () => {
+  it("HomeServicesの6サービスすべてを返す", async () => {
     const { buildServices } = await import("./service");
     const services = buildServices();
-    expect(services).toHaveLength(5);
+    expect(services).toHaveLength(6);
+  });
+
+  it("HYROX トレーニングを含む", async () => {
+    const { buildServices } = await import("./service");
+    const services = buildServices();
+    expect(services).toHaveLength(6);
+    expect(services.some((s) => s.serviceType === "HYROXトレーニング")).toBe(
+      true,
+    );
   });
 
   it("各サービスが@contextとServiceを含む", async () => {
@@ -64,6 +73,36 @@ describe("buildServices", () => {
     const rental = services.find((s) => s.name === "コートレンタル");
     expect(rental).toBeDefined();
     expect(rental?.serviceType).toBe("コートレンタル");
+  });
+
+  it("コートレンタルに価格帯(¥4,980〜¥7,980)の Offer を付与する", async () => {
+    const { buildServices } = await import("./service");
+    const rental = buildServices().find((s) => s.name === "コートレンタル");
+    expect(rental?.offers?.priceSpecification).toMatchObject({
+      "@type": "PriceSpecification",
+      priceCurrency: "JPY",
+      minPrice: 4980,
+      maxPrice: 7980,
+    });
+  });
+
+  it("HYROXトレーニングに単価(¥2,980/時)の Offer を付与する", async () => {
+    const { buildServices } = await import("./service");
+    const hyrox = buildServices().find(
+      (s) => s.serviceType === "HYROXトレーニング",
+    );
+    expect(hyrox?.offers?.priceSpecification).toMatchObject({
+      "@type": "UnitPriceSpecification",
+      priceCurrency: "JPY",
+      price: 2980,
+      unitCode: "HUR",
+    });
+  });
+
+  it("価格未設定のサービスには offers を付けない", async () => {
+    const { buildServices } = await import("./service");
+    const lesson = buildServices().find((s) => s.name.includes("レッスン"));
+    expect(lesson?.offers).toBeUndefined();
   });
 
   it("レッスンサービスを含む", async () => {

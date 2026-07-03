@@ -12,6 +12,13 @@ const ANIMATION_PROPS = new Set([
   "viewport",
   "layout",
   "layoutId",
+  "drag",
+  "dragConstraints",
+  "dragElastic",
+  "dragMomentum",
+  "onDragEnd",
+  "onDragStart",
+  "onDrag",
 ]);
 
 const componentCache: Record<string, React.ForwardRefExoticComponent<React.HTMLAttributes<HTMLElement> & { [key: string]: unknown } & React.RefAttributes<HTMLElement>>> = {};
@@ -82,4 +89,25 @@ function useMotionValue(initial: unknown) {
   };
 }
 
-export { motion, AnimatePresence, MotionConfig, useScroll, useTransform, useInView, useMotionValue, setMockUseInView };
+let mockReducedMotion = false;
+
+function setMockReducedMotion(value: boolean) {
+  mockReducedMotion = value;
+}
+
+function useReducedMotion() {
+  return mockReducedMotion;
+}
+
+export {
+  motion,
+  AnimatePresence,
+  MotionConfig,
+  useScroll,
+  useTransform,
+  useInView,
+  useMotionValue,
+  useReducedMotion,
+  setMockUseInView,
+  setMockReducedMotion,
+};

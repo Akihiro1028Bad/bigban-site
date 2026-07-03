@@ -79,7 +79,7 @@ describe("generateMetadata", () => {
       params: Promise.resolve({ locale: "ja" }),
     });
 
-    expect(metadata.title).toBe("translated:home.title");
+    expect(metadata.title).toEqual({ absolute: "translated:home.title" });
     expect(metadata.description).toBe("translated:home.description");
     expect(metadata.openGraph?.locale).toBe("ja_JP");
     expect(metadata.keywords).toEqual(["ティザー"]);
@@ -98,7 +98,7 @@ describe("generateMetadata", () => {
       params: Promise.resolve({ locale: "en" }),
     });
 
-    expect(metadata.title).toBe("translated:home.title");
+    expect(metadata.title).toEqual({ absolute: "translated:home.title" });
     expect(metadata.description).toBe("translated:home.description");
     expect(metadata.openGraph?.locale).toBe("en_US");
     expect(metadata.keywords).toEqual(["teaser"]);

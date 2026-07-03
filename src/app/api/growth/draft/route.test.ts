@@ -97,8 +97,8 @@ describe("GET /api/growth/draft", () => {
   it("#H19: 公開記事 slug を /ja/news/<slug> パスにして knownNewsPaths に入れる(ja のみ)", async () => {
     vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
     vi.mocked(getNewsSlugs).mockResolvedValue([
-      { locale: "ja", slug: "a" },
-      { locale: "en", slug: "b" },
+      { locale: "ja", slug: "a", updatedAt: "2026-01-01T00:00:00.000Z" },
+      { locale: "en", slug: "b", updatedAt: "2026-01-01T00:00:00.000Z" },
     ]);
     const json = (await (await GET(getRequest(null, PAGE_ID))).json()) as {
       draft: { knownNewsPaths: string[] };
