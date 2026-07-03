@@ -11,6 +11,10 @@
  */
 
 import type { NotionPage } from "./notion";
+import {
+  renderPerformanceSummary,
+  summarizeArticlePerformance,
+} from "./performanceSummary";
 
 /** 週次レポートの「対象週開始」が指定日に一致する Notion フィルタ。 */
 export function weekStartEqualsFilter(weekStart: string): unknown {
@@ -122,6 +126,11 @@ export function summarizeExisting(input: ExistingInput): string {
   } else {
     lines.push(`(既存行なし)`);
   }
+  lines.push("");
+
+  // #221: 公開済み記事の記事タイプ別 成績サマリ(伸ばす学習の入力)。
+  // 「避ける学習」(却下/見送りの併記)に加え、「効いた型を厚くする」判断材料を供給する。
+  lines.push(...renderPerformanceSummary(summarizeArticlePerformance(ideas)));
 
   return lines.join("\n");
 }

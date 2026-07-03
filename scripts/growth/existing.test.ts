@@ -219,4 +219,39 @@ describe("summarizeExisting", () => {
     expect(md).toContain("市川エリアガイド");
     expect(md).toContain("承認");
   });
+
+  it("公開済み記事があるとき記事タイプ別の成績サマリを含む(#221 伸ばす学習)", () => {
+    const publishedIdea: NotionPage = {
+      id: "pub1",
+      url: "https://notion.so/pub1",
+      properties: {
+        "タイトル案": title("本八幡で始めるガイド"),
+        "ステータス": select("公開済み"),
+        "対象週開始": date("2026-05-01"),
+        "記事タイプ": select("獲得"),
+        "公開後判定": select("成功"),
+      },
+    };
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [publishedIdea],
+    });
+    expect(md).toContain("成績サマリ");
+    expect(md).toContain("獲得");
+    expect(md).toContain("成功1");
+    expect(md).toContain("効いた型を優先");
+  });
+
+  it("公開済み記事が無いとき成績サマリは空表示で壊れない(#221 欠落耐性)", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [ideaPage({ id: "i2", title: "未公開案", status: "承認", weekStart: "2026-06-08" })],
+    });
+    expect(md).toContain("成績サマリ");
+    expect(md).toContain("公開済み記事がまだ無い");
+  });
 });
