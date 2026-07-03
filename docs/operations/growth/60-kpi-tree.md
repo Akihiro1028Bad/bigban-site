@@ -85,7 +85,7 @@
 - **記事タイプ**(5値・そのまま日本語): `獲得` / `不安解消` / `資産` / `比較` / `イベント`(`prompts/weekly.md`・`prompts/drafts.md`・[40-notion-props.md](40-notion-props.md) と同一)。
 - **公開後判定**(人が最終決定・3値): `成功` / `様子見` / `要改稿`。
 - **判定ラベル**(`metricsReview.ts` の `reviewLabels`・打ち手の示唆): `伸びている` / `CTR弱い` / `順位あと少し` / `読まれるがCTA弱い` / `要改稿` / `未計測`。
-- 記事タイプ→category マッピング(獲得→`start`/不安解消→`start`/資産→`rules`(or `improve`/`health`)/比較→`compare`/イベント→`event`)は `prompts/drafts.md` を正とする(category=読者向け・articleType=内部計測の別軸共存)。
+- 記事タイプ→category マッピング(獲得→`start`/不安解消→`start`/資産→`rules`(or `improve`/`health`)/比較→`compare`/イベント→`event`)は `scripts/growth/columnCategory.ts` の `ARTICLE_TYPE_TO_CATEGORY` を**単一の真実源**とする(#222。解決コマンドは `npm run growth:column-category`。`drafts.md` は手書き表を持たない。category=読者向け・articleType=内部計測の別軸共存)。
 
 ## 6. 実装への提案(この doc の範囲外・別エージェント/オーナー作業)
 
