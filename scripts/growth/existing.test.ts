@@ -89,6 +89,74 @@ describe("summarizeExisting", () => {
     expect(md).not.toContain("未作成");
   });
 
+  describe("オーナー週次手入力(改善案#4・週次グロースレポート DB)", () => {
+    function manualInputRow(weekStart: string, props: Record<string, unknown>): NotionPage {
+      // レポート本文(title)を持たない=手入力だけの行。作成済み判定には数えない。
+      return {
+        id: `mi-${weekStart}`,
+        url: `https://notion.so/mi-${weekStart}`,
+        properties: { "対象週開始": date(weekStart), ...props },
+      };
+    }
+
+    it("手入力(予約/LINE/IG/口コミ)があれば手入力データ節に載せる", () => {
+      const md = summarizeExisting({
+        period,
+        reportsForWeek: [
+          manualInputRow("2026-06-08", {
+            "予約件数": { type: "number", number: 42 },
+            "LINE友だち数": { type: "number", number: 130 },
+            "IGフォロワー数": { type: "number", number: 560 },
+            "口コミ件数": { type: "number", number: 8 },
+            "口コミ平均評価": { type: "number", number: 4.6 },
+          }),
+        ],
+        proposals: [],
+        ideas: [],
+      });
+      expect(md).toContain("オーナー手入力");
+      expect(md).toContain("予約件数");
+      expect(md).toContain("42");
+      expect(md).toContain("LINE友だち数");
+      expect(md).toContain("130");
+      expect(md).toContain("IGフォロワー数");
+      expect(md).toContain("口コミ件数");
+      expect(md).toContain("4.6");
+    });
+
+    it("手入力だけの行(レポート本文なし)は『作成済み』に数えない(#4)", () => {
+      const md = summarizeExisting({
+        period,
+        reportsForWeek: [manualInputRow("2026-06-08", { "予約件数": { type: "number", number: 10 } })],
+        proposals: [],
+        ideas: [],
+      });
+      // 手入力はあるがレポート本文(title)は無いので、レポートは未作成として新規作成を促す。
+      expect(md).toContain("未作成");
+      expect(md).not.toContain("週次グロースレポート: 作成済み");
+      // それでも手入力の数字は分析に供給する。
+      expect(md).toContain("オーナー手入力");
+      expect(md).toContain("10");
+    });
+
+    it("手入力が無ければ『手入力データなし』で従来動作(欠落耐性)", () => {
+      const md = summarizeExisting({ period, reportsForWeek: [], proposals: [], ideas: [] });
+      expect(md).toContain("手入力データなし");
+    });
+
+    it("一部だけ入力なら入力済みの指標だけ載せる", () => {
+      const md = summarizeExisting({
+        period,
+        reportsForWeek: [manualInputRow("2026-06-08", { "LINE友だち数": { type: "number", number: 200 } })],
+        proposals: [],
+        ideas: [],
+      });
+      expect(md).toContain("LINE友だち数");
+      expect(md).toContain("200");
+      expect(md).not.toContain("予約件数");
+    });
+  });
+
   it("施策提案を 週キー・カテゴリ・ステータス・施策名 付きで列挙する", () => {
     const md = summarizeExisting({
       period,
