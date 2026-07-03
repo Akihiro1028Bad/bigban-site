@@ -184,7 +184,7 @@ flowchart TD
 ### P0③ facility-context doNotWrite の公表済み事実を解禁
 
 - **目的**: 記事の一次情報密度を即上げ、一般論記事化を防ぐ。公表済み事実を封じると競合との差別化（E-E-A-T）が消える。
-- **具体設計**: `facility-context.json:14-20` の `doNotWrite` から「営業時間・定休日」「コート面数」を外し `confirmed` へ移す（6:00-23:00・3面・デコターフ/PickleRoll）。**料金・体験会日時のみ未確定として残す**。併せて `draftQuality.ts` の `detectDoNotWrite()`・`publishGate.ts` の `evaluatePublishGate()` の営業時間/面数パターンを、**「確定値と一致する記述は block しない／矛盾する断定のみ block」** に振る（最小実装は該当パターンの block 解除＋confirmed 注入）。→ Issue B。施設側への最終事実確認を1点取る。
+- **具体設計**: `facility-context.json:14-20` の `doNotWrite` から「営業時間・定休日」「コート面数」を外し `confirmed` へ移す（6:00-23:00・3面・デコターフ）。**料金・体験会日時のみ未確定として残す**。併せて `draftQuality.ts` の `detectDoNotWrite()`・`publishGate.ts` の `evaluatePublishGate()` の営業時間/面数パターンを、**「確定値と一致する記述は block しない／矛盾する断定のみ block」** に振る（最小実装は該当パターンの block 解除＋confirmed 注入）。→ Issue B。施設側への最終事実確認を1点取る。
 - **受け入れ基準**:
   - [ ] `confirmed` に営業時間・面数・サーフェスが入り、`doNotWrite` は料金・体験会日時（＋必要なら所要分）のみ。
   - [ ] 「6:00-23:00」「3面」を含む下書きが block されない。未確定の**料金**を断定する本文は従来どおり block（回帰なし）。
