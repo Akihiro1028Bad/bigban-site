@@ -44,6 +44,7 @@
     "growth:stall-check": "tsx scripts/growth/stall-check-cli.ts",
     "growth:prompt-lint": "tsx scripts/growth/prompt-lint-cli.ts",
     "growth:article-eval": "tsx scripts/growth/article-eval-cli.ts",
+    "growth:column-category": "tsx scripts/growth/column-category-cli.ts",
     "growth:comment-revise": "tsx scripts/growth/comment-revise-cli.ts",
     "growth:comment-revise-loop": "node scripts/growth/run.mjs comment-revise",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
