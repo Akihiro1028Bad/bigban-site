@@ -36,7 +36,7 @@ interface TokushohoContentProps {
 
 export default function TokushohoContent({
   showColumns = false,
-}: TokushohoContentProps = {}) {
+}: TokushohoContentProps) {
   const t = useTranslations("Tokushoho");
 
   return (
