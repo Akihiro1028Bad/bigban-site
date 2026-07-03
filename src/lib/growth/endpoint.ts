@@ -8,5 +8,9 @@
 export {
   growthArticleSegment,
   growthEndpoint,
+  growthMediaForRow,
+  MEDIA_COLUMN_LABEL,
+  MEDIA_NEWS_LABEL,
   type ArticleSegment,
+  type GrowthMedia,
 } from "../../../scripts/growth/endpoint";

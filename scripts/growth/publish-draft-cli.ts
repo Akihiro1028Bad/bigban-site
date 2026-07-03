@@ -41,7 +41,7 @@ import {
   classifyDraftFailure,
 } from "./draft-notify";
 import { fetchDraftKey } from "./draft-meta";
-import { growthEndpoint } from "./endpoint";
+import { growthEndpoint, growthMediaForRow, type GrowthMedia } from "./endpoint";
 import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
@@ -60,7 +60,6 @@ import {
 import { runStages, type Stage } from "./pipeline";
 import { evaluatePublishGate } from "./publishGate";
 
-const ENDPOINT = growthEndpoint();
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REF = path.join(here, "assets", "mascot-alien.png");
 
@@ -86,6 +85,12 @@ interface DraftImageInput {
 
 interface DraftSpec {
   payload: Record<string, unknown>;
+  /**
+   * 媒体軸(#media)。記事ネタ案 `媒体` プロパティの表示名(`ニュース`/`コラム`)。
+   * `ニュース` → 公開先 news(env 無視)/ それ以外・欠落 → column(env 従属・従来挙動)。
+   * 欠落時は column にフォールバックするため既存 spec は挙動不変(完全後方互換)。
+   */
+  media?: string;
   eyecatchAction?: string;
   imagePath?: string;
   /** 本文画像(#63)。構成案の画像指示から下書きモードがステージする。 */
@@ -118,6 +123,10 @@ async function main(): Promise<void> {
   const specPath = process.argv[2];
   if (!specPath) throw new Error("使い方: publish-draft -- <spec.json>");
   const spec = JSON.parse(await readFile(specPath, "utf-8")) as DraftSpec;
+
+  // 媒体軸(#media): 行の `媒体` で公開先を出し分ける。欠落=column=従来の env 従属。
+  const media: GrowthMedia = growthMediaForRow(spec.media);
+  const ENDPOINT = growthEndpoint(media);
 
   const serviceDomain = requireEnv("MICROCMS_SERVICE_DOMAIN");
   const contentKey =
