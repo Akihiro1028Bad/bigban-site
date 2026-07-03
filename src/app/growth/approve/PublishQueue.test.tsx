@@ -29,11 +29,15 @@ afterEach(() => {
 });
 
 describe("PublishQueue", () => {
-  it("下書きが無ければ何も描画しない", () => {
-    const { container } = render(
+  it("公開できる下書きが無ければ空状態メッセージを出す(公開直後の空白対策)", () => {
+    render(
       <PublishQueue items={[article({ id: "p", title: "提案", stage: "proposed" })]} token="t" onChanged={() => {}} />
     );
-    expect(container).toBeEmptyDOMElement();
+    // 公開キューの枠(見出し)は残したまま、空である旨を案内する。
+    expect(screen.getByRole("region", { name: "公開キュー" })).toBeInTheDocument();
+    expect(screen.getByText("公開待ちの記事はありません")).toBeInTheDocument();
+    // 空状態では公開/予約の操作ボタン・サマリ行は出さない。
+    expect(screen.queryByRole("button", { name: /今すぐ公開/ })).not.toBeInTheDocument();
   });
 
   it("公開OK/予約済み/要対応を3サマリ＋3セクションで振り分けて出す", () => {

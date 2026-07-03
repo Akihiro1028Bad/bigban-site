@@ -53,7 +53,27 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (ready.length === 0 && scheduled.length === 0 && blocked.length === 0) return null;
+  // 公開待ち(ready/scheduled/blocked)が空でも、見出しは残して空状態を明示する。
+  // 記事公開直後にキューが空になり画面が真っ白になる問題(UX)への対処。
+  if (ready.length === 0 && scheduled.length === 0 && blocked.length === 0) {
+    return (
+      <section aria-label="公開キュー" className="mx-auto max-w-[860px] px-6 py-7">
+        <div className="mb-5 flex items-center gap-2">
+          <IconCalendar size={18} style={{ color: "var(--p-accent)" }} />
+          <h2 className="text-[16px] font-semibold">公開キュー</h2>
+        </div>
+        <div
+          className="rounded-[12px] px-6 py-10 text-center"
+          style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+        >
+          <p className="text-[13.5px] font-medium">公開待ちの記事はありません</p>
+          <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--p-text-2)" }}>
+            記事を承認して下書きができると、ここに公開待ちとして並びます。
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   async function post(url: string, body: unknown): Promise<void> {
     const res = await fetch(url, {
