@@ -6,6 +6,7 @@ import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import StructuredData from "@/components/StructuredData";
 import { buildServices } from "@/lib/structured-data";
+import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
@@ -73,7 +74,7 @@ export default async function Home({ params }: HomePageProps) {
     <HomeIntro>
       <StructuredData data={buildServices()} />
       <main>
-        <HomeNavigation />
+        <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
         <HomeConcept />
         <HomeFacility />

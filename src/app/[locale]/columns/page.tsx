@@ -94,7 +94,7 @@ export default async function ColumnsPage({
 
   return (
     <>
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-12 py-8 lg:py-12">
           <p className="text-xs tracking-[0.3em] text-text-gray uppercase mb-4">

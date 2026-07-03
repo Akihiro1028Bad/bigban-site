@@ -20,6 +20,13 @@ interface MobileMenuProps {
   isJa: boolean;
   onSwitchLocale: (locale: "ja" | "en") => void;
   reserveHref: string;
+  navItems?: readonly NavigationItem[];
+}
+
+interface NavigationItem {
+  id: string;
+  kind: "anchor" | "page";
+  href: string;
 }
 
 function NavItemLink({
@@ -28,7 +35,7 @@ function NavItemLink({
   onLinkClick,
   children,
 }: {
-  item: (typeof NAV_ITEMS)[number];
+  item: NavigationItem;
   className: string;
   onLinkClick: () => void;
   children: React.ReactNode;
@@ -80,6 +87,7 @@ export default function MobileMenu({
   isJa,
   onSwitchLocale,
   reserveHref,
+  navItems = NAV_ITEMS,
 }: MobileMenuProps) {
   const t = useTranslations("Navigation");
 
@@ -187,7 +195,7 @@ export default function MobileMenu({
               animate="show"
               className="relative flex flex-1 flex-col gap-0.5 px-3 py-3"
             >
-              {NAV_ITEMS.map((nav) => {
+              {navItems.map((nav) => {
                 const ja = t(`${nav.id}Ja`);
                 const isActive = activeSection === nav.id;
                 return (
