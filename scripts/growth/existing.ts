@@ -55,6 +55,43 @@ function dateStart(page: NotionPage, prop: string): string {
   return value?.date?.start ?? "";
 }
 
+/** number プロパティを読む。未設定/非数値は null(手入力の欠落耐性)。 */
+function numberValue(page: NotionPage, prop: string): number | null {
+  const value = page.properties[prop] as { number?: number | null } | undefined;
+  return typeof value?.number === "number" ? value.number : null;
+}
+
+/** オーナー週次手入力(改善案#4)。週次グロースレポート DB の任意 number プロパティ。 */
+const MANUAL_INPUT_PROPS = [
+  { prop: "予約件数", label: "予約件数" },
+  { prop: "LINE友だち数", label: "LINE友だち数" },
+  { prop: "IGフォロワー数", label: "IGフォロワー数" },
+  { prop: "口コミ件数", label: "口コミ件数" },
+  { prop: "口コミ平均評価", label: "口コミ平均評価" },
+] as const;
+
+/**
+ * レポート行として「本文が作成済み」か(= `レポート` title を持つ)。
+ * オーナーが数字だけ先に入れた手入力行(title 無し)を「作成済み」に数えないための判定。
+ */
+function isCreatedReport(page: NotionPage): boolean {
+  return titleText(page, "レポート") !== "";
+}
+
+/**
+ * 対象週のレポート行群からオーナー手入力(予約/LINE/IG/口コミ)を1行ずつ抽出する。
+ * 複数行に散っていても最初に値が入っているものを採用(欠落耐性)。未入力の指標は含めない。
+ */
+function manualInputLines(reportsForWeek: NotionPage[]): string[] {
+  return MANUAL_INPUT_PROPS.flatMap(({ prop, label }) => {
+    for (const page of reportsForWeek) {
+      const value = numberValue(page, prop);
+      if (value !== null) return [`- ${label}: ${value}`];
+    }
+    return [];
+  });
+}
+
 function proposalLines(proposals: NotionPage[]): string[] {
   return proposals.map((page) => {
     const weekKey = richText(page, "週キー") || "週キー無し";
@@ -97,14 +134,27 @@ export function summarizeExisting(input: ExistingInput): string {
   lines.push(`対象週: ${period.start}〜${period.end}`);
   lines.push("");
 
-  if (reportsForWeek.length > 0) {
-    lines.push(`## 週次グロースレポート: 作成済み(${reportsForWeek.length}件)`);
+  // #4: 「作成済み」判定は レポート本文(title)を持つ行に限る。数字だけの手入力行は数えない。
+  const createdReports = reportsForWeek.filter(isCreatedReport);
+  if (createdReports.length > 0) {
+    lines.push(`## 週次グロースレポート: 作成済み(${createdReports.length}件)`);
     lines.push(`対象週開始=${period.start} の行が既に存在します。レポートは再作成しないでください。`);
   } else {
     lines.push(`## 週次グロースレポート: 未作成`);
     lines.push(
       `対象週開始=${period.start} の行は存在しません。重複ではないので、週次レポートを新規作成してください。`
     );
+  }
+  lines.push("");
+
+  // #4: オーナー週次手入力(予約/LINE/IG/口コミ)。実 KPI に接地させる分析入力。
+  const manual = manualInputLines(reportsForWeek);
+  lines.push(`## オーナー手入力(実 KPI・改善案#4)`);
+  if (manual.length > 0) {
+    lines.push(...manual);
+    lines.push(`(この実数を分析の成功指標の分母=実予約・SNS・口コミに使う。未入力の指標は推測しない)`);
+  } else {
+    lines.push(`手入力データなし(従来どおり GA4/GSC と Web 検索だけで分析。数字は推測しない)`);
   }
   lines.push("");
 
