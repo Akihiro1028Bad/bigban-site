@@ -51,7 +51,7 @@ interface HomeNavigationProps {
   showColumns?: boolean;
 }
 
-export default function HomeNavigation({ showColumns = false }: HomeNavigationProps = {}) {
+export default function HomeNavigation({ showColumns = false }: HomeNavigationProps) {
   const navItems = navItemsFor(showColumns);
   const locale = useLocale();
   const t = useTranslations("Navigation");

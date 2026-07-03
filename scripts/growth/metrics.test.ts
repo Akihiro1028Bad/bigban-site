@@ -49,6 +49,18 @@ describe("articlePagePath", () => {
       articlePagePath("spring-open", "en", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
     ).toBe("/en/columns/spring-open");
   });
+  it("env 引数省略時は process.env を参照する", () => {
+    const prev = process.env.GROWTH_MICROCMS_ENDPOINT;
+    try {
+      delete process.env.GROWTH_MICROCMS_ENDPOINT;
+      expect(articlePagePath("spring-open", "ja")).toBe("/news/spring-open");
+      process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+      expect(articlePagePath("spring-open", "ja")).toBe("/columns/spring-open");
+    } finally {
+      if (prev === undefined) delete process.env.GROWTH_MICROCMS_ENDPOINT;
+      else process.env.GROWTH_MICROCMS_ENDPOINT = prev;
+    }
+  });
 });
 
 describe("normalizePagePath", () => {
