@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ARTICLE_TYPE_TO_CATEGORY,
+  COLUMN_CATEGORY_IDS,
   columnCategoryIdForArticleType,
+  isColumnCategoryId,
+  resolveColumnCategoryId,
 } from "./columnCategory";
 
 describe("ARTICLE_TYPE_TO_CATEGORY(正典マッピング表)", () => {
@@ -63,13 +66,68 @@ describe("columnCategoryIdForArticleType", () => {
   });
 });
 
+describe("isColumnCategoryId", () => {
+  it("正典6件を受理する", () => {
+    for (const id of COLUMN_CATEGORY_IDS) {
+      expect(isColumnCategoryId(id)).toBe(true);
+    }
+    expect(COLUMN_CATEGORY_IDS).toEqual([
+      "start",
+      "rules",
+      "improve",
+      "health",
+      "compare",
+      "event",
+    ]);
+  });
+
+  it("正典外は拒否する", () => {
+    expect(isColumnCategoryId("acquire")).toBe(false); // articleType 内部IDは category IDではない
+    expect(isColumnCategoryId("")).toBe(false);
+    expect(isColumnCategoryId("不明")).toBe(false);
+  });
+});
+
+describe("resolveColumnCategoryId(#222 優先順位: コラムカテゴリ > 既定マッピング)", () => {
+  it("override が正典IDならそれを最優先で採用する", () => {
+    // 既定なら 資産→rules だが、override=improve が勝つ。
+    expect(resolveColumnCategoryId("資産", "improve")).toBe("improve");
+    // 既定なら 獲得→start だが、override=event が勝つ。
+    expect(resolveColumnCategoryId("獲得", "event")).toBe("event");
+  });
+
+  it("override が空/未追加なら既定マッピングにフォールバック(欠落耐性)", () => {
+    expect(resolveColumnCategoryId("資産", undefined)).toBe("rules");
+    expect(resolveColumnCategoryId("獲得", "")).toBe("start");
+    expect(resolveColumnCategoryId("比較", "   ")).toBe("compare");
+  });
+
+  it("override が正典外なら無視して既定にフォールバック", () => {
+    expect(resolveColumnCategoryId("獲得", "不正な値")).toBe("start");
+  });
+
+  it("override も articleType も解決不能なら undefined(category 省略)", () => {
+    expect(resolveColumnCategoryId(undefined, undefined)).toBeUndefined();
+    expect(resolveColumnCategoryId("不明", "")).toBeUndefined();
+  });
+
+  it("articleType 未知でも override が正典IDなら採用する", () => {
+    expect(resolveColumnCategoryId(undefined, "health")).toBe("health");
+  });
+
+  it("override の前後空白は無視する", () => {
+    expect(resolveColumnCategoryId("獲得", "  improve  ")).toBe("improve");
+  });
+});
+
 /**
- * 乖離検知(#columns レビュー対応): payload.json はプロンプト
- * `prompts/drafts.md` を読んだ実行エージェントが手書きするため、
- * マッピングの真実源(この TS 定数)とプロンプト内の転記が食い違うと
- * 静かに壊れる。プロンプト側の表を書き換え/削除したらここが赤になる。
+ * 単一ソース化の構造的保証(#222): かつては drafts.md に記事タイプ→カテゴリの
+ * 手書き表があり、乖離検知テストで転記ズレを防いでいた。#222 でその手書き表を
+ * 廃し、マッピングは `growth:column-category`(正典 ARTICLE_TYPE_TO_CATEGORY 由来)
+ * で解決する運用にした。ここでは「手書き表が復活していない=単一ソースが崩れていない」
+ * ことを構造的に守る(手書き表を書き戻すとこのテストが赤になる)。
  */
-describe("prompts/drafts.md との乖離検知", () => {
+describe("prompts/drafts.md の単一ソース化(#222)", () => {
   const promptPath = join(
     process.cwd(),
     "scripts",
@@ -79,30 +137,20 @@ describe("prompts/drafts.md との乖離検知", () => {
   );
   const prompt = readFileSync(promptPath, "utf-8");
 
-  const entries = Object.entries(ARTICLE_TYPE_TO_CATEGORY);
+  it("category 解決を growth:column-category コマンドに委ねている", () => {
+    expect(prompt).toContain("growth:column-category");
+  });
 
-  it.each(entries)(
-    "正典エントリ %s→%s がプロンプト本文に転記されている",
-    (labelJa, categoryId) => {
-      // プロンプトの表記: 獲得→`start`(workflow 手順3の既定マッピング行)
-      expect(prompt).toContain(`${labelJa}→\`${categoryId}\``);
-    },
-  );
-
-  it("プロンプト内の 記事タイプ→カテゴリ 行に正典外のマッピングが紛れていない", () => {
-    // `X→`y`` 形式(矢印直後にバッククォート付き content ID)を全て抽出し、
-    // 正典表と突き合わせる。画像スタイルの `A→b` は全体がコード span 内
-    // (矢印直後がバッククォートでない)ため一致しない。
-    const found = [...prompt.matchAll(/([^\s/(（`]+)→`([a-z-]+)`/g)].map(
-      (m) => [m[1], m[2]] as const,
-    );
-    // 抽出漏れで空振りしていないことも保証する(正典5件×転記1箇所以上)。
-    expect(found.length).toBeGreaterThanOrEqual(entries.length);
-    for (const [labelJa, categoryId] of found) {
-      expect(
-        ARTICLE_TYPE_TO_CATEGORY,
-        `プロンプトに正典外のマッピング: ${labelJa}→${categoryId}`,
-      ).toHaveProperty(labelJa, categoryId);
-    }
+  it("記事タイプ→カテゴリの手書き対応表(獲得→`start` 等)が本文に残っていない", () => {
+    // `記事タイプ日本語→`content-id`` 形式の手書き転記を全て抽出する。
+    // 画像スタイルの `A→b`(全体がコード span 内・矢印直後がバッククォートでない)は一致しない。
+    const handWritten = [...prompt.matchAll(/([^\s/(（`]+)→`([a-z-]+)`/g)]
+      .map((m) => [m[1], m[2]] as const)
+      // 正典の日本語ラベルが左辺にある行だけを「マッピング転記」とみなす。
+      .filter(([labelJa]) => labelJa in ARTICLE_TYPE_TO_CATEGORY);
+    expect(
+      handWritten,
+      `drafts.md に手書きマッピングが残存: ${JSON.stringify(handWritten)}`,
+    ).toEqual([]);
   });
 });
