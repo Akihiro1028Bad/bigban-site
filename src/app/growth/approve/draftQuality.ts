@@ -107,15 +107,23 @@ export function extractInternalLinkPaths(html: string): string[] {
 }
 
 /**
- * 壊れた内部リンク(#H19)。検証対象は `/ja/news/<slug>` の記事リンクのみ(誤検出を避け、
- * 一覧/施設/トップ等の静的パスは検証しない)。knownNewsPaths に無い記事リンクを返す。
+ * 記事詳細リンクのパスパターン。公開先が `news`(既定)でも `columns` でも同じ検査に載せる
+ * ため、両セグメントを許容する(#columns)。一覧(`/ja/news`)や施設/トップ等の静的パスは
+ * `.+` 要求で対象外になり誤検出しない。
+ */
+const ARTICLE_LINK_PATTERN = /^\/ja\/(?:news|columns)\/.+/;
+
+/**
+ * 壊れた内部リンク(#H19)。検証対象は `/ja/news/<slug>` および `/ja/columns/<slug>` の
+ * 記事リンクのみ(誤検出を避け、一覧/施設/トップ等の静的パスは検証しない)。
+ * knownNewsPaths(=公開先に応じて呼び出し側が組み立てた既知パス集合)に無い記事リンクを返す。
  */
 export function findBrokenInternalLinks(
   html: string,
   knownNewsPaths: ReadonlySet<string>
 ): string[] {
   return extractInternalLinkPaths(html).filter(
-    (path) => /^\/ja\/news\/.+/.test(path) && !knownNewsPaths.has(path)
+    (path) => ARTICLE_LINK_PATTERN.test(path) && !knownNewsPaths.has(path)
   );
 }
 

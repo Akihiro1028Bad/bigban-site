@@ -19,3 +19,22 @@ type EndpointEnv = Readonly<Record<string, string | undefined>>;
 export function growthEndpoint(env: EndpointEnv = process.env): string {
   return env.GROWTH_MICROCMS_ENDPOINT?.trim() || "news";
 }
+
+/** URL パスセグメントとして使える公開先(news / columns)。 */
+const ARTICLE_SEGMENTS = ["news", "columns"] as const;
+export type ArticleSegment = (typeof ARTICLE_SEGMENTS)[number];
+
+/**
+ * 公開記事の URL パスセグメント(`/ja/<segment>/<slug>` の <segment>)を返す。
+ *
+ * `growthEndpoint()` の値(news / columns)がそのまま URL セグメントになるが、
+ * 未知の endpoint 値が URL やリンク検査に漏れると壊れた導線を生むため、
+ * 既知の news / columns 以外は現行互換の `"news"` に丸める(欠落耐性)。
+ * env 未設定時は `"news"` = 挙動不変。
+ */
+export function growthArticleSegment(env: EndpointEnv = process.env): ArticleSegment {
+  const endpoint = growthEndpoint(env);
+  return (ARTICLE_SEGMENTS as ReadonlyArray<string>).includes(endpoint)
+    ? (endpoint as ArticleSegment)
+    : "news";
+}
