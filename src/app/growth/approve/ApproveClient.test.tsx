@@ -46,6 +46,12 @@ vi.mock("./PromptsView", () => ({
   PromptsView: ({ token }: { token: string }) => <div>プロンプト確認スタブ:{token}</div>,
 }));
 
+// 画像ディレクター UI は本番既定 OFF(#62・imageDirectorFlag)。構成案タブの画像トグル結線
+// (updateImageInstruction)を検証する統合テストがあるため、ここでは true にして表示させる。
+vi.mock("./imageDirectorFlag", () => ({
+  isImageDirectorEnabled: () => true,
+}));
+
 import { ApproveClient } from "./ApproveClient";
 import { STUCK_THRESHOLD_MS } from "./generating";
 

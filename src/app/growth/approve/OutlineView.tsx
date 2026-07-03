@@ -18,6 +18,7 @@ import { useState } from "react";
 
 import { effectiveMode, recommendOff, resolveAction } from "@/lib/growth/imageIntent";
 import { ImageDirector } from "./ImageDirector";
+import { isImageDirectorEnabled } from "./imageDirectorFlag";
 import { ImagePlanBanner } from "./ImagePlanBanner";
 import { ImageSlot } from "./ImageSlot";
 import { ImageStateToggle } from "./ImageStateToggle";
@@ -72,6 +73,10 @@ export function OutlineView({
   const [commentFor, setCommentFor] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const [editingImg, setEditingImg] = useState<number | null>(null);
+
+  // 画像ディレクター UI(バナー＋出す/出さないトグル)は保存先・生成側読込が未実装のため
+  // 既定で隠す(#62・[[imageDirectorFlag]])。コメントレーンは常時表示。
+  const showImageDirector = isImageDirectorEnabled();
 
   const total = sections.length;
   const totalComments = sections.reduce((n, s) => n + (s.comments?.length ?? 0), 0);
@@ -146,13 +151,15 @@ export function OutlineView({
         </button>
       </div>
 
-      <ImagePlanBanner
-        outline={sections.map((s, i) => ({
-          heading: s.heading,
-          summary: s.summary,
-          imageInstruction: imageInstructions[i],
-        }))}
-      />
+      {showImageDirector && (
+        <ImagePlanBanner
+          outline={sections.map((s, i) => ({
+            heading: s.heading,
+            summary: s.summary,
+            imageInstruction: imageInstructions[i],
+          }))}
+        />
+      )}
 
       <ol className="flex flex-col gap-2.5">
         {sections.map((s, i) => {
@@ -235,20 +242,24 @@ export function OutlineView({
                     >
                       <IconPlus size={13} /> コメント
                     </button>
-                    <span className="h-4 w-px" style={{ background: "var(--p-border)" }} />
-                    <ImageStateToggle mode={mode} recommendOff={recOff} onChange={(m) => changeMode(i, m)} />
-                    {editingImg !== i && (
-                      <ImageSlot
-                        mode={mode}
-                        action={slotAction}
-                        hue={hue}
-                        isEyecatch={inst?.isEyecatch}
-                        onEdit={() => { onUpdateImage(i, { mode: "custom" }); setEditingImg(i); }}
-                      />
+                    {showImageDirector && (
+                      <>
+                        <span className="h-4 w-px" style={{ background: "var(--p-border)" }} />
+                        <ImageStateToggle mode={mode} recommendOff={recOff} onChange={(m) => changeMode(i, m)} />
+                        {editingImg !== i && (
+                          <ImageSlot
+                            mode={mode}
+                            action={slotAction}
+                            hue={hue}
+                            isEyecatch={inst?.isEyecatch}
+                            onEdit={() => { onUpdateImage(i, { mode: "custom" }); setEditingImg(i); }}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
 
-                  {editingImg === i && (
+                  {showImageDirector && editingImg === i && (
                     <ImageDirector
                       section={sec}
                       hue={hue}

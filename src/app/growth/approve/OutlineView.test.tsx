@@ -1,12 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActionSuggestions } from "./ActionSuggestions";
 import { HouseStylePreview } from "./HouseStylePreview";
+import { isImageDirectorEnabled } from "./imageDirectorFlag";
 import { OutlineView } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { ArticleHypothesis } from "@/lib/growth/approve";
+
+// 画像ディレクター UI は本番既定 OFF(#62・imageDirectorFlag)。以降の画像レーン系テストは
+// 表示前提なので既定 true でモックし、隠す挙動は専用テストで false に上書きして検証する。
+vi.mock("./imageDirectorFlag", () => ({
+  isImageDirectorEnabled: vi.fn(() => true),
+}));
+
+beforeEach(() => {
+  vi.mocked(isImageDirectorEnabled).mockReturnValue(true);
+});
 
 function setup(over: Partial<Parameters<typeof OutlineView>[0]> = {}) {
   const props = {
@@ -133,6 +144,18 @@ describe("OutlineView", () => {
     });
     // 2セクション中、off が1つ → planned=1, specified=1
     expect(screen.getByText(/画像 1枚予定 ・ 指定済み 1/)).toBeInTheDocument();
+  });
+
+  it("画像ディレクターが無効(本番既定)ならバナー・トグルを隠しコメントレーンは残す", () => {
+    vi.mocked(isImageDirectorEnabled).mockReturnValue(false);
+    setup();
+    // バナー(house style 帯)・出す/出さないトグル・画像プラン集計は非表示
+    expect(screen.queryByText(/宇宙人マスコット × コスミック/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "画像をどうするか" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/枚予定/)).not.toBeInTheDocument();
+    // コメントレーンは従来どおり利用できる
+    expect(screen.getByRole("button", { name: /構成案の修正を依頼/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /コメント$/ }).length).toBeGreaterThan(0);
   });
 
   it("仮説カード: props 無しでは非表示", () => {
