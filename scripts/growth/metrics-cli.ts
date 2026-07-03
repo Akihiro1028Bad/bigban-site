@@ -17,6 +17,7 @@ import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
 import { loadGrowthConfig, type GrowthConfig } from "./config";
+import { growthMediaForRow } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import {
@@ -78,6 +79,12 @@ function titleOf(page: NotionPage): string {
     | { title?: { plain_text?: string }[] }
     | undefined;
   return (prop?.title ?? []).map((r) => r.plain_text ?? "").join("").trim();
+}
+
+/** #media: Notion 行の `媒体` select を読み、GA4/GSC の URL セグメント解決に使う。欠落=column。 */
+function mediaOf(page: NotionPage): ReturnType<typeof growthMediaForRow> {
+  const prop = page.properties["媒体"] as { select?: { name?: string } | null } | undefined;
+  return growthMediaForRow(prop?.select?.name ?? "");
 }
 
 /** 公開記事(ステータス=公開済み)のページを取得する。 */
@@ -187,7 +194,7 @@ async function main(): Promise<void> {
       console.warn(`[metrics] slug 解決失敗: ${titleOf(page)} (contentId=${contentId})`);
       continue;
     }
-    const pagePath = articlePagePath(sl.slug, sl.locale);
+    const pagePath = articlePagePath(sl.slug, sl.locale, mediaOf(page));
     const base = metricsForPagePath(pagePath, rows, current);
     if (!base) {
       unmatched += 1;

@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 
-import { growthArticleSegment } from "./endpoint";
+import { growthArticleSegment, type GrowthMedia } from "./endpoint";
 import type { MergedRow } from "./transform";
 
 /** 1指標の今期/前期/前週比。 */
@@ -64,15 +64,18 @@ const KEY_EVENTS_METRIC = "keyEvents";
 /**
  * 公開記事の GA4 pagePath を組み立てる。ja は接頭辞なし、それ以外(en)は /en。
  *
- * URL セグメント(news / columns)は `growthArticleSegment()` で解決する。
- * env 未設定時は news = 現行互換。env はテスト注入用の引数(既定は process.env)。
+ * URL セグメント(news / columns)は `growthArticleSegment(media, env)` で解決する。
+ * #media: news 媒体は常に news、column 媒体は env 従属(columns 切替後は columns)。
+ * media 省略時は column=従来挙動。env 未設定時は news = 現行互換。
+ * media/env はテスト注入用の引数(既定は column / process.env)。
  */
 export function articlePagePath(
   slug: string,
   locale: string,
+  media: GrowthMedia = "column",
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): string {
-  const segment = growthArticleSegment(env);
+  const segment = growthArticleSegment(media, env);
   return locale === "ja" ? `/${segment}/${slug}` : `/en/${segment}/${slug}`;
 }
 
