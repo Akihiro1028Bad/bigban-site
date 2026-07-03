@@ -87,8 +87,8 @@ describe("buildPersonYoshida", () => {
     const { buildPersonYoshida } = await import("./person");
     const schema = buildPersonYoshida();
 
-    expect(schema.name).toBe("吉田 裕太");
-    expect(schema.alternateName).toContain("吉田裕太");
+    expect(schema.name).toBe("吉田 祐太");
+    expect(schema.alternateName).toContain("吉田祐太");
     expect(schema.alternateName).toContain("Yuta Yoshida");
     expect(schema.alternateName).toContain("ヨシダユウタ");
   });

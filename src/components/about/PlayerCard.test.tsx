@@ -83,7 +83,7 @@ describe("PlayerCard", () => {
     const { container } = renderCard({
       ...activePlayer,
       image: "/images/yuta-yoshida.jpg",
-      imageAlt: "吉田 裕太",
+      imageAlt: "吉田 祐太",
     });
     const containImg = container.querySelector("img.object-contain");
     const blurImg = container.querySelector("img.blur-2xl");
@@ -96,9 +96,9 @@ describe("PlayerCard", () => {
     renderCard({
       ...activePlayer,
       image: "/images/yuta-yoshida.jpg",
-      imageAlt: "吉田 裕太",
+      imageAlt: "吉田 祐太",
     });
-    const img = screen.getByAltText("吉田 裕太");
+    const img = screen.getByAltText("吉田 祐太");
     expect(img).toBeInTheDocument();
     expect(
       screen.queryByText(jaMessages.About.photoPlaceholder)
