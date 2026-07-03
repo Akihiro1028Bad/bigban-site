@@ -133,6 +133,11 @@ OAuth 同意画面のステータスが **「テスト」のままだと、付�
 > 工程名・再開コマンドを出力して LINE 通知する。動作確認(`GROWTH_DRYRUN=1`)や明示 opt-out(`GROWTH_SKIP_PULL=1`)では
 > pull を skip する。成功時は週次通知に実行 SHA を載せ、承認画面(Vercel デプロイ)側 SHA とのスキュー確認ができる。
 > push / commit は引き続き headless からは不可(DISALLOW 維持)。
+>
+> **設計判断**: pull 前置は **run.mjs 経由の生成モードのみ**(weekly / drafts / initiatives / *-loop)。
+> tsx 直呼びの消費 CLI(`growth:publish-due` / `growth:metrics` / `growth:review-due` / `growth:stall-check` 等)は
+> 対象外とする(ロジック skew は許容・必要なら手動 pull)。生成モードが数時間おきに pull するため実質的な
+> 鮮度は保たれ、消費 CLI にまで pull を入れると 5〜15分間隔の cron が git 操作を高頻度で叩き合うため。
 
 ### 6-1. 起動用バッチを作成
 

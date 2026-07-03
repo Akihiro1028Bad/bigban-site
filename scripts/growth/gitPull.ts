@@ -7,11 +7,21 @@
  *
  * 失敗(非 ff・conflict・ネットワーク断)は「沈黙させない」原則に従い、工程を中断して
  * 工程名・再開コマンド・原因ヒントを LINE 通知する(組み立てはここ、送信は run.mjs)。
+ *
+ * ⚠️ 二重実装の注意(レビュー MEDIUM-1): run.mjs は .ts を import できないため、
+ * skip 判定と exit-code 成否判定は run.mjs の `pullLatestOrAbort()` にミラー実装がある。
+ * ここ(特に {@link PULL_SKIP_ENV_VARS})を変更したら run.mjs 側も必ず同時に更新すること。
  */
+
+/**
+ * pull を skip させる環境変数名の正典。
+ * run.mjs の `pullLatestOrAbort()` はこれと同名の判定をミラーしている(変更時は両方)。
+ */
+export const PULL_SKIP_ENV_VARS = ["GROWTH_DRYRUN", "GROWTH_SKIP_PULL"] as const;
 
 /** GROWTH_DRYRUN / GROWTH_SKIP_PULL のいずれかが立っていれば pull を skip する(動作確認を壊さない)。 */
 export function shouldSkipPull(env: Record<string, string | undefined>): boolean {
-  return Boolean(env.GROWTH_DRYRUN) || Boolean(env.GROWTH_SKIP_PULL);
+  return PULL_SKIP_ENV_VARS.some((name) => Boolean(env[name]));
 }
 
 /** pull の子プロセス終了コード → 成否。null(シグナル等)や非 0 は失敗。 */
