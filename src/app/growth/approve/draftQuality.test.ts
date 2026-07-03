@@ -78,12 +78,16 @@ describe("draftQuality", () => {
     expect(hasBlockingCheck(checks)).toBe(true);
   });
 
-  it("§13 断定NG(料金/営業時間/コート面数/所要分)は block", () => {
+  it("§13 断定NG(料金/所要分)は block(#217: 未確定情報のみ)", () => {
     const base = { bodyHtml: "", title: "t" } as const;
     expect(pick(draftQuality({ ...base, body: `月額5,000円${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `営業時間は10時から${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `コート4面完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
     expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩5分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+  });
+
+  it("#217: 公表済み事実(営業時間6:00-23:00・3面)は block しない", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    expect(pick(draftQuality({ ...base, body: `営業時間は6:00-23:00です${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    expect(pick(draftQuality({ ...base, body: `コート3面を完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
   });
 
   it("body が空なら bodyHtml からタグを除いて判定する", () => {
@@ -143,8 +147,11 @@ describe("draftQuality: 内部リンク先(#H19)", () => {
 });
 
 describe("detectDoNotWrite", () => {
-  it("該当カテゴリのラベルを返す", () => {
-    expect(detectDoNotWrite("コート4面・月額3000円")).toEqual(["料金", "コート面数"]);
+  it("該当カテゴリのラベルを返す(#217: 料金・所要分のみ)", () => {
+    expect(detectDoNotWrite("本八幡駅から徒歩7分・月額3000円")).toEqual(["料金", "所要時間"]);
+  });
+  it("#217: 公表済みの面数・営業時間は検出しない", () => {
+    expect(detectDoNotWrite("コート3面・営業時間6:00-23:00")).toEqual([]);
   });
   it("該当なしは空", () => {
     expect(detectDoNotWrite("市川の屋内コートで打てる")).toEqual([]);

@@ -4,7 +4,7 @@
  * 下書き本文(HTML/プレーン)とタイトルから各項目を **3段階(ok=緑 / warn=黄 / block=赤)** で判定する。
  * 赤(block)が1つでもあれば公開をブロックする(明示オーバーライドを要求)。しきい値は記事タイプ別に定数化。
  *
- * - block: §5 AI免責文の欠落 / §13 doNotWrite(料金・営業時間・コート面数・所要分)の断定
+ * - block: §5 AI免責文の欠落 / §13 doNotWrite(未確定=料金・所要分)の断定
  * - warn : 文字数不足/過多・見出し/画像/内部リンク不足・タイトル長超過
  */
 
@@ -50,11 +50,15 @@ const SITE_HOST = "thepicklebang.com";
 /** §5: 末尾に必須の AI 免責文(部分一致で存在を見る)。 */
 const DISCLAIMER_MARK = "AIが作成した下書き";
 
-/** §13 doNotWrite: 断定してはいけない可変情報のパターン(料金・営業時間・コート面数・所要分)。 */
+/**
+ * §13 doNotWrite: 断定してはいけない**未確定**情報のパターン(料金・所要分)。
+ *
+ * #217: 営業時間(6:00-23:00)・コート面数(3面)・サーフェス(デコターフ)は about/PR TIMES/
+ * PJ連盟公式で公表済みのため封印を解除し、confirmed(`facility-context.json`)へ移した。
+ * 未確定のまま残すのは料金(価格)と各駅からの正確な所要分のみ。
+ */
 const DO_NOT_WRITE: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "料金", pattern: /[0-9０-９][0-9０-９,，]*\s*円|月額|入会金|月会費/ },
-  { label: "営業時間", pattern: /営業時間|定休日/ },
-  { label: "コート面数", pattern: /コート\s*[0-9０-９]+\s*面/ },
   { label: "所要時間", pattern: /徒歩\s*[0-9０-９]+\s*分|駅から[^。]{0,8}?[0-9０-９]+\s*分/ },
 ];
 
@@ -164,7 +168,7 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
       label: "断定NG(可変情報)",
       value: doNotWrite.length > 0 ? doNotWrite.join("・") : "なし",
       level: doNotWrite.length > 0 ? "block" : "ok",
-      hint: doNotWrite.length > 0 ? "§13: 未確定の料金/時間/面数/所要分は断定しない" : undefined,
+      hint: doNotWrite.length > 0 ? "§13: 未確定の料金/所要分は断定しない(営業時間・面数は公表済みで解禁)" : undefined,
     },
     ...brokenLinkChecks(input),
   ];
