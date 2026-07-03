@@ -38,7 +38,7 @@
 
 ### 記事タイプ→中間KPIの対応(どの型が何を狙うか)
 
-`記事タイプ`(獲得/不安解消/資産/比較/イベント。#C4・[40-notion-props.md](40-notion-props.md))ごとに、主に効かせたい中間KPIが違う。読者向けカテゴリ(category)との対応は `drafts.md` のマッピング(獲得→`start`/不安解消→`start`/資産→`rules`(or `improve`/`health`)/比較→`compare`/イベント→`event`)に従う。
+`記事タイプ`(獲得/不安解消/資産/比較/イベント。#C4・[40-notion-props.md](40-notion-props.md))ごとに、主に効かせたい中間KPIが違う。読者向けカテゴリ(category)との対応は `scripts/growth/columnCategory.ts` の `ARTICLE_TYPE_TO_CATEGORY` を正典とするマッピング(再掲: 獲得→`start`/不安解消→`start`/資産→`rules`(or `improve`/`health`)/比較→`compare`/イベント→`event`)に従う(#222)。
 
 | 記事タイプ | 主に効かせる中間KPI | 狙い |
 |---|---|---|
