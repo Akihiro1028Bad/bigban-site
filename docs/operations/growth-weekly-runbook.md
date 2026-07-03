@@ -491,7 +491,7 @@ AI は使わない（純粋なデータ結線）。
 
 - 保存出力は許可リストに正規化される（**クライアント＋サーバの二重サニタイズ**。許可外タグ/属性は自動除去）。
 - 取得/保存の失敗は明示（再読み込み・エラー表示）。下書き未作成・取得失敗・保存失敗をそれぞれ区別する。
-- **認可は #36 でオフのまま**。プレビュー取得 API(`/api/growth/draft`)・保存 API(`/api/growth/draft/edit`)は誰でも叩ける状態のため、**実運用前に #7 のハードニング必須**（`APPROVE_AUTH_ENABLED=true` で承認系と同時に保護される構造）。
+- **認可は既定 ON・フェイルセーフ**（`APPROVE_AUTH_ENABLED` は `process.env.APPROVE_AUTH_ENABLED !== "false"`＝未設定なら ON・`featureFlags.ts:27`）。プレビュー取得 API(`/api/growth/draft`)・保存 API(`/api/growth/draft/edit`)は承認系 API と同じ `verifyToken` ゲートで保護される。**明示的に `APPROVE_AUTH_ENABLED=false` を本番 env に置いた場合のみ**フェイルオープン（誰でも叩ける）になるため、本番では値を外す（未設定）か `true` にすること。`check-prod-auth.mjs`（prebuild／CI ガード）が本番×`false` のビルドを失敗させる。
 - `下書きプレビューキー`(draftKey)は下書き読取トークンに相当。**Notion DB の共有範囲を「特定メンバー/プライベート」に限定**しておく（公開共有しない）。
 - **リッチエディタ本体(TipTap)はカバレッジ除外**のため、導入後はブラウザでの実挙動、特に**画像/表/埋め込み等の往復保持**（読み込み→保存で壊れないか）を実機確認する。保持が不十分なら別issueで強化する。
 - **プレビュー iframe の `postMessage` は同一オリジン限定**（`isAllowedPreviewOrigin`）・受信HTMLは型/サイズ検証(`parsePreviewMessage`)＋ `NewsBodyRenderer` 内で STRICT サニタイズ。iframe.contentWindow への薄い結線(`DraftPreviewFrame.tsx`)はカバレッジ除外のため、**iframe が本番スタイルで描画されるか**を実機確認する（純ロジックは `draftPreview.ts`、受信描画は `DraftFrameClient` でテスト済み）。
