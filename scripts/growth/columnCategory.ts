@@ -70,3 +70,42 @@ export function columnCategoryIdForArticleType(
   if (!key) return undefined;
   return LABEL_LOOKUP.get(key) ?? INTERNAL_ID_LOOKUP.get(key);
 }
+
+/**
+ * #222: category の**優先順位を単一ソースで解決**する純ロジック。
+ * Notion 任意プロパティ `コラムカテゴリ`(人が上書き)が既定マッピングより優先。
+ *
+ * - `override`(=Notion `コラムカテゴリ` select の値)が正典6件のいずれかなら**それを最優先で採用**。
+ * - override が空/未追加(欠落耐性)なら articleType からの既定マッピングにフォールバック。
+ * - どちらでも解決できなければ undefined(= category 省略・人が microCMS で後付け)。
+ *
+ * category(読者向け・回遊/SEO)と articleType(内部計測)は別軸で共存する(AD8)。
+ * override は読者向けの最終分類を人が動的に決める手段(columns AD7)であり、
+ * 内部計測軸である `記事タイプ` は上書きしない(両軸は独立)。
+ */
+export function resolveColumnCategoryId(
+  articleType: string | undefined,
+  override: string | undefined,
+): string | undefined {
+  const overrideKey = override?.trim();
+  if (overrideKey && isColumnCategoryId(overrideKey)) return overrideKey;
+  return columnCategoryIdForArticleType(articleType);
+}
+
+/** 承認/microCMS で選べる column-categories の正典 content ID(6件・AD7 の動的カテゴリ)。 */
+export const COLUMN_CATEGORY_IDS = [
+  "start",
+  "rules",
+  "improve",
+  "health",
+  "compare",
+  "event",
+] as const;
+export type ColumnCategoryId = (typeof COLUMN_CATEGORY_IDS)[number];
+
+const COLUMN_CATEGORY_ID_SET = new Set<string>(COLUMN_CATEGORY_IDS);
+
+/** 与えられた文字列が正典 content ID のいずれかか(override の妥当性判定)。 */
+export function isColumnCategoryId(value: string): value is ColumnCategoryId {
+  return COLUMN_CATEGORY_ID_SET.has(value);
+}

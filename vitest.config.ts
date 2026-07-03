@@ -83,6 +83,7 @@ export default defineConfig({
         "scripts/growth/stall-check-cli.ts",
         "scripts/growth/prompt-lint-cli.ts",
         "scripts/growth/article-eval-cli.ts",
+        "scripts/growth/column-category-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
