@@ -22,12 +22,13 @@ import {
   eyecatchUrlOf,
   ideaTitleOf,
   isNotionPageId,
+  mediaOf,
 } from "@/lib/growth/approve";
 import { bodyCommentViewOf } from "@/lib/growth/bodyComment";
 import { bodyRegenViewOf } from "@/lib/growth/bodyImageRegen";
 import { decorateViewOf } from "@/lib/growth/decorate";
 import { regenViewOf } from "@/lib/growth/eyecatchRegen";
-import { growthArticleSegment } from "@/lib/growth/endpoint";
+import { growthArticleSegment, type GrowthMedia } from "@/lib/growth/endpoint";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
 import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
@@ -37,12 +38,13 @@ export const runtime = "nodejs";
 /**
  * #H19 壊れ内部リンク検査用の既知記事パス集合を、公開先(news / columns)に合わせて取得する。
  *
- * 公開先が columns のときは columns の slug を、既定(news)のときは news の slug を見る。
- * env 未設定なら segment="news" = 現行互換。ja のみ検査対象(#H19 の既存仕様を踏襲)。
- * 取得不可(未設定/障害)は呼び出し側で undefined 化して検査をスキップする。
+ * #media: 公開先は行の `媒体` に追従する。`news` 媒体は常に news、`column` 媒体は env 従属
+ * (columns 分離切替後は columns)。これにより news 告知の内部リンク検査が news slug を、
+ * column 記事の検査が columns slug を見る。env 未設定なら segment="news" = 現行互換。
+ * ja のみ検査対象(#H19 の既存仕様を踏襲)。取得不可は呼び出し側で undefined 化してスキップ。
  */
-async function knownArticlePaths(): Promise<string[]> {
-  const segment = growthArticleSegment();
+async function knownArticlePaths(media: GrowthMedia): Promise<string[]> {
+  const segment = growthArticleSegment(media);
   const slugs =
     segment === "columns" ? await getColumnSlugs() : await getNewsSlugs();
   return slugs
@@ -86,7 +88,8 @@ export async function GET(request: Request): Promise<Response> {
     // 取得不可(未設定/障害)でも本文表示は止めない。未設定なら承認画面は壊れリンク検査をスキップする。
     let knownNewsPaths: string[] | undefined;
     try {
-      knownNewsPaths = await knownArticlePaths();
+      // #media: 行の 媒体 に応じて news / columns の公開 slug を検査対象にする。
+      knownNewsPaths = await knownArticlePaths(mediaOf(page));
     } catch {
       knownNewsPaths = undefined;
     }

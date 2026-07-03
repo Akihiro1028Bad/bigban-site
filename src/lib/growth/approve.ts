@@ -3,6 +3,7 @@
  * I/O を含まないためテスト可能。Route Handler はこれらを使う薄い配線にする。
  */
 
+import { growthMediaForRow, type GrowthMedia } from "./endpoint";
 import {
   BODY_MIRROR_PROP,
   chunkRichText,
@@ -139,6 +140,18 @@ export function draftBodyOf(page: NotionPage): string {
 /** ページのタイトル案(`タイトル案`)を読む(#95: 下書きプレビューの見出し)。未設定は空文字。 */
 export function ideaTitleOf(page: NotionPage): string {
   return titleText(page, "タイトル案");
+}
+
+/** 記事ネタ案 `媒体` プロパティ名(#media・任意 select)。 */
+export const MEDIA_PROP = "媒体";
+
+/**
+ * ページの媒体軸(`媒体` select)を読む(#media)。
+ * `ニュース` → news / それ以外・未追加・空 → column(欠落=コラム=完全後方互換)。
+ * 承認画面の下書きプレビュー(壊れ内部リンク検査の公開先解決)や公開先の出し分けに使う。
+ */
+export function mediaOf(page: NotionPage): GrowthMedia {
+  return growthMediaForRow(selectName(page, MEDIA_PROP));
 }
 
 /**

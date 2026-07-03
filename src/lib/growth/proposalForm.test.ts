@@ -74,9 +74,9 @@ describe("validateProposalForm", () => {
       expect(r.ok && r.payload.category).toBe("サイトデザイン");
     });
 
-    it("other は category=コンテンツ へ写像", () => {
+    it("other は category=MEO へ写像(#214・往復整合)", () => {
       const r = validateProposalForm({ name: "その他施策", kind: "other" });
-      expect(r.ok && r.payload.category).toBe("コンテンツ");
+      expect(r.ok && r.payload.category).toBe("MEO");
     });
   });
 

@@ -35,27 +35,40 @@ function row(
 }
 
 describe("articlePagePath", () => {
-  it("ja は /news/{slug}(env 未設定=現行互換)", () => {
-    expect(articlePagePath("spring-open", "ja", {})).toBe("/news/spring-open");
+  it("ja は /news/{slug}(column・env 未設定=現行互換)", () => {
+    expect(articlePagePath("spring-open", "ja", "column", {})).toBe("/news/spring-open");
   });
   it("ja 以外(en)は /en/news/{slug}", () => {
-    expect(articlePagePath("spring-open", "en", {})).toBe("/en/news/spring-open");
+    expect(articlePagePath("spring-open", "en", "column", {})).toBe("/en/news/spring-open");
   });
-  it("endpoint=columns なら /columns/{slug}", () => {
+  it("column 媒体で endpoint=columns なら /columns/{slug}", () => {
     expect(
-      articlePagePath("spring-open", "ja", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+      articlePagePath("spring-open", "ja", "column", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
     ).toBe("/columns/spring-open");
     expect(
-      articlePagePath("spring-open", "en", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+      articlePagePath("spring-open", "en", "column", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
     ).toBe("/en/columns/spring-open");
   });
-  it("env 引数省略時は process.env を参照する", () => {
+  it("news 媒体は env=columns でも常に /news/{slug}(#media)", () => {
+    expect(
+      articlePagePath("summer-fair", "ja", "news", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+    ).toBe("/news/summer-fair");
+    expect(
+      articlePagePath("summer-fair", "en", "news", { GROWTH_MICROCMS_ENDPOINT: "columns" }),
+    ).toBe("/en/news/summer-fair");
+  });
+  it("media 省略時は column 扱い(挙動不変)", () => {
+    expect(articlePagePath("spring-open", "ja", undefined, {})).toBe("/news/spring-open");
+  });
+  it("env 引数省略時は process.env を参照する(column)", () => {
     const prev = process.env.GROWTH_MICROCMS_ENDPOINT;
     try {
       delete process.env.GROWTH_MICROCMS_ENDPOINT;
-      expect(articlePagePath("spring-open", "ja")).toBe("/news/spring-open");
+      expect(articlePagePath("spring-open", "ja", "column")).toBe("/news/spring-open");
       process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
-      expect(articlePagePath("spring-open", "ja")).toBe("/columns/spring-open");
+      expect(articlePagePath("spring-open", "ja", "column")).toBe("/columns/spring-open");
+      // news 媒体は env を無視。
+      expect(articlePagePath("spring-open", "ja", "news")).toBe("/news/spring-open");
     } finally {
       if (prev === undefined) delete process.env.GROWTH_MICROCMS_ENDPOINT;
       else process.env.GROWTH_MICROCMS_ENDPOINT = prev;

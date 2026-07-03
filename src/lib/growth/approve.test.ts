@@ -10,6 +10,7 @@ import {
   eyecatchUrlOf,
   ideaTitleOf,
   isNotionPageId,
+  mediaOf,
   parseDecisions,
   pendingStatus,
   reviseProposalOf,
@@ -47,6 +48,40 @@ function idea(id: string, title: string, summary: string): NotionPage {
     },
   };
 }
+
+describe("mediaOf (#media)", () => {
+  it("媒体=ニュース は news", () => {
+    const page: NotionPage = {
+      id: "m1",
+      url: "",
+      properties: { "媒体": { type: "select", select: { name: "ニュース" } } },
+    };
+    expect(mediaOf(page)).toBe("news");
+  });
+
+  it("媒体=コラム は column", () => {
+    const page: NotionPage = {
+      id: "m2",
+      url: "",
+      properties: { "媒体": { type: "select", select: { name: "コラム" } } },
+    };
+    expect(mediaOf(page)).toBe("column");
+  });
+
+  it("媒体プロパティ未追加は column(完全後方互換)", () => {
+    const page: NotionPage = { id: "m3", url: "", properties: {} };
+    expect(mediaOf(page)).toBe("column");
+  });
+
+  it("媒体=null(select 未選択)は column", () => {
+    const page: NotionPage = {
+      id: "m4",
+      url: "",
+      properties: { "媒体": { type: "select", select: null } },
+    };
+    expect(mediaOf(page)).toBe("column");
+  });
+});
 
 describe("toPendingItems", () => {
   it("施策提案は判断根拠(優先度スコア/確度/インパクト/根拠/想定アクション)を details に持つ", () => {

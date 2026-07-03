@@ -78,6 +78,7 @@ export default defineConfig({
         "scripts/growth/metrics-cli.ts",
         "scripts/growth/publish-due-cli.ts",
         "scripts/growth/review-due-cli.ts",
+        "scripts/growth/proposal-review-due-cli.ts",
         "scripts/growth/notify-pull-fail-cli.ts",
         "scripts/growth/notify-loop-fail-cli.ts",
         "scripts/growth/stall-check-cli.ts",

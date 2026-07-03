@@ -17,6 +17,7 @@ import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
 import { loadGrowthConfig, type GrowthConfig } from "./config";
+import { growthEndpoint, growthMediaForRow } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import {
@@ -80,6 +81,12 @@ function titleOf(page: NotionPage): string {
   return (prop?.title ?? []).map((r) => r.plain_text ?? "").join("").trim();
 }
 
+/** #media: Notion 行の `媒体` select を読み、GA4/GSC の URL セグメント解決に使う。欠落=column。 */
+function mediaOf(page: NotionPage): ReturnType<typeof growthMediaForRow> {
+  const prop = page.properties["媒体"] as { select?: { name?: string } | null } | undefined;
+  return growthMediaForRow(prop?.select?.name ?? "");
+}
+
 /** 公開記事(ステータス=公開済み)のページを取得する。 */
 async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> {
   const { pages } = await queryDataSource(
@@ -93,14 +100,19 @@ async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> 
   return pages;
 }
 
-/** microCMS 公開記事を contentId で引いて slug / locale / publishedAt を得る。失敗は null。 */
+/**
+ * microCMS 公開記事を contentId で引いて slug / locale / publishedAt を得る。失敗は null。
+ * #media(レビュー対応): endpoint は行の `媒体` から `growthEndpoint(media)` で解決した値を受ける。
+ * news 固定だと columns 切替後(GROWTH_MICROCMS_ENDPOINT=columns)に column 記事の成績が永久に取れない。
+ */
 async function fetchSlugLocale(
   domain: string,
   apiKey: string,
+  endpoint: string,
   contentId: string
 ): Promise<{ slug: string; locale: string; publishedAt?: string } | null> {
   if (!CONTENT_ID_RE.test(contentId)) return null; // 不正な contentId は引かない(URL 汚染防止)。
-  const url = `https://${domain}.microcms.io/api/v1/news/${encodeURIComponent(contentId)}`;
+  const url = `https://${domain}.microcms.io/api/v1/${endpoint}/${encodeURIComponent(contentId)}`;
   const res = await defaultFetch(url, { headers: { "X-MICROCMS-API-KEY": apiKey } });
   if (!res.ok) return null;
   const body = (await res.json()) as {
@@ -181,13 +193,15 @@ async function main(): Promise<void> {
   for (const page of pages) {
     const contentId = contentIdOf(page);
     if (!contentId) continue;
-    const sl = await fetchSlugLocale(domain, microKey, contentId);
+    // #media: 行の 媒体 で microCMS エンドポイントと URL セグメントを揃えて解決する。
+    const media = mediaOf(page);
+    const sl = await fetchSlugLocale(domain, microKey, growthEndpoint(media), contentId);
     if (!sl) {
       unmatched += 1;
       console.warn(`[metrics] slug 解決失敗: ${titleOf(page)} (contentId=${contentId})`);
       continue;
     }
-    const pagePath = articlePagePath(sl.slug, sl.locale);
+    const pagePath = articlePagePath(sl.slug, sl.locale, media);
     const base = metricsForPagePath(pagePath, rows, current);
     if (!base) {
       unmatched += 1;
