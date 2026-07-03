@@ -22,6 +22,11 @@ import {
   type PublishQueueItem,
 } from "./publishQueue";
 import {
+  buildPublishDueFailureMessage,
+  buildPublishDueSkipMessage,
+  type SkippedPublication,
+} from "./publishDueNotify";
+import {
   queryDataSource,
   updatePageProps,
   updatePageSelect,
@@ -114,12 +119,14 @@ async function main(): Promise<void> {
   const due = selectDuePublications(items, Date.now());
 
   let published = 0;
+  const skipped: SkippedPublication[] = [];
   for (const item of due) {
     const page = byId.get(item.id);
     if (!page) continue;
     const contentId = richTextOf(page, "下書きID").trim();
     if (!CONTENT_ID_RE.test(contentId)) {
       console.warn(`[publish-due] 不正な contentId のためスキップ: ${titleOf(page)} (${contentId})`);
+      skipped.push({ title: titleOf(page), contentId });
       continue;
     }
     const title = titleOf(page);
@@ -147,9 +154,23 @@ async function main(): Promise<void> {
   const summary = `⏰ 予約公開: ${published}件 (対象 ${due.length}件)`;
   console.log(summary);
   if (!DRYRUN && published > 0) await notifyLine(summary);
+
+  // 不正 contentId のスキップを沈黙させない(#220): 取り残された記事を LINE 通知する。
+  const skipMessage = buildPublishDueSkipMessage(skipped);
+  if (!DRYRUN && skipMessage) await notifyLine(skipMessage);
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   console.error("[publish-due] 失敗:", error);
+  // 予約公開の総失敗を沈黙させない(#220): publish-draft と対称に LINE 通知する(best-effort)。
+  if (!DRYRUN) {
+    const reason = error instanceof Error ? error.message : String(error);
+    try {
+      await notifyLine(buildPublishDueFailureMessage(reason));
+    } catch (notifyError: unknown) {
+      const m = notifyError instanceof Error ? notifyError.message : String(notifyError);
+      console.error(`[publish-due] 失敗の LINE 通知も送れませんでした: ${m}`);
+    }
+  }
   process.exitCode = 1;
 });
