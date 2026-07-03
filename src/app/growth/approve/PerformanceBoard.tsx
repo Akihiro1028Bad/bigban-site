@@ -278,14 +278,6 @@ function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?
             <Stat label="CTR" value={formatCtr(search.ctr.current)} />
             <Stat label="平均掲載順位" value={formatPosition(search.position.current)} />
           </div>
-          {metrics.keyEvents ? (
-            <div className="mt-2.5 text-[12px]" style={{ color: "var(--p-text-2)" }}>
-              CTA（キーイベント）{" "}
-              <span className="font-semibold tabular-nums" style={{ color: "var(--p-text)" }}>
-                {formatCount(metrics.keyEvents.current)}
-              </span>
-            </div>
-          ) : null}
           {search.topQueries.length > 0 ? (
             <div className="mt-2.5">
               <div className="mb-1 text-[11px]" style={{ color: "var(--p-text-3)" }}>上位クエリ</div>
@@ -310,6 +302,15 @@ function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?
       ) : (
         <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>検索成績は未計測です。</div>
       )}
+      {/* #218: CTA(予約クリック等)キーイベントは search の有無に依らず、存在すれば常に表示する。 */}
+      {metrics.keyEvents ? (
+        <div className="mt-2.5 text-[12px]" style={{ color: "var(--p-text-2)" }}>
+          CTA（キーイベント）{" "}
+          <span className="font-semibold tabular-nums" style={{ color: "var(--p-text)" }}>
+            {formatCount(metrics.keyEvents.current)}
+          </span>
+        </div>
+      ) : null}
       {onAddIdea ? (
         <div
           className="mt-3 flex items-center gap-2 rounded-[10px] p-3"

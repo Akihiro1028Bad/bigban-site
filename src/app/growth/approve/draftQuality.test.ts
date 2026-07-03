@@ -131,6 +131,14 @@ describe("findBrokenInternalLinks", () => {
       "/ja/columns/missing",
     ]);
   });
+  it("#218: CTA 導線(予約=外部RESERVA・お問い合わせ=/#contact)は壊れ扱いしない", () => {
+    const html =
+      '<a href="https://reserva.be/tpbt">予約</a>' +
+      '<a href="/#contact">お問い合わせ</a>';
+    // 記事リンク(/ja/(news|columns)/<slug>)のみを検査対象とするため、
+    // 外部CTA・トップ内アンカーは knownNewsPaths が空でも壊れにならない。
+    expect(findBrokenInternalLinks(html, new Set())).toEqual([]);
+  });
 });
 
 describe("draftQuality: 内部リンク先(#H19)", () => {
