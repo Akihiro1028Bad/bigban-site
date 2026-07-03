@@ -6,7 +6,7 @@
  * `依頼中` を拾って下書き本文ミラーを読み、style-guide に照らした助言を書き戻す(プル型・read-only)。
  *
  * 暴走防止: 既に 依頼中/処理中/提示中 の行は 409。下書き未作成(contentId 無し)は 400。
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。強権キーは使わない。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。強権キーは使わない。
  */
 
 import { NextResponse } from "next/server";

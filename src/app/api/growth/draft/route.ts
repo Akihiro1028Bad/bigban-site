@@ -9,7 +9,7 @@
  *
  * - ミラー未保存(本文HTML 無し)→ exists:false(エラーにしない)
  * - Notion 取得失敗 → 502(沈黙させない)
- * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)
+ * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))
  */
 
 import { NextResponse } from "next/server";

@@ -6,7 +6,7 @@
  * 常時稼働 PC の画像ループが `依頼中` を拾って生成 → upload → patchDraft する(プル型)。
  *
  * 暴走防止: 既に 依頼中/処理中 の行は 409。下書き未作成(contentId 無し)は 400。
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";

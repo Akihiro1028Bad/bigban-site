@@ -5,7 +5,7 @@
  * クリアして「なし」に戻すだけ(本文・下書きには触らない・read-only 境界)。構成案修正ループの
  * 「破棄(discard)」と同型。冪等(既に「なし」でも安全)。強権キーは使わない。
  *
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";

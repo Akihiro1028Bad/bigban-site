@@ -6,7 +6,7 @@
  *
  * - 書き込みは **content API キー**(MICROCMS_CONTENT_API_KEY)で `patchDraft`(管理キーは使わない)。
  * - status=draft の PATCH のみ。公開はしない。
- * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";

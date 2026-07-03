@@ -6,7 +6,7 @@
  * 修正状態(修正指示/修正案/修正ステータス)は触らない。
  *
  * 競合ガード: AI処理中(依頼中/処理中/提示中)は 409(古い状態へ巻き戻さない)。
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";
