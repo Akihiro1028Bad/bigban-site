@@ -136,6 +136,19 @@ describe("PerformanceBoard", () => {
     expect(screen.queryByText("クリック")).not.toBeInTheDocument();
   });
 
+  it("#218: search 無しでも keyEvents があれば CTA(キーイベント)を表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(10, null, 5),
+      keyEvents: { current: 6, prior: 2, deltaPct: 200 },
+    };
+    render(<PerformanceBoard items={[published("a", "予約導線記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /予約導線記事/ }));
+    expect(screen.getByText("検索成績は未計測です。")).toBeInTheDocument();
+    expect(screen.getByText(/CTA/)).toBeInTheDocument();
+    expect(screen.getByText("6")).toBeInTheDocument();
+  });
+
   it("再クリックで行を閉じる(トグル)", async () => {
     const user = userEvent.setup();
     render(<PerformanceBoard items={[published("a", "旧データ", metrics(10, null, 5))]} />);

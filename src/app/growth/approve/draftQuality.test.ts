@@ -78,12 +78,26 @@ describe("draftQuality", () => {
     expect(hasBlockingCheck(checks)).toBe(true);
   });
 
-  it("§13 断定NG(料金/営業時間/コート面数/所要分)は block", () => {
+  it("§13 断定NG(料金/所要分)は block(#217: 未確定情報のみ)", () => {
     const base = { bodyHtml: "", title: "t" } as const;
     expect(pick(draftQuality({ ...base, body: `月額5,000円${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `営業時間は10時から${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `コート4面完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
     expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩5分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `徒歩10分の距離${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    expect(pick(draftQuality({ ...base, body: `駅から徒歩 3 分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+  });
+
+  it("#217: 公表済み事実(営業時間6:00-23:00・3面)は block しない", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    expect(pick(draftQuality({ ...base, body: `営業時間は6:00-23:00です${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    expect(pick(draftQuality({ ...base, body: `コート3面を完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+  });
+
+  it("#218レビュー対応: 確定値「徒歩1分」(CTA必須文)は block しない", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩1分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    expect(pick(draftQuality({ ...base, body: `徒歩１分でアクセス${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    // 「1」で始まる複数桁(徒歩11分)は先読みが「1分」に一致しないため従来どおり block
+    expect(pick(draftQuality({ ...base, body: `徒歩11分ほど${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
   });
 
   it("body が空なら bodyHtml からタグを除いて判定する", () => {
@@ -118,6 +132,23 @@ describe("findBrokenInternalLinks", () => {
       '<a href="/ja/about">施設</a>';
     expect(findBrokenInternalLinks(html, known)).toEqual(["/ja/news/missing"]);
   });
+  it("columns 記事リンクも検査対象(#columns: 公開先が columns の場合)", () => {
+    const knownCols = new Set(["/ja/columns/exists"]);
+    const html =
+      '<a href="/ja/columns/exists">ok</a>' +
+      '<a href="/ja/columns/missing">壊れ</a>';
+    expect(findBrokenInternalLinks(html, knownCols)).toEqual([
+      "/ja/columns/missing",
+    ]);
+  });
+  it("#218: CTA 導線(予約=外部RESERVA・お問い合わせ=/#contact)は壊れ扱いしない", () => {
+    const html =
+      '<a href="https://reserva.be/tpbt">予約</a>' +
+      '<a href="/#contact">お問い合わせ</a>';
+    // 記事リンク(/ja/(news|columns)/<slug>)のみを検査対象とするため、
+    // 外部CTA・トップ内アンカーは knownNewsPaths が空でも壊れにならない。
+    expect(findBrokenInternalLinks(html, new Set())).toEqual([]);
+  });
 });
 
 describe("draftQuality: 内部リンク先(#H19)", () => {
@@ -143,8 +174,19 @@ describe("draftQuality: 内部リンク先(#H19)", () => {
 });
 
 describe("detectDoNotWrite", () => {
-  it("該当カテゴリのラベルを返す", () => {
-    expect(detectDoNotWrite("コート4面・月額3000円")).toEqual(["料金", "コート面数"]);
+  it("該当カテゴリのラベルを返す(#217: 料金・所要分のみ)", () => {
+    expect(detectDoNotWrite("本八幡駅から徒歩7分・月額3000円")).toEqual(["料金", "所要時間"]);
+  });
+  it("#217: 公表済みの面数・営業時間は検出しない", () => {
+    expect(detectDoNotWrite("コート3面・営業時間6:00-23:00")).toEqual([]);
+  });
+  it("#218レビュー対応: 確定値「徒歩1分」は検出しない(全角１も)", () => {
+    expect(detectDoNotWrite("本八幡駅から徒歩1分")).toEqual([]);
+    expect(detectDoNotWrite("徒歩１分")).toEqual([]);
+  });
+  it("#218レビュー対応: 徒歩10分・駅から3分は従来どおり検出する", () => {
+    expect(detectDoNotWrite("徒歩10分")).toEqual(["所要時間"]);
+    expect(detectDoNotWrite("駅から3分")).toEqual(["所要時間"]);
   });
   it("該当なしは空", () => {
     expect(detectDoNotWrite("市川の屋内コートで打てる")).toEqual([]);

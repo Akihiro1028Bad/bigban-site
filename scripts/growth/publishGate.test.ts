@@ -52,6 +52,24 @@ describe("evaluatePublishGate", () => {
     expect(result.blockReasons.some((r) => r.includes("内部リンク先"))).toBe(true);
   });
 
+  it("#218レビュー対応: CTA必須文「本八幡駅から徒歩1分」は gate を通る(draftQuality 委譲)", () => {
+    const result = evaluatePublishGate({
+      title: "アクセス抜群の屋内コート",
+      bodyHtml: `<p>本八幡駅から徒歩1分。営業時間は6:00-23:00です。${DISCLAIMER}</p>`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.blockReasons).toEqual([]);
+  });
+
+  it("#218レビュー対応: 未確定の「徒歩5分」は gate でも従来どおり block(委譲の回帰確認)", () => {
+    const result = evaluatePublishGate({
+      title: "アクセスの話",
+      bodyHtml: `<p>最寄り駅から徒歩5分ほどです。${DISCLAIMER}</p>`,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.blockReasons.some((r) => r.includes("断定NG"))).toBe(true);
+  });
+
   it("本文・タイトルが空でも理由文字列を組み立てられる(欠落耐性)", () => {
     const result = evaluatePublishGate({ title: "", bodyHtml: "" });
     // 本文空=免責文も無いので block。理由は非空。

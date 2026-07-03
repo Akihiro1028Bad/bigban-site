@@ -6,7 +6,7 @@
  *        常時稼働PCの poller が `依頼中` を拾って修正する(プル型)。
  *
  * 暴走防止: 既に 依頼中/処理中/提示中 の行は 409(再依頼拒否)。
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";

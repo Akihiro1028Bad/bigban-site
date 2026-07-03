@@ -3,6 +3,7 @@ import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
 import TokushohoContent from "./TokushohoContent";
 import StructuredData from "@/components/StructuredData";
+import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { buildBreadcrumb } from "@/lib/structured-data";
 
 import type { Metadata } from "next";
@@ -58,7 +59,7 @@ export default async function TokushohoPage({ params }: TokushohoPageProps) {
           { name: breadcrumbName, path: "/tokushoho" },
         ])}
       />
-      <TokushohoContent />
+      <TokushohoContent showColumns={isCmsColumnsEnabled()} />
     </>
   );
 }

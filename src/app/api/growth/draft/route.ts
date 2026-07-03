@@ -9,7 +9,7 @@
  *
  * - ミラー未保存(本文HTML 無し)→ exists:false(エラーにしない)
  * - Notion 取得失敗 → 502(沈黙させない)
- * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)
+ * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))
  */
 
 import { NextResponse } from "next/server";
@@ -27,10 +27,28 @@ import { bodyCommentViewOf } from "@/lib/growth/bodyComment";
 import { bodyRegenViewOf } from "@/lib/growth/bodyImageRegen";
 import { decorateViewOf } from "@/lib/growth/decorate";
 import { regenViewOf } from "@/lib/growth/eyecatchRegen";
+import { growthArticleSegment } from "@/lib/growth/endpoint";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
+import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 
 export const runtime = "nodejs";
+
+/**
+ * #H19 壊れ内部リンク検査用の既知記事パス集合を、公開先(news / columns)に合わせて取得する。
+ *
+ * 公開先が columns のときは columns の slug を、既定(news)のときは news の slug を見る。
+ * env 未設定なら segment="news" = 現行互換。ja のみ検査対象(#H19 の既存仕様を踏襲)。
+ * 取得不可(未設定/障害)は呼び出し側で undefined 化して検査をスキップする。
+ */
+async function knownArticlePaths(): Promise<string[]> {
+  const segment = growthArticleSegment();
+  const slugs =
+    segment === "columns" ? await getColumnSlugs() : await getNewsSlugs();
+  return slugs
+    .filter((s) => s.locale === "ja")
+    .map((s) => `/ja/${segment}/${s.slug}`);
+}
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -68,9 +86,7 @@ export async function GET(request: Request): Promise<Response> {
     // 取得不可(未設定/障害)でも本文表示は止めない。未設定なら承認画面は壊れリンク検査をスキップする。
     let knownNewsPaths: string[] | undefined;
     try {
-      knownNewsPaths = (await getNewsSlugs())
-        .filter((s) => s.locale === "ja")
-        .map((s) => `/ja/news/${s.slug}`);
+      knownNewsPaths = await knownArticlePaths();
     } catch {
       knownNewsPaths = undefined;
     }

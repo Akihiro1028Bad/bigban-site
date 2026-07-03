@@ -4,7 +4,7 @@
  * POST { pageId }: 表示中(提示中/失敗)の装飾提案を片付ける。指示・結果・ステータスをクリアして
  * 「なし」に戻すだけ(本文・下書きには触らない)。構成案修正の「破棄」と同型。冪等。強権キー不使用。
  *
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";

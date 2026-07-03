@@ -5,4 +5,8 @@
  * `@/lib/growth/endpoint` で import できるよう薄く束ねるだけにする。
  */
 
-export { growthEndpoint } from "../../../scripts/growth/endpoint";
+export {
+  growthArticleSegment,
+  growthEndpoint,
+  type ArticleSegment,
+} from "../../../scripts/growth/endpoint";

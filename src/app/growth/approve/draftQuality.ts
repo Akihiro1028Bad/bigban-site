@@ -4,7 +4,7 @@
  * 下書き本文(HTML/プレーン)とタイトルから各項目を **3段階(ok=緑 / warn=黄 / block=赤)** で判定する。
  * 赤(block)が1つでもあれば公開をブロックする(明示オーバーライドを要求)。しきい値は記事タイプ別に定数化。
  *
- * - block: §5 AI免責文の欠落 / §13 doNotWrite(料金・営業時間・コート面数・所要分)の断定
+ * - block: §5 AI免責文の欠落 / §13 doNotWrite(未確定=料金・所要分)の断定
  * - warn : 文字数不足/過多・見出し/画像/内部リンク不足・タイトル長超過
  */
 
@@ -50,12 +50,26 @@ const SITE_HOST = "thepicklebang.com";
 /** §5: 末尾に必須の AI 免責文(部分一致で存在を見る)。 */
 const DISCLAIMER_MARK = "AIが作成した下書き";
 
-/** §13 doNotWrite: 断定してはいけない可変情報のパターン(料金・営業時間・コート面数・所要分)。 */
+/**
+ * §13 doNotWrite: 断定してはいけない**未確定**情報のパターン(料金・所要分)。
+ *
+ * #217: 営業時間(6:00-23:00)・コート面数(3面)・サーフェス(デコターフ)は about/PR TIMES/
+ * PJ連盟公式で公表済みのため封印を解除し、confirmed(`facility-context.json`)へ移した。
+ * 未確定のまま残すのは料金(価格)と各駅からの正確な所要分のみ。
+ *
+ * #218レビュー対応: 「徒歩1分」は facility-context の裏取り済み location
+ * (本八幡駅から徒歩1分)＝§15 定型CTAブロックの必須文のため、負の先読み
+ * `(?![1１]\s*分)` で block 対象から除外する(全角１も対象)。「徒歩10分」等の
+ * 「1」で始まる複数桁は、先読みが「1の直後に分」を要求するため一致せず従来どおり block。
+ * 「駅から◯分」の別分岐にも同じ先読みを適用する(「本八幡駅から徒歩1分」は両分岐に掛かる)。
+ */
 const DO_NOT_WRITE: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "料金", pattern: /[0-9０-９][0-9０-９,，]*\s*円|月額|入会金|月会費/ },
-  { label: "営業時間", pattern: /営業時間|定休日/ },
-  { label: "コート面数", pattern: /コート\s*[0-9０-９]+\s*面/ },
-  { label: "所要時間", pattern: /徒歩\s*[0-9０-９]+\s*分|駅から[^。]{0,8}?[0-9０-９]+\s*分/ },
+  {
+    label: "所要時間",
+    pattern:
+      /徒歩\s*(?![1１]\s*分)[0-9０-９]+\s*分|駅から[^。]{0,8}?(?![1１]\s*分)[0-9０-９]+\s*分/,
+  },
 ];
 
 function stripTags(html: string): string {
@@ -103,15 +117,23 @@ export function extractInternalLinkPaths(html: string): string[] {
 }
 
 /**
- * 壊れた内部リンク(#H19)。検証対象は `/ja/news/<slug>` の記事リンクのみ(誤検出を避け、
- * 一覧/施設/トップ等の静的パスは検証しない)。knownNewsPaths に無い記事リンクを返す。
+ * 記事詳細リンクのパスパターン。公開先が `news`(既定)でも `columns` でも同じ検査に載せる
+ * ため、両セグメントを許容する(#columns)。一覧(`/ja/news`)や施設/トップ等の静的パスは
+ * `.+` 要求で対象外になり誤検出しない。
+ */
+const ARTICLE_LINK_PATTERN = /^\/ja\/(?:news|columns)\/.+/;
+
+/**
+ * 壊れた内部リンク(#H19)。検証対象は `/ja/news/<slug>` および `/ja/columns/<slug>` の
+ * 記事リンクのみ(誤検出を避け、一覧/施設/トップ等の静的パスは検証しない)。
+ * knownNewsPaths(=公開先に応じて呼び出し側が組み立てた既知パス集合)に無い記事リンクを返す。
  */
 export function findBrokenInternalLinks(
   html: string,
   knownNewsPaths: ReadonlySet<string>
 ): string[] {
   return extractInternalLinkPaths(html).filter(
-    (path) => /^\/ja\/news\/.+/.test(path) && !knownNewsPaths.has(path)
+    (path) => ARTICLE_LINK_PATTERN.test(path) && !knownNewsPaths.has(path)
   );
 }
 
@@ -164,7 +186,7 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
       label: "断定NG(可変情報)",
       value: doNotWrite.length > 0 ? doNotWrite.join("・") : "なし",
       level: doNotWrite.length > 0 ? "block" : "ok",
-      hint: doNotWrite.length > 0 ? "§13: 未確定の料金/時間/面数/所要分は断定しない" : undefined,
+      hint: doNotWrite.length > 0 ? "§13: 未確定の料金/所要分は断定しない(営業時間・面数は公表済みで解禁)" : undefined,
     },
     ...brokenLinkChecks(input),
   ];

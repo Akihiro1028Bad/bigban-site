@@ -187,6 +187,21 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 - 対象週は「直近の確定した完全な週(月〜日)」。GSC の反映遅延(2〜3日)を見込み、実行は木曜朝
 - 数字は丸めて提示(セッションは整数、率は小数1位、順位は小数1位)
 
+### GA4 keyEvents 設定手順（オーナー作業・1回だけ・#218）
+
+記事末の CTA(予約クリック・LINE 追加・Instagram 遷移)を計測に載せるには、GA4 側で **key event(旧コンバージョン)** を設定する必要がある。これはコードではできない**人の作業**。設定後、`metrics.ts` が拾った keyEvents が承認画面 PerformanceBoard の「CTA（キーイベント）」に表示される(search 実データが無くても表示される)。
+
+1. **GA4 管理画面 → 管理 → イベント** を開く(対象プロパティ = 本番サイト)。
+2. 計測したい導線ごとにイベントを用意する:
+   - **予約クリック**: 予約ボタン(外部 RESERVA `https://reserva.be/tpbt` への遷移)。`click`(送信先ドメイン=reserva.be)または `outbound click` を条件にカスタムイベントを作成。
+   - **LINE 追加**: 公式 LINE への遷移(外部リンククリック)。
+   - **Instagram 遷移**: 公式 Instagram への遷移(外部リンククリック)。
+3. 作成した各イベントを **「キーイベントとしてマークする」** で key event に指定する。
+4. 反映には数時間〜1日かかる。反映後、GA4 Data API の `keyEvents` 指標に値が入り、週次計測ループが取り込む。
+5. 成功指標「予約クリック◯件/月」は、この予約クリック key event の月次合計で読む。
+
+> 注: サイト側の CTA リンクは既に `RESERVE_URL`(`src/constants/site.ts`)と `EXTERNAL_LINK_PROPS` で実装済み。GA4 側の key event 指定だけが未了の人手作業。
+
 ## slug汚染の回復（セルフヒール・#26）
 
 過去の非冪等POST＋504リトライで、同 slug の下書きが microCMS に大量残留する「slug汚染」が起きうる(冪等化 #21 で新規発生は防止済み)。既に汚染された slug は次で回復する。
@@ -491,7 +506,7 @@ AI は使わない（純粋なデータ結線）。
 
 - 保存出力は許可リストに正規化される（**クライアント＋サーバの二重サニタイズ**。許可外タグ/属性は自動除去）。
 - 取得/保存の失敗は明示（再読み込み・エラー表示）。下書き未作成・取得失敗・保存失敗をそれぞれ区別する。
-- **認可は #36 でオフのまま**。プレビュー取得 API(`/api/growth/draft`)・保存 API(`/api/growth/draft/edit`)は誰でも叩ける状態のため、**実運用前に #7 のハードニング必須**（`APPROVE_AUTH_ENABLED=true` で承認系と同時に保護される構造）。
+- **認可は既定 ON・フェイルセーフ**（`APPROVE_AUTH_ENABLED` は `process.env.APPROVE_AUTH_ENABLED !== "false"`＝未設定なら ON・`featureFlags.ts:27`）。プレビュー取得 API(`/api/growth/draft`)・保存 API(`/api/growth/draft/edit`)は承認系 API と同じ `verifyToken` ゲートで保護される。**明示的に `APPROVE_AUTH_ENABLED=false` を本番 env に置いた場合のみ**フェイルオープン（誰でも叩ける）になるため、本番では値を外す（未設定）か `true` にすること。`check-prod-auth.mjs`（prebuild／CI ガード）が本番×`false` のビルドを失敗させる。
 - `下書きプレビューキー`(draftKey)は下書き読取トークンに相当。**Notion DB の共有範囲を「特定メンバー/プライベート」に限定**しておく（公開共有しない）。
 - **リッチエディタ本体(TipTap)はカバレッジ除外**のため、導入後はブラウザでの実挙動、特に**画像/表/埋め込み等の往復保持**（読み込み→保存で壊れないか）を実機確認する。保持が不十分なら別issueで強化する。
 - **プレビュー iframe の `postMessage` は同一オリジン限定**（`isAllowedPreviewOrigin`）・受信HTMLは型/サイズ検証(`parsePreviewMessage`)＋ `NewsBodyRenderer` 内で STRICT サニタイズ。iframe.contentWindow への薄い結線(`DraftPreviewFrame.tsx`)はカバレッジ除外のため、**iframe が本番スタイルで描画されるか**を実機確認する（純ロジックは `draftPreview.ts`、受信描画は `DraftFrameClient` でテスト済み）。

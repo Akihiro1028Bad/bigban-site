@@ -5,7 +5,7 @@
  *   - action="apply"  : 提示中の `修正案` を `構成案` へ上書きし、修正状態をクリア(1 PATCH)。
  *   - action="discard": 構成案は触らず、修正指示・修正案・ステータスをクリア(再コメント可能へ)。
  *
- * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。現在オフ)。
+ * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
 import { NextResponse } from "next/server";
