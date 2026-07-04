@@ -4560,17 +4560,47 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     );
   });
 
-  it("画像タブ: 本文画像を『AIで再生成』すると /body-image/regen に targetSrc を POST し成功トースト", async () => {
+  it("画像タブ: 本文画像『AIで再生成』→モーダルで確定すると /body-image/regen に style/textSpec を POST", async () => {
     const { fn, dialog } = await openBodyImages({ json: { success: true } });
-    // 「AIで再生成」はアイキャッチ(先頭)と本文画像(次)の2つある。本文画像側は差し替えボタンと同じ行にある。
     const regenButtons = within(dialog).getAllByRole("button", { name: "AIで再生成" });
     expect(regenButtons).toHaveLength(2);
-    await userEvent.click(regenButtons[1]);
+    await userEvent.click(regenButtons[1]); // 本文画像側
+    // 生成モーダルが開く。スタイル「コート図」を選び、文字指定を入れて確定する。
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("radio", { name: "コート図" }));
+    await userEvent.type(within(modal).getByLabelText(/図に入れる文字・数値/), "13.41m x 6.10m");
+    await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
     await waitFor(() => {
       const call = fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen");
       expect(call).toBeDefined();
       const body = JSON.parse(String((call?.[1] as RequestInit)?.body));
-      expect(body).toEqual({ pageId: "i1", targetSrc: BODY_IMG, instruction: "" });
+      expect(body).toEqual({
+        pageId: "i1",
+        targetSrc: BODY_IMG,
+        style: "court",
+        textSpec: "13.41m x 6.10m",
+        instruction: "",
+      });
+    });
+    expect(await screen.findByText(/本文画像の再生成を依頼しました/)).toBeInTheDocument();
+  });
+
+  it("画像タブ: 本文画像『AIで再生成』→おまかせ既定で即確定すると style=auto/空を POST", async () => {
+    const { fn, dialog } = await openBodyImages({ json: { success: true } });
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
+    await waitFor(() => {
+      const call = fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen");
+      expect(call).toBeDefined();
+      const body = JSON.parse(String((call?.[1] as RequestInit)?.body));
+      expect(body).toEqual({
+        pageId: "i1",
+        targetSrc: BODY_IMG,
+        style: "auto",
+        textSpec: "",
+        instruction: "",
+      });
     });
     expect(await screen.findByText(/本文画像の再生成を依頼しました/)).toBeInTheDocument();
   });
@@ -4578,12 +4608,16 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
   it("画像タブ: 本文画像 再生成の失敗はエラートースト(error付き)", async () => {
     const { dialog } = await openBodyImages({ ok: false, status: 502, json: { success: false, error: "本文再生成NG" } });
     await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
     expect(await screen.findByText("本文再生成NG")).toBeInTheDocument();
   });
 
   it("画像タブ: 本文画像 再生成の失敗(error無し)は既定文言", async () => {
     const { dialog } = await openBodyImages({ ok: false, status: 502, json: { success: false } });
     await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
     expect(await screen.findByText("再生成の依頼に失敗しました。")).toBeInTheDocument();
   });
 

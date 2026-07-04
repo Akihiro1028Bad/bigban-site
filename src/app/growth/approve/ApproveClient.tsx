@@ -60,6 +60,9 @@ import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { MediaLibraryModal } from "./MediaLibraryModal";
+import type { BodyImageRegenInput } from "./bodyRegenRequest";
+import { buildBodyRegenBody } from "./bodyRegenRequest";
+import { BodyImageRegenModal } from "./BodyImageRegenModal";
 import { PromptsView } from "./PromptsView";
 import { ProposalView } from "./ProposalView";
 import { ProposalFormModal } from "./ProposalFormModal";
@@ -191,6 +194,8 @@ export function ApproveClient() {
   const [mediaFor, setMediaFor] = useState<PendingItem | null>(null);
   // 本文画像の差し替え(#145/P1)。対象記事＋差し替える現 src を持ち、MediaLibraryModal を本文画像モードで開く。
   const [bodyMediaFor, setBodyMediaFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
+  // 本文画像 AI 再生成モーダル(#156/P2)。対象記事＋対象 src を持ち、確定でスタイル/指示/文字指定を送る。
+  const [bodyRegenFor, setBodyRegenFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   const {
     decided,
@@ -822,15 +827,18 @@ export function ApproveClient() {
     }
   }
 
-  // 本文画像の AI 再生成(おまかせ)を実経路(/api/growth/body-image/regen)へ結線する(P1)。
-  // P1 ではスタイル選択なし・instruction 空。style/textSpec は P2 で追加する。
-  // 呼び出しは renderDetailPanel の onRegenBodyImage(index→src 変換)から行う(#59/T4)。
-  async function requestBodyImageRegen(pageId: string, targetSrc: string): Promise<void> {
+  // 本文画像の AI 再生成を実経路(/api/growth/body-image/regen)へ結線する(#156/P2)。
+  // スタイル・自由指示・文字指定は生成モーダル(BodyImageRegenModal)で集めて渡す。
+  async function requestBodyImageRegen(
+    pageId: string,
+    targetSrc: string,
+    input: BodyImageRegenInput
+  ): Promise<void> {
     try {
       const res = await fetch("/api/growth/body-image/regen", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, targetSrc, instruction: "" }),
+        body: JSON.stringify(buildBodyRegenBody(pageId, targetSrc, input)),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
@@ -918,7 +926,7 @@ export function ApproveClient() {
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
         onPickBodyImage={(index) => bodyImageTargetAt(index, (targetSrc) => setBodyMediaFor({ item, targetSrc }))}
         onRegenBodyImage={(index) =>
-          bodyImageTargetAt(index, (targetSrc) => void requestBodyImageRegen(item.id, targetSrc))
+          bodyImageTargetAt(index, (targetSrc) => setBodyRegenFor({ item, targetSrc }))
         }
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
@@ -1249,6 +1257,17 @@ export function ApproveClient() {
             void pollBoard();
             pushToast("本文画像を差し替えました。");
             setBodyMediaFor(null);
+          }}
+        />
+      ) : null}
+
+      {bodyRegenFor ? (
+        <BodyImageRegenModal
+          heading={bodyRegenFor.item.title}
+          onClose={() => setBodyRegenFor(null)}
+          onSubmit={(input) => {
+            void requestBodyImageRegen(bodyRegenFor.item.id, bodyRegenFor.targetSrc, input);
+            setBodyRegenFor(null);
           }}
         />
       ) : null}
