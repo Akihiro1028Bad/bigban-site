@@ -6,6 +6,7 @@ import {
   classifyPreservedBlock,
   countDraftCharacters,
   DECORATION_OPTIONS,
+  reconcilePendingImage,
   replaceImgSrcInHtml,
   sanitizeDraftHtml,
 } from "./draftEditorContent";
@@ -159,6 +160,65 @@ describe("replaceImgSrcInHtml", () => {
     const html = "<figure><figcaption>画像待ち</figcaption></figure>";
 
     expect(replaceImgSrcInHtml(html, "https://new.example/b.png")).toBe(html);
+  });
+});
+
+describe("reconcilePendingImage", () => {
+  it("エディタの pending figure と fresh 本文の新規画像が1件だけなら src と alt を返す", () => {
+    const editorHtml =
+      '<p>本文</p><figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>';
+    const freshBodyHtml =
+      '<p>本文</p><figure><img src="https://images.microcms-assets.io/assets/new.png" alt="コートの図"></figure>';
+
+    expect(reconcilePendingImage(editorHtml, freshBodyHtml, "img-abc123")).toEqual({
+      newSrc: "https://images.microcms-assets.io/assets/new.png",
+      alt: "コートの図",
+    });
+  });
+
+  it("既存画像を差し引いて、新しく増えた画像だけを候補にする", () => {
+    const editorHtml =
+      '<figure><img src="https://images.microcms-assets.io/assets/old.png" alt="既存"></figure>' +
+      '<figure class="x" data-pending="img-abc123"><figcaption>生成中</figcaption></figure>';
+    const freshBodyHtml =
+      '<figure><img src="https://images.microcms-assets.io/assets/old.png" alt="既存"></figure>' +
+      '<figure><img alt="新規" src="https://images.microcms-assets.io/assets/new.png"></figure>';
+
+    expect(reconcilePendingImage(editorHtml, freshBodyHtml, "img-abc123")).toEqual({
+      newSrc: "https://images.microcms-assets.io/assets/new.png",
+      alt: "新規",
+    });
+  });
+
+  it("該当 placeholder の pending figure がエディタに無ければ null", () => {
+    const editorHtml = '<figure data-pending="img-other"><figcaption>生成中</figcaption></figure>';
+    const freshBodyHtml = '<figure><img src="https://images.microcms-assets.io/assets/new.png" alt="新規"></figure>';
+
+    expect(reconcilePendingImage(editorHtml, freshBodyHtml, "img-abc123")).toBeNull();
+  });
+
+  it("差集合が0件または複数件なら null", () => {
+    const editorHtml =
+      '<figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>' +
+      '<figure><img src="https://images.microcms-assets.io/assets/a.png" alt="a"></figure>';
+    const unchangedFresh = '<figure><img src="https://images.microcms-assets.io/assets/a.png" alt="a"></figure>';
+    const ambiguousFresh =
+      unchangedFresh +
+      '<figure><img src="https://images.microcms-assets.io/assets/b.png" alt="b"></figure>' +
+      '<figure><img src="https://images.microcms-assets.io/assets/c.png" alt="c"></figure>';
+
+    expect(reconcilePendingImage(editorHtml, unchangedFresh, "img-abc123")).toBeNull();
+    expect(reconcilePendingImage(editorHtml, ambiguousFresh, "img-abc123")).toBeNull();
+  });
+
+  it("alt が無い場合は空文字で返す", () => {
+    const editorHtml = '<figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>';
+    const freshBodyHtml = '<figure><img src="https://images.microcms-assets.io/assets/new.png"></figure>';
+
+    expect(reconcilePendingImage(editorHtml, freshBodyHtml, "img-abc123")).toEqual({
+      newSrc: "https://images.microcms-assets.io/assets/new.png",
+      alt: "",
+    });
   });
 });
 

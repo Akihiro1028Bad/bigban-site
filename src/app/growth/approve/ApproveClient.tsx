@@ -50,7 +50,7 @@ import { outlineSections } from "./outline";
 import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
-import { extractBodyImages } from "@/lib/growth/bodyImageRegen";
+import { BODY_REGEN_BUSY_STATUSES, extractBodyImages } from "@/lib/growth/bodyImageRegen";
 import {
   bodyImageFigureHtml,
   buildPendingFigureHtml,
@@ -87,7 +87,8 @@ import { ShortcutOverlay } from "./shell/ShortcutOverlay";
 import { BulkBar } from "./shell/BulkBar";
 import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
-import { replacePreservedImageSrc } from "./DraftEditor";
+import { replacePreservedImageSrc, replacePreservedPendingFigure } from "./DraftEditor";
+import { reconcilePendingImage } from "./draftEditorContent";
 import { shouldWarnPollStale } from "./pollHealth";
 import { toMessage } from "./errorMessage";
 import { isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
@@ -454,6 +455,7 @@ export function ApproveClient() {
     startEditDraft,
     cancelEditDraft,
     exitEditDraft,
+    updateDraftOriginalHtml,
     saveDraft,
     saveDraftInPlace,
   } = useDraftEditing({
@@ -465,12 +467,59 @@ export function ApproveClient() {
   });
   const editedHtmlRef = useRef(editedHtml);
   const draftOriginalHtmlRef = useRef(draftOriginalHtml);
+  const editorRef = useRef<Editor | null>(null);
+  const previousBodyRegenRef = useRef<{ isBusy: boolean; targetSrc: string }>({
+    isBusy: false,
+    targetSrc: "",
+  });
   useEffect(() => {
     editedHtmlRef.current = editedHtml;
   }, [editedHtml]);
   useEffect(() => {
     draftOriginalHtmlRef.current = draftOriginalHtml;
   }, [draftOriginalHtml]);
+
+  useEffect(() => {
+    if (!editingDraft || draftState.status !== "ready") {
+      previousBodyRegenRef.current = { isBusy: false, targetSrc: "" };
+      return;
+    }
+
+    const bodyRegen = draftState.draft.bodyRegen;
+    const isBusy = bodyRegen
+      ? (BODY_REGEN_BUSY_STATUSES as readonly string[]).includes(bodyRegen.status)
+      : false;
+    const targetSrc = bodyRegen?.targetSrc ?? "";
+    const previous = previousBodyRegenRef.current;
+
+    if (previous.isBusy && !isBusy && previous.targetSrc.startsWith("placeholder:")) {
+      const placeholderId = previous.targetSrc.slice("placeholder:".length);
+      const editor = editorRef.current;
+      const freshBodyHtml = draftState.draft.bodyHtml ?? "";
+      const result = editor
+        ? reconcilePendingImage(editor.getHTML(), freshBodyHtml, placeholderId)
+        : null;
+      const replaced =
+        editor && result
+          ? replacePreservedPendingFigure(
+              editor,
+              placeholderId,
+              bodyImageFigureHtml(result.newSrc, result.alt),
+            )
+          : false;
+
+      if (editor && result && replaced) {
+        const nextHtml = editor.getHTML();
+        setEditedHtml(nextHtml);
+        updateDraftOriginalHtml(freshBodyHtml);
+        pushToast("AI画像が完成し、エディタに反映しました。");
+      } else {
+        pushToast("画像の生成が完了しました。保存前にプレビューで本文を確認してください。", "error");
+      }
+    }
+
+    previousBodyRegenRef.current = { isBusy, targetSrc };
+  }, [draftState, editingDraft, pushToast, setEditedHtml, updateDraftOriginalHtml]);
 
   // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
   // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
@@ -1004,7 +1053,7 @@ export function ApproveClient() {
     const saved = await saveDraftInPlace(editorInsertRegenFor.item.id, nextHtml);
     if (!saved) {
       pushToast(
-        "画像生成の処理中です。完了後にもう一度保存してください。プレースホルダはエディタに残っています。",
+        "保存に失敗したため生成を依頼していません。プレースホルダはエディタに残っています。",
         "error",
       );
       setEditorInsertRegenFor(null);
@@ -1130,6 +1179,9 @@ export function ApproveClient() {
         onCancelDiscard={() => setConfirmDiscard(false)}
         onSaveMeta={(text) => void saveMeta(activeItem.id, text)}
         isRegenPending={draftRegenPending}
+        onEditorReady={(editor) => {
+          editorRef.current = editor;
+        }}
         onInsertImageFromMedia={handleEditorMediaInsert}
         onGenerateImage={handleEditorImageGenerate}
         onPickImage={handleEditorImagePick}

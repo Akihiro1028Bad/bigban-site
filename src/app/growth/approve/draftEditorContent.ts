@@ -110,6 +110,47 @@ export function replaceImgSrcInHtml(html: string, newUrl: string): string {
   });
 }
 
+export interface PendingImageReconcileResult {
+  newSrc: string;
+  alt: string;
+}
+
+const IMG_TAG_RE = /<img\b[^>]*>/gi;
+const FIGURE_RE = /<figure\b[^>]*>[\s\S]*?<\/figure>/gi;
+
+function attrOf(tag: string, name: string): string {
+  const re = new RegExp(`\\b${name}=("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
+  const match = tag.match(re);
+  return match?.[2] ?? match?.[3] ?? match?.[4] ?? "";
+}
+
+function imgRefsOf(html: string): PendingImageReconcileResult[] {
+  return (html.match(IMG_TAG_RE) ?? [])
+    .map((tag) => ({ newSrc: attrOf(tag, "src"), alt: attrOf(tag, "alt") }))
+    .filter((ref) => ref.newSrc !== "");
+}
+
+function hasPendingFigure(html: string, placeholderId: string): boolean {
+  return (html.match(FIGURE_RE) ?? []).some((figure) => attrOf(figure, "data-pending") === placeholderId);
+}
+
+/**
+ * エディタ内の pending figure と、ポーリングで取得した fresh 本文を突き合わせる。
+ * fresh 側だけに増えた画像が一意に決まる場合だけ、その画像 src/alt を返す。
+ */
+export function reconcilePendingImage(
+  editorHtml: string,
+  freshBodyHtml: string,
+  placeholderId: string
+): PendingImageReconcileResult | null {
+  if (!hasPendingFigure(editorHtml, placeholderId)) return null;
+
+  const editorSrcs = new Set(imgRefsOf(editorHtml).map((ref) => ref.newSrc));
+  const freshDiff = imgRefsOf(freshBodyHtml).filter((ref) => !editorSrcs.has(ref.newSrc));
+  if (freshDiff.length !== 1) return null;
+  return freshDiff[0];
+}
+
 /**
  * ツールバーの装飾(#179)。種別ごとに付け方が異なる:
  * - block      … 段落を `<aside class="...">` で包むコールアウト(note/caution/highlight)。

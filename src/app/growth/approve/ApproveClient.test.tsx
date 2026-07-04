@@ -36,6 +36,7 @@ vi.mock("./DraftEditor", () => {
   interface MockDraftEditorProps {
     initialHtml: string;
     onChange: (html: string) => void;
+    onEditorReady?: (editor: FakeEditor | null) => void;
     onInsertImageFromMedia?: (editor: FakeEditor) => void;
     onGenerateImage?: (editor: FakeEditor) => void;
     onPickImage?: (src: string, editor: unknown) => void;
@@ -62,12 +63,14 @@ vi.mock("./DraftEditor", () => {
     DraftEditor: ({
       initialHtml,
       onChange,
+      onEditorReady,
       onInsertImageFromMedia,
       onGenerateImage,
       onPickImage,
       onRegenImage,
     }: MockDraftEditorProps) => {
       const editor = makeEditor(initialHtml, onChange);
+      onEditorReady?.(editor);
       return (
         <div>
           <textarea
@@ -93,6 +96,7 @@ vi.mock("./DraftEditor", () => {
       );
     },
     replacePreservedImageSrc: vi.fn(() => true),
+    replacePreservedPendingFigure: vi.fn(() => true),
   };
 });
 
@@ -109,7 +113,7 @@ vi.mock("./imageDirectorFlag", () => ({
 }));
 
 import { ApproveClient } from "./ApproveClient";
-import { replacePreservedImageSrc } from "./DraftEditor";
+import { replacePreservedImageSrc, replacePreservedPendingFigure } from "./DraftEditor";
 import { STUCK_THRESHOLD_MS } from "./generating";
 
 function mockFetchSequence(
@@ -4529,6 +4533,45 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       await waitFor(() =>
         expect(screen.queryByText(/AI再生成 処理中/)).not.toBeInTheDocument()
       );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("編集中の placeholder 生成が完了したらエディタ内の pending figure を完成画像へ置換する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(replacePreservedPendingFigure).mockClear();
+    try {
+      const placeholderId = "img-abc123";
+      const freshBodyHtml =
+        '<p>本文</p><figure><img src="https://images.microcms-assets.io/assets/a/done.png" alt="完成図"></figure>';
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+        {
+          json: draftWithRegen({
+            bodyHtml: `<p>本文</p><figure data-pending="${placeholderId}"><figcaption>生成中</figcaption></figure>`,
+            bodyRegen: { status: "処理中", targetSrc: `placeholder:${placeholderId}` },
+          }),
+        },
+        { json: draftWithRegen({ bodyHtml: freshBodyHtml, bodyRegen: { status: "なし", targetSrc: "" } }) }
+      );
+      flags.authEnabled = false;
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await vi.advanceTimersByTimeAsync(5100);
+
+      await waitFor(() => {
+        expect(replacePreservedPendingFigure).toHaveBeenCalledWith(
+          expect.anything(),
+          placeholderId,
+          '<figure><img src="https://images.microcms-assets.io/assets/a/done.png" alt="完成図"></figure>',
+        );
+      });
+      expect(await screen.findByText("AI画像が完成し、エディタに反映しました。")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
