@@ -49,7 +49,7 @@ import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
 import { useConsult } from "./hooks/useConsult";
-import { EmptyGate, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
+import { EmptyGateContent, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
 import { ToastList } from "./ToastList";
 import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
@@ -61,7 +61,7 @@ import { PromptsView } from "./PromptsView";
 import { ProposalView } from "./ProposalView";
 import { ProposalFormModal } from "./ProposalFormModal";
 import { nextReviewId } from "./reviewNav";
-import { decideInitialView, parseView } from "./viewRouting";
+import { decideInitialView, initialDraftFromUrl, parseView } from "./viewRouting";
 import type { ApproveView } from "./viewRouting";
 import { deriveShellCounts, syncAgoLabel } from "./boardShellStats";
 import type { ShellSegmentKey } from "./boardShellStats";
@@ -277,6 +277,27 @@ export function ApproveClient() {
 
   const boardInitRef = useRef(false);
   const prevBoardRef = useRef<PendingItem[]>([]);
+  // 通知の「承認画面で開く」ディープリンク(?draft=<contentId>)を一度だけ適用するためのガード。
+  const deepLinkAppliedRef = useRef(false);
+
+  // 通知ディープリンク: URL の ?draft(=下書きID/contentId)に一致する記事を、盤読込後に一度だけ
+  // 記事ビューで自動選択する。認証ゲートを挟んでも URL は保持されるため、認証後に盤が載った時点で
+  // 自然に適用される。一致しない(盤に無い/状態違い)場合は何もしない(クラッシュしない)。
+  useEffect(() => {
+    if (deepLinkAppliedRef.current) return;
+    if (items.length === 0) return;
+    const draftParam = initialDraftFromUrl();
+    if (!draftParam) {
+      // ?draft が無ければ以後判定しない(盤更新のたびに再走査しない)。
+      deepLinkAppliedRef.current = true;
+      return;
+    }
+    const target = items.find((item) => item.contentId === draftParam);
+    if (!target) return; // まだ盤に載っていない可能性があるので適用済みにはしない。
+    deepLinkAppliedRef.current = true;
+    setActiveId(target.id);
+    changeView("approve");
+  }, [items, changeView]);
 
   // 取得成功(値が同じでも)ごとの副作用: 滞留経過の基準時刻・最終成功時刻・連続失敗リセット。
   // dataUpdatedAt は毎回の成功で更新されるため、ポーリングで値が変わらなくても確実に走る。
@@ -584,9 +605,10 @@ export function ApproveClient() {
     );
   }
 
-  if (items.length === 0) {
-    return <EmptyGate token={token} onAdded={addProposal} />;
-  }
+  // #Task2: 盤が完全空(全カテゴリ0件)でも、ヘッダー＋左ナビのシェルは常に描画する。
+  // 空状態(ReviewDoneEmpty＋施策追加フォーム)はメインコンテンツ内に出し、
+  // 成績/公開キュー/プロンプト view へナビで移動できるようにする(全画面 EmptyGate への差し替えを廃止)。
+  const boardEmpty = items.length === 0;
 
   const allDone = processed === items.length;
   // #242: 施策/記事をセクション分割し、各セクション内を優先度スコア降順に並べる。
@@ -961,13 +983,20 @@ export function ApproveClient() {
                 onRetry={() => void pollBoard()}
               />
             ) : null}
-            {allDone && activeView !== "approve" ? (
+            {/* #Task2: 完全空のときは「すべて処理しました」ではなく空状態(EmptyGateContent)を出す
+                (元々1件も無い盤で完了メッセージを出さない)。 */}
+            {!boardEmpty && allDone && activeView !== "approve" ? (
               <p className="mb-3 rounded-md bg-[var(--p-green-weak)] px-3 py-2 text-sm font-semibold text-[var(--p-green)]">
                 🎉 すべて処理しました。承認分は次の制作実行で成果物になります（公開はまだされません）。
               </p>
             ) : null}
 
-            {activeView === "approve" ? (
+            {/* #Task2: 盤が完全空 かつ 施策/記事 view のときは、その view の通常コンテンツの代わりに
+                空状態(達成感メッセージ＋施策追加フォーム)を出す。プロンプト/成績/公開キューは
+                各自が空を扱えるため通常描画のままにし、ナビ移動を妨げない。 */}
+            {boardEmpty && (activeView === "approve" || activeView === "proposal") ? (
+              <EmptyGateContent token={token} onAdded={addProposal} />
+            ) : activeView === "approve" ? (
               // #proto P3a: approve view は「単一リスト(左)＋詳細ペイン(右)」の2ペイン。
               // 狭幅(lg未満)は master-detail の1ペイン: activeId!=null は右詳細のみ、
               // null は左リストのみを見せ、右ペイン先頭の「← 一覧」で戻る。

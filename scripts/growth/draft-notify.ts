@@ -1,9 +1,9 @@
 /**
- * 下書き作成完了を LINE 通知するためのメッセージ・プレビューURL組み立て(純関数)。
+ * 下書き作成完了を LINE 通知するためのメッセージ・リンクURL組み立て(純関数)。
  *
- * プレビューURLは既存のプレビュー入口(`/api/draft/enable`, Pattern A)を使う。
- * 将来、管理画面で下書きを閲覧できるようになったら、ここの URL 組み立てだけを
- * 差し替えれば通知側は変更不要(URL生成を1箇所に集約している)。
+ * 通知リンクは microCMS プレビュー(`/api/draft/enable`)ではなく、承認画面の対象記事
+ * (`/growth/approve?view=approve&draft=<contentId>`)へ飛ばす。承認画面が draft パラメータを
+ * 読み取り、該当記事を自動選択する。URL生成を1箇所(buildPreviewUrl)に集約している。
  *
  * リッチ通知(#35)は buildDraftFlex で Flex カルーセル(記事ごとにカード)を組み立てる。
  * テキスト版は Flex 非対応環境の altText フォールバックとして引き続き使う。
@@ -20,58 +20,55 @@ import type {
 export interface DraftPreviewParams {
   /** 例: https://www.thepicklebang.com (末尾スラッシュは正規化する) */
   siteUrl: string;
-  secret: string;
+  /** microCMS 下書きID。承認画面が draft パラメータで対象記事を選択するのに使う。 */
   contentId: string;
-  draftKey: string;
 }
 
-/** プレビュー入口(Pattern A: contentId + draftKey)の URL を組み立てる。 */
+/**
+ * 承認画面(記事ビュー)の対象記事へ飛ぶ URL を組み立てる。
+ * 承認画面は `?draft=<contentId>` を読み、該当記事を自動選択する。
+ */
 export function buildPreviewUrl(params: DraftPreviewParams): string {
   const base = params.siteUrl.replace(/\/+$/, "");
   const query = new URLSearchParams({
-    secret: params.secret,
-    draftKey: params.draftKey,
-    contentId: params.contentId,
+    view: "approve",
+    draft: params.contentId,
   });
-  return `${base}/api/draft/enable?${query.toString()}`;
+  return `${base}/growth/approve?${query.toString()}`;
 }
 
 export interface PreviewUrlInput {
   siteUrl: string | null | undefined;
-  secret: string | null | undefined;
   contentId: string;
-  draftKey: string | null | undefined;
 }
 
 /**
- * プレビューURLを組み立てる。siteUrl / secret / draftKey のいずれかが欠けていれば null。
- * (env や draftKey が無くても通知自体は続行させるため、ここで例外を投げない。)
+ * 承認画面リンクを組み立てる。siteUrl が欠けていれば null。
+ * (env が無くても通知自体は続行させ、下書きIDでフォールバックするため、ここで例外を投げない。)
  */
 export function previewUrlOrNull(input: PreviewUrlInput): string | null {
-  if (!input.siteUrl || !input.secret || !input.draftKey) {
+  if (!input.siteUrl) {
     return null;
   }
   return buildPreviewUrl({
     siteUrl: input.siteUrl,
-    secret: input.secret,
     contentId: input.contentId,
-    draftKey: input.draftKey,
   });
 }
 
 export interface DraftNotifyItem {
   title: string;
   contentId: string;
-  /** プレビューURL。draftKey が取れなかった場合は null。 */
+  /** 承認画面リンク。siteUrl が無い場合は null。 */
   previewUrl: string | null;
 }
 
-/** 1記事分の行(タイトル + プレビュー or 下書きID)を作る。 */
+/** 1記事分の行(タイトル + 承認画面リンク or 下書きID)を作る。 */
 function renderItem(item: DraftNotifyItem, index: number): string {
   const head = `${index + 1}. ${item.title}`;
   const detail = item.previewUrl
-    ? `プレビュー: ${item.previewUrl}`
-    : `下書きID: ${item.contentId}（プレビューURLは取得できませんでした）`;
+    ? `承認画面: ${item.previewUrl}`
+    : `下書きID: ${item.contentId}（承認画面リンクは取得できませんでした）`;
   return `${head}\n${detail}`;
 }
 
@@ -152,7 +149,7 @@ export interface DraftFlexItem {
   category: string;
   /** アイキャッチ画像 URL(HTTPS)。null なら hero を省略する。 */
   eyecatchUrl: string | null;
-  /** プレビューURL。null ならボタンの代わりに下書きIDを案内する。 */
+  /** 承認画面リンク。null ならボタンの代わりに下書きIDを案内する。 */
   previewUrl: string | null;
   contentId: string;
 }
@@ -185,7 +182,7 @@ function categoryBadge(category: string): FlexBox {
   };
 }
 
-/** フッター: プレビューボタン、無ければ下書きIDのフォールバック(沈黙させない)。 */
+/** フッター: 承認画面ボタン、無ければ下書きIDのフォールバック(沈黙させない)。 */
 function draftFooter(item: DraftFlexItem): FlexBox {
   if (item.previewUrl) {
     return {
@@ -196,7 +193,7 @@ function draftFooter(item: DraftFlexItem): FlexBox {
           type: "button",
           style: "primary",
           height: "sm",
-          action: { type: "uri", label: "プレビューを開く", uri: item.previewUrl },
+          action: { type: "uri", label: "承認画面で開く", uri: item.previewUrl },
         },
       ],
     };
@@ -207,7 +204,7 @@ function draftFooter(item: DraftFlexItem): FlexBox {
     contents: [
       {
         type: "text",
-        text: `下書きID: ${item.contentId}（プレビューURLは取得できませんでした）`,
+        text: `下書きID: ${item.contentId}（承認画面リンクは取得できませんでした）`,
         size: "xs",
         color: EXCERPT_COLOR,
         wrap: true,

@@ -64,7 +64,6 @@ interface PreviewCtx {
   /** 要約取得(コンテンツAPI)用キー。 */
   contentApiKey: string | null;
   siteUrl: string | null;
-  secret: string | null;
 }
 
 /** draftKey を取得する。設定欠落・障害時は例外を投げず null(通知は必ず送る=#20)。 */
@@ -114,7 +113,9 @@ async function main(): Promise<void> {
   const raw = JSON.parse(await readFile(payloadPath, "utf-8")) as unknown;
   const inputs = parseItems(raw);
 
-  // プレビューURL/要約用の設定はすべて任意。欠けていても通知は止めずフォールバックする(#20)。
+  // 承認画面リンク/要約用の設定はすべて任意。欠けていても通知は止めずフォールバックする(#20)。
+  // 通知リンクは承認画面(?draft=<contentId>)へ飛ぶため siteUrl のみで組み立てる
+  // (secret/draftKey は URL 用途には不要。draftKey は下の要約取得でのみ使う)。
   const ctx: PreviewCtx = {
     serviceDomain: process.env.MICROCMS_SERVICE_DOMAIN ?? null,
     // 管理API・コンテンツAPIはキーが別物。それぞれ適切なキーを優先し、無ければ相互フォールバック。
@@ -127,18 +128,16 @@ async function main(): Promise<void> {
       process.env.MICROCMS_MANAGEMENT_API_KEY ??
       null,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
-    secret: process.env.MICROCMS_DRAFT_SECRET ?? null,
   };
 
   const flexItems: DraftFlexItem[] = [];
   const notifyItems: DraftNotifyItem[] = [];
   for (const input of inputs) {
+    // draftKey は承認画面リンクには不要。表示用の要約(fetchContentSummary)取得にのみ使う。
     const draftKey = await resolveDraftKey(input, ctx);
     const previewUrl = previewUrlOrNull({
       siteUrl: ctx.siteUrl,
-      secret: ctx.secret,
       contentId: input.contentId,
-      draftKey,
     });
     const summary = await resolveSummary(input, draftKey, ctx);
     const title = summary?.title ?? input.title;

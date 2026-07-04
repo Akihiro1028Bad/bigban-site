@@ -671,6 +671,29 @@ describe("ApproveClient 施策の手動追加(#255)", () => {
     expect(await screen.findByText(/本日のレビュー完了/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "追加する" })).toBeInTheDocument();
   });
+
+  it("0件でもヘッダー＋左ナビ(シェル)を描画し、他 view へ移動できる(#Task2)", async () => {
+    mockFetchSequence({ json: { success: true, items: [] } });
+    render(<ApproveClient />);
+    await login();
+    // 空状態でもシェル(ヘッダー・左ナビ)が残る=全画面 EmptyGate に置き換わらない。
+    expect(await screen.findByText(/本日のレビュー完了/)).toBeInTheDocument();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+    // 左ナビから成績 view へ移動できる(EmptyGate だと nav が無く移動不可だった)。
+    await selectView(/成績/);
+    expect(await screen.findByRole("region", { name: "成績ボード" })).toBeInTheDocument();
+    // 空状態文言は消え、成績 view に切り替わる。
+    expect(screen.queryByText(/本日のレビュー完了/)).not.toBeInTheDocument();
+  });
+
+  it("0件でも左ナビから公開キュー view へ移動できる(#Task2)", async () => {
+    mockFetchSequence({ json: { success: true, items: [] } });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText(/本日のレビュー完了/);
+    await selectView(/公開キュー/);
+    expect(await screen.findByRole("region", { name: "公開キュー" })).toBeInTheDocument();
+  });
 });
 
 describe("ApproveClient フォーカス管理(#240/#213)", () => {
@@ -2070,6 +2093,70 @@ describe("ApproveClient 合言葉認証オフ(#36 一時措置)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("サーバー設定エラー");
     await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
     expect(await screen.findByText("市川ページ")).toBeInTheDocument();
+  });
+});
+
+describe("ApproveClient 通知ディープリンク(?draft で対象記事を自動選択)", () => {
+  const draftReady = (bodyHtml: string) => ({
+    json: {
+      success: true,
+      exists: true,
+      draft: { title: "T", displayMode: "html", bodyHtml, body: "" },
+    },
+  });
+
+  it("?draft が記事の contentId に一致すると記事ビューで対象記事の詳細を自動で開く", async () => {
+    window.history.replaceState(null, "", "/?draft=g-abc");
+    mockFetchSequence(
+      {
+        json: {
+          success: true,
+          items: [ideaItem({ id: "i1", title: "本八幡の屋内コート", contentId: "g-abc" })],
+        },
+      },
+      draftReady("<p>下書き本文</p>"),
+    );
+    render(<ApproveClient />);
+    await login();
+    // ディープリンクにより記事ビュー(approve)で対象記事の詳細パネルが自動で開く。
+    expect(
+      await screen.findByRole("region", { name: "詳細: 本八幡の屋内コート" }),
+    ).toBeInTheDocument();
+    // 記事ビューへ切り替わっている(URL にも反映)。
+    expect(window.location.search).toContain("view=approve");
+  });
+
+  it("?draft が盤のどの contentId にも一致しなければ何も選択せずクラッシュしない", async () => {
+    window.history.replaceState(null, "", "/?view=approve&draft=g-missing");
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ id: "i1", title: "猛暑記事", contentId: "g-abc" })],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    // 記事リストは出るが、詳細パネルは自動で開かない(一致なし=無変化)。
+    await screen.findByText("猛暑記事");
+    expect(
+      screen.queryByRole("region", { name: "詳細: 猛暑記事" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("?draft が無ければ従来どおり自動選択しない", async () => {
+    window.history.replaceState(null, "", "/?view=approve");
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [ideaItem({ id: "i1", title: "猛暑記事", contentId: "g-abc" })],
+      },
+    });
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    expect(
+      screen.queryByRole("region", { name: "詳細: 猛暑記事" }),
+    ).not.toBeInTheDocument();
   });
 });
 

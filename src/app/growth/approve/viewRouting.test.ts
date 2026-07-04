@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { APPROVE_VIEWS, decideInitialView, parseView } from "./viewRouting";
+import { APPROVE_VIEWS, decideInitialView, initialDraftFromUrl, parseView } from "./viewRouting";
 
 describe("parseView", () => {
   it("5 view を正規化し、未知/欠落は null", () => {
@@ -9,6 +9,27 @@ describe("parseView", () => {
     expect(parseView("articles")).toBeNull(); // 旧値は廃止
     expect(parseView(null)).toBeNull();
     expect(parseView(undefined)).toBeNull();
+  });
+});
+
+describe("initialDraftFromUrl", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("URL の draft パラメータ(=contentId)を読み取る", () => {
+    window.history.replaceState(null, "", "/?view=approve&draft=g-abc123");
+    expect(initialDraftFromUrl()).toBe("g-abc123");
+  });
+
+  it("draft が無ければ null", () => {
+    window.history.replaceState(null, "", "/?view=approve");
+    expect(initialDraftFromUrl()).toBeNull();
+  });
+
+  it("draft が空文字なら null(空 id を選択対象にしない)", () => {
+    window.history.replaceState(null, "", "/?draft=");
+    expect(initialDraftFromUrl()).toBeNull();
   });
 });
 

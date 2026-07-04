@@ -19,6 +19,17 @@ export function parseView(raw: string | null | undefined): ApproveView | null {
 }
 
 /**
+ * URL の `?draft`(=下書きID/contentId)を読み取る。ディープリンク(通知の「承認画面で開く」)で
+ * 対象記事を自動選択するために使う。SSR 安全(window ガード)。欠落/空文字は null。
+ */
+export function initialDraftFromUrl(): string | null {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("draft");
+  return raw && raw.length > 0 ? raw : null;
+}
+
+/**
  * 初期表示 view を決める(proto 既定着地)。
  * 1. URL の view が妥当ならそれを使う。
  * 2. 施策に未処理があれば施策。
