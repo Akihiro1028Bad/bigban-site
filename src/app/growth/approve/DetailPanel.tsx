@@ -438,12 +438,9 @@ export function DetailPanel({
               <OutlineView
                 sections={sections}
                 hypothesis={hypothesis}
-                hue={hue}
-                imageInstructions={{}}
                 revising={revising}
                 onAddComment={onAddComment}
                 onRemoveComment={onRemoveComment}
-                onUpdateImage={() => undefined}
                 onRequestOutlineRevise={onRequestOutlineRevise}
               />
             )}

@@ -2,8 +2,8 @@
  * メディアプレビュー用の SVG 生成(#proto P3b・本番移植・画像)。
  *
  * 実画像の代わりに data-URI の SVG イラストを生成し、スタイル別(マスコット/ミニマル/
- * 図解/イメージ)に描き分ける。`mediaSvgUrl` は HouseStylePreview / ImageSlot が
- * ハウススタイルのサンプル表示に使う(実データの一覧は MediaLibraryModal が API 経由で行う)。
+ * 図解/イメージ)に描き分ける。`mediaSvgUrl` はメディアプレビュー用途の純関数として残す
+ * (実データの一覧は MediaLibraryModal が API 経由で行う)。
  *
  * data-URI 生成は DOM 非依存の純ロジックのため、coverage.exclude しない(100% 対象)。
  */

@@ -1,29 +1,15 @@
 /**
- * 構成案タブ(#proto P3b・本番移植・最初の承認ゲート): セクションごとの行コメントと【画像指示(再設計)】、
- * コメントをまとめた構成案の修正依頼。
+ * 構成案タブ: セクションごとの行コメントと、コメントをまとめた構成案の修正依頼。
  *
- * 画像指示は house style(宇宙人マスコット×コスミック)ロックを前提に「オフ/おまかせ/指定」の
- * 3状態トグル＋行為(action)一言に正規化。コメント編集とは非排他の独立レーン(痛点6)。
- *
- * 【AD5-2 縮約】画像指示の persist は当面セッション state に縮約する(フル persist は P3.5 BE)。
- * proto の `section.imageInstruction` 直接参照を、親(DetailPanel)が保持する
- * `imageInstructions: Record<number, ImageInstruction>` ＋ `onUpdateImage`(セッション merge)へ置換した。
  * 行コメントは本番 `useReviseEditing`(draftComments)へ結線するため、コメント配列/追加/削除は
  * すべて props(`sections[i].comments`/`onAddComment`/`onRemoveComment`/`onRequestOutlineRevise`)で受ける。
- * 入力途中の一時状態(commentFor/commentText/editingImg)のみ UI ローカルで保持する。
+ * 入力途中の一時状態(commentFor/commentText)のみ UI ローカルで保持する。
  */
 "use client";
 
 import { useState } from "react";
 
-import { effectiveMode, recommendOff, resolveAction } from "@/lib/growth/imageIntent";
-import { ImageDirector } from "./ImageDirector";
-import { isImageDirectorEnabled } from "./imageDirectorFlag";
-import { ImagePlanBanner } from "./ImagePlanBanner";
-import { ImageSlot } from "./ImageSlot";
-import { ImageStateToggle } from "./ImageStateToggle";
 import { IconMessage, IconPlus, IconSparkles, IconWand, IconX } from "./ui/icons";
-import type { ImageInstruction, ImageMode } from "./imageIntentTypes";
 import type { ArticleHypothesis } from "@/lib/growth/approve";
 
 export interface OutlineViewSection {
@@ -37,16 +23,10 @@ interface OutlineViewProps {
   sections: OutlineViewSection[];
   /** 記事の狙い(仮説)。未記入(空文字/空配列)フィールドは非表示。 */
   hypothesis?: ArticleHypothesis;
-  /** house style プレビューの色相。 */
-  hue: number;
-  /** 画像指示(セッション state 縮約・親が保持)。 */
-  imageInstructions: Record<number, ImageInstruction>;
   /** 構成案修正が依頼中/処理中(useReviseEditing.reviseBusy 等)。 */
   revising: boolean;
   onAddComment: (sectionIndex: number, text: string) => void;
   onRemoveComment: (sectionIndex: number, commentIndex: number) => void;
-  /** 画像指示の部分更新(親のセッション merge)。 */
-  onUpdateImage: (sectionIndex: number, patch: Partial<ImageInstruction>) => void;
   onRequestOutlineRevise: () => void;
 }
 
@@ -62,21 +42,13 @@ const HYPOTHESIS_ROWS: { label: string; key: keyof Omit<ArticleHypothesis, "plan
 export function OutlineView({
   sections,
   hypothesis,
-  hue,
-  imageInstructions,
   revising,
   onAddComment,
   onRemoveComment,
-  onUpdateImage,
   onRequestOutlineRevise,
 }: OutlineViewProps) {
   const [commentFor, setCommentFor] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [editingImg, setEditingImg] = useState<number | null>(null);
-
-  // 画像ディレクター UI(バナー＋出す/出さないトグル)は保存先・生成側読込が未実装のため
-  // 既定で隠す(#62・[[imageDirectorFlag]])。コメントレーンは常時表示。
-  const showImageDirector = isImageDirectorEnabled();
 
   const total = sections.length;
   const totalComments = sections.reduce((n, s) => n + (s.comments?.length ?? 0), 0);
@@ -86,11 +58,6 @@ export function OutlineView({
     onAddComment(i, commentText.trim());
     setCommentText("");
     setCommentFor(null);
-  };
-
-  const changeMode = (i: number, mode: ImageMode) => {
-    onUpdateImage(i, { mode });
-    setEditingImg(mode === "custom" ? i : null);
   };
 
   const hypRows = hypothesis
@@ -151,23 +118,8 @@ export function OutlineView({
         </button>
       </div>
 
-      {showImageDirector && (
-        <ImagePlanBanner
-          outline={sections.map((s, i) => ({
-            heading: s.heading,
-            summary: s.summary,
-            imageInstruction: imageInstructions[i],
-          }))}
-        />
-      )}
-
       <ol className="flex flex-col gap-2.5">
         {sections.map((s, i) => {
-          const inst = imageInstructions[i];
-          const mode = effectiveMode(inst);
-          const sec = { heading: s.heading, summary: s.summary };
-          const recOff = recommendOff(sec, i, total);
-          const slotAction = mode === "custom" ? (inst?.action ?? "") : resolveAction(sec, inst);
           return (
             <li
               key={i}
@@ -233,7 +185,7 @@ export function OutlineView({
                     </div>
                   )}
 
-                  {/* コントロール行: コメント追加 | 画像レーン(トグル＋状態) */}
+                  {/* コントロール行: コメント追加 */}
                   <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-2">
                     <button
                       onClick={() => { setCommentFor(commentFor === i ? null : i); setCommentText(""); }}
@@ -242,35 +194,7 @@ export function OutlineView({
                     >
                       <IconPlus size={13} /> コメント
                     </button>
-                    {showImageDirector && (
-                      <>
-                        <span className="h-4 w-px" style={{ background: "var(--p-border)" }} />
-                        <ImageStateToggle mode={mode} recommendOff={recOff} onChange={(m) => changeMode(i, m)} />
-                        {editingImg !== i && (
-                          <ImageSlot
-                            mode={mode}
-                            action={slotAction}
-                            hue={hue}
-                            isEyecatch={inst?.isEyecatch}
-                            onEdit={() => { onUpdateImage(i, { mode: "custom" }); setEditingImg(i); }}
-                          />
-                        )}
-                      </>
-                    )}
                   </div>
-
-                  {showImageDirector && editingImg === i && (
-                    <ImageDirector
-                      section={sec}
-                      hue={hue}
-                      isFirst={i === 0}
-                      instruction={inst}
-                      onSetAction={(action) => { onUpdateImage(i, { mode: "custom", action }); setEditingImg(null); }}
-                      onToggleEyecatch={() => onUpdateImage(i, { isEyecatch: !inst?.isEyecatch })}
-                      onSetAdvancedNote={(note) => onUpdateImage(i, { advancedNote: note })}
-                      onCancel={() => { onUpdateImage(i, { mode: "auto" }); setEditingImg(null); }}
-                    />
-                  )}
                 </div>
               </div>
             </li>
