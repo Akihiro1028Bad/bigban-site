@@ -54,6 +54,7 @@ import {
 interface DraftEditorProps {
   initialHtml: string;
   onChange: (html: string) => void;
+  onEditorReady?: (editor: Editor | null) => void;
   onInsertImageFromMedia?: (editor: Editor) => void;
   onGenerateImage?: (editor: Editor) => void;
   onPickImage?: (src: string, editor: Editor) => void;
@@ -117,6 +118,26 @@ export function replacePreservedImageSrc(editor: Editor, oldSrc: string, newUrl:
     .focus()
     .setNodeSelection(targetPos)
     .updateAttributes("preservedBlock", { html: replaceImgSrcInHtml(targetHtml, newUrl) })
+    .run();
+}
+
+export function replacePreservedPendingFigure(editor: Editor, placeholderId: string, figureHtml: string): boolean {
+  let targetPos: number | null = null;
+  editor.state.doc.descendants((node, pos) => {
+    if (targetPos !== null || node.type.name !== "preservedBlock") return false;
+    const html = String((node.attrs as { html?: string }).html ?? "");
+    if (!new RegExp(`\\bdata-pending=(?:"${placeholderId}"|'${placeholderId}'|${placeholderId})(?:\\s|>|$)`).test(html)) {
+      return true;
+    }
+    targetPos = pos;
+    return false;
+  });
+  if (targetPos === null) return false;
+  return editor
+    .chain()
+    .focus()
+    .setNodeSelection(targetPos)
+    .updateAttributes("preservedBlock", { html: figureHtml })
     .run();
 }
 
@@ -552,6 +573,7 @@ function ImageMenu({
 export function DraftEditor({
   initialHtml,
   onChange,
+  onEditorReady,
   onInsertImageFromMedia,
   onGenerateImage,
   onPickImage,
@@ -591,6 +613,11 @@ export function DraftEditor({
   useEffect(() => {
     if (editor) editor.commands.setContent(sanitizeDraftHtml(initialHtml));
   }, [editor, initialHtml]);
+
+  useEffect(() => {
+    onEditorReady?.(editor ?? null);
+    return () => onEditorReady?.(null);
+  }, [editor, onEditorReady]);
 
   if (!editor) return null;
 

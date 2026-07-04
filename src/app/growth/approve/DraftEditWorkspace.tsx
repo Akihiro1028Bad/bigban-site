@@ -49,6 +49,7 @@ interface DraftEditWorkspaceProps {
    */
   onSaveMeta: (text: string) => void;
   isRegenPending?: boolean;
+  onEditorReady?: (editor: Editor | null) => void;
   onInsertImageFromMedia?: (editor: Editor) => void;
   onGenerateImage?: (editor: Editor) => void;
   onPickImage?: (src: string, editor: Editor) => void;
@@ -87,6 +88,7 @@ export function DraftEditWorkspace({
   metaDescription,
   onSaveMeta,
   isRegenPending = false,
+  onEditorReady,
   onInsertImageFromMedia,
   onGenerateImage,
   onPickImage,
@@ -94,6 +96,7 @@ export function DraftEditWorkspace({
 }: DraftEditWorkspaceProps) {
   const [previewWidth, setPreviewWidth] = useState<PreviewWidthKey>("desktop");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("edit");
+  const initialHtmlRef = useRef(initialHtml);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -246,8 +249,9 @@ export function DraftEditWorkspace({
               />
             </div>
             <DraftEditor
-              initialHtml={initialHtml}
+              initialHtml={initialHtmlRef.current}
               onChange={onChange}
+              onEditorReady={onEditorReady}
               onInsertImageFromMedia={onInsertImageFromMedia}
               onGenerateImage={onGenerateImage}
               onPickImage={onPickImage}

@@ -65,6 +65,10 @@ export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftE
     setDraftSaveError("");
   }
 
+  function updateDraftOriginalHtml(html: string): void {
+    setDraftOriginalHtml(html);
+  }
+
   // 未保存の変更があれば破棄確認を挟む。
   function cancelEditDraft(): void {
     if (editedHtml !== draftOriginalHtml) {
@@ -124,6 +128,7 @@ export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftE
     startEditDraft,
     cancelEditDraft,
     exitEditDraft,
+    updateDraftOriginalHtml,
     saveDraft,
     saveDraftInPlace,
   };
