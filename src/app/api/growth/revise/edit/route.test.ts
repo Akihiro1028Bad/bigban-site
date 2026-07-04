@@ -67,6 +67,31 @@ describe("POST /api/growth/revise/edit", () => {
     expect(props).toEqual({ "構成案": { rich_text: [{ text: { content: "## A\n説明" } }] } });
   });
 
+  it("構成案が20000字ちょうどなら保存できる", async () => {
+    const outline = "あ".repeat(20000);
+    vi.mocked(getPage).mockResolvedValue(page());
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, outline }));
+
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const outlineProp = props["構成案"] as { rich_text: Array<{ text: { content: string } }> };
+    expect(outlineProp.rich_text.map((item) => item.text.content).join("")).toBe(outline);
+  });
+
+  it("構成案が20001字なら 400 で保存しない", async () => {
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, outline: "あ".repeat(20001) }));
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "構成案が長すぎます(20000字以内)。",
+    });
+    expect(getPage).not.toHaveBeenCalled();
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("AI修正処理中なら 409", async () => {
     vi.mocked(getPage).mockResolvedValue(page("提示中"));
     const res = await POST(postRequest(null, { pageId: PAGE_ID, outline: "## A" }));

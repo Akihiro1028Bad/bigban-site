@@ -55,6 +55,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!hasOutline && !hasTitle) {
     return badRequest("構成案またはタイトルを入力してください。");
   }
+  if (hasOutline && outlineStr.length > 20000) {
+    return badRequest("構成案が長すぎます(20000字以内)。");
+  }
 
   const options = notionOptions();
   if (!options) {
