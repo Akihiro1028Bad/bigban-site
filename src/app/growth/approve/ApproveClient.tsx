@@ -48,7 +48,6 @@ import { detailBadge } from "./detailBadge";
 import { bodyImageUrlsOf } from "./detailBodyImages";
 import { outlineSections } from "./outline";
 import type { OutlineViewSection } from "./OutlineView";
-import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
 import { BODY_REGEN_BUSY_STATUSES, extractBodyImages } from "@/lib/growth/bodyImageRegen";
 import {
@@ -521,25 +520,12 @@ export function ApproveClient() {
     previousBodyRegenRef.current = { isBusy, targetSrc };
   }, [draftState, editingDraft, pushToast, setEditedHtml, updateDraftOriginalHtml]);
 
-  // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
+  // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)は
   // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
   const [detailTab, setDetailTab] = useState<DetailTab>("preview");
-  const [imageInstructions, setImageInstructions] = useState<Record<number, ImageInstruction>>({});
   useEffect(() => {
     setDetailTab("preview");
-    setImageInstructions({});
   }, [activeId]);
-
-  // 画像指示のセッション merge(immutable)。既定は「おまかせ(auto)」。
-  const updateImageInstruction = useCallback(
-    (index: number, patch: Partial<ImageInstruction>): void => {
-      setImageInstructions((prev) => ({
-        ...prev,
-        [index]: { ...(prev[index] ?? { mode: "auto" }), ...patch },
-      }));
-    },
-    [],
-  );
 
   // 差分B(#proto P3b で DetailPanelView から移設): AI相談ドロワー。DetailPanelView 撤去に伴い、
   // useConsult を ApproveClient で生成し ConsultDrawer/ConsultComposer もここで描画する(相談フロー不変)。
@@ -1096,6 +1082,15 @@ export function ApproveClient() {
     }));
   }
 
+  async function saveArtboard(item: PendingItem, nextSections: ReturnType<typeof outlineSections>): Promise<boolean> {
+    return revise.persistOutline(item, nextSections);
+  }
+
+  function openArtboardFromConsult(): void {
+    setDetailTab("artboard");
+    consult.closeDrawer();
+  }
+
   // #275/#proto P3b: 詳細パネル本体。記事は approve view の右ペイン内、施策は proposal view のドロワーとして
   // 親が配置する。2段タブ DetailPanel(proto 移植)へ本番データ・主操作・相談導線を結線する。
   function renderDetailPanel(item: PendingItem) {
@@ -1138,8 +1133,8 @@ export function ApproveClient() {
           )
         }
         sections={detailSections(item)}
+        artboardSections={outlineSections(item.outline)}
         hypothesis={item.hypothesis}
-        imageInstructions={imageInstructions}
         revising={revise.reviseBusy}
         onAddComment={(sectionIndex, text) => {
           // OutlineView は入力欄の text を直接渡す。setCommentText→saveComment を同一 tick で
@@ -1150,8 +1145,10 @@ export function ApproveClient() {
         onRemoveComment={(sectionIndex, commentIndex) =>
           revise.deleteComment(sectionIndex, commentIndex)
         }
-        onUpdateImage={updateImageInstruction}
         onRequestOutlineRevise={() => void revise.requestRevise(item)}
+        onSaveArtboard={(nextSections) => saveArtboard(item, nextSections)}
+        isSavingArtboard={revise.reviseBusy}
+        artboardSaveError={revise.reviseError}
         onSaveMeta={(text) => void saveMeta(item.id, text)}
         onReloadDraft={() => void loadDraft(item.id)}
       />
@@ -1422,6 +1419,7 @@ export function ApproveClient() {
               advice={consult.advice}
               bodyCommentConsult={consult.bodyCommentConsult}
               revise={revise}
+              onOpenArtboard={openArtboardFromConsult}
             />
           }
           busy={consult.busy}

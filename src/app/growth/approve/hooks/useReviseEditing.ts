@@ -14,8 +14,6 @@ import { toMessage } from "../errorMessage";
 import {
   outlineSections,
   serializeOutlineSections,
-  type ImageStyleKey,
-  type OutlineImage,
   type OutlineSection,
 } from "../outline";
 import type { PendingItem } from "../types";
@@ -38,12 +36,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editHeading, setEditHeading] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  // #61: 画像指示エディタ。フォームを開いているセクション index と入力値(スタイル/説明)、
-  // 既存画像を編集中のときの index(null=新規追加)。
-  const [imageFormFor, setImageFormFor] = useState<number | null>(null);
-  const [editingImageIdx, setEditingImageIdx] = useState<number | null>(null);
-  const [imageStyle, setImageStyle] = useState<ImageStyleKey>("mascot");
-  const [imageDesc, setImageDesc] = useState("");
   const [reviseBusy, setReviseBusy] = useState(false);
   const [reviseError, setReviseError] = useState("");
   // #139 B: タイトルへの AI 修正指示(構成案コメントとは別レーン)。
@@ -80,9 +72,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setEditingSection(null);
     setEditHeading("");
     setEditDescription("");
-    setImageFormFor(null);
-    setEditingImageIdx(null);
-    setImageDesc("");
     setReviseError("");
     setTitleRevisePrompt("");
   }, [openId]);
@@ -121,14 +110,12 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setOpenCommentFor(section);
     setEditingIdx(null);
     setCommentText("");
-    setImageFormFor(null); // 画像フォームが開いていれば閉じる
   }
 
   function startEditComment(section: number, idx: number, text: string): void {
     setOpenCommentFor(section);
     setEditingIdx(idx);
     setCommentText(text);
-    setImageFormFor(null);
   }
 
   function cancelComment(): void {
@@ -170,7 +157,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setEditHeading(section.heading);
     setEditDescription(section.description);
     setOpenCommentFor(null); // コメント入力中なら閉じる
-    setImageFormFor(null);
   }
 
   function cancelEditSection(): void {
@@ -224,69 +210,6 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     if (await persistOutline(item, next)) cancelEditSection();
   }
 
-  // #61: 画像指示の追加/編集/削除。構成案を直接上書き(AI不要・/revise/edit に相乗り)。
-  // 画像フォームを開くときは、コメント・手動編集フォームを閉じる(同時に複数フォームを開かない)。
-  function closeOtherForms(): void {
-    setOpenCommentFor(null);
-    setEditingSection(null);
-    setEditHeading("");
-    setEditDescription("");
-  }
-
-  function startAddImage(i: number): void {
-    setImageFormFor(i);
-    setEditingImageIdx(null);
-    setImageStyle("mascot");
-    setImageDesc("");
-    closeOtherForms();
-  }
-
-  function startEditImage(i: number, idx: number, image: OutlineImage): void {
-    setImageFormFor(i);
-    setEditingImageIdx(idx);
-    setImageStyle(image.style);
-    setImageDesc(image.description);
-    closeOtherForms();
-  }
-
-  function cancelImage(): void {
-    setImageFormFor(null);
-    setEditingImageIdx(null);
-    setImageDesc("");
-  }
-
-  async function saveImage(
-    item: PendingItem,
-    sections: OutlineSection[],
-    i: number
-  ): Promise<void> {
-    const description = imageDesc.trim();
-    if (!description) {
-      setReviseError("画像の説明を入力してください。");
-      return;
-    }
-    const currentImages = sections[i].images;
-    const nextImages =
-      editingImageIdx !== null
-        ? currentImages.map((img, k) =>
-            k === editingImageIdx ? { style: imageStyle, description } : img
-          )
-        : [...currentImages, { style: imageStyle, description }];
-    const next = sections.map((s, k) => (k === i ? { ...s, images: nextImages } : s));
-    if (await persistOutline(item, next)) cancelImage();
-  }
-
-  async function deleteImage(
-    item: PendingItem,
-    sections: OutlineSection[],
-    i: number,
-    idx: number
-  ): Promise<void> {
-    const nextImages = sections[i].images.filter((_, k) => k !== idx);
-    const next = sections.map((s, k) => (k === i ? { ...s, images: nextImages } : s));
-    await persistOutline(item, next);
-  }
-
   // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
   async function applyRevise(item: PendingItem, action: "apply" | "discard"): Promise<void> {
     setReviseBusy(true);
@@ -310,18 +233,12 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     editingSection,
     editHeading,
     editDescription,
-    imageFormFor,
-    editingImageIdx,
-    imageStyle,
-    imageDesc,
     reviseBusy,
     reviseError,
     titleRevisePrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
-    setImageStyle,
-    setImageDesc,
     setTitleRevisePrompt,
     requestRevise,
     startAddComment,
@@ -332,11 +249,7 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     startEditSection,
     cancelEditSection,
     saveSection,
-    startAddImage,
-    startEditImage,
-    cancelImage,
-    saveImage,
-    deleteImage,
+    persistOutline,
     applyRevise,
   };
 }

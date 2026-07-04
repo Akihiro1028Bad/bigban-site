@@ -18,7 +18,6 @@ import type { ConsultKind } from "@/lib/growth/consult";
 import { ReviseCommentForm } from "../ReviseCommentForm";
 import { Section } from "../Section";
 import { SectionEditor } from "../SectionEditor";
-import { SectionImages } from "../SectionImages";
 import { IconWand } from "../ui/icons";
 import type { useAdviceConsult } from "../hooks/useAdviceConsult";
 import type { useBodyCommentConsult } from "../hooks/useBodyCommentConsult";
@@ -34,6 +33,7 @@ interface ConsultComposerProps {
   advice: ReturnType<typeof useAdviceConsult>;
   bodyCommentConsult: ReturnType<typeof useBodyCommentConsult>;
   revise: ReturnType<typeof useReviseEditing>;
+  onOpenArtboard: () => void;
 }
 
 // ─── overall モード ────────────────────────────────────────────────────────────
@@ -98,9 +98,10 @@ function OverallComposer({ advice }: OverallComposerProps) {
 interface ReviseComposerProps {
   item: PendingItem;
   revise: ReturnType<typeof useReviseEditing>;
+  onOpenArtboard: () => void;
 }
 
-function ReviseComposer({ item, revise }: ReviseComposerProps) {
+function ReviseComposer({ item, revise, onOpenArtboard }: ReviseComposerProps) {
   const {
     draftComments,
     openCommentFor,
@@ -109,18 +110,12 @@ function ReviseComposer({ item, revise }: ReviseComposerProps) {
     editingSection,
     editHeading,
     editDescription,
-    imageFormFor,
-    editingImageIdx,
-    imageStyle,
-    imageDesc,
     reviseBusy,
     reviseError,
     titleRevisePrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
-    setImageStyle,
-    setImageDesc,
     setTitleRevisePrompt,
     requestRevise,
     startAddComment,
@@ -130,11 +125,6 @@ function ReviseComposer({ item, revise }: ReviseComposerProps) {
     deleteComment,
     startEditSection,
     cancelEditSection,
-    startAddImage,
-    startEditImage,
-    cancelImage,
-    saveImage,
-    deleteImage,
   } = revise;
 
   const sections = outlineSections(item.outline);
@@ -154,25 +144,17 @@ function ReviseComposer({ item, revise }: ReviseComposerProps) {
     );
   }
 
-  function renderSectionImages(sectionList: OutlineSection[], i: number): ReactNode {
+  function renderArtboardLink(): ReactNode {
     return (
-      <SectionImages
-        heading={sectionList[i].heading}
-        images={sectionList[i].images}
-        open={imageFormFor === i}
-        busy={reviseBusy}
-        sectionIndex={i}
-        imageStyle={imageStyle}
-        onImageStyleChange={setImageStyle}
-        imageDesc={imageDesc}
-        onImageDescChange={setImageDesc}
-        editing={editingImageIdx !== null}
-        onStartEdit={(idx, image) => startEditImage(i, idx, image)}
-        onDelete={(idx) => deleteImage(item, sectionList, i, idx)}
-        onStartAdd={() => startAddImage(i)}
-        onCancel={cancelImage}
-        onSave={() => saveImage(item, sectionList, i)}
-      />
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={onOpenArtboard}
+          className="text-xs font-medium text-[var(--p-purple)] opacity-80 transition-opacity hover:opacity-100"
+        >
+          誌面タブで画像を編集
+        </button>
+      </div>
     );
   }
 
@@ -197,7 +179,7 @@ function ReviseComposer({ item, revise }: ReviseComposerProps) {
         onStartAddComment={() => startAddComment(i)}
         onStartEditSection={() => startEditSection(i, section)}
         editor={renderSectionEditor(sectionList, i)}
-        images={renderSectionImages(sectionList, i)}
+        images={renderArtboardLink()}
       />
     );
   }
@@ -257,12 +239,13 @@ export function ConsultComposer({
   advice,
   bodyCommentConsult,
   revise,
+  onOpenArtboard,
 }: ConsultComposerProps) {
   if (mode === "overall") {
     return <OverallComposer advice={advice} />;
   }
   if (mode === "revise") {
-    return <ReviseComposer item={item} revise={revise} />;
+    return <ReviseComposer item={item} revise={revise} onOpenArtboard={onOpenArtboard} />;
   }
   // sentence
   return <SentenceComposer bodyHtml={bodyHtml} bodyCommentConsult={bodyCommentConsult} />;
