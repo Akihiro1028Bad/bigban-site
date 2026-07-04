@@ -12,6 +12,7 @@
  */
 
 import type { RequestedBodyImageStyle } from "./body-image";
+import { isPlaceholderId } from "./body-image-insert";
 import type { FlexBubble } from "./digest-flex";
 import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
@@ -288,6 +289,8 @@ const IMG_TAG_RE = /<img\b[^>]*>/gi;
 const SRC_ATTR_RE = /\bsrc\s*=\s*"([^"]*)"/i;
 // 差し替え用: 先頭の `src="` と閉じ `"` を捕捉して値だけ入れ替える。
 const SRC_REPLACE_RE = /(\bsrc\s*=\s*")[^"]*(")/i;
+const PLACEHOLDER_TARGET_PREFIX = "placeholder:";
+const PENDING_FIGURE_RE = /<figure\b[^>]*\bdata-pending\s*=\s*"([^"]*)"[^>]*>[\s\S]*?<\/figure>/gi;
 
 /** 値が microCMS アセット URL(https・images.microcms-assets.io)か判定する。 */
 export function isMicrocmsAssetUrl(value: string): boolean {
@@ -298,6 +301,19 @@ export function isMicrocmsAssetUrl(value: string): boolean {
     return false;
   }
   return parsed.protocol === "https:" && parsed.hostname === MICROCMS_ASSET_HOST;
+}
+
+/** Notion の本文画像再生成対象を差し替え(src)か挿入(placeholder)として解釈する。 */
+export function parseBodyRegenTarget(
+  raw: string
+): { kind: "src"; src: string } | { kind: "placeholder"; placeholderId: string } | null {
+  const value = raw.trim();
+  if (value === "") return null;
+  if (value.startsWith(PLACEHOLDER_TARGET_PREFIX)) {
+    const placeholderId = value.slice(PLACEHOLDER_TARGET_PREFIX.length);
+    return isPlaceholderId(placeholderId) ? { kind: "placeholder", placeholderId } : null;
+  }
+  return isMicrocmsAssetUrl(value) ? { kind: "src", src: value } : null;
 }
 
 function srcOf(tag: string): string {
@@ -330,6 +346,28 @@ export function replaceBodyImageBySrc(
     if (src !== oldSrc || !isMicrocmsAssetUrl(src)) return tag;
     replaced = true;
     return tag.replace(SRC_REPLACE_RE, (_m, open: string, close: string) => `${open}${newUrl}${close}`);
+  });
+  return { html: out, replaced };
+}
+
+/**
+ * 本文HTMLの `<figure data-pending="<placeholderId>">...</figure>` の先頭1件だけを
+ * 実画像 figure へ置換する。対象が無ければ本文を変えず replaced=false。
+ *
+ * replaceBodyImageBySrc と同じく関数形式で置換し、figureHtml 内の `$1` 等を
+ * 置換シーケンスとして展開させない。
+ */
+export function replaceBodyImagePlaceholder(
+  html: string,
+  placeholderId: string,
+  figureHtml: string
+): { html: string; replaced: boolean } {
+  if (!isPlaceholderId(placeholderId)) return { html, replaced: false };
+  let replaced = false;
+  const out = html.replace(PENDING_FIGURE_RE, (figure, id: string) => {
+    if (replaced || id !== placeholderId) return figure;
+    replaced = true;
+    return figureHtml;
   });
   return { html: out, replaced };
 }

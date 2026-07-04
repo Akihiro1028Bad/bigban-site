@@ -17,7 +17,9 @@ import {
   bodyRegenViewOf,
   extractBodyImages,
   isMicrocmsAssetUrl,
+  parseBodyRegenTarget,
   replaceBodyImageBySrc,
+  replaceBodyImagePlaceholder,
   requestedStyleFromLabel,
   selectStaleBodyRegenIds,
   type BodyImageRef,
@@ -381,6 +383,72 @@ describe("replaceBodyImageBySrc", () => {
     const tricky = "https://images.microcms-assets.io/assets/x/$2$1.png";
     const out = replaceBodyImageBySrc(`<img src="${SRC}" alt="図">`, SRC, tricky);
     expect(out.html).toBe(`<img src="${tricky}" alt="図">`);
+  });
+});
+
+describe("parseBodyRegenTarget", () => {
+  it("microCMS URL は src として返す", () => {
+    expect(parseBodyRegenTarget(SRC)).toEqual({ kind: "src", src: SRC });
+  });
+
+  it("placeholder:<id> は placeholder として返す", () => {
+    expect(parseBodyRegenTarget("placeholder:img-abc123")).toEqual({
+      kind: "placeholder",
+      placeholderId: "img-abc123",
+    });
+  });
+
+  it("不正 placeholder は null", () => {
+    expect(parseBodyRegenTarget("placeholder:bad!")).toBeNull();
+  });
+
+  it("外部 URL は null", () => {
+    expect(parseBodyRegenTarget("https://example.com/image.png")).toBeNull();
+  });
+
+  it("空文字は null", () => {
+    expect(parseBodyRegenTarget("")).toBeNull();
+  });
+});
+
+describe("replaceBodyImagePlaceholder", () => {
+  const placeholderId = "img-abc123";
+  const figureHtml = `<figure><img src="${NEW}" alt="新しい図"></figure>`;
+
+  it("一致する pending figure を figcaption ごと置換し前後の HTML は保つ", () => {
+    const html =
+      `<p>前</p>` +
+      `<figure data-pending="${placeholderId}"><figcaption>AI画像を生成中…（完了すると自動で差し替わります）</figcaption></figure>` +
+      `<p>後</p>`;
+    const out = replaceBodyImagePlaceholder(html, placeholderId, figureHtml);
+    expect(out).toEqual({
+      html: `<p>前</p>${figureHtml}<p>後</p>`,
+      replaced: true,
+    });
+  });
+
+  it("同一 ID が2つあっても先頭1件だけ置換する", () => {
+    const html =
+      `<figure data-pending="${placeholderId}"><figcaption>1</figcaption></figure>` +
+      `<figure data-pending="${placeholderId}"><figcaption>2</figcaption></figure>`;
+    const out = replaceBodyImagePlaceholder(html, placeholderId, figureHtml);
+    expect(out.replaced).toBe(true);
+    expect(out.html).toBe(
+      `${figureHtml}<figure data-pending="${placeholderId}"><figcaption>2</figcaption></figure>`
+    );
+  });
+
+  it("対象が無ければ replaced=false で本文は無変更", () => {
+    const html = `<figure data-pending="img-other1"><figcaption>待機中</figcaption></figure>`;
+    const out = replaceBodyImagePlaceholder(html, placeholderId, figureHtml);
+    expect(out).toEqual({ html, replaced: false });
+  });
+
+  it("figureHtml 内の $ 特殊シーケンスは展開せず literal で入る", () => {
+    const html = `<figure data-pending="${placeholderId}"><figcaption>待機中</figcaption></figure>`;
+    const tricky = `<figure><img src="https://images.microcms-assets.io/assets/x/$&-$1.png" alt="$2"></figure>`;
+    const out = replaceBodyImagePlaceholder(html, placeholderId, tricky);
+    expect(out.html).toBe(tricky);
   });
 });
 
