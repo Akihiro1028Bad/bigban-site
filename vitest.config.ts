@@ -135,6 +135,10 @@ export default defineConfig({
         // テスト済み。結線フロー(要対応→開く→選択/アップロード→eyecatch 反映→onChanged)は
         // PublishQueue.test.tsx で実挙動を検証する。
         "src/app/growth/approve/MediaLibraryModal.tsx",
+        // 本文画像 AI 再生成の生成モーダル(#156/P2)。承認画面が render する薄い presentation
+        // (dialog/スタイルチップ/入力→onSubmit の結線)。純ロジック(チップ定義・送信 body)は
+        // bodyRegenRequest.ts でテスト済み。結線挙動は ApproveClient.test.tsx で検証する。
+        "src/app/growth/approve/BodyImageRegenModal.tsx",
       ],
       thresholds: {
         statements: 100,
