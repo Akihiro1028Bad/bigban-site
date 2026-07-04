@@ -9,6 +9,9 @@
  * 対象画像は **その時点の microCMS アセットURL**(targetSrc)で指定する(インデックスは本文編集で
  * 並びが変わると壊れるため)。暴走防止: 既に 依頼中/処理中 の行は 409。下書き未作成は 400。
  * 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
+ *
+ * P2(#62): `style?`(表示値『おまかせ』/内部キー・省略時 auto)・`textSpec?`(1000 字上限)を
+ * 受理し依頼キュー(Notion `本文画像スタイル`/`本文画像文字指定`)へ通す。
  */
 
 import { NextResponse } from "next/server";
@@ -16,6 +19,7 @@ import { NextResponse } from "next/server";
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
 import { isNotionPageId } from "@/lib/growth/approve";
+import { normalizeBodyImageStyle, type RequestedBodyImageStyle } from "@/lib/growth/bodyImage";
 import {
   BODY_REGEN_BUSY_STATUSES,
   buildBodyRegenRequestProps,
@@ -29,6 +33,10 @@ export const runtime = "nodejs";
 
 /** 再生成指示(自由文)の上限長。濫用・巨大ペイロード防止。 */
 const MAX_INSTRUCTION_LEN = 500;
+/** 図に焼き込む文字・数値(textSpec)の上限長。巨大ペイロード防止。 */
+const MAX_TEXTSPEC_LEN = 1000;
+/** style として受理する表示値・内部キー(discriminated ではなく enum)。 */
+const ALLOWED_STYLE_INPUTS = ["おまかせ", "auto", "mascot", "illust", "court", "flow", "infographic"] as const;
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -61,6 +69,20 @@ export async function POST(request: Request): Promise<Response> {
   if (instruction.length > MAX_INSTRUCTION_LEN) {
     return badRequest(`再生成指示は${MAX_INSTRUCTION_LEN}文字以内にしてください。`);
   }
+  const rawStyle = (body as { style?: unknown })?.style;
+  let requestedStyle: RequestedBodyImageStyle = "auto";
+  if (rawStyle !== undefined) {
+    if (typeof rawStyle !== "string" || !(ALLOWED_STYLE_INPUTS as readonly string[]).includes(rawStyle)) {
+      return badRequest("不正なスタイル指定です。");
+    }
+    // 表示値『おまかせ』/auto は auto、内部キーはそのまま。旧値は enum に無いため 400 で弾く。
+    requestedStyle = rawStyle === "おまかせ" || rawStyle === "auto" ? "auto" : normalizeBodyImageStyle(rawStyle);
+  }
+  const rawTextSpec = (body as { textSpec?: unknown })?.textSpec;
+  const textSpec = typeof rawTextSpec === "string" ? rawTextSpec.trim() : "";
+  if (textSpec.length > MAX_TEXTSPEC_LEN) {
+    return badRequest(`文字指定は${MAX_TEXTSPEC_LEN}文字以内にしてください。`);
+  }
 
   const options = notionOptions();
   if (!options) {
@@ -83,7 +105,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     await updatePageProps(
       pageId,
-      buildBodyRegenRequestProps(instruction, rawTargetSrc, new Date().toISOString()),
+      buildBodyRegenRequestProps(instruction, rawTargetSrc, requestedStyle, textSpec, new Date().toISOString()),
       options
     );
   } catch (error) {
