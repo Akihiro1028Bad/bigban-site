@@ -221,6 +221,124 @@ describe("fetchContentSummary", () => {
     expect(summary.eyecatchUrl).toBeNull();
   });
 
+  it("category が relation オブジェクト(columns)なら name を文字列で取り出す(Bug2)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        title: "コラム記事",
+        category: { id: "start", name: "はじめる", nameEn: "Start" },
+      }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBe("はじめる");
+  });
+
+  it("category が relation オブジェクトの配列(columns)なら先頭の name を取り出す", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        title: "t",
+        category: [{ id: "compare", name: "くらべる" }],
+      }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBe("くらべる");
+  });
+
+  it("relation に name が無く nameEn だけなら nameEn を使う", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", category: { id: "x", nameEn: "Start" } }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBe("Start");
+  });
+
+  it("relation に表示名が無い(id のみ)ときは category を null にする(空/[object Object]を出さない)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", category: { id: "x" } }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBeNull();
+  });
+
+  it("category が空白のみの文字列(news select)なら null(空バッジを出さない)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", category: "   " }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("news", "id", null, {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBeNull();
+  });
+
+  it("category が想定外の型(数値など)なら null にする(防御)", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", category: 42 }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBeNull();
+  });
+
+  it("category が relation オブジェクトの空配列なら null", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ title: "t", category: [] }),
+      text: async () => "",
+    });
+
+    const summary = await fetchContentSummary("columns", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+    expect(summary.category).toBeNull();
+  });
+
   it("HTTP エラー時は内容付きで例外を投げる(本文は固定長に制限)", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,

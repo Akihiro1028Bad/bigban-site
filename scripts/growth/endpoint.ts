@@ -72,3 +72,40 @@ export function growthArticleSegment(
     ? (endpoint as ArticleSegment)
     : "news";
 }
+
+/**
+ * columns の `articleType`(microCMS kind=select)は書き込みに**配列**を要求する
+ * (`["獲得"]`)。LLM が誤って文字列で吐いても初回 create が HTTP 400
+ * (`articleType has unexpected data type`)で落ちないよう、create 直前に配列へ矯正する。
+ *
+ * - `columns` 系エンドポイントのときだけ適用(news に articleType は無い=触らない)。
+ * - 非空文字列 → `[その文字列]` に包む(前後空白は trim 判定に使うが値は保持)。
+ * - 既に配列(locale/displayMode と同様)ならそのまま通す(二重配列にしない)。
+ * - 空文字列 / 空白のみ / undefined / 空配列 → **キー自体を出さない**
+ *   (現行の「省略」挙動=欠落耐性を壊さない。空 select を送らない)。
+ * - 元 payload は破壊せず新オブジェクトを返す(immutable)。
+ */
+export function normalizeColumnsSelectFields(
+  endpoint: string,
+  payload: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...payload };
+  // columns 以外(news 等)は articleType を持たないので一切触らない。
+  if (endpoint !== "columns" || !("articleType" in next)) {
+    return next;
+  }
+
+  const value = next.articleType;
+  if (Array.isArray(value)) {
+    // 既に配列なら空配列だけ落とし、それ以外はそのまま通す(二重配列にしない)。
+    if (value.length === 0) delete next.articleType;
+    return next;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    next.articleType = [value];
+    return next;
+  }
+  // 空文字列 / 空白のみ / undefined / その他 → 省略(欠落耐性)。
+  delete next.articleType;
+  return next;
+}

@@ -41,7 +41,12 @@ import {
   classifyDraftFailure,
 } from "./draft-notify";
 import { fetchDraftKey } from "./draft-meta";
-import { growthEndpoint, growthMediaForRow, type GrowthMedia } from "./endpoint";
+import {
+  growthEndpoint,
+  growthMediaForRow,
+  normalizeColumnsSelectFields,
+  type GrowthMedia,
+} from "./endpoint";
 import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
@@ -221,7 +226,10 @@ async function main(): Promise<void> {
   stages.push({
     name: "create",
     run: async () => {
-      contentId = await createDraft(ENDPOINT, spec.payload, microOpts);
+      // Bug1: columns の articleType(kind=select)は配列を要求する。LLM が文字列で
+      // 吐いても初回 create が HTTP 400 で落ちないよう、投入直前に配列へ矯正する。
+      const createPayload = normalizeColumnsSelectFields(ENDPOINT, spec.payload);
+      contentId = await createDraft(ENDPOINT, createPayload, microOpts);
     },
   });
 

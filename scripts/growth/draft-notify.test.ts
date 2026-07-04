@@ -300,4 +300,52 @@ describe("buildDraftFlex", () => {
     const flex = buildDraftFlex([]);
     expect(flex).toEqual({ type: "carousel", contents: [] });
   });
+
+  // Bug2: LINE は空 text(空文字列)を 400 で弾く。全 text フィールドを空ガードする。
+  it("タイトルが空でも空 text を出さず、contentId でフォールバックする", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "", title: "" }]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.some((t) => t === "")).toBe(false);
+    // フォールバックに contentId を含む(沈黙させない)
+    expect(JSON.stringify(bubble)).toContain("c1");
+  });
+
+  it("タイトルが空白のみでも空 text を出さない", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "", title: "   " }]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.some((t) => t === "")).toBe(false);
+  });
+
+  it("カテゴリが空白のみでもバッジを出さない(空 text を送らない)", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "   " }]).contents;
+    const first = bubble.body!.contents[0];
+    expect(first).toMatchObject({ type: "text", text: full.title });
+  });
+
+  it("すべての空フィールド(title/category/excerpt空)でも Flex に空 text を1つも含めない", () => {
+    const [bubble] = buildDraftFlex([
+      { ...full, title: "", category: "", excerpt: "", eyecatchUrl: null, previewUrl: null },
+    ]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.some((t) => t === "")).toBe(false);
+  });
 });
+
+/** バブル配下の全 text コンポーネントの text 値を収集する(空 text 検出用)。 */
+function collectTexts(node: unknown): string[] {
+  const out: string[] = [];
+  const walk = (n: unknown): void => {
+    if (!n || typeof n !== "object") return;
+    const obj = n as Record<string, unknown>;
+    if (obj.type === "text" && typeof obj.text === "string") {
+      out.push(obj.text);
+    }
+    for (const value of Object.values(obj)) {
+      if (Array.isArray(value)) value.forEach(walk);
+      else if (value && typeof value === "object") walk(value);
+    }
+  };
+  walk(node);
+  return out;
+}
