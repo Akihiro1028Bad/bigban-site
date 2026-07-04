@@ -87,6 +87,7 @@ interface DraftImageInput {
   index: number;
   style: BodyImageStyle;
   description: string;
+  textSpec?: string;
 }
 
 interface DraftSpec {
@@ -205,7 +206,7 @@ async function main(): Promise<void> {
         // 正規化後の style は imgSpec.style として resolveBodyImageUrl の
         // mascot 参照画像分岐(refPath)でも使われるため、ここで確定させる。
         const allSpecs = inputs.map((im) =>
-          buildBodyImageSpec(im.index, normalizeBodyImageStyle(im.style), im.description)
+          buildBodyImageSpec(im.index, normalizeBodyImageStyle(im.style), im.description, im.textSpec)
         );
         const { kept, dropped } = capBodyImageSpecs(allSpecs);
         const { resolved, failures } = await resolveBodyImages(kept, resolveBodyImageUrl);

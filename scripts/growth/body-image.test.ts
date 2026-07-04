@@ -104,6 +104,38 @@ describe("buildBodyImageSpec", () => {
     });
   });
 
+  it("court/flow/infographic は textSpec を prompt に含め、捏造防止句を維持する", () => {
+    for (const style of ["court", "flow", "infographic"] as const) {
+      const spec = buildBodyImageSpec(1, style, "初心者向けの整理", "13.41m x 6.10m");
+      expect(spec.textSpec).toBe("13.41m x 6.10m");
+      expect(spec.prompt).toContain("13.41m x 6.10m");
+      expect(spec.prompt).toMatch(/only the exact text and numbers/i);
+      expect(spec.alt).toBe("イメージ図: 初心者向けの整理");
+    }
+  });
+
+  it("textSpec なし・空文字は既存 prompt と同じで textSpec を持たない", () => {
+    const before = buildBodyImagePrompt("court", "コート寸法");
+    const withoutTextSpec = buildBodyImageSpec(1, "court", "コート寸法");
+    const emptyTextSpec = buildBodyImageSpec(1, "court", "コート寸法", "   ");
+
+    expect(withoutTextSpec.prompt).toBe(before);
+    expect(withoutTextSpec).not.toHaveProperty("textSpec");
+    expect(emptyTextSpec.prompt).toBe(before);
+    expect(emptyTextSpec).not.toHaveProperty("textSpec");
+  });
+
+  it("mascot/illust は textSpec を渡しても prompt を変えず、文字を入れない", () => {
+    for (const style of ["mascot", "illust"] as const) {
+      const base = buildBodyImagePrompt(style, "宇宙人の練習風景");
+      const spec = buildBodyImageSpec(1, style, "宇宙人の練習風景", "入会金 0円");
+      expect(spec.prompt).toBe(base);
+      expect(spec.prompt).not.toContain("入会金 0円");
+      expect(spec).not.toHaveProperty("textSpec");
+      expect(spec.alt).toBe("宇宙人の練習風景");
+    }
+  });
+
   it("説明の改行・連続空白を1行に正規化する(プロンプト混入の防御)", () => {
     const spec = buildBodyImageSpec(1, "mascot", "宇宙人が\n\n  サーブ");
     expect(spec.description).toBe("宇宙人が サーブ");
@@ -229,6 +261,12 @@ describe("bodyImageFileStem", () => {
     const c = buildBodyImageSpec(1, "illust", "図A");
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", b));
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", c));
+  });
+
+  it("textSpec が違えば stem も変わる(文字指定つき画像のキャッシュ衝突防止)", () => {
+    const a = buildBodyImageSpec(1, "court", "コート図", "13.41m x 6.10m");
+    const b = buildBodyImageSpec(1, "court", "コート図", "キッチン 2.13m");
+    expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", b));
   });
 
   it("slug を英数字・ハイフンに正規化する(パス・トラバーサル防止)", () => {

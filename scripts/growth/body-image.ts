@@ -47,7 +47,12 @@ const TEXT_ONLY_AS_SPECIFIED =
   "do not invent any other numbers, prices, times, hours, or labels. " +
   "Keep any text short, legible, and correctly spelled.";
 
-const PROMPT_BUILDERS: Record<BodyImageStyle, (description: string) => string> = {
+function textSpecInstruction(textSpec?: string): string {
+  const t = textSpec?.trim().replace(/\s+/g, " ");
+  return t ? `Render exactly this text/numbers: ${t}. ` : "";
+}
+
+const PROMPT_BUILDERS: Record<BodyImageStyle, (description: string, textSpec?: string) => string> = {
   mascot: (d) =>
     `Using ${ALIEN_CHARACTER}, create a flat illustration of this same alien: ${d}. ` +
     `Cosmic deep-space scene, ${BRAND_PALETTE}. ${PICKLEBALL_GUARD} ` +
@@ -56,23 +61,30 @@ const PROMPT_BUILDERS: Record<BodyImageStyle, (description: string) => string> =
     `Atmospheric flat vector illustration of: ${d}. ` +
     `Premium editorial mood with generous negative space, ${BRAND_PALETTE} on a clean background. ${PICKLEBALL_GUARD} ` +
     `No text, no labels, no logos.`,
-  court: (d) =>
+  court: (d, textSpec) =>
     `Clean top-down pickleball court diagram illustrating: ${d}. ` +
+    textSpecInstruction(textSpec) +
     `Flat schematic style, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
     `Illustrative and conceptual, not a precise engineering drawing.`,
-  flow: (d) =>
+  flow: (d, textSpec) =>
     `Clean step-by-step flow diagram illustrating: ${d}. ` +
+    textSpecInstruction(textSpec) +
     `Left-to-right or top-to-bottom flat schematic with simple arrows, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
     `Illustrative and conceptual, not a precise engineering drawing.`,
-  infographic: (d) =>
+  infographic: (d, textSpec) =>
     `Clean comparison infographic illustrating: ${d}. ` +
+    textSpecInstruction(textSpec) +
     `Flat schematic panels or side-by-side layout, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
     `Illustrative and conceptual, not a precise engineering drawing.`,
 };
 
 /** スタイル別のフル画像生成プロンプトを組む。 */
-export function buildBodyImagePrompt(style: BodyImageStyle, description: string): string {
-  return PROMPT_BUILDERS[style](description.trim());
+export function buildBodyImagePrompt(
+  style: BodyImageStyle,
+  description: string,
+  textSpec?: string
+): string {
+  return PROMPT_BUILDERS[style](description.trim(), textSpec);
 }
 
 /**
@@ -90,6 +102,7 @@ export interface BodyImageSpec {
   index: number;
   style: BodyImageStyle;
   description: string;
+  textSpec?: string;
   prompt: string;
   alt: string;
 }
@@ -102,17 +115,22 @@ export interface BodyImageSpec {
 export function buildBodyImageSpec(
   index: number,
   style: BodyImageStyle,
-  description: string
+  description: string,
+  textSpec?: string
 ): BodyImageSpec {
   if (index < 1) {
     throw new Error(`本文画像の index は 1 以上にしてください: ${index}`);
   }
   const d = description.trim().replace(/\s+/g, " ");
+  const t = textSpec?.trim().replace(/\s+/g, " ");
+  const shouldUseTextSpec =
+    Boolean(t) && (style === "court" || style === "flow" || style === "infographic");
   return {
     index,
     style,
     description: d,
-    prompt: buildBodyImagePrompt(style, d),
+    ...(shouldUseTextSpec ? { textSpec: t } : {}),
+    prompt: buildBodyImagePrompt(style, d, shouldUseTextSpec ? t : undefined),
     alt: buildBodyImageAlt(style, d),
   };
 }
@@ -248,7 +266,10 @@ function hashString(value: string): string {
  */
 export function bodyImageFileStem(slug: string, spec: BodyImageSpec): string {
   const safeSlug = slug.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
-  const key = hashString(`${spec.style}|${spec.description}`);
+  const keySource = spec.textSpec
+    ? `${spec.style}|${spec.description}|${spec.textSpec}`
+    : `${spec.style}|${spec.description}`;
+  const key = hashString(keySource);
   return `growth-bodyimg-${safeSlug}-${spec.index}-${key}`;
 }
 
