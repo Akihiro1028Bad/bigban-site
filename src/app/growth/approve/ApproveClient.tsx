@@ -48,6 +48,8 @@ import { outlineSections } from "./outline";
 import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
+import { extractBodyImages } from "@/lib/growth/bodyImageRegen";
+import { bodyRegenIndices } from "./bodyRegenKeys";
 import { useConsult } from "./hooks/useConsult";
 import { EmptyGateContent, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
 import { LoginScreen } from "./LoginScreen";
@@ -817,15 +819,41 @@ export function ApproveClient() {
     }
   }
 
+  // 本文画像の AI 再生成(おまかせ)を実経路(/api/growth/body-image/regen)へ結線する(P1)。
+  // P1 ではスタイル選択なし・instruction 空。style/textSpec は P2 で追加する。
+  // 呼び出し(DetailPanel の onRegenBodyImage 経由・index→src 変換)は後続 T4 で結線する。
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- T4 で onRegenBodyImage に結線予定
+  async function requestBodyImageRegen(pageId: string, targetSrc: string): Promise<void> {
+    try {
+      const res = await fetch("/api/growth/body-image/regen", {
+        method: "POST",
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ pageId, targetSrc, instruction: "" }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) {
+        throw new Error(typeof json.error === "string" ? json.error : "再生成の依頼に失敗しました。");
+      }
+      pushToast("本文画像の再生成を依頼しました。PCが処理して数分で反映されます。");
+    } catch (error) {
+      pushToast(toMessage(error, "本文画像の再生成に失敗しました。"), "error");
+    }
+  }
+
   // #proto P3b: draft の再生成ステータスから「生成中」の regenKey を導出する(ImagesView の生成中表示用)。
   // 依頼中/処理中を生成中扱いにし、`${id}:eyecatch` / `${id}:body:<index>` の集合にする。
   function deriveRegenKeys(item: PendingItem): Set<string> {
     const keys = new Set<string>();
     if (draftState.status !== "ready") return keys;
-    const { eyecatchRegen, bodyRegen } = draftState.draft;
+    const { eyecatchRegen, bodyRegen, bodyHtml } = draftState.draft;
     const busy = (status?: string) => status === "依頼中" || status === "処理中";
     if (busy(eyecatchRegen?.status)) keys.add(`${item.id}:eyecatch`);
-    if (busy(bodyRegen?.status)) keys.add(`${item.id}:body:0`);
+    if (busy(bodyRegen?.status)) {
+      const srcs = extractBodyImages(bodyHtml ?? "").map((ref) => ref.src);
+      for (const index of bodyRegenIndices(srcs, bodyRegen?.targetSrc ?? "")) {
+        keys.add(`${item.id}:body:${index}`);
+      }
+    }
     return keys;
   }
 
