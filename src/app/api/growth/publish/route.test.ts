@@ -27,7 +27,9 @@ function postReq(token: string | null, body: unknown, raw?: string): Request {
   return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
 }
 
-function page(opts: { contentId?: string; eyecatch?: string; body?: string; title?: string } = {}) {
+function page(
+  opts: { contentId?: string; eyecatch?: string; body?: string; title?: string; media?: string } = {}
+) {
   const properties: Record<string, unknown> = {};
   if (opts.contentId !== undefined) {
     properties["下書きID"] = { rich_text: [{ plain_text: opts.contentId }] };
@@ -40,6 +42,9 @@ function page(opts: { contentId?: string; eyecatch?: string; body?: string; titl
   }
   if (opts.title !== undefined) {
     properties["タイトル案"] = { type: "title", title: [{ plain_text: opts.title }] };
+  }
+  if (opts.media !== undefined) {
+    properties["媒体"] = { type: "select", select: { name: opts.media } };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -70,15 +75,17 @@ afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_MANAGEMENT_API_KEY;
   delete process.env.MICROCMS_CONTENT_API_KEY;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
   vi.restoreAllMocks();
 });
 
 describe("POST /api/growth/publish", () => {
-  it("認証有効＋正規トークン＋検証OKで公開し、ステータスを公開済みにする(200)", async () => {
+  it("認証有効＋正規トークン＋検証OKで公開し、ステータスを公開済みにする(200・媒体欠落=コラム既定・env未設定でnews)", async () => {
     vi.mocked(getPage).mockResolvedValue(READY);
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
+    // 媒体欠落 → コラム既定 → env(GROWTH_MICROCMS_ENDPOINT)未設定 → news フォールバック。
     expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
     expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
     // #176: 公開直前に Notion タイトル案を microCMS 下書きの title へ最終同期する(content キー)。
@@ -92,6 +99,58 @@ describe("POST /api/growth/publish", () => {
     expect(vi.mocked(patchDraft).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(publishContent).mock.invocationCallOrder[0]
     );
+  });
+
+  it("媒体=コラム + env=columns なら columns へ publish(記事ごとの媒体を解決)", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        media: "コラム",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("columns", "my-article", expect.anything());
+    expect(patchDraft).toHaveBeenCalledWith(
+      "columns",
+      "my-article",
+      { title: "公開する承認タイトル" },
+      expect.objectContaining({ apiKey: "content-key" })
+    );
+  });
+
+  it("媒体=ニュースなら env=columns でも常に news へ publish(告知は必ず news)", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        media: "ニュース",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it("媒体欠落 + env=columns ならコラム既定で columns へ publish", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("columns", "my-article", expect.anything());
   });
 
   it("既に公開済みなら 409(冪等・二重公開や手直しタイトルの再上書きを防ぐ・#SPEC-14)", async () => {

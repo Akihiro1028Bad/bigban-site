@@ -18,6 +18,7 @@ import {
   eyecatchUrlOf,
   ideaTitleOf,
   isNotionPageId,
+  mediaOf,
   STATUS_PROP,
 } from "@/lib/growth/approve";
 import { patchDraft, publishContent } from "@/lib/growth/content";
@@ -26,7 +27,6 @@ import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/
 
 export const runtime = "nodejs";
 
-const ENDPOINT = growthEndpoint();
 const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 
@@ -101,13 +101,17 @@ export async function POST(request: Request): Promise<Response> {
     if (!draftBodyOf(page).trim()) {
       return badRequest("本文が空です。");
     }
+    // #media: 記事ごとの媒体(`媒体` select)から公開先を解決する。
+    // ニュース → 常に news / コラム(既定・欠落)→ env(GROWTH_MICROCMS_ENDPOINT)従属。
+    // draft ルート(growthArticleSegment)と一貫させ、env=columns でもニュース告知が壊れないようにする。
+    const endpoint = growthEndpoint(mediaOf(page));
     // #176: 公開直前に承認画面の正タイトル(Notion タイトル案)を microCMS 下書きへ最終同期する。
     // これで承認・編集したタイトルが公開記事に確実に反映される(AI 生成時のタイトルで公開しない)。
     const title = ideaTitleOf(page).trim();
     if (title) {
-      await patchDraft(ENDPOINT, contentId, { title }, contentOpts);
+      await patchDraft(endpoint, contentId, { title }, contentOpts);
     }
-    await publishContent(ENDPOINT, contentId, microOpts);
+    await publishContent(endpoint, contentId, microOpts);
     await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
   } catch {
     return NextResponse.json(
