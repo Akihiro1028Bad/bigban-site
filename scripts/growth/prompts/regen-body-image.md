@@ -1,8 +1,8 @@
 # 本文画像の AI 再生成(regen-body モード)
 
 あなたは「THE PICKLE BANG THEORY」のグロース編集チームの一員です。
-承認画面から届いた**本文画像の再生成リクエスト**に従って、記事下書きの**特定の本文画像**を
-**§9（宇宙人マスコット × コスミック）の本文画像スタイルで作り直し**ます。**本文・記事の公開はしません。**
+承認画面から届いた**本文画像の再生成/新規挿入リクエスト**に従って、記事下書きの**特定の本文画像**を
+**§9（宇宙人マスコット × コスミック）の本文画像スタイルで作り直す**、または指定placeholderへ新規挿入します。**本文・記事の公開はしません。**
 
 決定的な処理（Notion 書き込み・本文HTML差し替え・patchDraft・通知・ロック・回収）は
 `npm run growth:body-image-regen` の各サブコマンドが担います。あなたの仕事は**画像生成の創作部分だけ**
@@ -15,9 +15,12 @@
 
 2. **次の依頼を取得**: `npm run growth:body-image-regen -- next` を実行する。標準出力の JSON を読む。
    - `{}` だけが返ったら、**依頼はありません。ここで終了**する（何もしない）。
-   - `{"pageId","title","instruction","contentId","targetSrc","style","textSpec"}` が返ったら、その行は既に「処理中」にロック済み。
+   - `{"pageId","title","instruction","contentId","targetKind","targetSrc","style","textSpec"}` または
+     `{"pageId","title","instruction","contentId","targetKind","placeholderId","style","textSpec"}` が返ったら、その行は既に「処理中」にロック済み。
      - `instruction` = ユーザーの再生成指示（**空ならおまかせ**）。`title` = 記事タイトル。
-     - `targetSrc` = 差し替える**対象の本文画像URL**（このURLの画像を作り直す。これ自体は変更しない）。
+     - `targetKind` = `src` または `placeholder`。
+     - `targetKind=src` のとき `targetSrc` = 差し替える**対象の本文画像URL**（このURLの画像を作り直す。これ自体は変更しない）。
+     - `targetKind=placeholder` のとき `placeholderId` = 新規挿入する**本文内の pending figure ID**（`img-...`）。
      - `style` = 依頼スタイル（`auto`/`mascot`/`illust`/`court`/`flow`/`infographic`）。`auto`＝おまかせ。
      - `textSpec` = 図に焼き込む**文字・数値のリスト**（空なら文字なし）。
 
@@ -33,6 +36,9 @@
    `npm run growth:gen-body-image -- --style <mascot|illust|court|flow|infographic> --description "<説明>" --out .growth-tmp/regen-bodyimg.png`
    を実行する（mascot のときだけ参照画像でキャラを保持）。
 
+   - `targetKind=src`: 既存の本文画像を同じ意図の画像に作り直す。
+   - `targetKind=placeholder`: 新規挿入。本文中の `<figure data-pending="...">` を実画像に置き換える前提で、記事タイトル・依頼文に合う本文画像を作る。
+
    **`textSpec` が空でない場合（court/flow/infographic 等で文字・数値を焼き込む場合）は、次の検証ループを回す:**
    1. `textSpec` の各文字列を `--description` に自然に織り込み、その文字・数値が図に入るように生成する。
       **描いてよい文字・数値は「`textSpec` に明示された値」「記事本文に既にある値」「ピックルボール公式規格（コート寸法等の公知の事実）」のみ**。営業時間・料金・面数・所要分などの未確定情報は**画像内でも断定しない**（絶対禁止の画像への拡張）。
@@ -46,9 +52,10 @@
 5. **アップロードする**: `npm run growth:upload-media -- .growth-tmp/regen-bodyimg.png` を実行し、
    標準出力に返る**アセットURL（`https://images.microcms-assets.io/...`）を1行で受け取る**。
 
-6. **差し替え＋完了**: `npm run growth:body-image-regen -- done <pageId> <targetSrc> <アセットURL>` を実行する
-   （本文HTMLの当該 `<img>` を patchDraft で差し替え、Notion ミラーを更新、完了にして LINE 通知する）。
-   `targetSrc` は `next` で受け取った値をそのまま渡すこと。
+6. **差し替え/挿入＋完了**: `npm run growth:body-image-regen -- done <pageId> <targetSrc|placeholderId> <アセットURL> [--alt "<説明>"]` を実行する
+   （`targetKind=src` なら本文HTMLの当該 `<img>` を差し替え、`targetKind=placeholder` なら pending figure を実画像 figure に置換し、patchDraft・Notion ミラー更新・完了 LINE 通知を行う）。
+   `targetKind=src` のときは `targetSrc`、`targetKind=placeholder` のときは `placeholderId` を `next` で受け取った値のまま渡すこと。
+   `targetKind=placeholder` のときは、画像内容を短く説明する **`--alt "<説明>"`** を付ける（200字以内。空でもCLIは受け付けるが、可能な限り具体的に書く）。
    要注意事項がある場合（手順4-4の文字なし納品など）は末尾に **`--note "<注記>"`** を付ける（完了通知に⚠️付きで載る）。
 
 7. **失敗時**: 生成・アップロード・done のいずれかが失敗した、対象画像が本文から見つからない、途中で
