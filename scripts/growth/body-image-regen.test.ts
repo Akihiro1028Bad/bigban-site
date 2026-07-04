@@ -18,6 +18,7 @@ import {
   extractBodyImages,
   isMicrocmsAssetUrl,
   replaceBodyImageBySrc,
+  requestedStyleFromLabel,
   selectStaleBodyRegenIds,
   type BodyImageRef,
   type BodyRegenRow,
@@ -34,6 +35,8 @@ describe("BODY_REGEN 定数", () => {
       status: "本文画像再生成ステータス",
       requestedAt: "本文画像再生成依頼時刻",
       targetSrc: "本文画像再生成対象",
+      style: "本文画像スタイル",
+      textSpec: "本文画像文字指定",
     });
     expect(BODY_REGEN_STATUSES).toEqual(["なし", "依頼中", "処理中", "失敗"]);
     expect(BODY_REGEN_BUSY_STATUSES).toEqual(["依頼中", "処理中"]);
@@ -42,17 +45,19 @@ describe("BODY_REGEN 定数", () => {
 
 describe("buildBodyRegenRequestProps", () => {
   it("指示・対象src・依頼中・依頼時刻を1まとめにする", () => {
-    const props = buildBodyRegenRequestProps("もっと明るく", SRC, "2026-06-24T01:00:00.000Z");
+    const props = buildBodyRegenRequestProps("もっと明るく", SRC, "auto", "", "2026-06-24T01:00:00.000Z");
     expect(props).toEqual({
       "本文画像再生成指示": { rich_text: [{ text: { content: "もっと明るく" } }] },
       "本文画像再生成対象": { rich_text: [{ text: { content: SRC } }] },
+      "本文画像スタイル": { select: { name: "おまかせ" } },
+      "本文画像文字指定": { rich_text: [] },
       "本文画像再生成ステータス": { select: { name: "依頼中" } },
       "本文画像再生成依頼時刻": { date: { start: "2026-06-24T01:00:00.000Z" } },
     });
   });
 
   it("指示が空でも対象srcは必ず入る", () => {
-    const props = buildBodyRegenRequestProps("", SRC, "2026-06-24T01:00:00.000Z");
+    const props = buildBodyRegenRequestProps("", SRC, "auto", "", "2026-06-24T01:00:00.000Z");
     expect(props["本文画像再生成指示"]).toEqual({ rich_text: [] });
     expect(props["本文画像再生成対象"]).toEqual({ rich_text: [{ text: { content: SRC } }] });
   });
@@ -70,6 +75,8 @@ describe("PC poller プロパティ", () => {
       "本文画像再生成ステータス": { select: { name: "なし" } },
       "本文画像再生成指示": { rich_text: [] },
       "本文画像再生成対象": { rich_text: [] },
+      "本文画像スタイル": { select: { name: "おまかせ" } },
+      "本文画像文字指定": { rich_text: [] },
     });
   });
 
@@ -105,6 +112,8 @@ describe("bodyRegenRowFromPage", () => {
       requestedAtMs: Date.parse("2026-06-24T00:00:00.000Z"),
       contentId: "g-abc",
       targetSrc: SRC,
+      requestedStyle: "auto",
+      textSpec: "",
       bodyHtml: "<p>本文</p>",
     });
   });
@@ -154,17 +163,103 @@ describe("bodyRegenViewOf", () => {
         "本文画像再生成対象": { rich_text: [{ plain_text: SRC }] },
       })
     );
-    expect(view).toEqual({ status: "処理中", targetSrc: SRC, requestedAtMs: null });
+    expect(view).toEqual({
+      status: "処理中",
+      targetSrc: SRC,
+      requestedStyle: "auto",
+      textSpec: "",
+      requestedAtMs: null,
+    });
   });
 
   it("未設定・不正ステータスはなし、対象srcは空文字", () => {
     const view = bodyRegenViewOf(page({ "本文画像再生成ステータス": { select: { name: "謎" } } }));
-    expect(view).toEqual({ status: "なし", targetSrc: "", requestedAtMs: null });
+    expect(view).toEqual({
+      status: "なし",
+      targetSrc: "",
+      requestedStyle: "auto",
+      textSpec: "",
+      requestedAtMs: null,
+    });
+  });
+});
+
+describe("style/textSpec を依頼キューへ通す(P2)", () => {
+  const SRC = "https://images.microcms-assets.io/assets/a/1.png";
+
+  it("buildBodyRegenRequestProps はスタイル(表示値)と文字指定を書き込む", () => {
+    const props = buildBodyRegenRequestProps("図解で", SRC, "court", "13.41m x 6.10m", "2026-07-04T00:00:00.000Z");
+    expect(props["本文画像再生成ステータス"]).toEqual({ select: { name: "依頼中" } });
+    expect(props["本文画像再生成対象"]).toEqual({ rich_text: [{ text: { content: SRC } }] });
+    expect(props["本文画像スタイル"]).toEqual({ select: { name: "court" } });
+    expect(props["本文画像文字指定"]).toEqual({ rich_text: [{ text: { content: "13.41m x 6.10m" } }] });
+  });
+
+  it("style=auto は表示値『おまかせ』・textSpec 空は rich_text=[]", () => {
+    const props = buildBodyRegenRequestProps("", SRC, "auto", "", "2026-07-04T00:00:00.000Z");
+    expect(props["本文画像スタイル"]).toEqual({ select: { name: "おまかせ" } });
+    expect(props["本文画像文字指定"]).toEqual({ rich_text: [] });
+    expect(props["本文画像再生成指示"]).toEqual({ rich_text: [] });
+  });
+
+  it("buildBodyRegenDoneProps はスタイルをおまかせ・文字指定を空へクリアする", () => {
+    const props = buildBodyRegenDoneProps();
+    expect(props["本文画像再生成ステータス"]).toEqual({ select: { name: "なし" } });
+    expect(props["本文画像再生成指示"]).toEqual({ rich_text: [] });
+    expect(props["本文画像再生成対象"]).toEqual({ rich_text: [] });
+    expect(props["本文画像スタイル"]).toEqual({ select: { name: "おまかせ" } });
+    expect(props["本文画像文字指定"]).toEqual({ rich_text: [] });
+  });
+
+  it("buildBodyRegenFailProps はスタイル・文字指定を残す(status のみ変更)", () => {
+    const props = buildBodyRegenFailProps();
+    expect(props).toEqual({ "本文画像再生成ステータス": { select: { name: "失敗" } } });
+  });
+
+  it("requestedStyleFromLabel: おまかせ→auto・新5キーはそのまま・未知→auto", () => {
+    expect(requestedStyleFromLabel("おまかせ")).toBe("auto");
+    expect(requestedStyleFromLabel("court")).toBe("court");
+    expect(requestedStyleFromLabel("mascot")).toBe("mascot");
+    expect(requestedStyleFromLabel("")).toBe("auto");
+    expect(requestedStyleFromLabel("diagram")).toBe("auto");
+  });
+
+  it("bodyRegenRowFromPage / bodyRegenViewOf は requestedStyle と textSpec を読む", () => {
+    const page = {
+      id: "p1",
+      url: "",
+      properties: {
+        "本文画像スタイル": { select: { name: "flow" } },
+        "本文画像文字指定": { rich_text: [{ plain_text: "STEP1 予約" }] },
+        "本文画像再生成対象": { rich_text: [{ plain_text: SRC }] },
+        "本文画像再生成ステータス": { select: { name: "依頼中" } },
+      },
+    };
+    const row = bodyRegenRowFromPage(page);
+    expect(row.requestedStyle).toBe("flow");
+    expect(row.textSpec).toBe("STEP1 予約");
+    const view = bodyRegenViewOf(page);
+    expect(view.requestedStyle).toBe("flow");
+    expect(view.textSpec).toBe("STEP1 予約");
+  });
+
+  it("スタイル未設定(欠落)の行は requestedStyle=auto として読む", () => {
+    const page = { id: "p2", url: "", properties: {} };
+    expect(bodyRegenRowFromPage(page).requestedStyle).toBe("auto");
+    expect(bodyRegenRowFromPage(page).textSpec).toBe("");
   });
 });
 
 describe("selectStaleBodyRegenIds", () => {
-  const base = { title: "", instruction: "", contentId: "", targetSrc: "", bodyHtml: "" };
+  const base = {
+    title: "",
+    instruction: "",
+    contentId: "",
+    targetSrc: "",
+    requestedStyle: "auto" as const,
+    textSpec: "",
+    bodyHtml: "",
+  };
   const now = 1_000_000_000_000;
   const rows: BodyRegenRow[] = [
     { id: "stale", status: "処理中", requestedAtMs: now - 16 * 60 * 1000, ...base },

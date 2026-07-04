@@ -11,6 +11,7 @@
  * CLI(`body-image-regen-cli.ts`)が行い、ここは I/O を持たない純ロジック。
  */
 
+import type { RequestedBodyImageStyle } from "./body-image";
 import type { FlexBubble } from "./digest-flex";
 import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
@@ -26,7 +27,33 @@ export const BODY_REGEN_PROPS = {
   requestedAt: "本文画像再生成依頼時刻",
   /** 差し替え対象の本文画像URL(microCMS アセット。その時点の src で「どの画像か」を持つ)。 */
   targetSrc: "本文画像再生成対象",
+  /** 本文画像スタイル(select: おまかせ/mascot/illust/court/flow/infographic)。おまかせ=auto。 */
+  style: "本文画像スタイル",
+  /** 図に焼き込む文字・数値のリスト(textSpec・自由入力)。 */
+  textSpec: "本文画像文字指定",
 } as const;
+
+/** select の表示ラベル(auto→おまかせ・他は同名)。 */
+export const STYLE_DISPLAY_LABELS: Record<RequestedBodyImageStyle, string> = {
+  auto: "おまかせ",
+  mascot: "mascot",
+  illust: "illust",
+  court: "court",
+  flow: "flow",
+  infographic: "infographic",
+};
+
+/** 依頼スタイル → Notion select 表示ラベル。 */
+export function styleDisplayLabel(style: RequestedBodyImageStyle): string {
+  return STYLE_DISPLAY_LABELS[style];
+}
+
+/** Notion select 表示ラベル → 依頼スタイル。おまかせ/空/未知は auto、新5キーはそのまま。 */
+export function requestedStyleFromLabel(label: string): RequestedBodyImageStyle {
+  if (label === "おまかせ" || label === "" || label === "auto") return "auto";
+  const keys: RequestedBodyImageStyle[] = ["mascot", "illust", "court", "flow", "infographic"];
+  return keys.includes(label as RequestedBodyImageStyle) ? (label as RequestedBodyImageStyle) : "auto";
+}
 
 /** 記事ネタ案のタイトル / 下書き ID プロパティ名。 */
 const IDEA_TITLE_PROP = "タイトル案";
@@ -52,12 +79,16 @@ export const BODY_REGEN_BUSY_STATUSES: readonly BodyRegenStatus[] = ["依頼中"
 export function buildBodyRegenRequestProps(
   instruction: string,
   targetSrc: string,
+  style: RequestedBodyImageStyle,
+  textSpec: string,
   nowIso: string
 ): Record<string, unknown> {
   const requested: BodyRegenStatus = "依頼中";
   return {
     [BODY_REGEN_PROPS.instruction]: { rich_text: instruction ? chunkRichText(instruction) : [] },
     [BODY_REGEN_PROPS.targetSrc]: { rich_text: chunkRichText(targetSrc) },
+    [BODY_REGEN_PROPS.style]: { select: { name: styleDisplayLabel(style) } },
+    [BODY_REGEN_PROPS.textSpec]: { rich_text: textSpec ? chunkRichText(textSpec) : [] },
     [BODY_REGEN_PROPS.status]: { select: { name: requested } },
     [BODY_REGEN_PROPS.requestedAt]: { date: { start: nowIso } },
   };
@@ -76,6 +107,8 @@ export function buildBodyRegenDoneProps(): Record<string, unknown> {
     [BODY_REGEN_PROPS.status]: { select: { name: cleared } },
     [BODY_REGEN_PROPS.instruction]: { rich_text: [] },
     [BODY_REGEN_PROPS.targetSrc]: { rich_text: [] },
+    [BODY_REGEN_PROPS.style]: { select: { name: STYLE_DISPLAY_LABELS.auto } },
+    [BODY_REGEN_PROPS.textSpec]: { rich_text: [] },
   };
 }
 
@@ -124,6 +157,10 @@ export interface BodyRegenRow {
   contentId: string;
   /** 差し替え対象の本文画像URL(その時点の src)。 */
   targetSrc: string;
+  /** 依頼スタイル(auto=おまかせ)。PC ループが具体スタイルへ解決する。 */
+  requestedStyle: RequestedBodyImageStyle;
+  /** 図に焼き込む文字・数値のリスト(textSpec)。空なら文字なし。 */
+  textSpec: string;
   /** 下書き本文HTMLのミラー(#95)。done で当該 img を差し替える対象。 */
   bodyHtml: string;
 }
@@ -142,6 +179,8 @@ export function bodyRegenRowFromPage(page: NotionPage): BodyRegenRow {
     requestedAtMs: readDateStartMs(page, BODY_REGEN_PROPS.requestedAt),
     contentId: readRichTextPlain(page, DRAFT_ID_PROP),
     targetSrc: readRichTextPlain(page, BODY_REGEN_PROPS.targetSrc),
+    requestedStyle: requestedStyleFromLabel(readSelectName(page, BODY_REGEN_PROPS.style)),
+    textSpec: readRichTextPlain(page, BODY_REGEN_PROPS.textSpec),
     bodyHtml: readRichTextPlain(page, BODY_MIRROR_PROP),
   };
 }
@@ -151,6 +190,10 @@ export interface BodyRegenView {
   status: BodyRegenStatus;
   /** 再生成対象の本文画像URL(その時点の src)。なし時は空文字。 */
   targetSrc: string;
+  /** 依頼スタイル(auto=おまかせ)。 */
+  requestedStyle: RequestedBodyImageStyle;
+  /** 図に焼き込む文字・数値のリスト(textSpec)。空なら文字なし。 */
+  textSpec: string;
   /** 依頼時刻(ms)。経過時間/滞留警告の表示用(#C2 UI)。 */
   requestedAtMs?: number | null;
 }
@@ -161,7 +204,13 @@ export interface BodyRegenView {
  */
 export function bodyRegenViewOf(page: NotionPage): BodyRegenView {
   const row = bodyRegenRowFromPage(page);
-  return { status: row.status, targetSrc: row.targetSrc, requestedAtMs: row.requestedAtMs };
+  return {
+    status: row.status,
+    targetSrc: row.targetSrc,
+    requestedStyle: row.requestedStyle,
+    textSpec: row.textSpec,
+    requestedAtMs: row.requestedAtMs,
+  };
 }
 
 /** stale-lock とみなす時間(処理中のまま放置 → 失敗に回収)。 */
