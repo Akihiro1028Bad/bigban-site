@@ -21,14 +21,18 @@ import {
   mediaOf,
   STATUS_PROP,
 } from "@/lib/growth/approve";
+import { hasPendingBodyImage } from "@/lib/growth/bodyImageInsert";
+import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bodyImageRegen";
 import { patchDraft, publishContent } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
+import { REGEN_BUSY_STATUSES, regenRowFromPage } from "@/lib/growth/eyecatchRegen";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
 
 const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
+const IMAGE_GENERATION_PENDING_MESSAGE = "画像生成の完了を待ってから公開してください。";
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -60,6 +64,15 @@ function contentMicrocmsOptions(): { serviceDomain: string; apiKey: string; fetc
 function articleStatusOf(page: NotionPage): string {
   const value = page.properties[STATUS_PROP] as { select?: { name?: string } | null } | undefined;
   return value?.select?.name ?? "";
+}
+
+function hasUnfinishedImageGeneration(page: NotionPage): boolean {
+  const bodyHtml = draftBodyOf(page);
+  return (
+    hasPendingBodyImage(bodyHtml) ||
+    BODY_REGEN_BUSY_STATUSES.includes(bodyRegenRowFromPage(page).status) ||
+    REGEN_BUSY_STATUSES.includes(regenRowFromPage(page).status)
+  );
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -100,6 +113,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (!draftBodyOf(page).trim()) {
       return badRequest("本文が空です。");
+    }
+    if (hasUnfinishedImageGeneration(page)) {
+      return NextResponse.json(
+        { success: false, error: IMAGE_GENERATION_PENDING_MESSAGE },
+        { status: 409 }
+      );
     }
     // #media: 記事ごとの媒体(`媒体` select)から公開先を解決する。
     // ニュース → 常に news / コラム(既定・欠落)→ env(GROWTH_MICROCMS_ENDPOINT)従属。

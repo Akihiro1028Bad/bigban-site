@@ -11,7 +11,10 @@
 
 import "dotenv/config";
 
+import { hasPendingBodyImage } from "./body-image-insert";
+import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "./body-image-regen";
 import { patchDraft, publishContent, resolveRetryConfig } from "./content";
+import { REGEN_BUSY_STATUSES, regenRowFromPage } from "./eyecatch-regen";
 import { growthEndpoint } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
@@ -43,6 +46,7 @@ const APPROVED_STATUS = "承認";
 // microCMS contentId の許可文字＋長さ上限(draft/eyecatch route と同じ)。不正値・過大値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
+const IMAGE_GENERATION_PENDING_MESSAGE = "画像生成の完了を待ってから公開してください。";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -75,6 +79,15 @@ function dateMsOf(page: NotionPage, prop: string): number | null {
 function titleOf(page: NotionPage): string {
   const value = page.properties["タイトル案"] as { title?: { plain_text?: string }[] } | undefined;
   return (value?.title ?? []).map((r) => r.plain_text ?? "").join("").trim();
+}
+
+function hasUnfinishedImageGeneration(page: NotionPage): boolean {
+  const bodyHtml = richTextOf(page, "下書き本文HTML");
+  return (
+    hasPendingBodyImage(bodyHtml) ||
+    BODY_REGEN_BUSY_STATUSES.includes(bodyRegenRowFromPage(page).status) ||
+    REGEN_BUSY_STATUSES.includes(regenRowFromPage(page).status)
+  );
 }
 
 /** Notion ページ → 公開キュー判定用の項目。drafted 判定は status＋下書きID から。 */
@@ -127,6 +140,10 @@ async function main(): Promise<void> {
     if (!CONTENT_ID_RE.test(contentId)) {
       console.warn(`[publish-due] 不正な contentId のためスキップ: ${titleOf(page)} (${contentId})`);
       skipped.push({ title: titleOf(page), contentId });
+      continue;
+    }
+    if (hasUnfinishedImageGeneration(page)) {
+      console.warn(`[publish-due] ${IMAGE_GENERATION_PENDING_MESSAGE}: ${titleOf(page) || page.id}`);
       continue;
     }
     const title = titleOf(page);
