@@ -106,12 +106,6 @@ vi.mock("./PromptsView", () => ({
   PromptsView: ({ token }: { token: string }) => <div>プロンプト確認スタブ:{token}</div>,
 }));
 
-// 画像ディレクター UI は本番既定 OFF(#62・imageDirectorFlag)。構成案タブの画像トグル結線
-// (updateImageInstruction)を検証する統合テストがあるため、ここでは true にして表示させる。
-vi.mock("./imageDirectorFlag", () => ({
-  isImageDirectorEnabled: () => true,
-}));
-
 import { ApproveClient } from "./ApproveClient";
 import { replacePreservedImageSrc, replacePreservedPendingFigure } from "./DraftEditor";
 import { STUCK_THRESHOLD_MS } from "./generating";
@@ -1669,7 +1663,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
   // 未使用となり撤去)。独断で復活実装しない方針のため、当該テスト群を削除した。
   // ※タイトルの AI 修正(#139 B・titleInstruction)は相談ドロワーに残存・維持。
 
-  // P4a-T5: 画像指示は相談ドロワー内の SectionImages ではなく、詳細パネルの誌面タブで編集する。
+  // P4a-T5: 画像指示は相談ドロワー内ではなく、詳細パネルの誌面タブで編集する。
   it("構成案クラスタの誌面タブで ArtboardView を表示する", async () => {
     mockFetchSequence({
       json: {
@@ -1741,7 +1735,7 @@ describe("ApproveClient 構成案修正(#42/#53)", () => {
     expect(within(dialog).getAllByLabelText("画像の説明")[0]).toBeInTheDocument();
   });
 
-  it("相談ドロワーでは SectionImages の代わりに誌面タブへのリンクを表示する", async () => {
+  it("相談ドロワーでは画像追加UIの代わりに誌面タブへのリンクを表示する", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## A" })] } });
     const dialog = await openIdeaPanel();
     const drawer = await openConsultDrawer(dialog);
@@ -5206,7 +5200,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     expect(within(dialog).queryByText("箇条書きに")).not.toBeInTheDocument();
   });
 
-  it("構成案タブ: 画像指示を『おまかせ』に切替え、まとめて修正を依頼できる", async () => {
+  it("構成案タブ: コメント追加後にまとめて修正を依頼できる", async () => {
     const fn = mockFetchSequence(
       { json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] } },
       { json: { success: true } }, // /revise
@@ -5216,8 +5210,6 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
     await userEvent.click(within(dialog).getByRole("tab", { name: /構成案/ }));
-    // 画像指示トグル(おまかせ)を押して onUpdateImage を発火する。
-    await userEvent.click(within(dialog).getByRole("radio", { name: "おまかせ" }));
     // コメントを1件足して「構成案の修正を依頼」を有効化→依頼(onRequestOutlineRevise)。
     await userEvent.click(within(dialog).getByRole("button", { name: /コメント/ }));
     await userEvent.type(within(dialog).getByPlaceholderText("このセクションへの指示…"), "直して");
