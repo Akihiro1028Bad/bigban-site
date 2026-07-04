@@ -80,6 +80,42 @@ describe("POST /api/growth/body-image/regen", () => {
     expect((props as Record<string, { rich_text?: unknown }>)["本文画像再生成指示"].rich_text).toEqual([]);
   });
 
+  it("style(表示値おまかせ)・textSpec を書き込む", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ contentId: "g-abc" }));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(
+      postReq(null, { pageId: PAGE_ID, targetSrc: SRC, style: "court", textSpec: "13.41m x 6.10m", instruction: "図解で" })
+    );
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, { select?: { name: string }; rich_text?: unknown }>;
+    expect(p["本文画像スタイル"]).toEqual({ select: { name: "court" } });
+    expect(p["本文画像文字指定"].rich_text).toEqual([{ text: { content: "13.41m x 6.10m" } }]);
+  });
+
+  it("style 省略時は auto(おまかせ)・textSpec 省略は空", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ contentId: "g-abc" }));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: SRC }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, { select?: { name: string }; rich_text?: unknown }>;
+    expect(p["本文画像スタイル"]).toEqual({ select: { name: "おまかせ" } });
+    expect(p["本文画像文字指定"].rich_text).toEqual([]);
+  });
+
+  it("不正な style は 400(書き込まない)", async () => {
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: SRC, style: "diagram" }));
+    expect(res.status).toBe(400);
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
+  it("textSpec が1000字超は 400", async () => {
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: SRC, textSpec: "あ".repeat(1001) }));
+    expect(res.status).toBe(400);
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
   it("不正な pageId は 400", async () => {
     const res = await POST(postReq(null, { pageId: "bad!", targetSrc: SRC }));
     expect(res.status).toBe(400);
