@@ -66,6 +66,7 @@ function setup(over: Partial<Parameters<typeof DetailPanel>[0]> = {}) {
     onEdit: vi.fn(),
     onPickEyecatch: vi.fn(),
     onRegenEyecatch: vi.fn(),
+    onAddBodyImage: vi.fn(),
     onPickBodyImage: vi.fn(),
     onRegenBodyImage: vi.fn(),
     onAddComment: vi.fn(),

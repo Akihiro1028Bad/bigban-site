@@ -51,7 +51,11 @@ import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
 import { extractBodyImages } from "@/lib/growth/bodyImageRegen";
-import { bodyImageFigureHtml, buildPendingFigureHtml } from "@/lib/growth/bodyImageInsert";
+import {
+  bodyImageFigureHtml,
+  buildPendingFigureHtml,
+  insertHtmlAfterHeading,
+} from "@/lib/growth/bodyImageInsert";
 import { bodyRegenIndices } from "./bodyRegenKeys";
 import { useConsult } from "./hooks/useConsult";
 import { EmptyGateContent, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
@@ -62,6 +66,8 @@ import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { MediaLibraryModal } from "./MediaLibraryModal";
+import { BodyImageInsertModal } from "./BodyImageInsertModal";
+import type { BodyImageInsertChoice } from "./BodyImageInsertModal";
 import type { BodyImageRegenInput, BodyImageRegenTarget } from "./bodyRegenRequest";
 import { buildBodyRegenBody } from "./bodyRegenRequest";
 import { BodyImageRegenModal } from "./BodyImageRegenModal";
@@ -199,6 +205,11 @@ export function ApproveClient() {
   const [bodyMediaFor, setBodyMediaFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
   // 本文画像 AI 再生成モーダル(#156/P2)。対象記事＋対象 src を持ち、確定でスタイル/指示/文字指定を送る。
   const [bodyRegenFor, setBodyRegenFor] = useState<{ item: PendingItem; target: BodyImageRegenTarget } | null>(null);
+  const [bodyInsertFor, setBodyInsertFor] = useState<{ item: PendingItem; bodyHtml: string } | null>(null);
+  const [bodyInsertMediaFor, setBodyInsertMediaFor] =
+    useState<{ item: PendingItem; bodyHtml: string; headingIndex: number | null } | null>(null);
+  const [bodyInsertRegenFor, setBodyInsertRegenFor] =
+    useState<{ item: PendingItem; bodyHtml: string; headingIndex: number | null } | null>(null);
   const [editorMediaFor, setEditorMediaFor] = useState<{ item: PendingItem; editor: Editor } | null>(null);
   const [editorImageReplaceFor, setEditorImageReplaceFor] =
     useState<{ item: PendingItem; targetSrc: string; editor: Editor } | null>(null);
@@ -902,6 +913,70 @@ export function ApproveClient() {
     setBodyRegenFor({ item: activeItem, target: { kind: "src", targetSrc } });
   }
 
+  function handleAddBodyImage(item: PendingItem): void {
+    if (editingDraft) {
+      pushToast("編集画面から挿入してください", "error");
+      return;
+    }
+    if (draftState.status !== "ready") {
+      pushToast("下書きの読み込み後に挿入できます。", "error");
+      return;
+    }
+    setBodyInsertFor({ item, bodyHtml: draftState.draft.bodyHtml ?? "" });
+  }
+
+  function submitBodyImageInsert(choice: BodyImageInsertChoice): void {
+    if (!bodyInsertFor) return;
+    const next = {
+      item: bodyInsertFor.item,
+      bodyHtml: bodyInsertFor.bodyHtml,
+      headingIndex: choice.headingIndex,
+    };
+    setBodyInsertFor(null);
+    if (choice.method === "media") {
+      setBodyInsertMediaFor(next);
+      return;
+    }
+    setBodyInsertRegenFor(next);
+  }
+
+  async function saveInsertedBodyImage(
+    item: PendingItem,
+    bodyHtml: string,
+    headingIndex: number | null,
+    fragment: string
+  ): Promise<boolean> {
+    const nextHtml = insertHtmlAfterHeading(bodyHtml, headingIndex, fragment);
+    const saved = await saveDraftInPlace(item.id, nextHtml);
+    if (saved) {
+      pushToast("本文画像を挿入しました。");
+      return true;
+    }
+    pushToast("本文画像を挿入できませんでした。", "error");
+    return false;
+  }
+
+  async function submitBodyImageInsertGenerate(input: BodyImageRegenInput): Promise<void> {
+    if (!bodyInsertRegenFor) return;
+    const placeholderId = `img-${crypto.randomUUID()}`;
+    const saved = await saveInsertedBodyImage(
+      bodyInsertRegenFor.item,
+      bodyInsertRegenFor.bodyHtml,
+      bodyInsertRegenFor.headingIndex,
+      buildPendingFigureHtml(placeholderId),
+    );
+    if (!saved) {
+      setBodyInsertRegenFor(null);
+      return;
+    }
+    await requestBodyImageRegen(
+      bodyInsertRegenFor.item.id,
+      { kind: "placeholder", placeholderId },
+      input,
+    );
+    setBodyInsertRegenFor(null);
+  }
+
   async function submitEditorImageGenerate(input: BodyImageRegenInput): Promise<void> {
     if (!editorInsertRegenFor) return;
     const placeholderId = `img-${crypto.randomUUID()}`;
@@ -992,6 +1067,7 @@ export function ApproveClient() {
         regenKeys={deriveRegenKeys(item)}
         onPickEyecatch={() => setMediaFor(item)}
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
+        onAddBodyImage={() => handleAddBodyImage(item)}
         onPickBodyImage={(index) => bodyImageTargetAt(index, (targetSrc) => setBodyMediaFor({ item, targetSrc }))}
         onRegenBodyImage={(index) =>
           bodyImageTargetAt(index, (targetSrc) =>
@@ -1336,6 +1412,33 @@ export function ApproveClient() {
         />
       ) : null}
 
+      {bodyInsertFor ? (
+        <BodyImageInsertModal
+          heading={bodyInsertFor.item.title}
+          bodyHtml={bodyInsertFor.bodyHtml}
+          onClose={() => setBodyInsertFor(null)}
+          onSubmit={submitBodyImageInsert}
+        />
+      ) : null}
+
+      {bodyInsertMediaFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={bodyInsertMediaFor.item.id}
+          heading={bodyInsertMediaFor.item.title}
+          onClose={() => setBodyInsertMediaFor(null)}
+          onApplied={() => undefined}
+          onSelect={(url) => {
+            void saveInsertedBodyImage(
+              bodyInsertMediaFor.item,
+              bodyInsertMediaFor.bodyHtml,
+              bodyInsertMediaFor.headingIndex,
+              bodyImageFigureHtml(url, ""),
+            ).finally(() => setBodyInsertMediaFor(null));
+          }}
+        />
+      ) : null}
+
       {editorMediaFor ? (
         <MediaLibraryModal
           token={token}
@@ -1381,6 +1484,16 @@ export function ApproveClient() {
           onSubmit={(input) => {
             void requestBodyImageRegen(bodyRegenFor.item.id, bodyRegenFor.target, input);
             setBodyRegenFor(null);
+          }}
+        />
+      ) : null}
+
+      {bodyInsertRegenFor ? (
+        <BodyImageRegenModal
+          heading={bodyInsertRegenFor.item.title}
+          onClose={() => setBodyInsertRegenFor(null)}
+          onSubmit={(input) => {
+            void submitBodyImageInsertGenerate(input);
           }}
         />
       ) : null}
