@@ -19,6 +19,8 @@ import { type PreviewDevice } from "../previewDevice";
 
 // #98: ライブプレビューのデバウンス間隔(編集中の高頻度更新を間引く)。
 const LIVE_PREVIEW_DEBOUNCE_MS = 250;
+const DRAFT_REGEN_CONFLICT_MESSAGE =
+  "画像生成の処理中です。完了後にもう一度保存してください。";
 
 interface UseDraftEditingParams {
   token: string;
@@ -72,28 +74,39 @@ export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftE
     exitEditDraft();
   }
 
-  async function saveDraft(pageId: string): Promise<void> {
+  async function persistDraft(pageId: string, html: string, options: { shouldExit: boolean }): Promise<boolean> {
     setDraftSaving(true);
     setDraftSaveError("");
     try {
       const res = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify(buildDraftEditPayload(pageId, editedHtml)),
+        body: JSON.stringify(buildDraftEditPayload(pageId, html)),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
-        throw new Error(json.error ?? "保存に失敗しました。");
+        throw new Error(res.status === 409 ? DRAFT_REGEN_CONFLICT_MESSAGE : (json.error ?? "保存に失敗しました。"));
       }
-      setEditingDraft(false);
+      if (options.shouldExit) setEditingDraft(false);
       setConfirmDiscard(false);
+      setDraftOriginalHtml(html);
       onSaved?.(); // 保存成功トースト等(呼び出し側で結線)
       await loadDraft(pageId); // 保存後にプレビューを最新化
+      return true;
     } catch (error) {
       setDraftSaveError(toMessage(error, "保存に失敗しました。"));
+      return false;
     } finally {
       setDraftSaving(false);
     }
+  }
+
+  async function saveDraft(pageId: string): Promise<boolean> {
+    return persistDraft(pageId, editedHtml, { shouldExit: true });
+  }
+
+  async function saveDraftInPlace(pageId: string, html: string): Promise<boolean> {
+    return persistDraft(pageId, html, { shouldExit: false });
   }
 
   return {
@@ -112,5 +125,6 @@ export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftE
     cancelEditDraft,
     exitEditDraft,
     saveDraft,
+    saveDraftInPlace,
   };
 }

@@ -14,6 +14,10 @@ export interface BodyImageRegenInput {
   textSpec: string;
 }
 
+export type BodyImageRegenTarget =
+  | { kind: "src"; targetSrc: string }
+  | { kind: "placeholder"; placeholderId: string };
+
 /** スタイル6択チップ(先頭=おまかせ)。日本語ラベルは承認画面表示用。 */
 export const BODY_IMAGE_STYLE_CHIPS: readonly { key: RequestedBodyImageStyle; label: string }[] = [
   { key: "auto", label: "おまかせ" },
@@ -27,12 +31,14 @@ export const BODY_IMAGE_STYLE_CHIPS: readonly { key: RequestedBodyImageStyle; la
 /** API(/api/growth/body-image/regen)へ送る body を組む。style は内部キー/auto の文字列で送る。 */
 export function buildBodyRegenBody(
   pageId: string,
-  targetSrc: string,
+  target: BodyImageRegenTarget,
   input: BodyImageRegenInput
 ): Record<string, unknown> {
   return {
     pageId,
-    targetSrc,
+    ...(target.kind === "src"
+      ? { targetSrc: target.targetSrc }
+      : { placeholderId: target.placeholderId }),
     style: input.style,
     textSpec: input.textSpec,
     instruction: input.instruction,

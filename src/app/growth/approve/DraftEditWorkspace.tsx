@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
 
 import { DraftEditor } from "./DraftEditor";
 import { DraftPreviewFrame } from "./DraftPreviewFrame";
@@ -47,6 +48,11 @@ interface DraftEditWorkspaceProps {
    * (ApproveClient.saveMeta → POST /api/growth/draft/excerpt)へ結線する。
    */
   onSaveMeta: (text: string) => void;
+  isRegenPending?: boolean;
+  onInsertImageFromMedia?: (editor: Editor) => void;
+  onGenerateImage?: (editor: Editor) => void;
+  onPickImage?: (src: string, editor: Editor) => void;
+  onRegenImage?: (src: string, editor: Editor) => void;
 }
 
 // ダークテーマ(approveTheme.css の --p-* トークン)前提の共通ボタン基底。
@@ -80,6 +86,11 @@ export function DraftEditWorkspace({
   onCancelDiscard,
   metaDescription,
   onSaveMeta,
+  isRegenPending = false,
+  onInsertImageFromMedia,
+  onGenerateImage,
+  onPickImage,
+  onRegenImage,
 }: DraftEditWorkspaceProps) {
   const [previewWidth, setPreviewWidth] = useState<PreviewWidthKey>("desktop");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("edit");
@@ -121,7 +132,7 @@ export function DraftEditWorkspace({
     // #UI: ⌘S / Ctrl+S でブラウザ標準保存を抑止して下書き保存へ。
     if ((event.metaKey || event.ctrlKey) && (event.key === "s" || event.key === "S")) {
       event.preventDefault();
-      if (!saving && !confirmDiscard) onSave();
+      if (!saving && !confirmDiscard && !isRegenPending) onSave();
       return;
     }
     if (event.key !== "Tab") return;
@@ -234,7 +245,14 @@ export function DraftEditWorkspace({
                 onSave={onSaveMeta}
               />
             </div>
-            <DraftEditor initialHtml={initialHtml} onChange={onChange} />
+            <DraftEditor
+              initialHtml={initialHtml}
+              onChange={onChange}
+              onInsertImageFromMedia={onInsertImageFromMedia}
+              onGenerateImage={onGenerateImage}
+              onPickImage={onPickImage}
+              onRegenImage={onRegenImage}
+            />
           </div>
           <div
             className={`${paneClass(activeTab, "preview")} min-h-0 overflow-y-auto bg-[var(--p-bg-elevated)] p-3`}
@@ -252,6 +270,14 @@ export function DraftEditWorkspace({
 
         {/* 固定フッタ(保存バー) */}
         <div className="border-t border-[var(--p-border)] px-4 py-2">
+          {isRegenPending ? (
+            <p
+              role="status"
+              className="mb-2 rounded-md bg-[var(--p-accent-weak)] px-3 py-2 text-sm text-[var(--p-accent-ink)]"
+            >
+              画像生成の完了を待っています…（完了すると自動で反映されます）
+            </p>
+          ) : null}
           {saveError ? (
             <p role="alert" className="mb-2 text-sm text-[var(--p-red)]">
               {saveError}
@@ -291,7 +317,7 @@ export function DraftEditWorkspace({
               <button
                 type="button"
                 onClick={onSave}
-                disabled={saving}
+                disabled={saving || isRegenPending}
                 title="保存 (⌘S)"
                 className={`${BTN} border border-[var(--p-accent)] bg-[var(--p-accent)] text-[#0a0c10]`}
               >

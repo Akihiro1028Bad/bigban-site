@@ -39,6 +39,8 @@ interface MediaLibraryModalProps {
   onClose: () => void;
   /** 反映が成功したときに親へ通知(盤の再取得など)。 */
   onApplied: () => void;
+  /** 指定時は反映 API を呼ばず、選択/アップロードした URL を返す select モード。 */
+  onSelect?: (url: string) => void;
 }
 
 /** 一覧取得の上限。proto の 30 件相当。 */
@@ -79,8 +81,10 @@ export function MediaLibraryModal({
   targetSrc,
   onClose,
   onApplied,
+  onSelect,
 }: MediaLibraryModalProps) {
   const isBodyImage = mode === "body-image";
+  const isSelectMode = typeof onSelect === "function";
   const [urls, setUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,8 +93,16 @@ export function MediaLibraryModal({
   const dialogRef = useDialog();
 
   // 適用先(アイキャッチ / 本文画像)で出し分ける文言。
-  const promptLabel = isBodyImage ? "画像を選んで本文画像に差し替え" : "画像を選んでアイキャッチに設定";
-  const selectLabel = isBodyImage ? "この画像を本文画像に設定" : "この画像をアイキャッチに設定";
+  const promptLabel = isSelectMode
+    ? "画像を選んで本文へ挿入"
+    : isBodyImage
+      ? "画像を選んで本文画像に差し替え"
+      : "画像を選んでアイキャッチに設定";
+  const selectLabel = isSelectMode
+    ? "この画像を挿入"
+    : isBodyImage
+      ? "この画像を本文画像に設定"
+      : "この画像をアイキャッチに設定";
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -144,7 +156,12 @@ export function MediaLibraryModal({
       // 返却 URL を先頭へ挿入し、そのまま選択候補として即差し替えへ進める。
       const uploaded = body.url;
       setUrls((prev) => [uploaded, ...prev.filter((u) => u !== uploaded)]);
-      await applySelection(uploaded);
+      if (isSelectMode) {
+        onSelect?.(uploaded);
+        onClose();
+      } else {
+        await applySelection(uploaded);
+      }
     } catch {
       setError("アップロードに失敗しました。もう一度お試しください。");
     } finally {
@@ -153,6 +170,11 @@ export function MediaLibraryModal({
   }
 
   async function applySelection(url: string): Promise<void> {
+    if (isSelectMode) {
+      onSelect?.(url);
+      onClose();
+      return;
+    }
     setError(null);
     setBusy(true);
     try {

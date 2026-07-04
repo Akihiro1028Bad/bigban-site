@@ -71,4 +71,24 @@ describe("MediaLibraryModal 本文画像モード", () => {
     expect(url).toBe("/api/growth/draft/body-image");
     expect(body).toEqual({ pageId: PAGE_ID, targetSrc: OLD, newUrl: ASSET });
   });
+
+  it("select モードは選択URLを返して閉じ、反映APIを呼ばない", async () => {
+    const fn = stubFetch();
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <MediaLibraryModal
+        token=""
+        pageId={PAGE_ID}
+        heading="記事"
+        onClose={onClose}
+        onApplied={vi.fn()}
+        onSelect={onSelect}
+      />
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "この画像を挿入" }));
+    expect(onSelect).toHaveBeenCalledWith(ASSET);
+    expect(onClose).toHaveBeenCalled();
+    expect(fn.mock.calls.filter(([, init]) => (init?.method ?? "GET").toUpperCase() === "POST")).toHaveLength(0);
+  });
 });

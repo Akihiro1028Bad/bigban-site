@@ -24,21 +24,77 @@ vi.mock("@/config/featureFlags", () => ({
 
 // TipTap 本体(DraftEditor)はカバレッジ除外・jsdom で重いため、テストでは
 // initialHtml/onChange だけ持つ textarea スタブに差し替える(#77 の結線ロジックを検証)。
-vi.mock("./DraftEditor", () => ({
-  DraftEditor: ({
-    initialHtml,
-    onChange,
-  }: {
+vi.mock("./DraftEditor", () => {
+  interface FakeEditor {
+    getHTML: () => string;
+    chain: () => {
+      focus: () => {
+        insertContent: (html: string) => { run: () => boolean };
+      };
+    };
+  }
+  interface MockDraftEditorProps {
     initialHtml: string;
     onChange: (html: string) => void;
-  }) => (
-    <textarea
-      aria-label="本文エディタ"
-      defaultValue={initialHtml}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  ),
-}));
+    onInsertImageFromMedia?: (editor: FakeEditor) => void;
+    onGenerateImage?: (editor: FakeEditor) => void;
+    onPickImage?: (src: string, editor: unknown) => void;
+    onRegenImage?: (src: string, editor: unknown) => void;
+  }
+  function makeEditor(initialHtml: string, onChange: (html: string) => void): FakeEditor {
+    let currentHtml = initialHtml;
+    return {
+      getHTML: () => currentHtml,
+      chain: () => ({
+        focus: () => ({
+          insertContent: (html: string) => ({
+            run: () => {
+              currentHtml = `${currentHtml}${html}`;
+              onChange(currentHtml);
+              return true;
+            },
+          }),
+        }),
+      }),
+    };
+  }
+  return {
+    DraftEditor: ({
+      initialHtml,
+      onChange,
+      onInsertImageFromMedia,
+      onGenerateImage,
+      onPickImage,
+      onRegenImage,
+    }: MockDraftEditorProps) => {
+      const editor = makeEditor(initialHtml, onChange);
+      return (
+        <div>
+          <textarea
+            aria-label="本文エディタ"
+            defaultValue={initialHtml}
+            onChange={(e) => {
+              onChange(e.target.value);
+            }}
+          />
+          <button type="button" onClick={() => onInsertImageFromMedia?.(editor)}>
+            画像メニュー: メディアから挿入
+          </button>
+          <button type="button" onClick={() => onGenerateImage?.(editor)}>
+            画像メニュー: AIで生成
+          </button>
+          <button type="button" onClick={() => onPickImage?.("https://images.microcms-assets.io/assets/a/body.png", editor)}>
+            保存済み画像を差し替え
+          </button>
+          <button type="button" onClick={() => onRegenImage?.("https://images.microcms-assets.io/assets/a/body.png", editor)}>
+            保存済み画像をAIで再生成
+          </button>
+        </div>
+      );
+    },
+    replacePreservedImageSrc: vi.fn(() => true),
+  };
+});
 
 // プロンプト確認タブは自前で fetch するため、ApproveClient の結線検証では軽量スタブに差し替える
 // (中身は PromptsView.test.tsx で個別に検証済み)。
@@ -2595,6 +2651,118 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
 
     expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
     release(jsonResponse({ success: true }));
+  });
+
+  it("エディタのAI画像挿入はプレースホルダ入り本文を保存してから placeholderId で再生成依頼する", async () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID").mockReturnValue("123e4567-e89b-12d3-a456-426614174000");
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true } }
+    );
+    try {
+      render(<ApproveClient />);
+      await login();
+      await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await userEvent.click(within(getWorkspace()).getByRole("button", { name: "画像メニュー: AIで生成" }));
+      const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+      await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
+
+      await waitFor(() => {
+        const editIndex = fn.mock.calls.findIndex((c) => String(c[0]) === "/api/growth/draft/edit");
+        const regenIndex = fn.mock.calls.findIndex((c) => String(c[0]) === "/api/growth/body-image/regen");
+        expect(editIndex).toBeGreaterThan(-1);
+        expect(regenIndex).toBeGreaterThan(editIndex);
+        const editBody = JSON.parse(String((fn.mock.calls[editIndex][1] as RequestInit).body));
+        expect(editBody.bodyHtml).toContain('data-pending="img-123e4567-e89b-12d3-a456-426614174000"');
+        const regenBody = JSON.parse(String((fn.mock.calls[regenIndex][1] as RequestInit).body));
+        expect(regenBody).toEqual({
+          pageId: "i1",
+          placeholderId: "img-123e4567-e89b-12d3-a456-426614174000",
+          style: "auto",
+          textSpec: "",
+          instruction: "",
+        });
+      });
+    } finally {
+      randomUUID.mockRestore();
+    }
+  });
+
+  it("エディタのAI画像挿入は保存409なら再生成依頼せず競合メッセージを出す", async () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID").mockReturnValue("123e4567-e89b-12d3-a456-426614174000");
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { ok: false, status: 409, json: { success: false, error: "busy" } }
+    );
+    try {
+      render(<ApproveClient />);
+      await login();
+      await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+      await userEvent.click(within(getWorkspace()).getByRole("button", { name: "画像メニュー: AIで生成" }));
+      const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+      await userEvent.click(within(modal).getByRole("button", { name: "本文画像の再生成を依頼" }));
+
+      expect(
+        await within(getWorkspace()).findByText("画像生成の処理中です。完了後にもう一度保存してください。")
+      ).toBeInTheDocument();
+      expect(await screen.findByText(/プレースホルダはエディタに残っています/)).toBeInTheDocument();
+      expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen")).toBeUndefined();
+    } finally {
+      randomUUID.mockRestore();
+    }
+  });
+
+  it("画像生成中は編集ワークスペースの保存ボタンを無効化してバナーを出す", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: "<p>元</p>",
+            body: "",
+            bodyRegen: { status: "処理中", targetSrc: "https://images.microcms-assets.io/assets/a/body.png" },
+          },
+        },
+      }
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+    expect(await within(getWorkspace()).findByText("画像生成の完了を待っています…（完了すると自動で反映されます）")).toBeInTheDocument();
+    expect(within(getWorkspace()).getByRole("button", { name: "保存" })).toBeDisabled();
   });
 });
 
