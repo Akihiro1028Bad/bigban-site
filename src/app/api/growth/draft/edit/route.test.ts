@@ -31,13 +31,16 @@ function postRequest(token: string | null, body: unknown, raw?: string): Request
   return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
 }
 
-function pageWith(contentId?: string, title?: string) {
+function pageWith(contentId?: string, title?: string, bodyRegenStatus?: string) {
   const properties: Record<string, unknown> = {};
   if (contentId !== undefined) {
     properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
   }
   if (title !== undefined) {
     properties["タイトル案"] = { type: "title", title: [{ plain_text: title }] };
+  }
+  if (bodyRegenStatus !== undefined) {
+    properties["本文画像再生成ステータス"] = { select: { name: bodyRegenStatus } };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -100,6 +103,28 @@ describe("POST /api/growth/draft/edit", () => {
       BODY_MIRROR_PROP
     ];
     expect(mirror.rich_text.map((r) => r.text.content).join("")).toBe(saved);
+  });
+
+  it.each(["依頼中", "処理中"])("本文画像再生成が %s なら 409 で保存を弾く", async (status) => {
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "承認したタイトル", status));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>本文</p>" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の処理中です。完了後にもう一度保存してください。",
+    });
+    expect(updatePageProps).not.toHaveBeenCalled();
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
+  it.each(["なし", "失敗"])("本文画像再生成が %s なら従来どおり保存できる", async (status) => {
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "承認したタイトル", status));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>本文</p>" }));
+    expect(res.status).toBe(200);
+    expect(updatePageProps).toHaveBeenCalledTimes(1);
+    expect(patchDraft).toHaveBeenCalledTimes(1);
   });
 
   it("Notion タイトル案が空なら title を送らない(本文だけ patch・#176)", async () => {

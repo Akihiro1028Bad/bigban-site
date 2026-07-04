@@ -18,6 +18,7 @@ import { POST } from "./route";
 
 const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 const SRC = "https://images.microcms-assets.io/assets/a/1.png";
+const PLACEHOLDER_ID = "img-abcdef";
 
 function postReq(token: string | null, body: unknown): Request {
   const url = new URL("http://localhost/api/growth/body-image/regen");
@@ -68,6 +69,21 @@ describe("POST /api/growth/body-image/regen", () => {
     const p = props as Record<string, { rich_text?: unknown; select?: { name: string } }>;
     expect(p["本文画像再生成指示"].rich_text).toEqual([{ text: { content: "図解で" } }]);
     expect(p["本文画像再生成対象"].rich_text).toEqual([{ text: { content: SRC } }]);
+    expect(p["本文画像再生成ステータス"]).toEqual({ select: { name: "依頼中" } });
+  });
+
+  it("placeholderId 指定なら placeholder 対象として再生成リクエストを書き込む", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ contentId: "g-abc" }));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+
+    const res = await POST(
+      postReq(null, { pageId: PAGE_ID, placeholderId: PLACEHOLDER_ID, instruction: "この位置に図解を追加" })
+    );
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    const p = props as Record<string, { rich_text?: unknown; select?: { name: string } }>;
+    expect(p["本文画像再生成指示"].rich_text).toEqual([{ text: { content: "この位置に図解を追加" } }]);
+    expect(p["本文画像再生成対象"].rich_text).toEqual([{ text: { content: `placeholder:${PLACEHOLDER_ID}` } }]);
     expect(p["本文画像再生成ステータス"]).toEqual({ select: { name: "依頼中" } });
   });
 
@@ -150,6 +166,26 @@ describe("POST /api/growth/body-image/regen", () => {
   it("targetSrc が文字列でないと 400", async () => {
     const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: 123 }));
     expect(res.status).toBe(400);
+  });
+
+  it("不正な placeholderId は 400", async () => {
+    const res = await POST(postReq(null, { pageId: PAGE_ID, placeholderId: "bad-id" }));
+    expect(res.status).toBe(400);
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
+  it("targetSrc と placeholderId の両方指定は 400", async () => {
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: SRC, placeholderId: PLACEHOLDER_ID }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: "対象の指定が不正です。" });
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
+  it("targetSrc と placeholderId の両方なしは 400", async () => {
+    const res = await POST(postReq(null, { pageId: PAGE_ID }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: "対象の指定が不正です。" });
+    expect(getPage).not.toHaveBeenCalled();
   });
 
   it("指示が長すぎる(500文字超)は 400", async () => {

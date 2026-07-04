@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
+import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bodyImageRegen";
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import {
@@ -87,6 +88,12 @@ export async function POST(request: Request): Promise<Response> {
   let stageBlocked: Response | null = null;
   try {
     const page = await getPage(pageId, notionOpts);
+    if (BODY_REGEN_BUSY_STATUSES.includes(bodyRegenRowFromPage(page).status)) {
+      return NextResponse.json(
+        { success: false, error: "画像生成の処理中です。完了後にもう一度保存してください。" },
+        { status: 409 }
+      );
+    }
     stageBlocked = articleEditGuard(page);
     contentId = draftLinkOf(page).contentId;
     title = ideaTitleOf(page).trim();
