@@ -4605,6 +4605,19 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     expect(await screen.findByText(/本文画像の再生成を依頼しました/)).toBeInTheDocument();
   });
 
+  it("画像タブ: 本文画像『AIで再生成』→モーダルを閉じると POST せず閉じる", async () => {
+    const { fn, dialog } = await openBodyImages({ json: { success: true } });
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "閉じる" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen")).toBeUndefined();
+  });
+
   it("画像タブ: 本文画像 再生成の失敗はエラートースト(error付き)", async () => {
     const { dialog } = await openBodyImages({ ok: false, status: 502, json: { success: false, error: "本文再生成NG" } });
     await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);

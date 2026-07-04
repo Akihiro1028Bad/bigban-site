@@ -86,7 +86,13 @@ describe("GET /api/growth/draft", () => {
         advice: { status: "なし", advice: null, raw: "", requestedAtMs: null },
         adviceApply: { status: "なし", proposal: [], raw: "" },
         decorate: { status: "なし", proposals: [], raw: "", requestedAtMs: null },
-        bodyRegen: { status: "なし", targetSrc: "", requestedAtMs: null },
+        bodyRegen: {
+          status: "なし",
+          targetSrc: "",
+          requestedAtMs: null,
+          requestedStyle: "auto",
+          textSpec: "",
+        },
         eyecatchRegen: { status: "なし", requestedAtMs: null },
         bodyComment: { status: "なし", comments: [], proposal: [], raw: "" },
         knownNewsPaths: [],
@@ -145,6 +151,8 @@ describe("GET /api/growth/draft", () => {
       status: "処理中",
       targetSrc: "https://images.microcms-assets.io/assets/a/1.png",
       requestedAtMs: null,
+      requestedStyle: "auto",
+      textSpec: "",
     });
     expect(json.draft.eyecatchRegen).toEqual({ status: "依頼中", requestedAtMs: null });
   });
