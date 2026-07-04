@@ -46,6 +46,7 @@ export function buildDraftEditPayload(pageId: string, html: string): DraftEditPa
  * 先頭要素の種別を判定する純ロジック。DOM に依存せず(正規表現)テスト可能。
  */
 export type PreservedBlockKind =
+  | "pending"
   | "image"
   | "figure"
   | "table"
@@ -63,6 +64,7 @@ export interface PreservedBlockInfo {
 }
 
 const PRESERVED_BLOCK_LABELS: Record<PreservedBlockKind, { label: string; hint: string }> = {
+  pending: { label: "AI画像を生成中…（完了すると自動で差し替わります）", hint: "削除のみできます" },
   image: { label: "画像", hint: "差し替えは『素材』タブから" },
   figure: { label: "図表", hint: "差し替えは『素材』タブから" },
   table: { label: "表", hint: "内容の編集は次の更新で対応予定" },
@@ -87,6 +89,7 @@ export function classifyPreservedBlock(html: string): PreservedBlockInfo {
 function detectPreservedKind(html: string): PreservedBlockKind {
   const head = html.slice(0, 200).toLowerCase();
   if (/^<figure[\s>]/.test(head)) {
+    if (/\sdata-pending=(?:"[^"]*"|'[^']*'|[^\s>]+)/.test(head)) return "pending";
     return /<img[\s>]/.test(html.toLowerCase()) ? "image" : "figure";
   }
   if (/^<table[\s>]/.test(head)) return "table";
@@ -94,6 +97,20 @@ function detectPreservedKind(html: string): PreservedBlockKind {
   if (/^<div[^>]*\bclass="[^"]*\bschedule\b/.test(head)) return "schedule";
   if (/^<a[^>]*\bclass="[^"]*\bembed\b/.test(head)) return "embed";
   return "unknown";
+}
+
+/**
+ * 保持ブロック内の先頭 `<img>` の `src` 属性だけを差し替える。
+ * TipTap の preservedBlock.attrs.html 更新用。置換値に `$1` 等が含まれても
+ * RegExp 置換の展開を起こさないよう、関数形式で返す。
+ */
+export function replaceImgSrcInHtml(html: string, newUrl: string): string {
+  return html.replace(/(<img\b[^>]*\bsrc=)(["'])([^"']*)(\2)/i, (_match, prefix, quote, _src, suffix) => {
+    const safePrefix = typeof prefix === "string" ? prefix : "";
+    const safeQuote = typeof quote === "string" ? quote : '"';
+    const safeSuffix = typeof suffix === "string" ? suffix : safeQuote;
+    return `${safePrefix}${safeQuote}${newUrl}${safeSuffix}`;
+  });
 }
 
 /**

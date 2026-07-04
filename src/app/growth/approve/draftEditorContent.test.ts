@@ -6,6 +6,7 @@ import {
   classifyPreservedBlock,
   countDraftCharacters,
   DECORATION_OPTIONS,
+  replaceImgSrcInHtml,
   sanitizeDraftHtml,
 } from "./draftEditorContent";
 
@@ -62,6 +63,20 @@ describe("countDraftCharacters", () => {
 });
 
 describe("classifyPreservedBlock", () => {
+  it("data-pending 付き figure は img の有無に関わらず『生成中』に分類する", () => {
+    const withImg = classifyPreservedBlock(
+      '<figure data-pending="img-abcdef"><img src="/placeholder.png" alt=""></figure>'
+    );
+    const withoutImg = classifyPreservedBlock(
+      '<figure class="body-image-pending" data-pending="img-abcdef"><figcaption>生成中</figcaption></figure>'
+    );
+
+    expect(withImg.kind).toBe("pending");
+    expect(withImg.label).toBe("AI画像を生成中…（完了すると自動で差し替わります）");
+    expect(withImg.hint).toBe("削除のみできます");
+    expect(withoutImg.kind).toBe("pending");
+  });
+
   it("figure > img は『画像』に分類する", () => {
     const c = classifyPreservedBlock('<figure><img src="/a.png" alt=""><figcaption>x</figcaption></figure>');
     expect(c.kind).toBe("image");
@@ -112,6 +127,7 @@ describe("classifyPreservedBlock", () => {
   it("全種別に補足文(hint)がある", () => {
     const samples = [
       "<figure><img src=x></figure>",
+      '<figure data-pending="img-abcdef"></figure>',
       "<table></table>",
       '<div class="cta"></div>',
       '<a class="embed"></a>',
@@ -120,6 +136,29 @@ describe("classifyPreservedBlock", () => {
     for (const html of samples) {
       expect(classifyPreservedBlock(html).hint.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("replaceImgSrcInHtml", () => {
+  it("先頭 img の src 属性だけを差し替え、alt などは維持する", () => {
+    const html = '<figure><img src="https://old.example/a.png" alt="説明" width="640"></figure>';
+    const out = replaceImgSrcInHtml(html, "https://new.example/b.png");
+
+    expect(out).toBe('<figure><img src="https://new.example/b.png" alt="説明" width="640"></figure>');
+  });
+
+  it("$1 を含む URL でも置換文字列展開を起こさない", () => {
+    const html = '<figure><img src="https://old.example/a.png" alt="説明"></figure>';
+    const out = replaceImgSrcInHtml(html, "https://new.example/$1.png");
+
+    expect(out).toContain('src="https://new.example/$1.png"');
+    expect(out).not.toContain("https://new.example/https://old.example");
+  });
+
+  it("img が無い HTML は原文を返す", () => {
+    const html = "<figure><figcaption>画像待ち</figcaption></figure>";
+
+    expect(replaceImgSrcInHtml(html, "https://new.example/b.png")).toBe(html);
   });
 });
 
