@@ -4,34 +4,44 @@
  * Notion 依存なし(クライアントから安全に import できる)。
  */
 
-/** 本文画像のスタイルキー(#60)。すべて AI 生成。 */
-export type ImageStyleKey = "mascot" | "minimal" | "diagram";
+import type { RequestedBodyImageStyle } from "@/lib/growth/bodyImage";
 
 /** スタイルキー ↔ 表示名(承認画面のドロップダウン・構成案トークンで使う)。 */
-export const IMAGE_STYLES: readonly { key: ImageStyleKey; label: string }[] = [
-  { key: "mascot", label: "マスコット・コスミック" },
-  { key: "minimal", label: "ミニマル図解" },
-  { key: "diagram", label: "詳しい図解" },
+export const IMAGE_STYLES: readonly { key: RequestedBodyImageStyle; label: string }[] = [
+  { key: "auto", label: "おまかせ" },
+  { key: "mascot", label: "宇宙人マスコット" },
+  { key: "illust", label: "雰囲気イラスト" },
+  { key: "court", label: "コート図・ルール図解" },
+  { key: "flow", label: "手順・フロー図" },
+  { key: "infographic", label: "比較・インフォグラフィック" },
 ];
 
 // マッピングは IMAGE_STYLES を単一ソースに導出する(追加・変更を1箇所に)。
 const LABEL_BY_KEY = Object.fromEntries(
   IMAGE_STYLES.map((s) => [s.key, s.label])
-) as Record<ImageStyleKey, string>;
+) as Record<RequestedBodyImageStyle, string>;
 
 const KEY_BY_LABEL = Object.fromEntries(
   IMAGE_STYLES.map((s) => [s.label, s.key])
-) as Record<string, ImageStyleKey>;
+) as Record<string, RequestedBodyImageStyle>;
+
+const LEGACY_KEY_BY_LABEL: Record<string, RequestedBodyImageStyle> = {
+  "マスコット・コスミック": "mascot",
+  "ミニマル図解": "illust",
+  "詳しい図解": "court",
+};
 
 /** 表示名 → スタイルキー。未知の表示名は null(画像として採用しない)。 */
-export function imageStyleKeyFromLabel(label: string): ImageStyleKey | null {
-  return KEY_BY_LABEL[label.trim()] ?? null;
+export function imageStyleKeyFromLabel(label: string): RequestedBodyImageStyle | null {
+  const trimmed = label.trim();
+  return KEY_BY_LABEL[trimmed] ?? LEGACY_KEY_BY_LABEL[trimmed] ?? null;
 }
 
 /** 1 セクションに紐づく本文画像の指示。 */
 export interface OutlineImage {
-  style: ImageStyleKey;
+  style: RequestedBodyImageStyle;
   description: string;
+  textSpec?: string;
 }
 
 export interface OutlineSection {
@@ -39,15 +49,20 @@ export interface OutlineSection {
   description: string;
   /** 画像指示。parse は常に配列を設定する(空でも []). */
   images: OutlineImage[];
+  suppressImage?: boolean;
 }
 
 const HEADING_RE = /^#{1,6}\s+/;
 
-// 画像指示トークン: [画像:<表示名>: <説明>]。コロンは半角/全角どちらも許容。
-// 1 行に複数トークンも可(global)。表示名・説明はそれぞれ閉じ括弧/コロンを含まない。
+// 画像指示トークン: [画像:<表示名>: <説明> | 文字: <textSpec>]。コロンは半角/全角どちらも許容。
+// 1 行に複数トークンも可(global)。表示名・説明・textSpec はそれぞれ閉じ括弧を含まない。
 // 注: この定数は matchAll(内部でコピーを作る)と replace(lastIndex をリセット)からのみ使う。
 //     exec での共有はしないこと(lastIndex 汚染を避けるため)。
-const IMAGE_DIRECTIVE_RE = /\[画像[:：]\s*([^:：\]]+?)\s*[:：]\s*([^\]]+?)\s*\]/g;
+const IMAGE_DIRECTIVE_RE =
+  /\[画像[:：]\s*([^:：|｜\]]+?)\s*[:：]\s*([^|｜\]]*?)\s*(?:[|｜]\s*文字[:：]\s*([^\]]*?)\s*)?\]/g;
+
+// 画像なしトークン: [画像:なし]。parseOutlineSections で単独行だけを明示除外として扱う。
+const NO_IMAGE_DIRECTIVE_RE = /\[画像[:：]\s*なし\s*\]/g;
 
 /**
  * 1 行から画像指示を抽出する。
@@ -58,14 +73,19 @@ export function parseImageDirectives(line: string): OutlineImage[] {
   for (const match of line.matchAll(IMAGE_DIRECTIVE_RE)) {
     const style = imageStyleKeyFromLabel(match[1]);
     const description = match[2].trim();
-    if (style && description) out.push({ style, description });
+    const textSpec = match[3]?.trim();
+    if (style && description) {
+      out.push(textSpec ? { style, description, textSpec } : { style, description });
+    }
   }
   return out;
 }
 
 /** 画像指示 1 件をトークン文字列にする。 */
 export function serializeImageDirective(image: OutlineImage): string {
-  return `[画像:${LABEL_BY_KEY[image.style]}: ${image.description.trim()}]`;
+  const textSpec = image.textSpec?.trim();
+  const suffix = textSpec ? ` | 文字: ${textSpec}` : "";
+  return `[画像:${LABEL_BY_KEY[image.style]}: ${image.description.trim()}${suffix}]`;
 }
 
 /**
@@ -94,7 +114,15 @@ export function parseOutlineSections(outline: string): OutlineSection[] {
     // テキストと画像トークンが同一行に混在する場合は、行全体を説明として残す
     // (トークンは画像化せずリテラルのまま。UI は画像指示を単独行で書く=#61)。
     const images = parseImageDirectives(line);
-    const withoutImages = line.replace(IMAGE_DIRECTIVE_RE, "").trim();
+    const withoutImages = line
+      .replace(IMAGE_DIRECTIVE_RE, "")
+      .replace(NO_IMAGE_DIRECTIVE_RE, "")
+      .trim();
+    const hasNoImageDirective = line.replace(NO_IMAGE_DIRECTIVE_RE, "").trim() === "";
+    if (current && hasNoImageDirective && withoutImages === "") {
+      current.suppressImage = true;
+      continue;
+    }
     if (current && images.length > 0 && withoutImages === "") {
       current.images.push(...images);
       continue;
@@ -131,7 +159,11 @@ export function serializeOutlineSections(sections: readonly OutlineSection[]): s
       const parts = [`## ${s.heading.trim()}`];
       const description = s.description.trim();
       if (description) parts.push(description);
-      for (const image of s.images) parts.push(serializeImageDirective(image));
+      if (s.suppressImage) {
+        parts.push("[画像:なし]");
+      } else {
+        for (const image of s.images) parts.push(serializeImageDirective(image));
+      }
       return parts.join("\n");
     })
     .join("\n\n");
