@@ -25,6 +25,7 @@ import {
   buildBodyRegenRequestProps,
   bodyRegenRowFromPage,
 } from "@/lib/growth/bodyImageRegen";
+import { isPlaceholderId } from "@/lib/growth/bodyImageInsert";
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
 import { articleEditGuard } from "@/lib/growth/stageGuard";
@@ -60,9 +61,24 @@ export async function POST(request: Request): Promise<Response> {
   const pageId = (body as { pageId?: unknown })?.pageId;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
   const rawTargetSrc = (body as { targetSrc?: unknown })?.targetSrc;
-  // 対象画像は microCMS アセットURLに限定する(任意 URL を対象にできないようにする防御)。
-  if (typeof rawTargetSrc !== "string" || !isMicrocmsAssetUrl(rawTargetSrc)) {
-    return badRequest("不正な対象画像です。");
+  const rawPlaceholderId = (body as { placeholderId?: unknown })?.placeholderId;
+  const hasTargetSrc = rawTargetSrc !== undefined;
+  const hasPlaceholderId = rawPlaceholderId !== undefined;
+  if (hasTargetSrc === hasPlaceholderId) {
+    return badRequest("対象の指定が不正です。");
+  }
+  let target: string;
+  if (hasTargetSrc) {
+    // 対象画像は microCMS アセットURLに限定する(任意 URL を対象にできないようにする防御)。
+    if (typeof rawTargetSrc !== "string" || !isMicrocmsAssetUrl(rawTargetSrc)) {
+      return badRequest("不正な対象画像です。");
+    }
+    target = rawTargetSrc;
+  } else {
+    if (!isPlaceholderId(rawPlaceholderId)) {
+      return badRequest("不正な placeholderId です。");
+    }
+    target = `placeholder:${rawPlaceholderId}`;
   }
   const rawInstruction = (body as { instruction?: unknown })?.instruction;
   const instruction = typeof rawInstruction === "string" ? rawInstruction.trim() : "";
@@ -105,7 +121,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     await updatePageProps(
       pageId,
-      buildBodyRegenRequestProps(instruction, rawTargetSrc, requestedStyle, textSpec, new Date().toISOString()),
+      buildBodyRegenRequestProps(instruction, target, requestedStyle, textSpec, new Date().toISOString()),
       options
     );
   } catch (error) {
