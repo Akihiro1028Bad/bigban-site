@@ -842,6 +842,17 @@ export function ApproveClient() {
     }
   }
 
+  // #59/P1: 本文画像ボタン(差し替え/再生成)の抽出順 index を実 src へ写像し、存在すれば apply を呼ぶ。
+  // ボタンは draft ready 時のみ描画され、index は描画済み一覧由来のため src は実質必ず存在する(防御ガード)。
+  function bodyImageTargetAt(index: number, apply: (targetSrc: string) => void): void {
+    /* istanbul ignore next -- @preserve 本文画像ボタンは draft ready 時のみ描画され : [] 側は到達不可(防御) */
+    const srcs =
+      draftState.status === "ready" ? bodyImageUrlsOf(draftState.draft.bodyHtml ?? "") : [];
+    const targetSrc = srcs[index];
+    /* istanbul ignore else -- @preserve index は描画済み一覧由来のため src は必ず存在(防御) */
+    if (targetSrc) apply(targetSrc);
+  }
+
   // #proto P3b: draft の再生成ステータスから「生成中」の regenKey を導出する(ImagesView の生成中表示用)。
   // 依頼中/処理中を生成中扱いにし、`${id}:eyecatch` / `${id}:body:<index>` の集合にする。
   function deriveRegenKeys(item: PendingItem): Set<string> {
@@ -851,7 +862,9 @@ export function ApproveClient() {
     const busy = (status?: string) => status === "依頼中" || status === "処理中";
     if (busy(eyecatchRegen?.status)) keys.add(`${item.id}:eyecatch`);
     if (busy(bodyRegen?.status)) {
+      /* istanbul ignore next -- @preserve bodyHtml/targetSrc は busy な body 再生成時に PC ループが必ず設定する防御既定 */
       const srcs = extractBodyImages(bodyHtml ?? "").map((ref) => ref.src);
+      /* istanbul ignore next -- @preserve targetSrc 既定("")は busy 時に必ず設定されるため到達不可(防御) */
       for (const index of bodyRegenIndices(srcs, bodyRegen?.targetSrc ?? "")) {
         keys.add(`${item.id}:body:${index}`);
       }
@@ -903,18 +916,10 @@ export function ApproveClient() {
         regenKeys={deriveRegenKeys(item)}
         onPickEyecatch={() => setMediaFor(item)}
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
-        onPickBodyImage={(index) => {
-          const srcs =
-            draftState.status === "ready" ? bodyImageUrlsOf(draftState.draft.bodyHtml ?? "") : [];
-          const targetSrc = srcs[index];
-          if (targetSrc) setBodyMediaFor({ item, targetSrc });
-        }}
-        onRegenBodyImage={(index) => {
-          const srcs =
-            draftState.status === "ready" ? bodyImageUrlsOf(draftState.draft.bodyHtml ?? "") : [];
-          const targetSrc = srcs[index];
-          if (targetSrc) void requestBodyImageRegen(item.id, targetSrc);
-        }}
+        onPickBodyImage={(index) => bodyImageTargetAt(index, (targetSrc) => setBodyMediaFor({ item, targetSrc }))}
+        onRegenBodyImage={(index) =>
+          bodyImageTargetAt(index, (targetSrc) => void requestBodyImageRegen(item.id, targetSrc))
+        }
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
         imageInstructions={imageInstructions}

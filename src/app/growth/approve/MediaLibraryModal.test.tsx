@@ -10,8 +10,7 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 /** GET 一覧は 1 件、POST(反映)は success:true を返す fetch スタブ。POST の body を calls で拾う。 */
 function stubFetch(): ReturnType<typeof vi.fn> {
-  const fn = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
+  const fn = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "GET") {
       return Promise.resolve({

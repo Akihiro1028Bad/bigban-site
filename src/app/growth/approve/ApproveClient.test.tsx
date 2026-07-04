@@ -4499,6 +4499,94 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     expect(await screen.findByText("再生成の依頼に失敗しました。")).toBeInTheDocument();
   });
 
+  // P1: 本文画像(<figure><img>)入りの下書きで画像タブを開き、差し替え/再生成の結線を検証する。
+  const BODY_IMG = "https://images.microcms-assets.io/assets/a/body.png";
+  const BODY_IMG_DRAFT = {
+    json: {
+      success: true,
+      exists: true,
+      draft: {
+        title: "T",
+        displayMode: "html",
+        bodyHtml: `<figure><img src="${BODY_IMG}" alt="図"></figure>`,
+        body: "",
+      },
+    },
+  };
+
+  // 本文画像入りの下書きで詳細を開き、画像タブへ切り替える。
+  async function openBodyImages(...after: Array<{ json?: unknown; ok?: boolean; status?: number }>) {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      BODY_IMG_DRAFT,
+      ...after,
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
+    await gotoImages(dialog);
+    return { fn, dialog };
+  }
+
+  it("画像タブ: 本文画像を『差し替え』でメディアライブラリ(本文画像モード)→反映で下書き再取得＋成功トースト", async () => {
+    const { fn, dialog } = await openBodyImages(
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/pick.png" }] } }, // 一覧
+      { json: { success: true } }, // /api/growth/draft/body-image(反映)
+      BODY_IMG_DRAFT, // onApplied → loadDraft 再取得
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } }, // onApplied → pollBoard 再取得
+    );
+    // 本文画像セクションの「差し替え」ボタン(title)を押す。
+    await userEvent.click(within(dialog).getByRole("button", { name: "差し替え" }));
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await within(media).findByRole("button", { name: "この画像を本文画像に設定" });
+    await userEvent.click(within(media).getByRole("button", { name: "この画像を本文画像に設定" }));
+    // /api/growth/draft/body-image へ pageId/targetSrc/newUrl を POST。
+    await waitFor(() => {
+      const call = fn.mock.calls.find((c) => String(c[0]) === "/api/growth/draft/body-image");
+      expect(call).toBeDefined();
+      const body = JSON.parse(String((call?.[1] as RequestInit)?.body));
+      expect(body).toEqual({
+        pageId: "i1",
+        targetSrc: BODY_IMG,
+        newUrl: "https://images.microcms-assets.io/pick.png",
+      });
+    });
+    // onApplied → 成功トースト＋モーダルクローズ。
+    expect(await screen.findByText("本文画像を差し替えました。")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("画像タブ: 本文画像を『AIで再生成』すると /body-image/regen に targetSrc を POST し成功トースト", async () => {
+    const { fn, dialog } = await openBodyImages({ json: { success: true } });
+    // 「AIで再生成」はアイキャッチ(先頭)と本文画像(次)の2つある。本文画像側は差し替えボタンと同じ行にある。
+    const regenButtons = within(dialog).getAllByRole("button", { name: "AIで再生成" });
+    expect(regenButtons).toHaveLength(2);
+    await userEvent.click(regenButtons[1]);
+    await waitFor(() => {
+      const call = fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen");
+      expect(call).toBeDefined();
+      const body = JSON.parse(String((call?.[1] as RequestInit)?.body));
+      expect(body).toEqual({ pageId: "i1", targetSrc: BODY_IMG, instruction: "" });
+    });
+    expect(await screen.findByText(/本文画像の再生成を依頼しました/)).toBeInTheDocument();
+  });
+
+  it("画像タブ: 本文画像 再生成の失敗はエラートースト(error付き)", async () => {
+    const { dialog } = await openBodyImages({ ok: false, status: 502, json: { success: false, error: "本文再生成NG" } });
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    expect(await screen.findByText("本文再生成NG")).toBeInTheDocument();
+  });
+
+  it("画像タブ: 本文画像 再生成の失敗(error無し)は既定文言", async () => {
+    const { dialog } = await openBodyImages({ ok: false, status: 502, json: { success: false } });
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "AIで再生成" })[1]);
+    expect(await screen.findByText("再生成の依頼に失敗しました。")).toBeInTheDocument();
+  });
+
   it("構成案タブ: セクションにコメントを追加・削除できる(OutlineView 経由)", async () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem({ outline: "## 見出しA" })] } });
     render(<ApproveClient />);
