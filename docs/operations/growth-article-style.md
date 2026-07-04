@@ -120,22 +120,26 @@ standing on the court. Not table tennis, not ping pong: no table, no tiny ping-p
 bat. Leave clean negative space on one side for text. No text, no logos.
 ```
 
-> #89: 画像生成モデルの卓球(table tennis)バイアス対策として、競技をピックルボールに固定し卓球を明示除外する一文を `STYLE_SUFFIX` に自動付与している(本文画像 mascot/minimal も同句を共用。`diagram` は概念図のため付与しない)。正典は `PICKLEBALL_ANCHOR`/`NO_TABLE_TENNIS`（`scripts/growth/body-image.ts`）。
+> #89: 画像生成モデルの卓球(table tennis)バイアス対策として、競技をピックルボールに固定し卓球を明示除外する一文を `STYLE_SUFFIX` に自動付与している(本文画像は `mascot`/`illust` に同句を共用。概念図の `court`/`flow`/`infographic` には付与しない)。正典は `PICKLEBALL_ANCHOR`/`NO_TABLE_TENNIS`（`scripts/growth/body-image.ts`）。
 
 ### 本文画像(任意・構成案からの指示で生成 / Epic #59)
 
 アイキャッチ(必須・上記)とは別に、**本文中の画像**を構成案の指示から生成・埋め込みできる。承認画面の各セクションで「＋画像」からスタイルと説明を指定する(指示が無ければ本文画像は入らない)。生成・アップロード・本文への埋め込みは投入パイプライン(`growth:publish-draft`)が担う。
 
-- **スタイルは3種(すべてAI生成)**。指示はこのキーで保存される:
-  | 表示名 | キー | 中身 | 生成方式 |
-  |---|---|---|---|
-  | マスコット・コスミック | `mascot` | 宇宙人マスコットが行為をする(§9 と同じ世界観) | 参照画像方式(`/v1/images/edits`) |
-  | ミニマル図解 | `minimal` | フラット・文字なしの抽象イラスト・ブランド配色 | text-to-image(`/v1/images/generations`) |
-  | 詳しい図解 | `diagram` | 概念図(情報性重視) | text-to-image |
+- **スタイルは6種(すべてAI生成)**。承認画面の「本文画像スタイル」で選ぶ(`おまかせ`＝AIが文脈で選択・既定 `mascot`)。旧値は自動でマップされる(`minimal`→`illust`・`diagram`→`court`):
+  | 表示名 | キー | 中身 | 生成方式 | 文字・数値 |
+  |---|---|---|---|---|
+  | おまかせ | `auto` | AIが文脈で1つ選ぶ(既定 `mascot`) | — | — |
+  | 宇宙人マスコット | `mascot` | 宇宙人マスコットが行為をする(§9 の世界観) | 参照画像方式(`/v1/images/edits`) | なし |
+  | 雰囲気イラスト | `illust` | フラット・文字なしの抽象イラスト・ブランド配色 | text-to-image | なし |
+  | コート図・ルール図解 | `court` | 俯瞰コート図・ルール図(情報性重視) | text-to-image | **明示指定分のみ** |
+  | 手順・フロー図 | `flow` | 手順・工程のフロー図 | text-to-image | **明示指定分のみ** |
+  | 比較・インフォグラフィック | `infographic` | 比較・対比のインフォグラフィック | text-to-image | **明示指定分のみ** |
 - **実写は禁止**(§9 と同様)。施設の実写風画像は未確定事実の捏造になるため作らない。
-- **`diagram` は AI 生成のため不正確になりうる**。alt・キャプションに自動で「イメージ図」を明示し、**参考図**として扱う(正確な事実は本文テキストが担う)。下書き止まりで公開前に人が確認する前提。
+- **`court`/`flow`/`infographic` は文字・数値を焼き込める**が、描いてよいのは「承認画面の『本文画像文字指定』(textSpec)に明示した値」「記事本文に既にある値」「ピックルボール公式規格(コート寸法等の公知の事実)」のみ。**営業時間・料金・面数・所要分などの未確定情報は画像内でも断定しない**(絶対禁止の画像への拡張)。文字入りは PC ループの Claude が目視照合し、崩れれば最大3回再生成、3回失敗で文字なし版を納品して LINE 報告する(沈黙させない=#24)。
+- **図解系(`court`/`flow`/`infographic`)は AI 生成のため不正確になりうる**。alt に自動で「イメージ図」を明示し、**参考図**として扱う(正確な事実は本文テキストが担う)。下書き止まりで公開前に人が確認する前提。
 - **1記事あたり上限3枚**。超過分はスキップし LINE 通知する(沈黙させない=#24)。
-- alt・キャプションは説明文から自動補完される(本文に手書きしない)。生成画像のプロンプト組み立て・置換は `scripts/growth/body-image.ts`、生成は `scripts/growth/eyecatch.ts` の `generateImage`。
+- alt は説明文から自動補完される(本文に手書きしない)。生成画像のプロンプト組み立て・置換は `scripts/growth/body-image.ts`、生成は `scripts/growth/eyecatch.ts` の `generateImage`。
 - 生成画像は安定ファイル名でキャッシュされ、再実行で OpenAI を**再課金しない**(#21)。1枚失敗しても他画像・本文は生かす。
 
 ## 10. 取材ソース(執筆前に必ず行う)
