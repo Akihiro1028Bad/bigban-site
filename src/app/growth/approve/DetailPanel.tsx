@@ -21,6 +21,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import type { ArticleHypothesis } from "@/lib/growth/approve";
 
+import { bodyImageUrlsOf } from "./detailBodyImages";
 import { ImagesView, PreviewView, PromptView } from "./DetailViews";
 import { countByLevel, draftQuality } from "./draftQuality";
 import type { DraftState } from "./draftTypes";
@@ -164,7 +165,7 @@ export interface DetailPanelProps {
   regenKeys: Set<string>;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
-  // 本文画像の差し替え/再生成は現行の詳細パネルでは常に本文画像0のため到達不可(#proto P3b で撤去)。
+  // 本文画像の差し替え/再生成(#59・P1 で実データ配線)。draft 本文 HTML の抽出順 index を受け取る。
   onPickBodyImage?: (index: number) => void;
   onRegenBodyImage?: (index: number) => void;
   // 構成案タブ(OutlineView)。
@@ -227,6 +228,8 @@ export function DetailPanel({
   const draft = draftState.status === "ready" ? draftState.draft : null;
   const bodyHtml = draft?.bodyHtml ?? "";
   const body = draft?.body ?? "";
+  // #59/P1: 画像タブ(ImagesView)の本文画像は draft 本文 HTML から実データで供給する(枚数=length)。
+  const bodyImageUrls = bodyImageUrlsOf(bodyHtml);
 
   const tabs = tabsFor();
   const safeTab: DetailTab = tabs.some((t) => t.key === tab) ? tab : "preview";
@@ -455,7 +458,8 @@ export function DetailPanel({
                 hue={hue}
                 hasEyecatch={Boolean(item.eyecatchUrl) || Boolean(draft?.eyecatch)}
                 eyecatchUrl={item.eyecatchUrl ?? draft?.eyecatch}
-                bodyImages={0}
+                bodyImages={bodyImageUrls.length}
+                bodyImageUrls={bodyImageUrls}
                 regenKeys={regenKeys}
                 itemId={item.id}
                 onPickEyecatch={onPickEyecatch}
