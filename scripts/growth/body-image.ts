@@ -8,8 +8,11 @@
  * 文体・配色の正典は growth-article-style.md §9(宇宙人マスコット × コスミック)。
  */
 
-/** 本文画像のスタイル(承認画面 src/app/growth/approve/outline.ts の ImageStyleKey とキー一致)。 */
-export type BodyImageStyle = "mascot" | "minimal" | "diagram";
+/** 本文画像の生成に渡すスタイル(auto は含まない。生成時は必ず具体スタイルへ解決済み)。 */
+export type BodyImageStyle = "mascot" | "illust" | "court" | "flow" | "infographic";
+
+/** 依頼キューが運ぶスタイル値。auto は「Claude が文脈で選ぶ」の意(生成前に具体スタイルへ解決)。 */
+export type RequestedBodyImageStyle = BodyImageStyle | "auto";
 
 /** 1記事あたりの本文画像の上限(#61 と整合)。超過は投入側(#63)でスキップ＋通知。 */
 export const BODY_IMAGE_MAX = 3;
@@ -33,23 +36,38 @@ export const PICKLEBALL_ANCHOR =
 export const NO_TABLE_TENNIS =
   "Not table tennis, not ping pong: no table, no tiny ping-pong paddle, no small bat.";
 
-// mascot / minimal(スポーツシーンを描き得る)に付与する競技固定句。
-// diagram(概念図)はスポーツシーンとは限らないため付与しない。
+// mascot / illust(スポーツシーンを描き得る)に付与する競技固定句。
+// court / flow / infographic(概念図)はスポーツシーンとは限らないため付与しない。
 const PICKLEBALL_GUARD = `${PICKLEBALL_ANCHOR} ${NO_TABLE_TENNIS}`;
+
+// court/flow/infographic は図中に文字・数値を焼き込むが、捏造(#58)防止のため
+// **description に明示された文字・数値だけ**を描く(それ以外の数値は描かせない)。
+const TEXT_ONLY_AS_SPECIFIED =
+  "Render only the exact text and numbers explicitly given in the description; " +
+  "do not invent any other numbers, prices, times, hours, or labels. " +
+  "Keep any text short, legible, and correctly spelled.";
 
 const PROMPT_BUILDERS: Record<BodyImageStyle, (description: string) => string> = {
   mascot: (d) =>
     `Using ${ALIEN_CHARACTER}, create a flat illustration of this same alien: ${d}. ` +
     `Cosmic deep-space scene, ${BRAND_PALETTE}. ${PICKLEBALL_GUARD} ` +
     `Keep the alien's face identical to the reference. Clean premium flat illustration. No text, no logos.`,
-  minimal: (d) =>
-    `Minimal flat vector-style illustration of: ${d}. ` +
-    `Simple shapes with generous negative space, ${BRAND_PALETTE} on a clean background. ${PICKLEBALL_GUARD} ` +
+  illust: (d) =>
+    `Atmospheric flat vector illustration of: ${d}. ` +
+    `Premium editorial mood with generous negative space, ${BRAND_PALETTE} on a clean background. ${PICKLEBALL_GUARD} ` +
     `No text, no labels, no logos.`,
-  diagram: (d) =>
-    `Clean conceptual diagram illustrating: ${d}. ` +
-    `Flat schematic style, ${BRAND_PALETTE}. ` +
-    `Minimal or no text labels (avoid garbled text). Illustrative and conceptual, not a precise technical drawing.`,
+  court: (d) =>
+    `Clean top-down pickleball court diagram illustrating: ${d}. ` +
+    `Flat schematic style, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
+    `Illustrative and conceptual, not a precise engineering drawing.`,
+  flow: (d) =>
+    `Clean step-by-step flow diagram illustrating: ${d}. ` +
+    `Left-to-right or top-to-bottom flat schematic with simple arrows, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
+    `Illustrative and conceptual, not a precise engineering drawing.`,
+  infographic: (d) =>
+    `Clean comparison infographic illustrating: ${d}. ` +
+    `Flat schematic panels or side-by-side layout, ${BRAND_PALETTE}. ${TEXT_ONLY_AS_SPECIFIED} ` +
+    `Illustrative and conceptual, not a precise engineering drawing.`,
 };
 
 /** スタイル別のフル画像生成プロンプトを組む。 */
@@ -58,12 +76,13 @@ export function buildBodyImagePrompt(style: BodyImageStyle, description: string)
 }
 
 /**
- * alt テキスト。図解(diagram)は AI 生成のため「イメージ図」と明示し、
- * 正確な事実として読まれないようにする(#58/捏造リスク対策)。
+ * alt テキスト。図解系(court/flow/infographic)は AI 生成のため「イメージ図」と明示し、
+ * 正確な事実として読まれないようにする(#58/捏造リスク対策)。mascot/illust は説明をそのまま。
  */
 export function buildBodyImageAlt(style: BodyImageStyle, description: string): string {
   const d = description.trim();
-  return style === "diagram" ? `イメージ図: ${d}` : d;
+  const isDiagram = style === "court" || style === "flow" || style === "infographic";
+  return isDiagram ? `イメージ図: ${d}` : d;
 }
 
 /** 本文に埋め込む画像1枚分の仕様。投入パイプライン(#63)が生成・置換に使う。 */
@@ -231,4 +250,26 @@ export function bodyImageFileStem(slug: string, spec: BodyImageSpec): string {
   const safeSlug = slug.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
   const key = hashString(`${spec.style}|${spec.description}`);
   return `growth-bodyimg-${safeSlug}-${spec.index}-${key}`;
+}
+
+/**
+ * 受理したスタイル文字列を新 5 キーへ正規化する(入口正規化・後方互換)。
+ * 旧値 minimal→illust・diagram→court にマップし、空・未知・auto は既定 mascot に落とす。
+ * flow/infographic は旧 diagram から自動振り分けせず、明示指定のときだけ選ばれる(誤変換防止)。
+ */
+export function normalizeBodyImageStyle(raw: string): BodyImageStyle {
+  switch (raw) {
+    case "mascot":
+    case "illust":
+    case "court":
+    case "flow":
+    case "infographic":
+      return raw;
+    case "minimal":
+      return "illust";
+    case "diagram":
+      return "court";
+    default:
+      return "mascot";
+  }
 }
