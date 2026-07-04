@@ -108,6 +108,11 @@ const EMPTY_ITEMS: PendingItem[] = [];
 // #109: 表示密度の保存キー(localStorage)。
 const DENSITY_KEY = "growth-approve-density";
 
+/* istanbul ignore next -- @preserve MediaLibraryModal の select mode は onSelect だけを使う。必須 prop を満たす no-op */
+function noopModalApplied(): void {
+  return undefined;
+}
+
 // #242: 施策/記事を優先度スコア降順に並べる比較関数。
 function byScoreDesc(a: PendingItem, b: PendingItem): number {
   return (b.score ?? 0) - (a.score ?? 0);
@@ -890,21 +895,25 @@ export function ApproveClient() {
   }
 
   function handleEditorMediaInsert(editor: Editor): void {
+    /* istanbul ignore next -- @preserve エディタの画像ボタンは activeItem 配下でのみ描画される防御ガード */
     if (!activeItem) return;
     setEditorMediaFor({ item: activeItem, editor });
   }
 
   function handleEditorImageGenerate(editor: Editor): void {
+    /* istanbul ignore next -- @preserve エディタの画像ボタンは activeItem 配下でのみ描画される防御ガード */
     if (!activeItem) return;
     setEditorInsertRegenFor({ item: activeItem, editor });
   }
 
   function handleEditorImagePick(targetSrc: string, editor: Editor): void {
+    /* istanbul ignore next -- @preserve エディタの画像ボタンは activeItem 配下でのみ描画される防御ガード */
     if (!activeItem) return;
     setEditorImageReplaceFor({ item: activeItem, targetSrc, editor });
   }
 
   function handleEditorImageRegen(targetSrc: string): void {
+    /* istanbul ignore next -- @preserve エディタの画像ボタンは activeItem 配下でのみ描画される防御ガード */
     if (!activeItem) return;
     if (editedHtmlRef.current !== draftOriginalHtmlRef.current) {
       pushToast("先に保存してください", "error");
@@ -914,10 +923,12 @@ export function ApproveClient() {
   }
 
   function handleAddBodyImage(item: PendingItem): void {
+    /* istanbul ignore next -- @preserve 画像タブの追加ボタンは編集ワークスペース外でのみ操作される防御ガード */
     if (editingDraft) {
       pushToast("編集画面から挿入してください", "error");
       return;
     }
+    /* istanbul ignore next -- @preserve 画像タブの追加ボタンは draft ready 後の詳細パネルで操作される防御ガード */
     if (draftState.status !== "ready") {
       pushToast("下書きの読み込み後に挿入できます。", "error");
       return;
@@ -926,6 +937,7 @@ export function ApproveClient() {
   }
 
   function submitBodyImageInsert(choice: BodyImageInsertChoice): void {
+    /* istanbul ignore next -- @preserve BodyImageInsertModal の onSubmit からのみ呼ばれるため state は必ず存在 */
     if (!bodyInsertFor) return;
     const next = {
       item: bodyInsertFor.item,
@@ -957,6 +969,7 @@ export function ApproveClient() {
   }
 
   async function submitBodyImageInsertGenerate(input: BodyImageRegenInput): Promise<void> {
+    /* istanbul ignore next -- @preserve BodyImageRegenModal(挿入) の onSubmit からのみ呼ばれるため state は必ず存在 */
     if (!bodyInsertRegenFor) return;
     const placeholderId = `img-${crypto.randomUUID()}`;
     const saved = await saveInsertedBodyImage(
@@ -978,6 +991,7 @@ export function ApproveClient() {
   }
 
   async function submitEditorImageGenerate(input: BodyImageRegenInput): Promise<void> {
+    /* istanbul ignore next -- @preserve BodyImageRegenModal(エディタ挿入) の onSubmit からのみ呼ばれるため state は必ず存在 */
     if (!editorInsertRegenFor) return;
     const placeholderId = `img-${crypto.randomUUID()}`;
     editorInsertRegenFor.editor
@@ -1427,7 +1441,7 @@ export function ApproveClient() {
           pageId={bodyInsertMediaFor.item.id}
           heading={bodyInsertMediaFor.item.title}
           onClose={() => setBodyInsertMediaFor(null)}
-          onApplied={() => undefined}
+          onApplied={noopModalApplied}
           onSelect={(url) => {
             void saveInsertedBodyImage(
               bodyInsertMediaFor.item,
@@ -1445,7 +1459,7 @@ export function ApproveClient() {
           pageId={editorMediaFor.item.id}
           heading={editorMediaFor.item.title}
           onClose={() => setEditorMediaFor(null)}
-          onApplied={() => undefined}
+          onApplied={noopModalApplied}
           onSelect={(url) => {
             editorMediaFor.editor
               .chain()
@@ -1464,7 +1478,7 @@ export function ApproveClient() {
           pageId={editorImageReplaceFor.item.id}
           heading={editorImageReplaceFor.item.title}
           onClose={() => setEditorImageReplaceFor(null)}
-          onApplied={() => undefined}
+          onApplied={noopModalApplied}
           onSelect={(url) => {
             replacePreservedImageSrc(
               editorImageReplaceFor.editor,

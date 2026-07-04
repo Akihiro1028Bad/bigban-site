@@ -106,10 +106,7 @@ function detectPreservedKind(html: string): PreservedBlockKind {
  */
 export function replaceImgSrcInHtml(html: string, newUrl: string): string {
   return html.replace(/(<img\b[^>]*\bsrc=)(["'])([^"']*)(\2)/i, (_match, prefix, quote, _src, suffix) => {
-    const safePrefix = typeof prefix === "string" ? prefix : "";
-    const safeQuote = typeof quote === "string" ? quote : '"';
-    const safeSuffix = typeof suffix === "string" ? suffix : safeQuote;
-    return `${safePrefix}${safeQuote}${newUrl}${safeSuffix}`;
+    return `${prefix}${quote}${newUrl}${suffix}`;
   });
 }
 
