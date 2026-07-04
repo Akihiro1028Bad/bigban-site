@@ -444,6 +444,12 @@ describe("replaceBodyImagePlaceholder", () => {
     expect(out).toEqual({ html, replaced: false });
   });
 
+  it("不正 placeholderId は置換しない", () => {
+    const html = `<figure data-pending="${placeholderId}"><figcaption>待機中</figcaption></figure>`;
+    const out = replaceBodyImagePlaceholder(html, "bad!", figureHtml);
+    expect(out).toEqual({ html, replaced: false });
+  });
+
   it("figureHtml 内の $ 特殊シーケンスは展開せず literal で入る", () => {
     const html = `<figure data-pending="${placeholderId}"><figcaption>待機中</figcaption></figure>`;
     const tricky = `<figure><img src="https://images.microcms-assets.io/assets/x/$&-$1.png" alt="$2"></figure>`;

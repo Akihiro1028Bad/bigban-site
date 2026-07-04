@@ -109,6 +109,7 @@ vi.mock("./imageDirectorFlag", () => ({
 }));
 
 import { ApproveClient } from "./ApproveClient";
+import { replacePreservedImageSrc } from "./DraftEditor";
 import { STUCK_THRESHOLD_MS } from "./generating";
 
 function mockFetchSequence(
@@ -2739,6 +2740,220 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     }
   });
 
+  it("エディタのメディア画像挿入はメディア選択でエディタ本文だけを更新する", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/editor-pick.png" }] } },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "画像メニュー: メディアから挿入" }));
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(await within(media).findByRole("button", { name: "この画像を挿入" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+    expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/draft/edit")).toBeUndefined();
+  });
+
+  it("エディタのメディア画像挿入モーダルは閉じられる", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/editor-pick.png" }] } },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "画像メニュー: メディアから挿入" }));
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(within(media).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("エディタ内の保存済み画像差し替えはローカル置換だけを実行する", async () => {
+    vi.mocked(replacePreservedImageSrc).mockClear();
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: '<figure><img src="https://images.microcms-assets.io/assets/a/body.png" alt="図"></figure>',
+            body: "",
+          },
+        },
+      },
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/editor-replace.png" }] } },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存済み画像を差し替え" }));
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(await within(media).findByRole("button", { name: "この画像を挿入" }));
+
+    expect(replacePreservedImageSrc).toHaveBeenCalledWith(
+      expect.anything(),
+      "https://images.microcms-assets.io/assets/a/body.png",
+      "https://images.microcms-assets.io/editor-replace.png",
+    );
+    expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/draft/body-image")).toBeUndefined();
+  });
+
+  it("エディタ内の保存済み画像差し替えモーダルは閉じられる", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: '<figure><img src="https://images.microcms-assets.io/assets/a/body.png" alt="図"></figure>',
+            body: "",
+          },
+        },
+      },
+      { json: { success: true, media: [{ url: "https://images.microcms-assets.io/editor-replace.png" }] } },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存済み画像を差し替え" }));
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(within(media).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("エディタのAI画像挿入モーダルは閉じられる", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "画像メニュー: AIで生成" }));
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("エディタ内の保存済み画像AI再生成はモーダルを閉じるとPOSTしない", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: '<figure><img src="https://images.microcms-assets.io/assets/a/body.png" alt="図"></figure>',
+            body: "",
+          },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存済み画像をAIで再生成" }));
+    const modal = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(modal).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen")).toBeUndefined();
+  });
+
+  it("エディタ内の保存済み画像AI再生成は未保存変更があれば保存を促す", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: {
+            title: "T",
+            displayMode: "html",
+            bodyHtml: '<figure><img src="https://images.microcms-assets.io/assets/a/body.png" alt="図"></figure>',
+            body: "",
+          },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+    await userEvent.type(within(getWorkspace()).getByLabelText("本文エディタ"), "追記");
+
+    await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存済み画像をAIで再生成" }));
+
+    expect(await screen.findByText("先に保存してください")).toBeInTheDocument();
+    expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen")).toBeUndefined();
+  });
+
   it("画像生成中は編集ワークスペースの保存ボタンを無効化してバナーを出す", async () => {
     mockFetchSequence(
       { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
@@ -4707,7 +4922,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
+    await within(dialog).findByRole("tab", { name: /素材/ });
     await gotoImages(dialog);
     return { fn, dialog };
   }
@@ -4722,7 +4937,7 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     await login();
     await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
     const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
-    await within(dialog).findByRole("tablist", { name: "プレビュー端末" });
+    await within(dialog).findByRole("tab", { name: /素材/ });
     await gotoImages(dialog);
     return { fn, dialog };
   }
@@ -4784,6 +4999,70 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     expect(await screen.findByText("本文画像を挿入しました。")).toBeInTheDocument();
   });
 
+  it("画像タブ: ＋画像を追加モーダルは閉じられる", async () => {
+    const { dialog } = await openInsertImages();
+    await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+    const insert = await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" });
+    await userEvent.click(within(insert).getByRole("button", { name: "閉じる" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "本文画像を追加: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("画像タブ: 下書き本文HTMLが欠落していても＋画像を追加を開ける", async () => {
+    mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", body: "" },
+        },
+      },
+    );
+    render(<ApproveClient />);
+    await login();
+    await userEvent.click(await screen.findByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await within(dialog).findByRole("tab", { name: /素材/ });
+    await gotoImages(dialog);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+
+    expect(await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" })).toBeInTheDocument();
+  });
+
+  it("画像タブ: メディアから挿入モーダルは閉じられる", async () => {
+    const { dialog } = await openInsertImages(
+      { json: { success: true, media: [{ url: INSERT_PICK }] } },
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+    const insert = await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" });
+    await userEvent.click(within(insert).getByRole("button", { name: "メディアから挿入" }));
+
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(within(media).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "メディアライブラリ: 猛暑記事" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("画像タブ: メディアから挿入の保存失敗はエラートーストを出す", async () => {
+    const { dialog } = await openInsertImages(
+      { json: { success: true, media: [{ url: INSERT_PICK }] } },
+      { ok: false, status: 500, json: { success: false, error: "保存NG" } },
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+    const insert = await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" });
+    await userEvent.click(within(insert).getByRole("button", { name: "メディアから挿入" }));
+
+    const media = await screen.findByRole("dialog", { name: "メディアライブラリ: 猛暑記事" });
+    await userEvent.click(await within(media).findByRole("button", { name: "この画像を挿入" }));
+
+    expect(await screen.findByText("本文画像を挿入できませんでした。")).toBeInTheDocument();
+  });
+
   it("画像タブ: ＋画像を追加→AIで生成は edit 保存後に同じ placeholderId で再生成依頼する", async () => {
     const randomUUID = vi.spyOn(crypto, "randomUUID").mockReturnValue("123e4567-e89b-12d3-a456-426614174000");
     const { fn, dialog } = await openInsertImages(
@@ -4824,6 +5103,47 @@ describe("ApproveClient 詳細パネル各タブの結線(#proto P3b)", () => {
     } finally {
       randomUUID.mockRestore();
     }
+  });
+
+  it("画像タブ: ＋画像を追加→AIで生成は保存失敗なら再生成依頼しない", async () => {
+    const randomUUID = vi.spyOn(crypto, "randomUUID").mockReturnValue("123e4567-e89b-12d3-a456-426614174000");
+    const { fn, dialog } = await openInsertImages(
+      { ok: false, status: 500, json: { success: false, error: "保存NG" } },
+    );
+    try {
+      await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+      const insert = await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" });
+      await userEvent.click(within(insert).getByRole("button", { name: "AIで生成" }));
+
+      const regen = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+      await userEvent.click(within(regen).getByRole("button", { name: "本文画像の再生成を依頼" }));
+
+      expect(await screen.findByText("本文画像を挿入できませんでした。")).toBeInTheDocument();
+      expect(fn.mock.calls.find((c) => String(c[0]) === "/api/growth/body-image/regen")).toBeUndefined();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" }),
+        ).not.toBeInTheDocument(),
+      );
+    } finally {
+      randomUUID.mockRestore();
+    }
+  });
+
+  it("画像タブ: ＋画像を追加→AIで生成モーダルは閉じられる", async () => {
+    const { dialog } = await openInsertImages();
+    await userEvent.click(within(dialog).getByRole("button", { name: "＋ 画像を追加" }));
+    const insert = await screen.findByRole("dialog", { name: "本文画像を追加: 猛暑記事" });
+    await userEvent.click(within(insert).getByRole("button", { name: "AIで生成" }));
+
+    const regen = await screen.findByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" });
+    await userEvent.click(within(regen).getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "本文画像をAIで再生成: 猛暑記事" }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("画像タブ: 本文画像『AIで再生成』→モーダルで確定すると /body-image/regen に style/textSpec を POST", async () => {

@@ -60,7 +60,7 @@ export function extractBodyHeadings(html: string): { text: string; index: number
 }
 
 function h2Starts(html: string): number[] {
-  return [...html.matchAll(H2_RE)].map((match) => match.index ?? 0);
+  return [...html.matchAll(H2_RE)].map((match) => match.index as number);
 }
 
 /**
