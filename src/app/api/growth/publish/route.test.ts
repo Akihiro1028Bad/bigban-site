@@ -28,7 +28,15 @@ function postReq(token: string | null, body: unknown, raw?: string): Request {
 }
 
 function page(
-  opts: { contentId?: string; eyecatch?: string; body?: string; title?: string; media?: string } = {}
+  opts: {
+    contentId?: string;
+    eyecatch?: string;
+    body?: string;
+    title?: string;
+    media?: string;
+    bodyRegenStatus?: string;
+    eyecatchRegenStatus?: string;
+  } = {}
 ) {
   const properties: Record<string, unknown> = {};
   if (opts.contentId !== undefined) {
@@ -45,6 +53,12 @@ function page(
   }
   if (opts.media !== undefined) {
     properties["媒体"] = { type: "select", select: { name: opts.media } };
+  }
+  if (opts.bodyRegenStatus !== undefined) {
+    properties["本文画像再生成ステータス"] = { type: "select", select: { name: opts.bodyRegenStatus } };
+  }
+  if (opts.eyecatchRegenStatus !== undefined) {
+    properties["アイキャッチ再生成ステータス"] = { type: "select", select: { name: opts.eyecatchRegenStatus } };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -247,6 +261,68 @@ describe("POST /api/growth/publish", () => {
       page({ contentId: "my-article", eyecatch: "https://images.microcms-assets.io/x.png", body: "   " })
     );
     expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(400);
+  });
+
+  it("本文に pending figure が残っていたら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>`,
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("本文画像再生成が処理中なら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        bodyRegenStatus: "処理中",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("アイキャッチ再生成が依頼中なら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        eyecatchRegenStatus: "依頼中",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
   });
 
   it("公開処理が失敗したら 502", async () => {

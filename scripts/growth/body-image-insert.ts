@@ -16,6 +16,7 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 const H2_RE = /<h2\b[^>]*>[\s\S]*?<\/h2>/gi;
+const PENDING_FIGURE_RE = /<figure\b[^>]*\sdata-pending\s*=/i;
 const TAG_RE = /<[^>]*>/g;
 
 /** 値が本文画像挿入 placeholder ID の正規形か判定する。 */
@@ -45,6 +46,11 @@ function escapeHtml(value: string): string {
 export function bodyImageFigureHtml(src: string, alt: string): string {
   const img = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}">`;
   return `<figure>${img}</figure>`;
+}
+
+/** 本文HTMLに生成待ちの本文画像 figure が残っているか判定する。 */
+export function hasPendingBodyImage(html: string): boolean {
+  return PENDING_FIGURE_RE.test(html);
 }
 
 function stripTags(value: string): string {

@@ -7,6 +7,7 @@ import {
   buildPendingFigureHtml,
   extractBodyHeadings,
   insertHtmlAfterHeading,
+  hasPendingBodyImage,
   isPlaceholderId,
 } from "./body-image-insert";
 
@@ -44,6 +45,22 @@ describe("bodyImageFigureHtml", () => {
     expect(bodyImageFigureHtml("https://images.microcms-assets.io/assets/a&b.png", `図 "A"`)).toBe(
       `<figure><img src="https://images.microcms-assets.io/assets/a&amp;b.png" alt="図 &quot;A&quot;"></figure>`
     );
+  });
+});
+
+describe("hasPendingBodyImage", () => {
+  it("data-pending 付き figure があれば true", () => {
+    expect(hasPendingBodyImage(`<p>本文</p><figure data-pending="img-abc123"></figure>`)).toBe(true);
+    expect(hasPendingBodyImage(`<figure class="x" data-pending='img-abc123'><figcaption>生成中</figcaption></figure>`)).toBe(true);
+  });
+
+  it("data-pending 付き figure が無ければ false", () => {
+    expect(hasPendingBodyImage(`<p>本文</p><figure><img src="/x.png" alt=""></figure>`)).toBe(false);
+    expect(hasPendingBodyImage("")).toBe(false);
+  });
+
+  it("figure 以外の data-pending は対象外", () => {
+    expect(hasPendingBodyImage(`<div data-pending="img-abc123"></div><p>本文</p>`)).toBe(false);
   });
 });
 
