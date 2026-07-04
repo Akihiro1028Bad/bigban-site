@@ -35,6 +35,7 @@ import {
   classifyPreservedBlock,
   countDraftCharacters,
   DECORATION_OPTIONS,
+  replaceImgSrcInHtml,
   sanitizeDraftHtml,
   type DecorationKey,
   type DecorationOption,
@@ -47,11 +48,19 @@ import {
   IconFileText,
   IconImage,
   IconLayout,
+  IconSparkles,
 } from "./ui/icons";
 
 interface DraftEditorProps {
   initialHtml: string;
   onChange: (html: string) => void;
+  onPickImage?: (src: string) => void;
+  onRegenImage?: (src: string) => void;
+}
+
+interface PreservedBlockOptions {
+  onPickImage: ((src: string) => void) | null;
+  onRegenImage: ((src: string) => void) | null;
 }
 
 // 画像/表/埋め込み/CTA/スケジュール等を「保持専用」のアトミックブロックとして扱う。
@@ -66,6 +75,7 @@ const PRESERVE_SELECTORS = [
 
 // #P2: 保持ブロックの種別ごとのアイコン。種別判定は classifyPreservedBlock(純ロジック)に委譲。
 const PRESERVED_ICON: Record<PreservedBlockKind, (p: { size?: number }) => React.ReactElement> = {
+  pending: IconSparkles,
   image: IconImage,
   figure: IconImage,
   table: IconLayout,
@@ -75,12 +85,49 @@ const PRESERVED_ICON: Record<PreservedBlockKind, (p: { size?: number }) => React
   unknown: IconFileText,
 };
 
-function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
+function extractFirstImgSrc(html: string): string | null {
+  const match = html.match(/<img\b[^>]*\bsrc=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
+function preservedBlockOptionsFrom(extension: ReactNodeViewProps["extension"]): PreservedBlockOptions {
+  const options = extension.options as unknown as Partial<PreservedBlockOptions>;
+  return {
+    onPickImage: typeof options.onPickImage === "function" ? options.onPickImage : null,
+    onRegenImage: typeof options.onRegenImage === "function" ? options.onRegenImage : null,
+  };
+}
+
+export function replacePreservedImageSrc(editor: Editor, oldSrc: string, newUrl: string): boolean {
+  let targetPos: number | null = null;
+  let targetHtml = "";
+  editor.state.doc.descendants((node, pos) => {
+    if (targetPos !== null || node.type.name !== "preservedBlock") return false;
+    const html = String((node.attrs as { html?: string }).html ?? "");
+    if (extractFirstImgSrc(html) !== oldSrc) return true;
+    targetPos = pos;
+    targetHtml = html;
+    return false;
+  });
+  if (targetPos === null) return false;
+  return editor
+    .chain()
+    .focus()
+    .setNodeSelection(targetPos)
+    .updateAttributes("preservedBlock", { html: replaceImgSrcInHtml(targetHtml, newUrl) })
+    .run();
+}
+
+function PreservedBlockView({ node, deleteNode, extension }: ReactNodeViewProps) {
   const html = String((node.attrs as { html?: string }).html ?? "");
   const contentRef = useRef<HTMLDivElement>(null);
   // #P2: 種別アイコン・ラベル・補足文をカードのヘッダに出す(判定は純ロジック)。
   const info = classifyPreservedBlock(html);
   const Icon = PRESERVED_ICON[info.kind];
+  const src = extractFirstImgSrc(html);
+  const { onPickImage, onRegenImage } = preservedBlockOptionsFrom(extension);
+  const actionButtonClass =
+    "inline-flex shrink-0 items-center gap-1 rounded border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)] px-2 py-1 text-xs text-[var(--p-text-2)] hover:text-[var(--p-text)] disabled:cursor-not-allowed disabled:opacity-40";
 
   // 内側の <img>/<a> はブラウザ標準のドラッグ発生源(#161)。これが ProseMirror の
   // ノードドラッグと競合し、移動時に画像が複製されていた。描画後に draggable=false を
@@ -121,6 +168,32 @@ function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
           <span className="text-xs font-semibold text-[var(--p-text)]">{info.label}</span>
           <span className="ml-2 truncate text-[11px] text-[var(--p-text-3)]">{info.hint}</span>
         </div>
+        {info.kind === "image" ? (
+          <>
+            <button
+              type="button"
+              aria-label="この画像を差し替え"
+              disabled={!src || !onPickImage}
+              onClick={() => {
+                if (src) onPickImage?.(src);
+              }}
+              className={actionButtonClass}
+            >
+              <IconImage size={13} /> 差し替え
+            </button>
+            <button
+              type="button"
+              aria-label="この画像をAIで再生成"
+              disabled={!src || !onRegenImage}
+              onClick={() => {
+                if (src) onRegenImage?.(src);
+              }}
+              className={actionButtonClass}
+            >
+              <IconSparkles size={13} /> AIで再生成
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
           aria-label={`この${info.label}ブロックを削除`}
@@ -141,12 +214,18 @@ function PreservedBlockView({ node, deleteNode }: ReactNodeViewProps) {
   );
 }
 
-const PreservedBlock = Node.create({
+const PreservedBlock = Node.create<PreservedBlockOptions>({
   name: "preservedBlock",
   group: "block",
   atom: true,
   draggable: true,
   selectable: true,
+  addOptions() {
+    return {
+      onPickImage: null,
+      onRegenImage: null,
+    };
+  },
   addAttributes() {
     return { html: { default: "" } };
   },
@@ -388,14 +467,17 @@ function DecorationMenu({ editor }: { editor: Editor }) {
   );
 }
 
-export function DraftEditor({ initialHtml, onChange }: DraftEditorProps) {
+export function DraftEditor({ initialHtml, onChange, onPickImage, onRegenImage }: DraftEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [2, 3, 4] } }),
       Link.configure({ openOnClick: false, autolink: false }),
       Image,
-      PreservedBlock,
+      PreservedBlock.configure({
+        onPickImage: onPickImage ?? null,
+        onRegenImage: onRegenImage ?? null,
+      }),
       ParagraphLead,
       DecorationCallout,
       BadgeMark,
