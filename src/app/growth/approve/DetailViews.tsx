@@ -214,7 +214,9 @@ interface MetaEditorProps {
   onSave: (text: string) => void;
 }
 
-function MetaEditor({ bodyHtml, metaDescription, onSave }: MetaEditorProps) {
+// #UI(P1⑤): 本文編集モーダル(DraftEditWorkspace)でも同じ検索スニペット編集 UI を使えるよう
+// export する。プレビュータブ(PreviewView 内)と同一コンポーネント・同一保存経路を共有し、重複実装しない。
+export function MetaEditor({ bodyHtml, metaDescription, onSave }: MetaEditorProps) {
   const [text, setText] = useState(metaDescription ?? "");
   const over = isExcerptTooLong(text);
   const dirty = text !== (metaDescription ?? "");
@@ -252,6 +254,9 @@ function MetaEditor({ bodyHtml, metaDescription, onSave }: MetaEditorProps) {
         <button
           onClick={() => onSave(text)}
           disabled={!dirty}
+          // #P1⑤: 編集モーダルではフッタの本文「保存」ボタンと同居するため、
+          // メタ保存であることを明示する(支援技術・テストの取り違え防止)。
+          aria-label="メタディスクリプションを保存"
           className="approve-btn-primary ml-auto flex items-center gap-1.5 rounded-[8px] px-3 py-[7px] text-[12px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
           style={{ background: "var(--p-accent)", color: "#0a0c10" }}
         >

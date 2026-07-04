@@ -6,7 +6,10 @@
  * 各コンポーネントは Tailwind の arbitrary value(例: bg-[var(--p-bg)]) で参照する。
  */
 
-.approve-shell {
+/* トークンは .approve-shell と、その外(トップレベル fixed)に描画される
+   編集モーダル(.approve-theme-scope)の双方へ供給する。#編集モーダルはシェル外配置のため。 */
+.approve-shell,
+.approve-theme-scope {
   /* サーフェス */
   --p-bg: #0a0c10;
   --p-bg-elevated: #0f1218;
@@ -43,7 +46,9 @@
   --p-font: ui-sans-serif, -apple-system, "Hiragino Kaku Gothic ProN",
     "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
   --p-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+}
 
+.approve-shell {
   position: fixed;
   inset: 0;
   background: var(--p-bg);
@@ -54,6 +59,12 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: 0.1px;
+}
+
+/* 編集モーダル root: トークン継承＋基本の色/フォントだけ与える(レイアウトは各要素の Tailwind に委ねる)。 */
+.approve-theme-scope {
+  color: var(--p-text);
+  font-family: var(--p-font);
 }
 
 .approve-shell *,
@@ -287,6 +298,177 @@
   font-size: 12.5px;
   color: var(--p-text-3);
   text-align: center;
+}
+
+/* 記事本文の装飾クラス(#UI: リッチエディタ内でその場で見える管理画面版)。
+   本番 globals.css(.prose 配下)の同名装飾をダーク・`--p-*` トークンで再現する。
+   iframe プレビューが本番の厳密な見た目を担うため、ここは「構造と装飾がダークで
+   明確に見える」ことを目標に、本番と厳密一致でなくてよい。
+   注意: .approve-article は CommentableBody / DetailPanel プレビューでも使われるため
+   これらにも波及するが、装飾が正しく見える方向の改善で問題ない。 */
+
+/* リード文: やや大きめ・明るめ・下マージン。 */
+.approve-article .lead {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.9;
+  color: var(--p-text);
+  margin: 0 0 1.4em;
+}
+
+/* 補足(note): raised 背景 + アクセント左罫 + 角丸パディング。 */
+.approve-article aside.note {
+  position: relative;
+  margin: 1.6em 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border-left: 3px solid var(--p-accent);
+  background: var(--p-bg-raised);
+  color: #cdd2dc;
+}
+.approve-article aside.note::before {
+  content: "NOTE";
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--p-accent);
+}
+
+/* 注意(caution): amber 左罫 + 淡い amber 背景。 */
+.approve-article aside.caution {
+  position: relative;
+  margin: 1.6em 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border-left: 3px solid var(--p-amber);
+  background: var(--p-amber-weak);
+  color: #cdd2dc;
+}
+.approve-article aside.caution::before {
+  content: "CAUTION";
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--p-amber);
+}
+
+/* 強調(highlight): アクセントの淡い背景 + 左罫。 */
+.approve-article aside.highlight {
+  position: relative;
+  margin: 1.6em 0;
+  padding: 14px 16px;
+  border-radius: 0 10px 10px 0;
+  border-left: 3px solid var(--p-accent);
+  background: var(--p-accent-weak);
+  color: var(--p-text);
+}
+/* #P2: note/caution と統一感を保ちつつ、highlight のラベルは控えめ(text-3)にする。 */
+.approve-article aside.highlight::before {
+  content: "強調";
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--p-text-3);
+}
+
+/* aside 内の段落は上下マージンを詰める(先頭/末尾)。 */
+.approve-article aside.note > p:first-child,
+.approve-article aside.caution > p:first-child,
+.approve-article aside.highlight > p:first-child { margin-top: 0; }
+.approve-article aside.note > p:last-child,
+.approve-article aside.caution > p:last-child,
+.approve-article aside.highlight > p:last-child { margin-bottom: 0; }
+
+/* バッジ: インラインの小さいピル。 */
+.approve-article .badge {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--p-bg-active);
+  color: var(--p-text-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  vertical-align: baseline;
+}
+
+/* インライン強調(mark): アクセントの淡い背景。既定の黄色ベタを上書き。 */
+.approve-article mark {
+  background: var(--p-accent-weak);
+  color: var(--p-text);
+  padding: 0 0.15em;
+  border-radius: 3px;
+}
+
+/* CTA ボタン: アクセント背景の濃い文字ボタン風インラインブロック。 */
+.approve-article a.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 9px 18px;
+  border-radius: 8px;
+  background: var(--p-accent);
+  color: var(--p-bg);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+
+/* スケジュール: 番号付きの体裁(最低限、番号が見える程度)。 */
+.approve-article ol.schedule {
+  list-style: none;
+  margin: 1.6em 0;
+  padding: 0;
+  border-top: 1px solid var(--p-border-strong);
+  counter-reset: approve-schedule;
+}
+.approve-article ol.schedule li.schedule-item {
+  position: relative;
+  margin: 0;
+  padding: 12px 0 12px 2.2em;
+  border-bottom: 1px solid var(--p-border);
+  counter-increment: approve-schedule;
+}
+.approve-article ol.schedule li.schedule-item::before {
+  content: counter(approve-schedule);
+  position: absolute;
+  left: 0;
+  top: 12px;
+  min-width: 1.6em;
+  color: var(--p-accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.approve-article ol.schedule li.schedule-item > time {
+  display: block;
+  color: var(--p-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* #P2: 狭幅ツールバーの横スクロール。スクロールバーは控えめに(細く・半透明)。 */
+.approve-toolbar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--p-border-strong) transparent;
+}
+.approve-toolbar-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.approve-toolbar-scroll::-webkit-scrollbar-thumb {
+  background: var(--p-border-strong);
+  border-radius: 999px;
+}
+.approve-toolbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* a11y仕上げ: OSの「視差効果を減らす」設定を尊重し、CSS駆動の演出を抑制する。

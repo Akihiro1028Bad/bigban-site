@@ -388,6 +388,7 @@ export function ApproveClient() {
   // #77/#98/#110/#129: 下書きの手動リッチ編集はカスタムフックへ集約(#H7 分解)。
   const {
     editingDraft,
+    editedHtml,
     draftOriginalHtml,
     draftSaving,
     draftSaveError,
@@ -399,7 +400,13 @@ export function ApproveClient() {
     cancelEditDraft,
     exitEditDraft,
     saveDraft,
-  } = useDraftEditing({ token, openId: activeId, loadDraft });
+  } = useDraftEditing({
+    token,
+    openId: activeId,
+    loadDraft,
+    // #UI: 保存成功トースト。失敗は saveError(role=alert)で表示済み。
+    onSaved: () => pushToast("保存しました"),
+  });
 
   // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
   // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
@@ -880,9 +887,11 @@ export function ApproveClient() {
         onCancel={cancelEditDraft}
         saving={draftSaving}
         saveError={draftSaveError}
+        dirty={editedHtml !== draftOriginalHtml}
         confirmDiscard={confirmDiscard}
         onConfirmDiscard={exitEditDraft}
         onCancelDiscard={() => setConfirmDiscard(false)}
+        onSaveMeta={(text) => void saveMeta(activeItem.id, text)}
       />
     );
   }

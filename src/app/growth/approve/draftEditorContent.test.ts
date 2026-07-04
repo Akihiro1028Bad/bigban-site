@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDraftEditPayload,
+  classifyPreservedBlock,
+  countDraftCharacters,
   DECORATION_OPTIONS,
   sanitizeDraftHtml,
 } from "./draftEditorContent";
@@ -29,6 +31,95 @@ describe("buildDraftEditPayload", () => {
     expect(payload.pageId).toBe("page-1");
     expect(payload.bodyHtml).toContain("ok");
     expect(payload.bodyHtml).not.toContain("script");
+  });
+});
+
+describe("countDraftCharacters", () => {
+  it("空文字は 0", () => {
+    expect(countDraftCharacters("")).toBe(0);
+  });
+
+  it("プレーンテキストの文字数を数える(日本語)", () => {
+    expect(countDraftCharacters("あいうえお")).toBe(5);
+  });
+
+  it("前後の空白・改行を trim してから数える", () => {
+    expect(countDraftCharacters("  \n本文\n  ")).toBe(2);
+  });
+
+  it("連続する空白・改行は 1 文字に畳んで数える(DetailPanel の換算と一致)", () => {
+    // "本文" + 空白1 + "です" = 5 文字(改行/空白の連続は 1 に正規化)
+    expect(countDraftCharacters("本文\n\n  です")).toBe(5);
+  });
+
+  it("空白のみは 0", () => {
+    expect(countDraftCharacters("   \n\t  ")).toBe(0);
+  });
+
+  it("段落間の単一空白は 1 文字として数える", () => {
+    expect(countDraftCharacters("a b c")).toBe(5);
+  });
+});
+
+describe("classifyPreservedBlock", () => {
+  it("figure > img は『画像』に分類する", () => {
+    const c = classifyPreservedBlock('<figure><img src="/a.png" alt=""><figcaption>x</figcaption></figure>');
+    expect(c.kind).toBe("image");
+    expect(c.label).toBe("画像");
+  });
+
+  it("img を含まない figure は『図表』に分類する", () => {
+    const c = classifyPreservedBlock("<figure><figcaption>グラフ</figcaption></figure>");
+    expect(c.kind).toBe("figure");
+    expect(c.label).toBe("図表");
+  });
+
+  it("table は『表』に分類する", () => {
+    const c = classifyPreservedBlock("<table><tbody><tr><td>1</td></tr></tbody></table>");
+    expect(c.kind).toBe("table");
+    expect(c.label).toBe("表");
+  });
+
+  it("div.cta は『CTA』に分類する", () => {
+    const c = classifyPreservedBlock('<div class="cta"><a href="#">予約</a></div>');
+    expect(c.kind).toBe("cta");
+    expect(c.label).toBe("CTA");
+  });
+
+  it("div.schedule は『スケジュール』に分類する", () => {
+    const c = classifyPreservedBlock('<div class="schedule"><ol></ol></div>');
+    expect(c.kind).toBe("schedule");
+    expect(c.label).toBe("スケジュール");
+  });
+
+  it("a.embed は『埋め込み』に分類する", () => {
+    const c = classifyPreservedBlock('<a class="embed" href="https://x.com/p">投稿</a>');
+    expect(c.kind).toBe("embed");
+    expect(c.label).toBe("埋め込み");
+  });
+
+  it("大文字タグ・属性順が違っても分類できる", () => {
+    const c = classifyPreservedBlock('<TABLE class="x"><TR><TD>1</TD></TR></TABLE>');
+    expect(c.kind).toBe("table");
+  });
+
+  it("判定できない/空の入力は『ブロック』にフォールバックする", () => {
+    expect(classifyPreservedBlock("").kind).toBe("unknown");
+    expect(classifyPreservedBlock("").label).toBe("ブロック");
+    expect(classifyPreservedBlock("<span>x</span>").kind).toBe("unknown");
+  });
+
+  it("全種別に補足文(hint)がある", () => {
+    const samples = [
+      "<figure><img src=x></figure>",
+      "<table></table>",
+      '<div class="cta"></div>',
+      '<a class="embed"></a>',
+      "",
+    ];
+    for (const html of samples) {
+      expect(classifyPreservedBlock(html).hint.length).toBeGreaterThan(0);
+    }
   });
 });
 
