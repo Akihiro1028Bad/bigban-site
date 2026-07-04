@@ -100,5 +100,5 @@ export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreview
     return () => clearInterval(timer);
   }, [openId, draftRegenPending, refreshDraftSilently]);
 
-  return { draftState, loadDraft };
+  return { draftState, loadDraft, draftRegenPending };
 }

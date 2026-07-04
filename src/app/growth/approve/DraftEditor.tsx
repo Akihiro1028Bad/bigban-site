@@ -54,13 +54,15 @@ import {
 interface DraftEditorProps {
   initialHtml: string;
   onChange: (html: string) => void;
-  onPickImage?: (src: string) => void;
-  onRegenImage?: (src: string) => void;
+  onInsertImageFromMedia?: (editor: Editor) => void;
+  onGenerateImage?: (editor: Editor) => void;
+  onPickImage?: (src: string, editor: Editor) => void;
+  onRegenImage?: (src: string, editor: Editor) => void;
 }
 
 interface PreservedBlockOptions {
-  onPickImage: ((src: string) => void) | null;
-  onRegenImage: ((src: string) => void) | null;
+  onPickImage: ((src: string, editor: Editor) => void) | null;
+  onRegenImage: ((src: string, editor: Editor) => void) | null;
 }
 
 // 画像/表/埋め込み/CTA/スケジュール等を「保持専用」のアトミックブロックとして扱う。
@@ -118,7 +120,7 @@ export function replacePreservedImageSrc(editor: Editor, oldSrc: string, newUrl:
     .run();
 }
 
-function PreservedBlockView({ node, deleteNode, extension }: ReactNodeViewProps) {
+function PreservedBlockView({ node, deleteNode, extension, editor }: ReactNodeViewProps) {
   const html = String((node.attrs as { html?: string }).html ?? "");
   const contentRef = useRef<HTMLDivElement>(null);
   // #P2: 種別アイコン・ラベル・補足文をカードのヘッダに出す(判定は純ロジック)。
@@ -175,7 +177,7 @@ function PreservedBlockView({ node, deleteNode, extension }: ReactNodeViewProps)
               aria-label="この画像を差し替え"
               disabled={!src || !onPickImage}
               onClick={() => {
-                if (src) onPickImage?.(src);
+                if (src) onPickImage?.(src, editor);
               }}
               className={actionButtonClass}
             >
@@ -186,7 +188,7 @@ function PreservedBlockView({ node, deleteNode, extension }: ReactNodeViewProps)
               aria-label="この画像をAIで再生成"
               disabled={!src || !onRegenImage}
               onClick={() => {
-                if (src) onRegenImage?.(src);
+                if (src) onRegenImage?.(src, editor);
               }}
               className={actionButtonClass}
             >
@@ -467,7 +469,94 @@ function DecorationMenu({ editor }: { editor: Editor }) {
   );
 }
 
-export function DraftEditor({ initialHtml, onChange, onPickImage, onRegenImage }: DraftEditorProps) {
+function ImageMenu({
+  editor,
+  onInsertImageFromMedia,
+  onGenerateImage,
+}: {
+  editor: Editor;
+  onInsertImageFromMedia?: (editor: Editor) => void;
+  onGenerateImage?: (editor: Editor) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleDocClick(event: MouseEvent): void {
+      const target = event.target as globalThis.Node | null;
+      if (target && !containerRef.current?.contains(target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleDocClick);
+    return () => document.removeEventListener("mousedown", handleDocClick);
+  }, [open]);
+
+  const canUse = Boolean(onInsertImageFromMedia || onGenerateImage);
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="画像"
+        title="画像を挿入"
+        disabled={!canUse}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
+        className="approve-tool inline-flex h-[30px] items-center gap-1 rounded-md border border-[var(--p-border-strong)] px-2 text-xs text-[var(--p-text-2)] hover:bg-[var(--p-bg-hover)] hover:text-[var(--p-text)] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <IconImage size={14} /> 画像 ▾
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          aria-label="画像を挿入"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+          className="absolute left-0 z-20 mt-1 w-44 rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-elevated)] p-1 shadow-2xl"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!onInsertImageFromMedia}
+            onClick={() => {
+              onInsertImageFromMedia?.(editor);
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-[var(--p-text-2)] hover:bg-[var(--p-bg-hover)] hover:text-[var(--p-text)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconImage size={13} /> メディアから挿入
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!onGenerateImage}
+            onClick={() => {
+              onGenerateImage?.(editor);
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-[var(--p-text-2)] hover:bg-[var(--p-bg-hover)] hover:text-[var(--p-text)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconSparkles size={13} /> AIで生成
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function DraftEditor({
+  initialHtml,
+  onChange,
+  onInsertImageFromMedia,
+  onGenerateImage,
+  onPickImage,
+  onRegenImage,
+}: DraftEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -609,6 +698,11 @@ export function DraftEditor({ initialHtml, onChange, onPickImage, onRegenImage }
 
         {/* リンク(挿入/解除) */}
         <button type="button" aria-label="リンク" aria-pressed={isLink} title="リンクを挿入" onClick={addLink} className={btnClass(isLink)}>🔗</button>
+        <ImageMenu
+          editor={editor}
+          onInsertImageFromMedia={onInsertImageFromMedia}
+          onGenerateImage={onGenerateImage}
+        />
         <button type="button" aria-label="リンク解除" title="リンクを解除" disabled={!isLink} onClick={() => editor.chain().focus().unsetLink().run()} className={`${tbBtn} disabled:cursor-not-allowed disabled:opacity-40`}>🔗✕</button>
       </div>
       <EditorContent editor={editor} />

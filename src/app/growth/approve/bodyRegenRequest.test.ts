@@ -20,8 +20,8 @@ describe("BODY_IMAGE_STYLE_CHIPS", () => {
 });
 
 describe("buildBodyRegenBody", () => {
-  it("style/textSpec/instruction を含む送信 body を組む", () => {
-    const body = buildBodyRegenBody("i1", SRC, {
+  it("src target のとき style/textSpec/instruction を含む送信 body を組む", () => {
+    const body = buildBodyRegenBody("i1", { kind: "src", targetSrc: SRC }, {
       style: "court",
       instruction: "コート図で",
       textSpec: "13.41m x 6.10m",
@@ -36,7 +36,22 @@ describe("buildBodyRegenBody", () => {
   });
 
   it("auto/空文字もそのまま送る(API 側で解釈)", () => {
-    const body = buildBodyRegenBody("i1", SRC, { style: "auto", instruction: "", textSpec: "" });
+    const body = buildBodyRegenBody("i1", { kind: "src", targetSrc: SRC }, { style: "auto", instruction: "", textSpec: "" });
     expect(body).toEqual({ pageId: "i1", targetSrc: SRC, style: "auto", textSpec: "", instruction: "" });
+  });
+
+  it("placeholder target のとき placeholderId を送る", () => {
+    const body = buildBodyRegenBody("i1", { kind: "placeholder", placeholderId: "img-123e4567-e89b-12d3-a456-426614174000" }, {
+      style: "mascot",
+      instruction: "明るい雰囲気",
+      textSpec: "BIGBAN",
+    });
+    expect(body).toEqual({
+      pageId: "i1",
+      placeholderId: "img-123e4567-e89b-12d3-a456-426614174000",
+      style: "mascot",
+      textSpec: "BIGBAN",
+      instruction: "明るい雰囲気",
+    });
   });
 });

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import type { Editor } from "@tiptap/react";
 // useDebouncedValue は useDraftEditing フックへ移設(#H7)。
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
@@ -50,6 +51,7 @@ import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
 import type { DraftPreview } from "./draftTypes";
 import { extractBodyImages } from "@/lib/growth/bodyImageRegen";
+import { bodyImageFigureHtml, buildPendingFigureHtml } from "@/lib/growth/bodyImageInsert";
 import { bodyRegenIndices } from "./bodyRegenKeys";
 import { useConsult } from "./hooks/useConsult";
 import { EmptyGateContent, LoadErrorGate, LoadingGate, SearchEmpty } from "./GateScreens";
@@ -60,7 +62,7 @@ import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
 import { MediaLibraryModal } from "./MediaLibraryModal";
-import type { BodyImageRegenInput } from "./bodyRegenRequest";
+import type { BodyImageRegenInput, BodyImageRegenTarget } from "./bodyRegenRequest";
 import { buildBodyRegenBody } from "./bodyRegenRequest";
 import { BodyImageRegenModal } from "./BodyImageRegenModal";
 import { PromptsView } from "./PromptsView";
@@ -79,6 +81,7 @@ import { ShortcutOverlay } from "./shell/ShortcutOverlay";
 import { BulkBar } from "./shell/BulkBar";
 import { CommandPalette } from "./CommandPalette";
 import { DraftEditWorkspace } from "./DraftEditWorkspace";
+import { replacePreservedImageSrc } from "./DraftEditor";
 import { shouldWarnPollStale } from "./pollHealth";
 import { toMessage } from "./errorMessage";
 import { isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
@@ -195,7 +198,12 @@ export function ApproveClient() {
   // 本文画像の差し替え(#145/P1)。対象記事＋差し替える現 src を持ち、MediaLibraryModal を本文画像モードで開く。
   const [bodyMediaFor, setBodyMediaFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
   // 本文画像 AI 再生成モーダル(#156/P2)。対象記事＋対象 src を持ち、確定でスタイル/指示/文字指定を送る。
-  const [bodyRegenFor, setBodyRegenFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
+  const [bodyRegenFor, setBodyRegenFor] = useState<{ item: PendingItem; target: BodyImageRegenTarget } | null>(null);
+  const [editorMediaFor, setEditorMediaFor] = useState<{ item: PendingItem; editor: Editor } | null>(null);
+  const [editorImageReplaceFor, setEditorImageReplaceFor] =
+    useState<{ item: PendingItem; targetSrc: string; editor: Editor } | null>(null);
+  const [editorInsertRegenFor, setEditorInsertRegenFor] =
+    useState<{ item: PendingItem; editor: Editor } | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   const {
     decided,
@@ -414,7 +422,7 @@ export function ApproveClient() {
 
   // #75/#166: 下書きプレビューの取得・ポーリングはカスタムフックへ集約(#H7 分解)。
   const openHasDraft = polledItem?.kind === "idea" && Boolean(polledItem.contentId);
-  const { draftState, loadDraft } = useDraftPreview({ token, openId: activeId, openHasDraft });
+  const { draftState, loadDraft, draftRegenPending } = useDraftPreview({ token, openId: activeId, openHasDraft });
 
   // #77/#98/#110/#129: 下書きの手動リッチ編集はカスタムフックへ集約(#H7 分解)。
   const {
@@ -431,6 +439,7 @@ export function ApproveClient() {
     cancelEditDraft,
     exitEditDraft,
     saveDraft,
+    saveDraftInPlace,
   } = useDraftEditing({
     token,
     openId: activeId,
@@ -438,6 +447,14 @@ export function ApproveClient() {
     // #UI: 保存成功トースト。失敗は saveError(role=alert)で表示済み。
     onSaved: () => pushToast("保存しました"),
   });
+  const editedHtmlRef = useRef(editedHtml);
+  const draftOriginalHtmlRef = useRef(draftOriginalHtml);
+  useEffect(() => {
+    editedHtmlRef.current = editedHtml;
+  }, [editedHtml]);
+  useEffect(() => {
+    draftOriginalHtmlRef.current = draftOriginalHtml;
+  }, [draftOriginalHtml]);
 
   // #proto P3b: 詳細パネル(新 DetailPanel)の結線。詳細タブ(リーフ)と画像指示(セッション state)は
   // 開いている項目が変わったらリセットする(前の記事の状態を持ち越さない)。
@@ -831,14 +848,14 @@ export function ApproveClient() {
   // スタイル・自由指示・文字指定は生成モーダル(BodyImageRegenModal)で集めて渡す。
   async function requestBodyImageRegen(
     pageId: string,
-    targetSrc: string,
+    target: BodyImageRegenTarget,
     input: BodyImageRegenInput
   ): Promise<void> {
     try {
       const res = await fetch("/api/growth/body-image/regen", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify(buildBodyRegenBody(pageId, targetSrc, input)),
+        body: JSON.stringify(buildBodyRegenBody(pageId, target, input)),
       });
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) {
@@ -859,6 +876,57 @@ export function ApproveClient() {
     const targetSrc = srcs[index];
     /* istanbul ignore else -- @preserve index は描画済み一覧由来のため src は必ず存在(防御) */
     if (targetSrc) apply(targetSrc);
+  }
+
+  function handleEditorMediaInsert(editor: Editor): void {
+    if (!activeItem) return;
+    setEditorMediaFor({ item: activeItem, editor });
+  }
+
+  function handleEditorImageGenerate(editor: Editor): void {
+    if (!activeItem) return;
+    setEditorInsertRegenFor({ item: activeItem, editor });
+  }
+
+  function handleEditorImagePick(targetSrc: string, editor: Editor): void {
+    if (!activeItem) return;
+    setEditorImageReplaceFor({ item: activeItem, targetSrc, editor });
+  }
+
+  function handleEditorImageRegen(targetSrc: string): void {
+    if (!activeItem) return;
+    if (editedHtmlRef.current !== draftOriginalHtmlRef.current) {
+      pushToast("先に保存してください", "error");
+      return;
+    }
+    setBodyRegenFor({ item: activeItem, target: { kind: "src", targetSrc } });
+  }
+
+  async function submitEditorImageGenerate(input: BodyImageRegenInput): Promise<void> {
+    if (!editorInsertRegenFor) return;
+    const placeholderId = `img-${crypto.randomUUID()}`;
+    editorInsertRegenFor.editor
+      .chain()
+      .focus()
+      .insertContent(buildPendingFigureHtml(placeholderId))
+      .run();
+    const nextHtml = editorInsertRegenFor.editor.getHTML();
+    setEditedHtml(nextHtml);
+    const saved = await saveDraftInPlace(editorInsertRegenFor.item.id, nextHtml);
+    if (!saved) {
+      pushToast(
+        "画像生成の処理中です。完了後にもう一度保存してください。プレースホルダはエディタに残っています。",
+        "error",
+      );
+      setEditorInsertRegenFor(null);
+      return;
+    }
+    await requestBodyImageRegen(
+      editorInsertRegenFor.item.id,
+      { kind: "placeholder", placeholderId },
+      input,
+    );
+    setEditorInsertRegenFor(null);
   }
 
   // #proto P3b: draft の再生成ステータスから「生成中」の regenKey を導出する(ImagesView の生成中表示用)。
@@ -926,7 +994,9 @@ export function ApproveClient() {
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
         onPickBodyImage={(index) => bodyImageTargetAt(index, (targetSrc) => setBodyMediaFor({ item, targetSrc }))}
         onRegenBodyImage={(index) =>
-          bodyImageTargetAt(index, (targetSrc) => setBodyRegenFor({ item, targetSrc }))
+          bodyImageTargetAt(index, (targetSrc) =>
+            setBodyRegenFor({ item, target: { kind: "src", targetSrc } })
+          )
         }
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
@@ -969,6 +1039,11 @@ export function ApproveClient() {
         onConfirmDiscard={exitEditDraft}
         onCancelDiscard={() => setConfirmDiscard(false)}
         onSaveMeta={(text) => void saveMeta(activeItem.id, text)}
+        isRegenPending={draftRegenPending}
+        onInsertImageFromMedia={handleEditorMediaInsert}
+        onGenerateImage={handleEditorImageGenerate}
+        onPickImage={handleEditorImagePick}
+        onRegenImage={handleEditorImageRegen}
       />
     );
   }
@@ -1261,13 +1336,61 @@ export function ApproveClient() {
         />
       ) : null}
 
+      {editorMediaFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={editorMediaFor.item.id}
+          heading={editorMediaFor.item.title}
+          onClose={() => setEditorMediaFor(null)}
+          onApplied={() => undefined}
+          onSelect={(url) => {
+            editorMediaFor.editor
+              .chain()
+              .focus()
+              .insertContent(bodyImageFigureHtml(url, ""))
+              .run();
+            setEditedHtml(editorMediaFor.editor.getHTML());
+            setEditorMediaFor(null);
+          }}
+        />
+      ) : null}
+
+      {editorImageReplaceFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={editorImageReplaceFor.item.id}
+          heading={editorImageReplaceFor.item.title}
+          onClose={() => setEditorImageReplaceFor(null)}
+          onApplied={() => undefined}
+          onSelect={(url) => {
+            replacePreservedImageSrc(
+              editorImageReplaceFor.editor,
+              editorImageReplaceFor.targetSrc,
+              url,
+            );
+            setEditedHtml(editorImageReplaceFor.editor.getHTML());
+            setEditorImageReplaceFor(null);
+          }}
+        />
+      ) : null}
+
       {bodyRegenFor ? (
         <BodyImageRegenModal
           heading={bodyRegenFor.item.title}
           onClose={() => setBodyRegenFor(null)}
           onSubmit={(input) => {
-            void requestBodyImageRegen(bodyRegenFor.item.id, bodyRegenFor.targetSrc, input);
+            void requestBodyImageRegen(bodyRegenFor.item.id, bodyRegenFor.target, input);
             setBodyRegenFor(null);
+          }}
+        />
+      ) : null}
+
+      {editorInsertRegenFor ? (
+        <BodyImageRegenModal
+          heading={editorInsertRegenFor.item.title}
+          onClose={() => setEditorInsertRegenFor(null)}
+          onSubmit={(input) => {
+            void submitEditorImageGenerate(input);
           }}
         />
       ) : null}
