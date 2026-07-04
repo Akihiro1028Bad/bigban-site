@@ -281,6 +281,19 @@ describe("通知本文", () => {
     expect(msg).toContain("https://x/growth/approve");
   });
 
+  it("buildBodyRegenDoneMessage は note なしのとき注記行を含めない", () => {
+    const msg = buildBodyRegenDoneMessage("市川の記事", "https://x/growth/approve");
+    expect(msg).not.toContain("⚠️");
+  });
+
+  it("buildBodyRegenDoneMessage は note ありのとき ⚠️ 付き注記行を含める(沈黙させない)", () => {
+    const note = "文字焼き込みに3回失敗したため文字なしで納品しました。";
+    const msg = buildBodyRegenDoneMessage("市川の記事", "https://x/growth/approve", note);
+    expect(msg).toContain("市川の記事");
+    expect(msg).toContain(`⚠️ ${note}`);
+    expect(msg).toContain("https://x/growth/approve");
+  });
+
   it("buildBodyRegenDoneFlex はタイトルと承認URIボタンを持つカードを返す(#162)", () => {
     const bubble = buildBodyRegenDoneFlex("市川の記事", "https://x/growth/approve");
     expect(bubble.type).toBe("bubble");
@@ -288,6 +301,23 @@ describe("通知本文", () => {
     expect(bubble.footer?.contents[0]).toMatchObject({
       action: { type: "uri", uri: "https://x/growth/approve" },
     });
+  });
+
+  it("buildBodyRegenDoneFlex は note なしのとき注記行を含めない", () => {
+    const bubble = buildBodyRegenDoneFlex("市川の記事", "https://x/growth/approve");
+    const texts = (bubble.body?.contents ?? []).map((c) =>
+      "text" in c ? c.text : ""
+    );
+    expect(texts.some((t) => t?.includes("⚠️"))).toBe(false);
+  });
+
+  it("buildBodyRegenDoneFlex は note ありのとき ⚠️ 付き注記行を本文に含める", () => {
+    const note = "文字焼き込みに3回失敗したため文字なしで納品しました。";
+    const bubble = buildBodyRegenDoneFlex("市川の記事", "https://x/growth/approve", note);
+    const texts = (bubble.body?.contents ?? []).map((c) =>
+      "text" in c ? c.text : ""
+    );
+    expect(texts).toContain(`⚠️ ${note}`);
   });
 
   it("buildBodyRegenFailMessage は理由と再依頼導線を含む", () => {

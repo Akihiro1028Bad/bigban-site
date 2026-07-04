@@ -3,7 +3,7 @@
  *
  *   npm run growth:body-image-regen -- reap                              # 処理中のstale(>15分)を失敗に回収＋通知
  *   npm run growth:body-image-regen -- next                              # 依頼中を1件ロック(処理中)し JSON を標準出力
- *   npm run growth:body-image-regen -- done <pageId> <targetSrc> <url>   # 生成画像URLで本文の当該画像を差し替え＋完了＋通知
+ *   npm run growth:body-image-regen -- done <pageId> <targetSrc> <url> [--note <注記>]  # 生成画像URLで本文の当該画像を差し替え＋完了＋通知(--note があれば通知に⚠️注記行)
  *   npm run growth:body-image-regen -- fail <pageId> <reason>            # 失敗にして理由＋通知
  *
  * claude(regen-body-image.md)は「指示→スタイル/説明を決めて gen-body-image / upload-media を回す」
@@ -176,11 +176,16 @@ async function next(options: NotionApiOptions): Promise<void> {
   );
 }
 
-/** 生成済み画像 URL で本文の当該画像(targetSrc)を差し替え、完了にして通知する。 */
+/**
+ * 生成済み画像 URL で本文の当該画像(targetSrc)を差し替え、完了にして通知する。
+ * note があれば完了通知に「⚠️ <note>」の1行を載せ、正常完了でも要注意事項を沈黙させない
+ * (例: 文字焼き込み3回失敗で文字なし納品・spec §5.3)。
+ */
 async function done(
   pageId: string,
   targetSrc: string,
   newUrl: string,
+  note: string,
   options: NotionApiOptions
 ): Promise<void> {
   assertPageId(pageId);
@@ -204,8 +209,8 @@ async function done(
   }
   await write(pageId, { ...buildBodyMirrorProps(html), ...buildBodyRegenDoneProps() }, options);
   await notifyFlex(
-    buildBodyRegenDoneMessage(row.title, approveUrl()),
-    buildBodyRegenDoneFlex(row.title, approveUrl())
+    buildBodyRegenDoneMessage(row.title, approveUrl(), note),
+    buildBodyRegenDoneFlex(row.title, approveUrl(), note)
   );
 }
 
@@ -216,8 +221,33 @@ async function fail(pageId: string, reason: string, options: NotionApiOptions): 
   await notify(buildBodyRegenFailMessage(title, reason));
 }
 
+/**
+ * `--note <値>` を取り出し、残りの位置引数と分けて返す。
+ * `--note=<値>` 形式も許容する。note は完了通知に載せる要注意事項(任意)。
+ */
+function extractNote(args: readonly string[]): { positionals: string[]; note: string } {
+  const positionals: string[] = [];
+  let note = "";
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--note") {
+      note = args[i + 1] ?? "";
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--note=")) {
+      note = arg.slice("--note=".length);
+      continue;
+    }
+    positionals.push(arg);
+  }
+  return { positionals, note };
+}
+
 async function main(): Promise<void> {
-  const [command, a, b, c] = process.argv.slice(2);
+  const [command, ...rest] = process.argv.slice(2);
+  const { positionals, note } = extractNote(rest);
+  const [a, b, c] = positionals;
   const options = notionOptions();
   switch (command) {
     case "reap":
@@ -225,8 +255,9 @@ async function main(): Promise<void> {
     case "next":
       return next(options);
     case "done":
-      if (!a || !b || !c) throw new Error("使い方: done <pageId> <targetSrc> <newUrl>");
-      return done(a, b, c, options);
+      if (!a || !b || !c) throw new Error("使い方: done <pageId> <targetSrc> <newUrl> [--note <注記>]");
+      // 異常に長い通知本文を防ぐ(security M-3)。
+      return done(a, b, c, note.slice(0, 200), options);
     case "fail":
       if (!a || !b) throw new Error("使い方: fail <pageId> <reason>");
       // 異常に長い通知本文を防ぐ(security M-3)。
