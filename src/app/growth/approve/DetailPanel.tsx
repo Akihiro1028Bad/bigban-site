@@ -165,6 +165,7 @@ export interface DetailPanelProps {
   regenKeys: Set<string>;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
+  onAddBodyImage: () => void;
   // 本文画像の差し替え/再生成(#59・P1 で実データ配線)。draft 本文 HTML の抽出順 index を受け取る。
   onPickBodyImage?: (index: number) => void;
   onRegenBodyImage?: (index: number) => void;
@@ -210,6 +211,7 @@ export function DetailPanel({
   regenKeys,
   onPickEyecatch,
   onRegenEyecatch,
+  onAddBodyImage,
   onPickBodyImage,
   onRegenBodyImage,
   sections,
@@ -464,6 +466,7 @@ export function DetailPanel({
                 itemId={item.id}
                 onPickEyecatch={onPickEyecatch}
                 onRegenEyecatch={onRegenEyecatch}
+                onAddBodyImage={onAddBodyImage}
                 onPickBodyImage={onPickBodyImage}
                 onRegenBodyImage={onRegenBodyImage}
               />

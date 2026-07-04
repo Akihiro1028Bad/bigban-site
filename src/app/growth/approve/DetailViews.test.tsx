@@ -180,6 +180,7 @@ describe("ImagesView", () => {
     regenKeys: new Set<string>(),
     onPickEyecatch: vi.fn(),
     onRegenEyecatch: vi.fn(),
+    onAddBodyImage: vi.fn(),
     onPickBodyImage: vi.fn(),
     onRegenBodyImage: vi.fn(),
   };

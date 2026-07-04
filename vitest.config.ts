@@ -139,6 +139,10 @@ export default defineConfig({
         // (dialog/スタイルチップ/入力→onSubmit の結線)。純ロジック(チップ定義・送信 body)は
         // bodyRegenRequest.ts でテスト済み。結線挙動は ApproveClient.test.tsx で検証する。
         "src/app/growth/approve/BodyImageRegenModal.tsx",
+        // 本文画像の新規挿入位置セレクタ(P3-T7)。承認画面が render する薄い presentation
+        // (dialog/h2リスト/末尾選択/方法選択→onSubmit の結線)。h2抽出・挿入合成の純ロジックは
+        // body-image-insert.ts、結線挙動は ApproveClient.test.tsx で検証する。
+        "src/app/growth/approve/BodyImageInsertModal.tsx",
       ],
       thresholds: {
         statements: 100,

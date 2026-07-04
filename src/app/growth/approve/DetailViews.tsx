@@ -304,6 +304,7 @@ interface ImagesViewProps {
   itemId: string;
   onPickEyecatch: () => void;
   onRegenEyecatch: () => void;
+  onAddBodyImage: () => void;
   onPickBodyImage?: (index: number) => void;
   onRegenBodyImage?: (index: number) => void;
 }
@@ -319,6 +320,7 @@ export function ImagesView({
   itemId,
   onPickEyecatch,
   onRegenEyecatch,
+  onAddBodyImage,
   onPickBodyImage,
   onRegenBodyImage,
 }: ImagesViewProps) {
@@ -352,12 +354,19 @@ export function ImagesView({
       </div>
 
       <div>
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
-          本文画像 ({bodyImages})
+        <div className="mb-2 flex items-center gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+            本文画像 ({bodyImages})
+          </div>
+          <button type="button" onClick={onAddBodyImage} className="approve-btn-ghost ml-auto text-[12px]">
+            ＋ 画像を追加
+          </button>
         </div>
         {bodyImages === 0 ? (
-          <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
-            本文画像はありません。
+          <div className="flex flex-col gap-2">
+            <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+              本文画像はありません。
+            </div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-4">
