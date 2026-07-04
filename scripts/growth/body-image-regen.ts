@@ -228,22 +228,43 @@ export function selectStaleBodyRegenIds(
   return selectStaleJobIds(rows, nowMs, timeoutMs);
 }
 
-/** 再生成完了の LINE 本文(承認画面URLへ誘導)。 */
-export function buildBodyRegenDoneMessage(title: string, approveUrl: string): string {
+/**
+ * 再生成完了の LINE 本文(承認画面URLへ誘導)。
+ * note があれば「⚠️ <note>」の1行を含め、正常完了でも要注意事項を沈黙させない
+ * (例: 文字焼き込み3回失敗で文字なし納品・spec §5.3)。
+ */
+export function buildBodyRegenDoneMessage(
+  title: string,
+  approveUrl: string,
+  note?: string
+): string {
+  const trimmedNote = note?.trim() ?? "";
   return [
     "本文画像を再生成しました。",
     `タイトル: ${title}`,
+    ...(trimmedNote ? [`⚠️ ${trimmedNote}`] : []),
     "承認画面のプレビューで確認してください。",
     approveUrl,
   ].join("\n");
 }
 
-/** 再生成完了の Flex カード(#162)。altText は buildBodyRegenDoneMessage を流用する。 */
-export function buildBodyRegenDoneFlex(title: string, approveUrl: string): FlexBubble {
+/**
+ * 再生成完了の Flex カード(#162)。altText は buildBodyRegenDoneMessage を流用する。
+ * note があれば「⚠️ <note>」の補足行をカード本文に追加する(沈黙させない・spec §5.3)。
+ */
+export function buildBodyRegenDoneFlex(
+  title: string,
+  approveUrl: string,
+  note?: string
+): FlexBubble {
+  const trimmedNote = note?.trim() ?? "";
   return buildNoticeFlex({
     heading: "🖼️ 本文画像を再生成しました",
     title,
-    lines: ["承認画面のプレビューで確認してください。"],
+    lines: [
+      ...(trimmedNote ? [`⚠️ ${trimmedNote}`] : []),
+      "承認画面のプレビューで確認してください。",
+    ],
     approveUrl,
   });
 }
