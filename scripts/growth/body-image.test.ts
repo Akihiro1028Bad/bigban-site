@@ -10,6 +10,7 @@ import {
   buildBodyImagePrompt,
   buildBodyImageSpec,
   capBodyImageSpecs,
+  normalizeBodyImageStyle,
   placeholderIndices,
   resolveBodyImages,
   substituteBodyImages,
@@ -17,70 +18,88 @@ import {
   type ResolvedBodyImage,
 } from "./body-image";
 
-describe("buildBodyImagePrompt", () => {
-  it("mascot は参照キャラと宇宙シーンを含み、説明を埋める", () => {
-    const p = buildBodyImagePrompt("mascot", " 宇宙人がサーブする ");
+describe("buildBodyImagePrompt (P2 styles)", () => {
+  it("illust は雰囲気イラスト・文字なし・競技固定句を含む", () => {
+    const p = buildBodyImagePrompt("illust", "夏の練習風景");
+    expect(p).toContain("夏の練習風景");
+    expect(p).toMatch(/illustration/i);
+    expect(p).toMatch(/No text/i);
+    expect(p).toContain("#F6FF54");
+    expect(p).toMatch(/pickleball/i); // PICKLEBALL_ANCHOR 付与
+    expect(p).toMatch(/table tennis/i); // NO_TABLE_TENNIS 付与
+  });
+
+  it("court はコート図・textSpec 明示分のみ描く・競技固定句は付けない", () => {
+    const p = buildBodyImagePrompt("court", "非揮発ゾーン(キッチン)の位置");
+    expect(p).toContain("非揮発ゾーン(キッチン)の位置");
+    expect(p).toMatch(/court/i);
+    // 文字・数値は明示指定分のみ(捏造防止)。
+    expect(p).toMatch(/only the exact text and numbers/i);
+    // 概念図には卓球バイアス句を付けない。
+    expect(p).not.toMatch(/table tennis/i);
+  });
+
+  it("flow は手順・フロー図・明示指定分のみの文字", () => {
+    const p = buildBodyImagePrompt("flow", "予約から入場までの流れ");
+    expect(p).toContain("予約から入場までの流れ");
+    expect(p).toMatch(/flow|step/i);
+    expect(p).toMatch(/only the exact text and numbers/i);
+    expect(p).not.toMatch(/table tennis/i);
+  });
+
+  it("infographic は比較・インフォグラフィック・明示指定分のみの文字", () => {
+    const p = buildBodyImagePrompt("infographic", "テニスとの違い");
+    expect(p).toContain("テニスとの違い");
+    expect(p).toMatch(/infographic/i);
+    expect(p).toMatch(/only the exact text and numbers/i);
+    expect(p).not.toMatch(/table tennis/i);
+  });
+
+  it("mascot は従来どおり参照キャラ・宇宙シーン・競技固定句", () => {
+    const p = buildBodyImagePrompt("mascot", "宇宙人がサーブする");
     expect(p).toContain("宇宙人がサーブする");
     expect(p).toMatch(/alien/i);
-    expect(p).toContain("#F6FF54");
-    expect(p).toMatch(/No text/i);
-  });
-
-  it("minimal はミニマル・文字なしで説明を埋める", () => {
-    const p = buildBodyImagePrompt("minimal", "パドルの握り方");
-    expect(p).toContain("パドルの握り方");
-    expect(p).toMatch(/[Mm]inimal/);
-    expect(p).toMatch(/No text/i);
-  });
-
-  it("diagram は概念図・文字最小で説明を埋める", () => {
-    const p = buildBodyImagePrompt("diagram", "キッチンの位置関係");
-    expect(p).toContain("キッチンの位置関係");
-    expect(p).toMatch(/diagram/i);
-    expect(p).toMatch(/avoid garbled text/i);
+    expect(p).toMatch(/table tennis/i);
   });
 });
 
-describe("ピックルボール固定（#89: 卓球バイアス対策）", () => {
-  it("mascot はピックルボール視覚アンカーと卓球ネガティブを含む", () => {
-    const p = buildBodyImagePrompt("mascot", "宇宙人がプレー");
-    expect(p).toMatch(/pickleball/i);
-    expect(p).toMatch(/whiffle ball with holes/i);
-    expect(p.toLowerCase()).toContain("not table tennis");
-    expect(p.toLowerCase()).toContain("not ping pong");
+describe("normalizeBodyImageStyle", () => {
+  it("新5キーはそのまま返す", () => {
+    for (const s of ["mascot", "illust", "court", "flow", "infographic"] as const) {
+      expect(normalizeBodyImageStyle(s)).toBe(s);
+    }
   });
-
-  it("minimal もピックルボール視覚アンカーと卓球ネガティブを含む", () => {
-    const p = buildBodyImagePrompt("minimal", "パドルの握り方");
-    expect(p).toMatch(/pickleball/i);
-    expect(p.toLowerCase()).toContain("not table tennis");
+  it("旧 minimal は illust・旧 diagram は court へマップする", () => {
+    expect(normalizeBodyImageStyle("minimal")).toBe("illust");
+    expect(normalizeBodyImageStyle("diagram")).toBe("court");
   });
-
-  it("diagram には適用しない（概念図はスポーツシーンとは限らない）", () => {
-    const p = buildBodyImagePrompt("diagram", "コートの寸法");
-    expect(p.toLowerCase()).not.toContain("not table tennis");
-    expect(p).not.toMatch(/whiffle ball with holes/i);
+  it("空・未知・auto は既定 mascot", () => {
+    expect(normalizeBodyImageStyle("")).toBe("mascot");
+    expect(normalizeBodyImageStyle("unknown")).toBe("mascot");
+    expect(normalizeBodyImageStyle("auto")).toBe("mascot");
   });
 });
 
-describe("buildBodyImageAlt", () => {
-  it("diagram は alt に「イメージ図」を明示する(#88: 視覚キャプションは廃止・alt のみ)", () => {
-    expect(buildBodyImageAlt("diagram", " コート図 ")).toBe("イメージ図: コート図");
+describe("buildBodyImageAlt (P2 styles)", () => {
+  it("court/flow/infographic は『イメージ図』を明示する", () => {
+    expect(buildBodyImageAlt("court", " コート図 ")).toBe("イメージ図: コート図");
+    expect(buildBodyImageAlt("flow", "手順")).toBe("イメージ図: 手順");
+    expect(buildBodyImageAlt("infographic", "比較")).toBe("イメージ図: 比較");
   });
-
-  it("mascot / minimal は説明をそのまま使う", () => {
-    expect(buildBodyImageAlt("mascot", "宇宙人")).toBe("宇宙人");
+  it("mascot/illust は説明をそのまま返す", () => {
+    expect(buildBodyImageAlt("mascot", " 宇宙人 ")).toBe("宇宙人");
+    expect(buildBodyImageAlt("illust", "練習風景")).toBe("練習風景");
   });
 });
 
 describe("buildBodyImageSpec", () => {
   it("index・スタイル・正規化した説明・prompt/alt を揃える(#88: caption なし)", () => {
-    const spec = buildBodyImageSpec(2, "diagram", "  ゾーン図  ");
+    const spec = buildBodyImageSpec(2, "court", "  ゾーン図  ");
     expect(spec).toEqual({
       index: 2,
-      style: "diagram",
+      style: "court",
       description: "ゾーン図",
-      prompt: buildBodyImagePrompt("diagram", "ゾーン図"),
+      prompt: buildBodyImagePrompt("court", "ゾーン図"),
       alt: "イメージ図: ゾーン図",
     });
   });
@@ -149,7 +168,7 @@ describe("substituteBodyImages", () => {
 describe("resolveBodyImages", () => {
   const specs: BodyImageSpec[] = [
     buildBodyImageSpec(1, "mascot", "宇宙人"),
-    buildBodyImageSpec(2, "diagram", "コート図"),
+    buildBodyImageSpec(2, "court", "コート図"),
   ];
 
   it("成功分は resolved、失敗分は failures に分け、1枚失敗でも続行する", async () => {
@@ -179,7 +198,7 @@ describe("resolveBodyImages", () => {
 
 describe("capBodyImageSpecs", () => {
   it("3枚までを kept、超過を dropped にする", () => {
-    const specs = [1, 2, 3, 4].map((i) => buildBodyImageSpec(i, "minimal", `d${i}`));
+    const specs = [1, 2, 3, 4].map((i) => buildBodyImageSpec(i, "illust", `d${i}`));
     const { kept, dropped } = capBodyImageSpecs(specs);
     expect(kept.map((s) => s.index)).toEqual([1, 2, 3]);
     expect(dropped.map((s) => s.index)).toEqual([4]);
@@ -200,14 +219,14 @@ describe("buildBodyImageFailureMessage", () => {
 
 describe("bodyImageFileStem", () => {
   it("同一(slug+style+説明)なら決定的に同じ stem(冪等キャッシュ)", () => {
-    const spec = buildBodyImageSpec(1, "diagram", "コート図");
+    const spec = buildBodyImageSpec(1, "court", "コート図");
     expect(bodyImageFileStem("my-slug", spec)).toBe(bodyImageFileStem("my-slug", spec));
   });
 
   it("説明やスタイルが違えば stem も変わる", () => {
-    const a = buildBodyImageSpec(1, "diagram", "図A");
-    const b = buildBodyImageSpec(1, "diagram", "図B");
-    const c = buildBodyImageSpec(1, "minimal", "図A");
+    const a = buildBodyImageSpec(1, "court", "図A");
+    const b = buildBodyImageSpec(1, "court", "図B");
+    const c = buildBodyImageSpec(1, "illust", "図A");
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", b));
     expect(bodyImageFileStem("s", a)).not.toBe(bodyImageFileStem("s", c));
   });
