@@ -448,4 +448,60 @@ describe("CTA / Schedule timeline / time 要素", () => {
       expect(out).not.toMatch(/data-embed-id/);
     });
   });
+
+  describe("本文画像生成プレースホルダ (<figure data-pending>)", () => {
+    it("figure の正規 data-pending は STRICT_HTML_CONFIG で保持", () => {
+      const out = sanitizeNewsHtml(
+        `<figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>`,
+        STRICT_HTML_CONFIG,
+      );
+      expect(out).toMatch(/<figure data-pending="img-abc123">/);
+    });
+
+    it("不正形式の data-pending は除去", () => {
+      const cases = ["x-1", `img-${"a".repeat(65)}`, "img-abc123!"];
+      for (const v of cases) {
+        const out = sanitizeNewsHtml(
+          `<figure data-pending="${v}"><figcaption>生成中</figcaption></figure>`,
+          STRICT_HTML_CONFIG,
+        );
+        expect(out).not.toMatch(/data-pending/);
+        expect(out).toMatch(/<figure><figcaption>生成中<\/figcaption><\/figure>/);
+      }
+    });
+
+    it("figure 以外の data-pending は除去", () => {
+      const out = sanitizeNewsHtml(
+        `<div data-pending="img-abc123">生成中</div><p data-pending="img-def456">本文</p>`,
+        STRICT_HTML_CONFIG,
+      );
+      expect(out).not.toMatch(/data-pending/);
+      expect(out).toMatch(/生成中/);
+      expect(out).toMatch(/<p>本文<\/p>/);
+    });
+
+    it("data-pending 付き figure の figcaption は保持", () => {
+      const out = sanitizeNewsHtml(
+        `<figure data-pending="img-abc123"><figcaption>画像を生成しています</figcaption></figure>`,
+        STRICT_HTML_CONFIG,
+      );
+      expect(out).toMatch(
+        /<figure data-pending="img-abc123"><figcaption>画像を生成しています<\/figcaption><\/figure>/,
+      );
+    });
+
+    it("RICH_EDITOR_CONFIG でも同じ挙動", () => {
+      const valid = sanitizeNewsHtml(
+        `<figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>`,
+        RICH_EDITOR_CONFIG,
+      );
+      expect(valid).toMatch(/data-pending="img-abc123"/);
+
+      const invalid = sanitizeNewsHtml(
+        `<figure data-pending="img-abc123!"><figcaption>生成中</figcaption></figure>`,
+        RICH_EDITOR_CONFIG,
+      );
+      expect(invalid).not.toMatch(/data-pending/);
+    });
+  });
 });
