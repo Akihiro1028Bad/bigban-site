@@ -29,6 +29,7 @@
 - **差し替え**(#145): `BodyImagePicker.tsx` がプレビューの本文画像を一覧 → メディア選択/アップロード → `bodyImageEdit.ts` で該当 `<img src>` を差し替え → `/api/growth/draft/edit` で保存。
 - **AI再生成**(#156): `BodyImagePicker` の各画像「AIで再生成」→ `/api/growth/body-image/regen` が Notion に依頼記録(**対象src**＝その時点の画像URLで「どの画像か」を持つ・**インデックスは使わない**)。
   - PC の `npm run growth:regen-body-loop`(`run.mjs regen-body`)が `gen-body-image`→`upload-media`→`growth:body-image-regen done <pageId> <targetSrc> <url>` で本文HTMLの当該 `<img>` を `replaceBodyImageBySrc` で差し替え ＋ CONTENTキーで `patchDraft({bodyHtml})` ＋ Notion ミラー(本文HTML #95)更新 ＋ LINE通知。
+  - 新規挿入依頼も同じ Notion キュー・同じ `regen-body` ループで処理する。対象は `placeholder:<id>` として記録し、完了時に `growth:body-image-regen done <pageId> <placeholderId> <url> --alt "<説明>"` が pending figure を実画像 figure へ置換する。
   - 依頼後に本文が変わり対象src が消えたら**失敗通知**(沈黙させない)。
   - 純ロジック `scripts/growth/body-image-regen.ts`(`replaceBodyImageBySrc`/`isMicrocmsAssetUrl` 含む)、CLI/`gen-body-image`/run.mjs はカバレッジ除外。
 

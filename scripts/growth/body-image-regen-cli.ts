@@ -3,7 +3,7 @@
  *
  *   npm run growth:body-image-regen -- reap                              # 処理中のstale(>15分)を失敗に回収＋通知
  *   npm run growth:body-image-regen -- next                              # 依頼中を1件ロック(処理中)し JSON を標準出力
- *   npm run growth:body-image-regen -- done <pageId> <targetSrc> <url> [--note <注記>]  # 生成画像URLで本文の当該画像を差し替え＋完了＋通知(--note があれば通知に⚠️注記行)
+ *   npm run growth:body-image-regen -- done <pageId> <targetSrc|placeholderId> <url> [--alt <説明>] [--note <注記>]  # 生成画像URLで本文の当該画像を差し替え/挿入＋完了＋通知
  *   npm run growth:body-image-regen -- fail <pageId> <reason>            # 失敗にして理由＋通知
  *
  * claude(regen-body-image.md)は「指示→スタイル/説明を決めて gen-body-image / upload-media を回す」
@@ -25,10 +25,12 @@ import {
   BODY_REGEN_PROPS,
   BODY_REGEN_TIMEOUT_MS,
   isMicrocmsAssetUrl,
+  parseBodyRegenTarget,
   replaceBodyImageBySrc,
+  replaceBodyImagePlaceholder,
   selectStaleBodyRegenIds,
-  type BodyRegenRow,
 } from "./body-image-regen";
+import { bodyImageFigureHtml, isPlaceholderId } from "./body-image-insert";
 import { patchDraft } from "./content";
 import { growthEndpoint } from "./endpoint";
 import type { FlexContainer } from "./digest-flex";
@@ -41,6 +43,7 @@ import {
   updatePageProps,
   type NotionApiOptions,
 } from "./notion";
+import type { BodyRegenRow } from "./body-image-regen";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const ENDPOINT = growthEndpoint();
@@ -155,21 +158,26 @@ async function next(options: NotionApiOptions): Promise<void> {
     process.stdout.write("{}\n");
     return;
   }
-  if (!isMicrocmsAssetUrl(row.targetSrc)) {
-    // 対象画像が不正(承認画面の検証を通っていれば起きないが念のため)。
+  const target = parseBodyRegenTarget(row.targetSrc);
+  if (!target) {
+    // 対象指定が不正(承認画面の検証を通っていれば起きないが念のため)。
     await write(row.id, buildBodyRegenFailProps(), options);
-    await notify(buildBodyRegenFailMessage(row.title, "対象画像の指定が不正のため再生成できません。"));
+    await notify(buildBodyRegenFailMessage(row.title, "対象画像または挿入位置の指定が不正のため再生成できません。"));
     process.stdout.write("{}\n");
     return;
   }
   await write(row.id, buildBodyRegenProcessingProps(), options);
+  const targetFields =
+    target.kind === "src"
+      ? { targetKind: target.kind, targetSrc: target.src }
+      : { targetKind: target.kind, placeholderId: target.placeholderId };
   process.stdout.write(
     `${JSON.stringify({
       pageId: row.id,
       title: row.title,
       instruction: row.instruction,
       contentId: row.contentId,
-      targetSrc: row.targetSrc,
+      ...targetFields,
       style: row.requestedStyle,
       textSpec: row.textSpec,
     })}\n`
@@ -177,30 +185,34 @@ async function next(options: NotionApiOptions): Promise<void> {
 }
 
 /**
- * 生成済み画像 URL で本文の当該画像(targetSrc)を差し替え、完了にして通知する。
+ * 生成済み画像 URL で本文の当該画像(targetSrc)を差し替え、または placeholder を実画像に置換して通知する。
  * note があれば完了通知に「⚠️ <note>」の1行を載せ、正常完了でも要注意事項を沈黙させない
  * (例: 文字焼き込み3回失敗で文字なし納品・spec §5.3)。
  */
 async function done(
   pageId: string,
-  targetSrc: string,
+  target: string,
   newUrl: string,
+  alt: string,
   note: string,
   options: NotionApiOptions
 ): Promise<void> {
   assertPageId(pageId);
-  if (!isMicrocmsAssetUrl(targetSrc)) {
-    throw new Error(`targetSrc は microCMS アセットURLにしてください: ${targetSrc}`);
-  }
   if (!isMicrocmsAssetUrl(newUrl)) {
     throw new Error(`newUrl は microCMS アセットURLにしてください: ${newUrl}`);
   }
+  const isPlaceholderTarget = isPlaceholderId(target);
+  if (!isPlaceholderTarget && !isMicrocmsAssetUrl(target)) {
+    throw new Error(`対象は microCMS アセットURLまたは placeholderId にしてください: ${target}`);
+  }
   const row = bodyRegenRowFromPage(await getPage(pageId, options));
   if (!row.contentId) throw new Error("下書きID(contentId)がありません。");
-  const { html, replaced } = replaceBodyImageBySrc(row.bodyHtml, targetSrc, newUrl);
+  const { html, replaced } = isPlaceholderTarget
+    ? replaceBodyImagePlaceholder(row.bodyHtml, target, bodyImageFigureHtml(newUrl, alt))
+    : replaceBodyImageBySrc(row.bodyHtml, target, newUrl);
   if (!replaced) {
     // 依頼後に本文が変更され対象画像が消えた等。沈黙させず失敗にする。
-    throw new Error("対象の本文画像が見つかりませんでした(本文が変更された可能性があります)。");
+    throw new Error("対象の本文画像または placeholder が見つかりませんでした(本文が変更された可能性があります)。");
   }
   if (DRYRUN) {
     process.stdout.write(`[dry-run] patchDraft ${row.contentId} bodyHtml(${html.length}文字)\n`);
@@ -222,12 +234,13 @@ async function fail(pageId: string, reason: string, options: NotionApiOptions): 
 }
 
 /**
- * `--note <値>` を取り出し、残りの位置引数と分けて返す。
- * `--note=<値>` 形式も許容する。note は完了通知に載せる要注意事項(任意)。
+ * `--note <値>` / `--alt <値>` を取り出し、残りの位置引数と分けて返す。
+ * `--note=<値>` / `--alt=<値>` 形式も許容する。note は完了通知、alt は挿入画像の代替テキストに使う。
  */
-function extractNote(args: readonly string[]): { positionals: string[]; note: string } {
+function extractDoneOptions(args: readonly string[]): { positionals: string[]; note: string; alt: string } {
   const positionals: string[] = [];
   let note = "";
+  let alt = "";
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--note") {
@@ -239,14 +252,23 @@ function extractNote(args: readonly string[]): { positionals: string[]; note: st
       note = arg.slice("--note=".length);
       continue;
     }
+    if (arg === "--alt") {
+      alt = args[i + 1] ?? "";
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--alt=")) {
+      alt = arg.slice("--alt=".length);
+      continue;
+    }
     positionals.push(arg);
   }
-  return { positionals, note };
+  return { positionals, note, alt };
 }
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
-  const { positionals, note } = extractNote(rest);
+  const { positionals, note, alt } = extractDoneOptions(rest);
   const [a, b, c] = positionals;
   const options = notionOptions();
   switch (command) {
@@ -255,9 +277,11 @@ async function main(): Promise<void> {
     case "next":
       return next(options);
     case "done":
-      if (!a || !b || !c) throw new Error("使い方: done <pageId> <targetSrc> <newUrl> [--note <注記>]");
+      if (!a || !b || !c) {
+        throw new Error("使い方: done <pageId> <targetSrc|placeholderId> <newUrl> [--alt <説明>] [--note <注記>]");
+      }
       // 異常に長い通知本文を防ぐ(security M-3)。
-      return done(a, b, c, note.slice(0, 200), options);
+      return done(a, b, c, alt.slice(0, 200), note.slice(0, 200), options);
     case "fail":
       if (!a || !b) throw new Error("使い方: fail <pageId> <reason>");
       // 異常に長い通知本文を防ぐ(security M-3)。
