@@ -21,13 +21,14 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import type { ArticleHypothesis } from "@/lib/growth/approve";
 
+import { ArtboardView } from "./ArtboardView";
 import { bodyImageUrlsOf } from "./detailBodyImages";
 import { ImagesView, PreviewView, PromptView } from "./DetailViews";
 import { countByLevel, draftQuality } from "./draftQuality";
 import type { DraftState } from "./draftTypes";
-import type { ImageInstruction } from "./imageIntentTypes";
 import { OutlineView } from "./OutlineView";
 import type { OutlineViewSection } from "./OutlineView";
+import type { OutlineSection } from "./outline";
 import { QualityChecklist } from "./QualityChecklist";
 import type { PendingItem } from "./types";
 import type { BoardStage } from "./ui/boardStage";
@@ -49,7 +50,7 @@ import {
 import { Kbd, MetaStat, StageChip } from "./ui/primitives";
 
 /** 詳細パネルのタブ(リーフ)。ApproveClient 側は常にリーフ状態を保持する。 */
-export type DetailTab = "outline" | "prompt" | "preview" | "images";
+export type DetailTab = "outline" | "prompt" | "preview" | "images" | "artboard";
 
 interface TabDef {
   key: DetailTab;
@@ -61,6 +62,7 @@ interface TabDef {
 function tabsFor(): TabDef[] {
   return [
     { key: "outline", label: "構成案", icon: <IconLayout size={14} /> },
+    { key: "artboard", label: "誌面", icon: <IconLayout size={14} /> },
     { key: "prompt", label: "プロンプト・参照", icon: <IconFileText size={14} /> },
     { key: "preview", label: "プレビュー", icon: <IconSparkles size={14} /> },
     { key: "images", label: "画像", icon: <IconImage size={14} /> },
@@ -92,7 +94,7 @@ function clustersFromLeaves(leaves: TabDef[]): ClusterDef[] {
   const pick = (...keys: DetailTab[]) => keys.map(find).filter((t): t is TabDef => Boolean(t));
 
   const defs: Array<Omit<ClusterDef, "dot">> = [
-    { key: "outline", label: "構成案", icon: <IconLayout size={14} />, leaves: pick("outline") },
+    { key: "outline", label: "構成案", icon: <IconLayout size={14} />, leaves: pick("outline", "artboard") },
     { key: "preview", label: "プレビュー", icon: <IconSparkles size={14} />, leaves: pick("preview") },
     { key: "material", label: "素材", icon: <IconImage size={14} />, leaves: pick("images", "prompt") },
   ];
@@ -171,13 +173,15 @@ export interface DetailPanelProps {
   onRegenBodyImage?: (index: number) => void;
   // 構成案タブ(OutlineView)。
   sections: OutlineViewSection[];
+  artboardSections: OutlineSection[];
   hypothesis?: ArticleHypothesis;
-  imageInstructions: Record<number, ImageInstruction>;
   revising: boolean;
   onAddComment: (sectionIndex: number, text: string) => void;
   onRemoveComment: (sectionIndex: number, commentIndex: number) => void;
-  onUpdateImage: (sectionIndex: number, patch: Partial<ImageInstruction>) => void;
   onRequestOutlineRevise: () => void;
+  onSaveArtboard: (sections: OutlineSection[]) => Promise<boolean>;
+  isSavingArtboard: boolean;
+  artboardSaveError?: string;
   // プレビュータブのメタ保存。
   onSaveMeta: (text: string) => void;
   /** 下書き取得失敗からの再読み込み(#75)。 */
@@ -215,13 +219,15 @@ export function DetailPanel({
   onPickBodyImage,
   onRegenBodyImage,
   sections,
+  artboardSections,
   hypothesis,
-  imageInstructions,
   revising,
   onAddComment,
   onRemoveComment,
-  onUpdateImage,
   onRequestOutlineRevise,
+  onSaveArtboard,
+  isSavingArtboard,
+  artboardSaveError,
   onSaveMeta,
   onReloadDraft,
 }: DetailPanelProps) {
@@ -433,12 +439,22 @@ export function DetailPanel({
                 sections={sections}
                 hypothesis={hypothesis}
                 hue={hue}
-                imageInstructions={imageInstructions}
+                imageInstructions={{}}
                 revising={revising}
                 onAddComment={onAddComment}
                 onRemoveComment={onRemoveComment}
-                onUpdateImage={onUpdateImage}
+                onUpdateImage={() => undefined}
                 onRequestOutlineRevise={onRequestOutlineRevise}
+              />
+            )}
+            {safeTab === "artboard" && (
+              <ArtboardView
+                sections={artboardSections}
+                eyecatchUrl={item.eyecatchUrl ?? draft?.eyecatch}
+                onSave={onSaveArtboard}
+                onOpenEyecatch={onPickEyecatch}
+                isSaving={isSavingArtboard}
+                saveError={artboardSaveError}
               />
             )}
             {safeTab === "prompt" && <PromptView prompt={prompt} refs={refs} />}
