@@ -29,6 +29,7 @@ import {
   buildBodyImageFailureMessage,
   buildBodyImageSpec,
   capBodyImageSpecs,
+  normalizeBodyImageStyle,
   resolveBodyImages,
   substituteBodyImages,
   type BodyImageFailure,
@@ -199,8 +200,12 @@ async function main(): Promise<void> {
     stages.push({
       name: "body-images",
       run: async () => {
+        // spec.json は未検証 JSON。旧値(minimal/diagram 等)や未知値が来ても
+        // 落とさず新6語彙へ正規化してから spec を組む(#P2 レビュー Important)。
+        // 正規化後の style は imgSpec.style として resolveBodyImageUrl の
+        // mascot 参照画像分岐(refPath)でも使われるため、ここで確定させる。
         const allSpecs = inputs.map((im) =>
-          buildBodyImageSpec(im.index, im.style, im.description)
+          buildBodyImageSpec(im.index, normalizeBodyImageStyle(im.style), im.description)
         );
         const { kept, dropped } = capBodyImageSpecs(allSpecs);
         const { resolved, failures } = await resolveBodyImages(kept, resolveBodyImageUrl);

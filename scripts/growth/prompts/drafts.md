@@ -61,7 +61,7 @@
      - コマンドが**終了コード1(解決不能)**を返したら `category` フィールド自体を省略する(`記事タイプ` が空/未知・人が microCMS で後付け)。`コラムカテゴリ` の正典6件は `start`/`rules`/`improve`/`health`/`compare`/`event`。
      - category(読者向けの回遊/SEO)と `articleType`(内部計測軸 #C4)は**別軸で共存**する(AD8)。上書きは読者向け分類だけを動かし、`記事タイプ` は変えない。
    - `eyecatchAction` は **§9「宇宙人マスコット × コスミック」**(固定キャラ=`scripts/growth/assets/mascot-alien.png`・記事ごとに行為だけ変える)に沿って英語1フレーズで作る。
-   - **本文画像(#62)**: 構成案に画像指示 `[画像:<スタイル表示名>: <説明>]` があれば、本文HTMLの該当セクションの自然な位置にプレースホルダ `{{IMG:1}}`(以降 `{{IMG:2}}`…)を置き、`images[]` に対応する `{ index, style, description }` を入れる。スタイル表示名→キーは `マスコット・コスミック→mascot` / `ミニマル図解→minimal` / `詳しい図解→diagram`。指示が無ければ `images` は省略(または空配列)で、本文に `{{IMG:n}}` を入れない。
+   - **本文画像(#62)**: 構成案に画像指示 `[画像:<スタイル表示名>: <説明>]` があれば、本文HTMLの該当セクションの自然な位置にプレースホルダ `{{IMG:1}}`(以降 `{{IMG:2}}`…)を置き、`images[]` に対応する `{ index, style, description }` を入れる。スタイル表示名→キーは `宇宙人マスコット→mascot` / `雰囲気イラスト→illust` / `コート図・ルール図解→court` / `手順・フロー図→flow` / `比較・インフォグラフィック→infographic`。**文字・数値を図中に焼き込めるのは court / flow / infographic のみ**(description に明示した文字・数値だけを描かせる)。mascot / illust は文字を入れない雰囲気重視。指示が無ければ `images` は省略(または空配列)で、本文に `{{IMG:n}}` を入れない。
    - **上限3枚**。指示が4件以上あっても先頭3件までを `images[]`・`{{IMG:n}}` にし、超過分は本文に入れず**スキップした旨を報告**(#24)。
    - 画像の生成・アップロード・本文への埋め込み(`{{IMG:n}}`→`<figure>`)は手順4のスクリプトが行う。alt・キャプションはスクリプト側が `description`・`style` から補完するので本文に書かない。
 
@@ -84,7 +84,7 @@
   "eyecatchAction": "<§9の宇宙人の行為を英語1フレーズで>",
   "imagePath": "/tmp/growth-eyecatch-<slug>.png",
   "images": [
-    { "index": 1, "style": "mascot|minimal|diagram", "description": "<構成案の画像指示の説明>" }
+    { "index": 1, "style": "mascot|illust|court|flow|infographic", "description": "<構成案の画像指示の説明>" }
   ],
   "notion": { "pageId": "<記事ネタ案の該当ページID>", "property": "ステータス", "value": "下書き作成済み" }
 }

@@ -56,7 +56,7 @@
 
 | プロパティ | 型 | 用途 |
 |---|---|---|
-| `本文画像スタイル` | select(`おまかせ`/`mascot`/`illust`/`court`/`flow`/`infographic`) | 再生成のスタイル。`おまかせ`=`auto`(AIが文脈で選ぶ)。旧値(minimal/diagram)は API 側で吸収。 |
+| `本文画像スタイル` | select(`おまかせ`/`mascot`/`illust`/`court`/`flow`/`infographic`) | 再生成のスタイル。`おまかせ`=`auto`(AIが文脈で選ぶ)。API POST は新6値のみ受理し未知値は 400 で拒否。Notion select 読み取りでは未知値(旧 minimal/diagram 等)を `おまかせ`(auto)へ落とす。 |
 | `本文画像文字指定` | rich_text | 図に焼き込む文字・数値(textSpec・自由入力・サーバ側1000字上限)。`court`/`flow`/`infographic` 用。 |
 
 - **P2 追加の2プロパティは手動追加が前提**。**未追加でも沈黙落ちしない**: 書き込みは `growthApiError`(#177)でプロパティ名つきの 500 に可視化、読み取りは「未設定=`おまかせ`/空」で従来動作(欠落耐性)。
