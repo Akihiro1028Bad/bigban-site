@@ -44,6 +44,7 @@ import { ConsultComposer } from "./consult/ConsultComposer";
 import { ConsultDrawer } from "./consult/ConsultDrawer";
 import { deriveBoardStage } from "./ui/boardStage";
 import { detailBadge } from "./detailBadge";
+import { bodyImageUrlsOf } from "./detailBodyImages";
 import { outlineSections } from "./outline";
 import type { OutlineViewSection } from "./OutlineView";
 import type { ImageInstruction } from "./imageIntentTypes";
@@ -188,6 +189,8 @@ export function ApproveClient() {
   // #proto P6/#143: 詳細パネル素材タブの「メディアから選ぶ」で開くメディアライブラリの対象記事。
   // null で閉じ、非 null で MediaLibraryModal を描画する(P5b と同じ pull 型導線)。
   const [mediaFor, setMediaFor] = useState<PendingItem | null>(null);
+  // 本文画像の差し替え(#145/P1)。対象記事＋差し替える現 src を持ち、MediaLibraryModal を本文画像モードで開く。
+  const [bodyMediaFor, setBodyMediaFor] = useState<{ item: PendingItem; targetSrc: string } | null>(null);
   // #H7: 承認/却下/承認待ちに戻す(即時保存モデル)はカスタムフックへ集約。
   const {
     decided,
@@ -821,8 +824,7 @@ export function ApproveClient() {
 
   // 本文画像の AI 再生成(おまかせ)を実経路(/api/growth/body-image/regen)へ結線する(P1)。
   // P1 ではスタイル選択なし・instruction 空。style/textSpec は P2 で追加する。
-  // 呼び出し(DetailPanel の onRegenBodyImage 経由・index→src 変換)は後続 T4 で結線する。
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- T4 で onRegenBodyImage に結線予定
+  // 呼び出しは renderDetailPanel の onRegenBodyImage(index→src 変換)から行う(#59/T4)。
   async function requestBodyImageRegen(pageId: string, targetSrc: string): Promise<void> {
     try {
       const res = await fetch("/api/growth/body-image/regen", {
@@ -901,6 +903,18 @@ export function ApproveClient() {
         regenKeys={deriveRegenKeys(item)}
         onPickEyecatch={() => setMediaFor(item)}
         onRegenEyecatch={() => void requestEyecatchRegen(item.id)}
+        onPickBodyImage={(index) => {
+          const srcs =
+            draftState.status === "ready" ? bodyImageUrlsOf(draftState.draft.bodyHtml ?? "") : [];
+          const targetSrc = srcs[index];
+          if (targetSrc) setBodyMediaFor({ item, targetSrc });
+        }}
+        onRegenBodyImage={(index) => {
+          const srcs =
+            draftState.status === "ready" ? bodyImageUrlsOf(draftState.draft.bodyHtml ?? "") : [];
+          const targetSrc = srcs[index];
+          if (targetSrc) void requestBodyImageRegen(item.id, targetSrc);
+        }}
         sections={detailSections(item)}
         hypothesis={item.hypothesis}
         imageInstructions={imageInstructions}
@@ -1213,6 +1227,23 @@ export function ApproveClient() {
             void pollBoard();
             pushToast("アイキャッチを差し替えました。");
             setMediaFor(null);
+          }}
+        />
+      ) : null}
+
+      {bodyMediaFor ? (
+        <MediaLibraryModal
+          token={token}
+          pageId={bodyMediaFor.item.id}
+          heading={bodyMediaFor.item.title}
+          mode="body-image"
+          targetSrc={bodyMediaFor.targetSrc}
+          onClose={() => setBodyMediaFor(null)}
+          onApplied={() => {
+            void loadDraft(bodyMediaFor.item.id);
+            void pollBoard();
+            pushToast("本文画像を差し替えました。");
+            setBodyMediaFor(null);
           }}
         />
       ) : null}
