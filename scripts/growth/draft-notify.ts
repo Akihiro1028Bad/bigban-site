@@ -218,20 +218,25 @@ function draftFooter(item: DraftFlexItem): FlexBox {
 
 function draftBubble(item: DraftFlexItem): FlexBubble {
   const bodyContents: FlexComponent[] = [];
-  if (item.category) bodyContents.push(categoryBadge(item.category));
+  // LINE は空 text を 400 で弾く。全 text フィールドを trim して非空のときだけ入れる。
+  const category = item.category.trim();
+  if (category) bodyContents.push(categoryBadge(category));
+  // タイトルが空/空白のみなら空 text を送らず、contentId でフォールバック(沈黙させない)。
+  const title = item.title.trim() || `下書きID: ${item.contentId}`;
   bodyContents.push({
     type: "text",
-    text: item.title,
+    text: title,
     weight: "bold",
     size: "md",
     color: HEADING_COLOR,
     wrap: true,
     maxLines: 2,
   });
-  if (item.excerpt) {
+  const excerpt = item.excerpt.trim();
+  if (excerpt) {
     bodyContents.push({
       type: "text",
-      text: item.excerpt,
+      text: excerpt,
       size: "sm",
       color: EXCERPT_COLOR,
       wrap: true,

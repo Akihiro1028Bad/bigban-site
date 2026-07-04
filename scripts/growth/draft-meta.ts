@@ -56,6 +56,33 @@ export interface ContentSummary {
 }
 
 /**
+ * category フィールドの表示名(文字列)を1件取り出す。媒体で形が違うのを吸収する:
+ * - news: select → 文字列 or 文字列配列(先頭)。
+ * - columns: relation → オブジェクト `{ id, name, nameEn }` or その配列(先頭)。
+ *   relation は `name`(無ければ `nameEn`)を表示名として使う。id しか無ければ null
+ *   (LINE Flex の空/`[object Object]` バッジを防ぐ=沈黙させずバッジだけ省く)。
+ * どの形でも表示名が取れなければ null(呼び出し側でバッジ省略)。
+ */
+function extractCategoryName(raw: unknown): string | null {
+  const first = Array.isArray(raw) ? raw[0] ?? null : raw ?? null;
+  if (first === null || first === undefined) return null;
+  if (typeof first === "string") {
+    return first.trim() === "" ? null : first;
+  }
+  if (typeof first === "object") {
+    const rel = first as { name?: unknown; nameEn?: unknown };
+    const name =
+      typeof rel.name === "string" && rel.name.trim() !== ""
+        ? rel.name
+        : typeof rel.nameEn === "string" && rel.nameEn.trim() !== ""
+          ? rel.nameEn
+          : null;
+    return name;
+  }
+  return null;
+}
+
+/**
  * 通知カード(#35)用に、コンテンツの表示情報(title/excerpt/category/eyecatch)を
  * **コンテンツAPI**(`*.microcms.io`)から取得する。下書きは draftKey 必須。
  * draftKey 用の管理API(fetchDraftKey)とはドメインが異なる点に注意。
@@ -86,12 +113,11 @@ export async function fetchContentSummary(
   const json = (await res.json()) as {
     title?: string | null;
     excerpt?: string | null;
-    category?: string[] | string | null;
+    // news: select(文字列/文字列配列)。columns: relation(オブジェクト/オブジェクト配列)。
+    category?: unknown;
     eyecatch?: { url?: string | null } | null;
   };
-  const category = Array.isArray(json.category)
-    ? json.category[0] ?? null
-    : json.category ?? null;
+  const category = extractCategoryName(json.category);
   // 画像は LINE Flex に渡すため HTTPS のみ許可(javascript:/data: 等の混入を防ぐ)。
   const rawEyecatch = json.eyecatch?.url ?? null;
   const eyecatchUrl = rawEyecatch && /^https:\/\//i.test(rawEyecatch) ? rawEyecatch : null;

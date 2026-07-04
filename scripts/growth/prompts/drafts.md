@@ -54,7 +54,7 @@
    - **`spec.media`(媒体軸 #media・payload を媒体で分岐する)**: Notion `媒体` プロパティ(`コラム`/`ニュース`)の値を**そのまま日本語で** spec トップレベルの `media` に入れる。**`媒体` が空/未追加なら `コラム` 扱い**(欠落耐性・従来どおり)=`media` は省略してよい。この値で公開先(`ニュース`→news / `コラム`→columns 系)と category の型が決まる:
      - **`媒体=コラム`(既定)**: 下の `articleType` と column の `category`(content ID)を付ける(従来どおり)。
      - **`媒体=ニュース`**: `articleType` と column の `category`(content ID)は**付けない**。代わりに `category` を **news の日本語ラベル select 値の配列**にする(`["お知らせ"]`/`["メディア掲載"]`/`["イベント情報"]`/`["キャンペーン"]` のいずれか。`src/constants/news.ts` の正典4値)。告知の主旨に最も近い1値を選ぶ(イベント告知=`イベント情報`、キャンペーン=`キャンペーン`、メディア掲載=`メディア掲載`、その他の施設更新=`お知らせ`)。**告知の日時は正典(facility-context の doNotWrite 例外宣言)に従う**——公式に公表・確定済みの日時(PR TIMES・公式SNS・Notion 行の告知内容として確定記載)は書いてよく、未確定の日時は断定しない。
-   - **`payload.articleType`(コラム分離 #columns・`媒体=コラム` のみ)**: Notion `記事タイプ`(獲得/不安解消/資産/比較/イベント)の値を**そのまま日本語で**入れる(microCMS 側は日本語ラベルセレクト運用)。`記事タイプ` が空/欠落なら `articleType` フィールド自体を省略する(欠落耐性)。内部計測軸(#C4)。**`媒体=ニュース` の記事には付けない**。
+   - **`payload.articleType`(コラム分離 #columns・`媒体=コラム` のみ)**: Notion `記事タイプ`(獲得/不安解消/資産/比較/イベント)の値を**そのまま日本語で**入れる(microCMS 側は日本語ラベルセレクト運用)。**`articleType` は kind=select なので、`locale`/`displayMode` と同じく必ず配列で入れる**(例: `["獲得"]`。文字列 `"獲得"` は初回 create が HTTP 400 になる)。`記事タイプ` が空/欠落なら `articleType` フィールド自体を省略する(欠落耐性)。内部計測軸(#C4)。**`媒体=ニュース` の記事には付けない**。
    - **`payload.category`(`媒体=コラム` のみ・コラム分離 #columns / 単一ソース #222)**: `媒体=ニュース` の場合は上記のとおり news の日本語ラベル配列にするので、この column-category 解決は**行わない**。`媒体=コラム`(既定)のときのみ次を実施する。**手書きの対応表は使わない**。マッピングの正典は `scripts/growth/columnCategory.ts` の `ARTICLE_TYPE_TO_CATEGORY` ただ一つで、次のコマンドで**必ず解決する**(二重管理・転記ズレを排除):
      - `npm run growth:column-category -- "<記事タイプ>" "<コラムカテゴリ(あれば)>"` を実行し、標準出力の content ID(文字列1件)を `category` に入れる。
      - **優先順位(#222)**: Notion 任意プロパティ **`コラムカテゴリ`(select)があればそれを最優先**で第2引数に渡す(人が既定を上書きした最終分類)。無ければ第2引数を省略し、`記事タイプ` からの既定マッピングで解決する(**欠落耐性: プロパティ未追加でも従来どおり動く**)。
@@ -78,7 +78,7 @@
 {
   "media": "コラム",
   "payload": { "title": "...", "slug": "...", "locale": ["ja"],
-               "articleType": "獲得|不安解消|資産|比較|イベント(記事タイプ。空/欠落なら省略)",
+               "articleType": ["獲得"],
                "category": "start|rules|improve|health|compare|event(growth:column-category で解決。コラムカテゴリ優先。解決不能なら省略)",
                "excerpt": "...", "displayMode": ["html"], "bodyHtml": "...(末尾に『※この記事はAIが作成した下書きです。公開前に内容をご確認ください。』)" },
   "eyecatchAction": "<§9の宇宙人の行為を英語1フレーズで>",
@@ -101,6 +101,8 @@
   "notion": { "pageId": "<記事ネタ案の該当ページID>", "property": "ステータス", "value": "下書き作成済み" }
 }
 ```
+- `articleType` は `locale`/`displayMode` と同じく **kind=select なので配列**で入れる(`["獲得"]`。`獲得|不安解消|資産|比較|イベント` のいずれか1値)。文字列 `"獲得"` は初回 create が HTTP 400(`articleType has unexpected data type`)になる。`記事タイプ` が空/欠落なら `articleType` 自体を省略する。`媒体=ニュース` には付けない。
+- `category`(`媒体=コラム`)は `growth:column-category` が返す content ID 文字列(例 `"start"`)を入れる。解決不能なら省略。
 - `media` を省略すると `コラム` 扱い(公開先は columns 系・従来どおり)。`媒体=ニュース` の行だけ `media:"ニュース"` を必ず入れる(公開先が news に切り替わる)。
 - `OPENAI_API_KEY` 未設定等で画像生成できない場合は、その旨を報告し、アイキャッチ無しでは公開しないよう促す(下書き本文は作る)。
 </output_schema>
