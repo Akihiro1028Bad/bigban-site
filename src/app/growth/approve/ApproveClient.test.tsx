@@ -2397,6 +2397,43 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     expect(JSON.parse((editPost![1] as RequestInit).body as string).pageId).toBe("i1");
   });
 
+  // #P1⑤: 編集ワークスペース内の MetaEditor もプレビュータブと同一の保存経路
+  // (POST /api/growth/draft/excerpt)に結線されていること(onSaveMeta の結線カバレッジ)。
+  it("編集ワークスペースのメタディスクリプションを保存できる(/draft/excerpt へ送る)", async () => {
+    const fn = mockFetchSequence(
+      { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+      {
+        json: {
+          success: true,
+          exists: true,
+          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+        },
+      },
+      { json: { success: true } } // /api/growth/draft/excerpt
+    );
+    render(<ApproveClient />);
+    await login();
+    await screen.findByText("猛暑記事");
+    await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+    const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+    const meta = within(getWorkspace()).getByPlaceholderText(/検索結果に出る説明文/);
+    await userEvent.type(meta, "検索スニペット");
+    await userEvent.click(
+      within(getWorkspace()).getByRole("button", { name: "メタディスクリプションを保存" })
+    );
+
+    await waitFor(() =>
+      expect(
+        fn.mock.calls.some((c) => String(c[0]).includes("/api/growth/draft/excerpt"))
+      ).toBe(true)
+    );
+    expect(await screen.findByText("メタディスクリプションを保存しました。")).toBeInTheDocument();
+    const metaPost = fn.mock.calls.find((c) => String(c[0]).includes("/api/growth/draft/excerpt"));
+    expect(JSON.parse((metaPost![1] as RequestInit).body as string).pageId).toBe("i1");
+  });
+
   it("保存失敗はエラーを表示し、編集モードを維持する", async () => {
     const dialog = await openReadyDraft(
       "<p>元</p>",

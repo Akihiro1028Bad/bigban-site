@@ -18,6 +18,18 @@ export function sanitizeDraftHtml(html: string): string {
   return sanitizeNewsHtml(html, STRICT_HTML_CONFIG);
 }
 
+/**
+ * 下書き本文の文字数を数える(フッタ常時表示用・#UI)。
+ *
+ * 入力は TipTap の `editor.getText()`(タグ無しのプレーンテキスト)想定。
+ * DetailPanel の `bodyCharCount`(タグ除去 → 連続空白を 1 に畳む → trim → `.length`)と
+ * 同じ正規化を行い、両者の文字数が矛盾しないようにする。日本語(サロゲート無し文字)は
+ * `.length` で概ね字数と一致する。
+ */
+export function countDraftCharacters(text: string): number {
+  return text.replace(/\s+/g, " ").trim().length;
+}
+
 export interface DraftEditPayload {
   pageId: string;
   bodyHtml: string;
@@ -26,6 +38,62 @@ export interface DraftEditPayload {
 /** 保存APIへ送るペイロードを組み立てる(本文は許可リストに正規化)。 */
 export function buildDraftEditPayload(pageId: string, html: string): DraftEditPayload {
   return { pageId, bodyHtml: sanitizeDraftHtml(html) };
+}
+
+/**
+ * 保持ブロック(#77・画像/表/埋め込み/CTA/スケジュール)の種別。
+ * カード表示(#P2)で種別アイコン・ラベル・補足文を出すために、保持した outerHTML から
+ * 先頭要素の種別を判定する純ロジック。DOM に依存せず(正規表現)テスト可能。
+ */
+export type PreservedBlockKind =
+  | "image"
+  | "figure"
+  | "table"
+  | "cta"
+  | "schedule"
+  | "embed"
+  | "unknown";
+
+export interface PreservedBlockInfo {
+  kind: PreservedBlockKind;
+  /** カードに出す種別ラベル(日本語)。 */
+  label: string;
+  /** カードに出す補足文(差し替え導線の案内など)。 */
+  hint: string;
+}
+
+const PRESERVED_BLOCK_LABELS: Record<PreservedBlockKind, { label: string; hint: string }> = {
+  image: { label: "画像", hint: "差し替えは『素材』タブから" },
+  figure: { label: "図表", hint: "差し替えは『素材』タブから" },
+  table: { label: "表", hint: "内容の編集は次の更新で対応予定" },
+  cta: { label: "CTA", hint: "文言・リンクの編集は次の更新で対応予定" },
+  schedule: { label: "スケジュール", hint: "内容の編集は次の更新で対応予定" },
+  embed: { label: "埋め込み", hint: "差し替えは元の投稿リンクから" },
+  unknown: { label: "ブロック", hint: "移動・削除のみできます" },
+};
+
+/**
+ * 保持ブロックの outerHTML から種別を判定する。
+ * PRESERVE_SELECTORS(figure/table/div.cta/div.schedule/a.embed)に対応し、
+ * figure は内側に <img> があれば "image"、無ければ "figure" に分ける。
+ */
+export function classifyPreservedBlock(html: string): PreservedBlockInfo {
+  const trimmed = html.trim();
+  const kind = detectPreservedKind(trimmed);
+  const { label, hint } = PRESERVED_BLOCK_LABELS[kind];
+  return { kind, label, hint };
+}
+
+function detectPreservedKind(html: string): PreservedBlockKind {
+  const head = html.slice(0, 200).toLowerCase();
+  if (/^<figure[\s>]/.test(head)) {
+    return /<img[\s>]/.test(html.toLowerCase()) ? "image" : "figure";
+  }
+  if (/^<table[\s>]/.test(head)) return "table";
+  if (/^<div[^>]*\bclass="[^"]*\bcta\b/.test(head)) return "cta";
+  if (/^<div[^>]*\bclass="[^"]*\bschedule\b/.test(head)) return "schedule";
+  if (/^<a[^>]*\bclass="[^"]*\bembed\b/.test(head)) return "embed";
+  return "unknown";
 }
 
 /**

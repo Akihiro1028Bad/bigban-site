@@ -24,9 +24,11 @@ interface UseDraftEditingParams {
   token: string;
   openId: string | null;
   loadDraft: (pageId: string) => Promise<void>;
+  /** 保存成功時に呼ぶ(成功トースト等)。省略可。 */
+  onSaved?: () => void;
 }
 
-export function useDraftEditing({ token, openId, loadDraft }: UseDraftEditingParams) {
+export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftEditingParams) {
   const [editingDraft, setEditingDraft] = useState(false);
   const [editedHtml, setEditedHtml] = useState("");
   const [draftOriginalHtml, setDraftOriginalHtml] = useState("");
@@ -85,6 +87,7 @@ export function useDraftEditing({ token, openId, loadDraft }: UseDraftEditingPar
       }
       setEditingDraft(false);
       setConfirmDiscard(false);
+      onSaved?.(); // 保存成功トースト等(呼び出し側で結線)
       await loadDraft(pageId); // 保存後にプレビューを最新化
     } catch (error) {
       setDraftSaveError(toMessage(error, "保存に失敗しました。"));
