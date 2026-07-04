@@ -109,65 +109,48 @@ describe("buildDraftFailureMessage の原因別文言（#58）", () => {
 describe("previewUrlOrNull", () => {
   const base = {
     siteUrl: "https://www.thepicklebang.com",
-    secret: "s3cret",
     contentId: "abc123",
-    draftKey: "dk-xyz",
   };
 
-  it("必要な値が揃っていればプレビューURLを返す", () => {
+  it("siteUrl と contentId が揃っていれば承認画面リンクを返す", () => {
     expect(previewUrlOrNull(base)).toBe(
-      "https://www.thepicklebang.com/api/draft/enable?secret=s3cret&draftKey=dk-xyz&contentId=abc123"
+      "https://www.thepicklebang.com/growth/approve?view=approve&draft=abc123"
     );
   });
 
-  it("secret が無ければ null（通知は続行させるため）", () => {
-    expect(previewUrlOrNull({ ...base, secret: null })).toBeNull();
-    expect(previewUrlOrNull({ ...base, secret: undefined })).toBeNull();
-    expect(previewUrlOrNull({ ...base, secret: "" })).toBeNull();
-  });
-
-  it("siteUrl が無ければ null", () => {
+  it("siteUrl が無ければ null（通知は続行させるため）", () => {
     expect(previewUrlOrNull({ ...base, siteUrl: null })).toBeNull();
-  });
-
-  it("draftKey が無ければ null", () => {
-    expect(previewUrlOrNull({ ...base, draftKey: null })).toBeNull();
+    expect(previewUrlOrNull({ ...base, siteUrl: undefined })).toBeNull();
+    expect(previewUrlOrNull({ ...base, siteUrl: "" })).toBeNull();
   });
 });
 
 describe("buildPreviewUrl", () => {
-  it("プレビュー入口(Pattern A)の URL を secret/draftKey/contentId 付きで組み立てる", () => {
+  it("承認画面(記事ビュー)の対象記事へ飛ぶ URL を組み立てる", () => {
     const url = buildPreviewUrl({
       siteUrl: "https://www.thepicklebang.com",
-      secret: "s3cret",
       contentId: "abc123",
-      draftKey: "dk-xyz",
     });
     expect(url).toBe(
-      "https://www.thepicklebang.com/api/draft/enable?secret=s3cret&draftKey=dk-xyz&contentId=abc123"
+      "https://www.thepicklebang.com/growth/approve?view=approve&draft=abc123"
     );
   });
 
   it("siteUrl の末尾スラッシュを正規化する", () => {
     const url = buildPreviewUrl({
       siteUrl: "https://www.thepicklebang.com/",
-      secret: "s",
       contentId: "id",
-      draftKey: "dk",
     });
-    expect(url).toContain("https://www.thepicklebang.com/api/draft/enable?");
-    expect(url).not.toContain(".com//api");
+    expect(url).toContain("https://www.thepicklebang.com/growth/approve?");
+    expect(url).not.toContain(".com//growth");
   });
 
-  it("特殊文字を含む値を URL エンコードする", () => {
+  it("contentId を URL エンコードする", () => {
     const url = buildPreviewUrl({
       siteUrl: "https://example.com",
-      secret: "a b&c",
-      contentId: "id",
-      draftKey: "k/=?",
+      contentId: "a b/=?",
     });
-    expect(url).toContain("secret=a+b%26c");
-    expect(url).toContain("draftKey=k%2F%3D%3F");
+    expect(url).toContain("draft=a+b%2F%3D%3F");
   });
 });
 
@@ -175,7 +158,7 @@ describe("buildDraftNotifyMessage", () => {
   const withUrl: DraftNotifyItem = {
     title: "本八幡で始めるピックルボール",
     contentId: "c1",
-    previewUrl: "https://www.thepicklebang.com/api/draft/enable?secret=s&draftKey=dk&contentId=c1",
+    previewUrl: "https://www.thepicklebang.com/growth/approve?view=approve&draft=c1",
   };
   const noUrl: DraftNotifyItem = {
     title: "雨の日でも続けられる屋内コート",
@@ -183,18 +166,20 @@ describe("buildDraftNotifyMessage", () => {
     previewUrl: null,
   };
 
-  it("件数とタイトル・プレビューURLを含むメッセージを作る", () => {
+  it("件数とタイトル・承認画面リンクを含むメッセージを作る", () => {
     const msg = buildDraftNotifyMessage([withUrl]);
     expect(msg).toContain("下書きを1件作成しました");
     expect(msg).toContain("本八幡で始めるピックルボール");
     expect(msg).toContain(withUrl.previewUrl as string);
+    // 飛び先が承認画面と分かる文言にする(microCMS プレビューではない)。
+    expect(msg).toContain("承認画面:");
   });
 
-  it("プレビューURLが無い記事は下書きIDで案内する", () => {
+  it("承認画面リンクが無い記事は下書きIDで案内する", () => {
     const msg = buildDraftNotifyMessage([noUrl]);
     expect(msg).toContain("雨の日でも続けられる屋内コート");
     expect(msg).toContain("c2");
-    expect(msg).toContain("プレビューURLは取得できませんでした");
+    expect(msg).toContain("承認画面リンクは取得できませんでした");
   });
 
   it("複数記事を番号付きでまとめる", () => {
@@ -216,7 +201,7 @@ describe("buildDraftFlex", () => {
     excerpt: "雨でも続けられる屋内ピックルボール。",
     category: "お知らせ",
     eyecatchUrl: "https://img.example/cover.png",
-    previewUrl: "https://www.thepicklebang.com/api/draft/enable?secret=s&draftKey=dk&contentId=c1",
+    previewUrl: "https://www.thepicklebang.com/growth/approve?view=approve&draft=c1",
     contentId: "c1",
   };
 
@@ -252,11 +237,11 @@ describe("buildDraftFlex", () => {
     const excerpt = body.find((c) => c.type === "text" && c.text === full.excerpt);
     expect(excerpt).toMatchObject({ maxLines: 3 });
 
-    // フッターはプレビューボタン(uri)
+    // フッターは承認画面ボタン(uri)
     const footerBtn = bubble.footer!.contents[0];
     expect(footerBtn).toMatchObject({
       type: "button",
-      action: { type: "uri", label: "プレビューを開く", uri: full.previewUrl },
+      action: { type: "uri", label: "承認画面で開く", uri: full.previewUrl },
     });
   });
 
@@ -279,12 +264,12 @@ describe("buildDraftFlex", () => {
     expect(texts[0]).toMatchObject({ text: full.title });
   });
 
-  it("プレビューURLが無ければボタンの代わりに下書きIDを案内する", () => {
+  it("承認画面リンクが無ければボタンの代わりに下書きIDを案内する", () => {
     const [bubble] = buildDraftFlex([{ ...full, previewUrl: null }]).contents;
     const footer = bubble.footer!.contents[0];
     expect(footer.type).toBe("text");
     expect(JSON.stringify(footer)).toContain("c1");
-    expect(JSON.stringify(footer)).toContain("プレビューURLは取得できませんでした");
+    expect(JSON.stringify(footer)).toContain("承認画面リンクは取得できませんでした");
   });
 
   it("12件を超えるときは先頭12バブルに制限する", () => {

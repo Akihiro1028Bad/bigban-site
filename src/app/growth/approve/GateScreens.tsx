@@ -156,8 +156,31 @@ export function LoadErrorGate({ message, onRetry }: { message: string; onRetry: 
 }
 
 /**
+ * 承認待ちゼロの空状態の中身(達成感ある ReviewDoneEmpty ＋ 施策追加フォーム)。
+ * シェル(ヘッダー＋左ナビ)の内側に埋め込めるよう、`<main className="approve-shell">`
+ * ラッパーを持たない純粋なコンテンツにする(#Task2)。EmptyGate はこれを全画面で包む。
+ */
+export function EmptyGateContent({
+  token,
+  onAdded,
+}: {
+  token: string;
+  onAdded: Parameters<typeof AddProposalForm>[0]["onAdded"];
+}) {
+  return (
+    <div className="mx-auto w-full max-w-md px-4 py-6">
+      <ReviewDoneEmpty />
+      <div className="mx-auto mt-2 max-w-md text-left">
+        <AddProposalForm token={token} onAdded={onAdded} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * 後方互換: 承認待ちゼロのゲート。達成感ある空状態(ReviewDoneEmpty)へ寄せつつ
  * 施策追加フォーム(AddProposalForm・#255)は必ず維持する。
+ * 中身は EmptyGateContent を全画面(approve-shell)で包むだけ。
  */
 export function EmptyGate({
   token,
@@ -168,12 +191,7 @@ export function EmptyGate({
 }) {
   return (
     <main className="approve-shell flex items-center justify-center overflow-y-auto">
-      <div className="mx-auto w-full max-w-md px-4 py-6">
-        <ReviewDoneEmpty />
-        <div className="mx-auto mt-2 max-w-md text-left">
-          <AddProposalForm token={token} onAdded={onAdded} />
-        </div>
-      </div>
+      <EmptyGateContent token={token} onAdded={onAdded} />
     </main>
   );
 }
