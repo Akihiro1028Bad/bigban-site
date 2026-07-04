@@ -32,8 +32,12 @@ interface MediaLibraryModalProps {
   pageId: string;
   /** モーダル見出し(記事タイトルなど)。 */
   heading: string;
+  /** 適用先。既定はアイキャッチ(後方互換)。"body-image" は本文画像の同期差し替え。 */
+  mode?: "eyecatch" | "body-image";
+  /** mode==="body-image" のとき、差し替える本文画像の現 src(必須)。 */
+  targetSrc?: string;
   onClose: () => void;
-  /** アイキャッチ反映が成功したときに親へ通知(盤の再取得など)。 */
+  /** 反映が成功したときに親へ通知(盤の再取得など)。 */
   onApplied: () => void;
 }
 
@@ -51,7 +55,7 @@ interface UploadResponse {
   error?: unknown;
 }
 
-interface EyecatchResponse {
+interface ApplyResponse {
   success?: boolean;
   error?: unknown;
 }
@@ -67,13 +71,26 @@ function pickError(body: { error?: unknown }, fallback: string): string {
   return typeof body.error === "string" && body.error !== "" ? body.error : fallback;
 }
 
-export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }: MediaLibraryModalProps) {
+export function MediaLibraryModal({
+  token,
+  pageId,
+  heading,
+  mode = "eyecatch",
+  targetSrc,
+  onClose,
+  onApplied,
+}: MediaLibraryModalProps) {
+  const isBodyImage = mode === "body-image";
   const [urls, setUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const dialogRef = useDialog();
+
+  // 適用先(アイキャッチ / 本文画像)で出し分ける文言。
+  const promptLabel = isBodyImage ? "画像を選んで本文画像に差し替え" : "画像を選んでアイキャッチに設定";
+  const selectLabel = isBodyImage ? "この画像を本文画像に設定" : "この画像をアイキャッチに設定";
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -127,7 +144,7 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
       // 返却 URL を先頭へ挿入し、そのまま選択候補として即差し替えへ進める。
       const uploaded = body.url;
       setUrls((prev) => [uploaded, ...prev.filter((u) => u !== uploaded)]);
-      await applyEyecatch(uploaded);
+      await applySelection(uploaded);
     } catch {
       setError("アップロードに失敗しました。もう一度お試しください。");
     } finally {
@@ -135,32 +152,36 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
     }
   }
 
-  async function applyEyecatch(url: string): Promise<void> {
+  async function applySelection(url: string): Promise<void> {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/growth/draft/eyecatch", {
+      const endpoint = isBodyImage ? "/api/growth/draft/body-image" : "/api/growth/draft/eyecatch";
+      const payload = isBodyImage
+        ? { pageId, targetSrc, newUrl: url }
+        : { pageId, eyecatchUrl: url };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, eyecatchUrl: url }),
+        body: JSON.stringify(payload),
       });
-      const body = (await res.json().catch(() => ({}))) as EyecatchResponse;
+      const body = (await res.json().catch(() => ({}))) as ApplyResponse;
       // 他の呼び出しと揃え、HTTP 200 でも success:false は失敗扱いにする(防御的整合)。
       if (!res.ok || body.success === false) {
-        setError(pickError(body, "アイキャッチの反映に失敗しました。もう一度お試しください。"));
+        setError(pickError(body, "画像の反映に失敗しました。もう一度お試しください。"));
         return;
       }
       onApplied();
       onClose();
     } catch {
-      setError("アイキャッチの反映に失敗しました。もう一度お試しください。");
+      setError("画像の反映に失敗しました。もう一度お試しください。");
     } finally {
       setBusy(false);
     }
   }
 
   function handleSelect(url: string): void {
-    void applyEyecatch(url);
+    void applySelection(url);
   }
 
   return (
@@ -197,7 +218,7 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
 
         <div className="flex items-center gap-1 px-4 py-2.5" style={{ borderBottom: "1px solid var(--p-border)" }}>
           <span className="text-[12px]" style={{ color: "var(--p-text-3)" }}>
-            画像を選んでアイキャッチに設定
+            {promptLabel}
           </span>
           <input
             ref={fileRef}
@@ -239,7 +260,7 @@ export function MediaLibraryModal({ token, pageId, heading, onClose, onApplied }
                 type="button"
                 onClick={() => handleSelect(url)}
                 disabled={busy}
-                aria-label="この画像をアイキャッチに設定"
+                aria-label={selectLabel}
                 className="group flex flex-col gap-1.5 rounded-[10px] p-2 text-left disabled:opacity-50"
                 style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
               >
