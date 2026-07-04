@@ -143,6 +143,10 @@ export default defineConfig({
         // (dialog/h2リスト/末尾選択/方法選択→onSubmit の結線)。h2抽出・挿入合成の純ロジックは
         // body-image-insert.ts、結線挙動は ApproveClient.test.tsx で検証する。
         "src/app/growth/approve/BodyImageInsertModal.tsx",
+        // #P4a-T4: 誌面アートボードの薄い presentation(キャンバス/スロットエディタ)。
+        // 純ロジック(slotStateOf・suggestImageIdea・outline 記法)は T1/T2 の各テストで検証済み。
+        // 結線挙動は ArtboardView.test.tsx で担保する。
+        "src/app/growth/approve/ArtboardView.tsx",
       ],
       thresholds: {
         statements: 100,
