@@ -15,9 +15,11 @@ import {
   buildBodyRegenRequestProps,
   bodyRegenRowFromPage,
   bodyRegenViewOf,
+  extractBodyImages,
   isMicrocmsAssetUrl,
   replaceBodyImageBySrc,
   selectStaleBodyRegenIds,
+  type BodyImageRef,
   type BodyRegenRow,
 } from "./body-image-regen";
 
@@ -254,5 +256,34 @@ describe("replaceBodyImageBySrc", () => {
     const tricky = "https://images.microcms-assets.io/assets/x/$2$1.png";
     const out = replaceBodyImageBySrc(`<img src="${SRC}" alt="図">`, SRC, tricky);
     expect(out.html).toBe(`<img src="${tricky}" alt="図">`);
+  });
+});
+
+describe("extractBodyImages", () => {
+  const A = "https://images.microcms-assets.io/img1.png";
+  const B = "https://images.microcms-assets.io/img2.png";
+
+  it("本文出現順に <img src> を抽出する(figure 包み・複数)", () => {
+    const html =
+      `<h2>見出し</h2>` +
+      `<figure><img src="${A}" alt="図1"></figure>` +
+      `<p>本文</p>` +
+      `<figure><img src="${B}" alt="図2"></figure>`;
+    const refs: BodyImageRef[] = extractBodyImages(html);
+    expect(refs).toEqual([{ src: A }, { src: B }]);
+  });
+
+  it("src の無い <img> は除外する", () => {
+    const html = `<img alt="src無し"><img src="${A}" alt="x">`;
+    expect(extractBodyImages(html)).toEqual([{ src: A }]);
+  });
+
+  it("同一 src の重複は各出現を1要素として残す", () => {
+    const html = `<img src="${A}" alt="x"><img src="${A}" alt="y">`;
+    expect(extractBodyImages(html)).toEqual([{ src: A }, { src: A }]);
+  });
+
+  it("画像が無ければ空配列", () => {
+    expect(extractBodyImages("<p>本文だけ</p>")).toEqual([]);
   });
 });

@@ -263,3 +263,26 @@ export function replaceBodyImageBySrc(
   });
   return { html: out, replaced };
 }
+
+// ── 本文HTMLからの <img> 抽出(画像タブの本文画像実データ化・#59/P1) ──────────
+/** 本文HTMLから抽出した1枚の本文画像への参照。 */
+export interface BodyImageRef {
+  /** その時点の src(microCMS アセットとは限らない。差し替え可否は API 境界で検証する)。 */
+  src: string;
+}
+
+/**
+ * 本文HTML中の `<img>` を**出現順**に走査し、`src` を持つものを配列で返す(P1)。
+ * 承認画面の画像タブが「本文画像が何枚あり、どの URL か」を実データ化するために使う。
+ * src の無い `<img>` は除外し、同一 src の重複は各出現を1要素として残す(枚数=実 `<img>` 数)。
+ * アセット検証(差し替え可否)は API 境界(/api/growth/draft/body-image)が担うため、ここではしない。
+ */
+export function extractBodyImages(html: string): BodyImageRef[] {
+  const refs: BodyImageRef[] = [];
+  const tags = html.match(IMG_TAG_RE) ?? [];
+  for (const tag of tags) {
+    const src = srcOf(tag);
+    if (src !== "") refs.push({ src });
+  }
+  return refs;
+}
