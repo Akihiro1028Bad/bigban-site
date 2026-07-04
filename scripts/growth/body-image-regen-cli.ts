@@ -170,6 +170,8 @@ async function next(options: NotionApiOptions): Promise<void> {
       instruction: row.instruction,
       contentId: row.contentId,
       targetSrc: row.targetSrc,
+      style: row.requestedStyle,
+      textSpec: row.textSpec,
     })}\n`
   );
 }
