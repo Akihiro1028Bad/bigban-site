@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   countByLevel,
   detectDoNotWrite,
+  DISCLAIMER_MARK,
   draftPlainText,
   draftQuality,
   extractInternalLinkPaths,
@@ -76,6 +77,19 @@ describe("draftQuality", () => {
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "t" });
     expect(pick(checks, "AI免責文").level).toBe("block");
     expect(hasBlockingCheck(checks)).toBe(true);
+  });
+
+  it("DISCLAIMER_MARK は export され、AI免責文チェックの判定は不変", () => {
+    const withDisclaimer = draftQuality({
+      bodyHtml: "",
+      body: `本文 ${DISCLAIMER_MARK}`,
+      title: "t",
+    });
+    const withoutDisclaimer = draftQuality({ bodyHtml: "", body: "本文", title: "t" });
+
+    expect(DISCLAIMER_MARK).toBe("AIが作成した下書き");
+    expect(pick(withDisclaimer, "AI免責文").level).toBe("ok");
+    expect(pick(withoutDisclaimer, "AI免責文").level).toBe("block");
   });
 
   it("§13 断定NG(料金/所要分)は block(#217: 未確定情報のみ)", () => {

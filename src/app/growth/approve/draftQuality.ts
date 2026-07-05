@@ -48,7 +48,7 @@ export const QUALITY_THRESHOLDS = {
 const SITE_HOST = "thepicklebang.com";
 
 /** §5: 末尾に必須の AI 免責文(部分一致で存在を見る)。 */
-const DISCLAIMER_MARK = "AIが作成した下書き";
+export const DISCLAIMER_MARK = "AIが作成した下書き";
 
 /**
  * §13 doNotWrite: 断定してはいけない**未確定**情報のパターン(料金・所要分)。
