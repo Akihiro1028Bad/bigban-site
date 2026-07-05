@@ -96,7 +96,7 @@ export function DraftEditWorkspace({
 }: DraftEditWorkspaceProps) {
   const [previewWidth, setPreviewWidth] = useState<PreviewWidthKey>("desktop");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("edit");
-  const initialHtmlRef = useRef(initialHtml);
+  const [initialEditorHtml] = useState(() => initialHtml);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -249,7 +249,7 @@ export function DraftEditWorkspace({
               />
             </div>
             <DraftEditor
-              initialHtml={initialHtmlRef.current}
+              initialHtml={initialEditorHtml}
               onChange={onChange}
               onEditorReady={onEditorReady}
               onInsertImageFromMedia={onInsertImageFromMedia}

@@ -14,7 +14,10 @@ function render(ui: ReactElement): ReturnType<typeof renderWithClient> {
 
 // 合言葉認証フラグはテストごとに切り替える。既定の各テストは「有効(=現行のゲート)」で検証し、
 // 無効(一時措置)の挙動は専用 describe で flags.authEnabled=false にして検証する。
-const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
+const { flags, draftEditorMock } = vi.hoisted(() => ({
+  flags: { authEnabled: true },
+  draftEditorMock: { shouldSkipReady: false },
+}));
 vi.mock("@/config/featureFlags", () => ({
   get APPROVE_AUTH_ENABLED() {
     return flags.authEnabled;
@@ -70,7 +73,9 @@ vi.mock("./DraftEditor", () => {
       onRegenImage,
     }: MockDraftEditorProps) => {
       const editor = makeEditor(initialHtml, onChange);
-      onEditorReady?.(editor);
+      if (!draftEditorMock.shouldSkipReady) {
+        onEditorReady?.(editor);
+      }
       return (
         <div>
           <textarea
@@ -150,6 +155,7 @@ const TOKEN_URL = "/api/growth/approve";
 
 beforeEach(() => {
   flags.authEnabled = true;
+  draftEditorMock.shouldSkipReady = false;
   // #119: ?view はタブ切替で URL に書かれる。テスト間で漏れないよう毎回リセットする。
   window.history.replaceState(null, "", "/");
 });
@@ -4492,6 +4498,155 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         );
       });
       expect(await screen.findByText("AI画像が完成し、エディタに反映しました。")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("placeholder 生成完了後にエディタ反映できなければ確認を促すエラートーストを出す", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(replacePreservedPendingFigure).mockClear();
+    vi.mocked(replacePreservedPendingFigure).mockReturnValueOnce(false);
+    try {
+      const placeholderId = "img-abc123";
+      const freshBodyHtml =
+        '<p>本文</p><figure><img src="https://images.microcms-assets.io/assets/a/done.png" alt="完成図"></figure>';
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+        {
+          json: draftWithRegen({
+            bodyHtml: `<p>本文</p><figure data-pending="${placeholderId}"><figcaption>生成中</figcaption></figure>`,
+            bodyRegen: { status: "処理中", targetSrc: `placeholder:${placeholderId}` },
+          }),
+        },
+        { json: draftWithRegen({ bodyHtml: freshBodyHtml, bodyRegen: { status: "なし", targetSrc: "" } }) }
+      );
+      flags.authEnabled = false;
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await vi.advanceTimersByTimeAsync(5100);
+
+      expect(
+        await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
+      ).toBeInTheDocument();
+    } finally {
+      vi.mocked(replacePreservedPendingFigure).mockReturnValue(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it("placeholder 生成完了時にエディタ未起動なら確認を促すエラートーストを出す", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    draftEditorMock.shouldSkipReady = true;
+    try {
+      const placeholderId = "img-abc123";
+      const freshBodyHtml =
+        '<p>本文</p><figure><img src="https://images.microcms-assets.io/assets/a/done.png" alt="完成図"></figure>';
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+        {
+          json: draftWithRegen({
+            bodyHtml: `<p>本文</p><figure data-pending="${placeholderId}"><figcaption>生成中</figcaption></figure>`,
+            bodyRegen: { status: "処理中", targetSrc: `placeholder:${placeholderId}` },
+          }),
+        },
+        { json: draftWithRegen({ bodyHtml: freshBodyHtml, bodyRegen: { status: "なし", targetSrc: "" } }) }
+      );
+      flags.authEnabled = false;
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await vi.advanceTimersByTimeAsync(5100);
+
+      expect(
+        await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
+      ).toBeInTheDocument();
+    } finally {
+      draftEditorMock.shouldSkipReady = false;
+      vi.useRealTimers();
+    }
+  });
+
+  it("placeholder 生成完了後に新規画像を特定できなければ確認を促す", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(replacePreservedPendingFigure).mockClear();
+    try {
+      const placeholderId = "img-abc123";
+      const unchangedBodyHtml =
+        '<p>本文</p><figure data-pending="img-other"><figcaption>生成中</figcaption></figure>';
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+        {
+          json: draftWithRegen({
+            bodyHtml: `<p>本文</p><figure data-pending="${placeholderId}"><figcaption>生成中</figcaption></figure>`,
+            bodyRegen: { status: "処理中", targetSrc: `placeholder:${placeholderId}` },
+          }),
+        },
+        { json: draftWithRegen({ bodyHtml: unchangedBodyHtml, bodyRegen: { status: "なし", targetSrc: "" } }) }
+      );
+      flags.authEnabled = false;
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await vi.advanceTimersByTimeAsync(5100);
+
+      expect(replacePreservedPendingFigure).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("placeholder 生成完了レスポンスに本文HTMLが無くても確認を促す", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const placeholderId = "img-abc123";
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ contentId: "g-abc" })] } },
+        {
+          json: draftWithRegen({
+            bodyHtml: `<p>本文</p><figure data-pending="${placeholderId}"><figcaption>生成中</figcaption></figure>`,
+            bodyRegen: { status: "処理中", targetSrc: `placeholder:${placeholderId}` },
+          }),
+        },
+        {
+          json: {
+            success: true,
+            exists: true,
+            draft: {
+              title: "T",
+              displayMode: "html",
+              body: "",
+              bodyRegen: { status: "なし", targetSrc: "" },
+              eyecatchRegen: { status: "なし" },
+            },
+          },
+        }
+      );
+      flags.authEnabled = false;
+      render(<ApproveClient />);
+      await screen.findByText("猛暑記事");
+      await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
+      const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
+      await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
+
+      await vi.advanceTimersByTimeAsync(5100);
+
+      expect(
+        await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
+      ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

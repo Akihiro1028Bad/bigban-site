@@ -38,6 +38,27 @@ describe("suggestImageIdea", () => {
     expect(suggestImageIdea("  ", "auto").trim()).toBe("このセクションに合う図を提案する");
   });
 
+  it.each([
+    ["court", "ネット付近の立ち位置", "位置関係"],
+    ["flow", "体験前の準備", "までの流れ"],
+    ["infographic", "失敗しないための注意点", "要点"],
+    ["mascot", "施設のスペース紹介", "指し示す"],
+    ["mascot", "ラケットの選び方比較", "見比べる"],
+    ["mascot", "体験レッスンの予約", "誘う"],
+    ["illust", "気軽に交流できる安心感", "感覚"],
+    ["auto", "予約の流れ", "流れが伝わる図"],
+    ["auto", "初心者向けの比較", "比べやすい図"],
+  ] satisfies [RequestedBodyImageStyle, string, string][])(
+    "%s は追加キーワードに対応した説明を返す",
+    (style, heading, expected) => {
+      expect(suggestImageIdea(heading, style)).toContain(expected);
+    },
+  );
+
+  it("空見出しの非autoスタイルは中立トピックを使う", () => {
+    expect(suggestImageIdea("\n\t", "mascot")).toBe("宇宙人がこのセクションを楽しく紹介する");
+  });
+
   it("未確定の営業時間・料金・面数・所要時間を固定文言に混ぜない", () => {
     const styles: RequestedBodyImageStyle[] = [
       "auto",
