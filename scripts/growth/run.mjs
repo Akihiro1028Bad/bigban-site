@@ -280,6 +280,9 @@ function pullLatestOrAbort() {
         GROWTH_PULL_DETAIL: detail,
       },
     });
+    spawnSync(isWin ? "npm.cmd" : "npm",
+      ["run", "growth:learning-log", "--", "append-fail", "pull", String(pull.status ?? 1), detail],
+      { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
     process.exit(1);
   }
 }
@@ -322,6 +325,10 @@ function notifyLoopFail(kind, { exitCode, detail } = {}) {
       ...(detail ? { GROWTH_LOOP_DETAIL: detail } : {}),
     },
   });
+  // #SI1(d): 工程失敗を学習ログ台帳へ best-effort 追記(LINE 通知の後・exit は変えない)。
+  spawnSync(isWin ? "npm.cmd" : "npm",
+    ["run", "growth:learning-log", "--", "append-fail", mode, String(exitCode ?? ""), detail ?? ""],
+    { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
@@ -343,6 +350,11 @@ child.on("exit", async (code) => {
         ? { GROWTH_RUN_SHA: runSha }
         : { GROWTH_NOTIFY_ERROR: "1", GROWTH_WEEKLY_EXIT_CODE: String(exitCode) };
     const notifyCode = await runNpm("growth:notify-line", env);
+    if (exitCode !== 0) {
+      spawnSync(isWin ? "npm.cmd" : "npm",
+        ["run", "growth:learning-log", "--", "append-fail", "weekly", String(exitCode), ""],
+        { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
+    }
     // 異常終了時は元の失敗を握り潰さないよう、weekly の終了コードを優先する。
     process.exit(exitCode !== 0 ? exitCode : notifyCode);
   }
