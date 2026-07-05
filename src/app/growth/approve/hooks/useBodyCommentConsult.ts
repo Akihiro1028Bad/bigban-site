@@ -152,11 +152,12 @@ export function useBodyCommentConsult({
     }
     setBusy(true);
     setError("");
+    const adoptedAspects = applied.map(() => "インラインコメント");
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html }),
+        body: JSON.stringify({ pageId, bodyHtml: html, source: "comment-revise", adoptedAspects }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error((saveJson.error as string) ?? "保存に失敗しました。");

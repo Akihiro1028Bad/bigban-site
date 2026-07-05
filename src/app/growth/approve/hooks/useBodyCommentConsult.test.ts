@@ -11,8 +11,9 @@
  */
 
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { BodyCommentView } from "@/lib/growth/bodyComment";
 import { useBodyCommentConsult } from "./useBodyCommentConsult";
 
 // 1文=1行(コメント可)になる最小の本文。extractReviewLines の解析結果に依存しない
@@ -20,6 +21,17 @@ import { useBodyCommentConsult } from "./useBodyCommentConsult";
 const BODY = "<p>ここは重要です。</p>";
 const KEY = "0::ここは重要です。";
 const TOKEN = "secret-token";
+
+function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Response {
+  return { ok, status, json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
+}
+
+function mockFetch(...responses: Response[]): ReturnType<typeof vi.fn> {
+  const fn = vi.fn();
+  for (const r of responses) fn.mockResolvedValueOnce(r);
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
 
 function setup(pageId: string) {
   const onChanged = vi.fn();
@@ -29,6 +41,8 @@ function setup(pageId: string) {
     { initialProps: { pageId } },
   );
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("useBodyCommentConsult: pageId 変化での state リセット(記事跨ぎ持ち越し防止)", () => {
   it("pageId が変わると comments / openFor / draft が初期化される(別記事への誤送信を防ぐ)", () => {
@@ -60,5 +74,44 @@ describe("useBodyCommentConsult: pageId 変化での state リセット(記事�
     view.rerender({ pageId: "page-A" });
     expect(view.result.current.openFor).toBe(KEY);
     expect(view.result.current.draft).toBe("保持される下書き");
+  });
+});
+
+describe("useBodyCommentConsult: applyNow", () => {
+  it("保存 POST に comment-revise source と固定の採用観点を含める", async () => {
+    const bodyComment: BodyCommentView = {
+      status: "提示中",
+      comments: [],
+      raw: "",
+      proposal: [
+        {
+          commentIndex: 0,
+          before: "<p>ここは重要です。</p>",
+          after: "<p>ここが肝心です。</p>",
+        },
+      ],
+    };
+    const onChanged = vi.fn();
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment,
+        onChanged,
+      })
+    );
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/draft/edit");
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.bodyHtml).toContain("ここが肝心です。");
+    expect(saveBody.source).toBe("comment-revise");
+    expect(saveBody.adoptedAspects).toEqual(["インラインコメント"]);
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 });
