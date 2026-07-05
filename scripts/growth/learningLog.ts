@@ -284,6 +284,99 @@ export interface LearningLogRow {
   count: number | null;
 }
 
+export interface LearningLogSummary {
+  windowWeeks: number;
+  totalRows: number;
+  countByKind: Record<LearningEventKind | "その他", number>;
+  editRegionHeatmap: Record<string, number>;
+  adoptAspectHeatmap: Record<string, number>;
+  imageRetryTop: { key: string; style: string; pageId: string; maxAttempt: number }[];
+  failModeFrequency: Record<string, number>;
+}
+
+function emptyCountByKind(): Record<LearningEventKind | "その他", number> {
+  return {
+    編集: 0,
+    採否: 0,
+    画像試行: 0,
+    工程失敗: 0,
+    その他: 0,
+  };
+}
+
+function incrementCount(counts: Record<string, number>, key: string): void {
+  counts[key] = (counts[key] ?? 0) + 1;
+}
+
+function targetOrUnknown(target: string): string {
+  return target === "" ? "不明" : target;
+}
+
+function editRegionOf(summary: string): string {
+  const match = summary.match(/^\[(導入|見出し|本文|全体)\]/);
+  return match?.[1] ?? "不明";
+}
+
+function sortFrequencyDesc(frequency: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(Object.entries(frequency).sort((a, b) => b[1] - a[1]));
+}
+
+// 直近 windowWeeks 週の学習ログを、SI2 が拾いやすい決定的な形に集計する。
+export function summarizeLearningLog(
+  rows: readonly LearningLogRow[],
+  nowMs: number,
+  windowWeeks: number
+): LearningLogSummary {
+  const cutoff = nowMs - windowWeeks * 7 * 24 * 60 * 60 * 1000;
+  const windowRows = rows.filter(
+    (row) => row.recordedAtMs !== null && row.recordedAtMs >= cutoff
+  );
+  const countByKind = emptyCountByKind();
+  const editRegionHeatmap: Record<string, number> = {};
+  const adoptAspectHeatmap: Record<string, number> = {};
+  const imageRetries = new Map<
+    string,
+    { key: string; style: string; pageId: string; maxAttempt: number }
+  >();
+  const failModeFrequency: Record<string, number> = {};
+
+  for (const row of windowRows) {
+    countByKind[row.kind] += 1;
+
+    switch (row.kind) {
+      case "編集":
+        incrementCount(editRegionHeatmap, editRegionOf(row.summary));
+        break;
+      case "採否":
+        incrementCount(adoptAspectHeatmap, targetOrUnknown(row.target));
+        break;
+      case "画像試行": {
+        const key = `${row.pageId}::${row.target}`;
+        const maxAttempt = Math.max(row.count ?? 0, imageRetries.get(key)?.maxAttempt ?? 0);
+        imageRetries.set(key, { key, style: row.target, pageId: row.pageId, maxAttempt });
+        break;
+      }
+      case "工程失敗":
+        incrementCount(failModeFrequency, targetOrUnknown(row.target));
+        break;
+      case "その他":
+        break;
+    }
+  }
+
+  return {
+    windowWeeks,
+    totalRows: windowRows.length,
+    countByKind,
+    editRegionHeatmap,
+    adoptAspectHeatmap,
+    imageRetryTop: [...imageRetries.values()]
+      .sort((a, b) => b.maxAttempt - a.maxAttempt)
+      .slice(0, 10),
+    failModeFrequency: sortFrequencyDesc(failModeFrequency),
+  };
+}
+
 function readSelectName(page: NotionPage, prop: string): string {
   const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
   return value?.select?.name ?? "";
