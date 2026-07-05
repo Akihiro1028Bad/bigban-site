@@ -76,6 +76,9 @@ export default defineConfig({
         "scripts/growth/advise-apply-cli.ts",
         "scripts/growth/comment-revise-cli.ts",
         "scripts/growth/metrics-cli.ts",
+        // 学習ログ CLI(#SI1)。薄い I/O 配線(Notion 書き込み・LINE 通知・状態ファイル)。
+        // 純ロジック(型・差分要約・集計・appendLearningLog・parseLearningEvent)は learningLog.ts でテスト済み。
+        "scripts/growth/learning-log-cli.ts",
         "scripts/growth/publish-due-cli.ts",
         "scripts/growth/review-due-cli.ts",
         "scripts/growth/proposal-review-due-cli.ts",
