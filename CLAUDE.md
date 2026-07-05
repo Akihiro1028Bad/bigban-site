@@ -62,6 +62,7 @@ public/
 - pull型 AIループ(修正 #40・画像再生成 #144/#156・メディア #142/#143/#145・advise #146・decorate #147・apply #165・comment-revise #182): `docs/operations/growth/30-loops.md`
 - 公開キュー #H23/#H24・計測ループ #C4: `docs/operations/growth/50-publish-metrics.md`
 - Notion「記事ネタ案」必要プロパティ一覧: `docs/operations/growth/40-notion-props.md`
+- セルフチューニング(SI1 学習ログ): `docs/operations/growth/70-self-tuning.md`
 - プロンプト/ドキュメント再設計の方針: `docs/superpowers/plans/2026-06-28-growth-prompt-redesign-plan.md`
 
 ## Development Process — TDD
