@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import type { NotionPage } from "./notion";
+import type { NotionApiOptions, NotionPage } from "./notion";
 import {
+  appendLearningLog,
   buildLearningLogProps,
   buildLearningLogTitle,
   formatEditDiffSummary,
@@ -227,6 +228,119 @@ describe("buildLearningLogProps", () => {
     expect(props[LEARNING_LOG_PROPS.summary]).toEqual({
       rich_text: [{ text: { content: "あ".repeat(2000) } }, { text: { content: "あ" } }],
     });
+  });
+});
+
+describe("appendLearningLog", () => {
+  const event: LearningEvent = {
+    kind: "画像試行",
+    pageId: "idea-1",
+    title: "記事タイトル",
+    style: "diagram",
+    result: "成功",
+    attempt: 2,
+  };
+  const notionOptions: NotionApiOptions = {
+    token: "notion-token",
+    fetchFn: vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => "",
+    })),
+  };
+
+  it("DS 未設定なら createPageFn を呼ばず skipped を返す", async () => {
+    const createPageFn = vi.fn<() => Promise<string>>();
+
+    await expect(
+      appendLearningLog(event, {
+        dataSourceId: undefined,
+        notionOptions,
+        createPageFn,
+        nowIso: NOW_ISO,
+      })
+    ).resolves.toEqual({ status: "skipped" });
+    expect(createPageFn).not.toHaveBeenCalled();
+
+    await expect(
+      appendLearningLog(event, {
+        dataSourceId: "",
+        notionOptions,
+        createPageFn,
+        nowIso: NOW_ISO,
+      })
+    ).resolves.toEqual({ status: "skipped" });
+    expect(createPageFn).not.toHaveBeenCalled();
+  });
+
+  it("DS 設定済みなら createPageFn に props と options を渡して appended を返す", async () => {
+    const createPageFn = vi.fn<
+      (dataSourceId: string, props: Record<string, unknown>, options: NotionApiOptions) => Promise<string>
+    >();
+    createPageFn.mockResolvedValue("log-1");
+
+    await expect(
+      appendLearningLog(event, {
+        dataSourceId: "learning-log-ds",
+        notionOptions,
+        createPageFn,
+        nowIso: NOW_ISO,
+        diffSummary: "生成成功",
+      })
+    ).resolves.toEqual({ status: "appended", pageId: "log-1" });
+
+    expect(createPageFn).toHaveBeenCalledTimes(1);
+    const [dataSourceId, props, options] = createPageFn.mock.calls[0];
+    expect(dataSourceId).toBe("learning-log-ds");
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("画像試行");
+    expect(options).toBe(notionOptions);
+  });
+
+  it("createPageFn が reject しても throw せず failed と error を返す", async () => {
+    const error = new Error("notion down");
+    const createPageFn = vi.fn<
+      (dataSourceId: string, props: Record<string, unknown>, options: NotionApiOptions) => Promise<string>
+    >();
+    createPageFn.mockRejectedValue(error);
+
+    const outcome = await appendLearningLog(event, {
+      dataSourceId: "learning-log-ds",
+      notionOptions,
+      createPageFn,
+      nowIso: NOW_ISO,
+    });
+
+    expect(outcome).toEqual({ status: "failed", error });
+  });
+
+  it("編集イベントでは diffSummary と titleHeadline を props/title に反映する", async () => {
+    const createPageFn = vi.fn<
+      (dataSourceId: string, props: Record<string, unknown>, options: NotionApiOptions) => Promise<string>
+    >();
+    createPageFn.mockResolvedValue("log-1");
+
+    await appendLearningLog(
+      {
+        kind: "編集",
+        pageId: "idea-1",
+        title: "記事タイトル",
+        before: "<p>before</p>",
+        after: "<p>after</p>",
+      },
+      {
+        dataSourceId: "learning-log-ds",
+        notionOptions,
+        createPageFn,
+        nowIso: NOW_ISO,
+        diffSummary: "[導入] 80字短縮",
+        titleHeadline: "導入を短縮",
+      }
+    );
+
+    const props = createPageFn.mock.calls[0][1];
+    expect(titleContent(props[LEARNING_LOG_PROPS.event])).toBe("編集: 導入を短縮 (記事タイトル)");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toBe("[導入] 80字短縮");
   });
 });
 
