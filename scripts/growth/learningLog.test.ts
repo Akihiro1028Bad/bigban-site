@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { NotionApiOptions, NotionPage } from "./notion";
 import {
   appendLearningLog,
+  buildLearningLogFailNotice,
   buildLearningLogProps,
   buildLearningLogTitle,
   formatEditDiffSummary,
@@ -446,6 +447,14 @@ describe("appendLearningLog", () => {
     const props = createPageFn.mock.calls[0][1];
     expect(titleContent(props[LEARNING_LOG_PROPS.event])).toBe("編集: 導入を短縮 (記事タイトル)");
     expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toBe("[導入] 80字短縮");
+  });
+});
+
+describe("buildLearningLogFailNotice", () => {
+  it("学習ログ追記失敗の通知本文を生成する", () => {
+    expect(buildLearningLogFailNotice("画像試行")).toBe(
+      "学習ログの記録に失敗しました(画像試行)。台帳への追記に失敗しています。"
+    );
   });
 });
 
