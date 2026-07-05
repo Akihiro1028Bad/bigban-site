@@ -18,16 +18,17 @@ interface RailItem {
 
 interface LeftRailProps {
   view: ApproveView;
-  awaitingCount: number;
+  /** 記事(kind=idea)側のアクション待ち件数。施策を含む全体待ち(awaiting)とは別物。 */
+  articleCount: number;
   proposalCount: number;
   queueReadyCount: number;
   onChange: (view: ApproveView) => void;
 }
 
-export function LeftRail({ view, awaitingCount, proposalCount, queueReadyCount, onChange }: LeftRailProps) {
+export function LeftRail({ view, articleCount, proposalCount, queueReadyCount, onChange }: LeftRailProps) {
   const items: RailItem[] = [
     { key: "proposal", label: "施策", icon: <IconList size={18} />, badge: proposalCount },
-    { key: "approve", label: "記事", icon: <IconInbox size={18} />, badge: awaitingCount },
+    { key: "approve", label: "記事", icon: <IconInbox size={18} />, badge: articleCount },
     { key: "prompt", label: "プロンプト", icon: <IconFileText size={18} /> },
     { key: "performance", label: "成績", icon: <IconChart size={18} /> },
     { key: "queue", label: "公開キュー", icon: <IconCalendar size={18} />, badge: queueReadyCount },

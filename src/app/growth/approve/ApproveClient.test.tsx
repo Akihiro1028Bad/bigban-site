@@ -3757,6 +3757,9 @@ describe("ApproveClient タブ分離/ルーティング(#119)", () => {
     // 未処理がある施策が既定 view
     expect(railButton(/施策/)).toHaveAttribute("aria-current", "page");
     expect(within(railButton(/施策/)).getByText("1")).toBeInTheDocument(); // 施策の未処理1件バッジ
+    // 記事バッジは記事(kind=idea)側の未処理のみ。施策込みの全体待ち(2)にしない。
+    expect(within(railButton(/記事/)).getByText("1")).toBeInTheDocument();
+    expect(within(railButton(/記事/)).queryByText("2")).not.toBeInTheDocument();
     // 既定では記事パイプラインは出ない
     expect(screen.queryByRole("region", { name: "記事パイプライン" })).not.toBeInTheDocument();
   });

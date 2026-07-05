@@ -1231,7 +1231,7 @@ export function ApproveClient() {
         <div className="flex min-h-0 flex-1">
           <LeftRail
             view={activeView}
-            awaitingCount={counts.awaiting}
+            articleCount={counts.articlePending}
             proposalCount={counts.proposalPending}
             queueReadyCount={counts.queueReady}
             onChange={changeView}
