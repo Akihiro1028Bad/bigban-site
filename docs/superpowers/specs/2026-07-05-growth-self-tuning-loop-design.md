@@ -221,8 +221,8 @@ LearningEvent =
 
 学習ログ書き込みは**本処理を絶対に止めない**が、**沈黙もさせない**。
 
-- **API route(a・b)**: `appendLearningLog` は `next/server` の `after()` 内で実行し、内部で自前 try/catch する(§3.3.a)。失敗しても Web レスポンス(`{ success: true }`)は返る(レスポンスは `after()` 実行前に確定済み)。失敗時は `console.error` ではなく、**LINE 通知**(既存 `pushTextMessage`・`LINE_GROUP_ID`)で「学習ログの記録に失敗(種別/pageId)」を送る。ただし通知の多発を避けるため、**既存 `notify-throttle.ts`(`scripts/growth/notify-throttle.ts`)でスロットル**する(同種通知を短時間に連投しない)。
-- **CLI(c)/`run.mjs`(d)**: 追記の spawnSync/CLI が失敗しても、`done`/`fail`/`notifyLoopFail` 自体の終了コードは変えない。CLI 側は失敗を stderr に出し、**learning-log CLI が自前で LINE 通知**する(工程失敗の記録漏れも沈黙させない)。
+- **API route(a・b)**: `appendLearningLog` は `next/server` の `after()` 内で実行し、内部で自前 try/catch する(§3.3.a)。失敗しても Web レスポンス(`{ success: true }`)は返る(レスポンスは `after()` 実行前に確定済み)。失敗時は **`console.error`(Vercel サーバログ)に出す**。LINE 通知は行わない — Vercel から LINE を叩くには LINE トークンを Vercel 環境に置く必要があり、throttle の状態ファイルも持てないため、**LINE throttle 通知は状態ファイルを持てる PC 側 CLI 経路(下記)に集約**する(実装計画で確定した判断)。
+- **CLI(c)/`run.mjs`(d)**: 追記の spawnSync/CLI が失敗しても、`done`/`fail`/`notifyLoopFail` 自体の終了コードは変えない。CLI 側は失敗を stderr に出し、**LINE 通知**(既存 `pushTextMessage`・`LINE_GROUP_ID`)で「学習ログの記録に失敗(種別)」を送る(工程失敗の記録漏れも沈黙させない)。通知の多発を避けるため、**既存 `notify-throttle.ts` で 30 分ウィンドウのスロットル**をかける(状態ファイル `.growth-tmp/learning-log-notify.json`)。
 - **DB 未追加(欠落耐性)**: `GROWTH_LEARNING_LOG_DS` 未設定 or DB 未作成(createPage が 404 相当)なら、追記は**静かにスキップ**してよい(まだ基盤が入っていない段階での運用を壊さない)。ただし「DS 未設定」と「設定済みだが書き込み失敗」は区別し、後者だけ LINE 通知する。判定は learning-log CLI 内で行う。
 
 ### 3.6 CLI `learning-log-cli.ts`
