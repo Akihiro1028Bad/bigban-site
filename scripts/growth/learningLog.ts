@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { splitTopLevelBlocks } from "./decorate";
 import { chunkRichText } from "./notion";
 
@@ -21,6 +23,47 @@ export type LearningEvent =
   | { kind: "採否"; pageId: string; title: string; aspect: string; before: string; after: string }
   | { kind: "画像試行"; pageId: string; title: string; style: string; result: "成功" | "失敗"; attempt: number }
   | { kind: "工程失敗"; mode: string; exitCode: number | null; detail: string };
+
+export const LearningEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("編集"),
+    pageId: z.string(),
+    title: z.string(),
+    before: z.string(),
+    after: z.string(),
+  }),
+  z.object({
+    kind: z.literal("採否"),
+    pageId: z.string(),
+    title: z.string(),
+    aspect: z.string(),
+    before: z.string(),
+    after: z.string(),
+  }),
+  z.object({
+    kind: z.literal("画像試行"),
+    pageId: z.string(),
+    title: z.string(),
+    style: z.string(),
+    result: z.enum(["成功", "失敗"]),
+    attempt: z.number().int().min(1),
+  }),
+  z.object({
+    kind: z.literal("工程失敗"),
+    mode: z.string(),
+    exitCode: z.number().nullable(),
+    detail: z.string(),
+  }),
+]);
+
+export function parseLearningEvent(raw: string): LearningEvent | null {
+  try {
+    const result = LearningEventSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Notion「学習ログ」DB のプロパティ名(日本語・spec §3.1) ──
 export const LEARNING_LOG_PROPS = {

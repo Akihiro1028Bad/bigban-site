@@ -37,6 +37,8 @@
     "growth:advise-apply": "tsx scripts/growth/advise-apply-cli.ts",
     "growth:advise-apply-loop": "node scripts/growth/run.mjs apply",
     "growth:metrics": "tsx scripts/growth/metrics-cli.ts",
+    "growth:learning-log": "tsx scripts/growth/learning-log-cli.ts",
+    "growth:learning-log:recent": "tsx scripts/growth/learning-log-cli.ts recent 4",
     "growth:publish-due": "tsx scripts/growth/publish-due-cli.ts",
     "growth:review-due": "tsx scripts/growth/review-due-cli.ts",
     "growth:proposal-review-due": "tsx scripts/growth/proposal-review-due-cli.ts",

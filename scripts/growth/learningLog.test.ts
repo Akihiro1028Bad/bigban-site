@@ -8,6 +8,7 @@ import {
   formatEditDiffSummary,
   htmlToPlainBlocks,
   LEARNING_LOG_PROPS,
+  parseLearningEvent,
   parseLearningLogPage,
   summarizeLearningLog,
   summarizeEditDiff,
@@ -46,6 +47,110 @@ function numberValue(prop: unknown): number | null {
 function page(properties: Record<string, unknown>): NotionPage {
   return { id: "page-1", url: "https://notion.test/page-1", properties };
 }
+
+describe("parseLearningEvent", () => {
+  it("4 種別の妥当 JSON を LearningEvent に変換する", () => {
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "編集",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          before: "<p>before</p>",
+          after: "<p>after</p>",
+        })
+      )
+    ).toEqual({
+      kind: "編集",
+      pageId: "idea-1",
+      title: "記事タイトル",
+      before: "<p>before</p>",
+      after: "<p>after</p>",
+    });
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "採否",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          aspect: "読みやすさ",
+          before: "before",
+          after: "after",
+        })
+      )
+    ).toEqual({
+      kind: "採否",
+      pageId: "idea-1",
+      title: "記事タイトル",
+      aspect: "読みやすさ",
+      before: "before",
+      after: "after",
+    });
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "画像試行",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          style: "diagram",
+          result: "成功",
+          attempt: 1,
+        })
+      )
+    ).toEqual({
+      kind: "画像試行",
+      pageId: "idea-1",
+      title: "記事タイトル",
+      style: "diagram",
+      result: "成功",
+      attempt: 1,
+    });
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "工程失敗",
+          mode: "revise",
+          exitCode: null,
+          detail: "failed",
+        })
+      )
+    ).toEqual({
+      kind: "工程失敗",
+      mode: "revise",
+      exitCode: null,
+      detail: "failed",
+    });
+  });
+
+  it("不正 JSON とスキーマ不一致は null を返す", () => {
+    expect(parseLearningEvent("{")).toBeNull();
+    expect(parseLearningEvent(JSON.stringify({ pageId: "idea-1" }))).toBeNull();
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "画像試行",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          style: "diagram",
+          result: "成功",
+          attempt: 0,
+        })
+      )
+    ).toBeNull();
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "画像試行",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          style: "diagram",
+          result: "保留",
+          attempt: 1,
+        })
+      )
+    ).toBeNull();
+  });
+});
 
 describe("buildLearningLogTitle", () => {
   it("4 種別のタイトルを生成する", () => {
