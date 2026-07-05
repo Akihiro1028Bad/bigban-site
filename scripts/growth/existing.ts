@@ -118,7 +118,19 @@ function ideaLines(ideas: NotionPage[]): string[] {
     const weekStartValue = dateStart(page, "対象週開始") || "週開始無し";
     const status = selectName(page, "ステータス") || "ステータス無し";
     const titleValue = titleText(page, "タイトル案") || "(無題)";
-    return `- [${weekStartValue} | ${status}] ${titleValue}`;
+    const head = `- [${weekStartValue} | ${status}] ${titleValue}`;
+
+    const reason = richText(page, "却下理由");
+    const postJudgement = selectName(page, "公開後判定");
+
+    if (postJudgement === "要改稿") {
+      const tail = reason ? `公開後判定: 要改稿 / 却下理由: ${reason}` : `公開後判定: 要改稿`;
+      return `${head}\n  - ${tail}`;
+    }
+    if ((status === "却下" || status === "見送り") && reason) {
+      return `${head}\n  - 却下理由: ${reason}`;
+    }
+    return head;
   });
 }
 

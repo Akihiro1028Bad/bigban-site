@@ -45,15 +45,25 @@ function proposalPage(opts: {
   return { id: opts.id, url: `https://notion.so/${opts.id}`, properties: props };
 }
 
-function ideaPage(opts: { id: string; title: string; status: string; weekStart: string }): NotionPage {
+function ideaPage(opts: {
+  id: string;
+  title: string;
+  status: string;
+  weekStart: string;
+  reason?: string;
+  postJudgement?: string;
+}): NotionPage {
+  const props: Record<string, unknown> = {
+    "タイトル案": title(opts.title),
+    "ステータス": select(opts.status),
+    "対象週開始": date(opts.weekStart),
+  };
+  if (opts.reason) props["却下理由"] = text(opts.reason);
+  if (opts.postJudgement) props["公開後判定"] = select(opts.postJudgement);
   return {
     id: opts.id,
     url: `https://notion.so/${opts.id}`,
-    properties: {
-      "タイトル案": title(opts.title),
-      "ステータス": select(opts.status),
-      "対象週開始": date(opts.weekStart),
-    },
+    properties: props,
   };
 }
 
@@ -286,6 +296,118 @@ describe("summarizeExisting", () => {
     });
     expect(md).toContain("市川エリアガイド");
     expect(md).toContain("承認");
+  });
+
+  it("却下の記事ネタ案は却下理由を併記する", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-reject",
+          title: "狭すぎるテーマ",
+          status: "却下",
+          weekStart: "2026-06-08",
+          reason: "需要が薄いニッチ",
+        }),
+      ],
+    });
+    expect(md).toContain("却下理由: 需要が薄いニッチ");
+  });
+
+  it("見送りの記事ネタ案は却下理由を併記する", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-hold",
+          title: "情報不足のテーマ",
+          status: "見送り",
+          weekStart: "2026-06-08",
+          reason: "一次情報が出せない",
+        }),
+      ],
+    });
+    expect(md).toContain("却下理由: 一次情報が出せない");
+  });
+
+  it("公開後判定が要改稿の記事ネタ案は判定と却下理由を併記する", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-rewrite",
+          title: "公開済みだが要改稿",
+          status: "公開済み",
+          weekStart: "2026-06-08",
+          postJudgement: "要改稿",
+          reason: "検索意図とズレ",
+        }),
+      ],
+    });
+    expect(md).toContain("公開後判定: 要改稿");
+    expect(md).toContain("却下理由: 検索意図とズレ");
+  });
+
+  it("公開後判定が要改稿で却下理由が空なら判定だけを併記する", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-rewrite-no-reason",
+          title: "理由なし要改稿",
+          status: "公開済み",
+          weekStart: "2026-06-08",
+          postJudgement: "要改稿",
+        }),
+      ],
+    });
+    expect(md).toContain("公開後判定: 要改稿");
+    expect(md).not.toContain("却下理由:");
+  });
+
+  it("却下の記事ネタ案でも却下理由が空なら理由を併記しない", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-reject-no-reason",
+          title: "理由なし却下",
+          status: "却下",
+          weekStart: "2026-06-08",
+        }),
+      ],
+    });
+    expect(md).toContain("理由なし却下");
+    expect(md).not.toContain("却下理由:");
+  });
+
+  it("通常ステータスの記事ネタ案は却下理由や公開後判定を併記しない", () => {
+    const md = summarizeExisting({
+      period,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "i-normal",
+          title: "通常の承認行",
+          status: "承認",
+          weekStart: "2026-06-08",
+        }),
+      ],
+    });
+    expect(md).toContain("通常の承認行");
+    expect(md).not.toContain("却下理由:");
+    expect(md).not.toContain("公開後判定:");
   });
 
   it("公開済み記事があるとき記事タイプ別の成績サマリを含む(#221 伸ばす学習)", () => {
