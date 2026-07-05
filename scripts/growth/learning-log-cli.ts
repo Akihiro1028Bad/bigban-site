@@ -16,6 +16,7 @@ import { dirname } from "node:path";
 import { defaultFetch } from "./http";
 import {
   appendLearningLog,
+  buildLearningLogFailNotice,
   buildLearningLogProps,
   formatEditDiffSummary,
   LEARNING_EVENT_KINDS,
@@ -129,7 +130,7 @@ async function notifyThrottled(kind: LearningEventKind): Promise<void> {
     writeThrottleRecords(decision.records);
     if (!decision.send) return;
 
-    const message = `学習ログの記録に失敗しました(${kind})。台帳への追記に失敗しています。`;
+    const message = buildLearningLogFailNotice(kind);
     if (DRYRUN) {
       process.stdout.write(`[dry-run] LINE:\n${message}\n`);
       return;

@@ -337,6 +337,10 @@ export type AppendLearningLogOutcome =
   | { status: "appended"; pageId: string }
   | { status: "failed"; error: unknown };
 
+export function buildLearningLogFailNotice(kind: string): string {
+  return `学習ログの記録に失敗しました(${kind})。台帳への追記に失敗しています。`;
+}
+
 export async function appendLearningLog(
   event: LearningEvent,
   deps: AppendLearningLogDeps

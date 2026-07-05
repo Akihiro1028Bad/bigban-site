@@ -13,6 +13,8 @@
  */
 
 import "dotenv/config";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 import {
   buildBodyRegenDoneMessage,
@@ -35,14 +37,21 @@ import { patchDraft } from "./content";
 import { growthEndpoint } from "./endpoint";
 import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
+import { appendLearningLog, buildLearningLogFailNotice } from "./learningLog";
 import { pushFlexMessage, pushTextMessage } from "./line";
 import {
   buildBodyMirrorProps,
+  createPage,
   getPage,
   queryDataSource,
   updatePageProps,
   type NotionApiOptions,
 } from "./notion";
+import {
+  failureSignature,
+  shouldSendFailureNotice,
+  type NotifyThrottleRecord,
+} from "./notify-throttle";
 import type { BodyRegenRow } from "./body-image-regen";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
@@ -50,6 +59,8 @@ const ENDPOINT = growthEndpoint();
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。もう一度再生成を依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const WINDOW_MS = 30 * 60 * 1000;
+const LEARNING_LOG_THROTTLE_STATE_PATH = ".growth-tmp/learning-log-notify.json";
 // 差し替えに使えるのは microCMS のアセット URL のみ(任意 URL 書き込み防止)。判定は
 // 純ロジックの isMicrocmsAssetUrl(URLパースでホスト厳密一致)で統一する(security M-1)。
 // 前方一致の正規表現だと `images.microcms-assets.io.evil.example/` 等を弾けないため使わない。
@@ -126,6 +137,122 @@ async function write(pageId: string, props: Record<string, unknown>, options: No
     return;
   }
   await updatePageProps(pageId, props, options);
+}
+
+function readThrottleRecords(): NotifyThrottleRecord[] {
+  try {
+    const parsed = JSON.parse(readFileSync(LEARNING_LOG_THROTTLE_STATE_PATH, "utf-8")) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item): NotifyThrottleRecord[] => {
+      if (
+        item &&
+        typeof item === "object" &&
+        "signature" in item &&
+        "sentAtMs" in item &&
+        typeof item.signature === "string" &&
+        typeof item.sentAtMs === "number"
+      ) {
+        return [{ signature: item.signature, sentAtMs: item.sentAtMs }];
+      }
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeThrottleRecords(records: readonly NotifyThrottleRecord[]): void {
+  mkdirSync(dirname(LEARNING_LOG_THROTTLE_STATE_PATH), { recursive: true });
+  writeFileSync(LEARNING_LOG_THROTTLE_STATE_PATH, `${JSON.stringify(records)}\n`);
+}
+
+async function notifyLearningLogFailThrottled(kind: string): Promise<void> {
+  try {
+    const signature = failureSignature("learning-log", kind);
+    const decision = shouldSendFailureNotice(
+      readThrottleRecords(),
+      signature,
+      Date.now(),
+      WINDOW_MS
+    );
+    writeThrottleRecords(decision.records);
+    if (!decision.send) return;
+
+    const message = buildLearningLogFailNotice(kind);
+    if (DRYRUN) {
+      process.stdout.write(`[dry-run] LINE: ${message}\n`);
+      return;
+    }
+    await pushTextMessage(requireEnv("LINE_GROUP_ID"), message, {
+      channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
+      fetchFn: defaultFetch,
+    });
+  } catch {
+    // 学習ログ失敗通知はベストエフォート。本処理の exit には影響させない。
+  }
+}
+
+async function countRecentImageAttempts(
+  pageId: string,
+  style: string,
+  options: NotionApiOptions
+): Promise<number> {
+  const dataSourceId = process.env.GROWTH_LEARNING_LOG_DS;
+  if (!dataSourceId) return 0;
+  const cutoff = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const { pages } = await queryDataSource(
+      dataSourceId,
+      {
+        filter: {
+          and: [
+            { property: "種別", select: { equals: "画像試行" } },
+            { property: "ページID", rich_text: { contains: pageId } },
+            { property: "対象", rich_text: { equals: style } },
+            { property: "記録時刻", date: { on_or_after: cutoff } },
+          ],
+        },
+        pageSize: 100,
+      },
+      options
+    );
+    return pages.length;
+  } catch {
+    return 0;
+  }
+}
+
+async function recordImageAttempt(
+  pageId: string,
+  title: string,
+  style: string,
+  result: "成功" | "失敗",
+  options: NotionApiOptions
+): Promise<void> {
+  try {
+    const dataSourceId = process.env.GROWTH_LEARNING_LOG_DS;
+    const attempt = (await countRecentImageAttempts(pageId, style, options)) + 1;
+    if (DRYRUN) {
+      process.stdout.write(`[dry-run] learning-log 画像試行 ${style} ×${attempt} ${result}\n`);
+      return;
+    }
+    const outcome = await appendLearningLog(
+      { kind: "画像試行", pageId, title, style, result, attempt },
+      {
+        dataSourceId,
+        notionOptions: options,
+        createPageFn: createPage,
+        nowIso: new Date().toISOString(),
+      }
+    );
+    if (outcome.status === "failed") {
+      process.stderr.write(`learning-log 画像試行の記録に失敗: ${String(outcome.error)}\n`);
+      await notifyLearningLogFailThrottled("画像試行");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`learning-log 画像試行の記録をスキップしました: ${message}\n`);
+  }
 }
 
 /** reaper: 処理中・依頼中のまま放置された行(PC停止等)を失敗へ回収し通知する(C2 止血)。 */
@@ -224,13 +351,16 @@ async function done(
     buildBodyRegenDoneMessage(row.title, approveUrl(), note),
     buildBodyRegenDoneFlex(row.title, approveUrl(), note)
   );
+  await recordImageAttempt(pageId, row.title, row.requestedStyle, "成功", options);
 }
 
 async function fail(pageId: string, reason: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
-  const title = bodyRegenRowFromPage(await getPage(pageId, options)).title;
+  const row = bodyRegenRowFromPage(await getPage(pageId, options));
+  const title = row.title;
   await write(pageId, buildBodyRegenFailProps(), options);
   await notify(buildBodyRegenFailMessage(title, reason));
+  await recordImageAttempt(pageId, title, row.requestedStyle, "失敗", options);
 }
 
 /**
