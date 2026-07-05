@@ -222,6 +222,18 @@ describe("buildLearningLogTitle", () => {
       })
     ).toBe("失敗: regen-body 異常終了(exit ?)");
   });
+
+  it("編集で editHeadline が無いときは 変更 にフォールバックする", () => {
+    expect(
+      buildLearningLogTitle({
+        kind: "編集",
+        pageId: "idea-1",
+        title: "初めてのピックルボール",
+        before: "a",
+        after: "b",
+      })
+    ).toBe("編集: 変更 (初めてのピックルボール)");
+  });
 });
 
 describe("buildLearningLogProps", () => {
@@ -514,6 +526,15 @@ describe("parseLearningLogPage", () => {
     expect(row.recordedAtMs).toBeNull();
     expect(row.result).toBe("");
   });
+
+  it("rich_text 要素に plain_text が無くても空文字として読む", () => {
+    const row = parseLearningLogPage(
+      page({
+        [LEARNING_LOG_PROPS.summary]: { rich_text: [{}, { plain_text: "要約" }] },
+      })
+    );
+    expect(row.summary).toBe("要約");
+  });
 });
 
 describe("summarizeEditDiff", () => {
@@ -613,6 +634,17 @@ describe("summarizeEditDiff", () => {
     });
     expect(longSummary).toHaveLength(2000);
     expect(longSummary.startsWith("[本文] 加筆 / 1字→3001字(+3000)")).toBe(true);
+
+    const shortened = formatEditDiffSummary({
+      headline: "短縮",
+      region: "本文",
+      beforeChars: 100,
+      afterChars: 60,
+      delta: -40,
+      sample: { before: "前", after: "後" },
+      noChange: false,
+    });
+    expect(shortened.startsWith("[本文] 短縮 / 100字→60字(-40)")).toBe(true);
   });
 
   it("空入力と巨大 HTML を安全に扱う", () => {
