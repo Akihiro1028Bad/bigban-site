@@ -2,7 +2,7 @@ import { splitTopLevelBlocks } from "./decorate";
 import { chunkRichText } from "./notion";
 
 import type { TopLevelBlock } from "./decorate";
-import type { NotionPage } from "./notion";
+import type { NotionApiOptions, NotionPage } from "./notion";
 
 // ── イベント種別・discriminated union(spec §3.4.3) ──
 export type LearningEventKind = "編集" | "採否" | "画像試行" | "工程失敗";
@@ -268,6 +268,50 @@ export function buildLearningLogProps(
         [LEARNING_LOG_PROPS.target]: { rich_text: chunkRichText(event.mode) },
         [LEARNING_LOG_PROPS.result]: { select: { name: "失敗" } },
       };
+  }
+}
+
+export interface AppendLearningLogDeps {
+  /** learning log DB の data source ID。未設定(undefined/空)ならスキップ。 */
+  dataSourceId: string | undefined;
+  notionOptions: NotionApiOptions;
+  /** createPage を注入(テストで差し替え)。既定は notion.ts の createPage。 */
+  createPageFn: (
+    dataSourceId: string,
+    props: Record<string, unknown>,
+    options: NotionApiOptions
+  ) => Promise<string>;
+  /** イベント発生時刻(既定 new Date().toISOString())。 */
+  nowIso: string;
+  /** 編集/採否の要約に使う前後差分(kind が 編集/採否 のときのみ)。 */
+  diffSummary?: string;
+  /** タイトルの headline(編集の「導入を短縮」等)。 */
+  titleHeadline?: string;
+}
+
+export type AppendLearningLogOutcome =
+  | { status: "skipped" }
+  | { status: "appended"; pageId: string }
+  | { status: "failed"; error: unknown };
+
+export async function appendLearningLog(
+  event: LearningEvent,
+  deps: AppendLearningLogDeps
+): Promise<AppendLearningLogOutcome> {
+  if (!deps.dataSourceId) return { status: "skipped" };
+
+  const props = buildLearningLogProps(
+    event,
+    deps.nowIso,
+    deps.diffSummary ?? "",
+    deps.titleHeadline
+  );
+
+  try {
+    const pageId = await deps.createPageFn(deps.dataSourceId, props, deps.notionOptions);
+    return { status: "appended", pageId };
+  } catch (error) {
+    return { status: "failed", error };
   }
 }
 
