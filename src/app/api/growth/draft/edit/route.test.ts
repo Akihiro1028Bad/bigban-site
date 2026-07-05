@@ -430,6 +430,28 @@ describe("POST /api/growth/draft/edit", () => {
     expect(createPage).toHaveBeenCalledTimes(1);
   });
 
+  it("採否の学習ログ追記が失敗しても保存レスポンスは 200 を返す", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+    vi.mocked(createPage).mockRejectedValue(new Error("learning log down"));
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["冗長"],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(after).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+  });
+
   it("保存失敗時は学習ログ追記を登録しない", async () => {
     process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
     vi.mocked(getPage).mockResolvedValue({
