@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import {
   RESERVE_PATH,
+  LABOLA_SCHOOL_URL,
   TENNISBEAR_EVENTS_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
@@ -25,7 +26,7 @@ interface ServiceConfig {
 
 const SERVICES: ServiceConfig[] = [
   { number: "01", key: "service01", isReversed: false, isDark: true, imageSrc: "/images/rental.webp", imageAlt: "Court rental", hasCta: true, ctaUrl: RESERVE_PATH, ctaExternal: false },
-  { number: "02", key: "service02", isReversed: true, isDark: false, imageSrc: "/images/lesson.jpg", imageAlt: "Lessons & clinics", hasCta: false },
+  { number: "02", key: "service02", isReversed: true, isDark: false, imageSrc: "/images/lesson.jpg", imageAlt: "Lessons & clinics", hasCta: true, ctaUrl: LABOLA_SCHOOL_URL, ctaExternal: true },
   { number: "03", key: "service03", isReversed: false, isDark: true, imageSrc: "/images/training.jpg", imageAlt: "Training program", hasCta: false },
   { number: "04", key: "service04", isReversed: true, isDark: false, imageSrc: "/images/tournament.jpg", imageAlt: "Tournaments & leagues", hasCta: false },
   { number: "05", key: "service05", isReversed: false, isDark: true, imageSrc: "/images/event.jpg", imageAlt: "Events", hasCta: true, ctaUrl: TENNISBEAR_EVENTS_URL, ctaExternal: true },

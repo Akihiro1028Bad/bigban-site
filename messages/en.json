@@ -141,8 +141,15 @@
       "augCta": "Book from August",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROX Area",
-      "hyroxDesc": "Book the HYROX area here.",
-      "hyroxCta": "Book HYROX"
+      "hyroxDesc": "Book an area rental or a lesson / class.",
+      "hyroxAreaTag": "AREA RENTAL",
+      "hyroxAreaLabel": "Area Rental",
+      "hyroxAreaDesc": "Book the HYROX area rental here.",
+      "hyroxAreaCta": "Book the area",
+      "lessonKicker": "LESSON / CLASS",
+      "lessonHeading": "Lessons / Classes",
+      "lessonDesc": "Book HYROX small-group coaching classes here.",
+      "lessonCta": "Book a lesson"
     },
     "steps": {
       "heading": "How to Book",
@@ -307,7 +314,8 @@
     "service02": {
       "titleJa": "Lessons & Clinics",
       "titleEn": "LESSONS & CLINICS",
-      "description": "Direct coaching from top players. Level-based programs for beginners to advanced players. Special clinics with international top players coming soon."
+      "description": "Direct coaching from top players. Level-based programs for beginners to advanced players. Special clinics with international top players coming soon.",
+      "cta": "BOOK A LESSON"
     },
     "service03": {
       "titleJa": "Training Program",
@@ -764,12 +772,9 @@
       "title": "PROGRAM",
       "titleJa": "Program & Pricing",
       "rateLabel": "Area Rental",
-      "duration": "90 min",
-      "weekday": "Weekday",
-      "weekdayPrice": "¥3,500",
-      "weekend": "Weekend & Holidays",
-      "weekendPrice": "¥4,000",
-      "note": "Use the training area equipped for all 8 official HYROX stations, in 90-minute sessions."
+      "perHour": "Hourly rate",
+      "note": "Use the training area equipped for all 8 official HYROX stations.",
+      "partyNote": "Listed rates cover up to 4 people. Each additional person from the 5th onward is +¥1,000."
     },
     "coach": {
       "sectionTitle": "CREW",

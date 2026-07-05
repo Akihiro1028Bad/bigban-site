@@ -6,7 +6,12 @@ import { EASE } from "@/constants/motion";
 import { COURT_PRICES } from "@/constants/pricing";
 
 // コートレンタル料金テーブル（HomePricing / HyroxProgram 共用）。
-export default function CourtPriceTable() {
+interface CourtPriceTableProps {
+  // 見出しラベル。未指定時は "COURT RENTAL"（HomePricing 用）。
+  label?: string;
+}
+
+export default function CourtPriceTable({ label }: CourtPriceTableProps) {
   const t = useTranslations("HomePricing");
 
   return (
@@ -18,7 +23,7 @@ export default function CourtPriceTable() {
       transition={{ duration: 1.1, delay: 0.1, ease: EASE }}
     >
       <p className="text-[10px] tracking-[0.25em] text-accent mb-4">
-        {t("courtRental")}
+        {label ?? t("courtRental")}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full">
