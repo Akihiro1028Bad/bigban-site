@@ -212,6 +212,55 @@ describe("parseImageDirectives / serializeImageDirective", () => {
     );
   });
 
+  it("serialize は改行と連続空白を半角スペース1個に正規化し、1行トークンとして往復できる", () => {
+    const token = serializeImageDirective({
+      style: "court",
+      description: "  キッチン\n  と\tサーブ位置  ",
+      textSpec: "  ベースライン\n\nサーブ位置\tキッチン  ",
+    });
+
+    expect(token).toBe(
+      "[画像:コート図・ルール図解: キッチン と サーブ位置 | 文字: ベースライン サーブ位置 キッチン]"
+    );
+    expect(token).not.toContain("\n");
+    expect(parseOutlineSections(`## A\n${token}`)).toEqual([
+      {
+        heading: "A",
+        description: "",
+        images: [
+          {
+            style: "court",
+            description: "キッチン と サーブ位置",
+            textSpec: "ベースライン サーブ位置 キッチン",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("serialize は記法予約文字を除去し、縦棒と閉じ括弧入り入力でも往復で安定する", () => {
+    const token = serializeImageDirective({
+      style: "flow",
+      description: "受付 | 着替え｜体験] の流れ",
+      textSpec: "STEP1 | STEP2｜STEP3]",
+    });
+
+    expect(token).toBe("[画像:手順・フロー図: 受付 着替え体験 の流れ | 文字: STEP1 STEP2STEP3]");
+    expect(parseOutlineSections(serializeOutlineSections(parseOutlineSections(`## A\n${token}`)))).toEqual([
+      {
+        heading: "A",
+        description: "",
+        images: [
+          {
+            style: "flow",
+            description: "受付 着替え体験 の流れ",
+            textSpec: "STEP1 STEP2STEP3",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("parse→serialize→parse で 6語彙 × textSpec あり/なしが不変", () => {
     for (const { key, label } of IMAGE_STYLES) {
       const withTextSpec = `## A\n[画像:${label}: 説明 | 文字: 表示文字]`;

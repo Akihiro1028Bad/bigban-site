@@ -9,6 +9,7 @@ import type { RequestedBodyImageStyle } from "@/lib/growth/bodyImage";
 
 import { slotStateOf } from "./artboardState";
 import { BODY_IMAGE_STYLE_CHIPS } from "./bodyRegenRequest";
+import { sanitizeImageDirectiveField } from "./outline";
 import type { OutlineImage, OutlineSection } from "./outline";
 
 const TEXT_SPEC_STYLES = new Set<RequestedBodyImageStyle>(["court", "flow", "infographic"]);
@@ -34,14 +35,11 @@ interface ArtboardViewProps {
 
 interface EditorState {
   sectionIndex: number;
+  imageIndex: number | null;
   style: RequestedBodyImageStyle;
   description: string;
   textSpec: string;
   shouldSuppressImage: boolean;
-}
-
-function firstImageOf(section: OutlineSection): OutlineImage | undefined {
-  return section.images[0];
 }
 
 function specifiedCountOf(sections: readonly OutlineSection[]): number {
@@ -59,11 +57,12 @@ function styleChipLabel(style: RequestedBodyImageStyle): string {
   return BODY_IMAGE_STYLE_CHIPS.find((chip) => chip.key === style)?.label ?? "おまかせ";
 }
 
-function editorStateFor(section: OutlineSection, sectionIndex: number): EditorState {
-  const image = firstImageOf(section);
+function editorStateFor(section: OutlineSection, sectionIndex: number, imageIndex: number | null): EditorState {
+  const image = imageIndex === null ? undefined : section.images[imageIndex];
   const style = image?.style ?? "auto";
   return {
     sectionIndex,
+    imageIndex,
     style,
     description: image?.description ?? suggestImageIdea(section.heading, style),
     textSpec: image?.textSpec ?? "",
@@ -86,19 +85,18 @@ export function ArtboardView({
   const [editor, setEditor] = useState<EditorState | null>(null);
   const specifiedCount = specifiedCountOf(sections);
 
-  function handleOpenEditor(sectionIndex: number): void {
-    setEditor(editorStateFor(sections[sectionIndex], sectionIndex));
+  function handleOpenEditor(sectionIndex: number, imageIndex: number | null): void {
+    setEditor(editorStateFor(sections[sectionIndex], sectionIndex, imageIndex));
   }
 
   function handleStyleChange(style: RequestedBodyImageStyle): void {
     setEditor((current) => {
       if (!current) return current;
       const section = sections[current.sectionIndex];
-      const previousImage = firstImageOf(section);
+      const previousStyle = current.style;
       const shouldReplaceDescription =
         current.description.trim() === "" ||
-        current.description === suggestImageIdea(section.heading, current.style) ||
-        current.description === previousImage?.description;
+        current.description === suggestImageIdea(section.heading, previousStyle);
       return {
         ...current,
         style,
@@ -111,21 +109,37 @@ export function ArtboardView({
   async function handleSave(): Promise<void> {
     if (!editor) return;
     const section = sections[editor.sectionIndex];
+    const description =
+      sanitizeImageDirectiveField(editor.description) || suggestImageIdea(section.heading, editor.style);
+    const textSpec = sanitizeImageDirectiveField(editor.textSpec);
+    const nextImage: OutlineImage = {
+      style: editor.style,
+      description,
+      ...(TEXT_SPEC_STYLES.has(editor.style) && textSpec ? { textSpec } : {}),
+    };
+    const nextImages =
+      editor.imageIndex === null
+        ? [...section.images, nextImage]
+        : section.images.map((image, imageIndex) => (imageIndex === editor.imageIndex ? nextImage : image));
     const nextSection: OutlineSection = editor.shouldSuppressImage
       ? { ...section, images: [], suppressImage: true }
       : {
           ...section,
-          images: [
-            {
-              style: editor.style,
-              description: editor.description.trim() || suggestImageIdea(section.heading, editor.style),
-              ...(TEXT_SPEC_STYLES.has(editor.style) && editor.textSpec.trim()
-                ? { textSpec: editor.textSpec.trim() }
-                : {}),
-            },
-          ],
+          images: nextImages,
           suppressImage: undefined,
         };
+    const ok = await onSave(replaceSection(sections, editor.sectionIndex, nextSection));
+    if (ok) setEditor(null);
+  }
+
+  async function handleDeleteImage(): Promise<void> {
+    if (!editor || editor.imageIndex === null) return;
+    const section = sections[editor.sectionIndex];
+    const nextSection: OutlineSection = {
+      ...section,
+      images: section.images.filter((_, imageIndex) => imageIndex !== editor.imageIndex),
+      suppressImage: undefined,
+    };
     const ok = await onSave(replaceSection(sections, editor.sectionIndex, nextSection));
     if (ok) setEditor(null);
   }
@@ -237,7 +251,18 @@ export function ArtboardView({
           画像なし
         </label>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-2">
+          {state.imageIndex === null ? null : (
+            <button
+              type="button"
+              onClick={handleDeleteImage}
+              disabled={isSaving}
+              className="approve-btn-ghost rounded-[8px] px-4 py-2 text-[12.5px] font-semibold disabled:opacity-50"
+              style={{ color: "var(--p-red)" }}
+            >
+              この画像を削除
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -273,10 +298,8 @@ export function ArtboardView({
 
         <div className="mt-3 space-y-3">
           {sections.map((section, sectionIndex) => {
-            const image = firstImageOf(section);
-            const state = slotStateOf(image, undefined, false);
-            const isBlocked = state === "empty" && specifiedCount >= BODY_IMAGE_MAX && editor?.sectionIndex !== sectionIndex;
-            const badge = image ? STYLE_BADGE[image.style] : null;
+            const canShowEmptySlot = !section.suppressImage && specifiedCount < BODY_IMAGE_MAX;
+            const isBlocked = !section.suppressImage && section.images.length === 0 && specifiedCount >= BODY_IMAGE_MAX;
             return (
               <section key={`${section.heading}-${sectionIndex}`} className="rounded-[10px] p-3" style={{ background: "var(--p-bg-elevated)", border: "1px solid var(--p-border)" }}>
                 <h2 className="text-[13px] font-semibold leading-snug">{section.heading}</h2>
@@ -296,44 +319,56 @@ export function ArtboardView({
                 {section.suppressImage ? (
                   <button
                     type="button"
-                    onClick={() => handleOpenEditor(sectionIndex)}
+                    onClick={() => handleOpenEditor(sectionIndex, null)}
                     className="mt-3 w-full rounded-[9px] px-3 py-3 text-left text-[12.5px]"
                     style={{ background: "var(--p-bg-input)", border: "1px dashed var(--p-border-strong)", color: "var(--p-text-3)" }}
                   >
                     画像なし
                   </button>
-                ) : state === "specified" && image && badge ? (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditor(sectionIndex)}
-                    className="mt-3 w-full overflow-hidden rounded-[9px] text-left"
-                    style={{ background: badge.bg, border: "1px solid var(--p-border)" }}
-                  >
-                    <span className="flex items-center gap-2 px-3 py-2.5">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-[10px] font-bold" style={{ background: "var(--p-bg-elevated)", color: badge.color }}>
-                        {badge.icon}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-[11px] font-semibold" style={{ color: badge.color }}>
-                          {styleChipLabel(image.style)}
-                        </span>
-                        <span className="block truncate text-[12px]" style={{ color: "var(--p-text-2)" }}>
-                          {image.description}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
                 ) : (
-                  <button
-                    type="button"
-                    aria-label={isBlocked ? `画像上限のため追加できません: ${section.heading}` : `画像を置く: ${section.heading}`}
-                    onClick={() => handleOpenEditor(sectionIndex)}
-                    disabled={isBlocked}
-                    className="mt-3 min-h-[58px] w-full rounded-[9px] px-3 py-3 text-center text-[12.5px] font-semibold disabled:cursor-not-allowed"
-                    style={{ background: "transparent", border: "1px dashed var(--p-border-strong)", color: isBlocked ? "var(--p-text-3)" : "var(--p-purple)" }}
-                  >
-                    {isBlocked ? `上限 ${BODY_IMAGE_MAX} 枚(他のセクションの画像を減らすと追加できます)` : "＋画像を置く"}
-                  </button>
+                  <div className="mt-3 space-y-2">
+                    {section.images.map((image, imageIndex) => {
+                      const state = slotStateOf(image, undefined, false);
+                      const badge = state === "specified" ? STYLE_BADGE[image.style] : null;
+                      if (!badge) return null;
+                      return (
+                        <button
+                          key={`${image.style}-${imageIndex}`}
+                          type="button"
+                          aria-label={`画像を編集: ${section.heading} ${imageIndex + 1}枚目`}
+                          onClick={() => handleOpenEditor(sectionIndex, imageIndex)}
+                          className="w-full overflow-hidden rounded-[9px] text-left"
+                          style={{ background: badge.bg, border: "1px solid var(--p-border)" }}
+                        >
+                          <span className="flex items-center gap-2 px-3 py-2.5">
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-[10px] font-bold" style={{ background: "var(--p-bg-elevated)", color: badge.color }}>
+                              {badge.icon}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-[11px] font-semibold" style={{ color: badge.color }}>
+                                {styleChipLabel(image.style)}
+                              </span>
+                              <span className="block truncate text-[12px]" style={{ color: "var(--p-text-2)" }}>
+                                {image.description}
+                              </span>
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {canShowEmptySlot || isBlocked ? (
+                      <button
+                        type="button"
+                        aria-label={isBlocked ? `画像上限のため追加できません: ${section.heading}` : `画像を置く: ${section.heading}`}
+                        onClick={() => handleOpenEditor(sectionIndex, null)}
+                        disabled={isBlocked}
+                        className="min-h-[58px] w-full rounded-[9px] px-3 py-3 text-center text-[12.5px] font-semibold disabled:cursor-not-allowed"
+                        style={{ background: "transparent", border: "1px dashed var(--p-border-strong)", color: isBlocked ? "var(--p-text-3)" : "var(--p-purple)" }}
+                      >
+                        {isBlocked ? `上限 ${BODY_IMAGE_MAX} 枚(他のセクションの画像を減らすと追加できます)` : "＋画像を置く"}
+                      </button>
+                    ) : null}
+                  </div>
                 )}
 
                 {editor?.sectionIndex === sectionIndex ? <div className="mt-3 lg:hidden">{renderEditor(editor)}</div> : null}

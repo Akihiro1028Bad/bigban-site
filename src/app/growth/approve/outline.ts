@@ -63,6 +63,12 @@ const IMAGE_DIRECTIVE_RE =
 
 // 画像なしトークン: [画像:なし]。parseOutlineSections で単独行だけを明示除外として扱う。
 const NO_IMAGE_DIRECTIVE_RE = /\[画像[:：]\s*なし\s*\]/g;
+const DIRECTIVE_RESERVED_CHARS_RE = /[\]|｜]/g;
+
+/** 画像指示トークン内の自由入力を、1行かつ記法を壊さない文字列へ正規化する。 */
+export function sanitizeImageDirectiveField(value: string | undefined): string {
+  return (value ?? "").replace(DIRECTIVE_RESERVED_CHARS_RE, "").trim().replace(/\s+/g, " ");
+}
 
 /**
  * 1 行から画像指示を抽出する。
@@ -83,9 +89,10 @@ export function parseImageDirectives(line: string): OutlineImage[] {
 
 /** 画像指示 1 件をトークン文字列にする。 */
 export function serializeImageDirective(image: OutlineImage): string {
-  const textSpec = image.textSpec?.trim();
+  const description = sanitizeImageDirectiveField(image.description);
+  const textSpec = sanitizeImageDirectiveField(image.textSpec);
   const suffix = textSpec ? ` | 文字: ${textSpec}` : "";
-  return `[画像:${LABEL_BY_KEY[image.style]}: ${image.description.trim()}${suffix}]`;
+  return `[画像:${LABEL_BY_KEY[image.style]}: ${description}${suffix}]`;
 }
 
 /**
