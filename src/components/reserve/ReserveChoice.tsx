@@ -159,7 +159,7 @@ export default function ReserveChoice() {
           descKey="hyroxDesc"
         />
         {/* オープン記念＆千葉大会応援キャンペーン告知（期間外は自動非表示） */}
-        <HyroxCampaign variant="note" />
+        <HyroxCampaign />
         <ChoiceCardGrid cards={HYROX_CARDS} />
       </div>
     </section>

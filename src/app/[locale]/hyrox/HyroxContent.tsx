@@ -8,7 +8,6 @@ import HyroxFilm from "@/components/hyrox/HyroxFilm";
 import HyroxCoach from "@/components/hyrox/HyroxCoach";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
-import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 
 export default function HyroxContent() {
   return (
@@ -16,7 +15,6 @@ export default function HyroxContent() {
       <HomeNavigation />
       <main>
         <HyroxHero />
-        <HyroxCampaign variant="banner" />
         <HyroxFacility />
         <HyroxServices />
         <HyroxIntro />

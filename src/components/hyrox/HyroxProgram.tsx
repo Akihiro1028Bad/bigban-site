@@ -42,7 +42,7 @@ export default function HyroxProgram() {
         </motion.div>
 
         {/* オープン記念＆千葉大会応援キャンペーン告知（期間外は自動非表示） */}
-        <HyroxCampaign variant="note" />
+        <HyroxCampaign />
 
         {/* ピックルボールコートと同一の料金テーブル（COURT_PRICES を共有） */}
         <CourtPriceTable label={t("rateLabel")} />

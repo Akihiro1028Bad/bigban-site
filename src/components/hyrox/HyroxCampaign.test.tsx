@@ -15,36 +15,19 @@ describe("HyroxCampaign", () => {
     mockActive.mockReset();
   });
 
-  it("キャンペーン期間中は banner でタイトルと期間を表示する", () => {
-    mockActive.mockReturnValue(true);
-    renderWithIntl(<HyroxCampaign variant="banner" />);
-    expect(
-      screen.getByText(/オープン記念＆千葉大会応援キャンペーン/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/〜8\/9/)).toBeInTheDocument();
-  });
-
-  it("note バリアントでは料金がキャンペーン価格である旨も表示する", () => {
-    mockActive.mockReturnValue(true);
-    renderWithIntl(<HyroxCampaign variant="note" />);
-    expect(
-      screen.getByText(/オープン記念＆千葉大会応援キャンペーン/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/キャンペーン特別価格/)).toBeInTheDocument();
-  });
-
-  it("期間外は何も表示しない（null）", () => {
-    mockActive.mockReturnValue(false);
-    const { container } = renderWithIntl(<HyroxCampaign variant="banner" />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("variant 未指定時は banner として表示する", () => {
+  it("キャンペーン期間中はタイトル・期間・特別価格の注記を表示する", () => {
     mockActive.mockReturnValue(true);
     renderWithIntl(<HyroxCampaign />);
     expect(
       screen.getByText(/オープン記念＆千葉大会応援キャンペーン/),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/キャンペーン特別価格/)).not.toBeInTheDocument();
+    expect(screen.getByText(/〜8\/9/)).toBeInTheDocument();
+    expect(screen.getByText(/キャンペーン特別価格/)).toBeInTheDocument();
+  });
+
+  it("期間外は何も表示しない（null）", () => {
+    mockActive.mockReturnValue(false);
+    const { container } = renderWithIntl(<HyroxCampaign />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
