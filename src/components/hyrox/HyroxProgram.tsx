@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import CourtPriceTable from "@/components/pricing/CourtPriceTable";
+import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
 
 
@@ -39,6 +40,9 @@ export default function HyroxProgram() {
           <p className="text-text-light text-sm mb-2">{t("perHour")}</p>
           <div className="mx-auto mt-4 w-10 h-px bg-accent/30" />
         </motion.div>
+
+        {/* オープン記念＆千葉大会応援キャンペーン告知（期間外は自動非表示） */}
+        <HyroxCampaign variant="note" />
 
         {/* ピックルボールコートと同一の料金テーブル（COURT_PRICES を共有） */}
         <CourtPriceTable label={t("rateLabel")} />

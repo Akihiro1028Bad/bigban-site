@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
+import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
 import {
   RESERVE_URL,
@@ -157,6 +158,8 @@ export default function ReserveChoice() {
           headingKey="hyroxHeading"
           descKey="hyroxDesc"
         />
+        {/* オープン記念＆千葉大会応援キャンペーン告知（期間外は自動非表示） */}
+        <HyroxCampaign variant="note" />
         <ChoiceCardGrid cards={HYROX_CARDS} />
       </div>
     </section>
