@@ -206,6 +206,49 @@ describe("POST /api/growth/publish", () => {
     expect(publishContent).toHaveBeenCalled();
   });
 
+  it("公開直前にAI免責注記を除去した本文をtitleと一緒にPATCHする", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>",
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.objectContaining({
+        title: "公開する承認タイトル",
+        bodyHtml: expect.not.stringContaining("AIが作成した下書き"),
+      }),
+      expect.objectContaining({ apiKey: "content-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("AI免責注記あり・タイトル案が空なら除去済み本文だけをPATCHして公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>",
+        title: "   ",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "content-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
   it("APPROVE_AUTH_ENABLED が無効なら常に 401(公開は最強権限)", async () => {
     flags.authEnabled = false;
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));

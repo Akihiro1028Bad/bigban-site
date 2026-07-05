@@ -21,6 +21,7 @@ import {
   mediaOf,
   STATUS_PROP,
 } from "@/lib/growth/approve";
+import { removeAiDisclaimer } from "@/lib/growth/aiDisclaimer";
 import { hasPendingBodyImage } from "@/lib/growth/bodyImageInsert";
 import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bodyImageRegen";
 import { patchDraft, publishContent } from "@/lib/growth/content";
@@ -126,9 +127,19 @@ export async function POST(request: Request): Promise<Response> {
     const endpoint = growthEndpoint(mediaOf(page));
     // #176: 公開直前に承認画面の正タイトル(Notion タイトル案)を microCMS 下書きへ最終同期する。
     // これで承認・編集したタイトルが公開記事に確実に反映される(AI 生成時のタイトルで公開しない)。
+    // AI 免責注記は公開する microCMS 本文だけから除去する。Notion ミラーは下書き記録として残す。
+    const rawBody = draftBodyOf(page);
+    const { body: cleanBody, removed } = removeAiDisclaimer(rawBody);
+    const patch: Record<string, unknown> = {};
     const title = ideaTitleOf(page).trim();
     if (title) {
-      await patchDraft(endpoint, contentId, { title }, contentOpts);
+      patch.title = title;
+    }
+    if (removed) {
+      patch.bodyHtml = cleanBody;
+    }
+    if (Object.keys(patch).length > 0) {
+      await patchDraft(endpoint, contentId, patch, contentOpts);
     }
     await publishContent(endpoint, contentId, microOpts);
     await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
