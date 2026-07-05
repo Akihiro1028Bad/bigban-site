@@ -1,9 +1,17 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("next/server", async (orig) => ({
+  ...(await orig<typeof import("next/server")>()),
+  after: vi.fn((cb: () => unknown) => {
+    void cb();
+  }),
+}));
+
 // getPage / updatePageProps を差し替え、buildBodyMirrorProps 等の純関数は実物を使う(#95)。
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
+  createPage: vi.fn(),
   getPage: vi.fn(),
   updatePageProps: vi.fn(),
 }));
@@ -19,7 +27,10 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { BODY_MIRROR_PROP, getPage, updatePageProps } from "@/lib/growth/notion";
+import { after } from "next/server";
+
+import { LEARNING_LOG_PROPS } from "@/lib/growth/learningLog";
+import { BODY_MIRROR_PROP, createPage, getPage, updatePageProps } from "@/lib/growth/notion";
 import { patchDraft } from "@/lib/growth/content";
 import { POST } from "./route";
 
@@ -45,11 +56,39 @@ function pageWith(contentId?: string, title?: string, bodyRegenStatus?: string) 
   return { id: PAGE_ID, url: "", properties };
 }
 
+function pageWithBodyMirror(contentId: string, title: string, bodyHtml: string) {
+  const page = pageWith(contentId, title);
+  (page.properties as Record<string, unknown>)[BODY_MIRROR_PROP] = {
+    type: "rich_text",
+    rich_text: [{ plain_text: bodyHtml }],
+  };
+  return page;
+}
+
+function richTextContent(prop: unknown): string {
+  const value = prop as { rich_text?: Array<{ text?: { content?: string } }> };
+  return (value.rich_text ?? []).map((item) => item.text?.content ?? "").join("");
+}
+
+function titleContent(prop: unknown): string {
+  const value = prop as { title?: Array<{ text?: { content?: string } }> };
+  return (value.title ?? []).map((item) => item.text?.content ?? "").join("");
+}
+
+function selectName(prop: unknown): string {
+  const value = prop as { select?: { name?: string } };
+  return value.select?.name ?? "";
+}
+
 beforeEach(() => {
   flags.authEnabled = false;
+  delete process.env.GROWTH_LEARNING_LOG_DS;
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
   process.env.MICROCMS_CONTENT_API_KEY = "content-key";
+  vi.mocked(after).mockClear();
+  vi.mocked(createPage).mockReset();
+  vi.mocked(createPage).mockResolvedValue("learning-log-page");
   vi.mocked(getPage).mockReset();
   vi.mocked(updatePageProps).mockReset();
   vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
@@ -62,6 +101,7 @@ afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_CONTENT_API_KEY;
   delete process.env.APPROVE_SECRET;
+  delete process.env.GROWTH_LEARNING_LOG_DS;
 });
 
 describe("POST /api/growth/draft/edit", () => {
@@ -275,5 +315,84 @@ describe("POST /api/growth/draft/edit", () => {
     vi.mocked(getPage).mockResolvedValue(pageWith("g-abc"));
     const res = await POST(postRequest("right", { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
     expect(res.status).toBe(200);
+  });
+
+  it("保存成功後に after で手動編集の学習ログを追記する", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>新本文です。</p>" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(createPage).toHaveBeenCalledTimes(1);
+    const [dataSourceId, props, options] = vi.mocked(createPage).mock.calls[0];
+    expect(dataSourceId).toBe("ds-log");
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("編集");
+    expect(titleContent(props[LEARNING_LOG_PROPS.event])).toContain("編集:");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.articleTitle])).toBe("承認したタイトル");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.pageId])).toBe(PAGE_ID);
+    expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toContain("旧本文です");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toContain("新本文です");
+    expect((options as { token: string }).token).toBe("secret_notion");
+  });
+
+  it("本文が無変更なら学習ログ追記を登録しない", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>同じ本文です。</p>")
+    );
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>同じ本文です。</p>" }));
+
+    expect(res.status).toBe(200);
+    expect(after).not.toHaveBeenCalled();
+    expect(createPage).not.toHaveBeenCalled();
+  });
+
+  it("学習ログ DS 未設定なら保存は成功し追記を登録しない", async () => {
+    delete process.env.GROWTH_LEARNING_LOG_DS;
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>新本文です。</p>" }));
+
+    expect(res.status).toBe(200);
+    expect(after).not.toHaveBeenCalled();
+    expect(createPage).not.toHaveBeenCalled();
+  });
+
+  it("学習ログ追記が失敗しても保存レスポンスは 200 を返す", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+    vi.mocked(createPage).mockRejectedValue(new Error("learning log down"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>新本文です。</p>" }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(createPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("保存失敗時は学習ログ追記を登録しない", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue({
+      id: PAGE_ID,
+      url: "",
+      properties: { "ステータス": { select: { name: "生成中" } } },
+    });
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>新本文です。</p>" }));
+
+    expect(res.status).toBe(409);
+    expect(after).not.toHaveBeenCalled();
+    expect(createPage).not.toHaveBeenCalled();
   });
 });

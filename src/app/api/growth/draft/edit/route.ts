@@ -9,7 +9,7 @@
  * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate。既定ON・フェイルセーフ(未設定=ON))。
  */
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
@@ -17,7 +17,13 @@ import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bod
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import {
+  appendLearningLog,
+  formatEditDiffSummary,
+  summarizeEditDiff,
+} from "@/lib/growth/learningLog";
+import {
   buildBodyMirrorProps,
+  createPage,
   defaultFetch,
   getPage,
   updatePageProps,
@@ -145,6 +151,29 @@ export async function POST(request: Request): Promise<Response> {
       { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。再保存してください。" },
       { status: 502 }
     );
+  }
+
+  // #SI1: 手動リッチ編集の前後差分を学習ログへベストエフォート追記(after=レスポンス後実行)。
+  // 本処理(保存)の成否には一切影響させない。無変更保存は記録しない。
+  const learningLogDs = process.env.GROWTH_LEARNING_LOG_DS;
+  const editDiff = summarizeEditDiff(previousBody, sanitized);
+  if (learningLogDs && !editDiff.noChange) {
+    after(async () => {
+      const outcome = await appendLearningLog(
+        { kind: "編集", pageId, title, before: previousBody, after: sanitized },
+        {
+          dataSourceId: learningLogDs,
+          notionOptions: notionOpts,
+          createPageFn: createPage,
+          nowIso: new Date().toISOString(),
+          diffSummary: formatEditDiffSummary(editDiff),
+          titleHeadline: editDiff.headline,
+        }
+      );
+      if (outcome.status === "failed") {
+        console.error("learning-log append failed (draft/edit)", outcome.error);
+      }
+    });
   }
 
   return NextResponse.json({ success: true });
