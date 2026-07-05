@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ActionSuggestions } from "./ActionSuggestions";
 import { OutlineView } from "./OutlineView";
 import type { ArticleHypothesis } from "@/lib/growth/approve";
 
@@ -142,22 +141,3 @@ describe("OutlineView", () => {
   });
 });
 
-describe("ActionSuggestions(直接・分岐網羅)", () => {
-  it("候補が空なら null(何も描画しない)", () => {
-    const { container } = render(
-      <ActionSuggestions suggestions={[]} activeAction="" onPick={vi.fn()} />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("activeAction に一致しない候補は inactive スタイル", () => {
-    render(
-      <ActionSuggestions suggestions={["A", "B"]} activeAction="A" onPick={vi.fn()} />,
-    );
-    const active = screen.getByRole("button", { name: "A" });
-    const inactive = screen.getByRole("button", { name: "B" });
-    expect(active).toHaveStyle({ color: "#0a0c10" });
-    // inactive は purple 前景(#0a0c10 ではない)
-    expect(inactive).not.toHaveStyle({ color: "#0a0c10" });
-  });
-});

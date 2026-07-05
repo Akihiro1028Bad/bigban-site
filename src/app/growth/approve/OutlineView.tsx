@@ -50,7 +50,6 @@ export function OutlineView({
   const [commentFor, setCommentFor] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
 
-  const total = sections.length;
   const totalComments = sections.reduce((n, s) => n + (s.comments?.length ?? 0), 0);
 
   const submitComment = (i: number) => {

@@ -197,6 +197,12 @@ describe("reconcilePendingImage", () => {
     expect(reconcilePendingImage(editorHtml, freshBodyHtml, "img-abc123")).toBeNull();
   });
 
+  it("エディタに figure が無ければ pending なしとして null", () => {
+    const freshBodyHtml = '<figure><img src="https://images.microcms-assets.io/assets/new.png" alt="新規"></figure>';
+
+    expect(reconcilePendingImage("<p>本文</p>", freshBodyHtml, "img-abc123")).toBeNull();
+  });
+
   it("差集合が0件または複数件なら null", () => {
     const editorHtml =
       '<figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>' +
