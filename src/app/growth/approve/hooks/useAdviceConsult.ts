@@ -38,6 +38,7 @@ function errMsg(error: unknown, fallback: string): string {
 export function useAdviceConsult({
   pageId,
   token,
+  advice,
   adviceApply,
   bodyHtml,
   onChanged,
@@ -117,11 +118,12 @@ export function useAdviceConsult({
     }
     setBusy(true);
     setError("");
+    const adoptedAspects = applied.map((fixIndex) => advice?.advice?.fixes[fixIndex]?.area ?? "");
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html }),
+        body: JSON.stringify({ pageId, bodyHtml: html, source: "advise-apply", adoptedAspects }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");

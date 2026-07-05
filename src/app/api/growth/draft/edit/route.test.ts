@@ -340,6 +340,55 @@ describe("POST /api/growth/draft/edit", () => {
     expect((options as { token: string }).token).toBe("secret_notion");
   });
 
+  it("advise-apply は採用観点ごとに after で採否の学習ログを追記する", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["冗長", "敬体乱れ"],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(after).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(2));
+    const firstProps = vi.mocked(createPage).mock.calls[0][1];
+    const secondProps = vi.mocked(createPage).mock.calls[1][1];
+    expect(selectName(firstProps[LEARNING_LOG_PROPS.kind])).toBe("採否");
+    expect(selectName(secondProps[LEARNING_LOG_PROPS.kind])).toBe("採否");
+    expect(richTextContent(firstProps[LEARNING_LOG_PROPS.target])).toBe("冗長");
+    expect(richTextContent(secondProps[LEARNING_LOG_PROPS.target])).toBe("敬体乱れ");
+    expect(richTextContent(firstProps[LEARNING_LOG_PROPS.summary])).toBe("採用観点: 冗長");
+    expect(richTextContent(secondProps[LEARNING_LOG_PROPS.summary])).toBe("採用観点: 敬体乱れ");
+  });
+
+  it("source 付きでも adoptedAspects が空なら手動編集として学習ログを追記する", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: [],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(createPage).toHaveBeenCalledTimes(1);
+    const props = vi.mocked(createPage).mock.calls[0][1];
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("編集");
+  });
+
   it("本文が無変更なら学習ログ追記を登録しない", async () => {
     process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
     vi.mocked(getPage).mockResolvedValue(

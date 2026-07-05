@@ -72,6 +72,12 @@ export async function POST(request: Request): Promise<Response> {
   }
   const pageId = (body as { pageId?: unknown })?.pageId;
   const bodyHtml = (body as { bodyHtml?: unknown })?.bodyHtml;
+  const source = (body as { source?: unknown })?.source;
+  const rawAspects = (body as { adoptedAspects?: unknown })?.adoptedAspects;
+  const isAdopt = source === "advise-apply" || source === "comment-revise";
+  const adoptedAspects: string[] = Array.isArray(rawAspects)
+    ? rawAspects.filter((aspect): aspect is string => typeof aspect === "string").slice(0, 20)
+    : [];
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
   if (typeof bodyHtml !== "string" || bodyHtml.trim() === "") {
     return badRequest("本文が空です。");
@@ -153,27 +159,51 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // #SI1: 手動リッチ編集の前後差分を学習ログへベストエフォート追記(after=レスポンス後実行)。
-  // 本処理(保存)の成否には一切影響させない。無変更保存は記録しない。
+  // #SI1: 本文更新の学習ログをベストエフォート追記(after=レスポンス後実行)。
+  // 本処理(保存)の成否には一切影響させない。
   const learningLogDs = process.env.GROWTH_LEARNING_LOG_DS;
-  const editDiff = summarizeEditDiff(previousBody, sanitized);
-  if (learningLogDs && !editDiff.noChange) {
-    after(async () => {
-      const outcome = await appendLearningLog(
-        { kind: "編集", pageId, title, before: previousBody, after: sanitized },
-        {
-          dataSourceId: learningLogDs,
-          notionOptions: notionOpts,
-          createPageFn: createPage,
-          nowIso: new Date().toISOString(),
-          diffSummary: formatEditDiffSummary(editDiff),
-          titleHeadline: editDiff.headline,
+  if (learningLogDs) {
+    if (isAdopt && adoptedAspects.length > 0) {
+      // #SI1(b): 採用 fix ごとに 1 行「採否」を追記(却下は client 側で送られない)。
+      after(async () => {
+        for (const aspect of adoptedAspects) {
+          const outcome = await appendLearningLog(
+            { kind: "採否", pageId, title, aspect, before: previousBody, after: sanitized },
+            {
+              dataSourceId: learningLogDs,
+              notionOptions: notionOpts,
+              createPageFn: createPage,
+              nowIso: new Date().toISOString(),
+              diffSummary: `採用観点: ${aspect}`,
+            }
+          );
+          if (outcome.status === "failed") {
+            console.error("learning-log append failed (adopt)", outcome.error);
+          }
         }
-      );
-      if (outcome.status === "failed") {
-        console.error("learning-log append failed (draft/edit)", outcome.error);
+      });
+    } else {
+      // #SI1(a): 手動編集(source なし)は「編集」を 1 行。無変更はスキップ。
+      const editDiff = summarizeEditDiff(previousBody, sanitized);
+      if (!editDiff.noChange) {
+        after(async () => {
+          const outcome = await appendLearningLog(
+            { kind: "編集", pageId, title, before: previousBody, after: sanitized },
+            {
+              dataSourceId: learningLogDs,
+              notionOptions: notionOpts,
+              createPageFn: createPage,
+              nowIso: new Date().toISOString(),
+              diffSummary: formatEditDiffSummary(editDiff),
+              titleHeadline: editDiff.headline,
+            }
+          );
+          if (outcome.status === "failed") {
+            console.error("learning-log append failed (draft/edit)", outcome.error);
+          }
+        });
       }
-    });
+    }
   }
 
   return NextResponse.json({ success: true });

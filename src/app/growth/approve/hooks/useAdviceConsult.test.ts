@@ -15,6 +15,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AdviceView } from "@/lib/growth/advise";
 import type { AdviceApplyView } from "@/lib/growth/adviseApply";
 
 import { useAdviceConsult } from "./useAdviceConsult";
@@ -34,12 +35,13 @@ function mockFetch(...responses: Response[]): ReturnType<typeof vi.fn> {
   return fn;
 }
 
-function setup(opts: { adviceApply?: AdviceApplyView; bodyHtml?: string } = {}) {
+function setup(opts: { advice?: AdviceView; adviceApply?: AdviceApplyView; bodyHtml?: string } = {}) {
   const onChanged = vi.fn();
   const view = renderHook(() =>
     useAdviceConsult({
       pageId: PAGE_ID,
       token: TOKEN,
+      advice: opts.advice,
       adviceApply: opts.adviceApply,
       bodyHtml: opts.bodyHtml,
       onChanged,
@@ -212,7 +214,24 @@ describe("applyNow", () => {
 
   it("成功: 保存→片付け→onChanged、エラーは空", async () => {
     const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
-    const { onChanged, view } = setup({ bodyHtml: BODY, adviceApply: APPLY_VIEW });
+    const advice: AdviceView = {
+      status: "提示中",
+      raw: "",
+      advice: {
+        summary: "全体",
+        scores: [],
+        strengths: [],
+        fixes: [
+          {
+            area: "読みやすさ",
+            severity: "中",
+            reason: "冗長",
+            suggestion: "短くする",
+          },
+        ],
+      },
+    };
+    const { onChanged, view } = setup({ bodyHtml: BODY, adviceApply: APPLY_VIEW, advice });
     await act(async () => {
       await view.result.current.applyNow();
     });
@@ -220,6 +239,8 @@ describe("applyNow", () => {
     expect(fetchFn.mock.calls[1][0]).toBe("/api/growth/advise/apply/dismiss");
     const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
     expect(saveBody.bodyHtml).toContain("ここが肝心です。");
+    expect(saveBody.source).toBe("advise-apply");
+    expect(saveBody.adoptedAspects).toEqual(["読みやすさ"]);
     expect(onChanged).toHaveBeenCalledTimes(1);
     expect(view.result.current.error).toBe("");
   });
