@@ -8,9 +8,11 @@ import {
   htmlToPlainBlocks,
   LEARNING_LOG_PROPS,
   parseLearningLogPage,
+  summarizeLearningLog,
   summarizeEditDiff,
   type EditDiffSummary,
   type LearningEvent,
+  type LearningLogRow,
 } from "./learningLog";
 
 const NOW_ISO = "2026-07-05T12:34:56.000Z";
@@ -401,5 +403,166 @@ describe("summarizeEditDiff", () => {
         summarizeEditDiff(`<p>${"あ".repeat(30000)}</p>`, `<p>${"い".repeat(30000)}</p>`)
       )
     ).not.toThrow();
+  });
+});
+
+describe("summarizeLearningLog", () => {
+  const nowMs = Date.parse("2026-07-05T00:00:00.000Z");
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  function row(overrides: Partial<LearningLogRow>): LearningLogRow {
+    return {
+      id: "row-1",
+      kind: "編集",
+      recordedAtMs: nowMs,
+      articleTitle: "記事",
+      pageId: "page-1",
+      target: "",
+      result: "",
+      summary: "[導入] 導入を修正",
+      count: null,
+      ...overrides,
+    };
+  }
+
+  it("直近 windowWeeks 週内だけを対象にし、recordedAtMs=null は除外する", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ id: "old", recordedAtMs: nowMs - 35 * dayMs }),
+        row({ id: "recent", recordedAtMs: nowMs - 21 * dayMs }),
+        row({ id: "missing-date", recordedAtMs: null }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.totalRows).toBe(1);
+    expect(summary.countByKind).toEqual({
+      編集: 1,
+      採否: 0,
+      画像試行: 0,
+      工程失敗: 0,
+      その他: 0,
+    });
+  });
+
+  it("種別別件数は 4 種別とその他を初期化してカウントする", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ kind: "編集" }),
+        row({ kind: "採否" }),
+        row({ kind: "画像試行" }),
+        row({ kind: "工程失敗" }),
+        row({ kind: "その他" }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.countByKind).toEqual({
+      編集: 1,
+      採否: 1,
+      画像試行: 1,
+      工程失敗: 1,
+      その他: 1,
+    });
+  });
+
+  it("編集イベントの要約先頭から region を抽出し、抽出不能なら不明に寄せる", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ kind: "編集", summary: "[導入] 導入を修正" }),
+        row({ kind: "編集", summary: "[導入] 短縮" }),
+        row({ kind: "編集", summary: "[導入] 加筆" }),
+        row({ kind: "編集", summary: "無変更" }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.editRegionHeatmap).toEqual({ 導入: 3, 不明: 1 });
+  });
+
+  it("採否イベントは target を aspect として集計し、空なら不明に寄せる", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ kind: "採否", target: "冗長" }),
+        row({ kind: "採否", target: "冗長" }),
+        row({ kind: "採否", target: "" }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.adoptAspectHeatmap).toEqual({ 冗長: 2, 不明: 1 });
+  });
+
+  it("画像試行は pageId と style ごとの最大回数を降順にし、上位 10 件に丸める", () => {
+    const imageRows = Array.from({ length: 11 }, (_, index) =>
+      row({
+        id: `image-${index}`,
+        kind: "画像試行",
+        pageId: `page-${index}`,
+        target: "diagram",
+        count: index + 1,
+      })
+    );
+    const summary = summarizeLearningLog(
+      [
+        row({ id: "same-1", kind: "画像試行", pageId: "same-page", target: "mascot", count: 1 }),
+        row({ id: "same-3", kind: "画像試行", pageId: "same-page", target: "mascot", count: 3 }),
+        ...imageRows,
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.imageRetryTop).toHaveLength(10);
+    expect(summary.imageRetryTop[0]).toEqual({
+      key: "page-10::diagram",
+      style: "diagram",
+      pageId: "page-10",
+      maxAttempt: 11,
+    });
+    expect(summary.imageRetryTop.find((item) => item.key === "same-page::mascot")).toEqual({
+      key: "same-page::mascot",
+      style: "mascot",
+      pageId: "same-page",
+      maxAttempt: 3,
+    });
+  });
+
+  it("工程失敗は target を mode として集計し、空なら不明に寄せる", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ kind: "工程失敗", target: "revise" }),
+        row({ kind: "工程失敗", target: "revise" }),
+        row({ kind: "工程失敗", target: "revise" }),
+        row({ kind: "工程失敗", target: "weekly" }),
+        row({ kind: "工程失敗", target: "" }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.failModeFrequency).toEqual({ revise: 3, weekly: 1, 不明: 1 });
+  });
+
+  it("0 件でも空サマリを返す", () => {
+    expect(summarizeLearningLog([], nowMs, 4)).toEqual({
+      windowWeeks: 4,
+      totalRows: 0,
+      countByKind: {
+        編集: 0,
+        採否: 0,
+        画像試行: 0,
+        工程失敗: 0,
+        その他: 0,
+      },
+      editRegionHeatmap: {},
+      adoptAspectHeatmap: {},
+      imageRetryTop: [],
+      failModeFrequency: {},
+    });
   });
 });
