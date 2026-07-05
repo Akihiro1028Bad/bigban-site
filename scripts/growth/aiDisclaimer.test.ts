@@ -105,4 +105,28 @@ describe("removeAiDisclaimer", () => {
     expect(() => removeAiDisclaimer(input)).not.toThrow();
     expect(removeAiDisclaimer(input)).toEqual({ body: `<p>${body}</p>`, removed: true });
   });
+
+  it("連続する注記ブロック(後始末範囲が重なる)をまとめて除去する", () => {
+    const input = `<p>本文</p>\n<p>${DISCLAIMER}</p>\n<p>${DISCLAIMER}</p>`;
+
+    expect(removeAiDisclaimer(input)).toEqual({ body: "<p>本文</p>", removed: true });
+  });
+
+  it("注記ブロック直前の空ブロックと空白も後始末として併呑する", () => {
+    const input = `<p>本文</p><p></p>\n<p></p><p>${DISCLAIMER}</p>`;
+
+    expect(removeAiDisclaimer(input)).toEqual({ body: "<p>本文</p>", removed: true });
+  });
+
+  it("最終ブロックの後ろにある裸テキストの注記行を除去する", () => {
+    const input = `<p>本文</p>\n${DISCLAIMER}`;
+
+    expect(removeAiDisclaimer(input)).toEqual({ body: "<p>本文</p>", removed: true });
+  });
+
+  it("タグ属性内だけにマークがある場合は本文を変更しない", () => {
+    const input = `<p data-note="AIが作成した下書き">本文です。</p>`;
+
+    expect(removeAiDisclaimer(input)).toEqual({ body: input, removed: false });
+  });
 });
