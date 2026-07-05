@@ -32,6 +32,11 @@ export const LABOLA_PICKLEBALL_URL = labolaWeekUrl(
 export const LABOLA_HYROX_URL =
   "https://yoyaku.labola.jp/r/shop/3473/calendar_week/?&tab_name=H%20Y%20R%20O%20X";
 
+// レッスン / クラスのご予約（labola・スクール予約）。
+// コート/HYROX の calendar_week（枠貸し）とは別系統の event/school パス。
+export const LABOLA_SCHOOL_URL =
+  "https://yoyaku.labola.jp/r/shop/3473/event/school/";
+
 // 内部予約案内ページのパス（next-intl Link 用）。7月=RESERVA / 8月以降=labola の二択を案内する。
 export const RESERVE_PATH = "/reserve";
 
