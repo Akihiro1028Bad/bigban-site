@@ -62,7 +62,7 @@ describe("ArtboardView", () => {
           {
             style: "court",
             description: "キッチンとサーブ位置を俯瞰で示す",
-            textSpec: "キッチン\nサーブ位置",
+            textSpec: "キッチン サーブ位置",
           },
         ],
         suppressImage: undefined,
@@ -98,6 +98,116 @@ describe("ArtboardView", () => {
       BASE_SECTIONS[0],
       { ...BASE_SECTIONS[1], images: [], suppressImage: true },
     ]);
+  });
+
+  it("複数画像を持つセクションでは画像ごとのスロットを描画し、1枚目の編集で2枚目を保持する", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => true);
+    const sections: OutlineSection[] = [
+      {
+        heading: "複数画像セクション",
+        description: "説明",
+        images: [
+          { style: "court", description: "既存のコート図", textSpec: "キッチン" },
+          { style: "flow", description: "既存の導線図", textSpec: "受付 > 体験" },
+        ],
+      },
+    ];
+    renderArtboard({ sections, onSave });
+
+    expect(screen.getByRole("button", { name: "画像を編集: 複数画像セクション 1枚目" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "画像を編集: 複数画像セクション 2枚目" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "画像を編集: 複数画像セクション 1枚目" }));
+    const editor = firstEditor("複数画像セクション");
+    await user.clear(within(editor).getByLabelText("画像の説明"));
+    await user.type(within(editor).getByLabelText("画像の説明"), "更新したコート図");
+    await user.click(within(editor).getByRole("button", { name: "画像指示を保存" }));
+
+    expect(onSave).toHaveBeenCalledWith([
+      {
+        ...sections[0],
+        images: [
+          { style: "court", description: "更新したコート図", textSpec: "キッチン" },
+          { style: "flow", description: "既存の導線図", textSpec: "受付 > 体験" },
+        ],
+        suppressImage: undefined,
+      },
+    ]);
+  });
+
+  it("複数画像を持つセクションの画像を個別に削除できる", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => true);
+    const sections: OutlineSection[] = [
+      {
+        heading: "複数画像セクション",
+        description: "説明",
+        images: [
+          { style: "court", description: "既存のコート図", textSpec: "キッチン" },
+          { style: "flow", description: "既存の導線図", textSpec: "受付 > 体験" },
+        ],
+      },
+    ];
+    renderArtboard({ sections, onSave });
+
+    await user.click(screen.getByRole("button", { name: "画像を編集: 複数画像セクション 2枚目" }));
+    const editor = firstEditor("複数画像セクション");
+    await user.click(within(editor).getByRole("button", { name: "この画像を削除" }));
+
+    expect(onSave).toHaveBeenCalledWith([
+      {
+        ...sections[0],
+        images: [{ style: "court", description: "既存のコート図", textSpec: "キッチン" }],
+        suppressImage: undefined,
+      },
+    ]);
+  });
+
+  it("画像があるセクションにも上限未満なら追加スロットを描画し、保存時は末尾に追加する", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => true);
+    const sections: OutlineSection[] = [
+      {
+        heading: "追加できるセクション",
+        description: "説明",
+        images: [{ style: "court", description: "既存のコート図", textSpec: "キッチン" }],
+      },
+    ];
+    renderArtboard({ sections, onSave });
+
+    await user.click(screen.getByRole("button", { name: "画像を置く: 追加できるセクション" }));
+    const editor = firstEditor("追加できるセクション");
+    await user.click(within(editor).getByRole("radio", { name: "フロー図" }));
+    await user.clear(within(editor).getByLabelText("画像の説明"));
+    await user.type(within(editor).getByLabelText("画像の説明"), "受付から体験までの流れ");
+    await user.type(within(editor).getByLabelText("図に入れる文字・数値"), "受付\n着替え\n体験");
+    await user.click(within(editor).getByRole("button", { name: "画像指示を保存" }));
+
+    expect(onSave).toHaveBeenCalledWith([
+      {
+        ...sections[0],
+        images: [
+          { style: "court", description: "既存のコート図", textSpec: "キッチン" },
+          { style: "flow", description: "受付から体験までの流れ", textSpec: "受付 着替え 体験" },
+        ],
+        suppressImage: undefined,
+      },
+    ]);
+  });
+
+  it("ユーザーが書いた説明はスタイル切替で上書きしない", async () => {
+    const user = userEvent.setup();
+    renderArtboard();
+
+    await user.click(screen.getByRole("button", { name: "画像を置く: 初心者が最初に覚えるルール" }));
+    const editor = firstEditor("初心者が最初に覚えるルール");
+    const description = within(editor).getByLabelText("画像の説明");
+    await user.clear(description);
+    await user.type(description, "ユーザーが書いた説明");
+    await user.click(within(editor).getByRole("radio", { name: "コート図" }));
+
+    expect(description).toHaveValue("ユーザーが書いた説明");
   });
 
   it("3枚 specified 済みなら空スロットの追加ボタンを無効化して上限文言を出す", () => {
