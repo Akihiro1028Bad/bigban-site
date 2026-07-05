@@ -35,6 +35,12 @@ describe("deriveShellCounts", () => {
     expect(c.publishedTotal).toBe(1);  // pub1
   });
 
+  it("記事(kind=idea)のアクション待ちを施策と分けて算出する", () => {
+    const c = deriveShellCounts(items, decided);
+    expect(c.articlePending).toBe(1); // i1 のみ(g1 は下流待ち・d1 は isDraftReady・pub1 は published)
+    expect(c.articlePending + c.proposalPending).toBe(c.awaiting); // 記事+施策=全アクション待ち
+  });
+
   it("空配列でも 0 を返す", () => {
     const c = deriveShellCounts([], {});
     expect(c.awaiting).toBe(0);

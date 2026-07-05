@@ -17,6 +17,7 @@ export interface ShellCounts {
   awaiting: number;
   publishedTotal: number;
   proposalPending: number;
+  articlePending: number;
   queueReady: number;
   segmentCounts: Record<ShellSegmentKey, number>;
 }
@@ -34,6 +35,7 @@ export function deriveShellCounts(
   let generating = 0;
   let published = 0;
   let proposalPending = 0;
+  let articlePending = 0;
   let queueReady = 0;
   for (const it of items) {
     const actionable = isActionable(it, decided) && !TERMINAL_STAGES.has(it.stage);
@@ -41,12 +43,14 @@ export function deriveShellCounts(
     if (it.stage === "generating") generating += 1;
     if (it.stage === "published") published += 1;
     if (it.kind === "proposal" && actionable) proposalPending += 1;
+    if (it.kind === "idea" && actionable) articlePending += 1;
     if (it.stage === "drafted" && it.isDraftReady === true) queueReady += 1;
   }
   return {
     awaiting,
     publishedTotal: published,
     proposalPending,
+    articlePending,
     queueReady,
     segmentCounts: {
       all: items.length,
