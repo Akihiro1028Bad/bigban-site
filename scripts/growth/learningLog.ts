@@ -1,4 +1,8 @@
-import { chunkRichText, type NotionPage } from "./notion";
+import { splitTopLevelBlocks } from "./decorate";
+import { chunkRichText } from "./notion";
+
+import type { TopLevelBlock } from "./decorate";
+import type { NotionPage } from "./notion";
 
 // ── イベント種別・discriminated union(spec §3.4.3) ──
 export type LearningEventKind = "編集" | "採否" | "画像試行" | "工程失敗";
@@ -32,6 +36,163 @@ export const LEARNING_LOG_PROPS = {
 } as const;
 
 export const LEARNING_LOG_RESULTS: readonly LearningImageResult[] = ["成功", "失敗", "リトライ"];
+
+export interface PlainBlock {
+  text: string;
+  isHeading: boolean;
+}
+
+export interface EditDiffSummary {
+  headline: string;
+  region: "導入" | "見出し" | "本文" | "全体";
+  beforeChars: number;
+  afterChars: number;
+  delta: number;
+  sample: { before: string; after: string };
+  noChange: boolean;
+}
+
+function blockToPlainBlock(block: TopLevelBlock): PlainBlock | null {
+  const text = block.html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+  if (text === "") return null;
+  return { text, isHeading: /^h[1-6]$/.test(block.tag) };
+}
+
+// HTML をトップレベルブロックのプレーンテキスト配列へ(タグ除去)。
+export function htmlToPlainBlocks(html: string): PlainBlock[] {
+  return splitTopLevelBlocks(html).flatMap((block) => {
+    const plain = blockToPlainBlock(block);
+    return plain ? [plain] : [];
+  });
+}
+
+function plainTextLength(html: string): number {
+  return html.replace(/<[^>]+>/g, "").length;
+}
+
+function lcsPairs(beforeBlocks: PlainBlock[], afterBlocks: PlainBlock[]): Array<[number, number]> {
+  const rowCount = beforeBlocks.length + 1;
+  const columnCount = afterBlocks.length + 1;
+  const dp = Array.from({ length: rowCount }, () => Array<number>(columnCount).fill(0));
+
+  for (let i = beforeBlocks.length - 1; i >= 0; i -= 1) {
+    for (let j = afterBlocks.length - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        beforeBlocks[i].text === afterBlocks[j].text
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const pairs: Array<[number, number]> = [];
+  let i = 0;
+  let j = 0;
+  while (i < beforeBlocks.length && j < afterBlocks.length) {
+    if (beforeBlocks[i].text === afterBlocks[j].text) {
+      pairs.push([i, j]);
+      i += 1;
+      j += 1;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      i += 1;
+    } else {
+      j += 1;
+    }
+  }
+  return pairs;
+}
+
+function lcsOutsideBlocks(
+  beforeBlocks: PlainBlock[],
+  afterBlocks: PlainBlock[]
+): { removedBlocks: PlainBlock[]; addedBlocks: PlainBlock[] } {
+  const pairs = lcsPairs(beforeBlocks, afterBlocks);
+  const beforeMatched = new Set(pairs.map(([beforeIndex]) => beforeIndex));
+  const afterMatched = new Set(pairs.map(([, afterIndex]) => afterIndex));
+
+  return {
+    removedBlocks: beforeBlocks.filter((_, index) => !beforeMatched.has(index)),
+    addedBlocks: afterBlocks.filter((_, index) => !afterMatched.has(index)),
+  };
+}
+
+// 前後本文 HTML からブロック単位 LCS で構造化要約を作る(LLM 非依存・決定的)。
+export function summarizeEditDiff(before: string, after: string): EditDiffSummary {
+  const beforeBlocks = htmlToPlainBlocks(before);
+  const afterBlocks = htmlToPlainBlocks(after);
+  const { removedBlocks, addedBlocks } = lcsOutsideBlocks(beforeBlocks, afterBlocks);
+  const removedCount = removedBlocks.length;
+  const addedCount = addedBlocks.length;
+  const changed = Math.min(removedCount, addedCount);
+  const pureAdded = addedCount - changed;
+  const pureRemoved = removedCount - changed;
+  const beforeChars = plainTextLength(before);
+  const afterChars = plainTextLength(after);
+  const noChange = removedCount === 0 && addedCount === 0;
+  const changedBlocks = [...removedBlocks, ...addedBlocks];
+  const hasOnlyHeadingChanges =
+    changedBlocks.length > 0 && changedBlocks.every((block) => block.isHeading);
+  const hasIntroChanged = beforeBlocks[0]?.text !== afterBlocks[0]?.text;
+  const changedBlockScore = pureAdded + pureRemoved + changed;
+  const headline = headlineOf({
+    noChange,
+    hasOnlyHeadingChanges,
+    hasIntroChanged,
+    changedBlockScore,
+    pureAdded,
+    pureRemoved,
+  });
+  const region = regionOf(headline, hasIntroChanged, changedBlockScore);
+
+  return {
+    headline,
+    region,
+    beforeChars,
+    afterChars,
+    delta: afterChars - beforeChars,
+    sample: {
+      before: (removedBlocks[0]?.text ?? "").slice(0, 200),
+      after: (addedBlocks[0]?.text ?? "").slice(0, 200),
+    },
+    noChange,
+  };
+}
+
+function headlineOf(input: {
+  noChange: boolean;
+  hasOnlyHeadingChanges: boolean;
+  hasIntroChanged: boolean;
+  changedBlockScore: number;
+  pureAdded: number;
+  pureRemoved: number;
+}): string {
+  if (input.noChange) return "無変更";
+  if (input.hasOnlyHeadingChanges) return "見出しを修正";
+  if (input.hasIntroChanged && input.changedBlockScore <= 2) return "導入を修正";
+  if (input.pureAdded > input.pureRemoved) return "加筆";
+  if (input.pureRemoved > input.pureAdded) return "短縮";
+  return "言い換え";
+}
+
+function regionOf(
+  headline: string,
+  hasIntroChanged: boolean,
+  changedBlockScore: number
+): EditDiffSummary["region"] {
+  if (headline === "見出しを修正") return "見出し";
+  if (hasIntroChanged) return "導入";
+  if (changedBlockScore >= 4) return "全体";
+  return "本文";
+}
+
+// EditDiffSummary を `要約` プロパティ用の 1 本の文字列へ整形(2000 字で切る)。
+export function formatEditDiffSummary(diff: EditDiffSummary): string {
+  if (diff.noChange) return "無変更";
+  const signedDelta = diff.delta >= 0 ? `+${diff.delta}` : `${diff.delta}`;
+  return `[${diff.region}] ${diff.headline} / ${diff.beforeChars}字→${diff.afterChars}字(${signedDelta})\n変更前: ${diff.sample.before}\n変更後: ${diff.sample.after}`.slice(
+    0,
+    2000
+  );
+}
 
 function articleTitleHead(title: string): string {
   return title.trim() === "" ? "無題" : title.slice(0, 20);

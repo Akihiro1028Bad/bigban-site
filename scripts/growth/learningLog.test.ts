@@ -4,8 +4,12 @@ import type { NotionPage } from "./notion";
 import {
   buildLearningLogProps,
   buildLearningLogTitle,
+  formatEditDiffSummary,
+  htmlToPlainBlocks,
   LEARNING_LOG_PROPS,
   parseLearningLogPage,
+  summarizeEditDiff,
+  type EditDiffSummary,
   type LearningEvent,
 } from "./learningLog";
 
@@ -279,5 +283,123 @@ describe("parseLearningLogPage", () => {
     expect(row.kind).toBe("その他");
     expect(row.recordedAtMs).toBeNull();
     expect(row.result).toBe("");
+  });
+});
+
+describe("summarizeEditDiff", () => {
+  it("HTML をトップレベルブロックのプレーンテキストに変換する", () => {
+    expect(htmlToPlainBlocks("<h2>見出し</h2><p>本文</p>")).toEqual([
+      { text: "見出し", isHeading: true },
+      { text: "本文", isHeading: false },
+    ]);
+    expect(htmlToPlainBlocks("<p> </p><p>&nbsp;本文&nbsp;</p>")).toEqual([
+      { text: "本文", isHeading: false },
+    ]);
+  });
+
+  it("headline を決定的に判定する", () => {
+    expect(summarizeEditDiff("<p>A</p>", "<p>A</p><p>B</p><p>C</p>").headline).toBe("加筆");
+    expect(summarizeEditDiff("<p>A</p><p>B</p><p>C</p>", "<p>A</p>").headline).toBe(
+      "短縮"
+    );
+    expect(summarizeEditDiff("<p>A</p><p>B</p><p>C</p>", "<p>A</p><p>D</p><p>C</p>").headline).toBe(
+      "言い換え"
+    );
+    expect(summarizeEditDiff("<p>導入</p><p>本文</p>", "<p>新しい導入</p><p>本文</p>").headline).toBe(
+      "導入を修正"
+    );
+    expect(summarizeEditDiff("<h2>旧見出し</h2><p>本文</p>", "<h2>新見出し</h2><p>本文</p>").headline).toBe(
+      "見出しを修正"
+    );
+
+    const noChange = summarizeEditDiff("<p>同じ</p>", "<p>同じ</p>");
+    expect(noChange.headline).toBe("無変更");
+    expect(noChange.noChange).toBe(true);
+  });
+
+  it("region を決定的に判定する", () => {
+    expect(
+      summarizeEditDiff("<h2>旧見出し</h2><p>本文</p>", "<h2>新見出し</h2><p>本文</p>").region
+    ).toBe("見出し");
+    expect(summarizeEditDiff("<p>導入</p><p>本文</p>", "<p>新導入</p><p>本文</p>").region).toBe(
+      "導入"
+    );
+    expect(
+      summarizeEditDiff(
+        "<p>A</p><p>B</p><p>C</p><p>D</p><p>E</p><p>Z</p>",
+        "<p>A</p><p>V</p><p>W</p><p>X</p><p>Y</p><p>Z</p>"
+      ).region
+    ).toBe("全体");
+    expect(summarizeEditDiff("<p>A</p><p>B</p><p>C</p>", "<p>A</p><p>D</p><p>C</p>").region).toBe(
+      "本文"
+    );
+  });
+
+  it("タグ除去後の文字数と delta を返す", () => {
+    const diff = summarizeEditDiff(`<p>${"あ".repeat(100)}</p>`, `<p>${"い".repeat(60)}</p>`);
+    expect(diff.beforeChars).toBe(100);
+    expect(diff.afterChars).toBe(60);
+    expect(diff.delta).toBe(-40);
+  });
+
+  it("sample は最初の changed ペアを 200 字で切り、純追加では before を空にする", () => {
+    const longBefore = "前".repeat(250);
+    const longAfter = "後".repeat(250);
+    const changed = summarizeEditDiff(
+      `<p>A</p><p>${longBefore}</p><p>Z</p>`,
+      `<p>A</p><p>${longAfter}</p><p>Z</p>`
+    );
+    expect(changed.sample).toEqual({
+      before: "前".repeat(200),
+      after: "後".repeat(200),
+    });
+
+    expect(summarizeEditDiff("<p>A</p>", "<p>A</p><p>追加</p>").sample).toEqual({
+      before: "",
+      after: "追加",
+    });
+  });
+
+  it("formatEditDiffSummary は表示文字列を作り 2000 字で切る", () => {
+    const noChange: EditDiffSummary = {
+      headline: "無変更",
+      region: "本文",
+      beforeChars: 0,
+      afterChars: 0,
+      delta: 0,
+      sample: { before: "", after: "" },
+      noChange: true,
+    };
+    expect(formatEditDiffSummary(noChange)).toBe("無変更");
+
+    const longSummary = formatEditDiffSummary({
+      headline: "加筆",
+      region: "本文",
+      beforeChars: 1,
+      afterChars: 3001,
+      delta: 3000,
+      sample: { before: "前", after: "後".repeat(3000) },
+      noChange: false,
+    });
+    expect(longSummary).toHaveLength(2000);
+    expect(longSummary.startsWith("[本文] 加筆 / 1字→3001字(+3000)")).toBe(true);
+  });
+
+  it("空入力と巨大 HTML を安全に扱う", () => {
+    expect(summarizeEditDiff("", "")).toEqual({
+      headline: "無変更",
+      region: "本文",
+      beforeChars: 0,
+      afterChars: 0,
+      delta: 0,
+      sample: { before: "", after: "" },
+      noChange: true,
+    });
+
+    expect(() =>
+      formatEditDiffSummary(
+        summarizeEditDiff(`<p>${"あ".repeat(30000)}</p>`, `<p>${"い".repeat(30000)}</p>`)
+      )
+    ).not.toThrow();
   });
 });
