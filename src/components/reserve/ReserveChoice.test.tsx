@@ -5,6 +5,7 @@ import {
   RESERVE_URL,
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
+  LABOLA_SCHOOL_URL,
 } from "@/constants/site";
 import ReserveChoice from "./ReserveChoice";
 
@@ -14,13 +15,23 @@ describe("ReserveChoice", () => {
     expect(screen.getByText(/予約サイトが異なります/)).toBeInTheDocument();
   });
 
-  it("ピックルボールコートと HYROXエリア のセクション見出しを表示する", () => {
+  it("ピックルボールコート・HYROXエリア のセクション見出しを表示する", () => {
     renderWithIntl(<ReserveChoice />);
     expect(
       screen.getByRole("heading", { name: "ピックルボールコート" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "HYROXエリア" }),
+    ).toBeInTheDocument();
+  });
+
+  it("HYROXセクション内をエリア利用とレッスン/クラスの2カテゴリに分ける", () => {
+    renderWithIntl(<ReserveChoice />);
+    expect(
+      screen.getByRole("heading", { name: "エリア利用" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "レッスン / クラス" }),
     ).toBeInTheDocument();
   });
 
@@ -40,10 +51,18 @@ describe("ReserveChoice", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("HYROXの予約は labola（HYROXタブ）へ外部リンクする", () => {
+  it("エリアの予約は labola（HYROXタブ）へ外部リンクする", () => {
     renderWithIntl(<ReserveChoice />);
-    const link = screen.getByRole("link", { name: /HYROXの予約/ });
+    const link = screen.getByRole("link", { name: /エリアの予約/ });
     expect(link).toHaveAttribute("href", LABOLA_HYROX_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("レッスンの予約は labola（スクール）へ外部リンクする", () => {
+    renderWithIntl(<ReserveChoice />);
+    const link = screen.getByRole("link", { name: /レッスンの予約/ });
+    expect(link).toHaveAttribute("href", LABOLA_SCHOOL_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });

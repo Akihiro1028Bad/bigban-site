@@ -51,3 +51,12 @@ tsconfig.tsbuildinfo
 
 # playwright-mcp artifacts (screenshots, snapshots, logs)
 .playwright-mcp/
+
+# local claude config & scratch
+.claude/
+
+# local secrets (OAuth client, credentials — never commit)
+secrets/
+
+# local data artifacts (growth images, snapshots)
+data/

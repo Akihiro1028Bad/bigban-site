@@ -131,6 +131,11 @@
     "instagramAria": "THE PICKLE BANG THEORY の Instagram",
     "followUs": "フォローはこちら"
   },
+  "HyroxCampaign": {
+    "title": "オープン記念＆千葉大会応援キャンペーン",
+    "period": "千葉大会当日まで（〜8/9）",
+    "priceNote": "この期間の料金はキャンペーン特別価格です。"
+  },
   "PromoBanner": {
     "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
@@ -155,8 +160,15 @@
       "augCta": "8月以降の予約",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROXエリア",
-      "hyroxDesc": "HYROXエリアのご予約はこちらから。",
-      "hyroxCta": "HYROXの予約"
+      "hyroxDesc": "エリア利用とレッスン／クラス、それぞれご予約いただけます。",
+      "hyroxAreaTag": "AREA RENTAL",
+      "hyroxAreaLabel": "エリア利用",
+      "hyroxAreaDesc": "HYROXエリアの枠貸し予約はこちらから。",
+      "hyroxAreaCta": "エリアの予約",
+      "lessonKicker": "LESSON / CLASS",
+      "lessonHeading": "レッスン / クラス",
+      "lessonDesc": "少人数制コーチングクラスのご予約はこちらから。",
+      "lessonCta": "レッスンの予約"
     },
     "steps": {
       "heading": "予約の流れ",
@@ -321,7 +333,8 @@
     "service02": {
       "titleJa": "レッスン & クリニック",
       "titleEn": "LESSONS & CLINICS",
-      "description": "トップ選手による直接指導。レベル別プログラムで初心者から上級者まで対応。海外トッププレーヤーを招聘した特別クリニックも開催予定。"
+      "description": "トップ選手による直接指導。レベル別プログラムで初心者から上級者まで対応。海外トッププレーヤーを招聘した特別クリニックも開催予定。",
+      "cta": "BOOK A LESSON"
     },
     "service03": {
       "titleJa": "トレーニングプログラム",
@@ -778,12 +791,9 @@
       "title": "PROGRAM",
       "titleJa": "プログラム・料金",
       "rateLabel": "エリア利用料",
-      "duration": "90分",
-      "weekday": "平日",
-      "weekdayPrice": "¥3,500",
-      "weekend": "土日祝",
-      "weekendPrice": "¥4,000",
-      "note": "HYROX公式8種目に対応したトレーニングエリアを1回90分制でご利用いただけます。"
+      "perHour": "1時間あたりの料金",
+      "note": "HYROX公式8種目に対応したトレーニングエリアをご利用いただけます。",
+      "partyNote": "表示料金は4名までのご利用に対する金額です。5名目以降は1名につき+¥1,000で追加いただけます。"
     },
     "coach": {
       "sectionTitle": "CREW",

@@ -116,6 +116,23 @@ describe("HomeServices", () => {
     expect(reserveButtons).toHaveLength(1);
   });
 
+  it("レッスン & クリニックにBOOK A LESSONボタン（スクール予約への外部リンク）を表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeServices />
+      </NextIntlClientProvider>
+    );
+    const ctaButton = screen.getByText("BOOK A LESSON");
+    expect(ctaButton).toBeInTheDocument();
+    const link = ctaButton.closest("a");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://yoyaku.labola.jp/r/shop/3473/event/school/"
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("イベントにVIEW EVENTSボタン（テニスベアへのリンク）を表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
