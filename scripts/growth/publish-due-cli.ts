@@ -13,6 +13,7 @@ import "dotenv/config";
 
 import { hasPendingBodyImage } from "./body-image-insert";
 import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "./body-image-regen";
+import { removeAiDisclaimer } from "./aiDisclaimer";
 import { patchDraft, publishContent, resolveRetryConfig } from "./content";
 import { REGEN_BUSY_STATUSES, regenRowFromPage } from "./eyecatch-regen";
 import { growthEndpoint } from "./endpoint";
@@ -151,8 +152,13 @@ async function main(): Promise<void> {
       console.log(`[publish-due][dryrun] ${title || page.id} (contentId=${contentId})`);
       continue;
     }
-    // 公開直前に承認画面の正タイトルを下書きへ同期(#176 と同じ)。
-    if (title) await patchDraft(ENDPOINT, contentId, { title }, contentOpts);
+    // 公開直前に承認画面の正タイトルと、AI 免責注記を除去した本文を下書きへ同期(#176 と同じ)。
+    const rawBody = richTextOf(page, "下書き本文HTML");
+    const { body: cleanBody, removed } = removeAiDisclaimer(rawBody);
+    const patch: Record<string, unknown> = {};
+    if (title) patch.title = title;
+    if (removed) patch.bodyHtml = cleanBody;
+    if (Object.keys(patch).length > 0) await patchDraft(ENDPOINT, contentId, patch, contentOpts);
     // PATCH status PUBLISH は冪等(既に公開済みでも PUBLISH のまま)。
     await publishContent(ENDPOINT, contentId, managementOpts);
     // 先に Notion ステータスを公開済みにする(=次回ループの再公開を防ぐ要)。
