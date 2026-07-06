@@ -29,3 +29,20 @@
 - `DraftEditor.tsx` はカバレッジ除外、純ロジックは `draftEditorContent.ts`。
 - 前提: Notion「記事ネタ案」に `下書きID`/`下書きプレビューキー`、Vercel に `MICROCMS_CONTENT_API_KEY`。
 - 運用は runbook の「承認画面で下書きをプレビュー＋手動リッチ編集」節。
+
+## プロンプト変更時のA/B検証(必須)
+
+`scripts/growth/prompts/*.md` または `docs/operations/growth-article-style.md` を変更したら、投入品質が劣化していないかを機械ゲート(`draftQuality`)で確認してから確定する。手順:
+
+1. **変更前の下書きを控えに残す**: 変更前プロンプトで生成した既存下書きの spec JSON(`.growth-tmp/<slug>.json` 等)を1本、比較用に確保する。
+2. **変更後に同じネタで1本生成**: 同一の「記事ネタ案」で下書きを1本作り、その spec JSON を用意する。
+3. **block/warn 数を比較する**:
+   ```
+   npm run growth:article-eval -- <旧.json> <新.json>
+   ```
+   - 各 JSON は publish-draft の spec(`{ payload: { title, bodyHtml } }`)でも、直接 `{ title, bodyHtml }` でも受け付ける。
+   - 出力は `判定`(`improved`/`unchanged`/`regressed`)と `block`/`warn` の増減、`after` に残る block 一覧。
+   - **`regressed`(block/warn が悪化)なら終了コード1**で終わる。
+4. **悪化していたら変更を見直す**: `regressed` または after に新規 block が出たら、プロンプト変更を差し戻すか原因を潰してから再検証する。改善(`improved`)または `unchanged` を確認できたら変更を確定する。
+
+> 純ロジックは `scripts/growth/articleEval.ts`、実行入口は `scripts/growth/article-eval-cli.ts`(薄い配線のためカバレッジ除外)。
