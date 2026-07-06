@@ -11,6 +11,7 @@ export type ReviewLabel =
   | "CTR弱い"
   | "順位あと少し"
   | "読まれるがCTA弱い"
+  | "CV未計測"
   | "要改稿"
   | "未計測";
 
@@ -49,6 +50,7 @@ export function reviewLabels(
   const search = metrics.search;
   const clicks = search?.clicks.current ?? 0;
   const keyEvents = metrics.keyEvents?.current ?? 0;
+  const keyEventsMeasured = metrics.keyEventsMeasured === true;
 
   if (views === 0 && clicks === 0) return ["未計測"];
 
@@ -68,8 +70,12 @@ export function reviewLabels(
   ) {
     labels.push("順位あと少し");
   }
-  if (views >= CTA_WEAK_VIEWS && keyEvents === 0) {
-    labels.push("読まれるがCTA弱い");
+  if (views >= CTA_WEAK_VIEWS) {
+    if (!keyEventsMeasured) {
+      labels.push("CV未計測");
+    } else if (keyEvents === 0) {
+      labels.push("読まれるがCTA弱い");
+    }
   }
 
   const needsRewrite =
@@ -84,4 +90,10 @@ export function reviewLabels(
   if (up && !needsRewrite) labels.push("伸びている");
 
   return labels;
+}
+
+/** 判定ラベルの母数が小さく参考値かどうか。true なら表示側で注記する。 */
+export function isLowSample(metrics: ArticleMetrics): boolean {
+  const impressions = metrics.search?.impressions.current ?? 0;
+  return impressions < CTR_WEAK_IMPRESSIONS && metrics.views.current < CTA_WEAK_VIEWS;
 }

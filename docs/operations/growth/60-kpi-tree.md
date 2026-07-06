@@ -35,6 +35,7 @@
 
 - 実装の突き合わせは [50-publish-metrics.md](50-publish-metrics.md)「計測ループ #C4」を正典とする(`metrics.ts` が GA4/GSC を記事の `articlePagePath` に紐付けて Notion `成績データ` へ書き、PerformanceBoard が描画)。
 - keyEvents は後方互換のため `metrics.ts` で optional。**GA4 側 key event を設定しないと CV 系中間KPI が 0 のまま**になる(このとき判定ラベル「読まれるが CTA弱い」も成立しない=下記 §3)。
+- GA4 keyEvents 設定完了日を `GROWTH_GA4_KEYEVENTS_SINCE=YYYY-MM-DD` に入れる。未設定または設定日前公開の記事は「CV未計測」として扱い、keyEvents=0 を実0と断定しない。
 
 ### 記事タイプ→中間KPIの対応(どの型が何を狙うか)
 
@@ -60,7 +61,7 @@
 | **比較** | 記事セッションが付き、狙うクエリで表示されていること | 検討層は指名より一般クエリ。impressions の立ち上がりを見る |
 | **イベント** | 公開直後の瞬間セッション＋(事後ルポなら)資産としての継続表示 | 時期依存のため単発の到達で可。ルポは資産型の基準を併用 |
 
-- しきい値の出所(実装の判定ロジック): `metricsReview.ts`(CTR弱い=impressions≥100 かつ CTR<3% / 順位あと少し=position 5〜15 / 読まれるが CTA弱い=views≥50 かつ keyEvents=0 / 要改稿=公開28日でviews<50 かつ clicks<10)。既定ラインはこの判定と整合させる。
+- しきい値の出所(実装の判定ロジック): `metricsReview.ts`(CTR弱い=impressions≥100 かつ CTR<3% / 順位あと少し=position 5〜15 / 読まれるが CTA弱い=views≥50 かつ keyEvents=0 かつ `keyEventsMeasured=true` / CV未計測=views≥50 かつ keyEvents 未計測 / 要改稿=公開28日でviews<50 かつ clicks<10)。既定ラインはこの判定と整合させる。
 - **公開後判定は人が最終決定**する(`成功`/`様子見`/`要改稿`)。CLI(`growth:review-due`)は上記から判定メモの**候補**を作るだけで上書きしない([50-publish-metrics.md](50-publish-metrics.md))。
 
 ## 4. 週次レポートの経営サマリ仕様(実装は別途・#221/P2⑧後段)
@@ -84,7 +85,7 @@
 
 - **記事タイプ**(5値・そのまま日本語): `獲得` / `不安解消` / `資産` / `比較` / `イベント`(`prompts/weekly.md`・`prompts/drafts.md`・[40-notion-props.md](40-notion-props.md) と同一)。
 - **公開後判定**(人が最終決定・3値): `成功` / `様子見` / `要改稿`。
-- **判定ラベル**(`metricsReview.ts` の `reviewLabels`・打ち手の示唆): `伸びている` / `CTR弱い` / `順位あと少し` / `読まれるがCTA弱い` / `要改稿` / `未計測`。
+- **判定ラベル**(`metricsReview.ts` の `reviewLabels`・打ち手の示唆): `伸びている` / `CTR弱い` / `順位あと少し` / `読まれるがCTA弱い` / `CV未計測` / `要改稿` / `未計測`。
 - 記事タイプ→category マッピング(獲得→`start`/不安解消→`start`/資産→`rules`(or `improve`/`health`)/比較→`compare`/イベント→`event`)は `scripts/growth/columnCategory.ts` の `ARTICLE_TYPE_TO_CATEGORY` を**単一の真実源**とする(#222。解決コマンドは `npm run growth:column-category`。`drafts.md` は手書き表を持たない。category=読者向け・articleType=内部計測の別軸共存)。
 
 ## 6. 実装への提案(この doc の範囲外・別エージェント/オーナー作業)

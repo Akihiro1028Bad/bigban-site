@@ -149,6 +149,28 @@ describe("PerformanceBoard", () => {
     expect(screen.getByText("6")).toBeInTheDocument();
   });
 
+  it("keyEventsMeasured が false なら CTA 数値ではなく未計測を表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(10, null, 5),
+      keyEvents: { current: 6, prior: 2, deltaPct: 200 },
+      keyEventsMeasured: false,
+      search: {
+        clicks: { current: 3, prior: 0, deltaPct: null },
+        impressions: { current: 90, prior: 0, deltaPct: null },
+        ctr: { current: 0.033, prior: 0, deltaPct: null },
+        position: { current: 8, prior: 0, deltaPct: null },
+        topQueries: [],
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "未計測記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /未計測記事/ }));
+
+    expect(screen.getByText(/CTA/)).toBeInTheDocument();
+    expect(screen.getByText("未計測")).toBeInTheDocument();
+    expect(screen.queryByText("6")).not.toBeInTheDocument();
+  });
+
   it("再クリックで行を閉じる(トグル)", async () => {
     const user = userEvent.setup();
     render(<PerformanceBoard items={[published("a", "旧データ", metrics(10, null, 5))]} />);

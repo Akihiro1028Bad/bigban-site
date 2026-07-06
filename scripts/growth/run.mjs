@@ -37,9 +37,12 @@ const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__c
 // 執筆(下書きモード)は記事品質の勝負所なので既定で Opus 4.8 に固定する(#247)。
 // GROWTH_DRAFTS_MODEL で上書き可能。
 const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "claude-opus-4-8";
+// 週次(ネタ出し)は下流(記事品質)全体の上限を決めるため既定で Opus 4.8 に固定する。
+// GROWTH_WEEKLY_MODEL で上書き可能。
+const WEEKLY_MODEL = process.env.GROWTH_WEEKLY_MODEL || "claude-opus-4-8";
 
 const MODES = {
-  // 週次は growth:fetch(取得)と growth:existing(既存行の読み出し)だけ許可する。
+  // 週次は取得・既存行読み出し・学習ログ読み出しだけ許可する。
   // 既存行を確実に読めるようにし、headless が冪等性を推測して誤スキップするのを防ぐ。
   weekly: {
     prompt: "weekly.md",
@@ -47,7 +50,9 @@ const MODES = {
       ...COMMON,
       "Bash(npm run growth:fetch)",
       "Bash(npm run growth:existing)",
+      "Bash(npm run growth:learning-log:recent)",
     ],
+    model: WEEKLY_MODEL,
   },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
   drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
@@ -184,7 +189,7 @@ const args = [
   "--disallowedTools",
   ...DISALLOW,
 ];
-// モデル指定があるモード(下書き)は --model を付ける
+// モデル指定があるモードは --model を付ける
 if (cfg.model) {
   args.push("--model", cfg.model);
 }

@@ -26,8 +26,18 @@ describe("run.mjs dry-run の --model(#247)", () => {
     );
   });
 
-  it("weekly には --model を付けない", () => {
-    expect(dryRun("weekly")).not.toContain("--model");
+  it("weekly は既定で --model claude-opus-4-8 を付ける", () => {
+    expect(dryRun("weekly")).toContain("--model claude-opus-4-8");
+  });
+
+  it("GROWTH_WEEKLY_MODEL で週次モデルを上書きできる", () => {
+    expect(dryRun("weekly", { GROWTH_WEEKLY_MODEL: "claude-sonnet-4-6" })).toContain(
+      "--model claude-sonnet-4-6"
+    );
+  });
+
+  it("weekly は learning-log:recent を allowedTools に含む", () => {
+    expect(dryRun("weekly")).toContain("growth:learning-log:recent");
   });
 
   it("regen は再生成プロンプトと --model を付ける(#144)", () => {

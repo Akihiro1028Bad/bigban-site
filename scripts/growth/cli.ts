@@ -9,7 +9,7 @@
  */
 
 import "dotenv/config";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { loadGrowthConfig } from "./config";
@@ -17,6 +17,8 @@ import { computeWeeklyPeriods, jstDateString } from "./period";
 import { getAccessToken } from "./auth";
 import { collectGrowthData } from "./collect";
 import { saveSnapshot } from "./snapshot";
+import { buildTrend, type TrendReport } from "./trend";
+import { readRecentSnapshots } from "./trend-io";
 
 async function main(): Promise<void> {
   const config = loadGrowthConfig(process.env);
@@ -40,7 +42,15 @@ async function main(): Promise<void> {
     date: jstDateString(now),
   });
 
-  process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
+  let trend: TrendReport = { weeks: 0, series: [], note: "スナップショット未蓄積" };
+  try {
+    trend = buildTrend(await readRecentSnapshots({ readdir, readFile }, dir, 4));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`trend 組成をスキップ: ${message}\n`);
+  }
+
+  process.stdout.write(`${JSON.stringify({ ...snapshot, trend }, null, 2)}\n`);
   process.stderr.write(`\n保存しました: ${savedPath}\n`);
   if (snapshot.errors.length > 0) {
     process.stderr.write(

@@ -13,7 +13,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { type ArticleMetrics, summarizeMetrics } from "@/lib/growth/metrics";
-import { daysSincePublished, reviewLabels, type ReviewLabel } from "@/lib/growth/metricsReview";
+import { daysSincePublished, isLowSample, reviewLabels, type ReviewLabel } from "@/lib/growth/metricsReview";
 
 import {
   type DeltaTone,
@@ -48,6 +48,7 @@ const LABEL_TONE: Record<ReviewLabel, { color: string; bg: string }> = {
   CTR弱い: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
   順位あと少し: { color: "var(--p-accent)", bg: "var(--p-accent-weak)" },
   読まれるがCTA弱い: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
+  CV未計測: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
   要改稿: { color: "var(--p-red)", bg: "var(--p-red-weak)" },
   未計測: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
 };
@@ -156,6 +157,7 @@ export function PerformanceBoard({ items, onAddIdea }: PerformanceBoardProps) {
             metrics,
             metrics.publishedAt ? daysSincePublished(metrics.publishedAt, nowMs) : null
           );
+          const hasLowSample = isLowSample(metrics);
           return (
             <li
               key={item.id}
@@ -196,6 +198,14 @@ export function PerformanceBoard({ items, onAddIdea }: PerformanceBoardProps) {
                         {label}
                       </span>
                     ))}
+                    {hasLowSample ? (
+                      <span
+                        className="rounded-full px-2 py-[2px] text-[11px] font-medium"
+                        style={{ background: "var(--p-bg-active)", color: "var(--p-text-3)" }}
+                      >
+                        母数小・参考値
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
                 <div className="hidden w-[92px] text-right sm:block">
@@ -307,7 +317,7 @@ function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?
         <div className="mt-2.5 text-[12px]" style={{ color: "var(--p-text-2)" }}>
           CTA（キーイベント）{" "}
           <span className="font-semibold tabular-nums" style={{ color: "var(--p-text)" }}>
-            {formatCount(metrics.keyEvents.current)}
+            {metrics.keyEventsMeasured === false ? "未計測" : formatCount(metrics.keyEvents.current)}
           </span>
         </div>
       ) : null}

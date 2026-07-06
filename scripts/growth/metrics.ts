@@ -44,6 +44,8 @@ export interface ArticleMetrics {
   users: MetricDelta;
   // #計測強化 S2: GA4 keyEvents(CTAキーイベント。後方互換のため任意。旧データには無い)。
   keyEvents?: MetricDelta;
+  // R6: GA4 keyEvents が実測できる期間の記事か。未指定は未計測扱い(後方互換・安全側)。
+  keyEventsMeasured?: boolean;
   // #計測強化 S2: GSC 検索成績(後方互換のため任意。旧データには無い)。
   search?: SearchMetrics;
   // #計測強化 S3: 公開日(microCMS publishedAt・ISO)。要改稿(公開28日後)判定に使う。任意・後方互換。
@@ -169,6 +171,18 @@ export function metricsForPagePath(
   };
 }
 
+/** keyEvents の設定完了日以降に公開された記事だけを「計測済み」とみなす。 */
+export function isKeyEventsMeasured(
+  publishedAt: string | undefined,
+  sinceYmd: string | undefined
+): boolean {
+  if (!publishedAt || !sinceYmd) return false;
+  const since = Date.parse(`${sinceYmd}T00:00:00.000Z`);
+  const published = Date.parse(publishedAt);
+  if (Number.isNaN(since) || Number.isNaN(published)) return false;
+  return published >= since;
+}
+
 const deltaSchema = z.object({
   current: z.number(),
   prior: z.number(),
@@ -197,6 +211,7 @@ const metricsSchema = z.object({
   users: deltaSchema,
   // #計測強化 S2/S3: 後方互換。旧データ(keyEvents/search/publishedAt 無し)も valid のまま。
   keyEvents: deltaSchema.optional(),
+  keyEventsMeasured: z.boolean().optional(),
   search: searchSchema.optional(),
   publishedAt: z.string().optional(),
   period: z.object({ start: z.string(), end: z.string() }),

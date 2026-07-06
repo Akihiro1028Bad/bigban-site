@@ -1,8 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import type { ArticleMetrics } from "./metrics";
 import type { NotionPage } from "./notion";
-import { summarizeExisting, weekStartEqualsFilter } from "./existing";
+import {
+  articleReviewLabelLines,
+  coverageCrossTabLines,
+  searchIntentIndexLines,
+  summarizeExisting,
+  weekStartEqualsFilter,
+} from "./existing";
 
 function title(name: string) {
   return { type: "title", title: [{ plain_text: name }] };
@@ -15,6 +22,30 @@ function text(value: string) {
 }
 function date(start: string) {
   return { type: "date", date: { start } };
+}
+
+function emptyRichText() {
+  return { type: "rich_text", rich_text: [] };
+}
+
+function metricsJson(overrides: Partial<ArticleMetrics> = {}): string {
+  const metrics: ArticleMetrics = {
+    pagePath: "/news/test",
+    views: { current: 80, prior: 0, deltaPct: null },
+    users: { current: 60, prior: 0, deltaPct: null },
+    keyEvents: { current: 0, prior: 0, deltaPct: null },
+    search: {
+      clicks: { current: 5, prior: 0, deltaPct: null },
+      impressions: { current: 500, prior: 0, deltaPct: null },
+      ctr: { current: 0.02, prior: 0, deltaPct: null },
+      position: { current: 8, prior: 0, deltaPct: null },
+      topQueries: [],
+    },
+    publishedAt: "2026-06-01T00:00:00.000Z",
+    period: { start: "2026-06-01", end: "2026-06-07" },
+    ...overrides,
+  };
+  return JSON.stringify(metrics);
 }
 
 function reportPage(weekStart: string): NotionPage {
@@ -52,6 +83,10 @@ function ideaPage(opts: {
   weekStart: string;
   reason?: string;
   postJudgement?: string;
+  searchIntent?: string | null;
+  articleType?: string | null;
+  media?: string | null;
+  metrics?: string | null;
 }): NotionPage {
   const props: Record<string, unknown> = {
     "タイトル案": title(opts.title),
@@ -60,6 +95,23 @@ function ideaPage(opts: {
   };
   if (opts.reason) props["却下理由"] = text(opts.reason);
   if (opts.postJudgement) props["公開後判定"] = select(opts.postJudgement);
+  if (opts.searchIntent === null) props["検索意図"] = emptyRichText();
+  if (typeof opts.searchIntent === "string") props["検索意図"] = text(opts.searchIntent);
+  if (opts.articleType === null) {
+    // 欠落ケース用。何も設定しない。
+  } else if (opts.articleType) {
+    props["記事タイプ"] = select(opts.articleType);
+  }
+  if (opts.media === null) {
+    // 欠落ケース用。何も設定しない。
+  } else if (opts.media) {
+    props["媒体"] = select(opts.media);
+  }
+  if (opts.metrics === null) {
+    props["成績データ"] = emptyRichText();
+  } else if (opts.metrics) {
+    props["成績データ"] = text(opts.metrics);
+  }
   return {
     id: opts.id,
     url: `https://notion.so/${opts.id}`,
@@ -68,6 +120,7 @@ function ideaPage(opts: {
 }
 
 const period = { start: "2026-06-08", end: "2026-06-14" };
+const fixedNowMs = Date.parse("2026-07-06T00:00:00.000Z");
 
 describe("weekStartEqualsFilter", () => {
   it("対象週開始 の date equals フィルタを返す", () => {
@@ -80,7 +133,7 @@ describe("weekStartEqualsFilter", () => {
 
 describe("summarizeExisting", () => {
   it("対象週のレポートが無いとき『未作成』と新規作成の指示を含む", () => {
-    const md = summarizeExisting({ period, reportsForWeek: [], proposals: [], ideas: [] });
+    const md = summarizeExisting({ period, nowMs: fixedNowMs, reportsForWeek: [], proposals: [], ideas: [] });
     expect(md).toContain("2026-06-08");
     expect(md).toContain("未作成");
     // 未作成のときは明確に作成を促す
@@ -91,6 +144,7 @@ describe("summarizeExisting", () => {
   it("対象週のレポートがあるとき『作成済み』を示す", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [reportPage("2026-06-08")],
       proposals: [],
       ideas: [],
@@ -112,6 +166,7 @@ describe("summarizeExisting", () => {
     it("手入力(予約/LINE/IG/口コミ)があれば手入力データ節に載せる", () => {
       const md = summarizeExisting({
         period,
+        nowMs: fixedNowMs,
         reportsForWeek: [
           manualInputRow("2026-06-08", {
             "予約件数": { type: "number", number: 42 },
@@ -137,6 +192,7 @@ describe("summarizeExisting", () => {
     it("手入力だけの行(レポート本文なし)は『作成済み』に数えない(#4)", () => {
       const md = summarizeExisting({
         period,
+        nowMs: fixedNowMs,
         reportsForWeek: [manualInputRow("2026-06-08", { "予約件数": { type: "number", number: 10 } })],
         proposals: [],
         ideas: [],
@@ -150,13 +206,14 @@ describe("summarizeExisting", () => {
     });
 
     it("手入力が無ければ『手入力データなし』で従来動作(欠落耐性)", () => {
-      const md = summarizeExisting({ period, reportsForWeek: [], proposals: [], ideas: [] });
+      const md = summarizeExisting({ period, nowMs: fixedNowMs, reportsForWeek: [], proposals: [], ideas: [] });
       expect(md).toContain("手入力データなし");
     });
 
     it("一部だけ入力なら入力済みの指標だけ載せる", () => {
       const md = summarizeExisting({
         period,
+        nowMs: fixedNowMs,
         reportsForWeek: [manualInputRow("2026-06-08", { "LINE友だち数": { type: "number", number: 200 } })],
         proposals: [],
         ideas: [],
@@ -170,6 +227,7 @@ describe("summarizeExisting", () => {
   it("施策提案を 週キー・カテゴリ・ステータス・施策名 付きで列挙する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [
         proposalPage({
@@ -192,6 +250,7 @@ describe("summarizeExisting", () => {
   it("却下・見送りの施策は学習ループ用に判断者メモと検証結果を併記する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [
         proposalPage({
@@ -213,6 +272,7 @@ describe("summarizeExisting", () => {
   it("却下でも判断者メモ・検証結果が無ければ追記しない", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [
         proposalPage({
@@ -232,6 +292,7 @@ describe("summarizeExisting", () => {
   it("見送りも学習ループ対象。検証結果『未検証』は併記しない", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [
         proposalPage({
@@ -254,6 +315,7 @@ describe("summarizeExisting", () => {
     const emptyPage: NotionPage = { id: "x", url: "https://notion.so/x", properties: {} };
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [emptyPage],
       ideas: [emptyPage],
@@ -277,6 +339,7 @@ describe("summarizeExisting", () => {
     };
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [noPlainText],
       ideas: [],
@@ -288,6 +351,7 @@ describe("summarizeExisting", () => {
   it("記事ネタ案を タイトル案・ステータス付きで列挙する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -301,6 +365,7 @@ describe("summarizeExisting", () => {
   it("却下の記事ネタ案は却下理由を併記する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -319,6 +384,7 @@ describe("summarizeExisting", () => {
   it("見送りの記事ネタ案は却下理由を併記する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -337,6 +403,7 @@ describe("summarizeExisting", () => {
   it("公開後判定が要改稿の記事ネタ案は判定と却下理由を併記する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -357,6 +424,7 @@ describe("summarizeExisting", () => {
   it("公開後判定が要改稿で却下理由が空なら判定だけを併記する", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -376,6 +444,7 @@ describe("summarizeExisting", () => {
   it("却下の記事ネタ案でも却下理由が空なら理由を併記しない", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -394,6 +463,7 @@ describe("summarizeExisting", () => {
   it("通常ステータスの記事ネタ案は却下理由や公開後判定を併記しない", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [
@@ -424,6 +494,7 @@ describe("summarizeExisting", () => {
     };
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [publishedIdea],
@@ -437,11 +508,355 @@ describe("summarizeExisting", () => {
   it("公開済み記事が無いとき成績サマリは空表示で壊れない(#221 欠落耐性)", () => {
     const md = summarizeExisting({
       period,
+      nowMs: fixedNowMs,
       reportsForWeek: [],
       proposals: [],
       ideas: [ideaPage({ id: "i2", title: "未公開案", status: "承認", weekStart: "2026-06-08" })],
     });
     expect(md).toContain("成績サマリ");
     expect(md).toContain("公開済み記事がまだ無い");
+  });
+});
+
+describe("searchIntentIndexLines", () => {
+  it("検索意図インデックスに生きているネタのタイトルと検索意図を出す", () => {
+    const lines = searchIntentIndexLines([
+      ideaPage({
+        id: "i-live",
+        title: "本八幡で始めるガイド",
+        status: "提案中",
+        weekStart: "2026-06-08",
+        searchIntent: "本八幡 ピックルボール 始め方",
+      }),
+      ideaPage({
+        id: "i-pub",
+        title: "公開済みガイド",
+        status: "公開済み",
+        weekStart: "2026-05-01",
+        searchIntent: "市川 ピックルボール 屋内",
+      }),
+    ]);
+    const textValue = lines.join("\n");
+    expect(textValue).toContain("本八幡で始めるガイド ｜ 検索意図: 本八幡 ピックルボール 始め方");
+    expect(textValue).toContain("公開済みガイド ｜ 検索意図: 市川 ピックルボール 屋内");
+  });
+
+  it("却下・見送りのネタはインデックスに出さない", () => {
+    const lines = searchIntentIndexLines([
+      ideaPage({
+        id: "i-reject",
+        title: "却下済みテーマ",
+        status: "却下",
+        weekStart: "2026-06-08",
+        searchIntent: "却下 意図",
+      }),
+      ideaPage({
+        id: "i-hold",
+        title: "見送りテーマ",
+        status: "見送り",
+        weekStart: "2026-06-08",
+        searchIntent: "見送り 意図",
+      }),
+      ideaPage({
+        id: "i-live",
+        title: "生きているテーマ",
+        status: "生成中",
+        weekStart: "2026-06-08",
+        searchIntent: "生成中 意図",
+      }),
+    ]);
+    const textValue = lines.join("\n");
+    expect(textValue).toContain("生きているテーマ");
+    expect(textValue).not.toContain("却下済みテーマ");
+    expect(textValue).not.toContain("見送りテーマ");
+  });
+
+  it("検索意図が空なら未記入として出す", () => {
+    const lines = searchIntentIndexLines([
+      ideaPage({
+        id: "i-empty",
+        title: "検索意図なし",
+        status: "承認",
+        weekStart: "2026-06-08",
+        searchIntent: null,
+      }),
+    ]);
+    expect(lines.join("\n")).toContain("検索意図なし ｜ 検索意図: (検索意図未記入)");
+  });
+
+  it("生きているネタ0件でインデックスは空と出す", () => {
+    const lines = searchIntentIndexLines([
+      ideaPage({
+        id: "i-reject",
+        title: "却下済み",
+        status: "却下",
+        weekStart: "2026-06-08",
+      }),
+    ]);
+    expect(lines).toEqual(["(生きているネタが無いためインデックスは空)"]);
+  });
+});
+
+describe("coverageCrossTabLines", () => {
+  it("カバレッジ集計を記事タイプ×媒体で数える", () => {
+    const lines = coverageCrossTabLines([
+      ideaPage({
+        id: "i1",
+        title: "獲得コラム1",
+        status: "提案中",
+        weekStart: "2026-06-08",
+        articleType: "獲得",
+        media: "コラム",
+      }),
+      ideaPage({
+        id: "i2",
+        title: "獲得コラム2",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        articleType: "獲得",
+        media: "コラム",
+      }),
+      ideaPage({
+        id: "i3",
+        title: "イベントニュース",
+        status: "承認",
+        weekStart: "2026-06-08",
+        articleType: "イベント",
+        media: "ニュース",
+      }),
+    ]);
+    const textValue = lines.join("\n");
+    expect(textValue).toContain("| 獲得 | 2 | 0 |");
+    expect(textValue).toContain("| イベント | 0 | 1 |");
+  });
+
+  it("媒体欠落はコラム列に計上する", () => {
+    const textValue = coverageCrossTabLines([
+      ideaPage({
+        id: "i-missing-media",
+        title: "媒体なし",
+        status: "承認",
+        weekStart: "2026-06-08",
+        articleType: "資産",
+        media: null,
+      }),
+    ]).join("\n");
+    expect(textValue).toContain("| 資産 | 1 | 0 |");
+  });
+
+  it("記事タイプ欠落はタイプ未設定行に計上する", () => {
+    const textValue = coverageCrossTabLines([
+      ideaPage({
+        id: "i-missing-type",
+        title: "タイプなし",
+        status: "承認",
+        weekStart: "2026-06-08",
+        articleType: null,
+        media: "ニュース",
+      }),
+    ]).join("\n");
+    expect(textValue).toContain("| タイプ未設定 | 0 | 1 |");
+  });
+
+  it("既知5型は現れなくても0で出す", () => {
+    const textValue = coverageCrossTabLines([
+      ideaPage({
+        id: "i-acq",
+        title: "獲得だけ",
+        status: "提案中",
+        weekStart: "2026-06-08",
+        articleType: "獲得",
+        media: "コラム",
+      }),
+    ]).join("\n");
+    expect(textValue).toContain("| 不安解消 | 0 | 0 |");
+    expect(textValue).toContain("| 比較 | 0 | 0 |");
+  });
+
+  it("却下・見送りはカバレッジ本数に数えない", () => {
+    const lines = coverageCrossTabLines([
+      ideaPage({
+        id: "i-reject",
+        title: "却下獲得",
+        status: "却下",
+        weekStart: "2026-06-08",
+        articleType: "獲得",
+        media: "コラム",
+      }),
+      ideaPage({
+        id: "i-hold",
+        title: "見送りイベント",
+        status: "見送り",
+        weekStart: "2026-06-08",
+        articleType: "イベント",
+        media: "ニュース",
+      }),
+    ]);
+    expect(lines).toEqual(["(生きているネタが無いためカバレッジは空)"]);
+  });
+
+  it("生きているネタ0件でカバレッジは空と出す", () => {
+    const lines = coverageCrossTabLines([]);
+    expect(lines).toEqual(["(生きているネタが無いためカバレッジは空)"]);
+  });
+});
+
+describe("articleReviewLabelLines", () => {
+  it("公開済み記事に判定ラベルを記事単位で併記する", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-pub",
+        title: "CTR改善対象",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          views: { current: 40, prior: 0, deltaPct: null },
+          keyEvents: { current: 1, prior: 0, deltaPct: null },
+          search: {
+            clicks: { current: 5, prior: 0, deltaPct: null },
+            impressions: { current: 500, prior: 0, deltaPct: null },
+            ctr: { current: 0.02, prior: 0, deltaPct: null },
+            position: { current: 20, prior: 0, deltaPct: null },
+            topQueries: [],
+          },
+          publishedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      }),
+    ], fixedNowMs);
+    expect(lines).toContain("- CTR改善対象: CTR弱い");
+  });
+
+  it("複数ラベルは中黒で連結する", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-multi",
+        title: "複数改善対象",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          views: { current: 40, prior: 0, deltaPct: null },
+          keyEvents: { current: 1, prior: 0, deltaPct: null },
+          publishedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      }),
+    ], fixedNowMs);
+    expect(lines).toContain("- 複数改善対象: CTR弱い・順位あと少し");
+  });
+
+  it("成績データが空/不正の公開済み記事は未計測と出す", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-empty",
+        title: "未計測記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: null,
+      }),
+      ideaPage({
+        id: "i-invalid",
+        title: "不正JSON記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: "not-json",
+      }),
+    ], fixedNowMs);
+    expect(lines).toContain("- 未計測記事: 未計測");
+    expect(lines).toContain("- 不正JSON記事: 未計測");
+  });
+
+  it("publishedAt 欠落でも要改稿以外のラベルは出る", () => {
+    const parsed = JSON.parse(metricsJson({
+      views: { current: 40, prior: 0, deltaPct: null },
+      keyEvents: { current: 1, prior: 0, deltaPct: null },
+    })) as ArticleMetrics;
+    delete parsed.publishedAt;
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-no-published-at",
+        title: "公開日なし",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: JSON.stringify(parsed),
+      }),
+    ], fixedNowMs);
+    expect(lines).toContain("- 公開日なし: CTR弱い・順位あと少し");
+    expect(lines.join("\n")).not.toContain("要改稿");
+  });
+
+  it("公開前の記事はラベル節に出さない", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-draft",
+        title: "未公開案",
+        status: "承認",
+        weekStart: "2026-06-08",
+        metrics: metricsJson(),
+      }),
+      ideaPage({
+        id: "i-pub",
+        title: "公開済み案",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson(),
+      }),
+    ], fixedNowMs);
+    const textValue = lines.join("\n");
+    expect(textValue).toContain("公開済み案");
+    expect(textValue).not.toContain("未公開案");
+  });
+
+  it("ラベルが空ならコロン以降を省いてタイトルだけ出す", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-no-label",
+        title: "ラベルなし記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          views: { current: 40, prior: 0, deltaPct: null },
+          keyEvents: { current: 1, prior: 0, deltaPct: null },
+          search: {
+            clicks: { current: 5, prior: 0, deltaPct: null },
+            impressions: { current: 20, prior: 0, deltaPct: null },
+            ctr: { current: 0.25, prior: 0, deltaPct: null },
+            position: { current: 20, prior: 0, deltaPct: null },
+            topQueries: [],
+          },
+          publishedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      }),
+    ], fixedNowMs);
+    expect(lines).toEqual(["- ラベルなし記事"]);
+  });
+
+  it("公開済み0本なら空である旨を出す", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({ id: "i-draft", title: "未公開案", status: "承認", weekStart: "2026-06-08" }),
+    ], fixedNowMs);
+    expect(lines).toEqual(["(公開済み記事がまだ無いため記事単位ラベルは空)"]);
+  });
+
+  it("nowMs 注入で要改稿判定が決定的", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-rewrite",
+        title: "要改稿対象",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          views: { current: 20, prior: 0, deltaPct: null },
+          keyEvents: { current: 1, prior: 0, deltaPct: null },
+          search: {
+            clicks: { current: 5, prior: 0, deltaPct: null },
+            impressions: { current: 20, prior: 0, deltaPct: null },
+            ctr: { current: 0.25, prior: 0, deltaPct: null },
+            position: { current: 20, prior: 0, deltaPct: null },
+            topQueries: [],
+          },
+          publishedAt: "2026-06-01T00:00:00.000Z",
+        }),
+      }),
+    ], fixedNowMs);
+    expect(lines).toContain("- 要改稿対象: 要改稿");
   });
 });
