@@ -65,6 +65,7 @@ interface ConsultDrawerProps {
   selectable: boolean;
   classifications: { applicable: boolean; reason?: string }[];
   onToggleAdopt: (index: number) => void;
+  onSetAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
 }
 
 // ─── ConsultDrawer ──────────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ export function ConsultDrawer({
   selectable,
   classifications,
   onToggleAdopt,
+  onSetAdoptedBulk,
 }: ConsultDrawerProps) {
   /** 段階に応じたタブ種別一覧。 */
   const tabs = STAGE_KINDS[stage];
@@ -204,6 +206,7 @@ export function ConsultDrawer({
                         selectable={selectable}
                         classifications={classifications}
                         onToggleAdopt={onToggleAdopt}
+                        onSetAdoptedBulk={onSetAdoptedBulk}
                       />
                     ))}
                   </div>

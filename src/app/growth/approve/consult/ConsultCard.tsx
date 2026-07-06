@@ -66,6 +66,7 @@ interface ConsultCardProps {
   /** 各 fix の反映可否判定結果（advice.fixes と同じ順序・長さ）。 */
   classifications: { applicable: boolean; reason?: string }[];
   onToggleAdopt: (index: number) => void;
+  onSetAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
 }
 
 // ─── apply フロー (overall・AdviceCard.renderApplySection 踏襲) ─────────────────
@@ -223,6 +224,7 @@ export function ConsultCard({
   selectable,
   classifications,
   onToggleAdopt,
+  onSetAdoptedBulk,
 }: ConsultCardProps) {
   return (
     <section
@@ -309,6 +311,7 @@ export function ConsultCard({
               selectable={selectable}
               classifications={classifications}
               onToggleAdopt={onToggleAdopt}
+              onSetAdoptedBulk={onSetAdoptedBulk}
             />
           ) : (
             <p className="text-xs" style={{ color: "var(--p-text-2)" }}>
