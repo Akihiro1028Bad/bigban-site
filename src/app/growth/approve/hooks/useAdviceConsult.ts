@@ -119,11 +119,31 @@ export function useAdviceConsult({
     setBusy(true);
     setError("");
     const adoptedAspects = applied.map((fixIndex) => advice?.advice?.fixes[fixIndex]?.area ?? "");
+    // 学習ログ詳細化: 観点だけでなく指摘・変更前後も残す。applied は adviceApply.proposal の
+    // fixIndex 値(=実際に反映できた案)なので、その proposal エントリを直接使い before/after を得る。
+    // fix 本体(area/指摘)は fixIndex で引く(欠落時は空文字でフォールバック)。
+    const appliedSet = new Set(applied);
+    const adoptedFixes = adviceApply.proposal
+      .filter((item) => appliedSet.has(item.fixIndex))
+      .map((item) => {
+        const fix = advice?.advice?.fixes[item.fixIndex];
+        const quote = fix?.quote?.trim();
+        const detail = `指摘: ${fix?.reason ?? ""} / 提案: ${fix?.suggestion ?? ""}${
+          quote ? `（対象: ${quote}）` : ""
+        }`;
+        return { aspect: fix?.area ?? "", detail, before: item.before, after: item.after };
+      });
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html, source: "advise-apply", adoptedAspects }),
+        body: JSON.stringify({
+          pageId,
+          bodyHtml: html,
+          source: "advise-apply",
+          adoptedAspects,
+          adoptedFixes,
+        }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");

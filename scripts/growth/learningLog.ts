@@ -237,6 +237,49 @@ export function formatEditDiffSummary(diff: EditDiffSummary): string {
   );
 }
 
+// ── 採否(採用 fix)の詳細(spec: 学習ログに指摘・変更前後を残す) ──
+/**
+ * 採用した 1 件の fix の詳細。`採否` イベントの `要約` を組み立てる素材。
+ * advise 系は fix の area/指摘、comment 系は「インラインコメント」＋コメント本文が入る。
+ */
+export interface AdoptedFixDetail {
+  /** 観点(advise 系: fix の area / comment 系: "インラインコメント")。 */
+  aspect: string;
+  /** 指摘・修正指示の要旨。 */
+  detail: string;
+  /** 変更前ブロック HTML。 */
+  before: string;
+  /** 変更後ブロック HTML。 */
+  after: string;
+}
+
+/** 境界検証用スキーマ(全フィールド string)。API ルートで信頼できない入力を弾く。 */
+export const AdoptedFixDetailSchema = z.object({
+  aspect: z.string(),
+  detail: z.string(),
+  before: z.string(),
+  after: z.string(),
+});
+
+// 変更前/後 HTML のタグを除去した本文テキスト(先頭 headChars 字)。
+function plainTextHead(html: string, headChars: number): string {
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim()
+    .slice(0, headChars);
+}
+
+// AdoptedFixDetail を `要約` プロパティ用の 1 本の文字列へ整形(前後 200 字・全体 2000 字で切る)。
+export function formatAdoptedFixSummary(fix: AdoptedFixDetail): string {
+  const before = plainTextHead(fix.before, 200);
+  const after = plainTextHead(fix.after, 200);
+  return `[${fix.aspect || "観点なし"}] ${fix.detail}\n変更前: ${before}\n変更後: ${after}`.slice(
+    0,
+    2000
+  );
+}
+
 function articleTitleHead(title: string): string {
   return title.trim() === "" ? "無題" : title.slice(0, 20);
 }
