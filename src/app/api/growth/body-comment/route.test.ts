@@ -34,6 +34,12 @@ function page(opts: { commentStatus?: string; body?: string } = {}) {
   return { id: PAGE_ID, url: "", properties };
 }
 
+function writtenRequestJson(): unknown {
+  const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+  const p = props as Record<string, { rich_text?: Array<{ text: { content: string } }> }>;
+  return JSON.parse(p["本文コメント指示"].rich_text!.map((r) => r.text.content).join(""));
+}
+
 beforeEach(() => {
   flags.authEnabled = false;
   process.env.NOTION_TOKEN = "secret_notion";
@@ -71,6 +77,38 @@ describe("POST /api/growth/body-comment", () => {
     expect(JSON.parse(p["本文コメント指示"].rich_text!.map((r) => r.text.content).join(""))).toEqual({
       comments: [COMMENT],
     });
+  });
+
+  it("overall 単独はアンカー検証せず依頼として記録する(200)", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ body: BODY }));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, overall: "全体にヘッジが多い" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(writtenRequestJson()).toEqual({
+      comments: [],
+      overall: "全体にヘッジが多い",
+    });
+  });
+
+  it("overall と comments が両方非空なら 400", async () => {
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, overall: "x", comments: [COMMENT] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("同時に送れません");
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
+  it("overall と comments が両方空/未指定なら 400", async () => {
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("コメントを入力してください。");
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
+  it("overall 単独でも処理中/提示中の行は 409", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ commentStatus: "提示中", body: BODY }));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, overall: "全体を見直して" }));
+    expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
   });
 
   it("認証有効＋トークン不一致は 401", async () => {
