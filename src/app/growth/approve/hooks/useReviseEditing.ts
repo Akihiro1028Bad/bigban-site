@@ -9,6 +9,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
+import { OUTLINE_OVERALL_LINE } from "@/lib/growth/revise";
+
 import { fetchBoard, postRevise, postReviseApply, postReviseEdit } from "../api";
 import { toMessage } from "../errorMessage";
 import {
@@ -40,6 +42,7 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
   const [reviseError, setReviseError] = useState("");
   // #139 B: タイトルへの AI 修正指示(構成案コメントとは別レーン)。
   const [titleRevisePrompt, setTitleRevisePrompt] = useState("");
+  const [outlineOverallPrompt, setOutlineOverallPrompt] = useState("");
 
   const reviseMutation = useMutation({
     mutationFn: (body: Parameters<typeof postRevise>[1]) => postRevise(token, body),
@@ -74,14 +77,18 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setEditDescription("");
     setReviseError("");
     setTitleRevisePrompt("");
+    setOutlineOverallPrompt("");
   }, [openId]);
 
   // #53/#139 B: セクションに溜めたコメントを {見出し, comment} へ展開し、タイトル指示と一緒に送る。
   async function requestRevise(item: PendingItem): Promise<void> {
     const sections = outlineSections(item.outline);
-    const comments = sections.flatMap((section, i) =>
-      (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
-    );
+    const overall = outlineOverallPrompt.trim();
+    const comments = overall
+      ? [{ line: OUTLINE_OVERALL_LINE, comment: overall }]
+      : sections.flatMap((section, i) =>
+          (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
+        );
     const titleInstruction = titleRevisePrompt.trim();
     // 構成案コメント0件かつタイトル指示なしのときは「修正を依頼」ボタンが無効なので到達しない。
     setReviseBusy(true);
@@ -98,6 +105,7 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
       );
       setDraftComments({});
       setTitleRevisePrompt("");
+      setOutlineOverallPrompt("");
     } catch (error) {
       setReviseError(toMessage(error, "修正依頼に失敗しました。"));
     } finally {
@@ -236,10 +244,12 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     reviseBusy,
     reviseError,
     titleRevisePrompt,
+    outlineOverallPrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
     setTitleRevisePrompt,
+    setOutlineOverallPrompt,
     requestRevise,
     startAddComment,
     startEditComment,
