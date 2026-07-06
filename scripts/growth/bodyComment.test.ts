@@ -179,6 +179,13 @@ describe("parseBodyCommentRequest", () => {
       overall: undefined,
     });
   });
+
+  it("旧形の配列 JSON でも項目が不正なら安全側の空依頼にする", () => {
+    expect(parseBodyCommentRequest(JSON.stringify([{ blockIndex: -1 }]))).toEqual({
+      comments: [],
+      overall: undefined,
+    });
+  });
 });
 
 describe("反映案 parse/serialize/apply (Phase 2)", () => {
