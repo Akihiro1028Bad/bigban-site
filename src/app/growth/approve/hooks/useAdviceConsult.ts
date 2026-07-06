@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { AdviceView } from "@/lib/growth/advise";
-import { applyAdviceItems, type AdviceApplyView } from "@/lib/growth/adviseApply";
+import { applyAdviceItems, MAX_ADOPTED, type AdviceApplyView } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { authHeaders } from "../authHeaders";
@@ -24,6 +24,7 @@ interface UseAdviceConsultReturn {
   error: string;
   adopted: ReadonlySet<number>;
   toggleAdopt: (index: number) => void;
+  setAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
   requestAdvice: () => void;
   dismiss: () => void;
   submitApply: () => void;
@@ -96,6 +97,21 @@ export function useAdviceConsult({
     });
   }
 
+  function setAdoptedBulk(indexes: readonly number[], adopt: boolean): void {
+    setAdopted((prev) => {
+      const next = new Set(prev);
+      if (adopt) {
+        for (const i of indexes) {
+          if (next.size >= MAX_ADOPTED && !next.has(i)) break;
+          next.add(i);
+        }
+      } else {
+        for (const i of indexes) next.delete(i);
+      }
+      return next;
+    });
+  }
+
   function submitApply(): void {
     void postJson(
       "/api/growth/advise/apply",
@@ -152,6 +168,7 @@ export function useAdviceConsult({
     error,
     adopted,
     toggleAdopt,
+    setAdoptedBulk,
     requestAdvice,
     dismiss,
     submitApply,
