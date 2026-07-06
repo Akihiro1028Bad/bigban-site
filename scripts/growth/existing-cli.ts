@@ -57,6 +57,7 @@ async function main(): Promise<void> {
 
   const markdown = summarizeExisting({
     period,
+    nowMs: Date.now(),
     reportsForWeek: reportsForWeek.pages,
     proposals: proposals.pages,
     ideas: ideas.pages,

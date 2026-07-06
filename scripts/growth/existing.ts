@@ -11,6 +11,9 @@
  */
 
 import type { NotionPage } from "./notion";
+import { growthMediaForRow } from "./endpoint";
+import { parseMetrics } from "./metrics";
+import { daysSincePublished, reviewLabels, type ReviewLabel } from "./metricsReview";
 import {
   renderPerformanceSummary,
   summarizeArticlePerformance,
@@ -23,6 +26,8 @@ export function weekStartEqualsFilter(weekStart: string): unknown {
 
 export interface ExistingInput {
   period: { start: string; end: string };
+  /** 記事単位ラベルの公開後経過日数を決定的に算出するための現在時刻(ms)。 */
+  nowMs: number;
   /** 対象週開始 = period.start で絞り込んだ週次レポート行。 */
   reportsForWeek: NotionPage[];
   /** 施策提案 DB の全行(重複防止・学習ループの判断材料)。 */
@@ -69,6 +74,27 @@ const MANUAL_INPUT_PROPS = [
   { prop: "口コミ件数", label: "口コミ件数" },
   { prop: "口コミ平均評価", label: "口コミ平均評価" },
 ] as const;
+
+const PUBLISHED_STATUS = "公開済み";
+const DEAD_STATUSES = new Set(["却下", "見送り"]);
+const SEARCH_INTENT_EMPTY = "(検索意図未記入)";
+const KNOWN_ARTICLE_TYPES = ["獲得", "不安解消", "資産", "比較", "イベント"] as const;
+const UNSET_ARTICLE_TYPE = "タイプ未設定";
+const COLUMN_MEDIA_LABEL = "コラム";
+const NEWS_MEDIA_LABEL = "ニュース";
+const REVIEW_LABEL_FALLBACK: ReviewLabel[] = ["未計測"];
+
+function isLiveIdea(page: NotionPage): boolean {
+  return !DEAD_STATUSES.has(selectName(page, "ステータス"));
+}
+
+function articleTitle(page: NotionPage): string {
+  return titleText(page, "タイトル案") || "(無題)";
+}
+
+function mediaLabelForPage(page: NotionPage): typeof COLUMN_MEDIA_LABEL | typeof NEWS_MEDIA_LABEL {
+  return growthMediaForRow(selectName(page, "媒体")) === "news" ? NEWS_MEDIA_LABEL : COLUMN_MEDIA_LABEL;
+}
 
 /**
  * レポート行として「本文が作成済み」か(= `レポート` title を持つ)。
@@ -135,11 +161,88 @@ function ideaLines(ideas: NotionPage[]): string[] {
 }
 
 /**
+ * 生きているネタの (タイトル案, 検索意図) 一覧を Markdown 行にする。
+ * 却下・見送りは除外し、検索意図が空でも未記入として明示する。
+ */
+export function searchIntentIndexLines(ideas: readonly NotionPage[]): string[] {
+  const liveIdeas = ideas.filter(isLiveIdea);
+  if (liveIdeas.length === 0) return ["(生きているネタが無いためインデックスは空)"];
+
+  return liveIdeas.map((page) => {
+    const intent = richText(page, "検索意図") || SEARCH_INTENT_EMPTY;
+    return `- ${articleTitle(page)} ｜ 検索意図: ${intent}`;
+  });
+}
+
+/**
+ * 生きているネタを 記事タイプ×媒体 でクロス集計した本数表にする。
+ * 既知5型は0件でも出し、記事タイプ欠落は「タイプ未設定」に寄せる。
+ */
+export function coverageCrossTabLines(ideas: readonly NotionPage[]): string[] {
+  const liveIdeas = ideas.filter(isLiveIdea);
+  if (liveIdeas.length === 0) return ["(生きているネタが無いためカバレッジは空)"];
+
+  const rows = new Map<string, { column: number; news: number }>();
+  for (const articleType of KNOWN_ARTICLE_TYPES) {
+    rows.set(articleType, { column: 0, news: 0 });
+  }
+
+  for (const page of liveIdeas) {
+    const articleType = selectName(page, "記事タイプ") || UNSET_ARTICLE_TYPE;
+    const current = rows.get(articleType) ?? { column: 0, news: 0 };
+    if (mediaLabelForPage(page) === NEWS_MEDIA_LABEL) {
+      current.news += 1;
+    } else {
+      current.column += 1;
+    }
+    rows.set(articleType, current);
+  }
+
+  const orderedTypes: string[] = [...KNOWN_ARTICLE_TYPES];
+  if (rows.has(UNSET_ARTICLE_TYPE)) orderedTypes.push(UNSET_ARTICLE_TYPE);
+
+  return [
+    "| 記事タイプ | コラム | ニュース |",
+    "|---|---:|---:|",
+    ...orderedTypes.map((articleType) => {
+      const counts = rows.get(articleType)!;
+      return `| ${articleType} | ${counts.column} | ${counts.news} |`;
+    }),
+    "(薄い型・媒体を埋める視点も本命/補欠の選定材料にする。ただし成功型を厚くする学習(#221)と両立させ、根拠なく薄い枠を量産しない)",
+  ];
+}
+
+/**
+ * 公開済み記事1本ごとの reviewLabels 行を作る。
+ * 成績データが空/不正の公開済み記事も「未計測」として出し、黙って落とさない。
+ */
+export function articleReviewLabelLines(
+  ideas: readonly NotionPage[],
+  nowMs: number
+): string[] {
+  const publishedIdeas = ideas.filter((page) => selectName(page, "ステータス") === PUBLISHED_STATUS);
+  if (publishedIdeas.length === 0) return ["(公開済み記事がまだ無いため記事単位ラベルは空)"];
+
+  return publishedIdeas.map((page) => {
+    const metrics = parseMetrics(richText(page, "成績データ"));
+    const labels =
+      metrics === null
+        ? REVIEW_LABEL_FALLBACK
+        : reviewLabels(
+            metrics,
+            metrics.publishedAt ? daysSincePublished(metrics.publishedAt, nowMs) : null
+          );
+    const suffix = labels.length > 0 ? `: ${labels.join("・")}` : "";
+    return `- ${articleTitle(page)}${suffix}`;
+  });
+}
+
+/**
  * 既存行を、週次エージェントがそのまま重複防止・学習ループに使える Markdown にする。
  * 先頭に「対象週レポートの作成済み/未作成」という明確な判定を置く。
  */
 export function summarizeExisting(input: ExistingInput): string {
-  const { period, reportsForWeek, proposals, ideas } = input;
+  const { period, nowMs, reportsForWeek, proposals, ideas } = input;
   const lines: string[] = [];
 
   lines.push(`# 既存行(Notion グラウンドトゥルース)`);
@@ -188,6 +291,24 @@ export function summarizeExisting(input: ExistingInput): string {
   } else {
     lines.push(`(既存行なし)`);
   }
+  lines.push("");
+
+  lines.push(`## 検索意図インデックス(生きているネタ・カニバリ回避の材料)`);
+  lines.push(...searchIntentIndexLines(ideas));
+  lines.push(
+    `(新ネタの検索意図が上記と実質同一なら出さない=カニバリ回避。角度違いなら差分が勝ち筋に書けるときだけ可)`
+  );
+  lines.push("");
+
+  lines.push(`## カバレッジ集計(生きているネタ・記事タイプ×媒体・薄い枠の材料)`);
+  lines.push(...coverageCrossTabLines(ideas));
+  lines.push("");
+
+  lines.push(`## 公開済み記事の判定ラベル(記事単位・次の打ち手の材料)`);
+  lines.push(...articleReviewLabelLines(ideas, nowMs));
+  lines.push(
+    `(ラベルは機械判定の参考値。CTR弱い→タイトル/description、順位あと少し→リライト/内部リンク、読まれるがCTA弱い→CTA/導線、要改稿→改稿。最終判断は分析で行う)`
+  );
   lines.push("");
 
   // #221: 公開済み記事の記事タイプ別 成績サマリ(伸ばす学習の入力)。

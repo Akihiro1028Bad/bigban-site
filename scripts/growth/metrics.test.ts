@@ -6,6 +6,7 @@ import {
   articleSearchUrl,
   buildMetricsMirrorProps,
   buildSearchMetrics,
+  isKeyEventsMeasured,
   type ArticleMetrics,
   metricsForPagePath,
   METRICS_PROPS,
@@ -185,6 +186,41 @@ describe("serializeMetrics / parseMetrics", () => {
   it("search 無しの旧データも valid(後方互換)", () => {
     expect(parseMetrics(serializeMetrics(metrics))).toEqual(metrics);
     expect(parseMetrics(serializeMetrics(metrics))?.search).toBeUndefined();
+  });
+
+  it("keyEventsMeasured 無しの旧データも valid(後方互換)", () => {
+    expect(parseMetrics(serializeMetrics(metrics))).toEqual(metrics);
+    expect(parseMetrics(serializeMetrics(metrics))?.keyEventsMeasured).toBeUndefined();
+  });
+
+  it("keyEventsMeasured 付きも往復できる", () => {
+    const withMeasured: ArticleMetrics = {
+      ...metrics,
+      keyEventsMeasured: true,
+    };
+    expect(parseMetrics(serializeMetrics(withMeasured))).toEqual(withMeasured);
+  });
+});
+
+describe("isKeyEventsMeasured", () => {
+  it("publishedAt が since 以降なら true", () => {
+    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "2026-07-01")).toBe(true);
+    expect(isKeyEventsMeasured("2026-07-01T00:00:00.000Z", "2026-07-01")).toBe(true);
+  });
+
+  it("publishedAt が since より前なら false", () => {
+    expect(isKeyEventsMeasured("2026-06-20T00:00:00.000Z", "2026-07-01")).toBe(false);
+  });
+
+  it("since 未指定または publishedAt 不明なら false", () => {
+    expect(isKeyEventsMeasured(undefined, "2026-07-01")).toBe(false);
+    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", undefined)).toBe(false);
+    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "")).toBe(false);
+  });
+
+  it("不正な日付文字列なら false", () => {
+    expect(isKeyEventsMeasured("not-a-date", "2026-07-01")).toBe(false);
+    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "not-a-date")).toBe(false);
   });
 });
 

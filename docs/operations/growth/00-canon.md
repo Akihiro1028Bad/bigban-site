@@ -20,7 +20,7 @@
 
 - ランチャー: `scripts/growth/run.mjs`(Windows/macOS 両対応)。プロンプトは stdin で渡す。
 - 動作確認(claude 非起動): `GROWTH_DRYRUN=1`。
-- 下書き系の勝負所モデルは既定 `claude-opus-4-8`(`GROWTH_DRAFTS_MODEL` で上書き可)。
+- 下書き系の勝負所モデルは既定 `claude-opus-4-8`(`GROWTH_DRAFTS_MODEL` で上書き可)。weekly(ネタ出し)も同様に既定 `claude-opus-4-8`(`GROWTH_WEEKLY_MODEL` で上書き可)。
 
 ## 実行モード一覧と参照先
 

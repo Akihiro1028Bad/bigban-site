@@ -25,6 +25,7 @@ import {
   articleSearchUrl,
   buildMetricsMirrorProps,
   buildSearchMetrics,
+  isKeyEventsMeasured,
   metricsForPagePath,
   type SearchMetrics,
 } from "./metrics";
@@ -43,6 +44,7 @@ const PUBLISHED_STATUS = "公開済み";
 // microCMS contentId の許可文字＋長さ上限(draft/eyecatch route と同じ)。不正値・過大値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
+const KEY_EVENTS_SINCE = process.env.GROWTH_GA4_KEYEVENTS_SINCE;
 
 // topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数/keyEvents)。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
@@ -215,6 +217,7 @@ async function main(): Promise<void> {
     // #計測強化 S3: 公開日(要改稿判定)も載せる。
     const metrics = {
       ...base,
+      keyEventsMeasured: isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
       ...(search ? { search } : {}),
       ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
     };

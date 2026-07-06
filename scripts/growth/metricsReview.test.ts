@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ArticleMetrics } from "./metrics";
-import { daysSincePublished, reviewLabels } from "./metricsReview";
+import { daysSincePublished, isLowSample, reviewLabels } from "./metricsReview";
 
 const PERIOD = { start: "2026-06-15", end: "2026-06-21" };
 
@@ -63,10 +63,49 @@ describe("reviewLabels", () => {
   });
 
   it("読まれるがCTA弱い: views>=50 かつ keyEvents=0", () => {
-    const m = base({ views: { current: 50, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null } });
+    const m = base({ views: { current: 50, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null }, keyEventsMeasured: true });
     expect(reviewLabels(m, 3)).toContain("読まれるがCTA弱い");
-    const m2 = base({ views: { current: 49, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null } });
+    const m2 = base({ views: { current: 49, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null }, keyEventsMeasured: true });
     expect(reviewLabels(m2, 3)).not.toContain("読まれるがCTA弱い");
+  });
+
+  it("未計測期間: views>=50 keyEvents=0 は CV未計測(CTA弱いにしない)", () => {
+    const labels = reviewLabels(
+      base({
+        views: { current: 60, prior: 0, deltaPct: null },
+        keyEvents: { current: 0, prior: 0, deltaPct: null },
+        keyEventsMeasured: false,
+      }),
+      3
+    );
+    expect(labels).toContain("CV未計測");
+    expect(labels).not.toContain("読まれるがCTA弱い");
+  });
+
+  it("計測済み: keyEvents>0 は CV 系ラベルを付けない", () => {
+    const labels = reviewLabels(
+      base({
+        views: { current: 60, prior: 0, deltaPct: null },
+        keyEvents: { current: 1, prior: 0, deltaPct: null },
+        keyEventsMeasured: true,
+      }),
+      3
+    );
+    expect(labels).not.toContain("CV未計測");
+    expect(labels).not.toContain("読まれるがCTA弱い");
+  });
+
+  it("views<50: CV未計測も付かない", () => {
+    const labels = reviewLabels(
+      base({
+        views: { current: 10, prior: 0, deltaPct: null },
+        keyEvents: { current: 0, prior: 0, deltaPct: null },
+        keyEventsMeasured: false,
+      }),
+      3
+    );
+    expect(labels).not.toContain("CV未計測");
+    expect(labels).not.toContain("読まれるがCTA弱い");
   });
 
   it("要改稿: 公開28日後かつ低調(views<50 & clicks<10)。伸びているは出さない", () => {
@@ -95,6 +134,38 @@ describe("reviewLabels", () => {
 
   it("search 無し(旧データ)でも落ちない", () => {
     const m = base({ search: undefined, keyEvents: { current: 0, prior: 0, deltaPct: null } });
-    expect(reviewLabels(m, 3)).toContain("読まれるがCTA弱い");
+    expect(reviewLabels(m, 3)).toContain("CV未計測");
+  });
+});
+
+describe("isLowSample", () => {
+  it("impressions<100 かつ views<50 で true", () => {
+    expect(
+      isLowSample(
+        base({
+          views: { current: 49, prior: 0, deltaPct: null },
+          search: search({ impressions: { current: 99, prior: 0, deltaPct: null } }),
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("どちらか母数が十分なら false", () => {
+    expect(
+      isLowSample(
+        base({
+          views: { current: 50, prior: 0, deltaPct: null },
+          search: search({ impressions: { current: 99, prior: 0, deltaPct: null } }),
+        })
+      )
+    ).toBe(false);
+    expect(
+      isLowSample(
+        base({
+          views: { current: 49, prior: 0, deltaPct: null },
+          search: search({ impressions: { current: 100, prior: 0, deltaPct: null } }),
+        })
+      )
+    ).toBe(false);
   });
 });
