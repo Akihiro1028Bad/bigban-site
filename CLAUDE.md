@@ -48,7 +48,7 @@ public/
 
 **正典の優先順位**: `scripts/growth/facility-context.json`(施設の前提・書いてはいけない未確定項目の単一ソース) > `docs/operations/growth-article-style.md`(文体・構成・NG) > `docs/operations/growth-weekly-runbook.md`(運用手順)。
 
-**絶対禁止(全モード)**: 本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(営業時間・料金・面数・所要分)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。
+**絶対禁止(全モード)**: 本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(料金・正確な所要分 等。列挙の正典は `scripts/growth/facility-context.json` の `doNotWrite`)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。
 
 **実行**: 自宅 PC の headless `claude -p`(`scripts/growth/run.mjs`)。動作確認は `GROWTH_DRYRUN=1`。下書き系の既定モデルは `claude-opus-4-8`。
 
