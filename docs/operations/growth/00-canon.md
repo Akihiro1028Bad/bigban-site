@@ -14,7 +14,7 @@
 - **本番公開しない**(下書きのまま。microCMS MCP は headless 非接続=スクリプト経由のみ)。
 - **git push / git commit しない**(`run.mjs` の `DISALLOW` で `Bash(git push:*)`/`Bash(git commit:*)` を明示拒否)。
 - **未確定情報を断定しない**(facility-context の `doNotWrite`(料金・正確な所要分・未確定の日時。列挙はファイルを正典とし、ここに再掲しない)。必要時は「最新情報をご確認ください」と促す)。なお営業時間 6:00-23:00・コート3面・デコターフは公表済みの確定事実(#217)で、断定してよい。
-- **失敗を沈黙させない**(途中失敗は工程名・再開コマンドを出力し、LINE 通知。冪等に再開できる設計を崩さない)。
+- **失敗を沈黙させない**(途中失敗は工程名・再開コマンドを出力し、`data/growth-failures.log` に追記する。LINE は週次完了と週次モード自身の失敗だけに絞り、週次本文で直近7日の失敗件数をサマリする。冪等に再開できる設計を崩さない)。
 
 ## 実行(headless / `claude -p`)
 
@@ -38,6 +38,11 @@
 | comment-revise | (#182) | 本文インラインコメント→AI修正 | [30-loops.md](30-loops.md) |
 | (純データ) | `growth:metrics` | GA4成績→Notion(計測ループ #C4) | [50-publish-metrics.md](50-publish-metrics.md) |
 | (純データ) | `growth:publish-due` | 予約公開の到来分を公開(#H24) | [50-publish-metrics.md](50-publish-metrics.md) |
+
+## 人間向けガイド(初期構築・日常運用)
+
+- **初期構築**: [01-setup-guide.md](01-setup-guide.md) — 新環境を一から立ち上げ、週次モードの空実行が通るまで(自宅PCのタスク登録・環境変数・LINE 承認を全統合)。
+- **日常運用**: [10-operator-guide.md](10-operator-guide.md) — 週次サイクル(承認→下書き→公開→レビュー)を通しで回す運用者向けの1本。
 
 ## 設計の共通原則(全ループ)
 

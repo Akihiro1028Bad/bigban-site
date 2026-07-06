@@ -116,17 +116,9 @@ describe("assemblePromptGroups", () => {
   });
 
   it("運用・セットアップ資料も該当グループに整形する", () => {
-    const groups = assemblePromptGroups([
-      file("news-admin-manual.md"),
-      file("growth-windows-setup.md"),
-      file("growth-line-approval-setup.md"),
-    ]);
+    const groups = assemblePromptGroups([file("news-admin-manual.md")]);
     const ops = groups.find((g) => g.group === "運用・セットアップ");
-    expect(ops?.phases.map((p) => p.filename)).toEqual([
-      "growth-windows-setup.md",
-      "growth-line-approval-setup.md",
-      "news-admin-manual.md",
-    ]);
+    expect(ops?.phases.map((p) => p.filename)).toEqual(["news-admin-manual.md"]);
   });
 
   it("空配列なら空配列を返す", () => {

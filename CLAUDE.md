@@ -58,6 +58,8 @@ public/
 
 **分割ドキュメント**:
 - 正典・絶対禁止・実行モード一覧: `docs/operations/growth/00-canon.md`
+- 初期構築ガイド(人間向け・環境立ち上げ〜空実行): `docs/operations/growth/01-setup-guide.md`
+- 日常運用ガイド(人間向け・週次サイクル通し): `docs/operations/growth/10-operator-guide.md`
 - 下書きモード(本文画像 #59 / 手動リッチ編集 #72): `docs/operations/growth/20-draft.md`
 - pull型 AIループ(修正 #40・画像再生成 #144/#156・メディア #142/#143/#145・advise #146・decorate #147・apply #165・comment-revise #182): `docs/operations/growth/30-loops.md`
 - 公開キュー #H23/#H24・計測ループ #C4: `docs/operations/growth/50-publish-metrics.md`

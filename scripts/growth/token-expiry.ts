@@ -39,11 +39,11 @@ export function buildTokenExpiryWarning(input: TokenExpiryInput): string | null 
   const remainingMs = input.expiresAt - input.now;
 
   if (remainingMs < 0) {
-    return "⚠ Google 連携トークンが失効しました。再取得してください(手順: docs/operations/growth-windows-setup.md)。";
+    return "⚠ Google 連携トークンが失効しました。再取得してください(手順: docs/operations/growth/01-setup-guide.md 手順5)。";
   }
 
   if (remainingMs > thresholdDays * MS_PER_DAY) return null;
 
   const remainingDays = Math.floor(remainingMs / MS_PER_DAY);
-  return `⚠ Google 連携トークンの失効まで残り ${remainingDays}日です。早めに再取得してください(手順: docs/operations/growth-windows-setup.md)。`;
+  return `⚠ Google 連携トークンの失効まで残り ${remainingDays}日です。早めに再取得してください(手順: docs/operations/growth/01-setup-guide.md 手順5)。`;
 }

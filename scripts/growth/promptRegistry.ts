@@ -211,21 +211,7 @@ export const PROMPT_REGISTRY: readonly PromptPhaseMeta[] = [
     order: 6,
     whenItRuns: "下書きの編集者ゲートで参照する、ありがちな事故と直し方(§13/§14/§15/§7)",
   },
-  // この分析機能(グロースループ)を動かすための運用・セットアップ手順(人間向け資料)。
-  {
-    filename: "growth-windows-setup.md",
-    label: "常時稼働PCのセットアップ",
-    group: "運用・セットアップ",
-    order: 1,
-    whenItRuns: "週次/修正ループ等を常時稼働させる PC の初期設定手順",
-  },
-  {
-    filename: "growth-line-approval-setup.md",
-    label: "LINE承認導線のセットアップ",
-    group: "運用・セットアップ",
-    order: 2,
-    whenItRuns: "承認画面への導線・LINE 通知の設定手順",
-  },
+  // 公開先 microCMS の手動運用マニュアル(人間向け資料)。
   {
     filename: "news-admin-manual.md",
     label: "microCMS手動運用マニュアル",

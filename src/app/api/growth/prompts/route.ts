@@ -33,15 +33,13 @@ const FACILITY_CONTEXT_PATH = path.join(
   "facility-context.json",
 );
 
-// AI が参照する資料＋この分析機能の運用/セットアップ手順。リポジトリルートからの相対パス。
+// AI が参照する資料＋この分析機能の運用マニュアル。リポジトリルートからの相対パス。
 // (basename をキーに promptRegistry のラベル/グループへ対応づく)
 const REFERENCE_DOC_PATHS: readonly string[] = [
   "CLAUDE.md",
   "docs/operations/growth-article-style.md",
   "docs/operations/ai-news-prompt.md",
   "docs/operations/growth-weekly-runbook.md",
-  "docs/operations/growth-windows-setup.md",
-  "docs/operations/growth-line-approval-setup.md",
   "docs/operations/news-admin-manual.md",
 ];
 

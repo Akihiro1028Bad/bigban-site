@@ -85,12 +85,8 @@ describe("GET /api/growth/prompts", () => {
       "ai-news-prompt.md",
       "growth-weekly-runbook.md",
     ]);
-    // 運用・セットアップ3点
-    expect(byGroup["運用・セットアップ"]).toEqual([
-      "growth-windows-setup.md",
-      "growth-line-approval-setup.md",
-      "news-admin-manual.md",
-    ]);
+    // 運用・セットアップ(microCMS 手動運用マニュアルのみ)
+    expect(byGroup["運用・セットアップ"]).toEqual(["news-admin-manual.md"]);
   });
 
   it("examples ディレクトリが無くても他は返す", async () => {
