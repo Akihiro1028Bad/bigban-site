@@ -7,12 +7,15 @@
 
 import type { FlexContainer } from "./digest-flex";
 import type { FetchFn } from "./http";
+import { resolveNotifyLevel, shouldPushLine } from "./notifyGate";
+import type { NotifyKind } from "./notifyGate";
 
 export const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 
 export interface LinePushOptions {
   channelAccessToken: string;
   fetchFn: FetchFn;
+  kind?: NotifyKind;
 }
 
 /** push エンドポイントへ messages 配列を送る共通処理。失敗時は throw。 */
@@ -21,6 +24,9 @@ async function pushMessages(
   messages: unknown[],
   options: LinePushOptions
 ): Promise<void> {
+  const kind = options.kind ?? "routine";
+  if (!shouldPushLine(kind, resolveNotifyLevel(process.env))) return;
+
   const res = await options.fetchFn(LINE_PUSH_URL, {
     method: "POST",
     headers: {

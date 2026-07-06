@@ -37,7 +37,11 @@ async function main(): Promise<void> {
   }
 
   try {
-    await pushTextMessage(to, message, { channelAccessToken: token, fetchFn: defaultFetch });
+    await pushTextMessage(to, message, {
+      channelAccessToken: token,
+      fetchFn: defaultFetch,
+      kind: "failure",
+    });
     process.stderr.write("LINE グループへ pull 失敗を通知しました。\n");
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);

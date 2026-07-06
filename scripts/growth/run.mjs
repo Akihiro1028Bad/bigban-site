@@ -14,6 +14,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   readFileSync,
   writeFileSync,
   mkdirSync,
@@ -30,6 +31,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
 const tmpDir = path.join(here, "..", "..", ".growth-tmp");
+const FAILURE_LOG_PATH = "data/growth-failures.log";
 
 // 共通の許可ツール。Notion は headless では mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
@@ -252,16 +254,47 @@ const RESUME_COMMANDS = {
   "comment-revise": "npm run growth:comment-revise-loop",
 };
 
+function cleanFailureField(value) {
+  return String(value).replace(/[\t\r\n]+/g, " ").trim();
+}
+
+// Keep this format mirrored with scripts/growth/notifyGate.ts (formatFailureLogEntry).
+function formatFailureLogEntry({ nowIso, source, exitCode, resume, detail }) {
+  const parts = [`source=${cleanFailureField(source)}`];
+  if (exitCode !== undefined) parts.push(`exit=${cleanFailureField(exitCode)}`);
+  if (resume) parts.push(`resume=${cleanFailureField(resume)}`);
+  if (detail) parts.push(`detail=${cleanFailureField(detail)}`);
+  return [nowIso, ...parts].join("\t");
+}
+
+function appendGrowthFailureLog({ source, exitCode, resume, detail }) {
+  const filePath = path.join(process.cwd(), FAILURE_LOG_PATH);
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  appendFileSync(
+    filePath,
+    `${formatFailureLogEntry({
+      nowIso: new Date().toISOString(),
+      source,
+      exitCode,
+      resume,
+      detail,
+    })}\n`,
+    "utf-8"
+  );
+}
+
 /**
- * 実行前に最新を取り込む(#219 / P1⑤): git fetch → git pull --ff-only(現在ブランチ)。
+ * weekly モードの実行前に最新を取り込む(#219 / P1⑤): git fetch → git pull --ff-only(現在ブランチ)。
  * 失敗(非 ff・conflict・ネットワーク断)は工程を中断し、工程名・再開コマンド・原因を
  * LINE 通知して exit≠0 で抜ける(旧版のまま走り続けるのを防ぐ・沈黙させない)。
- * GROWTH_DRYRUN / GROWTH_SKIP_PULL 指定時は no-op(動作確認を壊さない)。push/commit の DISALLOW は不変。
+ * weekly 以外、または GROWTH_DRYRUN / GROWTH_SKIP_PULL 指定時は no-op(動作確認を壊さない)。
+ * push/commit の DISALLOW は不変。
  */
 function pullLatestOrAbort() {
-  // ⚠️ この skip 判定と exit-code 成否判定は gitPull.ts(PULL_SKIP_ENV_VARS /
-  // shouldSkipPull / classifyPullResult)のミラー実装(run.mjs は .ts を import 不可)。
+  // ⚠️ この mode 判定、skip 判定、exit-code 成否判定は gitPull.ts(shouldPullForMode /
+  // PULL_SKIP_ENV_VARS / shouldSkipPull / classifyPullResult)のミラー実装(run.mjs は .ts を import 不可)。
   // env 名や判定を変更する時は gitPull.ts と両方を必ず同時に更新すること。
+  if (mode !== "weekly") return;
   if (process.env.GROWTH_DRYRUN || process.env.GROWTH_SKIP_PULL) return;
   const branch = currentBranch();
   // fetch は best-effort(オフラインでも pull --ff-only 側で確実に失敗を拾う)。
@@ -273,6 +306,12 @@ function pullLatestOrAbort() {
     process.stderr.write(
       `git pull --ff-only に失敗しました(${mode})。工程を中断します。再開: ${resumeCommand}\n`
     );
+    appendGrowthFailureLog({
+      source: "pull",
+      exitCode: pull.status ?? 1,
+      resume: resumeCommand,
+      detail,
+    });
     // 失敗を沈黙させない: LINE へ通知する(本文は gitPull.ts、送信は notify-pull-fail CLI)。
     spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-pull-fail"], {
       stdio: ["ignore", "inherit", "inherit"],
@@ -292,7 +331,7 @@ function pullLatestOrAbort() {
   }
 }
 
-// 各モードは最新を取り込んでから起動する(dry-run/skip は no-op・失敗時はここで中断)。
+// weekly は最新を取り込んでから起動する(dry-run/skip/weekly 以外は no-op・失敗時はここで中断)。
 pullLatestOrAbort();
 
 // pull 後の実行 SHA(週次通知に載せてデプロイ側とのスキュー確認を可能にする=#219)。
@@ -316,8 +355,14 @@ if (cfg.lock) {
  * 送信は notify-loop-fail CLI(本文は loopFailure.ts)。spawnSync で確実に完了させてから exit する。
  */
 function notifyLoopFail(kind, { exitCode, detail } = {}) {
-  if (mode === "weekly") return; // weekly は notify-line 側で通知済み
   const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
+  appendGrowthFailureLog({
+    source: mode,
+    exitCode,
+    resume: resumeCommand,
+    detail: detail || kind,
+  });
+  if (mode === "weekly") return; // weekly は notify-line 側で kind=weekly の通知を送る
   spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-loop-fail"], {
     stdio: ["ignore", "inherit", "inherit"],
     shell: isWin,
@@ -350,6 +395,9 @@ child.on("exit", async (code) => {
   // claude の出力には依存せず、スナップショット + Notion から通知を組み立てる。
   // 異常終了(exit≠0)でも、失敗を**沈黙させない**ためにエラー通知を送る。
   if (mode === "weekly") {
+    if (exitCode !== 0) {
+      notifyLoopFail("nonzero-exit", { exitCode });
+    }
     const env =
       exitCode === 0
         ? { GROWTH_RUN_SHA: runSha }
@@ -374,6 +422,7 @@ child.on("error", (err) => {
   process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
   // claude 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
   if (mode === "weekly") {
+    notifyLoopFail("spawn-error", { exitCode: 1, detail: err.message });
     runNpm("growth:notify-line", {
       GROWTH_NOTIFY_ERROR: "1",
       GROWTH_WEEKLY_EXIT_CODE: "1",

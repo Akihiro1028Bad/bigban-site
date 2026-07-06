@@ -1,5 +1,5 @@
 /**
- * ⚠️ このテストが守る skip/成否判定は run.mjs の `pullLatestOrAbort()` のミラーである
+ * ⚠️ このテストが守る mode/skip/成否判定は run.mjs の `pullLatestOrAbort()` のミラーである
  * (run.mjs は .ts を import できないための二重実装)。乖離させないこと:
  * gitPull.ts(特に PULL_SKIP_ENV_VARS)を変更したら run.mjs 側も必ず同時に更新する。
  */
@@ -10,6 +10,7 @@ import {
   classifyPullResult,
   formatShaLine,
   PULL_SKIP_ENV_VARS,
+  shouldPullForMode,
   shouldSkipPull,
 } from "./gitPull";
 
@@ -34,6 +35,23 @@ describe("shouldSkipPull", () => {
 
   it("空文字は未指定扱い(false)", () => {
     expect(shouldSkipPull({ GROWTH_DRYRUN: "", GROWTH_SKIP_PULL: "" })).toBe(false);
+  });
+});
+
+describe("shouldPullForMode", () => {
+  it("weekly かつ skip env 無しなら pull する", () => {
+    expect(shouldPullForMode("weekly", {})).toBe(true);
+  });
+
+  it("weekly でも GROWTH_DRYRUN / GROWTH_SKIP_PULL があれば pull しない", () => {
+    expect(shouldPullForMode("weekly", { GROWTH_DRYRUN: "1" })).toBe(false);
+    expect(shouldPullForMode("weekly", { GROWTH_SKIP_PULL: "1" })).toBe(false);
+  });
+
+  it("weekly 以外のモードは env に関わらず pull しない", () => {
+    expect(shouldPullForMode("drafts", {})).toBe(false);
+    expect(shouldPullForMode("revise", {})).toBe(false);
+    expect(shouldPullForMode("regen", { GROWTH_SKIP_PULL: "1" })).toBe(false);
   });
 });
 

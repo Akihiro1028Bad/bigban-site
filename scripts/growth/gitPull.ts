@@ -1,15 +1,15 @@
 /**
  * 実行前 git pull(ff-only)の純ロジック(#219 / P1⑤)。プロセス spawn は run.mjs 側。
  *
- * 自宅 PC の headless 実行が「旧版のまま走り続ける」のを防ぐため、各モード起動**前**に
- * `git pull --ff-only` を行う。ここでは pull を skip すべきか・結果が成功か・失敗通知文を
+ * 自宅 PC の headless 実行が「旧版のまま走り続ける」のを防ぐため、weekly モード起動**前**に
+ * `git pull --ff-only` を行う。ここでは pull を実行/skip すべきか・結果が成功か・失敗通知文を
  * どう組み立てるか、といった判定だけを持つ(IO 非依存でテスト可能)。
  *
  * 失敗(非 ff・conflict・ネットワーク断)は「沈黙させない」原則に従い、工程を中断して
  * 工程名・再開コマンド・原因ヒントを LINE 通知する(組み立てはここ、送信は run.mjs)。
  *
  * ⚠️ 二重実装の注意(レビュー MEDIUM-1): run.mjs は .ts を import できないため、
- * skip 判定と exit-code 成否判定は run.mjs の `pullLatestOrAbort()` にミラー実装がある。
+ * mode 判定、skip 判定、exit-code 成否判定は run.mjs の `pullLatestOrAbort()` にミラー実装がある。
  * ここ(特に {@link PULL_SKIP_ENV_VARS})を変更したら run.mjs 側も必ず同時に更新すること。
  */
 
@@ -22,6 +22,14 @@ export const PULL_SKIP_ENV_VARS = ["GROWTH_DRYRUN", "GROWTH_SKIP_PULL"] as const
 /** GROWTH_DRYRUN / GROWTH_SKIP_PULL のいずれかが立っていれば pull を skip する(動作確認を壊さない)。 */
 export function shouldSkipPull(env: Record<string, string | undefined>): boolean {
   return PULL_SKIP_ENV_VARS.some((name) => Boolean(env[name]));
+}
+
+/** weekly モードのみ pull する。skip env が立っていれば weekly でも pull しない。 */
+export function shouldPullForMode(
+  mode: string,
+  env: Record<string, string | undefined>
+): boolean {
+  return mode === "weekly" && !shouldSkipPull(env);
 }
 
 /** pull の子プロセス終了コード → 成否。null(シグナル等)や非 0 は失敗。 */

@@ -19,6 +19,12 @@ import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
 import { getLatestReport, queryDataSource } from "./notion";
 import {
+  FAILURE_LOG_PATH,
+  FAILURE_WINDOW_MS,
+  buildFailureSummaryLine,
+  countRecentFailures,
+} from "./notifyGate";
+import {
   buildApproveUrl,
   buildPublicNotionUrl,
   extractActionTitles,
@@ -52,6 +58,17 @@ function tokenWarnings(): string[] {
   return warning ? [warning] : [];
 }
 
+async function failureSummaryLine(): Promise<string> {
+  let logText = "";
+  try {
+    logText = await readFile(path.resolve(process.cwd(), FAILURE_LOG_PATH), "utf-8");
+  } catch {
+    logText = "";
+  }
+  const count = countRecentFailures(logText, FAILURE_WINDOW_MS, Date.now());
+  return buildFailureSummaryLine(count, FAILURE_LOG_PATH);
+}
+
 /** 週次実行が異常終了した場合のエラー通知。スナップショット等は読まない。 */
 async function notifyFailure(): Promise<void> {
   const logPath = process.env.GROWTH_WEEKLY_LOG ?? DEFAULT_WEEKLY_LOG;
@@ -65,6 +82,7 @@ async function notifyFailure(): Promise<void> {
   await pushTextMessage(requireEnv("LINE_GROUP_ID"), message, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
+    kind: "weekly",
   });
   process.stderr.write("LINE グループへ失敗を通知しました。\n");
 }
@@ -122,8 +140,20 @@ async function main(): Promise<void> {
     sha: process.env.GROWTH_RUN_SHA,
   };
   // テキストは Flex 非対応環境向けの altText(フォールバック)として活用する。
-  const altText = buildDigestMessage(digestInput);
+  const summaryLine = await failureSummaryLine();
+  const baseAltText = buildDigestMessage(digestInput);
+  const altText = summaryLine ? `${baseAltText}\n\n${summaryLine}` : baseAltText;
   const flex = buildDigestFlex(digestInput);
+  if (summaryLine) {
+    flex.body?.contents.push({
+      type: "text",
+      text: summaryLine,
+      size: "sm",
+      weight: "bold",
+      color: "#d97706",
+      wrap: true,
+    });
+  }
 
   if (process.env.GROWTH_DRYRUN) {
     process.stdout.write(`${altText}\n`);
@@ -133,6 +163,7 @@ async function main(): Promise<void> {
   await pushFlexMessage(requireEnv("LINE_GROUP_ID"), altText, flex, {
     channelAccessToken: requireEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     fetchFn: defaultFetch,
+    kind: "weekly",
   });
   process.stderr.write("LINE グループへ通知しました。\n");
 }

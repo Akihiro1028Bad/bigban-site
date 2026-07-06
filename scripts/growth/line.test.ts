@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import { LINE_PUSH_URL, pushFlexMessage, pushTextMessage } from "./line";
@@ -11,11 +11,19 @@ function res(ok: boolean, status: number, text = ""): HttpResponse {
 
 const TOKEN = "line_token";
 
+afterEach(() => {
+  delete process.env.GROWTH_NOTIFY_LEVEL;
+});
+
 describe("pushTextMessage", () => {
   it("LINE Messaging API の push に text メッセージを送る", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
 
-    await pushTextMessage("Gabc", "こんにちは", { channelAccessToken: TOKEN, fetchFn });
+    await pushTextMessage("Gabc", "こんにちは", {
+      channelAccessToken: TOKEN,
+      fetchFn,
+      kind: "weekly",
+    });
 
     const [url, init] = fetchFn.mock.calls[0];
     expect(url).toBe(LINE_PUSH_URL);
@@ -33,8 +41,25 @@ describe("pushTextMessage", () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(false, 401, "invalid token"));
 
     await expect(
-      pushTextMessage("Gabc", "x", { channelAccessToken: TOKEN, fetchFn })
+      pushTextMessage("Gabc", "x", { channelAccessToken: TOKEN, fetchFn, kind: "weekly" })
     ).rejects.toThrow(/401.*invalid token/);
+  });
+
+  it("weekly-only 既定では routine メッセージを送信しない", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
+
+    await pushTextMessage("Gabc", "routine", { channelAccessToken: TOKEN, fetchFn });
+
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("GROWTH_NOTIFY_LEVEL=all では routine メッセージも送信する", async () => {
+    process.env.GROWTH_NOTIFY_LEVEL = "all";
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
+
+    await pushTextMessage("Gabc", "routine", { channelAccessToken: TOKEN, fetchFn });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -50,6 +75,7 @@ describe("pushFlexMessage", () => {
     await pushFlexMessage("Gabc", "代替テキスト", bubble, {
       channelAccessToken: TOKEN,
       fetchFn,
+      kind: "weekly",
     });
 
     const [url, init] = fetchFn.mock.calls[0];
@@ -67,6 +93,7 @@ describe("pushFlexMessage", () => {
     await pushFlexMessage("Gabc", "代替", carousel, {
       channelAccessToken: TOKEN,
       fetchFn,
+      kind: "weekly",
     });
 
     const [, init] = fetchFn.mock.calls[0];
@@ -80,7 +107,7 @@ describe("pushFlexMessage", () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(false, 400, "bad flex"));
 
     await expect(
-      pushFlexMessage("Gabc", "x", bubble, { channelAccessToken: TOKEN, fetchFn })
+      pushFlexMessage("Gabc", "x", bubble, { channelAccessToken: TOKEN, fetchFn, kind: "weekly" })
     ).rejects.toThrow(/400.*bad flex/);
   });
 });
