@@ -21,14 +21,12 @@ import {
   ADVISE_APPLY_BUSY_STATUSES,
   applyStatusOf,
   buildApplyRequestProps,
+  MAX_ADOPTED,
   selectApplicableFixes,
 } from "@/lib/growth/adviseApply";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
-
-/** 一度に採用できる fix の上限(濫用・巨大ペイロード防止)。 */
-const MAX_ADOPTED = 20;
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
