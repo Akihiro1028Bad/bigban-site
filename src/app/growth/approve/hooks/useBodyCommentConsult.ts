@@ -153,11 +153,31 @@ export function useBodyCommentConsult({
     setBusy(true);
     setError("");
     const adoptedAspects = applied.map(() => "インラインコメント");
+    // 学習ログ詳細化: 観点だけでなくコメント本文・対象・変更前後も残す。applied は proposal の
+    // commentIndex 値なので、同じ index の投稿コメント・proposal エントリから引く(対応が
+    // 取れない場合は空文字でフォールバック)。
+    const postedComments = bodyComment?.comments ?? [];
+    const adoptedFixes = applied.map((commentIndex) => {
+      const comment = postedComments[commentIndex];
+      const item = proposal.find((p) => p.commentIndex === commentIndex);
+      return {
+        aspect: "インラインコメント",
+        detail: `コメント: ${comment?.comment ?? ""}（対象: ${comment?.excerpt ?? ""}）`,
+        before: item?.before ?? "",
+        after: item?.after ?? "",
+      };
+    });
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html, source: "comment-revise", adoptedAspects }),
+        body: JSON.stringify({
+          pageId,
+          bodyHtml: html,
+          source: "comment-revise",
+          adoptedAspects,
+          adoptedFixes,
+        }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error((saveJson.error as string) ?? "保存に失敗しました。");

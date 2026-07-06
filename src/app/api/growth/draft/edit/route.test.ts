@@ -368,6 +368,91 @@ describe("POST /api/growth/draft/edit", () => {
     expect(richTextContent(secondProps[LEARNING_LOG_PROPS.summary])).toBe("採用観点: 敬体乱れ");
   });
 
+  it("adoptedFixes があれば fix ごとに指摘・変更前後を要約に残して採否を追記する", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["読みやすさ"],
+        adoptedFixes: [
+          {
+            aspect: "読みやすさ",
+            detail: "指摘: 冗長 / 提案: 短くする",
+            before: "<p>ここは冗長で読みにくい段落です。</p>",
+            after: "<p>ここは簡潔です。</p>",
+          },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(after).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+    const props = vi.mocked(createPage).mock.calls[0][1];
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("採否");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.target])).toBe("読みやすさ");
+    const summary = richTextContent(props[LEARNING_LOG_PROPS.summary]);
+    expect(summary).toContain("[読みやすさ] 指摘: 冗長 / 提案: 短くする");
+    expect(summary).toContain("変更前: ここは冗長で読みにくい段落です。");
+    expect(summary).toContain("変更後: ここは簡潔です。");
+  });
+
+  it("adoptedFixes は adoptedAspects より優先される", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["A", "B", "C"],
+        adoptedFixes: [
+          { aspect: "只1件", detail: "d", before: "<p>b</p>", after: "<p>a</p>" },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    // adoptedAspects が3件でも、優先される adoptedFixes(1件)ぶんだけ追記される。
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+    expect(richTextContent(vi.mocked(createPage).mock.calls[0][1][LEARNING_LOG_PROPS.target])).toBe(
+      "只1件"
+    );
+  });
+
+  it("adoptedFixes が壊れた形なら adoptedAspects 挙動へフォールバックする(後方互換)", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["冗長"],
+        adoptedFixes: [{ aspect: 1, detail: "d", before: "b", after: "a" }],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+    const props = vi.mocked(createPage).mock.calls[0][1];
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("採否");
+    // フォールバックのハードコード要約(旧挙動)。
+    expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toBe("採用観点: 冗長");
+  });
+
   it("source 付きでも adoptedAspects が空なら手動編集として学習ログを追記する", async () => {
     process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
     vi.mocked(getPage).mockResolvedValue(
@@ -450,6 +535,35 @@ describe("POST /api/growth/draft/edit", () => {
     expect(await res.json()).toEqual({ success: true });
     expect(after).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+  });
+
+  it("adoptedFixes の採否追記が失敗しても保存レスポンスは 200 を返す", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", "<p>旧本文です。</p>")
+    );
+    vi.mocked(createPage).mockRejectedValue(new Error("learning log down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedFixes: [
+          { aspect: "読みやすさ", detail: "d", before: "<p>b</p>", after: "<p>a</p>" },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    await vi.waitFor(() => expect(createPage).toHaveBeenCalledTimes(1));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "learning-log append failed (adopt-fix)",
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
   });
 
   it("保存失敗時は学習ログ追記を登録しない", async () => {
