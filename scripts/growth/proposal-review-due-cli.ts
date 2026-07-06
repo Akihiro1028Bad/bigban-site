@@ -1,12 +1,12 @@
 /**
  * 施策の効果検証レビュー抽出 CLI(改善案#5・記事 review-due の施策版)。
  *
- *   npm run growth:proposal-review-due                 # 検証予定日が来た施策の検証結果候補を Notion に書く
+ *   npm run growth:proposal-review-due                 # 検証予定日が来た施策の検証メモ候補を Notion に書く
  *   GROWTH_DRYRUN=1 npm run growth:proposal-review-due # 書かずに対象だけ表示
  *
  * プル型: Notion 施策提案 DB の取得・書き込み・LINE 通知はこの CLI が担い、承認画面(Vercel)は
- * Notion を読むだけ。効いた/効かないの最終判断は**人が決める**ので CLI は触らず、`検証結果`(候補)と
- * `検証済み`(到来日)だけを書く。純ロジック(到来判定・メモ生成)は proposal-review-due.ts でテスト済み。
+ * Notion を読むだけ。効いた/効かないの最終判断は**人が select `検証結果` で決める**ので CLI は触らず、
+ * `検証メモ`(候補)と `検証済み`(到来日)だけを書く。純ロジック(到来判定・メモ生成)は proposal-review-due.ts でテスト済み。
  * 薄い I/O 配線のためカバレッジ対象外(記事版 review-due-cli.ts と同じ流儀)。
  */
 

@@ -2,16 +2,20 @@
  * 施策の効果検証レビューの純ロジック(改善案#5・記事の review-due と対称)。
  *
  * 施策提案 DB の `検証予定日`(date)が到来した施策を拾い、`仮説`＋`成功指標` から
- * 「検証結果」候補メモを作る。I/O は持たない(Notion 読み書き・LINE 通知は
+ * 検証メモ候補を作る。I/O は持たない(Notion 読み書き・LINE 通知は
  * proposal-review-due-cli.ts)。承認画面は Notion を読むだけ(プル型)で、
- * 最終判断(効いた/効かない)は人が決める。CLI は候補メモと検証済み日だけを書く。
+ * 最終判断(効いた/効かない)は人が select `検証結果` で決める。CLI は候補メモ
+ * (`検証メモ`)と検証済み日だけを書き、`検証結果`(人の判定)には触れない。
  */
 
 /** 検証予定日(到来判定に使う date プロパティ)。 */
 export const PROPOSAL_REVIEW_DATE_PROP = "検証予定日";
 
-/** 候補メモを書くプロパティ(効いたか/効かないかは人が最終決定)。 */
-export const PROPOSAL_REVIEW_MEMO_PROP = "検証結果";
+/**
+ * 候補メモを書く text プロパティ。効いたか/効かないかの最終判定は人が
+ * select `検証結果` で行うため、自動書き込みはメモ専用の `検証メモ` に分離する。
+ */
+export const PROPOSAL_REVIEW_MEMO_PROP = "検証メモ";
 
 /** 二重に拾わないための「検証済み」記録日プロパティ。 */
 export const PROPOSAL_REVIEW_DONE_PROP = "検証済み";
@@ -49,7 +53,7 @@ export function isProposalReviewDue(
 }
 
 /**
- * 検証結果の候補文を作る(施策名＋仮説＋成功指標)。
+ * 検証メモの候補文を作る(施策名＋仮説＋成功指標)。
  * 効いた/効かないの最終判断は人が決めるので、ここは突き合わせの足場だけ書く。
  */
 export function buildProposalReviewMemo(

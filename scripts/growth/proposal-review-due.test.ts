@@ -69,9 +69,10 @@ describe("buildProposalReviewMemo", () => {
 });
 
 describe("プロパティ名(承認画面・書き込み先の単一ソース)", () => {
-  it("検証予定日/検証結果/検証済み のプロパティ名を持つ", () => {
+  it("検証予定日/検証メモ/検証済み のプロパティ名を持つ", () => {
     expect(PROPOSAL_REVIEW_DATE_PROP).toBe("検証予定日");
-    expect(PROPOSAL_REVIEW_MEMO_PROP).toBe("検証結果");
+    // 候補メモは text `検証メモ` に書く(select `検証結果` は人の最終判定用で触らない)。
+    expect(PROPOSAL_REVIEW_MEMO_PROP).toBe("検証メモ");
     expect(PROPOSAL_REVIEW_DONE_PROP).toBe("検証済み");
   });
 });
