@@ -5,8 +5,10 @@
  * 赤(block)が1つでもあれば公開をブロックする(明示オーバーライドを要求)。しきい値は記事タイプ別に定数化。
  *
  * - block: §5 AI免責文の欠落 / §13 doNotWrite(未確定=料金・所要分)の断定
- * - warn : 文字数不足/過多・見出し/画像/内部リンク不足・タイトル長超過
+ * - warn : 文字数不足/過多・見出し/画像/内部リンク不足・タイトル長超過・文体注意
  */
+
+import { styleLint, styleLintSummary } from "@/lib/growth/styleLint";
 
 /** 各チェックの重大度。 */
 export type CheckLevel = "ok" | "warn" | "block";
@@ -159,6 +161,24 @@ function warnIf(label: string, value: string, fail: boolean, hint?: string): Qua
   return fail ? { label, value, level: "warn", hint } : { label, value, level: "ok" };
 }
 
+function styleWarningCheck(plain: string): QualityCheck {
+  const hits = styleLint(plain);
+  const summary = styleLintSummary(hits);
+  const total = hits.length;
+  const value =
+    total > 0
+      ? `${total}(${summary.map((s) => `${s.category}${s.count}`).join("・")})`
+      : "0";
+
+  if (total === 0) return { label: "文体注意", value, level: "ok" };
+  return {
+    label: "文体注意",
+    value,
+    level: "warn",
+    hint: "§6/§14 の要確認語(誤検知あり・人が判断)",
+  };
+}
+
 export function draftQuality(input: DraftQualityInput): QualityCheck[] {
   const t = QUALITY_THRESHOLDS;
   const plain = plainText(input);
@@ -176,6 +196,7 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
     warnIf("画像", `${images} / 3`, images < t.minImages, "1枚以上を推奨"),
     warnIf("内部リンク", `${internalLinks}`, internalLinks < t.minInternalLinks, "1本以上を検討"),
     warnIf("タイトル長", `${titleLen}字`, titleLen > t.maxTitleLen, `${t.maxTitleLen}字以内に`),
+    styleWarningCheck(plain),
     {
       label: "AI免責文",
       value: hasDisclaimer ? "あり" : "なし",
@@ -190,6 +211,15 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
     },
     ...brokenLinkChecks(input),
   ];
+}
+
+/** styleLint 由来の文体注意 warn を人向け1行に要約する(0件なら null)。 */
+export function summarizeStyleWarnings(bodyHtml: string, title: string): string | null {
+  const check = draftQuality({ bodyHtml, body: "", title }).find(
+    (c) => c.label === "文体注意"
+  );
+  if (!check || check.level !== "warn") return null;
+  return `${check.value}: ${check.hint}`;
 }
 
 /** #H19: knownNewsPaths が渡されたときだけ、壊れた記事リンクを赤(block)で検査する。 */

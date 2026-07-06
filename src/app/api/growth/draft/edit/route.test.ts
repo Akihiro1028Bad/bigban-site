@@ -368,6 +368,30 @@ describe("POST /api/growth/draft/edit", () => {
     expect(richTextContent(secondProps[LEARNING_LOG_PROPS.summary])).toBe("採用観点: 敬体乱れ");
   });
 
+  it("advise-apply で新規 block が発生する本文は 409 で保存しない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror(
+        "g-abc",
+        "承認したタイトル",
+        "<p>旧本文です。※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>"
+      )
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml: "<p>新本文です。</p>",
+        source: "advise-apply",
+        adoptedAspects: ["簡潔化"],
+      })
+    );
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("公開前チェック");
+    expect(updatePageProps).not.toHaveBeenCalled();
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
   it("source 付きでも adoptedAspects が空なら手動編集として学習ログを追記する", async () => {
     process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
     vi.mocked(getPage).mockResolvedValue(

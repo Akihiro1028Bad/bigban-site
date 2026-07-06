@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluatePublishGate } from "./publishGate";
+import {
+  evaluatePublishGate,
+  evaluateRegate,
+  publishGateReason,
+  resolveGateArticleType,
+} from "./publishGate";
 
 const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
@@ -52,6 +57,15 @@ describe("evaluatePublishGate", () => {
     expect(result.blockReasons.some((r) => r.includes("内部リンク先"))).toBe(true);
   });
 
+  it("knownNewsPaths 未指定なら壊れた内部リンクは検査しない", () => {
+    const result = evaluatePublishGate({
+      title: "回遊リンク",
+      bodyHtml: `<p>詳しくは<a href="/ja/news/missing-article">こちら</a>。${DISCLAIMER}</p>`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.blockReasons).toEqual([]);
+  });
+
   it("#218レビュー対応: CTA必須文「本八幡駅から徒歩1分」は gate を通る(draftQuality 委譲)", () => {
     const result = evaluatePublishGate({
       title: "アクセス抜群の屋内コート",
@@ -70,10 +84,93 @@ describe("evaluatePublishGate", () => {
     expect(result.blockReasons.some((r) => r.includes("断定NG"))).toBe(true);
   });
 
+  it("styleLint の文体注意 warn は blockReasons に入らない", () => {
+    const result = evaluatePublishGate({
+      title: "文体チェック",
+      bodyHtml: `<p>この記事では最高の始め方を紹介します。${DISCLAIMER}</p>`,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.blockReasons).toEqual([]);
+  });
+
   it("本文・タイトルが空でも理由文字列を組み立てられる(欠落耐性)", () => {
     const result = evaluatePublishGate({ title: "", bodyHtml: "" });
     // 本文空=免責文も無いので block。理由は非空。
     expect(result.ok).toBe(false);
     expect(result.blockReasons.every((r) => r.length > 0)).toBe(true);
+  });
+});
+
+describe("publishGateReason", () => {
+  it("block があれば理由文字列を返す", () => {
+    const reason = publishGateReason(
+      "<p>本文です。</p>",
+      "屋内コートの話",
+      "single",
+      undefined
+    );
+    expect(reason).toContain("AI免責文");
+  });
+
+  it("block が無ければ null を返す", () => {
+    const reason = publishGateReason(
+      `<p>本八幡駅すぐの屋内コートです。${DISCLAIMER}</p>`,
+      "屋内ピックルボール入門",
+      "single",
+      undefined
+    );
+    expect(reason).toBeNull();
+  });
+
+  it("免責文を含む raw 本文では §5 免責欠落 block が誤発火しない", () => {
+    const rawBody = `<p>公開前に読む本文です。</p><p>${DISCLAIMER}</p>`;
+    const reason = publishGateReason(rawBody, "公開直前の確認", "single", undefined);
+    expect(reason).toBeNull();
+  });
+});
+
+describe("evaluateRegate", () => {
+  it("新規 block のみ newBlocks に含める", () => {
+    const result = evaluateRegate({
+      before: `<p>1時間2,000円です。${DISCLAIMER}</p>`,
+      after: `<p>1時間2,000円です。営業時間は9時からです。</p>`,
+      title: "料金の話",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.newBlocks.some((r) => r.includes("AI免責文"))).toBe(true);
+    expect(result.newBlocks.some((r) => r.includes("断定NG"))).toBe(false);
+  });
+
+  it("既存 block だけなら ok=true", () => {
+    const result = evaluateRegate({
+      before: "<p>本文です。</p>",
+      after: "<p>本文を少し直しました。</p>",
+      title: "免責なしの既存 block",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.newBlocks).toEqual([]);
+  });
+
+  it("after で新しい block が発生したら ok=false", () => {
+    const result = evaluateRegate({
+      before: `<p>本文です。${DISCLAIMER}</p>`,
+      after: "<p>本文です。</p>",
+      title: "AI修正適用",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.newBlocks.some((r) => r.includes("AI免責文"))).toBe(true);
+  });
+});
+
+describe("resolveGateArticleType", () => {
+  it("cornerstone フラグが true なら cornerstone を返す", () => {
+    expect(resolveGateArticleType({ cornerstone: true })).toBe("cornerstone");
+  });
+
+  it("cornerstone フラグ無し・false・文字列 articleType は single を返す", () => {
+    expect(resolveGateArticleType({})).toBe("single");
+    expect(resolveGateArticleType({ cornerstone: false })).toBe("single");
+    expect(resolveGateArticleType({ articleType: "獲得" })).toBe("single");
   });
 });

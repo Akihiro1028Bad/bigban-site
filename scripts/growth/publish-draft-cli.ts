@@ -24,6 +24,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { getColumnSlugs } from "../../src/lib/microcms/columnsQueries";
+import { getNewsSlugs } from "../../src/lib/microcms/queries";
+import { summarizeStyleWarnings } from "../../src/app/growth/approve/draftQuality";
+
 import {
   bodyImageFileStem,
   buildBodyImageFailureMessage,
@@ -50,6 +54,7 @@ import {
 } from "./endpoint";
 import { buildEyecatchPrompt, generateEyecatch, generateImage } from "./eyecatch";
 import { defaultFetch } from "./http";
+import { knownArticlePathsForMedia } from "./knownArticlePaths";
 import { pushTextMessage } from "./line";
 import { uploadMedia } from "./media";
 import {
@@ -64,7 +69,7 @@ import {
   type NotifyThrottleRecord,
 } from "./notify-throttle";
 import { runStages, type Stage } from "./pipeline";
-import { evaluatePublishGate } from "./publishGate";
+import { evaluatePublishGate, resolveGateArticleType } from "./publishGate";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REF = path.join(here, "assets", "mascot-alien.png");
@@ -126,6 +131,10 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function main(): Promise<void> {
   const specPath = process.argv[2];
   if (!specPath) throw new Error("使い方: publish-draft -- <spec.json>");
@@ -180,16 +189,42 @@ async function main(): Promise<void> {
 
   // 品質ゲート(P1-B 案B): 投入前に draftQuality の block を判定し、1つでもあれば中断する。
   // 画像生成や microCMS 投入の前に止めることで、不合格の下書きを作らず API 課金も無駄にしない。
-  // block 例: §5 AI免責文欠落 / §13 doNotWrite の断定。失敗は既存の failedAt 経路で LINE 通知される。
+  // block 例: §5 AI免責文欠落 / §13 doNotWrite の断定 / §15 壊れ内部リンク。
+  // slug 取得失敗時はリンク検査だけを従来動作にフォールバックし、投入自体は止めない。
+  // gate 不合格の失敗は既存の failedAt 経路で LINE 通知される。
   stages.push({
     name: "quality-gate",
     run: async () => {
+      let knownNewsPaths: ReadonlySet<string> | undefined;
+      try {
+        const paths = await knownArticlePathsForMedia(media, {
+          getColumnSlugs,
+          getNewsSlugs,
+        });
+        knownNewsPaths = new Set(paths);
+      } catch (error: unknown) {
+        knownNewsPaths = undefined;
+        const msg = `品質ゲート: 既知記事パスの取得に失敗。壊れリンク検査をスキップして続行します: ${errorMessage(error)}`;
+        process.stderr.write(`${msg}\n`);
+        await notifyLineBestEffort(msg);
+      }
       const gate = evaluatePublishGate({
         bodyHtml: String(spec.payload.bodyHtml ?? ""),
         title: String(spec.payload.title ?? ""),
+        articleType: resolveGateArticleType(spec.payload),
+        knownNewsPaths,
       });
       if (!gate.ok) {
         throw new Error(`品質ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);
+      }
+      const styleWarn = summarizeStyleWarnings(
+        String(spec.payload.bodyHtml ?? ""),
+        String(spec.payload.title ?? "")
+      );
+      if (styleWarn) {
+        const msg = `文体チェック(要確認・投入は継続): ${String(spec.payload.title ?? "")} / ${styleWarn}`;
+        process.stderr.write(`${msg}\n`);
+        await notifyLineBestEffort(msg);
       }
     },
   });

@@ -10,6 +10,7 @@ import {
   findBrokenInternalLinks,
   hasBlockingCheck,
   QUALITY_THRESHOLDS,
+  summarizeStyleWarnings,
 } from "./draftQuality";
 import type { QualityCheck } from "./draftQuality";
 
@@ -117,6 +118,43 @@ describe("draftQuality", () => {
   it("body が空なら bodyHtml からタグを除いて判定する", () => {
     const bodyHtml = `<p>${"あ".repeat(QUALITY_THRESHOLDS.chars.single.min)}${DISCLAIMER}</p>`;
     expect(pick(draftQuality({ bodyHtml, body: "", title: "t" }), "文字数").level).toBe("ok");
+  });
+
+  it("文体注意: styleLint ヒットで warn になりカテゴリ別件数を表示する", () => {
+    const checks = draftQuality({
+      bodyHtml: "",
+      body: `この記事では最高の始め方を紹介します。${DISCLAIMER}`,
+      title: "文体チェック",
+    });
+
+    const check = pick(checks, "文体注意");
+    expect(check.level).toBe("warn");
+    expect(check.value).toContain("3(");
+    expect(check.value).toContain("誇大1");
+    expect(check.value).toContain("メタ言及2");
+    expect(check.hint).toContain("§6/§14");
+  });
+
+  it("文体注意: styleLint ヒット無しで ok・value=0", () => {
+    const checks = draftQuality({
+      bodyHtml: "",
+      body: `本八幡駅近くの屋内コートで、天候を気にせず練習できます。${DISCLAIMER}`,
+      title: "文体チェック",
+    });
+
+    expect(pick(checks, "文体注意")).toEqual({
+      label: "文体注意",
+      value: "0",
+      level: "ok",
+    });
+  });
+
+  it("文体注意 warn は block 判定に影響しない", () => {
+    const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + `最高です。${DISCLAIMER}`;
+    const checks = draftQuality({ bodyHtml: okHtml(), body, title: "文体チェック" });
+
+    expect(pick(checks, "文体注意").level).toBe("warn");
+    expect(hasBlockingCheck(checks)).toBe(false);
   });
 });
 
@@ -237,5 +275,56 @@ describe("countByLevel", () => {
 
   it("空配列は全て 0", () => {
     expect(countByLevel([])).toEqual({ block: 0, warn: 0, ok: 0 });
+  });
+
+  it("draftQuality の文体注意 warn も warn 件数に含める", () => {
+    const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + `最高です。${DISCLAIMER}`;
+    const checks = draftQuality({ bodyHtml: okHtml(), body, title: "文体チェック" });
+
+    expect(countByLevel(checks)).toEqual({ block: 0, warn: 1, ok: 7 });
+  });
+});
+
+describe("summarizeStyleWarnings", () => {
+  it("文体注意 warn があれば人向け1行を返す", () => {
+    const summary = summarizeStyleWarnings(
+      `<p>この記事では最高の始め方を紹介します。${DISCLAIMER}</p>`,
+      "文体チェック"
+    );
+
+    expect(summary).not.toBeNull();
+    expect(summary).toContain("3(");
+    expect(summary).toContain("誇大1");
+    expect(summary).toContain("メタ言及2");
+    expect(summary).toContain("§6/§14");
+  });
+
+  it("文体注意 warn には必ず hint が付くため要約は固定 hint を使う", () => {
+    const checks = draftQuality({
+      bodyHtml: "",
+      body: `この記事では最高の始め方を紹介します。${DISCLAIMER}`,
+      title: "文体チェック",
+    });
+    const warning = pick(checks, "文体注意");
+
+    expect(warning).toMatchObject({
+      level: "warn",
+      hint: "§6/§14 の要確認語(誤検知あり・人が判断)",
+    });
+    expect(
+      summarizeStyleWarnings(
+        `<p>この記事では最高の始め方を紹介します。${DISCLAIMER}</p>`,
+        "文体チェック"
+      )
+    ).toContain(warning.hint);
+  });
+
+  it("文体注意 warn が無ければ null", () => {
+    expect(
+      summarizeStyleWarnings(
+        `<p>本八幡駅近くの屋内コートで、天候を気にせず練習できます。${DISCLAIMER}</p>`,
+        "文体チェック"
+      )
+    ).toBeNull();
   });
 });

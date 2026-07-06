@@ -27,7 +27,11 @@ import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bod
 import { patchDraft, publishContent } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import { REGEN_BUSY_STATUSES, regenRowFromPage } from "@/lib/growth/eyecatchRegen";
+import { knownArticlePathsForMedia } from "@/lib/growth/knownArticlePaths";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
+import { publishGateReason, resolveGateArticleType } from "@/lib/growth/publishGate";
+import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
+import { getNewsSlugs } from "@/lib/microcms/queries";
 
 export const runtime = "nodejs";
 
@@ -129,6 +133,28 @@ export async function POST(request: Request): Promise<Response> {
     // これで承認・編集したタイトルが公開記事に確実に反映される(AI 生成時のタイトルで公開しない)。
     // AI 免責注記は公開する microCMS 本文だけから除去する。Notion ミラーは下書き記録として残す。
     const rawBody = draftBodyOf(page);
+    let knownNewsPaths: ReadonlySet<string> | undefined;
+    try {
+      const paths = await knownArticlePathsForMedia(mediaOf(page), {
+        getColumnSlugs,
+        getNewsSlugs,
+      });
+      knownNewsPaths = new Set(paths);
+    } catch {
+      knownNewsPaths = undefined;
+    }
+    const gateReason = publishGateReason(
+      rawBody,
+      ideaTitleOf(page).trim(),
+      resolveGateArticleType({}),
+      knownNewsPaths
+    );
+    if (gateReason) {
+      return NextResponse.json(
+        { success: false, error: `公開前チェックで公開できません: ${gateReason}` },
+        { status: 409 }
+      );
+    }
     const { body: cleanBody, removed } = removeAiDisclaimer(rawBody);
     const patch: Record<string, unknown> = {};
     const title = ideaTitleOf(page).trim();

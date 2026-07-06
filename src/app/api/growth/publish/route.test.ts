@@ -6,6 +6,8 @@ vi.mock("@/lib/growth/notion", async (importActual) => {
   return { ...actual, getPage: vi.fn(), updatePageSelect: vi.fn(), defaultFetch: vi.fn() };
 });
 vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn(), patchDraft: vi.fn() }));
+vi.mock("@/lib/microcms/columnsQueries", () => ({ getColumnSlugs: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/lib/microcms/queries", () => ({ getNewsSlugs: vi.fn().mockResolvedValue([]) }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
 vi.mock("@/config/featureFlags", () => ({
@@ -15,11 +17,13 @@ vi.mock("@/config/featureFlags", () => ({
 }));
 
 import { patchDraft, publishContent } from "@/lib/growth/content";
+import { getNewsSlugs } from "@/lib/microcms/queries";
 import { getPage, updatePageSelect } from "@/lib/growth/notion";
 import { POST } from "./route";
 
 const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 const SECRET = "open-sesame";
+const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 function postReq(token: string | null, body: unknown, raw?: string): Request {
   const url = new URL("http://localhost/api/growth/publish");
@@ -66,7 +70,7 @@ function page(
 const READY = page({
   contentId: "my-article",
   eyecatch: "https://images.microcms-assets.io/x.png",
-  body: "<p>本文</p>",
+  body: `<p>本文</p><p>${DISCLAIMER}</p>`,
   title: "公開する承認タイトル",
 });
 
@@ -81,6 +85,7 @@ beforeEach(() => {
   vi.mocked(updatePageSelect).mockReset();
   vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
   vi.mocked(patchDraft).mockReset().mockResolvedValue("my-article");
+  vi.mocked(getNewsSlugs).mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -106,7 +111,7 @@ describe("POST /api/growth/publish", () => {
     expect(patchDraft).toHaveBeenCalledWith(
       "news",
       "my-article",
-      { title: "公開する承認タイトル" },
+      { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
       expect.objectContaining({ apiKey: "content-key" })
     );
     // タイトル同期 → 公開の順(公開後に title を変えない)。
@@ -121,7 +126,7 @@ describe("POST /api/growth/publish", () => {
       page({
         contentId: "my-article",
         eyecatch: "https://images.microcms-assets.io/x.png",
-        body: "<p>本文</p>",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
         title: "公開する承認タイトル",
         media: "コラム",
       })
@@ -132,7 +137,7 @@ describe("POST /api/growth/publish", () => {
     expect(patchDraft).toHaveBeenCalledWith(
       "columns",
       "my-article",
-      { title: "公開する承認タイトル" },
+      { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
       expect.objectContaining({ apiKey: "content-key" })
     );
   });
@@ -143,7 +148,7 @@ describe("POST /api/growth/publish", () => {
       page({
         contentId: "my-article",
         eyecatch: "https://images.microcms-assets.io/x.png",
-        body: "<p>本文</p>",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
         title: "公開する承認タイトル",
         media: "ニュース",
       })
@@ -196,13 +201,18 @@ describe("POST /api/growth/publish", () => {
       page({
         contentId: "my-article",
         eyecatch: "https://images.microcms-assets.io/x.png",
-        body: "<p>本文</p>",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
         title: "   ",
       })
     );
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
     expect(res.status).toBe(200);
-    expect(patchDraft).not.toHaveBeenCalled();
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "content-key" })
+    );
     expect(publishContent).toHaveBeenCalled();
   });
 
@@ -211,7 +221,7 @@ describe("POST /api/growth/publish", () => {
       page({
         contentId: "my-article",
         eyecatch: "https://images.microcms-assets.io/x.png",
-        body: "<p>本文</p><p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
         title: "公開する承認タイトル",
       })
     );
@@ -234,7 +244,7 @@ describe("POST /api/growth/publish", () => {
       page({
         contentId: "my-article",
         eyecatch: "https://images.microcms-assets.io/x.png",
-        body: "<p>本文</p><p>※この記事はAIが作成した下書きです。公開前に内容をご確認ください。</p>",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
         title: "   ",
       })
     );
@@ -247,6 +257,46 @@ describe("POST /api/growth/publish", () => {
       expect.objectContaining({ apiKey: "content-key" })
     );
     expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("免責文が除去対象ブロックでなければ title だけをPATCHして公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>AIが作成した<span>下書き</span>です。</p>",
+        title: "公開する承認タイトル",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { title: "公開する承認タイトル" },
+      expect.objectContaining({ apiKey: "content-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("タイトル同期も免責除去も不要ならPATCHせず公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>AIが作成した<span>下書き</span>です。</p>",
+        title: "   ",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
   });
 
   it("APPROVE_AUTH_ENABLED が無効なら常に 401(公開は最強権限)", async () => {
@@ -324,6 +374,43 @@ describe("POST /api/growth/publish", () => {
     expect(patchDraft).not.toHaveBeenCalled();
     expect(publishContent).not.toHaveBeenCalled();
     expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("公開直前ゲートで block があれば 409 で公開しない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("公開前チェック");
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("slug取得が失敗しても壊れリンク検査だけスキップして公開を続行する", async () => {
+    vi.mocked(getNewsSlugs).mockRejectedValue(new Error("microCMS slug fetch failed"));
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p><a href="/ja/news/missing-slug">関連記事</a></p><p>${DISCLAIMER}</p>`,
+        title: "公開する承認タイトル",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(getNewsSlugs).toHaveBeenCalled();
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
   });
 
   it("本文画像再生成が処理中なら 409 で公開書き込みしない", async () => {

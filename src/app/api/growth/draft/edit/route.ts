@@ -28,6 +28,7 @@ import {
   getPage,
   updatePageProps,
 } from "@/lib/growth/notion";
+import { evaluateRegate } from "@/lib/growth/publishGate";
 import { articleEditGuard } from "@/lib/growth/stageGuard";
 import { sanitizeNewsHtml, STRICT_HTML_CONFIG } from "@/lib/news/sanitize";
 
@@ -126,6 +127,19 @@ export async function POST(request: Request): Promise<Response> {
 
   // サーバ側で再サニタイズ(許可外タグ/属性を除去)してから書き込む(XSS 最終段)。
   const sanitized = sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG);
+
+  if (isAdopt) {
+    const regate = evaluateRegate({ before: previousBody, after: sanitized, title });
+    if (!regate.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `公開前チェックで新しい問題が見つかりました: ${regate.newBlocks.join(" / ")}`,
+        },
+        { status: 409 }
+      );
+    }
+  }
 
   // #95: (1)プレビュー正本=Notion ミラーを先に更新 → (2)公開ターゲット=microCMS 下書きへ同期。
   // どちらが失敗したかを明示し(再保存で両者を冪等に上書きできる)、沈黙させない。

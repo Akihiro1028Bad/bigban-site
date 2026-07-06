@@ -36,3 +36,27 @@ export function buildPublishDueSkipMessage(skipped: readonly SkippedPublication[
   }
   return lines.join("\n");
 }
+
+/** 公開直前ゲートで保留した記事の識別情報。 */
+export interface GateBlockedPublication {
+  title: string;
+  contentId: string;
+  reason: string;
+}
+
+/** 公開直前ゲートで保留した記事の LINE 本文。空配列なら通知不要=null。 */
+export function buildPublishDueGateBlockMessage(
+  items: readonly GateBlockedPublication[]
+): string | null {
+  if (items.length === 0) return null;
+  const lines = [
+    "⚠️ 予約公開の公開直前ゲートで公開を保留した記事があります(本文を修正すると次回再評価されます):",
+  ];
+  for (const item of items) {
+    const title = item.title.trim() || "(無題)";
+    const id = item.contentId.trim() || "空";
+    lines.push(`・${title}(下書きID: ${id})`);
+    lines.push(`  理由: ${item.reason}`);
+  }
+  return lines.join("\n");
+}

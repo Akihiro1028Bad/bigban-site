@@ -57,6 +57,7 @@ export default defineConfig({
         "src/app/growth/approve/providers.tsx",
         // 実行時の薄い入口(実データでの手動検証のためテスト対象外)
         "scripts/growth/cli.ts",
+        "scripts/growth/trend-io.ts",
         "scripts/growth/existing-cli.ts",
         "scripts/growth/setup-token.ts",
         "scripts/growth/upload-media.ts",
@@ -67,6 +68,8 @@ export default defineConfig({
         "scripts/growth/gen-body-image.ts",
         "scripts/growth/self-heal-cli.ts",
         "scripts/growth/publish-draft-cli.ts",
+        // 既知記事パス取得の I/O ラッパ。純ロジックは knownPaths.ts でテスト済み。
+        "scripts/growth/knownArticlePaths.ts",
         "scripts/growth/notify-line.ts",
         "scripts/growth/revise-cli.ts",
         "scripts/growth/eyecatch-regen-cli.ts",
