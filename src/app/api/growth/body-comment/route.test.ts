@@ -90,6 +90,22 @@ describe("POST /api/growth/body-comment", () => {
     });
   });
 
+  it("comments の項目がスキーマ不一致なら 400", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ body: BODY }));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, comments: [{ blockIndex: -1 }] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("コメントを入力してください。");
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
+  it("overall が2000字を超えると 400", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ body: BODY }));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, overall: "あ".repeat(2001) }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("全体コメントが長すぎます。");
+    expect(updatePageProps).not.toHaveBeenCalled();
+  });
+
   it("overall と comments が両方非空なら 400", async () => {
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID, overall: "x", comments: [COMMENT] }));
     expect(res.status).toBe(400);
