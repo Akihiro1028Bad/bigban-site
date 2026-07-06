@@ -50,52 +50,6 @@ export default function HomePricing() {
         {/* Court Rental Table */}
         <CourtPriceTable />
 
-        {/* Training Area & Membership */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
-          <motion.div
-            className="border border-text-gray/15 rounded-sm px-5 py-4 flex items-center justify-between"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-150px" }}
-            transition={{ duration: 1.0, delay: 0.2, ease: EASE }}
-          >
-            <div>
-              <span className="text-[10px] tracking-[0.25em] text-accent block mb-1">
-                {t("trainingArea")}
-              </span>
-              <span className="text-text-light text-sm">
-                {t("trainingAreaJa")}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="block font-serif text-lg font-bold tracking-wider text-accent">
-                {t("trainingAreaPrice")}
-              </span>
-              <span className="text-[10px] tracking-wider text-text-gray">
-                {t("trainingAreaUnit")}
-              </span>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="border border-text-gray/15 rounded-sm px-5 py-4 flex items-center justify-between"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-150px" }}
-            transition={{ duration: 1.0, delay: 0.25, ease: EASE }}
-          >
-            <div>
-              <span className="text-[10px] tracking-[0.25em] text-accent block mb-1">
-                {t("membership")}
-              </span>
-              <span className="text-text-light text-sm">{t("membershipJa")}</span>
-            </div>
-            <span className="text-accent/50 text-xs tracking-wider">
-              {t("comingSoon")}
-            </span>
-          </motion.div>
-        </div>
-
         {/* Footer notes */}
         <motion.div
           className="border-t border-text-gray/10 pt-8 space-y-3"

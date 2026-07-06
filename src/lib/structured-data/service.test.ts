@@ -86,23 +86,18 @@ describe("buildServices", () => {
     });
   });
 
-  it("HYROXトレーニングに単価(¥2,980/時)の Offer を付与する", async () => {
-    const { buildServices } = await import("./service");
-    const hyrox = buildServices().find(
-      (s) => s.serviceType === "HYROXトレーニング",
-    );
-    expect(hyrox?.offers?.priceSpecification).toMatchObject({
-      "@type": "UnitPriceSpecification",
-      priceCurrency: "JPY",
-      price: 2980,
-      unitCode: "HUR",
-    });
-  });
-
   it("価格未設定のサービスには offers を付けない", async () => {
     const { buildServices } = await import("./service");
     const lesson = buildServices().find((s) => s.name.includes("レッスン"));
     expect(lesson?.offers).toBeUndefined();
+  });
+
+  it("HYROXトレーニングには offers を付けない（コート料金に一元化）", async () => {
+    const { buildServices } = await import("./service");
+    const hyrox = buildServices().find(
+      (s) => s.serviceType === "HYROXトレーニング",
+    );
+    expect(hyrox?.offers).toBeUndefined();
   });
 
   it("レッスンサービスを含む", async () => {
