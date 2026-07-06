@@ -114,4 +114,80 @@ describe("useBodyCommentConsult: applyNow", () => {
     expect(saveBody.adoptedAspects).toEqual(["インラインコメント"]);
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
+
+  it("adoptedFixes: コメント本文・対象・変更前後を送る", async () => {
+    const bodyComment: BodyCommentView = {
+      status: "提示中",
+      comments: [
+        { blockIndex: 0, excerpt: "ここは重要です。", comment: "もっと具体的に" },
+      ],
+      raw: "",
+      proposal: [
+        {
+          commentIndex: 0,
+          before: "<p>ここは重要です。</p>",
+          after: "<p>ここが肝心です。</p>",
+        },
+      ],
+    };
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment,
+        onChanged: vi.fn(),
+      })
+    );
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "インラインコメント",
+        detail: "コメント: もっと具体的に（対象: ここは重要です。）",
+        before: "<p>ここは重要です。</p>",
+        after: "<p>ここが肝心です。</p>",
+      },
+    ]);
+  });
+
+  it("adoptedFixes: コメント/proposal が欠落しても空文字でフォールバックする", async () => {
+    const bodyComment: BodyCommentView = {
+      status: "提示中",
+      comments: [], // commentIndex に対応するコメントが無い
+      raw: "",
+      proposal: [
+        { commentIndex: 0, before: "<p>ここは重要です。</p>", after: "<p>ここが肝心です。</p>" },
+      ],
+    };
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment,
+        onChanged: vi.fn(),
+      })
+    );
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "インラインコメント",
+        detail: "コメント: （対象: ）",
+        before: "<p>ここは重要です。</p>",
+        after: "<p>ここが肝心です。</p>",
+      },
+    ]);
+  });
 });

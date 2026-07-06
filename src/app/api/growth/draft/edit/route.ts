@@ -17,9 +17,12 @@ import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bod
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import {
+  AdoptedFixDetailSchema,
   appendLearningLog,
+  formatAdoptedFixSummary,
   formatEditDiffSummary,
   summarizeEditDiff,
+  type AdoptedFixDetail,
 } from "@/lib/growth/learningLog";
 import {
   buildBodyMirrorProps,
@@ -38,6 +41,10 @@ const ENDPOINT = growthEndpoint();
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 // 本文HTMLの上限(記事本文として十分・過大入力を境界で弾く)。
 const MAX_BODY_HTML = 500_000;
+// 学習ログに残す採用 fix / 観点の上限(既存 adoptedAspects の .slice(0,20) に合わせる)。
+const MAX_ADOPTED = 20;
+// adoptedFixes(採用 fix の詳細)を境界で検証する(上限 MAX_ADOPTED)。
+const AdoptedFixesSchema = AdoptedFixDetailSchema.array().max(MAX_ADOPTED);
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -74,10 +81,14 @@ export async function POST(request: Request): Promise<Response> {
   const bodyHtml = (body as { bodyHtml?: unknown })?.bodyHtml;
   const source = (body as { source?: unknown })?.source;
   const rawAspects = (body as { adoptedAspects?: unknown })?.adoptedAspects;
+  const rawFixes = (body as { adoptedFixes?: unknown })?.adoptedFixes;
   const isAdopt = source === "advise-apply" || source === "comment-revise";
   const adoptedAspects: string[] = Array.isArray(rawAspects)
     ? rawAspects.filter((aspect): aspect is string => typeof aspect === "string").slice(0, 20)
     : [];
+  // adoptedFixes は省略可能。壊れた形は空配列(→ adoptedAspects 挙動へフォールバック=後方互換)。
+  const adoptedFixesParsed = AdoptedFixesSchema.safeParse(rawFixes);
+  const adoptedFixes: AdoptedFixDetail[] = adoptedFixesParsed.success ? adoptedFixesParsed.data : [];
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
   if (typeof bodyHtml !== "string" || bodyHtml.trim() === "") {
     return badRequest("本文が空です。");
@@ -163,8 +174,35 @@ export async function POST(request: Request): Promise<Response> {
   // 本処理(保存)の成否には一切影響させない。
   const learningLogDs = process.env.GROWTH_LEARNING_LOG_DS;
   if (learningLogDs) {
-    if (isAdopt && adoptedAspects.length > 0) {
-      // #SI1(b): 採用 fix ごとに 1 行「採否」を追記(却下は client 側で送られない)。
+    if (isAdopt && adoptedFixes.length > 0) {
+      // #SI1(b'): 採用 fix の詳細(指摘・変更前後)を fix ごとに 1 行「採否」で残す。
+      // adoptedAspects(観点文字列のみ)より優先=fix の中身が学習ログに残る。
+      after(async () => {
+        for (const fix of adoptedFixes) {
+          const outcome = await appendLearningLog(
+            {
+              kind: "採否",
+              pageId,
+              title,
+              aspect: fix.aspect,
+              before: fix.before,
+              after: fix.after,
+            },
+            {
+              dataSourceId: learningLogDs,
+              notionOptions: notionOpts,
+              createPageFn: createPage,
+              nowIso: new Date().toISOString(),
+              diffSummary: formatAdoptedFixSummary(fix),
+            }
+          );
+          if (outcome.status === "failed") {
+            console.error("learning-log append failed (adopt-fix)", outcome.error);
+          }
+        }
+      });
+    } else if (isAdopt && adoptedAspects.length > 0) {
+      // #SI1(b): 採用観点ごとに 1 行「採否」を追記(adoptedFixes 未送信時の後方互換)。
       after(async () => {
         for (const aspect of adoptedAspects) {
           const outcome = await appendLearningLog(
