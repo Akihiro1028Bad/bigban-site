@@ -16,7 +16,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdviceView } from "@/lib/growth/advise";
-import type { AdviceApplyView } from "@/lib/growth/adviseApply";
+import { MAX_ADOPTED, type AdviceApplyView } from "@/lib/growth/adviseApply";
 
 import { useAdviceConsult } from "./useAdviceConsult";
 
@@ -128,6 +128,46 @@ describe("toggleAdopt", () => {
     act(() => view.result.current.toggleAdopt(2));
     expect([...view.result.current.adopted]).toEqual([2]);
     act(() => view.result.current.toggleAdopt(2));
+    expect([...view.result.current.adopted]).toEqual([]);
+  });
+});
+
+describe("setAdoptedBulk", () => {
+  it("adopt=true は既存採用を保持して和集合で追加する", () => {
+    const { view } = setup();
+    act(() => view.result.current.toggleAdopt(1));
+    act(() => view.result.current.setAdoptedBulk([0, 2], true));
+    expect(new Set(view.result.current.adopted)).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("adopt=false は指定 index を差集合で外す", () => {
+    const { view } = setup();
+    act(() => view.result.current.setAdoptedBulk([0, 1, 2, 3], true));
+    act(() => view.result.current.setAdoptedBulk([1, 3], false));
+    expect(new Set(view.result.current.adopted)).toEqual(new Set([0, 2]));
+  });
+
+  it("adopt=true は MAX_ADOPTED 件まで先頭優先でクランプする", () => {
+    const { view } = setup();
+    const indexes = Array.from({ length: MAX_ADOPTED + 5 }, (_, i) => i);
+    act(() => view.result.current.setAdoptedBulk(indexes, true));
+    expect(view.result.current.adopted.size).toBe(MAX_ADOPTED);
+    expect([...view.result.current.adopted]).toEqual(
+      Array.from({ length: MAX_ADOPTED }, (_, i) => i),
+    );
+  });
+
+  it("pageId が変わると一括採用した集合も初期化される", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ pageId }: { pageId: string }) =>
+        useAdviceConsult({ pageId, token: TOKEN, onChanged }),
+      { initialProps: { pageId: "page-A" } },
+    );
+    act(() => view.result.current.setAdoptedBulk([0, 1], true));
+    expect([...view.result.current.adopted]).toEqual([0, 1]);
+
+    view.rerender({ pageId: "page-B" });
     expect([...view.result.current.adopted]).toEqual([]);
   });
 });

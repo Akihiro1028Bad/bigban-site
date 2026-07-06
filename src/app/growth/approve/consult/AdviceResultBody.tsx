@@ -13,12 +13,13 @@
  * 採用チェック(#165)の可否判定・reason 表示ロジック・aria は不変(配色のみ再スキン)。
  */
 
+import type { Advice, AdviceFix } from "@/lib/growth/advise";
+import { MAX_ADOPTED, selectableAdoptIndexes } from "@/lib/growth/adviseApply";
+import type { FixClassification } from "@/lib/growth/adviseApply";
+
+import { overallFromScores } from "../adviceScore";
 import { IconArrowDown, IconArrowUp, IconChart } from "../ui/icons";
 import { RingScore } from "../ui/primitives";
-import { overallFromScores } from "../adviceScore";
-
-import type { Advice, AdviceFix } from "@/lib/growth/advise";
-import type { FixClassification } from "@/lib/growth/adviseApply";
 
 interface AdviceResultBodyProps {
   advice: Advice;
@@ -32,6 +33,7 @@ interface AdviceResultBodyProps {
    */
   classifications: { applicable: boolean; reason?: string }[];
   onToggleAdopt: (index: number) => void;
+  onSetAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
 }
 
 /** severity → バッジ配色(proto トーン。未知は弱グレーへフォールバック)。 */
@@ -127,7 +129,14 @@ export function AdviceResultBody({
   selectable,
   classifications,
   onToggleAdopt,
+  onSetAdoptedBulk,
 }: AdviceResultBodyProps) {
+  const selected = selectableAdoptIndexes(classifications, MAX_ADOPTED);
+  const applicableCount = classifications.filter((c) => c.applicable).length;
+  const allSelected = selected.length > 0 && selected.every((i) => adopted.has(i));
+  const shouldShowBulkToggle = selectable && selected.length > 0;
+  const shouldShowClampNote = allSelected && applicableCount > MAX_ADOPTED;
+
   return (
     <div className="flex flex-col gap-5">
       {/* 総評: RingScore(観点平均→0-100 導出) ＋ summary テキスト */}
@@ -211,6 +220,23 @@ export function AdviceResultBody({
           >
             <IconArrowDown size={14} /> 直すべき点
           </div>
+          {shouldShowBulkToggle ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onSetAdoptedBulk(selected, !allSelected)}
+                className="approve-btn-ghost"
+                style={{ padding: "4px 10px" }}
+              >
+                {allSelected ? "選択を全て外す" : "反映可能なfixを全て選択"}
+              </button>
+              {shouldShowClampNote ? (
+                <span className="text-[11px]" style={{ color: "var(--p-text-3)" }} aria-live="polite">
+                  {MAX_ADOPTED}件まで選択しました
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
             {advice.fixes.map((fix, i) => {
               const c = classifications[i] as FixClassification | undefined;

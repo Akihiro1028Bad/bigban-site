@@ -35,6 +35,8 @@ interface UseBodyCommentConsultReturn {
   openFor: string | null;
   draft: string;
   setDraft: (v: string) => void;
+  overallDraft: string;
+  setOverallDraft: (v: string) => void;
   busy: boolean;
   error: string;
   openComposer: (key: string) => void;
@@ -43,6 +45,7 @@ interface UseBodyCommentConsultReturn {
   closeComposer: () => void;
   buildPayload: () => BodyComment[];
   requestAi: () => Promise<void>;
+  requestOverall: () => Promise<void>;
   dismiss: () => Promise<void>;
   applyNow: () => Promise<void>;
 }
@@ -58,6 +61,7 @@ export function useBodyCommentConsult({
   const [comments, setComments] = useState<Record<string, string[]>>({});
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [overallDraft, setOverallDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +74,7 @@ export function useBodyCommentConsult({
     setComments({});
     setOpenFor(null);
     setDraft("");
+    setOverallDraft("");
   }
 
   const proposal = bodyComment?.proposal ?? [];
@@ -139,6 +144,14 @@ export function useBodyCommentConsult({
     }
   }
 
+  async function requestOverall(): Promise<void> {
+    const overall = overallDraft.trim();
+    if (!overall) return;
+    if (await post("/api/growth/body-comment", { pageId, overall }, "依頼に失敗しました。")) {
+      setOverallDraft("");
+    }
+  }
+
   async function dismiss(): Promise<void> {
     await post("/api/growth/body-comment/dismiss", { pageId }, "取り消しに失敗しました。");
   }
@@ -203,6 +216,8 @@ export function useBodyCommentConsult({
     openFor,
     draft,
     setDraft,
+    overallDraft,
+    setOverallDraft,
     busy,
     error,
     openComposer,
@@ -211,6 +226,7 @@ export function useBodyCommentConsult({
     closeComposer,
     buildPayload,
     requestAi,
+    requestOverall,
     dismiss,
     applyNow,
   };

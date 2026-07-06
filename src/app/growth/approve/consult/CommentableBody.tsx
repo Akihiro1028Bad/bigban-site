@@ -27,6 +27,7 @@ export function CommentableBody({ bodyHtml, bodyCommentConsult }: CommentableBod
   const lines = extractReviewLines(bodyHtml);
   const ic = bodyCommentConsult;
   const total = ic.buildPayload().length;
+  const hasOverallDraft = ic.overallDraft.trim() !== "";
 
   return (
     <div>
@@ -34,6 +35,52 @@ export function CommentableBody({ bodyHtml, bodyCommentConsult }: CommentableBod
         className="approve-article overflow-hidden rounded-[8px]"
         style={{ border: "1px solid var(--p-border)" }}
       >
+        <div className="px-3 py-3" style={{ background: "var(--p-bg-input)", borderBottom: "1px solid var(--p-border)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="body-overall-comment" className="text-xs font-semibold" style={{ color: "var(--p-text-2)" }}>
+              本文全体へのコメント
+            </label>
+            <span className="font-mono text-[11px]" style={{ color: "var(--p-text-3)" }}>
+              {ic.overallDraft.length} / 2000
+            </span>
+          </div>
+          <textarea
+            id="body-overall-comment"
+            rows={2}
+            maxLength={2000}
+            value={ic.overallDraft}
+            onChange={(e) => ic.setOverallDraft(e.target.value)}
+            disabled={ic.busy || total > 0}
+            placeholder="例：全体にヘッジが多い。言い切る文体に寄せたい"
+            className="mt-2 w-full resize-y rounded-[8px] p-2 text-sm outline-none disabled:opacity-50"
+            style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)", color: "var(--p-text)" }}
+          />
+          <p className="mt-1 text-[11px]" style={{ color: "var(--p-text-3)" }}>
+            ※採点や助言だけが欲しいときは『全体を見てもらう』タブへ
+          </p>
+          {total > 0 ? (
+            <p className="mt-1 text-[11px]" style={{ color: "var(--p-amber)" }}>
+              行コメントを送る場合は、本文全体へのコメントは使えません（どちらか一方）
+            </p>
+          ) : null}
+          {hasOverallDraft ? (
+            <p className="mt-1 text-[11px]" style={{ color: "var(--p-amber)" }}>
+              本文全体へのコメント中は、行コメントは送れません（どちらか一方）
+            </p>
+          ) : null}
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void ic.requestOverall()}
+              disabled={ic.busy || total > 0 || !hasOverallDraft}
+              className="approve-btn-primary flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+            >
+              <IconSparkles size={13} />
+              全体コメントで修正を依頼
+            </button>
+          </div>
+        </div>
+
         {lines.map((line, i) => {
           const key = line.excerpt !== null ? `${line.blockIndex}::${line.excerpt}` : `nt-${i}`;
           const thread = line.excerpt !== null ? (ic.comments[key] ?? []) : [];
@@ -51,7 +98,8 @@ export function CommentableBody({ bodyHtml, bodyCommentConsult }: CommentableBod
                       type="button"
                       aria-label={`${i + 1}行目にコメント`}
                       onClick={() => ic.openComposer(key)}
-                      className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100"
+                      disabled={hasOverallDraft}
+                      className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] opacity-0 transition-opacity disabled:opacity-30 group-hover/row:opacity-100 focus-visible:opacity-100"
                       style={{ background: "var(--p-bg-active)", color: "var(--p-text-3)" }}
                     >
                       <IconPlus size={12} />

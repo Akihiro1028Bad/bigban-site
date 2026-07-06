@@ -14,9 +14,10 @@
 
 2. **次の依頼を取得**: `npm run growth:comment-revise -- next` を実行する。標準出力の JSON を読む。
    - `{}` だけが返ったら、**依頼はありません。ここで終了**する（何もしない）。
-   - `{"pageId","comments","bodyHtml"}` が返ったら、その行は既に「処理中」にロック済み。
-     - `comments` = 投稿コメントの JSON 配列（`{blockIndex, excerpt, comment}` の配列）。
+   - `{"pageId","comments","overall","bodyHtml"}` が返ったら、その行は既に「処理中」にロック済み。
+     - `comments` = 投稿コメントの JSON 配列（`{blockIndex, excerpt, comment}` の配列。**空のこともある**）。
        `excerpt` = コメント対象の文、`comment` = その文への指摘。
+     - `overall` = **本文全体へのコメント**（空/無いこともある）。**`overall` が非空のときは全体コメントモード**（行コメントは来ない=単独依頼）。
      - `bodyHtml` = 現在の下書き本文HTML。
 
 3. **書き換え案を作る（最重要・厳守）**:
@@ -32,6 +33,10 @@
      - `before` は **bodyHtml 中の対象ブロックHTMLを完全一致でそのまま**入れる（システムが照合に使う・不一致は弾かれる）。
        同じ文が複数ブロックにある場合は `blockIndex` で対象を特定する。
      - 書き換えできない・対象が曖昧なコメントは**含めない**（無理に作らない）。
+   - **全体コメントモード（`overall` が非空のとき）**: 本文全体を読み、その指摘に**最も影響の大きいブロックから最大10ブロック**を選んで書き換える。各ブロックは行コメントと同じ `{ "commentIndex", "before", "after" }` 形式で出す。
+     - `commentIndex` は **0 から始まる提示項目の連番**を入れる（全体コメントは配列 index を持たないため）。
+     - `before` は対象ブロックの現在 HTML を**完全一致**で入れる（照合に使う）。**11 ブロック以上は出さない**（多くても効く 10 に絞る）。
+     - 事実・数値・固有名詞・確定情報は変えない/未確定情報を足さない（既存の禁止と同じ）。翻訳調・AI 臭（§14）を避ける。
    - JSON を一時ファイル（例 `.growth-tmp/comment-revise-<pageId>.json`）に書く。
 
 4. **提示する**: `npm run growth:comment-revise -- present <pageId> <jsonファイル>` を実行する

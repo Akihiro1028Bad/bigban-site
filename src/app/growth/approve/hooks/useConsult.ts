@@ -67,6 +67,7 @@ interface UseConsultReturn {
   onReviseDiscard: () => void;
   onSentenceApplyAll: () => void;
   onToggleAdopt: (index: number) => void;
+  onSetAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
   adopted: ReadonlySet<number>;
 }
 
@@ -206,6 +207,7 @@ export function useConsult({
     onReviseDiscard: () => void revise.applyRevise(item, "discard"),
     onSentenceApplyAll: () => void bodyCommentConsult.applyNow(),
     onToggleAdopt: advice.toggleAdopt,
+    onSetAdoptedBulk: advice.setAdoptedBulk,
     adopted: advice.adopted,
   };
 }

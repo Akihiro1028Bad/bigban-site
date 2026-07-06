@@ -128,6 +128,25 @@ export function selectApplicableFixes(
   return out;
 }
 
+/** 一度に採用できる fix の上限(濫用・巨大ペイロード防止)。route と UI で共有する単一ソース。 */
+export const MAX_ADOPTED = 20;
+
+/**
+ * 全選択で採用する fix index を決定的に返す。classifications と同順。
+ * applicable な index を出現順に集め、max 件でクランプする(超過は先頭優先で切る)。
+ */
+export function selectableAdoptIndexes(
+  classifications: readonly { applicable: boolean }[],
+  max: number
+): number[] {
+  if (max <= 0) return [];
+  const out: number[] = [];
+  classifications.forEach((classification, index) => {
+    if (classification.applicable) out.push(index);
+  });
+  return out.slice(0, max);
+}
+
 // ── PC が返す before/after 案(信頼できない JSON を zod 検証) ──────────────
 export const AdviceApplyItemSchema = z.object({
   /** 採用した fix の index(advice.fixes 内)。 */
