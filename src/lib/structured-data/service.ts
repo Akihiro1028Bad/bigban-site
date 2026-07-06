@@ -37,7 +37,7 @@ interface ServiceDefinition {
   offers?: OfferSchema;
 }
 
-// 料金は constants/pricing.ts（コート）と HyroxPage.program（HYROX ¥2,980/時）に一致させること。
+// 料金は constants/pricing.ts（コート料金）に一致させること。
 const COURT_RENTAL_OFFER: OfferSchema = {
   "@type": "Offer",
   priceCurrency: "JPY",
@@ -46,18 +46,6 @@ const COURT_RENTAL_OFFER: OfferSchema = {
     priceCurrency: "JPY",
     minPrice: 4980,
     maxPrice: 7980,
-  },
-};
-
-const HYROX_OFFER: OfferSchema = {
-  "@type": "Offer",
-  priceCurrency: "JPY",
-  priceSpecification: {
-    "@type": "UnitPriceSpecification",
-    priceCurrency: "JPY",
-    price: 2980,
-    unitCode: "HUR",
-    unitText: "1時間",
   },
 };
 
@@ -96,9 +84,8 @@ const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
   {
     name: "HYROXトレーニング",
     description:
-      "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本格的なトレーニングエリアを併設。エリア利用料 1時間 ¥2,980。",
+      "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本格的なトレーニングエリアを併設。",
     serviceType: "HYROXトレーニング",
-    offers: HYROX_OFFER,
   },
 ] as const;
 

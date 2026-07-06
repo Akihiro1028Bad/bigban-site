@@ -211,10 +211,6 @@
           "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week."
         },
         {
-          "question": "Can I use the HYROX area, and how much is it?",
-          "answer": "Yes. The HYROX area rental is ¥2,980 per hour."
-        },
-        {
           "question": "Where are you located?",
           "answer": "We're a 1-minute walk from Motoyawata Station."
         },
@@ -347,13 +343,6 @@
     "timeSlot": "Time Slot",
     "weekday": "Weekday",
     "weekend": "Weekend / Holiday",
-    "trainingArea": "TRAINING AREA",
-    "trainingAreaJa": "Training Area",
-    "trainingAreaPrice": "¥2,980",
-    "trainingAreaUnit": "per hour",
-    "membership": "MEMBERSHIP",
-    "membershipJa": "Membership",
-    "comingSoon": "Coming Soon",
     "rentalPaddleNote": "Rental paddles ¥500 each (up to 6 per court). Rental shoes are not available.",
     "privateFacilityNote": "For full facility private bookings including training area and lounge, or corporate use, please",
     "contactUs": "contact us",
