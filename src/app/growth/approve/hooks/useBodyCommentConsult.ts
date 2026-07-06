@@ -35,6 +35,8 @@ interface UseBodyCommentConsultReturn {
   openFor: string | null;
   draft: string;
   setDraft: (v: string) => void;
+  overallDraft: string;
+  setOverallDraft: (v: string) => void;
   busy: boolean;
   error: string;
   openComposer: (key: string) => void;
@@ -43,6 +45,7 @@ interface UseBodyCommentConsultReturn {
   closeComposer: () => void;
   buildPayload: () => BodyComment[];
   requestAi: () => Promise<void>;
+  requestOverall: () => Promise<void>;
   dismiss: () => Promise<void>;
   applyNow: () => Promise<void>;
 }
@@ -58,6 +61,7 @@ export function useBodyCommentConsult({
   const [comments, setComments] = useState<Record<string, string[]>>({});
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [overallDraft, setOverallDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +74,7 @@ export function useBodyCommentConsult({
     setComments({});
     setOpenFor(null);
     setDraft("");
+    setOverallDraft("");
   }
 
   const proposal = bodyComment?.proposal ?? [];
@@ -139,6 +144,14 @@ export function useBodyCommentConsult({
     }
   }
 
+  async function requestOverall(): Promise<void> {
+    const overall = overallDraft.trim();
+    if (!overall) return;
+    if (await post("/api/growth/body-comment", { pageId, overall }, "依頼に失敗しました。")) {
+      setOverallDraft("");
+    }
+  }
+
   async function dismiss(): Promise<void> {
     await post("/api/growth/body-comment/dismiss", { pageId }, "取り消しに失敗しました。");
   }
@@ -153,11 +166,31 @@ export function useBodyCommentConsult({
     setBusy(true);
     setError("");
     const adoptedAspects = applied.map(() => "インラインコメント");
+    // 学習ログ詳細化: 観点だけでなくコメント本文・対象・変更前後も残す。applied は proposal の
+    // commentIndex 値なので、同じ index の投稿コメント・proposal エントリから引く(対応が
+    // 取れない場合は空文字でフォールバック)。
+    const postedComments = bodyComment?.comments ?? [];
+    const adoptedFixes = applied.map((commentIndex) => {
+      const comment = postedComments[commentIndex];
+      const item = proposal.find((p) => p.commentIndex === commentIndex);
+      return {
+        aspect: "インラインコメント",
+        detail: `コメント: ${comment?.comment ?? ""}（対象: ${comment?.excerpt ?? ""}）`,
+        before: item?.before ?? "",
+        after: item?.after ?? "",
+      };
+    });
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html, source: "comment-revise", adoptedAspects }),
+        body: JSON.stringify({
+          pageId,
+          bodyHtml: html,
+          source: "comment-revise",
+          adoptedAspects,
+          adoptedFixes,
+        }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error((saveJson.error as string) ?? "保存に失敗しました。");
@@ -183,6 +216,8 @@ export function useBodyCommentConsult({
     openFor,
     draft,
     setDraft,
+    overallDraft,
+    setOverallDraft,
     busy,
     error,
     openComposer,
@@ -191,6 +226,7 @@ export function useBodyCommentConsult({
     closeComposer,
     buildPayload,
     requestAi,
+    requestOverall,
     dismiss,
     applyNow,
   };

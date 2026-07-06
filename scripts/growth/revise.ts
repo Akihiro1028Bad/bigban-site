@@ -30,6 +30,9 @@ export const REVISE_PROPS = {
 /** 既存の構成案(本文)プロパティ名。反映時のみ上書きする。 */
 export const OUTLINE_PROP = "構成案";
 
+/** 構成案全体への指示を表す予約 line。UI と revise-outline.md が単一ソースとして参照する。 */
+export const OUTLINE_OVERALL_LINE = "記事全体";
+
 export type ReviseStatus = "なし" | "依頼中" | "処理中" | "提示中" | "失敗";
 
 export const REVISE_STATUSES: readonly ReviseStatus[] = [

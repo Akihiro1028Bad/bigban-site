@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { NotionApiOptions, NotionPage } from "./notion";
 import {
+  AdoptedFixDetailSchema,
   appendLearningLog,
   buildLearningLogFailNotice,
   buildLearningLogProps,
   buildLearningLogTitle,
+  formatAdoptedFixSummary,
   formatEditDiffSummary,
   htmlToPlainBlocks,
   LEARNING_LOG_PROPS,
@@ -13,6 +15,7 @@ import {
   parseLearningLogPage,
   summarizeLearningLog,
   summarizeEditDiff,
+  type AdoptedFixDetail,
   type EditDiffSummary,
   type LearningEvent,
   type LearningLogRow,
@@ -824,5 +827,68 @@ describe("summarizeLearningLog", () => {
       imageRetryTop: [],
       failModeFrequency: {},
     });
+  });
+});
+
+describe("formatAdoptedFixSummary", () => {
+  it("観点・指摘・前後の HTML タグ除去テキストを整形する", () => {
+    const fix: AdoptedFixDetail = {
+      aspect: "読みやすさ",
+      detail: "指摘: 冗長 / 提案: 短くする",
+      before: "<p>ここは<strong>重要</strong>です。読んでください。</p>",
+      after: "<p>ここが肝心です。</p>",
+    };
+    const summary = formatAdoptedFixSummary(fix);
+    expect(summary).toBe(
+      "[読みやすさ] 指摘: 冗長 / 提案: 短くする\n変更前: ここは重要です。読んでください。\n変更後: ここが肝心です。"
+    );
+  });
+
+  it("aspect が空なら「観点なし」を使う", () => {
+    const summary = formatAdoptedFixSummary({
+      aspect: "",
+      detail: "コメント: ここを直す",
+      before: "<p>前</p>",
+      after: "<p>後</p>",
+    });
+    expect(summary.startsWith("[観点なし] コメント: ここを直す")).toBe(true);
+  });
+
+  it("前後テキストは HTML タグ除去後 200 字で切る", () => {
+    const summary = formatAdoptedFixSummary({
+      aspect: "文体",
+      detail: "短い指摘",
+      before: `<p>${"あ".repeat(3000)}</p>`,
+      after: `<p>${"う".repeat(3000)}</p>`,
+    });
+    expect(summary).toContain(`変更前: ${"あ".repeat(200)}\n`);
+    expect(summary).not.toContain("あ".repeat(201));
+    expect(summary).toContain(`変更後: ${"う".repeat(200)}`);
+    expect(summary).not.toContain("う".repeat(201));
+  });
+
+  it("全体は 2000 字で切る(長い detail)", () => {
+    const summary = formatAdoptedFixSummary({
+      aspect: "文体",
+      detail: "い".repeat(3000),
+      before: "<p>前</p>",
+      after: "<p>後</p>",
+    });
+    expect(summary).toHaveLength(2000);
+    expect(summary.startsWith("[文体] いい")).toBe(true);
+  });
+
+  it("AdoptedFixDetailSchema は全フィールド string を要求する", () => {
+    expect(
+      AdoptedFixDetailSchema.safeParse({
+        aspect: "x",
+        detail: "y",
+        before: "z",
+        after: "w",
+      }).success
+    ).toBe(true);
+    expect(
+      AdoptedFixDetailSchema.safeParse({ aspect: 1, detail: "y", before: "z", after: "w" }).success
+    ).toBe(false);
   });
 });

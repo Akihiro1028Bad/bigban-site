@@ -77,6 +77,76 @@ describe("useBodyCommentConsult: pageId 変化での state リセット(記事�
   });
 });
 
+describe("useBodyCommentConsult: overall body comment", () => {
+  it("requestOverall が overall だけを送信し、成功後に下書きをクリアして再取得を依頼する", async () => {
+    const onChanged = vi.fn();
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        onChanged,
+      })
+    );
+
+    act(() => view.result.current.setOverallDraft(" 全体にヘッジ "));
+    await act(async () => {
+      await view.result.current.requestOverall();
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/body-comment");
+    const body = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body).toEqual({ pageId: "page-A", overall: "全体にヘッジ" });
+    expect(body).not.toHaveProperty("comments");
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(view.result.current.overallDraft).toBe("");
+  });
+
+  it("requestOverall は空文字なら no-op にする", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const view = setup("page-A");
+
+    await act(async () => {
+      await view.result.current.requestOverall();
+    });
+
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("pageId が変わると overallDraft も初期化される", () => {
+    const view = setup("page-A");
+    act(() => view.result.current.setOverallDraft("記事Aの全体コメント"));
+
+    view.rerender({ pageId: "page-B" });
+
+    expect(view.result.current.overallDraft).toBe("");
+  });
+
+  it("requestAi は行コメントだけを送信し overall を含めない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const view = setup("page-A");
+
+    act(() => view.result.current.openComposer(KEY));
+    act(() => view.result.current.setDraft("この行を強くする"));
+    act(() => view.result.current.addComment(KEY));
+    act(() => view.result.current.setOverallDraft("全体コメントは別送信"));
+    await act(async () => {
+      await view.result.current.requestAi();
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/body-comment");
+    const body = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      pageId: "page-A",
+      comments: [{ blockIndex: 0, excerpt: "ここは重要です。", comment: "この行を強くする" }],
+    });
+    expect(body).not.toHaveProperty("overall");
+  });
+});
+
 describe("useBodyCommentConsult: applyNow", () => {
   it("保存 POST に comment-revise source と固定の採用観点を含める", async () => {
     const bodyComment: BodyCommentView = {
@@ -113,5 +183,81 @@ describe("useBodyCommentConsult: applyNow", () => {
     expect(saveBody.source).toBe("comment-revise");
     expect(saveBody.adoptedAspects).toEqual(["インラインコメント"]);
     expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("adoptedFixes: コメント本文・対象・変更前後を送る", async () => {
+    const bodyComment: BodyCommentView = {
+      status: "提示中",
+      comments: [
+        { blockIndex: 0, excerpt: "ここは重要です。", comment: "もっと具体的に" },
+      ],
+      raw: "",
+      proposal: [
+        {
+          commentIndex: 0,
+          before: "<p>ここは重要です。</p>",
+          after: "<p>ここが肝心です。</p>",
+        },
+      ],
+    };
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment,
+        onChanged: vi.fn(),
+      })
+    );
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "インラインコメント",
+        detail: "コメント: もっと具体的に（対象: ここは重要です。）",
+        before: "<p>ここは重要です。</p>",
+        after: "<p>ここが肝心です。</p>",
+      },
+    ]);
+  });
+
+  it("adoptedFixes: コメント/proposal が欠落しても空文字でフォールバックする", async () => {
+    const bodyComment: BodyCommentView = {
+      status: "提示中",
+      comments: [], // commentIndex に対応するコメントが無い
+      raw: "",
+      proposal: [
+        { commentIndex: 0, before: "<p>ここは重要です。</p>", after: "<p>ここが肝心です。</p>" },
+      ],
+    };
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment,
+        onChanged: vi.fn(),
+      })
+    );
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "インラインコメント",
+        detail: "コメント: （対象: ）",
+        before: "<p>ここは重要です。</p>",
+        after: "<p>ここが肝心です。</p>",
+      },
+    ]);
   });
 });

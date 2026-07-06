@@ -22,22 +22,18 @@ import {
   buildBodyCommentFailProps,
   buildBodyCommentPresentProps,
   buildBodyCommentProcessingProps,
+  parseBodyCommentRequest,
   parseBodyCommentProposal,
   selectStaleBodyCommentIds,
   serializeBodyCommentProposal,
-  type BodyCommentRow,
 } from "./bodyComment";
-import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
 import { buildNoticeFlex } from "./notice-flex";
-import {
-  getPage,
-  queryDataSource,
-  updatePageProps,
-  type NotionApiOptions,
-  type NotionPage,
-} from "./notion";
+import { getPage, queryDataSource, updatePageProps } from "./notion";
+import type { BodyComment, BodyCommentRow } from "./bodyComment";
+import type { FlexContainer } from "./digest-flex";
+import type { NotionApiOptions, NotionPage } from "./notion";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const REAP_REASON = "コメント反映が15分以上完了しませんでした(PC再起動等の可能性)。もう一度依頼できます。";
@@ -148,10 +144,14 @@ async function next(options: NotionApiOptions): Promise<void> {
     return;
   }
   await write(row.id, buildBodyCommentProcessingProps(), options);
-  // request = 投稿コメントの JSON 配列({blockIndex, excerpt, comment})。
-  process.stdout.write(
-    `${JSON.stringify({ pageId: row.id, comments: row.request, bodyHtml: row.bodyHtml })}\n`
-  );
+  const parsed = parseBodyCommentRequest(row.request);
+  const payload: { pageId: string; comments: BodyComment[]; overall?: string; bodyHtml: string } = {
+    pageId: row.id,
+    comments: parsed.comments,
+    bodyHtml: row.bodyHtml,
+  };
+  if (parsed.overall) payload.overall = parsed.overall;
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
 
 /** claude が書いた before/after 案ファイルを検証し、提示中にして通知する。 */

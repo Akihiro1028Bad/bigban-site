@@ -113,10 +113,12 @@ function ReviseComposer({ item, revise, onOpenArtboard }: ReviseComposerProps) {
     reviseBusy,
     reviseError,
     titleRevisePrompt,
+    outlineOverallPrompt,
     setCommentText,
     setEditHeading,
     setEditDescription,
     setTitleRevisePrompt,
+    setOutlineOverallPrompt,
     requestRevise,
     startAddComment,
     startEditComment,
@@ -128,6 +130,7 @@ function ReviseComposer({ item, revise, onOpenArtboard }: ReviseComposerProps) {
   } = revise;
 
   const sections = outlineSections(item.outline);
+  const isOutlineOverallActive = outlineOverallPrompt.trim() !== "";
 
   function renderSectionEditor(sectionList: OutlineSection[], i: number): ReactNode {
     return (
@@ -171,7 +174,7 @@ function ReviseComposer({ item, revise, onOpenArtboard }: ReviseComposerProps) {
         commentText={commentText}
         onCommentTextChange={setCommentText}
         editingComment={editingIdx !== null}
-        busy={reviseBusy}
+        busy={reviseBusy || isOutlineOverallActive}
         onStartEditComment={(idx, comment) => startEditComment(i, idx, comment)}
         onDeleteComment={(idx) => deleteComment(i, idx)}
         onCancelComment={cancelComment}
@@ -209,6 +212,8 @@ function ReviseComposer({ item, revise, onOpenArtboard }: ReviseComposerProps) {
         itemId={item.id}
         titlePrompt={titleRevisePrompt}
         onTitlePromptChange={setTitleRevisePrompt}
+        outlineOverallPrompt={outlineOverallPrompt}
+        onOutlineOverallPromptChange={setOutlineOverallPrompt}
         busy={reviseBusy}
         sectionCount={sections.length}
         commentTotal={total}

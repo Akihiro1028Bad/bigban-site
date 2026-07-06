@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { AdviceView } from "@/lib/growth/advise";
-import { applyAdviceItems, type AdviceApplyView } from "@/lib/growth/adviseApply";
+import { applyAdviceItems, MAX_ADOPTED, type AdviceApplyView } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { authHeaders } from "../authHeaders";
@@ -24,6 +24,7 @@ interface UseAdviceConsultReturn {
   error: string;
   adopted: ReadonlySet<number>;
   toggleAdopt: (index: number) => void;
+  setAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
   requestAdvice: () => void;
   dismiss: () => void;
   submitApply: () => void;
@@ -96,6 +97,21 @@ export function useAdviceConsult({
     });
   }
 
+  function setAdoptedBulk(indexes: readonly number[], adopt: boolean): void {
+    setAdopted((prev) => {
+      const next = new Set(prev);
+      if (adopt) {
+        for (const i of indexes) {
+          if (next.size >= MAX_ADOPTED && !next.has(i)) break;
+          next.add(i);
+        }
+      } else {
+        for (const i of indexes) next.delete(i);
+      }
+      return next;
+    });
+  }
+
   function submitApply(): void {
     void postJson(
       "/api/growth/advise/apply",
@@ -119,11 +135,31 @@ export function useAdviceConsult({
     setBusy(true);
     setError("");
     const adoptedAspects = applied.map((fixIndex) => advice?.advice?.fixes[fixIndex]?.area ?? "");
+    // 学習ログ詳細化: 観点だけでなく指摘・変更前後も残す。applied は adviceApply.proposal の
+    // fixIndex 値(=実際に反映できた案)なので、その proposal エントリを直接使い before/after を得る。
+    // fix 本体(area/指摘)は fixIndex で引く(欠落時は空文字でフォールバック)。
+    const appliedSet = new Set(applied);
+    const adoptedFixes = adviceApply.proposal
+      .filter((item) => appliedSet.has(item.fixIndex))
+      .map((item) => {
+        const fix = advice?.advice?.fixes[item.fixIndex];
+        const quote = fix?.quote?.trim();
+        const detail = `指摘: ${fix?.reason ?? ""} / 提案: ${fix?.suggestion ?? ""}${
+          quote ? `（対象: ${quote}）` : ""
+        }`;
+        return { aspect: fix?.area ?? "", detail, before: item.before, after: item.after };
+      });
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
         headers: authHeaders(token, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ pageId, bodyHtml: html, source: "advise-apply", adoptedAspects }),
+        body: JSON.stringify({
+          pageId,
+          bodyHtml: html,
+          source: "advise-apply",
+          adoptedAspects,
+          adoptedFixes,
+        }),
       });
       const saveJson = await readJsonObject(saveRes);
       if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");
@@ -152,6 +188,7 @@ export function useAdviceConsult({
     error,
     adopted,
     toggleAdopt,
+    setAdoptedBulk,
     requestAdvice,
     dismiss,
     submitApply,

@@ -1438,6 +1438,7 @@ export function ApproveClient() {
           selectable={consult.selectable}
           classifications={consult.classifications}
           onToggleAdopt={consult.onToggleAdopt}
+          onSetAdoptedBulk={consult.onSetAdoptedBulk}
         />
       ) : null}
 

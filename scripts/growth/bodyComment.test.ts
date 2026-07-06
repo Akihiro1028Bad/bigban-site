@@ -10,6 +10,7 @@ import {
   selectStaleBodyCommentIds,
   BODY_COMMENT_PROPS,
   BODY_COMMENT_BUSY_STATUSES,
+  BodyCommentRequestSchema,
   bodyCommentStatusOf,
   bodyCommentViewOf,
   buildBodyCommentClearProps,
@@ -19,7 +20,9 @@ import {
   buildBodyCommentRequestProps,
   extractReviewLines,
   MAX_BODY_COMMENTS,
+  OVERALL_COMMENT_MAX_BLOCKS,
   parseBodyComments,
+  parseBodyCommentRequest,
   parseBodyCommentProposal,
   selectAnchoredComments,
   serializeBodyComments,
@@ -122,6 +125,69 @@ describe("parse/serialize/select", () => {
   });
 });
 
+describe("BodyCommentRequestSchema", () => {
+  const c: BodyComment = { blockIndex: 0, excerpt: "x。", comment: "y" };
+
+  it("comments のみを受け付ける", () => {
+    expect(BodyCommentRequestSchema.safeParse({ comments: [c] }).success).toBe(true);
+  });
+
+  it("overall のみを受け付け、comments は空配列を既定値にする", () => {
+    const parsed = BodyCommentRequestSchema.parse({ overall: "全体にヘッジが多い" });
+    expect(parsed).toEqual({ comments: [], overall: "全体にヘッジが多い" });
+  });
+
+  it("comments と overall の併用も受け付ける", () => {
+    expect(BodyCommentRequestSchema.safeParse({ comments: [c], overall: "全体も見る" }).success).toBe(true);
+  });
+
+  it("overall 空文字は拒否する", () => {
+    expect(BodyCommentRequestSchema.safeParse({ overall: "" }).success).toBe(false);
+  });
+
+  it("comments が上限を超えたら拒否する", () => {
+    const many = Array.from({ length: MAX_BODY_COMMENTS + 1 }, () => c);
+    expect(BodyCommentRequestSchema.safeParse({ comments: many }).success).toBe(false);
+  });
+});
+
+describe("parseBodyCommentRequest", () => {
+  const c: BodyComment = { blockIndex: 0, excerpt: "x。", comment: "y" };
+
+  it("旧形の配列 JSON を comments に読み替える", () => {
+    expect(parseBodyCommentRequest(JSON.stringify([c]))).toEqual({ comments: [c], overall: undefined });
+  });
+
+  it("オブジェクト JSON を復元する", () => {
+    expect(parseBodyCommentRequest(JSON.stringify({ comments: [c], overall: "z" }))).toEqual({
+      comments: [c],
+      overall: "z",
+    });
+  });
+
+  it("overall のみを復元する", () => {
+    expect(parseBodyCommentRequest(JSON.stringify({ overall: "z" }))).toEqual({ comments: [], overall: "z" });
+  });
+
+  it("壊れた JSON は安全側の空依頼にする", () => {
+    expect(parseBodyCommentRequest("{壊")).toEqual({ comments: [], overall: undefined });
+  });
+
+  it("スキーマ不一致は安全側の空依頼にする", () => {
+    expect(parseBodyCommentRequest(JSON.stringify({ comments: [{ blockIndex: -1 }] }))).toEqual({
+      comments: [],
+      overall: undefined,
+    });
+  });
+
+  it("旧形の配列 JSON でも項目が不正なら安全側の空依頼にする", () => {
+    expect(parseBodyCommentRequest(JSON.stringify([{ blockIndex: -1 }]))).toEqual({
+      comments: [],
+      overall: undefined,
+    });
+  });
+});
+
 describe("反映案 parse/serialize/apply (Phase 2)", () => {
   const item = {
     commentIndex: 0,
@@ -162,14 +228,36 @@ describe("反映案 parse/serialize/apply (Phase 2)", () => {
 describe("Notion props / status / view", () => {
   it("依頼プロパティ: 指示(JSON)・結果クリア・依頼中・依頼時刻", () => {
     const c: BodyComment = { blockIndex: 1, excerpt: "一文目です。", comment: "やわらかく" };
-    const props = buildBodyCommentRequestProps([c], "2026-06-25T00:00:00.000Z");
+    const props = buildBodyCommentRequestProps({ comments: [c] }, "2026-06-25T00:00:00.000Z");
     const status = props[BODY_COMMENT_PROPS.status] as { select: { name: string } };
     expect(status.select.name).toBe("依頼中");
     const reqText = (props[BODY_COMMENT_PROPS.request] as { rich_text: Array<{ text: { content: string } }> })
       .rich_text.map((r) => r.text.content)
       .join("");
-    expect(JSON.parse(reqText)).toEqual([c]);
+    expect(JSON.parse(reqText)).toEqual({ comments: [c] });
     expect(props[BODY_COMMENT_PROPS.requestedAt]).toEqual({ date: { start: "2026-06-25T00:00:00.000Z" } });
+  });
+  it("依頼プロパティ: overall だけをオブジェクト JSON として書く", () => {
+    const props = buildBodyCommentRequestProps({ comments: [], overall: "全体コメント" }, "2026-06-25T00:00:00.000Z");
+    const status = props[BODY_COMMENT_PROPS.status] as { select: { name: string } };
+    expect(status.select.name).toBe("依頼中");
+    const reqText = (props[BODY_COMMENT_PROPS.request] as { rich_text: Array<{ text: { content: string } }> })
+      .rich_text.map((r) => r.text.content)
+      .join("");
+    expect(JSON.parse(reqText)).toEqual({ comments: [], overall: "全体コメント" });
+    expect(props[BODY_COMMENT_PROPS.requestedAt]).toEqual({ date: { start: "2026-06-25T00:00:00.000Z" } });
+  });
+  it("依頼プロパティ: comments だけなら overall キーを持たない", () => {
+    const c: BodyComment = { blockIndex: 1, excerpt: "一文目です。", comment: "やわらかく" };
+    const props = buildBodyCommentRequestProps({ comments: [c] }, "2026-06-25T00:00:00.000Z");
+    const reqText = (props[BODY_COMMENT_PROPS.request] as { rich_text: Array<{ text: { content: string } }> })
+      .rich_text.map((r) => r.text.content)
+      .join("");
+    expect(JSON.parse(reqText)).toEqual({ comments: [c] });
+    expect(reqText).not.toContain("overall");
+  });
+  it("OVERALL_COMMENT_MAX_BLOCKS は 10", () => {
+    expect(OVERALL_COMMENT_MAX_BLOCKS).toBe(10);
   });
   it("クリアプロパティ: なし＋指示/結果を空に", () => {
     const props = buildBodyCommentClearProps();

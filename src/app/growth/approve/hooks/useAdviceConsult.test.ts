@@ -16,7 +16,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdviceView } from "@/lib/growth/advise";
-import type { AdviceApplyView } from "@/lib/growth/adviseApply";
+import { MAX_ADOPTED, type AdviceApplyView } from "@/lib/growth/adviseApply";
 
 import { useAdviceConsult } from "./useAdviceConsult";
 
@@ -132,6 +132,46 @@ describe("toggleAdopt", () => {
   });
 });
 
+describe("setAdoptedBulk", () => {
+  it("adopt=true は既存採用を保持して和集合で追加する", () => {
+    const { view } = setup();
+    act(() => view.result.current.toggleAdopt(1));
+    act(() => view.result.current.setAdoptedBulk([0, 2], true));
+    expect(new Set(view.result.current.adopted)).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("adopt=false は指定 index を差集合で外す", () => {
+    const { view } = setup();
+    act(() => view.result.current.setAdoptedBulk([0, 1, 2, 3], true));
+    act(() => view.result.current.setAdoptedBulk([1, 3], false));
+    expect(new Set(view.result.current.adopted)).toEqual(new Set([0, 2]));
+  });
+
+  it("adopt=true は MAX_ADOPTED 件まで先頭優先でクランプする", () => {
+    const { view } = setup();
+    const indexes = Array.from({ length: MAX_ADOPTED + 5 }, (_, i) => i);
+    act(() => view.result.current.setAdoptedBulk(indexes, true));
+    expect(view.result.current.adopted.size).toBe(MAX_ADOPTED);
+    expect([...view.result.current.adopted]).toEqual(
+      Array.from({ length: MAX_ADOPTED }, (_, i) => i),
+    );
+  });
+
+  it("pageId が変わると一括採用した集合も初期化される", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ pageId }: { pageId: string }) =>
+        useAdviceConsult({ pageId, token: TOKEN, onChanged }),
+      { initialProps: { pageId: "page-A" } },
+    );
+    act(() => view.result.current.setAdoptedBulk([0, 1], true));
+    expect([...view.result.current.adopted]).toEqual([0, 1]);
+
+    view.rerender({ pageId: "page-B" });
+    expect([...view.result.current.adopted]).toEqual([]);
+  });
+});
+
 describe("pageId 変化での state リセット(記事跨ぎ持ち越し防止)", () => {
   it("pageId が変わると instruction と adopted が初期化される(別記事への誤送信を防ぐ)", () => {
     const onChanged = vi.fn();
@@ -241,8 +281,93 @@ describe("applyNow", () => {
     expect(saveBody.bodyHtml).toContain("ここが肝心です。");
     expect(saveBody.source).toBe("advise-apply");
     expect(saveBody.adoptedAspects).toEqual(["読みやすさ"]);
+    // #学習ログ詳細化: 観点だけでなく指摘・変更前後も送る。
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "読みやすさ",
+        detail: "指摘: 冗長 / 提案: 短くする",
+        before: "<p>ここは重要です。読んでください。</p>",
+        after: "<p>ここが肝心です。</p>",
+      },
+    ]);
     expect(onChanged).toHaveBeenCalledTimes(1);
     expect(view.result.current.error).toBe("");
+  });
+
+  it("adoptedFixes: quote があれば detail に「対象」を付ける", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const advice: AdviceView = {
+      status: "提示中",
+      raw: "",
+      advice: {
+        summary: "全体",
+        scores: [],
+        strengths: [],
+        fixes: [
+          {
+            area: "文体",
+            severity: "中",
+            quote: "読んでください",
+            reason: "指示口調",
+            suggestion: "和らげる",
+          },
+        ],
+      },
+    };
+    const { view } = setup({
+      bodyHtml: BODY,
+      adviceApply: {
+        status: "提示中",
+        raw: "",
+        proposal: [
+          { fixIndex: 0, before: "<p>ここは重要です。読んでください。</p>", after: "<p>肝心です。</p>" },
+        ],
+      },
+      advice,
+    });
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "文体",
+        detail: "指摘: 指示口調 / 提案: 和らげる（対象: 読んでください）",
+        before: "<p>ここは重要です。読んでください。</p>",
+        after: "<p>肝心です。</p>",
+      },
+    ]);
+  });
+
+  it("adoptedFixes: fix 本体が見つからなくても before/after は残り観点・指摘は空になる", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    // proposal の fixIndex がアドバイスの fixes 範囲外(=対応 fix なし)。
+    // before/after は proposal から確実に残り、area/reason/suggestion は空でフォールバック。
+    const { view } = setup({
+      bodyHtml: BODY,
+      adviceApply: {
+        status: "提示中",
+        raw: "",
+        proposal: [
+          { fixIndex: 9, before: "<p>ここは重要です。読んでください。</p>", after: "<p>肝心です。</p>" },
+        ],
+      },
+      advice: { status: "提示中", raw: "", advice: { summary: "s", scores: [], strengths: [], fixes: [] } },
+    });
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.adoptedFixes).toEqual([
+      {
+        aspect: "",
+        detail: "指摘:  / 提案: ",
+        before: "<p>ここは重要です。読んでください。</p>",
+        after: "<p>肝心です。</p>",
+      },
+    ]);
+    // fix が無いので観点も空文字。
+    expect(saveBody.adoptedAspects).toEqual([""]);
   });
 
   it("一部スキップ時は件数メッセージを出す", async () => {

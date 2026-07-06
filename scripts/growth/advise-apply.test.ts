@@ -23,8 +23,10 @@ import {
   FIX_REASON_NO_QUOTE,
   findAnchorBlock,
   isApplicableArea,
+  MAX_ADOPTED,
   parseApplyProposal,
   selectApplicableFixes,
+  selectableAdoptIndexes,
   selectStaleApplyIds,
   serializeApplyProposal,
   type AdviceApplyRow,
@@ -119,6 +121,65 @@ describe("selectApplicableFixes", () => {
     const got = selectApplicableFixes(fixes, BODY);
     expect(got).toHaveLength(1);
     expect(got[0]).toMatchObject({ index: 0, quote: "導入の段落", blockIndex: 1 });
+  });
+});
+
+describe("selectableAdoptIndexes", () => {
+  it("applicable が飛び飛びのとき applicable な index だけを出現順に返す", () => {
+    expect(
+      selectableAdoptIndexes(
+        [
+          { applicable: true },
+          { applicable: false },
+          { applicable: true },
+          { applicable: false },
+          { applicable: true },
+        ],
+        MAX_ADOPTED
+      )
+    ).toEqual([0, 2, 4]);
+  });
+
+  it("applicable が max を超えるとき先頭から max 件に切る", () => {
+    const got = selectableAdoptIndexes(
+      Array.from({ length: 25 }, () => ({ applicable: true })),
+      MAX_ADOPTED
+    );
+    expect(got).toHaveLength(20);
+    expect(got).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    expect(got.at(-1)).toBe(19);
+  });
+
+  it("全件 non-applicable のとき空配列を返す", () => {
+    expect(
+      selectableAdoptIndexes(
+        [{ applicable: false }, { applicable: false }, { applicable: false }],
+        MAX_ADOPTED
+      )
+    ).toEqual([]);
+  });
+
+  it("空配列のとき空配列を返す", () => {
+    expect(selectableAdoptIndexes([], MAX_ADOPTED)).toEqual([]);
+  });
+
+  it("max が 0 以下のとき applicable があっても空配列を返す", () => {
+    const classifications = [{ applicable: true }, { applicable: true }];
+    expect(selectableAdoptIndexes(classifications, 0)).toEqual([]);
+    expect(selectableAdoptIndexes(classifications, -1)).toEqual([]);
+  });
+
+  it("applicable がちょうど max 件のとき全件返す", () => {
+    const got = selectableAdoptIndexes(
+      Array.from({ length: MAX_ADOPTED }, () => ({ applicable: true })),
+      MAX_ADOPTED
+    );
+    expect(got).toHaveLength(20);
+    expect(got).toEqual(Array.from({ length: 20 }, (_, i) => i));
+  });
+
+  it("MAX_ADOPTED は 20", () => {
+    expect(MAX_ADOPTED).toBe(20);
   });
 });
 

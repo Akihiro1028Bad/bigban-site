@@ -13,6 +13,7 @@ import {
   buildReviseProposalProps,
   buildReviseRequestProps,
   buildRevisePresentMessage,
+  OUTLINE_OVERALL_LINE,
   parseReviseInstructions,
   REVISE_BUSY_STATUSES,
   REVISE_PROPS,
@@ -36,6 +37,10 @@ describe("REVISE 定数", () => {
     });
     expect(REVISE_STATUSES).toContain("提示中");
     expect(REVISE_BUSY_STATUSES).toEqual(["依頼中", "処理中", "提示中"]);
+  });
+
+  it("構成案全体への指示を表す予約 line を固定する", () => {
+    expect(OUTLINE_OVERALL_LINE).toBe("記事全体");
   });
 });
 
@@ -81,6 +86,15 @@ describe("parseReviseInstructions", () => {
   it("要素の line / comment が不正なら弾く", () => {
     expect(() => parseReviseInstructions('[{"line":"a"}]')).toThrow(/不正/);
     expect(() => parseReviseInstructions('[{"line":"","comment":"c"}]')).toThrow(/不正/);
+  });
+
+  it("構成案全体への擬似コメントを serialize / parse で素通りさせる", () => {
+    const comments = [{ line: OUTLINE_OVERALL_LINE, comment: "順序を入れ替えたい" }];
+    const json = serializeReviseInstructions(comments);
+    expect(json).toBe(JSON.stringify([{ line: "記事全体", comment: "順序を入れ替えたい" }]));
+    expect(parseReviseInstructions(json)).toEqual([
+      { line: "記事全体", comment: "順序を入れ替えたい" },
+    ]);
   });
 });
 
