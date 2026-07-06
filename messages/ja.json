@@ -225,10 +225,6 @@
           "answer": "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。"
         },
         {
-          "question": "HYROXエリアは利用できますか？料金は？",
-          "answer": "ご利用いただけます。エリア利用料は1時間 ¥2,980 です。"
-        },
-        {
           "question": "最寄り駅・アクセスは？",
           "answer": "本八幡駅から徒歩1分です。"
         },
@@ -361,13 +357,6 @@
     "timeSlot": "時間帯",
     "weekday": "平日",
     "weekend": "週末・祝日",
-    "trainingArea": "TRAINING AREA",
-    "trainingAreaJa": "トレーニングエリア",
-    "trainingAreaPrice": "¥2,980",
-    "trainingAreaUnit": "1時間あたり",
-    "membership": "MEMBERSHIP",
-    "membershipJa": "会員制度",
-    "comingSoon": "近日公開",
     "rentalPaddleNote": "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません",
     "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切をご希望、法人利用ご希望の場合は",
     "contactUs": "お問い合わせ",
