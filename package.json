@@ -50,6 +50,7 @@
     "growth:column-category": "tsx scripts/growth/column-category-cli.ts",
     "growth:comment-revise": "tsx scripts/growth/comment-revise-cli.ts",
     "growth:comment-revise-loop": "node scripts/growth/run.mjs comment-revise",
+    "growth:daemon": "tsx scripts/growth/daemon-cli.ts",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"
