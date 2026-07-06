@@ -33,6 +33,35 @@ export interface PublishGateResult {
   blockReasons: string[];
 }
 
+export interface RegateInput {
+  before: string;
+  after: string;
+  title: string;
+  articleType?: ArticleType;
+  knownNewsPaths?: ReadonlySet<string>;
+}
+
+export interface RegateResult {
+  newBlocks: string[];
+  ok: boolean;
+}
+
+/**
+ * quality-gate の文字数閾値軸を payload から解決する。
+ * microCMS の articleType(select)とは別軸のため、明示 cornerstone フラグだけを採用する。
+ */
+export function resolveGateArticleType(payload: unknown): ArticleType {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "cornerstone" in payload &&
+    payload.cornerstone === true
+  ) {
+    return "cornerstone";
+  }
+  return "single";
+}
+
 /**
  * 下書きを投入してよいかを判定する。draftQuality の block 項目だけを抽出して返す。
  * 本文(プレーン)は bodyHtml からタグ除去で得るため body は渡さない(投入スペックは HTML のみ)。
@@ -50,4 +79,38 @@ export function evaluatePublishGate(input: PublishGateInput): PublishGateResult 
     .filter((c) => c.level === "block")
     .map((c) => `${c.label}: ${c.value}`);
   return { ok: blockReasons.length === 0, blockReasons };
+}
+
+/** 公開直前の再ゲート理由。block が無ければ null。 */
+export function publishGateReason(
+  bodyHtml: string,
+  title: string,
+  articleType?: ArticleType,
+  knownNewsPaths?: ReadonlySet<string>
+): string | null {
+  const result = evaluatePublishGate({ bodyHtml, title, articleType, knownNewsPaths });
+  if (result.ok) return null;
+  return result.blockReasons.join(" / ");
+}
+
+/**
+ * AI 修正適用時の再ゲート。before に既に存在した block は修正機会を奪わないため許容し、
+ * after で新規発生した block だけを止める。
+ */
+export function evaluateRegate(input: RegateInput): RegateResult {
+  const before = evaluatePublishGate({
+    bodyHtml: input.before,
+    title: input.title,
+    articleType: input.articleType,
+    knownNewsPaths: input.knownNewsPaths,
+  });
+  const after = evaluatePublishGate({
+    bodyHtml: input.after,
+    title: input.title,
+    articleType: input.articleType,
+    knownNewsPaths: input.knownNewsPaths,
+  });
+  const existing = new Set(before.blockReasons);
+  const newBlocks = after.blockReasons.filter((reason) => !existing.has(reason));
+  return { newBlocks, ok: newBlocks.length === 0 };
 }

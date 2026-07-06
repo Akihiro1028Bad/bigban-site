@@ -10,7 +10,7 @@
  *   (左プレビューは維持・コメントはドロワーだけ / F7)。
  * - 手動リッチ編集(TipTap)は親の全画面 overlay(renderEditWorkspace)が担うため、DetailPanel の
  *   `editing` はヘッダの「編集中」バッジ表示のみに縮約する(body の tabpanel は通常表示のまま)。
- * - フッターの公開前チェックは本番 draftQuality(...) のみ(styleLint/StyleHints の合流は将来拡張)。
+ * - フッターの公開前チェックは本番 draftQuality(...) のみ(styleLint は warn として合流済み)。
  */
 "use client";
 
@@ -253,7 +253,7 @@ export function DetailPanel({
   // proto の記事段階(outline_review/draft_review)に加えて idea をレビュー可能にする。
   const isReviewable = stage === "draft_review" || stage === "outline_review" || stage === "idea";
 
-  // フッターの公開前チェックは本番 draftQuality のみ(ready 時)。styleLint 合流は将来拡張。
+  // フッターの公開前チェックは本番 draftQuality のみ(ready 時)。styleLint は warn として合流済み。
   const checks =
     draft !== null
       ? draftQuality({

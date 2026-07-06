@@ -11,13 +11,20 @@
 
 import "dotenv/config";
 
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+import { getColumnSlugs } from "../../src/lib/microcms/columnsQueries";
+import { getNewsSlugs } from "../../src/lib/microcms/queries";
+
 import { hasPendingBodyImage } from "./body-image-insert";
 import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "./body-image-regen";
 import { removeAiDisclaimer } from "./aiDisclaimer";
 import { patchDraft, publishContent, resolveRetryConfig } from "./content";
 import { REGEN_BUSY_STATUSES, regenRowFromPage } from "./eyecatch-regen";
-import { growthEndpoint } from "./endpoint";
+import { growthEndpoint, growthMediaForRow } from "./endpoint";
 import { defaultFetch } from "./http";
+import { knownArticlePathsForMedia } from "./knownArticlePaths";
 import { pushTextMessage } from "./line";
 import {
   buildScheduleProps,
@@ -27,7 +34,9 @@ import {
 } from "./publishQueue";
 import {
   buildPublishDueFailureMessage,
+  buildPublishDueGateBlockMessage,
   buildPublishDueSkipMessage,
+  type GateBlockedPublication,
   type SkippedPublication,
 } from "./publishDueNotify";
 import {
@@ -37,6 +46,12 @@ import {
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import {
+  failureSignature,
+  shouldSendFailureNotice,
+  type NotifyThrottleRecord,
+} from "./notify-throttle";
+import { publishGateReason, resolveGateArticleType } from "./publishGate";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const ENDPOINT = growthEndpoint();
@@ -48,6 +63,8 @@ const APPROVED_STATUS = "承認";
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const IMAGE_GENERATION_PENDING_MESSAGE = "画像生成の完了を待ってから公開してください。";
+const NOTIFY_THROTTLE_PATH = ".growth-tmp/notify-throttle.json";
+const DEFAULT_NOTIFY_WINDOW_MS = 10 * 60 * 1000;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -80,6 +97,21 @@ function dateMsOf(page: NotionPage, prop: string): number | null {
 function titleOf(page: NotionPage): string {
   const value = page.properties["タイトル案"] as { title?: { plain_text?: string }[] } | undefined;
   return (value?.title ?? []).map((r) => r.plain_text ?? "").join("").trim();
+}
+
+async function readThrottleRecords(): Promise<NotifyThrottleRecord[]> {
+  try {
+    const raw = await readFile(NOTIFY_THROTTLE_PATH, "utf-8");
+    const data: unknown = JSON.parse(raw);
+    return Array.isArray(data) ? (data as NotifyThrottleRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeThrottleRecords(records: readonly NotifyThrottleRecord[]): Promise<void> {
+  await mkdir(path.dirname(NOTIFY_THROTTLE_PATH), { recursive: true }).catch(() => {});
+  await writeFile(NOTIFY_THROTTLE_PATH, JSON.stringify(records), "utf-8").catch(() => {});
 }
 
 function hasUnfinishedImageGeneration(page: NotionPage): boolean {
@@ -134,6 +166,11 @@ async function main(): Promise<void> {
 
   let published = 0;
   const skipped: SkippedPublication[] = [];
+  const gateBlocked: GateBlockedPublication[] = [];
+  const windowEnv = Number(process.env.GROWTH_NOTIFY_WINDOW_MS);
+  const windowMs =
+    Number.isInteger(windowEnv) && windowEnv > 0 ? windowEnv : DEFAULT_NOTIFY_WINDOW_MS;
+  let throttleRecords = await readThrottleRecords();
   for (const item of due) {
     const page = byId.get(item.id);
     if (!page) continue;
@@ -154,6 +191,30 @@ async function main(): Promise<void> {
     }
     // 公開直前に承認画面の正タイトルと、AI 免責注記を除去した本文を下書きへ同期(#176 と同じ)。
     const rawBody = richTextOf(page, "下書き本文HTML");
+    let knownNewsPaths: ReadonlySet<string> | undefined;
+    try {
+      const paths = await knownArticlePathsForMedia(growthMediaForRow(selectOf(page, "媒体")), {
+        getColumnSlugs,
+        getNewsSlugs,
+      });
+      knownNewsPaths = new Set(paths);
+    } catch {
+      knownNewsPaths = undefined;
+    }
+    const reason = publishGateReason(
+      rawBody,
+      title,
+      resolveGateArticleType({}),
+      knownNewsPaths
+    );
+    if (reason) {
+      console.warn(`[publish-due] 公開直前ゲートでスキップ: ${title || page.id}: ${reason}`);
+      const signature = failureSignature("publish-due-gate", `${contentId}:${reason}`);
+      const decision = shouldSendFailureNotice(throttleRecords, signature, Date.now(), windowMs);
+      throttleRecords = decision.records;
+      if (decision.send) gateBlocked.push({ title, contentId, reason });
+      continue;
+    }
     const { body: cleanBody, removed } = removeAiDisclaimer(rawBody);
     const patch: Record<string, unknown> = {};
     if (title) patch.title = title;
@@ -181,6 +242,10 @@ async function main(): Promise<void> {
   // 不正 contentId のスキップを沈黙させない(#220): 取り残された記事を LINE 通知する。
   const skipMessage = buildPublishDueSkipMessage(skipped);
   if (!DRYRUN && skipMessage) await notifyLine(skipMessage);
+
+  await writeThrottleRecords(throttleRecords);
+  const gateBlockMessage = buildPublishDueGateBlockMessage(gateBlocked);
+  if (!DRYRUN && gateBlockMessage) await notifyLine(gateBlockMessage);
 }
 
 main().catch(async (error: unknown) => {

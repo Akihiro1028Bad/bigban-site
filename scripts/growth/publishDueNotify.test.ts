@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPublishDueFailureMessage,
+  buildPublishDueGateBlockMessage,
   buildPublishDueSkipMessage,
 } from "./publishDueNotify";
 
@@ -29,5 +30,24 @@ describe("buildPublishDueSkipMessage", () => {
 
   it("空配列なら null(通知不要)", () => {
     expect(buildPublishDueSkipMessage([])).toBeNull();
+  });
+});
+
+describe("buildPublishDueGateBlockMessage", () => {
+  it("公開直前ゲートで止めた記事を理由付きで列挙する", () => {
+    const msg = buildPublishDueGateBlockMessage([
+      { title: "屋内ピックル入門", contentId: "article-1", reason: "AI免責文: 欠落" },
+      { title: "", contentId: "", reason: "断定NG: 料金" },
+    ]);
+    expect(msg).toContain("公開直前ゲート");
+    expect(msg).toContain("屋内ピックル入門");
+    expect(msg).toContain("article-1");
+    expect(msg).toContain("AI免責文");
+    expect(msg).toContain("(無題)");
+    expect(msg).toContain("断定NG");
+  });
+
+  it("空配列なら null(通知不要)", () => {
+    expect(buildPublishDueGateBlockMessage([])).toBeNull();
   });
 });
