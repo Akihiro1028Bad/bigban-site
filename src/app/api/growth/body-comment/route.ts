@@ -73,7 +73,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     await updatePageProps(
       pageId,
-      buildBodyCommentRequestProps(anchored, new Date().toISOString()),
+      buildBodyCommentRequestProps({ comments: anchored }, new Date().toISOString()),
       options
     );
   } catch (error) {

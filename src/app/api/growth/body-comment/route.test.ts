@@ -68,9 +68,9 @@ describe("POST /api/growth/body-comment", () => {
     const [, props] = vi.mocked(updatePageProps).mock.calls[0];
     const p = props as Record<string, { select?: { name: string }; rich_text?: Array<{ text: { content: string } }> }>;
     expect(p["本文コメントステータス"].select?.name).toBe("依頼中");
-    expect(JSON.parse(p["本文コメント指示"].rich_text!.map((r) => r.text.content).join(""))).toEqual([
-      COMMENT,
-    ]);
+    expect(JSON.parse(p["本文コメント指示"].rich_text!.map((r) => r.text.content).join(""))).toEqual({
+      comments: [COMMENT],
+    });
   });
 
   it("認証有効＋トークン不一致は 401", async () => {

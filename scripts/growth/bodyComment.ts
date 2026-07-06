@@ -120,6 +120,15 @@ export const MAX_BODY_COMMENTS = 50;
 
 export const BodyCommentsSchema = z.array(BodyCommentSchema).min(1).max(MAX_BODY_COMMENTS);
 
+export const BodyCommentRequestSchema: z.ZodType<{ comments: BodyComment[]; overall?: string }> = z.object({
+  comments: z.array(BodyCommentSchema).max(MAX_BODY_COMMENTS).default([]),
+  overall: z.string().min(1).max(2_000).optional(),
+});
+export type BodyCommentRequest = z.infer<typeof BodyCommentRequestSchema>;
+
+/** 全体コメント1件から提示するブロックの上限(プロンプト参照の単一ソース)。 */
+export const OVERALL_COMMENT_MAX_BLOCKS = 10;
+
 /** JSON 文字列をコメント配列へ。壊れた JSON / スキーマ不一致は空配列(安全側)。 */
 export function parseBodyComments(raw: string): BodyComment[] {
   try {
@@ -128,6 +137,25 @@ export function parseBodyComments(raw: string): BodyComment[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * 依頼プロパティの生 JSON を BodyCommentRequest へ正規化する。
+ * 旧形(BodyComment[] 直列化)も { comments, overall: undefined } に読み替える。
+ */
+export function parseBodyCommentRequest(raw: string): BodyCommentRequest {
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { comments: [], overall: undefined };
+  }
+  if (Array.isArray(data)) {
+    const arr = z.array(BodyCommentSchema).max(MAX_BODY_COMMENTS).safeParse(data);
+    return { comments: arr.success ? arr.data : [], overall: undefined };
+  }
+  const obj = BodyCommentRequestSchema.safeParse(data);
+  return obj.success ? obj.data : { comments: [], overall: undefined };
 }
 
 /** コメント配列を検証して JSON 文字列化(不正は throw)。 */
@@ -255,12 +283,17 @@ export const BODY_COMMENT_BUSY_STATUSES: readonly BodyCommentStatus[] = ["依頼
 
 /** コメントを依頼として書き込む(1 PATCH)。 */
 export function buildBodyCommentRequestProps(
-  comments: readonly BodyComment[],
+  request: BodyCommentRequest,
   nowIso: string
 ): Record<string, unknown> {
   const requested: BodyCommentStatus = "依頼中";
+  const normalized = BodyCommentRequestSchema.parse(request);
+  const json = JSON.stringify({
+    comments: normalized.comments,
+    ...(normalized.overall ? { overall: normalized.overall } : {}),
+  });
   return {
-    [BODY_COMMENT_PROPS.request]: { rich_text: chunkRichText(serializeBodyComments(comments)) },
+    [BODY_COMMENT_PROPS.request]: { rich_text: chunkRichText(json) },
     [BODY_COMMENT_PROPS.result]: { rich_text: [] },
     [BODY_COMMENT_PROPS.status]: { select: { name: requested } },
     [BODY_COMMENT_PROPS.requestedAt]: { date: { start: nowIso } },
