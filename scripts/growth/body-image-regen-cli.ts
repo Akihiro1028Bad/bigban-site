@@ -2,6 +2,7 @@
  * 本文画像 AI 再生成ループ(Epic #140 / #156)の決定的オペレーション CLI(headless poller 用)。
  *
  *   npm run growth:body-image-regen -- reap                              # 処理中のstale(>15分)を失敗に回収＋通知
+ *   npm run growth:body-image-regen -- peek                              # 依頼中の件数を読み取り専用で出力
  *   npm run growth:body-image-regen -- next                              # 依頼中を1件ロック(処理中)し JSON を標準出力
  *   npm run growth:body-image-regen -- done <pageId> <targetSrc|placeholderId> <url> [--alt <説明>] [--note <注記>]  # 生成画像URLで本文の当該画像を差し替え/挿入＋完了＋通知
  *   npm run growth:body-image-regen -- fail <pageId> <reason>            # 失敗にして理由＋通知
@@ -311,6 +312,12 @@ async function next(options: NotionApiOptions): Promise<void> {
   );
 }
 
+/** next が拾う候補(依頼中)を読み取り専用で数える。claim/通知はしない。 */
+async function peek(options: NotionApiOptions): Promise<void> {
+  const rows = await rowsByStatus("依頼中", options);
+  process.stdout.write(`${rows.length}\n`);
+}
+
 /**
  * 生成済み画像 URL で本文の当該画像(targetSrc)を差し替え、または placeholder を実画像に置換して通知する。
  * note があれば完了通知に「⚠️ <note>」の1行を載せ、正常完了でも要注意事項を沈黙させない
@@ -404,6 +411,8 @@ async function main(): Promise<void> {
   switch (command) {
     case "reap":
       return reap(options);
+    case "peek":
+      return peek(options);
     case "next":
       return next(options);
     case "done":
@@ -417,7 +426,7 @@ async function main(): Promise<void> {
       // 異常に長い通知本文を防ぐ(security M-3)。
       return fail(a, b.slice(0, 200), options);
     default:
-      throw new Error("使い方: body-image-regen-cli <reap|next|done|fail> ...");
+      throw new Error("使い方: body-image-regen-cli <reap|peek|next|done|fail> ...");
   }
 }
 

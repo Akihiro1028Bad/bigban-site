@@ -2,6 +2,7 @@
  * 記事スタイリング・アドバイザー(Epic #146)の決定的オペレーション CLI(headless poller 用)。
  *
  *   npm run growth:advise -- reap                          # 処理中のstale(>15分)を失敗に回収＋通知
+ *   npm run growth:advise -- peek                          # 依頼中の件数を読み取り専用で出力
  *   npm run growth:advise -- next                          # 依頼中を1件ロック(処理中)し JSON を標準出力
  *   npm run growth:advise -- present <pageId> <jsonファイル> # アドバイスJSONを検証→提示中＋通知
  *   npm run growth:advise -- fail <pageId> <reason>        # 失敗にして理由＋通知
@@ -150,6 +151,12 @@ async function next(options: NotionApiOptions): Promise<void> {
   );
 }
 
+/** next が拾う候補(依頼中)を読み取り専用で数える。claim/通知はしない。 */
+async function peek(options: NotionApiOptions): Promise<void> {
+  const rows = await rowsByStatus("依頼中", options);
+  process.stdout.write(`${rows.length}\n`);
+}
+
 /** claude が書いたアドバイスJSONファイルを検証し、提示中にして通知する。 */
 async function present(pageId: string, jsonPath: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
@@ -178,6 +185,8 @@ async function main(): Promise<void> {
   switch (command) {
     case "reap":
       return reap(options);
+    case "peek":
+      return peek(options);
     case "next":
       return next(options);
     case "present":
@@ -188,7 +197,7 @@ async function main(): Promise<void> {
       // 異常に長い通知本文を防ぐ(security M-3)。
       return fail(a, b.slice(0, 200), options);
     default:
-      throw new Error("使い方: advise-cli <reap|next|present|fail> ...");
+      throw new Error("使い方: advise-cli <reap|peek|next|present|fail> ...");
   }
 }
 

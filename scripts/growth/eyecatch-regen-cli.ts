@@ -2,6 +2,7 @@
  * アイキャッチ AI 再生成ループ(Epic #140 / #144)の決定的オペレーション CLI(headless poller 用)。
  *
  *   npm run growth:eyecatch-regen -- reap                    # 処理中のstale(>15分)を失敗に回収＋通知
+ *   npm run growth:eyecatch-regen -- peek                    # 依頼中の件数を読み取り専用で出力
  *   npm run growth:eyecatch-regen -- next                    # 依頼中を1件ロック(処理中)し JSON を標準出力
  *   npm run growth:eyecatch-regen -- done <pageId> <url>     # 生成画像URLで下書きを差し替え＋完了＋通知
  *   npm run growth:eyecatch-regen -- fail <pageId> <reason>  # 失敗にして理由＋通知
@@ -290,6 +291,12 @@ async function next(options: NotionApiOptions): Promise<void> {
   );
 }
 
+/** next が拾う候補(依頼中)を読み取り専用で数える。claim/通知はしない。 */
+async function peek(options: NotionApiOptions): Promise<void> {
+  const rows = await rowsByStatus("依頼中", options);
+  process.stdout.write(`${rows.length}\n`);
+}
+
 /** 生成済み画像 URL で下書きのアイキャッチを差し替え、完了にして通知する。 */
 async function done(pageId: string, eyecatchUrl: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
@@ -329,6 +336,8 @@ async function main(): Promise<void> {
   switch (command) {
     case "reap":
       return reap(options);
+    case "peek":
+      return peek(options);
     case "next":
       return next(options);
     case "done":
@@ -339,7 +348,7 @@ async function main(): Promise<void> {
       // 異常に長い通知本文を防ぐ(security M-3)。
       return fail(a, b.slice(0, 200), options);
     default:
-      throw new Error("使い方: eyecatch-regen-cli <reap|next|done|fail> ...");
+      throw new Error("使い方: eyecatch-regen-cli <reap|peek|next|done|fail> ...");
   }
 }
 

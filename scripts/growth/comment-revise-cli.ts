@@ -2,6 +2,7 @@
  * 本文インラインコメント→AI修正(#182 Phase 2)の決定的オペレーション CLI(headless poller 用)。
  *
  *   npm run growth:comment-revise -- reap                          # 処理中のstale(>15分)を失敗に回収＋通知
+ *   npm run growth:comment-revise -- peek                          # 依頼中の件数を読み取り専用で出力
  *   npm run growth:comment-revise -- next                          # 依頼中を1件ロック(処理中)し JSON を標準出力
  *   npm run growth:comment-revise -- present <pageId> <jsonファイル> # before/after案を検証→提示中＋通知
  *   npm run growth:comment-revise -- fail <pageId> <reason>        # 失敗にして理由＋通知
@@ -154,6 +155,12 @@ async function next(options: NotionApiOptions): Promise<void> {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
 
+/** next が拾う候補(依頼中)を読み取り専用で数える。claim/通知はしない。 */
+async function peek(options: NotionApiOptions): Promise<void> {
+  const rows = await rowsByStatus("依頼中", options);
+  process.stdout.write(`${rows.length}\n`);
+}
+
 /** claude が書いた before/after 案ファイルを検証し、提示中にして通知する。 */
 async function present(pageId: string, jsonPath: string, options: NotionApiOptions): Promise<void> {
   assertPageId(pageId);
@@ -192,6 +199,8 @@ async function main(): Promise<void> {
   switch (command) {
     case "reap":
       return reap(options);
+    case "peek":
+      return peek(options);
     case "next":
       return next(options);
     case "present":
@@ -201,7 +210,7 @@ async function main(): Promise<void> {
       if (!a || !b) throw new Error("使い方: fail <pageId> <reason>");
       return fail(a, b.slice(0, 200), options);
     default:
-      throw new Error("使い方: comment-revise-cli <reap|next|present|fail> ...");
+      throw new Error("使い方: comment-revise-cli <reap|peek|next|present|fail> ...");
   }
 }
 
