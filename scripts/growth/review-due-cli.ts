@@ -21,6 +21,7 @@ import {
   daysSincePublished,
   REVIEW_DATE_PROPS,
   REVIEW_MEMO_PROP,
+  reviewEndpointForPage,
   selectReviewMilestone,
   type ReviewMilestone,
 } from "./review-due";
@@ -76,9 +77,14 @@ async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> 
 }
 
 /** microCMS 公開記事を contentId で引いて publishedAt を得る。失敗は null。 */
-async function fetchPublishedAt(domain: string, apiKey: string, contentId: string): Promise<string | null> {
+async function fetchPublishedAt(
+  domain: string,
+  apiKey: string,
+  endpoint: string,
+  contentId: string
+): Promise<string | null> {
   if (!CONTENT_ID_RE.test(contentId)) return null;
-  const url = `https://${domain}.microcms.io/api/v1/news/${encodeURIComponent(contentId)}`;
+  const url = `https://${domain}.microcms.io/api/v1/${endpoint}/${encodeURIComponent(contentId)}`;
   const res = await defaultFetch(url, { headers: { "X-MICROCMS-API-KEY": apiKey } });
   if (!res.ok) return null;
   const body = (await res.json()) as { publishedAt?: string };
@@ -110,10 +116,11 @@ async function main(): Promise<void> {
   for (const page of pages) {
     const contentId = richTextOf(page, CONTENT_ID_PROP);
     if (!contentId) continue;
-    const publishedAt = await fetchPublishedAt(domain, microKey, contentId);
+    const endpoint = reviewEndpointForPage(page);
+    const publishedAt = await fetchPublishedAt(domain, microKey, endpoint, contentId);
     if (!publishedAt) {
       skipped += 1;
-      console.warn(`[review-due] publishedAt 取得不可: ${titleOf(page)} (contentId=${contentId})`);
+      console.warn(`[review-due] publishedAt 取得不可: ${titleOf(page)} (${endpoint}/${contentId})`);
       continue;
     }
     const days = daysSincePublished(publishedAt, nowMs);

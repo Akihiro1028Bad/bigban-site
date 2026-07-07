@@ -6,8 +6,21 @@ import {
   REVIEW_DATE_PROPS,
   REVIEW_MEMO_PROP,
   REVIEW_MILESTONES,
+  reviewEndpointForPage,
   selectReviewMilestone,
 } from "./review-due";
+import type { NotionPage } from "./notion";
+
+function pageWithMedia(media?: string): NotionPage {
+  return {
+    id: "page-1",
+    properties: media
+      ? {
+          "媒体": { select: { name: media } },
+        }
+      : {},
+  } as NotionPage;
+}
 
 describe("daysSincePublished(再エクスポート)", () => {
   it("review-due 経由でも経過日を返す", () => {
@@ -71,5 +84,31 @@ describe("buildReviewMemo", () => {
 
   it("成功指標が空なら付けない", () => {
     expect(buildReviewMemo(90, ["伸びている"], "")).toBe("[90日レビュー] 伸びている");
+  });
+});
+
+describe("reviewEndpointForPage", () => {
+  it("媒体=ニュースは env=columns でも news を返す", () => {
+    expect(
+      reviewEndpointForPage(pageWithMedia("ニュース"), {
+        GROWTH_MICROCMS_ENDPOINT: "columns",
+      })
+    ).toBe("news");
+  });
+
+  it("媒体=コラムは env の columns を返す", () => {
+    expect(
+      reviewEndpointForPage(pageWithMedia("コラム"), {
+        GROWTH_MICROCMS_ENDPOINT: "columns",
+      })
+    ).toBe("columns");
+  });
+
+  it("媒体未設定は従来通り column 扱い", () => {
+    expect(
+      reviewEndpointForPage(pageWithMedia(), {
+        GROWTH_MICROCMS_ENDPOINT: "columns",
+      })
+    ).toBe("columns");
   });
 });

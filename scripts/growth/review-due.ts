@@ -6,6 +6,8 @@
  */
 
 import type { ReviewLabel } from "./metricsReview";
+import { growthEndpoint, growthMediaForRow } from "./endpoint";
+import type { NotionPage } from "./notion";
 
 export { daysSincePublished } from "./metricsReview";
 
@@ -22,6 +24,21 @@ export const REVIEW_DATE_PROPS: Record<ReviewMilestone, string> = {
 
 /** 候補を書くプロパティ名(公開後判定 select は人が決めるので、ここには書かない)。 */
 export const REVIEW_MEMO_PROP = "判定メモ";
+
+type EndpointEnv = Readonly<Record<string, string | undefined>>;
+
+function selectName(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
+  return value?.select?.name ?? "";
+}
+
+/** 公開後レビューで読む microCMS endpoint を Notion 行の `媒体` から解決する。 */
+export function reviewEndpointForPage(
+  page: NotionPage,
+  env: EndpointEnv = process.env
+): string {
+  return growthEndpoint(growthMediaForRow(selectName(page, "媒体")), env);
+}
 
 /**
  * 到来済み(daysSince >= マイルストーン)で、まだ記録していない**最小**のマイルストーンを返す。

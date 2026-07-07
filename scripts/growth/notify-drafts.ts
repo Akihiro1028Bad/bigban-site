@@ -13,6 +13,7 @@
 
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { fetchContentSummary, fetchDraftKey, type ContentSummary } from "./draft-meta";
 import {
@@ -22,15 +23,16 @@ import {
   type DraftFlexItem,
   type DraftNotifyItem,
 } from "./draft-notify";
-import { growthEndpoint } from "./endpoint";
+import { growthEndpoint, growthMediaForRow } from "./endpoint";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
 
-const ENDPOINT = growthEndpoint();
+type EndpointEnv = Readonly<Record<string, string | undefined>>;
 
-interface InputItem {
+export interface InputItem {
   title: string;
   contentId: string;
+  media?: string;
 }
 
 function requireEnv(name: string): string {
@@ -39,7 +41,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function parseItems(raw: unknown): InputItem[] {
+export function parseItems(raw: unknown): InputItem[] {
   const list = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as { items?: unknown }).items)
@@ -53,8 +55,19 @@ function parseItems(raw: unknown): InputItem[] {
     if (!item.title || !item.contentId) {
       throw new Error("各要素には title と contentId が必要です。");
     }
-    return { title: item.title, contentId: item.contentId };
+    return {
+      title: item.title,
+      contentId: item.contentId,
+      ...(typeof item.media === "string" ? { media: item.media } : {}),
+    };
   });
+}
+
+export function endpointForNotifyItem(
+  item: InputItem,
+  env: EndpointEnv = process.env
+): string {
+  return growthEndpoint(growthMediaForRow(item.media), env);
 }
 
 interface PreviewCtx {
@@ -69,8 +82,9 @@ interface PreviewCtx {
 /** draftKey を取得する。設定欠落・障害時は例外を投げず null(通知は必ず送る=#20)。 */
 async function resolveDraftKey(item: InputItem, ctx: PreviewCtx): Promise<string | null> {
   if (!ctx.serviceDomain || !ctx.managementApiKey) return null;
+  const endpoint = endpointForNotifyItem(item);
   try {
-    return await fetchDraftKey(ENDPOINT, item.contentId, {
+    return await fetchDraftKey(endpoint, item.contentId, {
       serviceDomain: ctx.serviceDomain,
       apiKey: ctx.managementApiKey,
       fetchFn: defaultFetch,
@@ -78,7 +92,7 @@ async function resolveDraftKey(item: InputItem, ctx: PreviewCtx): Promise<string
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(
-      `${item.contentId} の draftKey 取得に失敗(URLなしで通知): ${message}\n`
+      `${endpoint}/${item.contentId} の draftKey 取得に失敗(URLなしで通知): ${message}\n`
     );
     return null;
   }
@@ -91,8 +105,9 @@ async function resolveSummary(
   ctx: PreviewCtx
 ): Promise<ContentSummary | null> {
   if (!ctx.serviceDomain || !ctx.contentApiKey) return null;
+  const endpoint = endpointForNotifyItem(item);
   try {
-    return await fetchContentSummary(ENDPOINT, item.contentId, draftKey, {
+    return await fetchContentSummary(endpoint, item.contentId, draftKey, {
       serviceDomain: ctx.serviceDomain,
       apiKey: ctx.contentApiKey,
       fetchFn: defaultFetch,
@@ -100,7 +115,7 @@ async function resolveSummary(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(
-      `${item.contentId} の要約取得に失敗(簡易表示で通知): ${message}\n`
+      `${endpoint}/${item.contentId} の要約取得に失敗(簡易表示で通知): ${message}\n`
     );
     return null;
   }
@@ -180,8 +195,10 @@ async function main(): Promise<void> {
   process.stderr.write("LINE グループへ下書き完了を通知しました(Flex)。\n");
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`下書き通知に失敗しました: ${message}\n`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`下書き通知に失敗しました: ${message}\n`);
+    process.exitCode = 1;
+  });
+}
