@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
-import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
+import { draftLinkOf, isNotionPageId, mediaOf } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
@@ -27,7 +27,6 @@ import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = growthEndpoint();
 // contentId は Notion 由来(攻撃者制御外)だが、異常値のフェイルセーフとして上限長も課す。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 
@@ -74,10 +73,12 @@ export async function POST(request: Request): Promise<Response> {
 
   let contentId: string;
   let stageBlocked: Response | null = null;
+  let endpoint = growthEndpoint();
   try {
     const page = await getPage(pageId, notionOpts);
     stageBlocked = articleEditGuard(page);
     contentId = draftLinkOf(page).contentId;
+    endpoint = growthEndpoint(mediaOf(page));
   } catch {
     return NextResponse.json(
       { success: false, error: "更新中にエラーが発生しました" },
@@ -102,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   try {
-    await patchDraft(ENDPOINT, contentId, { eyecatch: eyecatchUrl }, microOpts);
+    await patchDraft(endpoint, contentId, { eyecatch: eyecatchUrl }, microOpts);
   } catch {
     return NextResponse.json(
       { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。やり直してください。" },

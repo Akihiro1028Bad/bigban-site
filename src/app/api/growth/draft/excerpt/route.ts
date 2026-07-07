@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
-import { draftLinkOf, isNotionPageId } from "@/lib/growth/approve";
+import { draftLinkOf, isNotionPageId, mediaOf } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import { EXCERPT_HARD_MAX } from "@/lib/growth/excerptDraft";
@@ -19,7 +19,6 @@ import { articleEditGuard } from "@/lib/growth/stageGuard";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = growthEndpoint();
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 
 function badRequest(message: string): Response {
@@ -64,10 +63,12 @@ export async function POST(request: Request): Promise<Response> {
 
   let contentId: string;
   let stageBlocked: Response | null = null;
+  let endpoint = growthEndpoint();
   try {
     const page = await getPage(pageId, notionOpts);
     stageBlocked = articleEditGuard(page);
     contentId = draftLinkOf(page).contentId;
+    endpoint = growthEndpoint(mediaOf(page));
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
@@ -83,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    await patchDraft(ENDPOINT, contentId, { excerpt }, microOpts);
+    await patchDraft(endpoint, contentId, { excerpt }, microOpts);
   } catch {
     return NextResponse.json(
       { success: false, error: "メタディスクリプションの保存に失敗しました。再保存してください。" },

@@ -35,7 +35,7 @@ import {
 } from "./body-image-regen";
 import { bodyImageFigureHtml, isPlaceholderId } from "./body-image-insert";
 import { patchDraft } from "./content";
-import { growthEndpoint } from "./endpoint";
+import { growthEndpoint, growthMediaForRow } from "./endpoint";
 import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { appendLearningLog, buildLearningLogFailNotice } from "./learningLog";
@@ -47,6 +47,7 @@ import {
   queryDataSource,
   updatePageProps,
   type NotionApiOptions,
+  type NotionPage,
 } from "./notion";
 import {
   failureSignature,
@@ -56,7 +57,6 @@ import {
 import type { BodyRegenRow } from "./body-image-regen";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
-const ENDPOINT = growthEndpoint();
 const REAP_REASON = "処理が15分以上完了しませんでした(PC再起動等の可能性)。もう一度再生成を依頼できます。";
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const PAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
@@ -98,6 +98,15 @@ function approveUrl(): string {
 
 function statusFilter(value: string): unknown {
   return { property: BODY_REGEN_PROPS.status, select: { equals: value } };
+}
+
+function selectName(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
+  return value?.select?.name ?? "";
+}
+
+function endpointForPage(page: NotionPage): string {
+  return growthEndpoint(growthMediaForRow(selectName(page, "媒体")));
 }
 
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<BodyRegenRow[]> {
@@ -339,7 +348,9 @@ async function done(
   if (!isPlaceholderTarget && !isMicrocmsAssetUrl(target)) {
     throw new Error(`対象は microCMS アセットURLまたは placeholderId にしてください: ${target}`);
   }
-  const row = bodyRegenRowFromPage(await getPage(pageId, options));
+  const page = await getPage(pageId, options);
+  const row = bodyRegenRowFromPage(page);
+  const endpoint = endpointForPage(page);
   if (!row.contentId) throw new Error("下書きID(contentId)がありません。");
   const { html, replaced } = isPlaceholderTarget
     ? replaceBodyImagePlaceholder(row.bodyHtml, target, bodyImageFigureHtml(newUrl, alt))
@@ -349,9 +360,9 @@ async function done(
     throw new Error("対象の本文画像または placeholder が見つかりませんでした(本文が変更された可能性があります)。");
   }
   if (DRYRUN) {
-    process.stdout.write(`[dry-run] patchDraft ${row.contentId} bodyHtml(${html.length}文字)\n`);
+    process.stdout.write(`[dry-run] patchDraft ${endpoint}/${row.contentId} bodyHtml(${html.length}文字)\n`);
   } else {
-    await patchDraft(ENDPOINT, row.contentId, { bodyHtml: html }, contentOptions());
+    await patchDraft(endpoint, row.contentId, { bodyHtml: html }, contentOptions());
   }
   await write(pageId, { ...buildBodyMirrorProps(html), ...buildBodyRegenDoneProps() }, options);
   await notifyFlex(

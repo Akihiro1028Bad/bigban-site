@@ -27,13 +27,18 @@ function postReq(token: string | null, body: unknown): Request {
   return new Request(url, { method: "POST", body: JSON.stringify(body) });
 }
 
-function pageWithContentId(contentId?: string) {
+function pageWithContentId(contentId?: string, media?: string) {
+  const properties: Record<string, unknown> = {};
+  if (contentId) {
+    properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
+  }
+  if (media !== undefined) {
+    properties["媒体"] = { select: { name: media } };
+  }
   return {
     id: PAGE_ID,
     url: "",
-    properties: contentId
-      ? { "下書きID": { type: "rich_text", rich_text: [{ plain_text: contentId }] } }
-      : {},
+    properties,
   };
 }
 
@@ -52,6 +57,7 @@ afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_CONTENT_API_KEY;
   delete process.env.APPROVE_SECRET;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 describe("POST /api/growth/draft/eyecatch", () => {
@@ -81,6 +87,32 @@ describe("POST /api/growth/draft/eyecatch", () => {
     expect(endpoint).toBe("news");
     expect(contentId).toBe("g-abc");
     expect(data).toEqual({ eyecatch: ASSET });
+  });
+
+  it("媒体=ニュースなら GROWTH_MICROCMS_ENDPOINT=columns でも news 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWithContentId("g-news", "ニュース"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    vi.mocked(patchDraft).mockResolvedValue("g-news");
+
+    const res = await POST(postReq(null, { pageId: PAGE_ID, eyecatchUrl: ASSET }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("news");
+    expect(contentId).toBe("g-news");
+  });
+
+  it("媒体=コラムなら GROWTH_MICROCMS_ENDPOINT=columns の columns 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWithContentId("g-column", "コラム"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    vi.mocked(patchDraft).mockResolvedValue("g-column");
+
+    const res = await POST(postReq(null, { pageId: PAGE_ID, eyecatchUrl: ASSET }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("columns");
+    expect(contentId).toBe("g-column");
   });
 
   it("不正な pageId は 400", async () => {

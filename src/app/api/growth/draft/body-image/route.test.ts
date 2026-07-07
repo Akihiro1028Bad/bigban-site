@@ -52,9 +52,18 @@ afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_CONTENT_API_KEY;
   delete process.env.APPROVE_SECRET;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 describe("POST /api/growth/draft/body-image", () => {
+  function pageWithMedia(media: string) {
+    return {
+      id: PAGE_ID,
+      url: "",
+      properties: { "媒体": { select: { name: media } } },
+    };
+  }
+
   it("本文の該当 img を差し替え、Notion ミラー→microCMS 下書きへ同期する", async () => {
     const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: OLD, newUrl: NEW }));
     expect(res.status).toBe(200);
@@ -66,6 +75,30 @@ describe("POST /api/growth/draft/body-image", () => {
     expect(contentId).toBe("g-abc");
     expect((data as { bodyHtml: string }).bodyHtml).toContain(NEW);
     expect((data as { bodyHtml: string }).bodyHtml).not.toContain(OLD);
+  });
+
+  it("媒体=ニュースなら GROWTH_MICROCMS_ENDPOINT=columns でも news 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWithMedia("ニュース"));
+    vi.mocked(draftLinkOf).mockReturnValue({ contentId: "g-news", draftKey: "" });
+
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: OLD, newUrl: NEW }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("news");
+    expect(contentId).toBe("g-news");
+  });
+
+  it("媒体=コラムなら GROWTH_MICROCMS_ENDPOINT=columns の columns 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWithMedia("コラム"));
+    vi.mocked(draftLinkOf).mockReturnValue({ contentId: "g-column", draftKey: "" });
+
+    const res = await POST(postReq(null, { pageId: PAGE_ID, targetSrc: OLD, newUrl: NEW }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("columns");
+    expect(contentId).toBe("g-column");
   });
 
   it("不正な pageId は 400", async () => {

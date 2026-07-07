@@ -54,7 +54,6 @@ import {
 import { publishGateReason, resolveGateArticleType } from "./publishGate";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
-const ENDPOINT = growthEndpoint();
 const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
 const DRAFTED_STATUS = "下書き作成済み";
@@ -191,9 +190,11 @@ async function main(): Promise<void> {
     }
     // 公開直前に承認画面の正タイトルと、AI 免責注記を除去した本文を下書きへ同期(#176 と同じ)。
     const rawBody = richTextOf(page, "下書き本文HTML");
+    const media = growthMediaForRow(selectOf(page, "媒体"));
+    const endpoint = growthEndpoint(media);
     let knownNewsPaths: ReadonlySet<string> | undefined;
     try {
-      const paths = await knownArticlePathsForMedia(growthMediaForRow(selectOf(page, "媒体")), {
+      const paths = await knownArticlePathsForMedia(media, {
         getColumnSlugs,
         getNewsSlugs,
       });
@@ -219,9 +220,9 @@ async function main(): Promise<void> {
     const patch: Record<string, unknown> = {};
     if (title) patch.title = title;
     if (removed) patch.bodyHtml = cleanBody;
-    if (Object.keys(patch).length > 0) await patchDraft(ENDPOINT, contentId, patch, contentOpts);
+    if (Object.keys(patch).length > 0) await patchDraft(endpoint, contentId, patch, contentOpts);
     // PATCH status PUBLISH は冪等(既に公開済みでも PUBLISH のまま)。
-    await publishContent(ENDPOINT, contentId, managementOpts);
+    await publishContent(endpoint, contentId, managementOpts);
     // 先に Notion ステータスを公開済みにする(=次回ループの再公開を防ぐ要)。
     await updatePageSelect(page.id, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
     // 予約の消去は付随処理。失敗しても公開自体は完了しているのでループは止めず警告だけ出す

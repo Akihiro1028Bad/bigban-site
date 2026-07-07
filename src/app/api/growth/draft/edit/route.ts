@@ -12,7 +12,7 @@
 import { after, NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
-import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId } from "@/lib/growth/approve";
+import { draftBodyOf, draftLinkOf, ideaTitleOf, isNotionPageId, mediaOf } from "@/lib/growth/approve";
 import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bodyImageRegen";
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
@@ -37,7 +37,6 @@ import { sanitizeNewsHtml, STRICT_HTML_CONFIG } from "@/lib/news/sanitize";
 
 export const runtime = "nodejs";
 
-const ENDPOINT = growthEndpoint();
 // microCMS contentId の許可文字(slugToContentId と同じ)。不正値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]+$/;
 // 本文HTMLの上限(記事本文として十分・過大入力を境界で弾く)。
@@ -110,6 +109,7 @@ export async function POST(request: Request): Promise<Response> {
   let previousBody = "";
   // #H9: 生成中・公開済みの記事は本文編集を弾く(getPage 失敗とは別経路で 409 を返す)。
   let stageBlocked: Response | null = null;
+  let endpoint = growthEndpoint();
   try {
     const page = await getPage(pageId, notionOpts);
     if (BODY_REGEN_BUSY_STATUSES.includes(bodyRegenRowFromPage(page).status)) {
@@ -122,6 +122,7 @@ export async function POST(request: Request): Promise<Response> {
     contentId = draftLinkOf(page).contentId;
     title = ideaTitleOf(page).trim();
     previousBody = draftBodyOf(page);
+    endpoint = growthEndpoint(mediaOf(page));
   } catch {
     return NextResponse.json(
       { success: false, error: "保存中にエラーが発生しました" },
@@ -164,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   try {
     await patchDraft(
-      ENDPOINT,
+      endpoint,
       contentId,
       { ...(title ? { title } : {}), bodyHtml: sanitized },
       microOpts

@@ -42,7 +42,7 @@ function postRequest(token: string | null, body: unknown, raw?: string): Request
   return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
 }
 
-function pageWith(contentId?: string, title?: string, bodyRegenStatus?: string) {
+function pageWith(contentId?: string, title?: string, bodyRegenStatus?: string, media?: string) {
   const properties: Record<string, unknown> = {};
   if (contentId !== undefined) {
     properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
@@ -52,6 +52,9 @@ function pageWith(contentId?: string, title?: string, bodyRegenStatus?: string) 
   }
   if (bodyRegenStatus !== undefined) {
     properties["本文画像再生成ステータス"] = { select: { name: bodyRegenStatus } };
+  }
+  if (media !== undefined) {
+    properties["媒体"] = { select: { name: media } };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -102,6 +105,7 @@ afterEach(() => {
   delete process.env.MICROCMS_CONTENT_API_KEY;
   delete process.env.APPROVE_SECRET;
   delete process.env.GROWTH_LEARNING_LOG_DS;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 describe("POST /api/growth/draft/edit", () => {
@@ -143,6 +147,30 @@ describe("POST /api/growth/draft/edit", () => {
       BODY_MIRROR_PROP
     ];
     expect(mirror.rich_text.map((r) => r.text.content).join("")).toBe(saved);
+  });
+
+  it("媒体=ニュースなら GROWTH_MICROCMS_ENDPOINT=columns でも news 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-news", "ニュース記事", undefined, "ニュース"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>本文</p>" }));
+    expect(res.status).toBe(200);
+
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("news");
+    expect(contentId).toBe("g-news");
+  });
+
+  it("媒体=コラムなら GROWTH_MICROCMS_ENDPOINT=columns の columns 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-column", "コラム記事", undefined, "コラム"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>本文</p>" }));
+    expect(res.status).toBe(200);
+
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("columns");
+    expect(contentId).toBe("g-column");
   });
 
   it.each(["依頼中", "処理中"])("本文画像再生成が %s なら 409 で保存を弾く", async (status) => {

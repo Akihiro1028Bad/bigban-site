@@ -29,10 +29,13 @@ function postRequest(token: string | null, body: unknown, raw?: string): Request
   return new Request(url, { method: "POST", headers, body: raw ?? JSON.stringify(body) });
 }
 
-function pageWith(contentId?: string) {
+function pageWith(contentId?: string, media?: string) {
   const properties: Record<string, unknown> = {};
   if (contentId !== undefined) {
     properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
+  }
+  if (media !== undefined) {
+    properties["媒体"] = { select: { name: media } };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -51,6 +54,7 @@ afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
   delete process.env.MICROCMS_CONTENT_API_KEY;
   delete process.env.APPROVE_SECRET;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
 
 describe("POST /api/growth/draft/excerpt", () => {
@@ -73,6 +77,28 @@ describe("POST /api/growth/draft/excerpt", () => {
     expect(contentId).toBe("g-abc");
     expect((data as { excerpt: string }).excerpt).toBe("市川の屋内コートで打てる");
     expect((opts as { apiKey: string }).apiKey).toBe("content-key");
+  });
+
+  it("媒体=ニュースなら GROWTH_MICROCMS_ENDPOINT=columns でも news 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-news", "ニュース"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, excerpt: "ニュース本文" }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("news");
+    expect(contentId).toBe("g-news");
+  });
+
+  it("媒体=コラムなら GROWTH_MICROCMS_ENDPOINT=columns の columns 下書きを更新する", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-column", "コラム"));
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, excerpt: "コラム本文" }));
+    expect(res.status).toBe(200);
+    const [endpoint, contentId] = vi.mocked(patchDraft).mock.calls[0];
+    expect(endpoint).toBe("columns");
+    expect(contentId).toBe("g-column");
   });
 
   it("excerpt が長すぎると 400(patch しない)", async () => {
