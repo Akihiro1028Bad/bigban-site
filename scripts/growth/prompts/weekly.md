@@ -17,7 +17,7 @@
 - 文体・地理スコープ(コア=市川・本八幡/準コア=東京東部・総武/都営新宿線/全国): `docs/operations/growth-article-style.md`。
 - **唯一のグラウンドトゥルース**: `npm run growth:existing` の出力(Notion 3 DB を REST で実照会した結果)。既存判定はこれだけで行う。
 - data source ID(固定値): 週次グロースレポート=`27d6794f-4133-4cd4-9407-491d95c1b82b` / 記事ネタ案=`5adab8b1-f182-4123-b963-9463a2580d4a` / 施策提案=`3503f4bc-b1c4-4927-91ce-7609a6c4e460`。
-- Notion のツール名は環境依存(headless では `mcp__claude_ai_Notion__*`)。
+- Notion のツール名は実行 agent と環境に依存する。推測せず、利用可能な Notion tool/connector か npm script の標準出力を使う。
 </source_of_truth>
 
 <workflow>

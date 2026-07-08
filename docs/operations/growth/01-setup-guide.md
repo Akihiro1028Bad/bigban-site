@@ -15,7 +15,7 @@
 | 場所 / サービス | 役割 |
 |---|---|
 | **Mac（開発機）** | コードの開発・修正。ここでは本番の週次自動実行は**しない**（後述、二重実行防止）。 |
-| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（`claude -p` の headless 実行）を回す本番実行機。 |
+| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（headless agent 実行。既定は `claude -p`、任意で Codex CLI）を回す本番実行機。 |
 | **Vercel（承認画面 + サイト）** | 公開サイトと承認画面 `/growth/approve` をホスト。承認画面は **Notion に「依頼」を書くだけ**（重い処理はしない）。 |
 | **Notion（4つの DB）** | データの中核。①記事ネタ案 ②施策提案 ③週次グロースレポート ④学習ログ。 |
 | **microCMS** | 記事本文の CMS。AI は**下書きまで**を作る（本番公開は人間が手動）。 |
@@ -32,7 +32,7 @@
  │ 自宅 Windows PC │ ─── growth:weekly ───────▶ │ GA4 / Search Console   │
  │ (常時稼働・本番) │ ◀── 成績データ取得 ────────  └──────────────────────┘
  │                │
- │  claude -p で   │ ─── レポート/ネタ案/施策 ──▶ ┌──────────────────────┐
+ │ headless agentで│ ─── レポート/ネタ案/施策 ──▶ ┌──────────────────────┐
  │  分析→書き込み   │                            │ Notion 4DB            │
  │                │                            │ (ネタ案/施策/         │
  │  LINE 通知      │ ─── 「今週の数字/やること」─▶ │  週次レポート/学習ログ) │
@@ -155,13 +155,20 @@
    ```powershell
    git --version
    ```
-3. **Claude Code CLI**: グローバルに入れ、初回だけ対話ログインする。
+3. **Headless agent CLI**: 既定運用は Claude Code CLI。Codex 併用検証をする場合は Codex CLI も入れ、初回だけ対話ログインする。
    ```powershell
    npm install -g @anthropic-ai/claude-code
    claude --version
    claude          # 初回は対話起動。Mac と同じ Anthropic アカウントで /login → その後 /exit
    ```
    > **確認**: ログインは Mac と同一アカウントで。Notion 連携（headless で使う `mcp__claude_ai_Notion`）はアカウントに紐づくため、同じアカウントなら Windows でも使えます。
+
+   Codex を併用する場合:
+   ```powershell
+   codex --version
+   codex mcp login notion
+   ```
+   > **確認**: `GROWTH_AGENT` 未設定なら Claude のまま。Codex は `GROWTH_AGENT=codex` を付けたときだけ使います。
 
 ### 手順 3-2: リポジトリを取得する
 
@@ -312,7 +319,7 @@ npm run growth:fetch
 
 ### 手順 7-2: 週次モードの空実行（`GROWTH_DRYRUN=1`）
 
-`GROWTH_DRYRUN=1` を付けると、**claude を起動せず**にランチャーが組み立てるコマンドだけを表示します（Notion にも書き込まない・LINE も送らない）。ここまで通れば初期構築の完了条件クリアです。
+`GROWTH_DRYRUN=1` を付けると、**headless agent を起動せず**にランチャーが組み立てるコマンドだけを表示します（Notion にも書き込まない・LINE も送らない）。ここまで通れば初期構築の完了条件クリアです。
 
 ```powershell
 $env:GROWTH_DRYRUN=1; npm run growth:weekly; Remove-Item Env:\GROWTH_DRYRUN
@@ -320,6 +327,14 @@ $env:GROWTH_DRYRUN=1; npm run growth:weekly; Remove-Item Env:\GROWTH_DRYRUN
 
 > **確認**: `[dry-run] ... claude -p --permission-mode default --allowedTools ...` と、続けて `[dry-run] then: npm run growth:notify-line ...` の 2 行が表示されれば **週次の DRYRUN 疎通 OK（初期構築の完了条件クリア）**。
 > ※ 最新取り込み（`git pull --ff-only`）は weekly モードだけが対象です。weekly でも `GROWTH_DRYRUN=1` や `GROWTH_SKIP_PULL=1` のときは、動作確認を壊さないため pull をスキップします。
+
+Codex 併用の dry-run:
+
+```powershell
+$env:GROWTH_DRYRUN=1; $env:GROWTH_AGENT="codex"; npm run growth:advise-loop; Remove-Item Env:\GROWTH_DRYRUN; Remove-Item Env:\GROWTH_AGENT
+```
+
+> **確認**: `[dry-run] ... codex -a never exec --sandbox workspace-write ...` が表示されれば Codex 起動形の組み立ては OK。実走で `tsx` IPC / Notion fetch が塞がる場合だけ `GROWTH_CODEX_SANDBOX=danger-full-access` を検証用に指定します。
 
 ### 手順 7-3: LINE 通知の本文確認（送信せず表示）
 
@@ -343,7 +358,8 @@ npm run growth:weekly     # 分析→Notion 3DB 書き込み→自動で notify-
 ### つまずいたら
 
 - `claude` が見つからない: PowerShell を開き直す / `npm i -g @anthropic-ai/claude-code` を再確認。
-- Notion に書けない: `claude` が Mac と同一アカウントでログイン済みか / DB がインテグレーションに接続済みか（手順 4）。
+- `codex` が見つからない: Codex CLI のインストールと `codex --version` を確認。Notion 併用時は `codex mcp login notion` も確認。
+- Notion に書けない: Claude なら Mac と同一アカウントでログイン済みか、Codex なら Notion MCP/connector がログイン済みか、DB がインテグレーションに接続済みか（手順 4）。
 - LINE に届かない: 週次通知であること、`LINE_CHANNEL_ACCESS_TOKEN` / `LINE_GROUP_ID`、Bot がグループに入っているかを確認。通常ループ通知は `GROWTH_NOTIFY_LEVEL` 未設定では送られません。
 - 承認待ちが空 / レポート URL が出ない: `NOTION_TOKEN` 未設定か、対象 DB がインテグレーション未接続（手順 4-2）。
 - microCMS: 下書き/画像は MCP ではなくスクリプト（管理 API 直叩き）で動くため、Windows で MCP 未接続でも問題なし。
@@ -358,19 +374,20 @@ npm run growth:weekly     # 分析→Notion 3DB 書き込み→自動で notify-
 
 ### 手順 8-0: 応答ループは「常駐デーモン」でまとめて回す（推奨・簡単）
 
-承認画面からの依頼（構成修正・アイキャッチ/本文画像の再生成・アドバイス・装飾・コメント修正）を拾う **プル型ループ7種＋公開キュー（publish-due）＋滞留検知（stall-check）** は、個別にタスク登録しなくても、**1コマンドの常駐デーモン**でまとめて回せます。
+承認画面からの依頼（構成修正・アイキャッチ/本文画像の再生成・アドバイス・装飾・コメント修正）を拾う **プル型ループ7種＋公開キュー（publish-due）＋滞留検知（stall-check）** は、個別にタスク登録しなくても、**1コマンドの常駐デーモン**でまとめて回せます。下書き生成も手動を避けたい場合は、`GROWTH_DRAFTS_AUTO=1` で opt-in できます。
 
 ```powershell
 npm run growth:daemon
 ```
 
-- 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分）。依頼が無いループは軽い `peek` だけで空振りし、`claude` 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。
+- 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分）。依頼が無いループは軽い `peek` だけで空振りし、headless agent 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。
+- `GROWTH_DRAFTS_AUTO=1` を付けると、`drafts-auto` もデーモンに追加されます。既定5分間隔で「承認済み/生成中 かつ 下書きID未作成」の記事だけを軽く `peek` し、対象がある時だけ `growth:drafts` 相当の下書き生成を起動します。対象が無い時は headless agent を起動しません。
 - デーモンは git pull しません。デプロイ後や週途中のコード更新を反映したい場合は、自宅PCで手動 `git pull --ff-only` するか、デーモンを再起動して最新化してください。
 - デーモンやタスクスケジューラで回すコマンドは、soft fail も後で追えるよう `>> data\*.log 2>&1` でログファイルへリダイレクトしてください。ハード失敗は別途 `data\growth-failures.log` に構造化追記されます。
 - 7つのプル型ループは元々**1つのロックを共有**（同時に2つは動かない）ので、デーモンが逐次実行するのと整合します。**このデーモンを使えば下の 8-4（個別タスク登録）は不要**です。
-- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
+- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_DRAFTS_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
 - **常駐させる**: Mac を常時つけっぱなしなら launchd/ログイン項目に、Windows ならタスクスケジューラで「ログオン時に起動」に登録すれば起動時に自動で常駐します。これで**Windowsで7個のタスクを個別登録する手間が消えます**。
-- 対象外（デーモンに含めない）: `weekly`（週次・8-2 で別途スケジュール）、`drafts`/`initiatives`（承認後の重い処理・OpenAI 課金あり＝手動のまま。8-5）。
+- 対象外（デーモンに既定では含めない）: `weekly`（週次・8-2 で別途スケジュール）、`drafts`/`initiatives`（承認後の重い処理・OpenAI 課金あり＝既定は手動。下書きだけ `GROWTH_DRAFTS_AUTO=1` で opt-in 可）。
 
 > つまり最小構成は **①週次だけタスク登録（8-2）＋②`growth:daemon` を常駐** の2つだけ。以下の 8-1〜8-4 は「デーモンを使わず個別登録したい場合」の手順です。
 
@@ -413,14 +430,28 @@ pull 型の各ループも、承認/依頼を拾えるようタスク登録し�
 - **設定タブで「既に実行中の場合は新しいインスタンスを開始しない」**を選ぶ（二重起動防止）。
 - 他のループ（regen / regen-body / advise / decorate 等）も必要に応じて同様に登録できます。全モードの一覧は [`00-canon.md`](00-canon.md) の「実行モード一覧」、詳細は [`30-loops.md`](30-loops.md) を参照。
 
-### 手順 8-5: 承認後の手動実行（自動化しない処理）
+### 手順 8-5: 承認後の実行（手動 / opt-in 自動）
 
-下書き生成・施策実行は**人間の承認が前提**なので、既定では手動実行です（必要なら同様にスケジュール可）:
+下書き生成・施策実行は**人間の承認が前提**なので、既定では手動実行です:
 
 ```powershell
 npm run growth:drafts        # 承認した記事 → microCMS 下書き + 画像
 npm run growth:initiatives   # 承認した施策 → Notion 本文に文案/仕様書
 ```
+
+手動実行を避けたい場合は、デーモン起動時に下書き自動生成を opt-in します:
+
+```powershell
+$env:GROWTH_DRAFTS_AUTO="1"; npm run growth:daemon
+```
+
+Codex で動かす場合:
+
+```powershell
+$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; $env:GROWTH_DRAFTS_AUTO="1"; npm run growth:daemon
+```
+
+この場合も `weekly` と `initiatives` は自動巡回に含めません。`drafts-auto` は `growth:drafts-auto-peek` で対象件数を確認し、0件なら何も起動しません。
 
 > **二重実行に注意**: Mac と Windows の両方で本番自動実行すると二重実行になります。**本番の自動実行は自宅 Windows PC のみ**にしてください。
 

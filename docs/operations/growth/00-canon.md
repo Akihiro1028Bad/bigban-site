@@ -16,11 +16,14 @@
 - **未確定情報を断定しない**(facility-context の `doNotWrite`(料金・正確な所要分・未確定の日時。列挙はファイルを正典とし、ここに再掲しない)。必要時は「最新情報をご確認ください」と促す)。なお営業時間 6:00-23:00・コート3面・デコターフは公表済みの確定事実(#217)で、断定してよい。
 - **失敗を沈黙させない**(途中失敗は工程名・再開コマンドを出力し、`data/growth-failures.log` に追記する。LINE は週次完了と週次モード自身の失敗だけに絞り、週次本文で直近7日の失敗件数をサマリする。冪等に再開できる設計を崩さない)。
 
-## 実行(headless / `claude -p`)
+## 実行(headless agent)
 
 - ランチャー: `scripts/growth/run.mjs`(Windows/macOS 両対応)。プロンプトは stdin で渡す。
-- 動作確認(claude 非起動): `GROWTH_DRYRUN=1`。
-- 下書き系の勝負所モデルは既定 `claude-opus-4-8`(`GROWTH_DRAFTS_MODEL` で上書き可)。weekly(ネタ出し)も同様に既定 `claude-opus-4-8`(`GROWTH_WEEKLY_MODEL` で上書き可)。
+- 既定は従来どおり Claude(`GROWTH_AGENT` 未設定/`claude`)。`GROWTH_AGENT=codex` の時だけ Codex CLI(`codex -a ... exec --sandbox ...`)で実行する。移行ではなく併用対応。
+- 動作確認(agent 非起動): `GROWTH_DRYRUN=1`。
+- Claude 側: 下書き系の勝負所モデルは既定 `claude-opus-4-8`(`GROWTH_DRAFTS_MODEL` で上書き可)。weekly(ネタ出し)も同様に既定 `claude-opus-4-8`(`GROWTH_WEEKLY_MODEL` で上書き可)。
+- Codex 側: `GROWTH_CODEX_APPROVAL`(既定 `never`) / `GROWTH_CODEX_SANDBOX`(既定 `workspace-write`) / `GROWTH_CODEX_MODEL`(任意)で調整する。Claude 専用の allowedTools や `mcp__claude_ai_Notion` は渡さない。`workspace-write` で `tsx` IPC や Notion fetch が塞がる場合だけ、検証用に `GROWTH_CODEX_SANDBOX=danger-full-access` を使う。
+- Codex の初期実運用検証は、書き込み面が小さい `growth:advise-loop` と `growth:decorate-loop` から始める。weekly/drafts は Claude 既定のまま維持する。
 
 ## 実行モード一覧と参照先
 
@@ -28,6 +31,7 @@
 |---|---|---|---|
 | weekly | `growth:weekly` | 週次分析→Notionレポート+施策提案 | runbook「週次モード」 |
 | drafts | `growth:drafts` | 承認記事→microCMS下書き+画像 | [20-draft.md](20-draft.md) |
+| drafts-auto | `growth:drafts-auto` | opt-in: 承認済み/生成中かつ下書きID未作成がある時だけ下書き生成 | [20-draft.md](20-draft.md) |
 | initiatives | `growth:initiatives` | 承認施策→Notion本文に文案/仕様書 | runbook「施策実行モード」 |
 | revise | `growth:revise-loop` | 構成案/タイトルの修正ループ(#40/#139B) | [30-loops.md](30-loops.md) |
 | regen | `growth:regen-loop` | アイキャッチ AI 再生成(#144) | [30-loops.md](30-loops.md) |
@@ -46,7 +50,7 @@
 
 ## 設計の共通原則(全ループ)
 
-- **pull型**: 承認画面(Vercel)は Notion に「依頼」を書くだけ。重い処理(claude/画像生成/microCMS書込)は常時稼働PCのループが拾う。
+- **pull型**: 承認画面(Vercel)は Notion に「依頼」を書くだけ。重い処理(headless agent/画像生成/microCMS書込)は常時稼働PCのループが拾う。
 - **承認画面は基本 Notion を読むだけ**(GA4/microCMS の強権操作は PC 側ループに集約)。
 - **純ロジックを分離**: DOM/IO 非依存の純関数(`scripts/growth/*.ts`)＋`src/lib/growth/*` 再エクスポート。CLI/`run.mjs`/`gen-*` はカバレッジ除外。
 - **欠落耐性**: Notion プロパティが未追加でも沈黙落ちせず動く/その旨を報告する。必要プロパティ一覧は [40-notion-props.md](40-notion-props.md)。

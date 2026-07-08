@@ -16,6 +16,13 @@ function dryRun(mode: string, env: Record<string, string> = {}): string {
 }
 
 describe("run.mjs dry-run の --model(#247)", () => {
+  it("未指定では従来どおり Claude 引数で起動する", () => {
+    const out = dryRun("advise");
+    expect(out).toContain("claude -p");
+    expect(out).toContain("--allowedTools");
+    expect(out).toContain("mcp__claude_ai_Notion");
+  });
+
   it("drafts は既定で --model claude-opus-4-8 を付ける", () => {
     expect(dryRun("drafts")).toContain("--model claude-opus-4-8");
   });
@@ -62,5 +69,73 @@ describe("run.mjs dry-run の --model(#247)", () => {
     const out = dryRun("decorate");
     expect(out).toContain("decorate.md");
     expect(out).toContain("--model claude-opus-4-8");
+  });
+});
+
+describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
+  const codexModes = [
+    "weekly",
+    "drafts",
+    "drafts-auto",
+    "initiatives",
+    "revise",
+    "regen",
+    "regen-body",
+    "advise",
+    "decorate",
+    "apply",
+    "comment-revise",
+  ];
+
+  it("Codex CLI の exec 形式で起動する", () => {
+    const out = dryRun("advise", { GROWTH_AGENT: "codex" });
+
+    expect(out).toContain("codex -a never exec");
+    expect(out).toContain("--sandbox workspace-write");
+    expect(out).toContain(" -C ");
+  });
+
+  it("Claude 専用の tool 引数を Codex へ渡さない", () => {
+    const out = dryRun("decorate", { GROWTH_AGENT: "codex" });
+
+    expect(out).not.toContain("--allowedTools");
+    expect(out).not.toContain("mcp__claude_ai_Notion");
+  });
+
+  it("GROWTH_CODEX_MODEL で Codex モデルを指定できる", () => {
+    expect(dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_MODEL: "gpt-5.5" })).toContain(
+      "--model gpt-5.5"
+    );
+  });
+
+  it("GROWTH_CODEX_SANDBOX で Codex sandbox を指定できる", () => {
+    expect(
+      dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_SANDBOX: "read-only" })
+    ).toContain("--sandbox read-only");
+  });
+
+  it("GROWTH_CODEX_APPROVAL で Codex approval を指定できる", () => {
+    expect(
+      dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_APPROVAL: "on-request" })
+    ).toContain("codex -a on-request exec");
+  });
+
+  it("不正な GROWTH_AGENT は非0終了する", () => {
+    expect(() => dryRun("advise", { GROWTH_AGENT: "openai" })).toThrow();
+  });
+
+  it("drafts-auto は drafts.md を使い Codex でも起動できる", () => {
+    const out = dryRun("drafts-auto", { GROWTH_AGENT: "codex" });
+
+    expect(out).toContain("drafts.md+codex-runtime");
+    expect(out).toContain("codex -a never exec");
+  });
+
+  it.each(codexModes)("mode=%s でも Codex dry-run を選べる", (mode) => {
+    const out = dryRun(mode, { GROWTH_AGENT: "codex" });
+
+    expect(out).toContain("codex -a never exec");
+    expect(out).not.toContain("--allowedTools");
+    expect(out).not.toContain("mcp__claude_ai_Notion");
   });
 });

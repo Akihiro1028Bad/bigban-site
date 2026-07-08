@@ -1,7 +1,7 @@
 # グロース運用 指示書(AI 実行用ランブック)
 
 THE PICKLE BANG THEORY のグロース運用を AI が行うための手順書。
-`claude -p` でこの手順を渡して実行する想定。設計の「② AI が分析 → ③ 成果物」を担う。
+headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex CLI)でこの手順を渡して実行する想定。設計の「② AI が分析 → ③ 成果物」を担う。
 
 - 設計書: [2026-06-12-growth-loop-mvp-design.md](../superpowers/specs/2026-06-12-growth-loop-mvp-design.md)
 - データ取得実装: `scripts/growth/`(`npm run growth:fetch`)
@@ -17,7 +17,7 @@ THE PICKLE BANG THEORY のグロース運用を AI が行うための手順書�
 
 承認のサイクル: 週次モードが提案を出す → 人間が Notion で `承認`/`却下` → **下書きモード/施策実行モードを手動実行すると即反映**。webhook は使わず、実行時に Notion を読む。
 
-> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives`(いずれも内部で `claude -p` に該当モードの指示を渡す。具体的なコマンドは Windows セットアップ時に確定)。
+> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives`(いずれも内部で headless agent に該当モードの指示を渡す。既定は Claude、Codex は `GROWTH_AGENT=codex` 指定時のみ)。
 
 ## 出力先(確定)
 
@@ -216,8 +216,8 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 ## 構成案の修正ループ（承認画面 × 常時稼働PC・Epic #40）
 
 承認画面で記事ネタ案の**構成案(見出しアウトライン)に行ごとのコメント**、または**タイトルへの指示**(#139 B)を
-付けて「修正を依頼」すると、常時稼働PCが拾って `claude` で構成案／タイトルを直し、ユーザーが**提示→確認して反映**
-する。プル型(Web は Notion に依頼を書くだけ／PC が5分間隔で拾う)。推論はサブスクの `claude` なので **API 追加課金なし**。
+付けて「修正を依頼」すると、常時稼働PCが拾って headless agent で構成案／タイトルを直し、ユーザーが**提示→確認して反映**
+する。プル型(Web は Notion に依頼を書くだけ／PC が5分間隔で拾う)。既定の Claude 運用ではサブスク推論なので **API 追加課金なし**。Codex 併用時は Codex 側の利用条件に従う。
 
 ### 事前セットアップ：Notion「記事ネタ案」DB にプロパティを追加（1回だけ・手動）
 
@@ -242,7 +242,7 @@ Notion 管理画面で「記事ネタ案」DB(`5adab8b1-f182-4123-b963-9463a2580
 1. **依頼(あなた)**: 承認画面の記事詳細パネルで、構成案の各行にコメント、または「タイトルについて（AIに修正を依頼）」
    枠にタイトルの指示を書いて「修正を依頼」。**片方だけ／両方**どちらでも依頼できる。
 2. **処理(PC・自動)**: 5分間隔のタスク([初期構築ガイド](./growth/01-setup-guide.md) 手順8)が `npm run growth:revise-loop` を起動。
-   `claude` が**指示が来た方だけ**(構成案／タイトル)を §13/§14/§15 と facility-context に沿って直し、「提示中」にして
+   headless agent が**指示が来た方だけ**(構成案／タイトル)を §13/§14/§15 と facility-context に沿って直し、「提示中」にして
    **LINE に通知**(タイトル提案があれば新タイトルも通知に表示)。最大5分待ち。
 3. **確認(あなた)**: 通知の承認画面URLを開き、構成案・タイトルの**元 vs 新**を見比べて「反映」or「やり直し(再コメント)」。
    反映は提案がある方だけまとめて適用される。
@@ -275,9 +275,9 @@ Notion 管理画面で「記事ネタ案」DB(`5adab8b1-f182-4123-b963-9463a2580
 ### 運用の流れ
 
 1. **依頼(あなた)**: 承認画面の下書きプレビューで「AIで再生成」→ 指示（任意）→「再生成を依頼」。
-2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:regen-loop` を起動。`claude` が指示を英語の行為に翻案して
+2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:regen-loop` を起動。headless agent が指示を英語の行為に翻案して
    `gen-eyecatch`→`upload-media`→`growth:eyecatch-regen done` を回し、下書きの eyecatch を差し替え、**LINE 通知**。
-   ロック/日次上限は構成案修正ループと共有（同時に1つの `claude` だけ動く）。
+   ロック/日次上限は構成案修正ループと共有（同時に1つの headless agent だけ動く）。
 3. **確認(あなた)**: 通知の承認画面URLを開き、プレビューで新しいアイキャッチを確認（必要なら再度依頼）。
 
 ### 失敗・沈黙させない
@@ -311,9 +311,9 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 ### 運用の流れ
 
 1. **依頼(あなた)**: 承認画面の下書きプレビュー → 本文画像の「AIで再生成」→ 指示（任意・例「もっと明るく」「図解で」）→「再生成を依頼」。
-2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:regen-body-loop` を起動。`claude` が指示からスタイル/説明を決めて
+2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:regen-body-loop` を起動。headless agent が指示からスタイル/説明を決めて
    `gen-body-image`→`upload-media`→`growth:body-image-regen done <pageId> <targetSrc> <url>` を回し、本文の当該画像を差し替え、**LINE 通知**。
-   ロック/日次上限は構成案修正・アイキャッチ再生成ループと共有（同時に1つの `claude` だけ動く）。
+   ロック/日次上限は構成案修正・アイキャッチ再生成ループと共有（同時に1つの headless agent だけ動く）。
 3. **確認(あなた)**: 通知の承認画面URLを開き、プレビューで新しい本文画像を確認（必要なら再度依頼）。
 
 ### 失敗・沈黙させない
@@ -323,7 +323,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 
 ## 記事スタイリング・アドバイザー（承認画面 × 常時稼働PC・#146）
 
-下書きプレビューの「**スタイリング・アドバイス**」カードで「アドバイスを依頼」すると、常時稼働PCの claude が
+下書きプレビューの「**スタイリング・アドバイス**」カードで「アドバイスを依頼」すると、常時稼働PCの headless agent が
 下書き（本文＋タイトル）を style-guide（§11/§14/§15/§4/§12/§9）に照らして分析し、**○×ではなく具体的な助言**
 （総評＋観点別スコア＋強み＋直すべき点〔引用＋理由＋修正案〕）を返して承認画面に表示する。**read-only**：本文や
 下書きは自動で書き換えない（人が見て既存の「直接修正」「AIコメント修正(#40)」で反映）。アイキャッチ/本文画像
@@ -339,13 +339,13 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `アドバイス依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性・ステータスなし＝依頼導線だけ表示）。
-> 分析は **claude（サブスク・追加課金なし）**。PC に `NOTION_TOKEN`、通知に LINE（`LINE_GROUP_ID`/`LINE_CHANNEL_ACCESS_TOKEN`）が必要。
+> 分析は既定では **Claude（サブスク・追加課金なし）**。Codex 検証時は `GROWTH_AGENT=codex` とし、`workspace-write` で `tsx` IPC / Notion fetch が塞がる環境では `GROWTH_CODEX_SANDBOX=danger-full-access` を検証用に使う。PC に `NOTION_TOKEN`、通知に LINE（`LINE_GROUP_ID`/`LINE_CHANNEL_ACCESS_TOKEN`）が必要。
 > **read-only なので OpenAI/microCMS キーは不要**。本文は Notion ミラー `下書き本文HTML`(#95) を読む（下書きプレビューが機能していること）。
 
 ### 運用の流れ
 
 1. **依頼(あなた)**: 承認画面の下書きプレビュー →「スタイリング・アドバイス」→ 見てほしい点（任意）→「アドバイスを依頼」。
-2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:advise-loop` を起動。`claude` が本文を style-guide に照らして分析し、
+2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:advise-loop` を起動。headless agent が本文を style-guide に照らして分析し、
    `advise present` でアドバイスJSONを Notion へ書き（提示中）、**LINE 通知**。ロック/日次上限は構成案修正・画像再生成ループと共有。
 3. **確認(あなた)**: 通知の承認画面URLを開き、カードで総評／スコア／強み／直すべき点を確認。直したくなったら既存の編集・修正導線で反映。
 4. **片付け**: 「閉じる」でアドバイスをクリア（なしに戻す）。`#128 DraftChecklist`（機械的○×）とは別レイヤーの**補完**（理由・改善案）。
@@ -356,7 +356,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 
 ## 記事装飾アシスタント（承認画面 × 常時稼働PC・#147）
 
-下書きプレビューの「**装飾アシスタント**」カードで「装飾を提案」すると、常時稼働PCの claude が本文を
+下書きプレビューの「**装飾アシスタント**」カードで「装飾を提案」すると、常時稼働PCの headless agent が本文を
 **トップレベル要素ごと**に見て【箇所ごとの装飾提案】（足す/直す/消す）を返す。人が各提案を **採用/却下**
 （before/after プレビュー付き）し、「採用分を反映」で**採用したものだけ**を本文へ反映する。提案生成だけがAI、
 採用/却下・反映はAI不要・即時。#146 アドバイザー（助言）と違い、こちらは**採用→本文反映まで**する。
@@ -376,12 +376,12 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `装飾依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性）。
-> 提案生成は **claude（サブスク・追加課金なし）**。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_CONTENT_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
+> 提案生成は既定では **Claude（サブスク・追加課金なし）**。Codex 検証時は `GROWTH_AGENT=codex` とし、必要に応じて `GROWTH_CODEX_SANDBOX=danger-full-access` を使う。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_CONTENT_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
 
 ### 運用の流れ
 
 1. **依頼(あなた)**: 承認画面の下書きプレビュー →「装飾アシスタント」→ 見てほしい点（任意）→「装飾を提案」。
-2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:decorate-loop` を起動。`claude` が本文をトップレベル要素に分割し、
+2. **処理(PC・自動)**: 5分間隔のタスクが `npm run growth:decorate-loop` を起動。headless agent が本文をトップレベル要素に分割し、
    各箇所の装飾提案（メタのみ）を作って `decorate present` で Notion へ書き（提示中）、**LINE 通知**。lock/日次上限は他ループと共有。
 3. **採用(あなた)**: 通知の承認画面URLを開き、提案ごとに before/after を見て採用にチェック →「採用分を反映」。決定的な
    applyDecoration で本文へ反映し、既存 draft/edit で保存→プレビュー更新。「閉じる」で提案を片付け（なしに戻す）。

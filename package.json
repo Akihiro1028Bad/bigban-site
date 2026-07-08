@@ -53,6 +53,8 @@
     "growth:daemon": "tsx scripts/growth/daemon-cli.ts",
     "growth:weekly": "node scripts/growth/run.mjs weekly",
     "growth:drafts": "node scripts/growth/run.mjs drafts",
+    "growth:drafts-auto": "node scripts/growth/run.mjs drafts-auto",
+    "growth:drafts-auto-peek": "tsx scripts/growth/drafts-auto-cli.ts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives"
   },
   "keywords": [],

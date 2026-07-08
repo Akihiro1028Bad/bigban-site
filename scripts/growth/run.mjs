@@ -1,12 +1,12 @@
 /**
- * グロース3モードの起動ランチャー(headless / claude -p)。
+ * グロース3モードの起動ランチャー(headless agent)。
  * Windows / macOS 両対応。
  *
  *   npm run growth:weekly        週次モード(分析→Notionレポート+施策提案)
  *   npm run growth:drafts        下書きモード(承認記事→microCMS下書き+画像)
  *   npm run growth:initiatives   施策実行モード(承認施策→Notion本文に文案/仕様書)
  *
- * 動作確認(claude を起動せずコマンドだけ表示): GROWTH_DRYRUN=1 を付ける。
+ * 動作確認(agent を起動せずコマンドだけ表示): GROWTH_DRYRUN=1 を付ける。
  *
  * プロンプトは引数ではなく**標準入力**で渡す(巨大引数の引用符問題を回避し、
  * Windows の claude.cmd 起動でも安定させるため)。
@@ -33,7 +33,7 @@ const promptsDir = path.join(here, "prompts");
 const tmpDir = path.join(here, "..", "..", ".growth-tmp");
 const FAILURE_LOG_PATH = "data/growth-failures.log";
 
-// 共通の許可ツール。Notion は headless では mcp__claude_ai_Notion になる。
+// 共通の許可ツール。Claude headless では Notion が mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
 
 // 執筆(下書きモード)は記事品質の勝負所なので既定で Opus 4.8 に固定する(#247)。
@@ -42,6 +42,21 @@ const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "claude-opus-4-8";
 // 週次(ネタ出し)は下流(記事品質)全体の上限を決めるため既定で Opus 4.8 に固定する。
 // GROWTH_WEEKLY_MODEL で上書き可能。
 const WEEKLY_MODEL = process.env.GROWTH_WEEKLY_MODEL || "claude-opus-4-8";
+
+const AGENT = process.env.GROWTH_AGENT || "claude";
+const CODEX_APPROVAL = process.env.GROWTH_CODEX_APPROVAL || "never";
+const CODEX_SANDBOX = process.env.GROWTH_CODEX_SANDBOX || "workspace-write";
+const CODEX_MODEL = process.env.GROWTH_CODEX_MODEL || "";
+
+const CODEX_RUNTIME_PREAMBLE = `
+<runtime>
+You are running under Codex CLI, not Claude Code.
+Do not assume Claude-only tools such as mcp__claude_ai_Notion are available.
+Use the available Notion tool or connector configured in this Codex environment.
+For npm scripts, stdout/stderr from the script is the source of truth.
+Do not run git commit, git push, or production publish operations.
+</runtime>
+`.trim();
 
 const MODES = {
   // 週次は取得・既存行読み出し・学習ログ読み出しだけ許可する。
@@ -58,6 +73,13 @@ const MODES = {
   },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
   drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
+  // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけ drafts.md を起動する。
+  "drafts-auto": {
+    prompt: "drafts.md",
+    allow: [...COMMON, "Bash"],
+    model: DRAFTS_MODEL,
+    lock: true,
+  },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
   // 構成案修正(#44)。決定的処理は growth:revise CLI、claude はテキスト修正のみ。
   // 5分間隔の高頻度起動なので lockfile で多重起動を防ぎ、1日上限で暴走も止める。
@@ -175,32 +197,55 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|initiatives|revise|regen|regen-body|advise|decorate|apply>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|drafts-auto|initiatives|revise|regen|regen-body|advise|decorate|apply|comment-revise>\n`
   );
   process.exit(1);
 }
 
-const prompt = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
-// プロンプトは stdin で渡すので引数には含めない
-const args = [
-  "-p",
-  "--permission-mode",
-  "default",
-  "--allowedTools",
-  ...cfg.allow,
-  "--disallowedTools",
-  ...DISALLOW,
-];
-// モデル指定があるモードは --model を付ける
-if (cfg.model) {
-  args.push("--model", cfg.model);
+if (AGENT !== "claude" && AGENT !== "codex") {
+  process.stderr.write(`GROWTH_AGENT は claude または codex を指定してください: ${AGENT}\n`);
+  process.exit(1);
 }
+
+const promptBody = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
+const prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${promptBody}` : promptBody;
 
 const isWin = process.platform === "win32";
 
+function buildClaudeArgs() {
+  // プロンプトは stdin で渡すので引数には含めない
+  const claudeArgs = [
+    "-p",
+    "--permission-mode",
+    "default",
+    "--allowedTools",
+    ...cfg.allow,
+    "--disallowedTools",
+    ...DISALLOW,
+  ];
+  // モデル指定があるモードは --model を付ける
+  if (cfg.model) {
+    claudeArgs.push("--model", cfg.model);
+  }
+  return claudeArgs;
+}
+
+function buildCodexArgs() {
+  const codexArgs = ["-a", CODEX_APPROVAL, "exec", "--sandbox", CODEX_SANDBOX, "-C", process.cwd()];
+  if (CODEX_MODEL) {
+    codexArgs.push("--model", CODEX_MODEL);
+  }
+  codexArgs.push("-");
+  return codexArgs;
+}
+
+const agentCommand = AGENT === "codex" ? "codex" : "claude";
+const args = AGENT === "codex" ? buildCodexArgs() : buildClaudeArgs();
+
 if (process.env.GROWTH_DRYRUN) {
+  const promptLabel = AGENT === "codex" ? `${cfg.prompt}+codex-runtime` : cfg.prompt;
   process.stdout.write(
-    `[dry-run] (stdin=<prompt:${cfg.prompt}>) claude ${args.join(" ")}\n`
+    `[dry-run] (stdin=<prompt:${promptLabel}>) ${agentCommand} ${args.join(" ")}\n`
   );
   if (mode === "weekly") {
     process.stdout.write(
@@ -244,6 +289,7 @@ function currentBranch() {
 const RESUME_COMMANDS = {
   weekly: "npm run growth:weekly",
   drafts: "npm run growth:drafts",
+  "drafts-auto": "npm run growth:drafts-auto",
   initiatives: "npm run growth:initiatives",
   revise: "npm run growth:revise-loop",
   regen: "npm run growth:regen-loop",
@@ -252,6 +298,18 @@ const RESUME_COMMANDS = {
   decorate: "npm run growth:decorate-loop",
   apply: "npm run growth:advise-apply-loop",
   "comment-revise": "npm run growth:comment-revise-loop",
+};
+
+/** mode → 読み取り専用 peek を持つ npm script。next の候補集合と一致させる。 */
+const PEEK_COMMANDS = {
+  "drafts-auto": "growth:drafts-auto-peek",
+  revise: "growth:revise",
+  regen: "growth:eyecatch-regen",
+  "regen-body": "growth:body-image-regen",
+  advise: "growth:advise",
+  decorate: "growth:decorate",
+  apply: "growth:advise-apply",
+  "comment-revise": "growth:comment-revise",
 };
 
 function cleanFailureField(value) {
@@ -337,10 +395,43 @@ pullLatestOrAbort();
 // pull 後の実行 SHA(週次通知に載せてデプロイ側とのスキュー確認を可能にする=#219)。
 const runSha = currentShortSha();
 
-// revise は高頻度起動。多重起動を lockfile で防ぎ、1日上限で暴走を止める(dry-run後・spawn前)。
+// scripts/growth/peekGate.ts (shouldRunLoop) とミラー。run.mjs は .ts を import しない。
+// きれいに数値0を返した時だけ「依頼なし」とみなし、それ以外は実依頼取りこぼし防止で走らせる。
+// ⚠️ この判定は scripts/growth/peekGate.ts(shouldRunLoop)のミラー。両方同時に更新すること。
+// `npm run` はバナーを stdout に前置するため、最後の非空行を件数として解釈する。
+function shouldRunLoopFromPeek(peekStdout, peekExitCode) {
+  if (peekExitCode !== 0) return true;
+  const lines = String(peekStdout)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const last = lines[lines.length - 1];
+  if (last === undefined || !/^\d+$/.test(last)) return true;
+  return Number(last) > 0;
+}
+
+function peekShouldRunLoop() {
+  const scriptName = PEEK_COMMANDS[mode];
+  if (!scriptName) return true;
+  const npm = isWin ? "npm.cmd" : "npm";
+  // --silent で npm バナーを抑制(残っても shouldRunLoopFromPeek が最後の行で吸収)。
+  const res = spawnSync(npm, ["run", "--silent", scriptName, "--", "peek"], {
+    encoding: "utf-8",
+    shell: isWin,
+    env: { ...process.env },
+  });
+  return shouldRunLoopFromPeek(res.stdout ?? "", res.status);
+}
+
+// lock 系ループは高頻度起動。多重起動を lockfile で防ぎ、依頼ありの実作業だけ1日上限に数える。
 if (cfg.lock) {
   if (!acquireReviseLock()) {
     process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
+    process.exit(0);
+  }
+  if (!peekShouldRunLoop()) {
+    releaseReviseLock();
+    process.stdout.write(`${mode}: 依頼なし(スキップ)\n`);
     process.exit(0);
   }
   if (!underDailyCap()) {
@@ -382,7 +473,7 @@ function notifyLoopFail(kind, { exitCode, detail } = {}) {
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
-const child = spawn("claude", args, {
+const child = spawn(agentCommand, args, {
   stdio: ["pipe", "inherit", "inherit"],
   shell: isWin,
 });
@@ -392,7 +483,7 @@ child.on("exit", async (code) => {
   if (cfg.lock) releaseReviseLock();
   const exitCode = code ?? 0;
   // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
-  // claude の出力には依存せず、スナップショット + Notion から通知を組み立てる。
+  // agent の出力には依存せず、スナップショット + Notion から通知を組み立てる。
   // 異常終了(exit≠0)でも、失敗を**沈黙させない**ためにエラー通知を送る。
   if (mode === "weekly") {
     if (exitCode !== 0) {
@@ -419,8 +510,8 @@ child.on("exit", async (code) => {
 });
 child.on("error", (err) => {
   if (cfg.lock) releaseReviseLock();
-  process.stderr.write(`claude の起動に失敗しました: ${err.message}\n`);
-  // claude 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
+  process.stderr.write(`${agentCommand} の起動に失敗しました: ${err.message}\n`);
+  // agent 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
   if (mode === "weekly") {
     notifyLoopFail("spawn-error", { exitCode: 1, detail: err.message });
     runNpm("growth:notify-line", {

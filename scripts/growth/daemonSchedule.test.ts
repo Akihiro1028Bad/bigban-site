@@ -54,6 +54,25 @@ describe("buildJobs", () => {
     ]);
   });
 
+  it("GROWTH_DRAFTS_AUTO=1 の時だけ下書き自動生成ジョブを追加する", () => {
+    const built = buildJobs({ GROWTH_DRAFTS_AUTO: "1" });
+
+    expect(built).toContainEqual({
+      name: "drafts-auto",
+      script: "growth:drafts-auto",
+      everyMs: 300_000,
+    });
+  });
+
+  it("下書き自動生成ジョブの間隔を GROWTH_DAEMON_DRAFTS_EVERY_MS で上書きする", () => {
+    const built = buildJobs({
+      GROWTH_DRAFTS_AUTO: "1",
+      GROWTH_DAEMON_DRAFTS_EVERY_MS: "600000",
+    });
+
+    expect(built.find((job) => job.name === "drafts-auto")?.everyMs).toBe(600_000);
+  });
+
   it("pull 系の間隔だけ GROWTH_DAEMON_PULL_EVERY_MS で上書きする", () => {
     const built = buildJobs({ GROWTH_DAEMON_PULL_EVERY_MS: "30000" });
 
