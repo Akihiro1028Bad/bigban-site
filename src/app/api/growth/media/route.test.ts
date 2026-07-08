@@ -39,7 +39,8 @@ function pngFile(bytes = 8, name = "a.png", type = "image/png"): File {
 }
 
 beforeEach(() => {
-  flags.authEnabled = false; // 既定はオフ(開発段階)
+  flags.authEnabled = true;
+  process.env.APPROVE_SECRET = "secret-token";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
   process.env.MICROCMS_MANAGEMENT_API_KEY = "mgmt-key";
   vi.mocked(fetchMediaList).mockReset();
@@ -60,7 +61,7 @@ describe("GET /api/growth/media", () => {
       limit: 30,
       offset: 0,
     });
-    const res = await GET(getReq(null, "limit=999&offset=0"));
+    const res = await GET(getReq("secret-token", "limit=999&offset=0"));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
@@ -71,46 +72,47 @@ describe("GET /api/growth/media", () => {
 
   it("MANAGEMENT キー未設定は 500", async () => {
     delete process.env.MICROCMS_MANAGEMENT_API_KEY;
-    const res = await GET(getReq(null));
+    const res = await GET(getReq("secret-token"));
     expect(res.status).toBe(500);
     expect(fetchMediaList).not.toHaveBeenCalled();
   });
 
   it("取得失敗は 502(詳細は返さない)", async () => {
     vi.mocked(fetchMediaList).mockRejectedValue(new Error("mgmt 403: secret"));
-    const res = await GET(getReq(null));
+    const res = await GET(getReq("secret-token"));
     expect(res.status).toBe(502);
     expect((await res.json()).error).not.toMatch(/secret/);
   });
 
-  it("認可ON時、token 不一致は 401", async () => {
-    flags.authEnabled = true;
-    process.env.APPROVE_SECRET = "s";
+  it("token 不一致は 401", async () => {
     const res = await GET(getReq("wrong"));
     expect(res.status).toBe(401);
     expect(fetchMediaList).not.toHaveBeenCalled();
   });
 
-  it("認可ON時、token 未指定は 401", async () => {
-    flags.authEnabled = true;
-    process.env.APPROVE_SECRET = "s";
+  it("token 未指定は 401", async () => {
     const res = await GET(getReq(null));
     expect(res.status).toBe(401);
   });
 
-  it("認可ON時、APPROVE_SECRET 未設定は 401", async () => {
-    flags.authEnabled = true;
+  it("APPROVE_SECRET 未設定は 401", async () => {
     delete process.env.APPROVE_SECRET;
     const res = await GET(getReq("x"));
     expect(res.status).toBe(401);
   });
 
-  it("認可ON時、正しい token なら通る", async () => {
-    flags.authEnabled = true;
-    process.env.APPROVE_SECRET = "secret-token";
+  it("正しい token なら通る", async () => {
     vi.mocked(fetchMediaList).mockResolvedValue({ media: [], totalCount: 0, limit: 30, offset: 0 });
     const res = await GET(getReq("secret-token"));
     expect(res.status).toBe(200);
+  });
+
+  it("認可フラグが無効でも 401 で fail-closed する", async () => {
+    flags.authEnabled = false;
+    vi.mocked(fetchMediaList).mockResolvedValue({ media: [], totalCount: 0, limit: 30, offset: 0 });
+    const res = await GET(getReq("secret-token"));
+    expect(res.status).toBe(401);
+    expect(fetchMediaList).not.toHaveBeenCalled();
   });
 });
 
@@ -123,7 +125,7 @@ describe("POST /api/growth/media", () => {
 
   it("アップロードして url を返す", async () => {
     vi.mocked(uploadMediaBlob).mockResolvedValue({ url: "https://images.microcms-assets.io/x.png" });
-    const res = await POST(postReq(form(pngFile())));
+    const res = await POST(postReq(form(pngFile()), "secret-token"));
     expect(res.status).toBe(200);
     expect((await res.json())).toEqual({ success: true, url: "https://images.microcms-assets.io/x.png" });
     const [input, options] = vi.mocked(uploadMediaBlob).mock.calls[0];
@@ -132,7 +134,7 @@ describe("POST /api/growth/media", () => {
   });
 
   it("ファイル未指定は 400", async () => {
-    const res = await POST(postReq(form()));
+    const res = await POST(postReq(form(), "secret-token"));
     expect(res.status).toBe(400);
     expect(uploadMediaBlob).not.toHaveBeenCalled();
   });
@@ -143,38 +145,43 @@ describe("POST /api/growth/media", () => {
       "evil.png",
       { type: "image/png" }
     );
-    const res = await POST(postReq(form(svg)));
+    const res = await POST(postReq(form(svg), "secret-token"));
     expect(res.status).toBe(400);
     expect(uploadMediaBlob).not.toHaveBeenCalled();
   });
 
   it("未対応MIMEは 400(検証で弾く)", async () => {
-    const res = await POST(postReq(form(pngFile(4, "a.pdf", "application/pdf"))));
+    const res = await POST(postReq(form(pngFile(4, "a.pdf", "application/pdf")), "secret-token"));
     expect(res.status).toBe(400);
     expect(uploadMediaBlob).not.toHaveBeenCalled();
   });
 
   it("不正なボディ(multipartでない)は 400", async () => {
-    const res = await POST(postReq("not-a-form", null, { "content-type": "application/json" }));
+    const res = await POST(postReq("not-a-form", "secret-token", { "content-type": "application/json" }));
     expect(res.status).toBe(400);
   });
 
   it("MANAGEMENT キー未設定は 500", async () => {
     delete process.env.MICROCMS_MANAGEMENT_API_KEY;
-    const res = await POST(postReq(form(pngFile())));
+    const res = await POST(postReq(form(pngFile()), "secret-token"));
     expect(res.status).toBe(500);
   });
 
   it("アップロード失敗は 502", async () => {
     vi.mocked(uploadMediaBlob).mockRejectedValue(new Error("mgmt down"));
-    const res = await POST(postReq(form(pngFile())));
+    const res = await POST(postReq(form(pngFile()), "secret-token"));
     expect(res.status).toBe(502);
   });
 
-  it("認可ON時、token 不一致は 401", async () => {
-    flags.authEnabled = true;
-    process.env.APPROVE_SECRET = "s";
+  it("token 不一致は 401", async () => {
     const res = await POST(postReq(form(pngFile()), "wrong"));
+    expect(res.status).toBe(401);
+    expect(uploadMediaBlob).not.toHaveBeenCalled();
+  });
+
+  it("認可フラグが無効でも 401 で fail-closed する", async () => {
+    flags.authEnabled = false;
+    const res = await POST(postReq(form(pngFile()), "secret-token"));
     expect(res.status).toBe(401);
     expect(uploadMediaBlob).not.toHaveBeenCalled();
   });

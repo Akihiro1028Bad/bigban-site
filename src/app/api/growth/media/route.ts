@@ -7,9 +7,7 @@
  * 提供は **list / upload のみ**(delete 等は作らない)。`MICROCMS_MANAGEMENT_API_KEY` は
  * 削除も可能な強権限のため **server-only**(このルートでのみ参照・クライアントへ渡さない)。
  *
- * ⚠️ リリース前TODO: 本番公開(一般露出)前に `APPROVE_AUTH_ENABLED` を必ず ON にする。
- *    現在は開発段階のためオフ(オーナー判断)で、強権限 API が認証なしで叩ける状態。
- *    認証 ON のための gate(verifyToken)は実装済みで、フラグ1つで有効化できる。
+ * 強権限 API のため、APPROVE_AUTH_ENABLED=false でも fail-closed にする。
  */
 
 import { NextResponse } from "next/server";
@@ -45,7 +43,7 @@ function managementOptions(): ManagementOptions | null {
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  if (!verifyToken(request)) return unauthorized();
+  if (!verifyToken(request, true)) return unauthorized("メディア操作には認証が必要です。");
 
   const options = managementOptions();
   if (!options) return serverError();
@@ -62,7 +60,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!verifyToken(request)) return unauthorized();
+  if (!verifyToken(request, true)) return unauthorized("メディア操作には認証が必要です。");
 
   const options = managementOptions();
   if (!options) return serverError();
