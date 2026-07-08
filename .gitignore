@@ -31,6 +31,9 @@ yarn-error.log*
 .vscode/
 .idea/
 
+# local assistant app settings
+.claude/
+
 # turbopack
 .turbo/
 

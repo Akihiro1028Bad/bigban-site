@@ -4,6 +4,7 @@
  * GET: 記事生成に使う素材を**そのまま**返す。実行時に AI へ渡している静的テンプレ＋資料を
  * 承認画面から確認できるようにするのが目的(編集はしない)。返すもの:
  *   - 各フェーズのプロンプト   : `scripts/growth/prompts/*.md`
+ *   - 共通プロンプト部品       : `scripts/growth/prompts/shared/*.md`
  *   - 文体の例(few-shot)      : `scripts/growth/prompts/examples/*.md`
  *   - 参考ドキュメント         : `docs/operations/{growth-article-style,ai-news-prompt,growth-weekly-runbook}.md`
  *   - 前提情報                 : `scripts/growth/facility-context.json`(別枠で返す)
@@ -25,6 +26,7 @@ import { assemblePromptGroups, type PromptFile } from "@/lib/growth/promptRegist
 export const runtime = "nodejs";
 
 const PROMPTS_DIR = path.join(process.cwd(), "scripts", "growth", "prompts");
+const SHARED_PROMPTS_DIR = path.join(PROMPTS_DIR, "shared");
 const EXAMPLES_DIR = path.join(PROMPTS_DIR, "examples");
 const FACILITY_CONTEXT_PATH = path.join(
   process.cwd(),
@@ -89,8 +91,9 @@ export async function GET(request: Request): Promise<Response> {
   if (!verifyToken(request)) return unauthorized();
 
   try {
-    const [prompts, examples, refs, facilityContext] = await Promise.all([
+    const [prompts, shared, examples, refs, facilityContext] = await Promise.all([
       readMdDir(PROMPTS_DIR, false), // 必須(失敗で 500)
+      readMdDir(SHARED_PROMPTS_DIR, true), // 任意
       readMdDir(EXAMPLES_DIR, true), // 任意
       readReferenceDocs(), // 任意(個別に省く)
       readFacilityContext(), // 任意
@@ -98,7 +101,7 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json({
       success: true,
       facilityContext,
-      groups: assemblePromptGroups([...prompts, ...examples, ...refs]),
+      groups: assemblePromptGroups([...prompts, ...shared, ...examples, ...refs]),
     });
   } catch {
     return NextResponse.json(

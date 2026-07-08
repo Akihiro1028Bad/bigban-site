@@ -102,6 +102,52 @@ describe("toPendingItems", () => {
     ]);
   });
 
+  it("施策提案は仮説・成功指標・検証予定日を proposalHypothesis に持つ", () => {
+    const page = proposal("p1", "市川ページ", "サイト表示内容");
+    page.properties["仮説"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "市川ページの訴求を強めると予約導線の迷いが減る" }],
+    };
+    page.properties["成功指標"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "予約クリックが月10件増える" }],
+    };
+    page.properties["検証予定日"] = {
+      type: "date",
+      date: { start: "2026-08-01T00:00:00.000Z" },
+    };
+
+    const [item] = toPendingItems([page], []);
+
+    expect(item.proposalHypothesis).toEqual({
+      hypothesis: "市川ページの訴求を強めると予約導線の迷いが減る",
+      successMetric: "予約クリックが月10件増える",
+      reviewAtMs: Date.parse("2026-08-01T00:00:00.000Z"),
+    });
+  });
+
+  it("施策提案の仮説系プロパティ未記入は proposalHypothesis=undefined", () => {
+    const [item] = toPendingItems([proposal("p1", "市川ページ", "サイト表示内容")], []);
+
+    expect(item.proposalHypothesis).toBeUndefined();
+  });
+
+  it("成果物化済の施策は成果物リンク・承認日時を持つ", () => {
+    const page = proposal("p1", "市川ページ", "サイト表示内容");
+    page.url = "https://notion.so/page";
+    page.properties["ステータス"] = { type: "select", select: { name: "成果物化済" } };
+    page.properties["成果物リンク"] = { type: "url", url: "https://notion.so/artifact" };
+    page.properties["承認日時"] = { type: "date", date: { start: "2026-07-08T10:00:00.000Z" } };
+
+    const [item] = toPendingItems([page], []);
+
+    expect(item).toMatchObject({
+      stage: "completed",
+      artifactUrl: "https://notion.so/artifact",
+      approvedAtMs: Date.parse("2026-07-08T10:00:00.000Z"),
+    });
+  });
+
   it("記事ネタ案は優先度と概要・構成案(outline)・修正状態を持つ", () => {
     const [item] = toPendingItems([], [idea("i1", "猛暑×屋内", "夏向けの集客記事")]);
 

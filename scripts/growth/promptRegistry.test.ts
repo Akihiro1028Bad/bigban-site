@@ -90,12 +90,14 @@ describe("assemblePromptGroups", () => {
       file("example-trend.md"),
       file("growth-article-style.md"),
       file("ai-news-prompt.md"),
+      file("article-idea.md"),
     ]);
     const ref = groups.find((g) => g.group === "参考ドキュメント");
     const ex = groups.find((g) => g.group === "文体の例");
     expect(ref?.phases.map((p) => p.filename)).toEqual([
       "growth-article-style.md",
       "ai-news-prompt.md",
+      "article-idea.md",
     ]);
     expect(ex?.phases.map((p) => p.filename)).toEqual(["example-trend.md"]);
     // フェーズより後、その他より前に並ぶ
@@ -105,6 +107,7 @@ describe("assemblePromptGroups", () => {
 
   it("CLAUDE.md は参考ドキュメントの先頭に並ぶ", () => {
     const groups = assemblePromptGroups([
+      file("article-idea.md"),
       file("growth-article-style.md"),
       file("CLAUDE.md"),
     ]);
@@ -112,6 +115,7 @@ describe("assemblePromptGroups", () => {
     expect(ref?.phases.map((p) => p.filename)).toEqual([
       "CLAUDE.md",
       "growth-article-style.md",
+      "article-idea.md",
     ]);
   });
 

@@ -2,7 +2,7 @@
  * 承認画面の共有ドメイン型(#H7 分解で共有化)。ApproveClient と各カスタムフック/コンポーネントで使う。
  */
 
-import type { ArticleHypothesis } from "@/lib/growth/approve";
+import type { ArticleHypothesis, ProposalHypothesis } from "@/lib/growth/approve";
 import type { Stage } from "@/lib/growth/stage";
 
 export interface PendingDetail {
@@ -42,6 +42,11 @@ export interface PendingItem {
   stage: Stage;
   // #計測強化 S4: 記事の仮説(狙い)。未記入は undefined。
   hypothesis?: ArticleHypothesis;
+  // #改善案5: 施策の仮説(狙い・成功指標・検証予定)。未記入は undefined。
+  proposalHypothesis?: ProposalHypothesis;
+  // 施策実行モードの成果物確認用。Notion 本文へのリンクと承認日時。
+  artifactUrl?: string;
+  approvedAtMs?: number | null;
 }
 
 // 即時保存モデルでのカードごとの選択(承認/却下)。

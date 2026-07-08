@@ -1322,6 +1322,7 @@ export function ApproveClient() {
             ) : activeView === "proposal" ? (
               <ProposalView
                 proposals={visibleProposals}
+                token={token}
                 decided={decided}
                 activeId={activeId}
                 onActivate={setActiveId}

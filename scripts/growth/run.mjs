@@ -5,6 +5,7 @@
  *   npm run growth:weekly        週次モード(分析→Notionレポート+施策提案)
  *   npm run growth:drafts        下書きモード(承認記事→microCMS下書き+画像)
  *   npm run growth:initiatives   施策実行モード(承認施策→Notion本文に文案/仕様書)
+ *   npm run growth:initiatives-auto   施策自動成果物化(承認施策がある時だけ initiatives)
  *
  * 動作確認(agent を起動せずコマンドだけ表示): GROWTH_DRYRUN=1 を付ける。
  *
@@ -81,6 +82,12 @@ const MODES = {
     lock: true,
   },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
+  // 施策自動成果物化。承認済みの施策提案がある時だけ initiatives.md を起動する。
+  "initiatives-auto": {
+    prompt: "initiatives.md",
+    allow: [...COMMON, "Bash"],
+    lock: true,
+  },
   // 構成案修正(#44)。決定的処理は growth:revise CLI、claude はテキスト修正のみ。
   // 5分間隔の高頻度起動なので lockfile で多重起動を防ぎ、1日上限で暴走も止める。
   revise: {
@@ -197,7 +204,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|drafts-auto|initiatives|revise|regen|regen-body|advise|decorate|apply|comment-revise>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|drafts-auto|initiatives|initiatives-auto|revise|regen|regen-body|advise|decorate|apply|comment-revise>\n`
   );
   process.exit(1);
 }
@@ -291,6 +298,7 @@ const RESUME_COMMANDS = {
   drafts: "npm run growth:drafts",
   "drafts-auto": "npm run growth:drafts-auto",
   initiatives: "npm run growth:initiatives",
+  "initiatives-auto": "npm run growth:initiatives-auto",
   revise: "npm run growth:revise-loop",
   regen: "npm run growth:regen-loop",
   "regen-body": "npm run growth:regen-body-loop",
@@ -303,6 +311,7 @@ const RESUME_COMMANDS = {
 /** mode → 読み取り専用 peek を持つ npm script。next の候補集合と一致させる。 */
 const PEEK_COMMANDS = {
   "drafts-auto": "growth:drafts-auto-peek",
+  "initiatives-auto": "growth:initiatives-auto-peek",
   revise: "growth:revise",
   regen: "growth:eyecatch-regen",
   "regen-body": "growth:body-image-regen",

@@ -55,7 +55,9 @@
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:drafts-auto": "node scripts/growth/run.mjs drafts-auto",
     "growth:drafts-auto-peek": "tsx scripts/growth/drafts-auto-cli.ts",
-    "growth:initiatives": "node scripts/growth/run.mjs initiatives"
+    "growth:initiatives": "node scripts/growth/run.mjs initiatives",
+    "growth:initiatives-auto": "node scripts/growth/run.mjs initiatives-auto",
+    "growth:initiatives-auto-peek": "tsx scripts/growth/initiatives-auto-cli.ts"
   },
   "keywords": [],
   "author": "",

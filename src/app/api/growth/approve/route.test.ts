@@ -104,7 +104,7 @@ describe("GET", () => {
     });
   });
 
-  it("施策は未処理＋承認を取得する(#106)", async () => {
+  it("施策は未処理＋承認＋成果物化済を取得する(#106/#成果物確認)", async () => {
     vi.mocked(queryDataSource)
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
@@ -114,6 +114,7 @@ describe("GET", () => {
       or: [
         { property: "ステータス", select: { equals: "未処理" } },
         { property: "ステータス", select: { equals: "承認" } },
+        { property: "ステータス", select: { equals: "成果物化済" } },
       ],
     });
   });

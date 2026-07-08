@@ -163,10 +163,17 @@ export const PROMPT_REGISTRY: readonly PromptPhaseMeta[] = [
     whenItRuns: "本文 HTML で使える許可タグ・属性・クラス(§3)。下書き/修正で参照",
   },
   {
+    filename: "article-idea.md",
+    label: "記事ネタ案作成ルール",
+    group: "参考ドキュメント",
+    order: 3,
+    whenItRuns: "週次分析や承認済みコンテンツ施策から記事ネタ案を作るときに参照",
+  },
+  {
     filename: "growth-weekly-runbook.md",
     label: "運用ランブック",
     group: "参考ドキュメント",
-    order: 3,
+    order: 4,
     whenItRuns: "週次〜公開の運用手順。週次/下書き/施策で参照",
   },
   {

@@ -150,6 +150,7 @@
 | 依頼種別(承認画面で何をしたか) | コマンド | AI課金 |
 |---|---|---|
 | 記事下書きの生成(承認済みネタを記事化) | `growth:drafts` / `growth:drafts-auto` | サブスク(追加課金なし) |
+| 施策の成果物化(承認済み施策を文案/仕様化) | `growth:initiatives` / `growth:initiatives-auto` | サブスク(追加課金なし) |
 | アイキャッチ AI 再生成(#144) | `growth:regen-loop` | サブスク+**画像生成(OpenAI)課金あり** |
 | 本文画像 AI 再生成/挿入(#156) | `growth:regen-body-loop` | サブスク+**画像生成(OpenAI)課金あり** |
 | スタイリング・アドバイス(#146・read-only) | `growth:advise-loop` | サブスク(追加課金なし) |
@@ -163,13 +164,14 @@
 
 ### 3-2. 5分間隔・1日上限・lock 共有の運用
 
-修正・画像再生成・アドバイス・装飾の**プル型ループ7種**(`revise` / `regen` / `regen-body` / `advise` / `decorate` / `apply` / `comment-revise`)は、次の共通ルールで動く。下書き自動生成を有効にした場合の `drafts-auto` も、同じ lock/上限で逐次処理される:
+修正・画像再生成・アドバイス・装飾の**プル型ループ7種**(`revise` / `regen` / `regen-body` / `advise` / `decorate` / `apply` / `comment-revise`)は、次の共通ルールで動く。下書き自動生成を有効にした場合の `drafts-auto`、施策自動成果物化を有効にした場合の `initiatives-auto` も、同じ lock/上限で逐次処理される:
 
 - **5分間隔**で起動する(タスクスケジューラの「繰り返し間隔=5分・継続時間=無期限」で登録)。依頼を書いてから最大5分で拾われる。
 - **同時に1つだけ**動く(lock 共有)。7ループは1つのロックファイルを共有するので、複数の依頼が来ても順番に処理され二重起動しない。すでに実行中なら「既に実行中のためスキップ」して次の起動を待つ。
 - **1日の実行上限**は既定50回(`GROWTH_REVISE_DAILY_CAP` で変更可)。これは headless agent を起動して実際に依頼を処理した回数の上限で、依頼なしの空振りポーリングは数えない。上限に達すると「本日の実行上限に達したためスキップ」する。
 - 自動 pull は weekly のみ。各ループやデーモンにコード更新を反映したい場合は、自宅PCで手動 `git pull --ff-only` するか、デーモンを再起動する。
 - 下書き自動生成は既定OFF。`GROWTH_DRAFTS_AUTO=1` で daemon に追加され、既定5分間隔で「承認済み/生成中 かつ 下書きID未作成」を `peek` し、対象がある時だけ `growth:drafts` 相当を起動する。
+- 施策自動成果物化は既定OFF。`GROWTH_INITIATIVES_AUTO=1` で daemon に追加され、既定5分間隔で「承認済み」の施策を `peek` し、対象がある時だけ `growth:initiatives` 相当を起動する。
 
 > ループの内部仕様・純ロジックの所在は [30-loops.md](30-loops.md)。タスク登録の具体手順は [01-setup-guide.md](01-setup-guide.md) 手順8。
 

@@ -78,6 +78,7 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
     "drafts",
     "drafts-auto",
     "initiatives",
+    "initiatives-auto",
     "revise",
     "regen",
     "regen-body",
@@ -128,6 +129,13 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
     const out = dryRun("drafts-auto", { GROWTH_AGENT: "codex" });
 
     expect(out).toContain("drafts.md+codex-runtime");
+    expect(out).toContain("codex -a never exec");
+  });
+
+  it("initiatives-auto は initiatives.md を使い Codex でも起動できる", () => {
+    const out = dryRun("initiatives-auto", { GROWTH_AGENT: "codex" });
+
+    expect(out).toContain("initiatives.md+codex-runtime");
     expect(out).toContain("codex -a never exec");
   });
 

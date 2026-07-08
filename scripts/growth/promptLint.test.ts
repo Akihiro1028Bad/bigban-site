@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -70,5 +73,30 @@ describe("lintPrompts", () => {
       exists: () => true,
     });
     expect(issues).toEqual([]);
+  });
+});
+
+describe("記事ネタ案ルールの共通化", () => {
+  const promptsDir = path.join(process.cwd(), "scripts/growth/prompts");
+
+  it("weekly と initiatives は同じ shared/article-idea.md を参照する", () => {
+    const weekly = readFileSync(path.join(promptsDir, "weekly.md"), "utf-8");
+    const initiatives = readFileSync(path.join(promptsDir, "initiatives.md"), "utf-8");
+
+    expect(weekly).toContain("scripts/growth/prompts/shared/article-idea.md");
+    expect(initiatives).toContain("scripts/growth/prompts/shared/article-idea.md");
+  });
+
+  it("共通記事案ルールは構成案フォーマットと記事仮説プロパティを正典化する", () => {
+    const shared = readFileSync(path.join(promptsDir, "shared/article-idea.md"), "utf-8");
+
+    expect(shared).toContain("構成案の書式");
+    expect(shared).toContain("## 見出し");
+    expect(shared).toContain("記事タイプ");
+    expect(shared).toContain("狙う読者");
+    expect(shared).toContain("検索意図");
+    expect(shared).toContain("勝ち筋");
+    expect(shared).toContain("成功指標");
+    expect(shared).toContain("想定CTA");
   });
 });

@@ -14,6 +14,7 @@ import {
   EYECATCH_MIRROR_PROP,
   getLatestReport,
   getPage,
+  listBlockChildren,
   queryDataSource,
   updatePageProps,
   updatePageSelect,
@@ -189,6 +190,37 @@ describe("getPage", () => {
   it("失敗時は throw する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(404, "no page"));
     await expect(getPage("p1", { token: TOKEN, fetchFn })).rejects.toThrow(/404/);
+  });
+});
+
+describe("listBlockChildren", () => {
+  it("GET /v1/blocks/{id}/children を page_size 付きで叩き blocks を返す", async () => {
+    const block = { id: "b1", type: "paragraph", paragraph: { rich_text: [{ plain_text: "本文" }] } };
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ results: [block], has_more: true, next_cursor: "cur" }));
+
+    const result = await listBlockChildren("p1", { token: TOKEN, fetchFn }, { pageSize: 25 });
+
+    expect(result).toEqual({ blocks: [block], hasMore: true, nextCursor: "cur" });
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/blocks/p1/children?page_size=25");
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("欠落フィールドに既定値を補う", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({}));
+
+    const result = await listBlockChildren("p1", { token: TOKEN, fetchFn });
+
+    expect(result).toEqual({ blocks: [], hasMore: false, nextCursor: null });
+    const [url] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/blocks/p1/children?page_size=100");
+  });
+
+  it("失敗時は throw する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(403, "forbidden"));
+
+    await expect(listBlockChildren("p1", { token: TOKEN, fetchFn })).rejects.toThrow(/403/);
   });
 });
 

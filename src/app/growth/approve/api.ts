@@ -14,6 +14,14 @@ export const BOARD_URL = "/api/growth/approve";
 
 export const PROMPTS_URL = "/api/growth/prompts";
 
+export const PROPOSAL_ARTIFACT_URL = "/api/growth/proposal-artifact";
+
+export interface ProposalArtifactBlock {
+  id: string;
+  type: string;
+  text: string;
+}
+
 /** プロンプト確認タブのデータ(前提情報の生テキスト＋フェーズ群)。 */
 export interface PromptsData {
   facilityContext: string | null;
@@ -56,6 +64,18 @@ export async function fetchBoard(token: string): Promise<PendingItem[]> {
     );
   }
   return json.items as PendingItem[];
+}
+
+/** 成果物化済み施策の Notion 本文を、画面表示用のテキストブロックとして取得する。 */
+export async function fetchProposalArtifact(token: string, pageId: string): Promise<ProposalArtifactBlock[]> {
+  const res = await fetch(`${PROPOSAL_ARTIFACT_URL}?pageId=${encodeURIComponent(pageId)}`, {
+    headers: authHeaders(token),
+  });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(json.error ?? "成果物の取得に失敗しました。");
+  }
+  return Array.isArray(json.blocks) ? (json.blocks as ProposalArtifactBlock[]) : [];
 }
 
 /** 承認/却下/クローズ/承認待ち復帰: ステータスを1件更新する。失敗時は表示用 Error を投げる。 */

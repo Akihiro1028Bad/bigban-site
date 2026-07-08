@@ -28,6 +28,12 @@ export interface NotionPage {
   properties: Record<string, unknown>;
 }
 
+export interface NotionBlock {
+  id: string;
+  type: string;
+  [key: string]: unknown;
+}
+
 export interface QueryDataSourceBody {
   filter?: unknown;
   sorts?: unknown[];
@@ -37,6 +43,12 @@ export interface QueryDataSourceBody {
 
 export interface QueryDataSourceResult {
   pages: NotionPage[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface ListBlockChildrenResult {
+  blocks: NotionBlock[];
   hasMore: boolean;
   nextCursor: string | null;
 }
@@ -82,6 +94,29 @@ export async function getPage(
     options
   )) as NotionPage;
   return json;
+}
+
+/** ページ/ブロック直下の本文ブロックを取得する(GET /v1/blocks/{id}/children)。 */
+export async function listBlockChildren(
+  blockId: string,
+  options: NotionApiOptions,
+  body: { pageSize?: number; startCursor?: string } = {}
+): Promise<ListBlockChildrenResult> {
+  const params = new URLSearchParams();
+  params.set("page_size", String(body.pageSize ?? 100));
+  if (body.startCursor !== undefined) params.set("start_cursor", body.startCursor);
+  const json = (await notionRequest(
+    "GET",
+    `${NOTION_API_BASE}/blocks/${encodeURIComponent(blockId)}/children?${params.toString()}`,
+    undefined,
+    options
+  )) as { results?: NotionBlock[]; has_more?: boolean; next_cursor?: string | null };
+
+  return {
+    blocks: json.results ?? [],
+    hasMore: json.has_more ?? false,
+    nextCursor: json.next_cursor ?? null,
+  };
 }
 
 /** data source を照会して該当ページ一覧(と次カーソル)を返す。 */

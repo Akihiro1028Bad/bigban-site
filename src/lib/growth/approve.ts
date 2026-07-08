@@ -41,6 +41,13 @@ export interface ArticleHypothesis {
   successMetric: string;
 }
 
+/** 施策の仮説(#改善案5)。施策を承認する前に狙い・成功条件・検証日を確認するために表示する。 */
+export interface ProposalHypothesis {
+  hypothesis: string;
+  successMetric: string;
+  reviewAtMs: number | null;
+}
+
 export interface PendingItem {
   id: string;
   kind: PendingKind;
@@ -78,6 +85,12 @@ export interface PendingItem {
   scheduledAtMs?: number | null;
   /** 記事の仮説(#計測強化 S4)。未記入は undefined。記事のみ。 */
   hypothesis?: ArticleHypothesis;
+  /** 施策の仮説(#改善案5)。未記入は undefined。施策のみ。 */
+  proposalHypothesis?: ProposalHypothesis;
+  /** 施策実行モードが作った成果物への Notion リンク。未記入は undefined。施策のみ。 */
+  artifactUrl?: string;
+  /** 施策の承認日時(ms)。未記入は null/undefined。施策のみ。 */
+  approvedAtMs?: number | null;
 }
 
 /** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
@@ -220,6 +233,14 @@ function richText(page: NotionPage, prop: string): string {
   return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("").trim();
 }
 
+function urlText(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as
+    | { url?: string | null; rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  if (typeof value?.url === "string") return value.url.trim();
+  return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("").trim();
+}
+
 function selectName(page: NotionPage, prop: string): string {
   const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
   return value?.select?.name ?? "";
@@ -255,6 +276,16 @@ function hypothesisOf(page: NotionPage): ArticleHypothesis | undefined {
     h.winningAngle !== "" ||
     h.plannedCta.length > 0 ||
     h.successMetric !== "";
+  return hasAny ? h : undefined;
+}
+
+function proposalHypothesisOf(page: NotionPage): ProposalHypothesis | undefined {
+  const h: ProposalHypothesis = {
+    hypothesis: richText(page, "仮説"),
+    successMetric: richText(page, "成功指標"),
+    reviewAtMs: dateStartMs(page, "検証予定日"),
+  };
+  const hasAny = h.hypothesis !== "" || h.successMetric !== "" || h.reviewAtMs !== null;
   return hasAny ? h : undefined;
 }
 
@@ -305,15 +336,22 @@ export function toPendingItems(
   proposals: NotionPage[],
   ideas: NotionPage[]
 ): PendingItem[] {
-  const proposalItems: PendingItem[] = proposals.map((page) => ({
-    id: page.id,
-    kind: "proposal",
-    title: titleText(page, "施策名"),
-    subtitle: selectName(page, "カテゴリ"),
-    details: proposalDetails(page),
-    score: numberValue(page, "優先度スコア") ?? 0,
-    stage: deriveProposalStage(selectName(page, STATUS_PROP)),
-  }));
+  const proposalItems: PendingItem[] = proposals.map((page) => {
+    const artifactUrl = urlText(page, "成果物リンク") || page.url;
+    const approvedAtMs = dateStartMs(page, "承認日時");
+    return {
+      id: page.id,
+      kind: "proposal",
+      title: titleText(page, "施策名"),
+      subtitle: selectName(page, "カテゴリ"),
+      details: proposalDetails(page),
+      score: numberValue(page, "優先度スコア") ?? 0,
+      stage: deriveProposalStage(selectName(page, STATUS_PROP)),
+      proposalHypothesis: proposalHypothesisOf(page),
+      ...(artifactUrl !== "" ? { artifactUrl } : {}),
+      ...(approvedAtMs !== null ? { approvedAtMs } : {}),
+    };
+  });
   const ideaItems: PendingItem[] = ideas.map((page) => {
     const contentId = richText(page, DRAFT_LINK_PROPS.contentId);
     return {

@@ -382,12 +382,13 @@ npm run growth:daemon
 
 - 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分）。依頼が無いループは軽い `peek` だけで空振りし、headless agent 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。
 - `GROWTH_DRAFTS_AUTO=1` を付けると、`drafts-auto` もデーモンに追加されます。既定5分間隔で「承認済み/生成中 かつ 下書きID未作成」の記事だけを軽く `peek` し、対象がある時だけ `growth:drafts` 相当の下書き生成を起動します。対象が無い時は headless agent を起動しません。
+- `GROWTH_INITIATIVES_AUTO=1` を付けると、`initiatives-auto` もデーモンに追加されます。既定5分間隔で「承認済み」の施策だけを軽く `peek` し、対象がある時だけ `growth:initiatives` 相当の施策成果物化を起動します。対象が無い時は headless agent を起動しません。
 - デーモンは git pull しません。デプロイ後や週途中のコード更新を反映したい場合は、自宅PCで手動 `git pull --ff-only` するか、デーモンを再起動して最新化してください。
 - デーモンやタスクスケジューラで回すコマンドは、soft fail も後で追えるよう `>> data\*.log 2>&1` でログファイルへリダイレクトしてください。ハード失敗は別途 `data\growth-failures.log` に構造化追記されます。
 - 7つのプル型ループは元々**1つのロックを共有**（同時に2つは動かない）ので、デーモンが逐次実行するのと整合します。**このデーモンを使えば下の 8-4（個別タスク登録）は不要**です。
-- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_DRAFTS_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
+- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_DRAFTS_EVERY_MS` / `GROWTH_DAEMON_INITIATIVES_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
 - **常駐させる**: Mac を常時つけっぱなしなら launchd/ログイン項目に、Windows ならタスクスケジューラで「ログオン時に起動」に登録すれば起動時に自動で常駐します。これで**Windowsで7個のタスクを個別登録する手間が消えます**。
-- 対象外（デーモンに既定では含めない）: `weekly`（週次・8-2 で別途スケジュール）、`drafts`/`initiatives`（承認後の重い処理・OpenAI 課金あり＝既定は手動。下書きだけ `GROWTH_DRAFTS_AUTO=1` で opt-in 可）。
+- 対象外（デーモンに既定では含めない）: `weekly`（週次・8-2 で別途スケジュール）、`drafts`/`initiatives`（承認後の重い処理＝既定は手動。`GROWTH_DRAFTS_AUTO=1` / `GROWTH_INITIATIVES_AUTO=1` で opt-in 可）。
 
 > つまり最小構成は **①週次だけタスク登録（8-2）＋②`growth:daemon` を常駐** の2つだけ。以下の 8-1〜8-4 は「デーモンを使わず個別登録したい場合」の手順です。
 
@@ -439,19 +440,19 @@ npm run growth:drafts        # 承認した記事 → microCMS 下書き + 画�
 npm run growth:initiatives   # 承認した施策 → Notion 本文に文案/仕様書
 ```
 
-手動実行を避けたい場合は、デーモン起動時に下書き自動生成を opt-in します:
+手動実行を避けたい場合は、デーモン起動時に下書き自動生成や施策自動成果物化を opt-in します:
 
 ```powershell
-$env:GROWTH_DRAFTS_AUTO="1"; npm run growth:daemon
+$env:GROWTH_DRAFTS_AUTO="1"; $env:GROWTH_INITIATIVES_AUTO="1"; npm run growth:daemon
 ```
 
 Codex で動かす場合:
 
 ```powershell
-$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; $env:GROWTH_DRAFTS_AUTO="1"; npm run growth:daemon
+$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; $env:GROWTH_DRAFTS_AUTO="1"; $env:GROWTH_INITIATIVES_AUTO="1"; npm run growth:daemon
 ```
 
-この場合も `weekly` と `initiatives` は自動巡回に含めません。`drafts-auto` は `growth:drafts-auto-peek` で対象件数を確認し、0件なら何も起動しません。
+この場合も `weekly` は自動巡回に含めません。`drafts-auto` は `growth:drafts-auto-peek`、`initiatives-auto` は `growth:initiatives-auto-peek` で対象件数を確認し、0件なら何も起動しません。
 
 > **二重実行に注意**: Mac と Windows の両方で本番自動実行すると二重実行になります。**本番の自動実行は自宅 Windows PC のみ**にしてください。
 

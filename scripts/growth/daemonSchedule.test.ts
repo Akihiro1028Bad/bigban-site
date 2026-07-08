@@ -64,6 +64,16 @@ describe("buildJobs", () => {
     });
   });
 
+  it("GROWTH_INITIATIVES_AUTO=1 の時だけ施策自動成果物化ジョブを追加する", () => {
+    const built = buildJobs({ GROWTH_INITIATIVES_AUTO: "1" });
+
+    expect(built).toContainEqual({
+      name: "initiatives-auto",
+      script: "growth:initiatives-auto",
+      everyMs: 300_000,
+    });
+  });
+
   it("下書き自動生成ジョブの間隔を GROWTH_DAEMON_DRAFTS_EVERY_MS で上書きする", () => {
     const built = buildJobs({
       GROWTH_DRAFTS_AUTO: "1",
@@ -71,6 +81,15 @@ describe("buildJobs", () => {
     });
 
     expect(built.find((job) => job.name === "drafts-auto")?.everyMs).toBe(600_000);
+  });
+
+  it("施策自動成果物化ジョブの間隔を GROWTH_DAEMON_INITIATIVES_EVERY_MS で上書きする", () => {
+    const built = buildJobs({
+      GROWTH_INITIATIVES_AUTO: "1",
+      GROWTH_DAEMON_INITIATIVES_EVERY_MS: "600000",
+    });
+
+    expect(built.find((job) => job.name === "initiatives-auto")?.everyMs).toBe(600_000);
   });
 
   it("pull 系の間隔だけ GROWTH_DAEMON_PULL_EVERY_MS で上書きする", () => {

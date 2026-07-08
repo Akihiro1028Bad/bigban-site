@@ -27,14 +27,15 @@ import type { Choice, PendingItem, ProposalKind } from "./types";
 import { IconArrowLeft, IconArrowRight, IconCheck, IconList, IconPlus, IconX } from "./ui/icons";
 
 /** 施策のトリアージ状態(本番の決定モデルから導出)。 */
-type ProposalTriageStatus = "pending" | "rejected" | "adopted";
+type ProposalTriageStatus = "pending" | "rejected" | "adopted" | "completed";
 
 const STATUS_META: Record<ProposalTriageStatus, { label: string; tone: string }> = {
   pending: { label: "未処理", tone: "var(--p-amber)" },
   adopted: { label: "承認済み", tone: "var(--p-green)" },
+  completed: { label: "成果物化済", tone: "var(--p-accent)" },
   rejected: { label: "却下", tone: "var(--p-text-3)" },
 };
-const ORDER: ProposalTriageStatus[] = ["pending", "adopted", "rejected"];
+const ORDER: ProposalTriageStatus[] = ["pending", "adopted", "completed", "rejected"];
 
 /** 種別フィルタの選択肢("all" + 全 ProposalKind)。 */
 const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "site", "event", "other"];
@@ -42,6 +43,8 @@ const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "sit
 interface ProposalViewProps {
   /** 表示対象の施策(親で検索/優先度ソート済み)。 */
   proposals: PendingItem[];
+  /** 承認 API 用の合言葉。成果物プレビュー取得に使う。 */
+  token: string;
   /** 保存済みの決定(承認/却下)。未決定は未登録。 */
   decided: Record<string, Choice | undefined>;
   /** 右詳細ペインでアクティブな施策 id(未選択は null)。 */
@@ -73,12 +76,14 @@ function statusOf(item: PendingItem, decided: Record<string, Choice | undefined>
   if (choice === "承認") return "adopted";
   if (choice === "却下") return "rejected";
   if (item.stage === "approved") return "adopted";
+  if (item.stage === "completed") return "completed";
   if (item.stage === "rejected") return "rejected";
   return "pending";
 }
 
 export function ProposalView({
   proposals,
+  token,
   decided,
   activeId,
   onActivate,
@@ -225,6 +230,7 @@ export function ProposalView({
             item={active}
             kind={kindOf(active)}
             status={statusOf(active, decided)}
+            token={token}
             onApprove={() => {
               onApprove(active);
               setShowDetailMobile(false);
@@ -249,13 +255,14 @@ interface ProposalDetailProps {
   item: PendingItem;
   kind: ProposalKind;
   status: ProposalTriageStatus;
+  token: string;
   onApprove: () => void;
   onReopen: () => void;
   onReject: () => void;
   onBack: () => void;
 }
 
-function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onBack }: ProposalDetailProps) {
+function ProposalDetail({ item, kind, status, token, onApprove, onReopen, onReject, onBack }: ProposalDetailProps) {
   const DetailKindIcon = KIND_ICON[kind];
   const outcome = approveOutcomeFor(kind);
   return (
@@ -291,7 +298,7 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        <ProposalDetailBody item={item} kind={kind} />
+        <ProposalDetailBody item={item} kind={kind} token={token} />
       </div>
 
       <footer
@@ -310,6 +317,10 @@ function ProposalDetail({ item, kind, status, onApprove, onReopen, onReject, onB
             <button type="button" onClick={onReopen} className="approve-btn-ghost self-start">
               未処理に戻す
             </button>
+          </div>
+        ) : status === "completed" ? (
+          <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-accent)" }}>
+            <IconCheck size={13} /> 成果物化済み
           </div>
         ) : (
           <div className="flex flex-col">

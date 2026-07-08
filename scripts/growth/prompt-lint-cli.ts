@@ -16,15 +16,34 @@ import { PROMPT_REGISTRY } from "./promptRegistry";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
+const sharedPromptsDir = path.join(promptsDir, "shared");
 const repoRoot = path.join(here, "..", "..");
 
+function readPromptFiles(dir: string, optional: boolean): { name: string; content: string }[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch (error) {
+    if (optional) return [];
+    throw error;
+  }
+
+  return entries
+    .filter((name) => name.endsWith(".md"))
+    .sort()
+    .map((name) => ({
+      name,
+      content: readFileSync(path.join(dir, name), "utf-8"),
+    }));
+}
+
 function main(): void {
-  const present = readdirSync(promptsDir).filter((f) => f.endsWith(".md"));
+  const files = [
+    ...readPromptFiles(promptsDir, false),
+    ...readPromptFiles(sharedPromptsDir, true),
+  ];
+  const present = files.map((file) => file.name);
   const registered = PROMPT_REGISTRY.map((m) => m.filename);
-  const files = present.map((name) => ({
-    name,
-    content: readFileSync(path.join(promptsDir, name), "utf-8"),
-  }));
 
   const issues = lintPrompts({
     present,

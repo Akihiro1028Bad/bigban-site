@@ -33,6 +33,7 @@
 | drafts | `growth:drafts` | 承認記事→microCMS下書き+画像 | [20-draft.md](20-draft.md) |
 | drafts-auto | `growth:drafts-auto` | opt-in: 承認済み/生成中かつ下書きID未作成がある時だけ下書き生成 | [20-draft.md](20-draft.md) |
 | initiatives | `growth:initiatives` | 承認施策→Notion本文に文案/仕様書 | runbook「施策実行モード」 |
+| initiatives-auto | `growth:initiatives-auto` | opt-in: 承認済み施策がある時だけ施策実行 | runbook「施策実行モード」 |
 | revise | `growth:revise-loop` | 構成案/タイトルの修正ループ(#40/#139B) | [30-loops.md](30-loops.md) |
 | regen | `growth:regen-loop` | アイキャッチ AI 再生成(#144) | [30-loops.md](30-loops.md) |
 | regen-body | `growth:regen-body-loop` | 本文画像 AI 再生成(#156) | [30-loops.md](30-loops.md) |

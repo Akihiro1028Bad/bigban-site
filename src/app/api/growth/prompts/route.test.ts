@@ -26,10 +26,14 @@ function getReq(token: string | null = null): Request {
   return new Request(url, { method: "GET", headers });
 }
 
-/** prompts ディレクトリと examples ディレクトリで返す一覧を出し分ける。 */
-function mockReaddir(prompts: string[], examples: string[]): void {
+/** prompts / shared / examples ディレクトリで返す一覧を出し分ける。 */
+function mockReaddir(prompts: string[], examples: string[], shared: string[] = []): void {
   vi.mocked(readdir).mockImplementation((async (dir: string) =>
-    String(dir).endsWith("examples") ? examples : prompts) as unknown as typeof readdir);
+    String(dir).endsWith("examples")
+      ? examples
+      : String(dir).endsWith("shared")
+        ? shared
+        : prompts) as unknown as typeof readdir);
 }
 
 /** suffix 一致で内容を返す readFile。throwFor に含むパス suffix は読み取り失敗にする。 */
@@ -60,7 +64,11 @@ describe("GET /api/growth/prompts", () => {
   });
 
   it("プロンプト・例・参考ドキュメント・前提情報をまとめて返す", async () => {
-    mockReaddir(["weekly.md", "drafts.md", "README.txt"], ["example-trend.md"]);
+    mockReaddir(
+      ["weekly.md", "drafts.md", "README.txt"],
+      ["example-trend.md"],
+      ["article-idea.md"],
+    );
     mockReadFile();
 
     const res = await GET(getReq());
@@ -83,6 +91,7 @@ describe("GET /api/growth/prompts", () => {
       "CLAUDE.md",
       "growth-article-style.md",
       "ai-news-prompt.md",
+      "article-idea.md",
       "growth-weekly-runbook.md",
     ]);
     // 運用・セットアップ(microCMS 手動運用マニュアルのみ)
@@ -92,6 +101,7 @@ describe("GET /api/growth/prompts", () => {
   it("examples ディレクトリが無くても他は返す", async () => {
     vi.mocked(readdir).mockImplementation((async (dir: string) => {
       if (String(dir).endsWith("examples")) throw new Error("ENOENT");
+      if (String(dir).endsWith("shared")) return [];
       return ["weekly.md"];
     }) as unknown as typeof readdir);
     mockReadFile();

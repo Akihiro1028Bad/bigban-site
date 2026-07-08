@@ -50,6 +50,10 @@ describe("deriveProposalStage", () => {
     expect(deriveProposalStage("却下")).toBe("rejected");
   });
 
+  it("成果物化済 → completed", () => {
+    expect(deriveProposalStage("成果物化済")).toBe("completed");
+  });
+
   it("未知ステータスは untouched に倒す", () => {
     expect(deriveProposalStage("謎")).toBe("untouched");
   });

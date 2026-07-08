@@ -6,6 +6,7 @@ export interface DaemonJob {
 
 const PULL_DEFAULT_MS = 60_000;
 const DRAFTS_DEFAULT_MS = 300_000;
+const INITIATIVES_DEFAULT_MS = 300_000;
 const PUBLISH_DEFAULT_MS = 300_000;
 const STALL_DEFAULT_MS = 900_000;
 
@@ -27,16 +28,25 @@ function positiveMs(value: string | undefined, fallback: number): number {
 export function buildJobs(env: Record<string, string | undefined>): DaemonJob[] {
   const pullEveryMs = positiveMs(env.GROWTH_DAEMON_PULL_EVERY_MS, PULL_DEFAULT_MS);
   const draftsEveryMs = positiveMs(env.GROWTH_DAEMON_DRAFTS_EVERY_MS, DRAFTS_DEFAULT_MS);
+  const initiativesEveryMs = positiveMs(
+    env.GROWTH_DAEMON_INITIATIVES_EVERY_MS,
+    INITIATIVES_DEFAULT_MS
+  );
   const publishEveryMs = positiveMs(env.GROWTH_DAEMON_PUBLISH_EVERY_MS, PUBLISH_DEFAULT_MS);
   const stallEveryMs = positiveMs(env.GROWTH_DAEMON_STALL_EVERY_MS, STALL_DEFAULT_MS);
   const draftsAutoJobs =
     env.GROWTH_DRAFTS_AUTO === "1"
       ? [{ name: "drafts-auto", script: "growth:drafts-auto", everyMs: draftsEveryMs }]
       : [];
+  const initiativesAutoJobs =
+    env.GROWTH_INITIATIVES_AUTO === "1"
+      ? [{ name: "initiatives-auto", script: "growth:initiatives-auto", everyMs: initiativesEveryMs }]
+      : [];
 
   return [
     ...PULL_JOBS.map((job) => ({ ...job, everyMs: pullEveryMs })),
     ...draftsAutoJobs,
+    ...initiativesAutoJobs,
     { name: "publish-due", script: "growth:publish-due", everyMs: publishEveryMs },
     { name: "stall-check", script: "growth:stall-check", everyMs: stallEveryMs },
   ];

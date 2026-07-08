@@ -52,8 +52,9 @@ function ideaStatusFilter(): unknown {
 }
 
 // #106: 施策も未処理に加え承認を取得し、盤の施策レーンで段階表示できるようにする。
+// 成果物化済も残し、growth:initiatives 実行後に成果物リンクを確認できるようにする。
 function proposalStatusFilter(): unknown {
-  return { or: [statusFilter("未処理"), statusFilter("承認")] };
+  return { or: [statusFilter("未処理"), statusFilter("承認"), statusFilter("成果物化済")] };
 }
 
 export async function GET(request: Request): Promise<Response> {

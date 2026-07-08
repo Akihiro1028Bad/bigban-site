@@ -18,6 +18,7 @@ export type ArticleStage =
 export type ProposalStage =
   | "untouched" // 未処理
   | "approved" // 承認
+  | "completed" // 成果物化済
   | "rejected"; // 却下
 
 export type Stage = ArticleStage | ProposalStage;
@@ -48,6 +49,7 @@ export function deriveArticleStage(
 const PROPOSAL_STAGE_BY_STATUS: Record<string, ProposalStage> = {
   未処理: "untouched",
   承認: "approved",
+  成果物化済: "completed",
   却下: "rejected",
 };
 
