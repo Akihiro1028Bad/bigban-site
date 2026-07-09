@@ -532,8 +532,10 @@ const Cta = Node.create({
   },
   parseHTML() {
     // a.cta(現行) / div.cta(旧フォーマット)を parseCta で構造化。CTA でなければマッチ拒否。
+    // priority を Link マーク(既定50)より上げ、<a class="cta"> を Cta ノードとして確実に拾う。
     return ["a.cta", "div.cta"].map((tag) => ({
       tag,
+      priority: 60,
       getAttrs: (el: HTMLElement) => {
         const parsed = parseCta(el.outerHTML);
         return parsed

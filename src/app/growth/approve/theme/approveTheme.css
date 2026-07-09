@@ -422,6 +422,13 @@
   text-decoration: none;
 }
 
+/* CTA 二次ボタン: 枠線のみ(アウトライン)。一次との強弱差を出す。 */
+.approve-article a.cta.cta--ghost {
+  background: transparent;
+  color: var(--p-accent);
+  border: 1px solid var(--p-accent);
+}
+
 /* スケジュール: 番号付きの体裁(最低限、番号が見える程度)。 */
 .approve-article ol.schedule {
   list-style: none;
