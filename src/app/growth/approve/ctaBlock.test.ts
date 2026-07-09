@@ -93,12 +93,20 @@ describe("validateCta", () => {
   it("文言が空なら error", () => {
     expect(validateCta({ label: "  ", href: "https://x", variant: "primary" }).ok).toBe(false);
   });
-  it("内部アンカー(/#contact)も許可", () => {
-    expect(validateCta({ label: "問い合わせ", href: "/#contact", variant: "ghost" }).ok).toBe(true);
+  it("相対パス(/reserve・/#contact)は保存時サニタイザで href が除去されるため error", () => {
+    // サニタイザ(ALLOWED_HREF_PROTOCOLS)は https:/mailto:/tel:/# 以外を落とすため、
+    // validateCta もそれ以上に寛容にしない(バリデーション通過=保存で残る、を保証)。
+    expect(validateCta({ label: "問い合わせ", href: "/#contact", variant: "ghost" }).ok).toBe(false);
+    expect(validateCta({ label: "予約", href: "/reserve", variant: "primary" }).ok).toBe(false);
   });
   it("不正な href(javascript:)は error", () => {
     const r = validateCta({ label: "x", href: "javascript:alert(1)", variant: "primary" });
     expect(r.ok).toBe(false);
     expect(r.errors).toContain("リンク先の形式が不正です");
+  });
+  it("全宛先プリセットの url が validateCta を通る(サニタイザ整合)", () => {
+    for (const dest of CTA_DESTINATIONS) {
+      expect(validateCta({ label: dest.label, href: dest.url, variant: "primary" }).ok).toBe(true);
+    }
   });
 });

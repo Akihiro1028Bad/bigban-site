@@ -86,12 +86,16 @@ export const CTA_DESTINATIONS: readonly CtaDestination[] = [
   { key: "top", label: "公式サイト", url: "https://www.thepicklebang.com/" },
 ];
 
-/** CTA の文言必須・href 形式(http(s) 完全URL または内部パス/アンカー)を検証する。 */
+/**
+ * CTA の文言必須・href 形式を検証する。
+ * href は保存時サニタイザ(`ALLOWED_HREF_PROTOCOLS = /^(?:https:|mailto:|tel:|#)/`)と整合させ、
+ * それ以外(相対パス等)は弾く。validateCta 通過 = 保存で href が残る、を保証するため。
+ */
 export function validateCta(cta: Cta): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (cta.label.trim() === "") errors.push("文言を入力してください");
   const href = cta.href.trim();
-  const valid = /^https?:\/\/\S+$/.test(href) || /^\/[^\s]*$/.test(href);
+  const valid = /^(?:https:|mailto:|tel:|#)\S*$/.test(href);
   if (!valid) errors.push("リンク先の形式が不正です");
   return { ok: errors.length === 0, errors };
 }
