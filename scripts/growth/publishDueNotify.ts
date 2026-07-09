@@ -60,3 +60,26 @@ export function buildPublishDueGateBlockMessage(
   }
   return lines.join("\n");
 }
+
+/** microCMS 公開は成功したが Notion ステータス更新に失敗した記事。 */
+export interface PartialStatusPublication {
+  title: string;
+  contentId: string;
+}
+
+/** 外部公開済み・Notion未同期の記事を知らせる LINE 本文。空配列なら通知不要=null。 */
+export function buildPublishDuePartialStatusMessage(
+  items: readonly PartialStatusPublication[]
+): string | null {
+  if (items.length === 0) return null;
+  const lines = [
+    "⚠️ 予約公開で microCMS では公開済みですが、Notion ステータス更新に失敗した記事があります。",
+    "Notion のステータスを手動で公開済みにしてください:",
+  ];
+  for (const item of items) {
+    const title = item.title.trim() || "(無題)";
+    const id = item.contentId.trim() || "空";
+    lines.push(`・${title}(下書きID: ${id})`);
+  }
+  return lines.join("\n");
+}

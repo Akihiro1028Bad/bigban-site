@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
-import { draftLinkOf, isNotionPageId, mediaOf } from "@/lib/growth/approve";
+import { draftLinkOf, eyecatchUrlOf, isNotionPageId, mediaOf } from "@/lib/growth/approve";
 import { patchDraft } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import { isMicrocmsAssetUrl } from "@/lib/growth/media";
@@ -72,12 +72,14 @@ export async function POST(request: Request): Promise<Response> {
   if (!notionOpts || !microOpts) return serverError();
 
   let contentId: string;
+  let previousEyecatchUrl = "";
   let stageBlocked: Response | null = null;
   let endpoint = growthEndpoint();
   try {
     const page = await getPage(pageId, notionOpts);
     stageBlocked = articleEditGuard(page);
     contentId = draftLinkOf(page).contentId;
+    previousEyecatchUrl = eyecatchUrlOf(page);
     endpoint = growthEndpoint(mediaOf(page));
   } catch {
     return NextResponse.json(
@@ -105,6 +107,11 @@ export async function POST(request: Request): Promise<Response> {
   try {
     await patchDraft(endpoint, contentId, { eyecatch: eyecatchUrl }, microOpts);
   } catch {
+    try {
+      await updatePageProps(pageId, buildEyecatchMirrorProps(previousEyecatchUrl), notionOpts);
+    } catch {
+      /* rollback 失敗。再操作で冪等に回復する。 */
+    }
     return NextResponse.json(
       { success: false, error: "公開ターゲット(microCMS)への同期に失敗しました。やり直してください。" },
       { status: 502 }

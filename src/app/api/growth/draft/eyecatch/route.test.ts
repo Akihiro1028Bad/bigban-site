@@ -27,13 +27,16 @@ function postReq(token: string | null, body: unknown): Request {
   return new Request(url, { method: "POST", body: JSON.stringify(body) });
 }
 
-function pageWithContentId(contentId?: string, media?: string) {
+function pageWithContentId(contentId?: string, media?: string, eyecatchUrl?: string) {
   const properties: Record<string, unknown> = {};
   if (contentId) {
     properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: contentId }] };
   }
   if (media !== undefined) {
     properties["媒体"] = { select: { name: media } };
+  }
+  if (eyecatchUrl !== undefined) {
+    properties["アイキャッチURL"] = { type: "url", url: eyecatchUrl };
   }
   return {
     id: PAGE_ID,
@@ -164,12 +167,16 @@ describe("POST /api/growth/draft/eyecatch", () => {
     expect(patchDraft).not.toHaveBeenCalled();
   });
 
-  it("microCMS 同期失敗は 502", async () => {
-    vi.mocked(getPage).mockResolvedValue(pageWithContentId("g-abc"));
+  it("microCMS 同期失敗は 502 で Notion ミラーを旧アイキャッチへ戻す", async () => {
+    const previous = "https://images.microcms-assets.io/assets/abc/old.png";
+    vi.mocked(getPage).mockResolvedValue(pageWithContentId("g-abc", undefined, previous));
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
     vi.mocked(patchDraft).mockRejectedValue(new Error("microcms down"));
     const res = await POST(postReq(null, { pageId: PAGE_ID, eyecatchUrl: ASSET }));
     expect(res.status).toBe(502);
+    expect(updatePageProps).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(updatePageProps).mock.calls[0][1]).toEqual({ "アイキャッチURL": { url: ASSET } });
+    expect(vi.mocked(updatePageProps).mock.calls[1][1]).toEqual({ "アイキャッチURL": { url: previous } });
   });
 
   it("認可ON時、token 不一致は 401", async () => {

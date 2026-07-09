@@ -35,8 +35,10 @@ import {
 import {
   buildPublishDueFailureMessage,
   buildPublishDueGateBlockMessage,
+  buildPublishDuePartialStatusMessage,
   buildPublishDueSkipMessage,
   type GateBlockedPublication,
+  type PartialStatusPublication,
   type SkippedPublication,
 } from "./publishDueNotify";
 import {
@@ -166,6 +168,7 @@ async function main(): Promise<void> {
   let published = 0;
   const skipped: SkippedPublication[] = [];
   const gateBlocked: GateBlockedPublication[] = [];
+  const partialStatusFailures: PartialStatusPublication[] = [];
   const windowEnv = Number(process.env.GROWTH_NOTIFY_WINDOW_MS);
   const windowMs =
     Number.isInteger(windowEnv) && windowEnv > 0 ? windowEnv : DEFAULT_NOTIFY_WINDOW_MS;
@@ -223,8 +226,15 @@ async function main(): Promise<void> {
     if (Object.keys(patch).length > 0) await patchDraft(endpoint, contentId, patch, contentOpts);
     // PATCH status PUBLISH は冪等(既に公開済みでも PUBLISH のまま)。
     await publishContent(endpoint, contentId, managementOpts);
-    // 先に Notion ステータスを公開済みにする(=次回ループの再公開を防ぐ要)。
-    await updatePageSelect(page.id, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+    // microCMS 公開後の Notion 同期失敗は「外部公開済み」として明示し、総失敗にしない。
+    try {
+      await updatePageSelect(page.id, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+    } catch (error: unknown) {
+      console.warn(`[publish-due] Notion ステータス更新に失敗(公開は完了): ${title || page.id}`, error);
+      partialStatusFailures.push({ title, contentId });
+      published += 1;
+      continue;
+    }
     // 予約の消去は付随処理。失敗しても公開自体は完了しているのでループは止めず警告だけ出す
     // (ステータスは既に公開済みなので次回ループで再公開されることはない)。
     try {
@@ -247,6 +257,8 @@ async function main(): Promise<void> {
   await writeThrottleRecords(throttleRecords);
   const gateBlockMessage = buildPublishDueGateBlockMessage(gateBlocked);
   if (!DRYRUN && gateBlockMessage) await notifyLine(gateBlockMessage);
+  const partialStatusMessage = buildPublishDuePartialStatusMessage(partialStatusFailures);
+  if (!DRYRUN && partialStatusMessage) await notifyLine(partialStatusMessage);
 }
 
 main().catch(async (error: unknown) => {

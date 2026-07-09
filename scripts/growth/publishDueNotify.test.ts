@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPublishDueFailureMessage,
   buildPublishDueGateBlockMessage,
+  buildPublishDuePartialStatusMessage,
   buildPublishDueSkipMessage,
 } from "./publishDueNotify";
 
@@ -49,5 +50,24 @@ describe("buildPublishDueGateBlockMessage", () => {
 
   it("空配列なら null(通知不要)", () => {
     expect(buildPublishDueGateBlockMessage([])).toBeNull();
+  });
+});
+
+describe("buildPublishDuePartialStatusMessage", () => {
+  it("公開済みだが Notion ステータス更新に失敗した記事を列挙する", () => {
+    const msg = buildPublishDuePartialStatusMessage([
+      { title: "東京PPA記事", contentId: "ppa-tokyo" },
+      { title: "", contentId: "" },
+    ]);
+
+    expect(msg).toContain("microCMS では公開済み");
+    expect(msg).toContain("Notion");
+    expect(msg).toContain("東京PPA記事");
+    expect(msg).toContain("ppa-tokyo");
+    expect(msg).toContain("(無題)");
+  });
+
+  it("空配列なら null(通知不要)", () => {
+    expect(buildPublishDuePartialStatusMessage([])).toBeNull();
   });
 });

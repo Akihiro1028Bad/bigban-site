@@ -460,4 +460,19 @@ describe("POST /api/growth/publish", () => {
     vi.mocked(publishContent).mockRejectedValue(new Error("microcms down"));
     expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(502);
   });
+
+  it("microCMS 公開後に Notion ステータス更新だけ失敗したら partial success として明示する", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(updatePageSelect).mockRejectedValue(new Error("notion down"));
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(207);
+    expect(await res.json()).toEqual({
+      success: false,
+      partial: "notion-status",
+      error: "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。",
+    });
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+  });
 });

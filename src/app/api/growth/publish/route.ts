@@ -168,7 +168,18 @@ export async function POST(request: Request): Promise<Response> {
       await patchDraft(endpoint, contentId, patch, contentOpts);
     }
     await publishContent(endpoint, contentId, microOpts);
-    await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+    try {
+      await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          partial: "notion-status",
+          error: "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。",
+        },
+        { status: 207 }
+      );
+    }
   } catch {
     return NextResponse.json(
       { success: false, error: "公開中にエラーが発生しました" },
