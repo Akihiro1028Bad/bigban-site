@@ -28,6 +28,10 @@
    - §14 執筆7原則に従う（言い回しを発明しない・翻訳調・AI臭を避ける）。外部リンク濫用・未検証数値（§15）も避ける。
    - 許可された HTML タグ・属性・クラスのみ使う（[ai-news-prompt.md](./ai-news-prompt.md) §3）。インライン style 禁止。
      生成物は保存時にサーバ側で STRICT 再サニタイズされるが、最初から許可リスト内で書くこと。
+   - **CTA（`<a class="cta">` ボタン）へのコメント**の場合、対象ブロックが CTA なら `after` は正準の CTA HTML `<a class="cta" href="…">文言</a>`（二次は `<a class="cta cta--ghost" href="…">文言</a>`）で返す。指示に沿って**文言・種別（一次/二次）・リンク先**を変えてよい。リンク先は許可先から選ぶ:
+     - 予約 = `https://www.thepicklebang.com/reserve`（**必ず内部 /reserve を使う**。RESERVA→labola 切替を /reserve が吸収するため raw RESERVA URL は使わない）
+     - 公式Instagram = `https://www.instagram.com/thepicklebangtheory/` / アクセス = `https://www.thepicklebang.com/about` / 問い合わせ = `https://www.thepicklebang.com/#contact` / 公式サイト = `https://www.thepicklebang.com/`
+     - 指示で明示された場合のみ任意の**完全URL**を使ってよい。未確定情報の断定禁止（doNotWrite）。
    - 出力は **JSON 配列**。各要素 `{ "commentIndex": <number>, "before": "<対象ブロックの現在HTML>", "after": "<書き換え後HTML>" }`。
      - `commentIndex` = `comments` 配列内のインデックス。
      - `before` は **bodyHtml 中の対象ブロックHTMLを完全一致でそのまま**入れる（システムが照合に使う・不一致は弾かれる）。

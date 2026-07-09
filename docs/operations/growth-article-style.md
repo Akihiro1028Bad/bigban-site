@@ -327,7 +327,7 @@ bat. Leave clean negative space on one side for text. No text, no logos.
 - **本文中に外部ドメインへの `<a>` を原則張らない**。リンクジュースの流出・回遊低下を避ける。
 - 事実・統計の根拠は**リンクではなくテキストの帰属**で示す(例:「(出典: SFIA の競技人口レポート)」)。§10 のとおり出典 URL の本文明記は不要。
 - どうしても外部参照が必要でも**最小限**にとどめ、**不完全・省略された URL(例: `https://sfia.org/resources/...`)は絶対に書かない**(壊れたリンクはブランド毀損)。
-- **CTA(来店導線)の外部リンクは例外として許可**する。予約は外部サービス(RESERVA)で完結するため、記事末の予約導線は完全な外部 URL `https://reserva.be/tpbt`(2026年7月時点。8月以降は labola へ切替予定)を使う。SNS 導線(Instagram / 公式 LINE)も CTA 例外。**完全な URL のみ**を使う。
+- **CTA(来店導線)の予約は内部の予約案内ページ**`https://www.thepicklebang.com/reserve`を使う(RESERVA(2026年7月)→labola(8月以降)の切替は /reserve ページ側が吸収するため、切替時に CTA URL を直す必要がない)。SNS 導線(公式 Instagram `https://www.instagram.com/thepicklebangtheory/`)も CTA 例外。**完全な URL のみ**を使う。
 
 ### 数値・可変情報(断定しない・裏取り必須)
 - **未確定の可変情報(所要時間[分]・料金・未確定の日時 等)は断定しない**。列挙の正典は facility-context.json の `doNotWrite`(§13)——必要時は「最新情報をご確認ください」と促す。
@@ -350,14 +350,14 @@ bat. Leave clean negative space on one side for text. No text, no logos.
   - 施設について: `/ja/about`
   - トップ: `/ja`
   - お問い合わせ(トップ内アンカー): `/#contact`(独立した `/contact` ページは無い)
-- **予約導線は内部リンクではなく外部 CTA**(RESERVA `https://reserva.be/tpbt`)。
+- **予約導線は内部の予約案内ページ /reserve**(`https://www.thepicklebang.com/reserve`)を使う(RESERVA/labola の切替を /reserve が吸収する)。
 - **リンク先が実在しない場合は張らない**(壊れた内部リンクを作らない)。
 
 ### 記事末の定型 CTA ブロック(#218)
 - 記事の末尾(AI 免責文の直前)に、来店導線の定型ブロックを置く。構成:
   - **アクセス**: 本八幡駅から徒歩1分(千葉県市川市・都営新宿線始発駅)。
   - **営業時間**: 6:00-23:00(公表済み・#217 で解禁)。
-  - **予約導線**: RESERVA への予約ボタン(外部 CTA・上記例外)。必要に応じて公式 Instagram / LINE。
+  - **予約導線**: 内部の予約案内ページ /reserve への予約ボタン(`https://www.thepicklebang.com/reserve`)。必要に応じて公式 Instagram。
 - 予約導線の直前に §7 の一押し1文を置く(記事ごとに新しく作る)。
 - 記事末の要素順(推奨): 一押し → 予約導線 → (最末尾に)ヘッジ集約 → AI 免責文。
 - 予約クリック等は GA4 の key event として計測する(承認画面 PerformanceBoard の keyEvents に反映)。GA4 側設定手順は runbook 参照(オーナー作業)。

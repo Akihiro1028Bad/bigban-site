@@ -72,7 +72,7 @@ THE PICKLE BANG THEORY は、本八幡駅から徒歩1分の屋内に3面のコ�
 
 **アクセス**: 本八幡駅から徒歩1分(千葉県市川市・都営新宿線の始発駅)。
 **営業時間**: 6:00-23:00。
-**ご予約**: [https://reserva.be/tpbt](https://reserva.be/tpbt)(オンライン予約)。最新情報や施設の様子は公式 Instagram・LINE でも発信しています。
+**ご予約**: [https://www.thepicklebang.com/reserve](https://www.thepicklebang.com/reserve)(オンライン予約)。最新情報や施設の様子は公式 Instagram・LINE でも発信しています。
 
 料金や体験の詳しい流れ、各駅からの所要時間などは、予約ページの最新のご案内をご確認ください。感じ方には個人差があります。
 
