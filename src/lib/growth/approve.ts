@@ -4,6 +4,7 @@
  */
 
 import { growthMediaForRow, type GrowthMedia } from "./endpoint";
+import { pendingActivitiesOf, type PendingActivity } from "./activity";
 import {
   BODY_MIRROR_PROP,
   chunkRichText,
@@ -91,6 +92,8 @@ export interface PendingItem {
   artifactUrl?: string;
   /** 施策の承認日時(ms)。未記入は null/undefined。施策のみ。 */
   approvedAtMs?: number | null;
+  /** 記事/施策に紐づく AI 依頼・提案の表示用アクティビティ。 */
+  activities?: PendingActivity[];
 }
 
 /** ステータス select のプロパティ名と「下書き作成済み」値(#87)。承認画面の下書きタブで使う。 */
@@ -376,6 +379,7 @@ export function toPendingItems(
       hasDraftBody: draftBodyOf(page).trim() !== "",
       scheduledAtMs: dateStartMs(page, PUBLISH_SCHEDULE_PROP),
       hypothesis: hypothesisOf(page),
+      activities: pendingActivitiesOf(page),
     };
   });
   return [...proposalItems, ...ideaItems];

@@ -92,6 +92,9 @@ export default defineConfig({
         "scripts/growth/prompt-lint-cli.ts",
         "scripts/growth/article-eval-cli.ts",
         "scripts/growth/column-category-cli.ts",
+        // Worker 可視化/照合の薄い I/O 入口(他 *-cli.ts と同様)。純ロジックは workerLog.ts / reconcile.ts でテスト済み。
+        "scripts/growth/worker-log-cli.ts",
+        "scripts/growth/reconcile-cli.ts",
         // TipTap(third-party)への薄い DOM 結線。純ロジックは draftEditorContent.ts でテスト済み。
         "src/app/growth/approve/DraftEditor.tsx",
         // iframe.contentWindow への薄い DOM 結線(#100)。純ロジックは draftPreview.ts、
@@ -154,6 +157,9 @@ export default defineConfig({
         // 純ロジック(slotStateOf・suggestImageIdea・outline 記法)は T1/T2 の各テストで検証済み。
         // 結線挙動は ArtboardView.test.tsx で担保する。
         "src/app/growth/approve/ArtboardView.tsx",
+        // Worker 運用ビューの薄い presentation。純ロジック(整形・状態写像・reconcile判定)は
+        // workerLog.ts / reconcile.ts / activity.ts、結線は ApproveClient.test.tsx で検証する。
+        "src/app/growth/approve/OpsView.tsx",
       ],
       thresholds: {
         statements: 100,

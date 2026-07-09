@@ -108,6 +108,39 @@ describe("DetailPanel(2段タブ)", () => {
     expect(p.onRevise).toHaveBeenCalled();
   });
 
+  it("AI依頼状況カードに進捗と修正案要約を出す", () => {
+    setup({
+      item: pi({
+        activities: [
+          {
+            kind: "revise",
+            status: "presented",
+            label: "構成案修正",
+            requestedAtMs: null,
+            updatedAtMs: null,
+            hasResult: true,
+            summary: "導入を短くしました",
+          },
+          {
+            kind: "decorate",
+            status: "running",
+            label: "装飾提案",
+            requestedAtMs: null,
+            updatedAtMs: null,
+            hasResult: false,
+            summary: null,
+          },
+        ],
+      }),
+    });
+    expect(screen.getByText("AI依頼状況")).toBeInTheDocument();
+    expect(screen.getByText("構成案修正")).toBeInTheDocument();
+    expect(screen.getByText("提示中")).toBeInTheDocument();
+    expect(screen.getByText("導入を短くしました")).toBeInTheDocument();
+    expect(screen.getByText("装飾提案")).toBeInTheDocument();
+    expect(screen.getByText("処理中")).toBeInTheDocument();
+  });
+
   it("draft_review は『構成からやり直す』を出し onRevert", async () => {
     const p = setup({ stage: "draft_review" });
     await userEvent.click(screen.getByRole("button", { name: /構成からやり直す/ }));

@@ -2,6 +2,7 @@
  * 承認画面の共有ドメイン型(#H7 分解で共有化)。ApproveClient と各カスタムフック/コンポーネントで使う。
  */
 
+import type { PendingActivity } from "@/lib/growth/activity";
 import type { ArticleHypothesis, ProposalHypothesis } from "@/lib/growth/approve";
 import type { Stage } from "@/lib/growth/stage";
 
@@ -47,6 +48,8 @@ export interface PendingItem {
   // 施策実行モードの成果物確認用。Notion 本文へのリンクと承認日時。
   artifactUrl?: string;
   approvedAtMs?: number | null;
+  /** 記事/施策に紐づく AI 依頼・提案の表示用アクティビティ。 */
+  activities?: PendingActivity[];
 }
 
 // 即時保存モデルでのカードごとの選択(承認/却下)。

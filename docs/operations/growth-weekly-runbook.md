@@ -18,6 +18,7 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 承認のサイクル: 週次モードが提案を出す → 人間が Notion で `承認`/`却下` → **下書きモード/施策実行モードを手動実行、または daemon の opt-in 自動で反映**。webhook は使わず、実行時に Notion を読む。
 
 > 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives` / opt-in 自動 `GROWTH_DRAFTS_AUTO=1 GROWTH_INITIATIVES_AUTO=1 npm run growth:daemon`(いずれも内部で headless agent に該当モードの指示を渡す。既定は Claude、Codex は `GROWTH_AGENT=codex` 指定時のみ)。
+> Worker の状態・直近失敗・reconcile は `docs/operations/growth/worker-observability.md` を参照。
 
 ## 出力先(確定)
 

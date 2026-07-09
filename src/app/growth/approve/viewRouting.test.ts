@@ -4,7 +4,7 @@ import { APPROVE_VIEWS, decideInitialView, initialDraftFromUrl, parseView } from
 
 describe("parseView", () => {
   it("5 view を正規化し、未知/欠落は null", () => {
-    expect(APPROVE_VIEWS).toEqual(["proposal", "approve", "prompt", "performance", "queue"]);
+    expect(APPROVE_VIEWS).toEqual(["proposal", "approve", "prompt", "performance", "queue", "ops"]);
     for (const v of APPROVE_VIEWS) expect(parseView(v)).toBe(v);
     expect(parseView("articles")).toBeNull(); // 旧値は廃止
     expect(parseView(null)).toBeNull();

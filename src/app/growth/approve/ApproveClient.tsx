@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -33,7 +33,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { fetchBoard, postRevert } from "./api";
+import { fetchBoard, fetchOps, postRevert } from "./api";
 import { authHeaders } from "./authHeaders";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import { BoardCard } from "./BoardCard";
@@ -64,6 +64,7 @@ import { APPROVE_BOARD_KEY, useApproveBoard } from "./hooks/useApproveBoard";
 import { BoardList } from "./BoardList";
 import { PerformanceBoard } from "./PerformanceBoard";
 import { PublishQueue } from "./PublishQueue";
+import { OpsView } from "./OpsView";
 import { MediaLibraryModal } from "./MediaLibraryModal";
 import { BodyImageInsertModal } from "./BodyImageInsertModal";
 import type { BodyImageInsertChoice } from "./BodyImageInsertModal";
@@ -92,6 +93,7 @@ import { shouldWarnPollStale } from "./pollHealth";
 import { toMessage } from "./errorMessage";
 import { isReviseBusy, KIND_BADGE, rowClass } from "./boardItemHelpers";
 import type { Choice, PendingItem } from "./types";
+import type { CurrentWorkerTarget } from "@/lib/growth/workerLog";
 import { useApproveDecisions } from "./hooks/useApproveDecisions";
 import { useDraftEditing } from "./hooks/useDraftEditing";
 import { useDraftPreview } from "./hooks/useDraftPreview";
@@ -157,6 +159,12 @@ export function ApproveClient() {
     enabled: authed && boardSeeded,
     pollIntervalMs: REVISE_POLL_MS,
     shouldPoll: (data) => (data ?? []).some((it) => isInFlight(it.stage)),
+  });
+  const opsQuery = useQuery({
+    queryKey: ["growth-ops", token],
+    queryFn: () => fetchOps(token),
+    enabled: authed && boardSeeded,
+    refetchInterval: 60_000,
   });
   const items = boardQuery.data ?? EMPTY_ITEMS;
   /** 盤データを差し替える(命令的 seed/楽観更新)。setItems 相当。 */
@@ -714,6 +722,26 @@ export function ApproveClient() {
 
   // #proto P1: 表示中 view(未確定時は施策を既定描画)。
   const activeView: ApproveView = view ?? "proposal";
+  const opsIssueCount =
+    (opsQuery.data?.recentFailures.length ?? 0) +
+    (opsQuery.data?.reconcileFindings.length ?? 0) +
+    (opsQuery.data?.worker.status === "stale" ? 1 : 0);
+  const activityTargets: CurrentWorkerTarget[] = items
+    .flatMap((item) =>
+      (item.activities ?? [])
+        .filter((activity) => activity.status === "running" || activity.status === "requested")
+        .map((activity) => ({
+          targetPageId: item.id,
+          targetTitle: item.title,
+          targetType: item.kind === "proposal" ? ("proposal" as const) : ("article" as const),
+          mode: activity.kind,
+          status: "running" as const,
+          startedAt: activity.requestedAtMs ? new Date(activity.requestedAtMs).toISOString() : null,
+          elapsedMs: activity.requestedAtMs ? Math.max(0, nowTick - activity.requestedAtMs) : null,
+        }))
+    )
+    .slice(0, 5);
+  const currentWorkerTarget = opsQuery.data?.currentTargets[0] ?? activityTargets[0] ?? null;
 
   // #proto P2: 検索絞り込みで active view が0件になったら SearchEmpty を出す
   // (元データはあるのに検索で消えた状態を「該当なし」として明示する)。
@@ -1203,6 +1231,7 @@ export function ApproveClient() {
     prompt: "プロンプト",
     performance: "成績",
     queue: "公開キュー",
+    ops: "運用",
   };
 
   // #proto P1: proto 固定シェル(position:fixed; inset:0)。MotionConfig で OS の motion 設定を尊重。
@@ -1228,12 +1257,26 @@ export function ApproveClient() {
           onToggleDensity={handleToggleDensity}
         />
 
+        {currentWorkerTarget ? (
+          <div
+            className="flex shrink-0 items-center gap-2 px-4 py-2 text-[12px] font-medium"
+            style={{ background: "var(--p-purple-weak)", color: "var(--p-purple)", borderBottom: "1px solid var(--p-border)" }}
+          >
+            <span className="approve-pulse">AI処理中</span>
+            <span className="min-w-0 truncate" style={{ color: "var(--p-text)" }}>
+              {currentWorkerTarget.targetTitle || "system"}
+            </span>
+            <span style={{ color: "var(--p-text-2)" }}>/ {currentWorkerTarget.mode}</span>
+          </div>
+        ) : null}
+
         <div className="flex min-h-0 flex-1">
           <LeftRail
             view={activeView}
             articleCount={counts.articlePending}
             proposalCount={counts.proposalPending}
             queueReadyCount={counts.queueReady}
+            opsIssueCount={opsIssueCount}
             onChange={changeView}
           />
 
@@ -1335,7 +1378,7 @@ export function ApproveClient() {
               <PromptsView token={token} />
             ) : activeView === "performance" ? (
               <PerformanceBoard items={ideas} />
-            ) : (
+            ) : activeView === "queue" ? (
               <PublishQueue
                 items={ideas}
                 token={token}
@@ -1345,6 +1388,14 @@ export function ApproveClient() {
                   changeView("approve");
                   setActiveId(id);
                 }}
+              />
+            ) : (
+              <OpsView
+                ops={opsQuery.data ?? null}
+                activityTargets={activityTargets}
+                isLoading={opsQuery.isLoading}
+                error={opsQuery.error ? toMessage(opsQuery.error, "運用状態の取得に失敗しました。") : null}
+                onRefresh={() => void opsQuery.refetch()}
               />
             )}
           </main>

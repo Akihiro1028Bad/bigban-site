@@ -148,6 +148,30 @@ describe("toPendingItems", () => {
     });
   });
 
+  it("成果物リンクは rich_text ミラーにも対応する", () => {
+    const page = proposal("p1", "市川ページ", "サイト表示内容");
+    page.properties["ステータス"] = { type: "select", select: { name: "成果物化済" } };
+    page.properties["成果物リンク"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: " https://notion.so/artifact-rich " }, {}],
+    };
+
+    const [item] = toPendingItems([page], []);
+
+    expect(item.artifactUrl).toBe("https://notion.so/artifact-rich");
+  });
+
+  it("成果物リンクが url:null かつ rich_text 欠落なら Notion ページ URL にフォールバックする", () => {
+    const page = proposal("p1", "市川ページ", "サイト表示内容");
+    page.url = "https://notion.so/page";
+    page.properties["ステータス"] = { type: "select", select: { name: "成果物化済" } };
+    page.properties["成果物リンク"] = { type: "url", url: null };
+
+    const [item] = toPendingItems([page], []);
+
+    expect(item.artifactUrl).toBe("https://notion.so/page");
+  });
+
   it("記事ネタ案は優先度と概要・構成案(outline)・修正状態を持つ", () => {
     const [item] = toPendingItems([], [idea("i1", "猛暑×屋内", "夏向けの集客記事")]);
 
@@ -346,6 +370,7 @@ describe("toPendingItems", () => {
         details: [],
         score: 0,
         stage: "untouched",
+        proposalHypothesis: undefined,
       },
       {
         id: "x",
@@ -363,9 +388,12 @@ describe("toPendingItems", () => {
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
+        hypothesis: undefined,
+        metrics: undefined,
         eyecatchUrl: "",
         hasDraftBody: false,
         scheduledAtMs: null,
+        activities: [],
       },
     ]);
   });
@@ -401,6 +429,7 @@ describe("toPendingItems", () => {
         details: [],
         score: 0,
         stage: "untouched",
+        proposalHypothesis: undefined,
       },
       {
         id: "y",
@@ -418,9 +447,12 @@ describe("toPendingItems", () => {
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
+        hypothesis: undefined,
+        metrics: undefined,
         eyecatchUrl: "",
         hasDraftBody: false,
         scheduledAtMs: null,
+        activities: [],
       },
     ]);
   });

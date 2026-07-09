@@ -16,6 +16,30 @@ function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
+function writeHeartbeat(detail: string, currentJob = ""): void {
+  const args = [
+    "run",
+    "--silent",
+    "growth:worker-log",
+    "--",
+    "heartbeat",
+    "--mode",
+    currentJob || "daemon",
+    "--name",
+    `daemon ${detail}`,
+    "--detail",
+    detail,
+    "--target-type",
+    "system",
+  ];
+  const child = spawn("npm", args, {
+    env: process.env,
+    shell: true,
+    stdio: "ignore",
+  });
+  child.on("error", () => undefined);
+}
+
 function clampSleep(ms: number): number {
   return Math.min(MAX_SLEEP_MS, Math.max(MIN_SLEEP_MS, ms));
 }
@@ -76,6 +100,7 @@ async function main(): Promise<void> {
     log(`- ${job.name}: npm run ${job.script} every ${job.everyMs}ms`);
   }
   log("Ctrl+C で停止");
+  writeHeartbeat("started");
 
   while (!isStopping) {
     const due = selectDueJobs(jobs, lastRun, Date.now());
@@ -84,9 +109,11 @@ async function main(): Promise<void> {
       if (isStopping) break;
 
       log(`[${timestamp()}] ▶ ${job.name}`);
+      writeHeartbeat("running", job.name);
       const exitCode = await runScript(job);
       const mark = exitCode === 0 ? "✓" : "✗";
       log(`[${timestamp()}] ${mark} ${job.name} (exit ${exitCode})`);
+      writeHeartbeat(`idle exit=${exitCode}`, job.name);
       lastRun[job.name] = Date.now();
     }
 
@@ -96,6 +123,7 @@ async function main(): Promise<void> {
     await sleep(sleepMs);
   }
 
+  writeHeartbeat("stopping");
   process.exit(0);
 }
 

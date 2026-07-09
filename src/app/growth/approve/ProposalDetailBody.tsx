@@ -318,6 +318,11 @@ export function ProposalDetailBody({ item, kind, token }: ProposalDetailBodyProp
         )}
         <ArtifactSection item={item} token={token} />
         <ProposalFlow kind={kind} />
+        <DetailSection title="次にやること">
+          <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--p-text-2)" }}>
+            {nextActionFor(category, kind)}
+          </p>
+        </DetailSection>
       </div>
     );
   }

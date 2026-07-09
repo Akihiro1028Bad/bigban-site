@@ -137,6 +137,13 @@ describe("ProposalDetailBody", () => {
     );
   });
 
+  it("記事カテゴリの施策でも次にやることを表示する", () => {
+    render(<ProposalDetailBody item={proposal({ subtitle: "コンテンツ" })} kind="article" />);
+
+    expect(screen.getByRole("heading", { name: "次にやること" })).toBeInTheDocument();
+    expect(screen.getByText(/記事化後の下書きを確認/)).toBeInTheDocument();
+  });
+
   it("空の optional 情報は表示しない", () => {
     render(
       <ProposalDetailBody

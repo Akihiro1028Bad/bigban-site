@@ -1,9 +1,9 @@
 /**
- * 承認画面のナビ(5 view)ルーティングの純ロジック(#proto P1)。DOM/IO 非依存。
- * proto MainView 語彙へ統一(施策/記事/プロンプト/成績/公開キュー)。旧 proposals|articles|prompts は廃止。
+ * 承認画面のナビ(6 view)ルーティングの純ロジック(#proto P1)。DOM/IO 非依存。
+ * proto MainView 語彙へ統一(施策/記事/プロンプト/成績/公開キュー/運用)。旧 proposals|articles|prompts は廃止。
  */
 
-export type ApproveView = "proposal" | "approve" | "prompt" | "performance" | "queue";
+export type ApproveView = "proposal" | "approve" | "prompt" | "performance" | "queue" | "ops";
 
 export const APPROVE_VIEWS: readonly ApproveView[] = [
   "proposal",
@@ -11,6 +11,7 @@ export const APPROVE_VIEWS: readonly ApproveView[] = [
   "prompt",
   "performance",
   "queue",
+  "ops",
 ];
 
 /** `?view` の生値を ApproveView に正規化する。未知/欠落は null。 */

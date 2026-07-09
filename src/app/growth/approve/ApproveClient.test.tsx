@@ -114,6 +114,41 @@ vi.mock("./PromptsView", () => ({
 import { ApproveClient } from "./ApproveClient";
 import { replacePreservedImageSrc, replacePreservedPendingFigure } from "./DraftEditor";
 import { STUCK_THRESHOLD_MS } from "./generating";
+import type { GrowthOpsView } from "@/lib/growth/workerLog";
+
+const EMPTY_OPS: GrowthOpsView = {
+  setupMissing: true,
+  worker: {
+    status: "unknown",
+    workerId: null,
+    lastHeartbeatAt: null,
+    currentJob: null,
+  },
+  currentTargets: [],
+  recentRuns: [],
+  recentFailures: [],
+  reconcileFindings: [],
+};
+
+let opsResponse: GrowthOpsView | Error | Promise<unknown> = EMPTY_OPS;
+
+function mockOpsResponse(next: GrowthOpsView | Error | Promise<unknown>): void {
+  opsResponse = next;
+}
+
+function requestUrl(input: RequestInfo | URL): string {
+  return typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+}
+
+function isOpsRequest(input: RequestInfo | URL): boolean {
+  return requestUrl(input).includes("/api/growth/ops");
+}
+
+function opsFetchResult(): Promise<unknown> {
+  if (opsResponse instanceof Error) return Promise.reject(opsResponse);
+  if (opsResponse instanceof Promise) return opsResponse;
+  return Promise.resolve(jsonResponse({ success: true, ops: opsResponse }));
+}
 
 function mockFetchSequence(
   ...responses: Array<
@@ -121,20 +156,27 @@ function mockFetchSequence(
   >
 ) {
   const fn = vi.fn();
-  responses.forEach((r) => {
-    if (r instanceof Error || typeof r === "string") {
-      fn.mockRejectedValueOnce(r);
-    } else {
-      // 本番は readJsonObject 経由で res.text() を読むため text を必ず供給する。
-      // text 明示時はそれを優先(空ボディ/非 JSON のケース表現用)。
-      const body = r.text ?? JSON.stringify(r.json);
-      fn.mockResolvedValueOnce({
-        ok: r.ok ?? true,
-        status: r.status ?? 200,
-        json: async () => r.json,
-        text: async () => body,
-      });
+  const queue = [...responses];
+  fn.mockImplementation((input: RequestInfo | URL) => {
+    if (isOpsRequest(input)) {
+      fn.mock.calls.pop();
+      return opsFetchResult();
     }
+    const url = requestUrl(input);
+    const r = queue.shift();
+    if (!r) return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    if (r instanceof Error || typeof r === "string") {
+      return Promise.reject(r);
+    }
+    // 本番は readJsonObject 経由で res.text() を読むため text を必ず供給する。
+    // text 明示時はそれを優先(空ボディ/非 JSON のケース表現用)。
+    const body = r.text ?? JSON.stringify(r.json);
+    return Promise.resolve({
+      ok: r.ok ?? true,
+      status: r.status ?? 200,
+      json: async () => r.json,
+      text: async () => body,
+    });
   });
   vi.stubGlobal("fetch", fn);
   return fn;
@@ -156,6 +198,7 @@ const TOKEN_URL = "/api/growth/approve";
 beforeEach(() => {
   flags.authEnabled = true;
   draftEditorMock.shouldSkipReady = false;
+  opsResponse = EMPTY_OPS;
   // #119: ?view はタブ切替で URL に書かれる。テスト間で漏れないよう毎回リセットする。
   window.history.replaceState(null, "", "/");
 });
@@ -2340,12 +2383,18 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
     const pending = new Promise((r) => {
       release = r;
     });
-    const fn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] })
-      )
-      .mockReturnValueOnce(pending);
+    const queue = [
+      jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
+      pending,
+    ];
+    const fn = vi.fn((input: RequestInfo | URL) => {
+      if (isOpsRequest(input)) {
+        fn.mock.calls.pop();
+        return opsFetchResult();
+      }
+      const next = queue.shift();
+      return next instanceof Promise ? next : Promise.resolve(next);
+    });
     vi.stubGlobal("fetch", fn);
 
     const dialog = await openIdeaPanel();
@@ -2556,19 +2605,23 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     const pending = new Promise((r) => {
       release = r;
     });
-    const fn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] })
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          exists: true,
-          draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
-        })
-      )
-      .mockReturnValueOnce(pending);
+    const queue = [
+      jsonResponse({ success: true, items: [ideaItem({ contentId: "g-abc" })] }),
+      jsonResponse({
+        success: true,
+        exists: true,
+        draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+      }),
+      pending,
+    ];
+    const fn = vi.fn((input: RequestInfo | URL) => {
+      if (isOpsRequest(input)) {
+        fn.mock.calls.pop();
+        return opsFetchResult();
+      }
+      const next = queue.shift();
+      return next instanceof Promise ? next : Promise.resolve(next);
+    });
     vi.stubGlobal("fetch", fn);
 
     render(<ApproveClient />);
@@ -3639,6 +3692,193 @@ describe("ApproveClient シェル操作(#proto P1)", () => {
     expect(await screen.findByRole("region", { name: "詳細: 猛暑記事" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "情報源" });
     expect(within(nav).getByRole("button", { name: /記事/ })).toHaveAttribute("aria-current", "page");
+  });
+});
+
+describe("ApproveClient 運用オブザーバビリティ", () => {
+  it("運用タブへ切り替えると worker 状態ビューを表示する", async () => {
+    flags.authEnabled = false;
+    mockOpsResponse({
+      ...EMPTY_OPS,
+      setupMissing: false,
+      worker: {
+        status: "healthy",
+        workerId: "worker-1",
+        lastHeartbeatAt: "2026-07-09T00:00:00.000Z",
+        currentJob: null,
+      },
+    });
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+
+    await selectView(/運用/);
+
+    expect(screen.getByRole("main")).toHaveAttribute("aria-label", "運用");
+    expect(screen.getByRole("heading", { name: "運用" })).toBeInTheDocument();
+    expect(screen.getByText("healthy")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "更新" }));
+  });
+
+  it("運用タブで読み込み中と取得失敗を表示する", async () => {
+    flags.authEnabled = false;
+    let release!: (value: unknown) => void;
+    mockOpsResponse(new Promise((resolve) => {
+      release = resolve;
+    }));
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await selectView(/運用/);
+    expect(await screen.findByText("運用状態を読み込み中…")).toBeInTheDocument();
+    release(jsonResponse({ success: true, ops: EMPTY_OPS }));
+  });
+
+  it("運用タブで ops 取得エラーを表示する", async () => {
+    flags.authEnabled = false;
+    mockOpsResponse(new Error("運用状態の取得に失敗しました。"));
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("市川ページ");
+    await selectView(/運用/);
+    expect(await screen.findByText("運用状態の取得に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("直近失敗・reconcile・stale worker を運用バッジ件数に反映する", async () => {
+    flags.authEnabled = false;
+    mockOpsResponse({
+      ...EMPTY_OPS,
+      setupMissing: false,
+      worker: {
+        status: "stale",
+        workerId: "worker-1",
+        lastHeartbeatAt: "2026-07-08T23:00:00.000Z",
+        currentJob: null,
+      },
+      recentFailures: [
+        {
+          id: "run-failed",
+          mode: "revise",
+          status: "failed",
+          targetPageId: "i1",
+          targetTitle: "失敗記事",
+          targetType: "article",
+          startedAt: "2026-07-09T00:00:00.000Z",
+          finishedAt: "2026-07-09T00:01:00.000Z",
+          recordedAt: "2026-07-09T00:01:00.000Z",
+          elapsedMs: 60_000,
+          exitCode: 1,
+          resumeCommand: null,
+          detail: "失敗しました",
+        },
+      ],
+      reconcileFindings: [
+        {
+          id: "finding-1",
+          targetPageId: "i2",
+          targetTitle: "差分記事",
+          severity: "warning",
+          detail: "Notion と microCMS の状態が違います",
+          recordedAt: "2026-07-09T00:02:00.000Z",
+        },
+      ],
+    });
+    mockFetchSequence({ json: { success: true, items: [proposalItem()] } });
+    render(<ApproveClient />);
+
+    const nav = await screen.findByRole("navigation", { name: "情報源" });
+    await waitFor(() => expect(within(nav).getByRole("button", { name: "運用" })).toHaveTextContent("3"));
+  });
+
+  it("ops の currentTargets と記事 activities から AI処理中バナーを表示する", async () => {
+    flags.authEnabled = false;
+    mockOpsResponse({
+      ...EMPTY_OPS,
+      setupMissing: false,
+      currentTargets: [
+        {
+          targetPageId: "i-ops",
+          targetTitle: null,
+          targetType: "article",
+          mode: "decorate",
+          status: "running",
+          startedAt: "2026-07-09T00:00:00.000Z",
+          elapsedMs: 120_000,
+        },
+      ],
+    });
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          ideaItem({
+            id: "i1",
+            activities: [
+              {
+                kind: "revise",
+                status: "requested",
+                label: "構成案修正",
+                requestedAtMs: Date.parse("2026-07-09T00:00:00.000Z"),
+                updatedAtMs: Date.parse("2026-07-09T00:00:00.000Z"),
+                hasResult: false,
+                summary: null,
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+
+    expect(await screen.findByText("AI処理中")).toBeInTheDocument();
+    expect(await screen.findByText("system")).toBeInTheDocument();
+    expect(screen.getByText(/decorate/)).toBeInTheDocument();
+  });
+
+  it("ops の処理対象が無いとき item activities から AI処理中バナーを表示する", async () => {
+    flags.authEnabled = false;
+    mockFetchSequence({
+      json: {
+        success: true,
+        items: [
+          proposalItem({
+            id: "p-activity",
+            title: "施策処理中",
+            activities: [
+              {
+                kind: "decorate",
+                status: "requested",
+                label: "装飾提案",
+                requestedAtMs: null,
+                updatedAtMs: null,
+                hasResult: false,
+                summary: null,
+              },
+            ],
+          }),
+          ideaItem({
+            id: "i-activity",
+            title: "記事処理中",
+            activities: [
+              {
+                kind: "advise",
+                status: "running",
+                label: "スタイリング助言",
+                requestedAtMs: Date.parse("2026-07-09T00:00:00.000Z"),
+                updatedAtMs: Date.parse("2026-07-09T00:00:00.000Z"),
+                hasResult: false,
+                summary: null,
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    render(<ApproveClient />);
+
+    expect(await screen.findByText("AI処理中")).toBeInTheDocument();
+    expect(screen.getAllByText("施策処理中").length).toBeGreaterThan(0);
+    expect(screen.getByText(/decorate/)).toBeInTheDocument();
   });
 });
 

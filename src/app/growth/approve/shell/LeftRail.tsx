@@ -6,7 +6,7 @@
 
 import type { ReactNode } from "react";
 
-import { IconCalendar, IconChart, IconFileText, IconInbox, IconList } from "@/app/growth/approve/ui/icons";
+import { IconCalendar, IconChart, IconFileText, IconInbox, IconList, IconRefresh } from "@/app/growth/approve/ui/icons";
 import type { ApproveView } from "@/app/growth/approve/viewRouting";
 
 interface RailItem {
@@ -22,16 +22,18 @@ interface LeftRailProps {
   articleCount: number;
   proposalCount: number;
   queueReadyCount: number;
+  opsIssueCount: number;
   onChange: (view: ApproveView) => void;
 }
 
-export function LeftRail({ view, articleCount, proposalCount, queueReadyCount, onChange }: LeftRailProps) {
+export function LeftRail({ view, articleCount, proposalCount, queueReadyCount, opsIssueCount, onChange }: LeftRailProps) {
   const items: RailItem[] = [
     { key: "proposal", label: "施策", icon: <IconList size={18} />, badge: proposalCount },
     { key: "approve", label: "記事", icon: <IconInbox size={18} />, badge: articleCount },
     { key: "prompt", label: "プロンプト", icon: <IconFileText size={18} /> },
     { key: "performance", label: "成績", icon: <IconChart size={18} /> },
     { key: "queue", label: "公開キュー", icon: <IconCalendar size={18} />, badge: queueReadyCount },
+    { key: "ops", label: "運用", icon: <IconRefresh size={18} />, badge: opsIssueCount },
   ];
 
   return (

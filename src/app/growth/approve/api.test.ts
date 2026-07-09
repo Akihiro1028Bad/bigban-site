@@ -7,6 +7,8 @@ import { setupMswServer } from "@/test/msw/setup";
 import {
   BOARD_URL,
   fetchBoard,
+  fetchOps,
+  fetchProposalArtifact,
   fetchPrompts,
   postDecision,
   postRevert,
@@ -14,6 +16,8 @@ import {
   postReviseApply,
   postReviseEdit,
   PROMPTS_URL,
+  OPS_URL,
+  PROPOSAL_ARTIFACT_URL,
 } from "./api";
 
 setupMswServer();
@@ -218,5 +222,45 @@ describe("fetchPrompts", () => {
     await expect(fetchPrompts("tok")).rejects.toThrow("読込障害");
     server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
     await expect(fetchPrompts("tok")).rejects.toThrow("取得に失敗しました。");
+  });
+});
+
+describe("fetchOps", () => {
+  it("success レスポンスから ops を返す", async () => {
+    const ops = {
+      setupMissing: true,
+      worker: { status: "unknown", workerId: null, lastHeartbeatAt: null, currentJob: null },
+      currentTargets: [],
+      recentRuns: [],
+      recentFailures: [],
+      reconcileFindings: [],
+    };
+    server.use(http.get(OPS_URL, () => HttpResponse.json({ success: true, ops })));
+    await expect(fetchOps("tok")).resolves.toEqual(ops);
+  });
+
+  it("401 は合言葉エラー、その他は error/既定文言", async () => {
+    server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
+    await expect(fetchOps("tok")).rejects.toThrow(/合言葉が違います/);
+    server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false, error: "OPS NG" }, { status: 500 })));
+    await expect(fetchOps("tok")).rejects.toThrow("OPS NG");
+    server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(fetchOps("tok")).rejects.toThrow("運用状態の取得に失敗しました。");
+  });
+});
+
+describe("fetchProposalArtifact", () => {
+  it("blocks 配列を返し、欠落時は空配列にする", async () => {
+    server.use(http.get(PROPOSAL_ARTIFACT_URL, () => HttpResponse.json({ success: true, blocks: [{ id: "b1" }] })));
+    await expect(fetchProposalArtifact("tok", "p1")).resolves.toEqual([{ id: "b1" }]);
+    server.use(http.get(PROPOSAL_ARTIFACT_URL, () => HttpResponse.json({ success: true })));
+    await expect(fetchProposalArtifact("tok", "p1")).resolves.toEqual([]);
+  });
+
+  it("失敗は error 文言、無ければ既定文言", async () => {
+    server.use(http.get(PROPOSAL_ARTIFACT_URL, () => HttpResponse.json({ success: false, error: "成果物NG" }, { status: 500 })));
+    await expect(fetchProposalArtifact("tok", "p1")).rejects.toThrow("成果物NG");
+    server.use(http.get(PROPOSAL_ARTIFACT_URL, () => HttpResponse.json({ success: false }, { status: 500 })));
+    await expect(fetchProposalArtifact("tok", "p1")).rejects.toThrow("成果物の取得に失敗しました。");
   });
 });

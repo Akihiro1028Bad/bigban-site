@@ -7,6 +7,7 @@
 import type { PendingItem } from "@/lib/growth/approve";
 import type { PromptGroup } from "@/lib/growth/promptRegistry";
 import { readJsonObject } from "@/lib/growth/safeJson";
+import type { GrowthOpsView } from "@/lib/growth/workerLog";
 
 import { authHeaders } from "./authHeaders";
 
@@ -15,6 +16,8 @@ export const BOARD_URL = "/api/growth/approve";
 export const PROMPTS_URL = "/api/growth/prompts";
 
 export const PROPOSAL_ARTIFACT_URL = "/api/growth/proposal-artifact";
+
+export const OPS_URL = "/api/growth/ops";
 
 export interface ProposalArtifactBlock {
   id: string;
@@ -64,6 +67,20 @@ export async function fetchBoard(token: string): Promise<PendingItem[]> {
     );
   }
   return json.items as PendingItem[];
+}
+
+/** Worker運用状態を取得する。未設定時は setupMissing=true の空データを返す。 */
+export async function fetchOps(token: string): Promise<GrowthOpsView> {
+  const res = await fetch(OPS_URL, { headers: authHeaders(token) });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(
+      res.status === 401
+        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        : json.error ?? "運用状態の取得に失敗しました。"
+    );
+  }
+  return json.ops as GrowthOpsView;
 }
 
 /** 成果物化済み施策の Notion 本文を、画面表示用のテキストブロックとして取得する。 */

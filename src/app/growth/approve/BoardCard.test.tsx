@@ -134,6 +134,54 @@ describe("BoardCard 開く/選ぶ(proto 対話モデル)", () => {
 });
 
 describe("BoardCard 状態チップ(情報のみ・非操作)", () => {
+  it("activities から AI 状態バッジを表示する", () => {
+    renderCard({
+      item: {
+        activities: [
+          {
+            kind: "revise",
+            status: "presented",
+            label: "構成案修正",
+            requestedAtMs: null,
+            updatedAtMs: null,
+            hasResult: true,
+            summary: "修正案",
+          },
+          {
+            kind: "advise",
+            status: "requested",
+            label: "スタイリング助言",
+            requestedAtMs: null,
+            updatedAtMs: null,
+            hasResult: false,
+            summary: null,
+          },
+        ],
+      },
+    });
+    expect(screen.getByText("AI処理中")).toBeInTheDocument();
+    expect(screen.getByText("修正案あり")).toBeInTheDocument();
+  });
+
+  it("失敗 activity は直近失敗バッジを表示する", () => {
+    renderCard({
+      item: {
+        activities: [
+          {
+            kind: "decorate",
+            status: "failed",
+            label: "装飾提案",
+            requestedAtMs: null,
+            updatedAtMs: null,
+            hasResult: true,
+            summary: "失敗",
+          },
+        ],
+      },
+    });
+    expect(screen.getByText("直近失敗")).toBeInTheDocument();
+  });
+
   it("決定済み(承認)は ✓承認 チップを出し取り消しボタンは出さない", () => {
     renderCard({ props: { choice: "承認" } });
     expect(screen.getByText("✓承認")).toBeInTheDocument();

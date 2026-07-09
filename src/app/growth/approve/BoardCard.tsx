@@ -14,6 +14,7 @@
 
 import { cardExcerpt, cardHasEyecatch, cardHue } from "./boardCardView";
 import { isReviseBusy } from "./boardItemHelpers";
+import { activityBadgeLabels } from "@/lib/growth/activity";
 import type { PendingItem } from "./types";
 import { IconCheck } from "./ui/icons";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
@@ -56,6 +57,7 @@ export function BoardCard({
   const awaitingYou = !choice && !item.isDraftReady && !awaitingDownstream;
   const excerpt = cardExcerpt(item);
   const reviseBusy = isReviseBusy(item.reviseStatus);
+  const activityBadges = activityBadgeLabels(item.activities ?? []);
   const downstreamLabel =
     item.kind === "proposal"
       ? "承認済み"
@@ -148,6 +150,20 @@ export function BoardCard({
               修正中
             </span>
           ) : null}
+          {activityBadges.map((label) => (
+            <span
+              key={label}
+              className={`rounded-full px-1.5 py-[1px] text-[10px] font-medium ${
+                label === "AI処理中" || label === "画像再生成中" ? "approve-pulse" : ""
+              }`}
+              style={{
+                background: label === "直近失敗" ? "var(--p-red-weak)" : "var(--p-bg-raised)",
+                color: label === "直近失敗" ? "var(--p-red)" : "var(--p-text-2)",
+              }}
+            >
+              {label}
+            </span>
+          ))}
           {choice ? (
             <span
               className="rounded-full px-1.5 py-[1px] text-[10px] font-medium"

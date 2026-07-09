@@ -114,6 +114,21 @@ const PROMPTS_SAMPLE: PromptsData = {
 };
 
 import { ApproveClient } from "./ApproveClient";
+import type { GrowthOpsView } from "@/lib/growth/workerLog";
+
+const EMPTY_OPS: GrowthOpsView = {
+  setupMissing: true,
+  worker: {
+    status: "unknown",
+    workerId: null,
+    lastHeartbeatAt: null,
+    currentJob: null,
+  },
+  currentTargets: [],
+  recentRuns: [],
+  recentFailures: [],
+  reconcileFindings: [],
+};
 
 function mockFetchSequence(
   ...responses: Array<
@@ -121,18 +136,30 @@ function mockFetchSequence(
   >
 ) {
   const fn = vi.fn();
-  responses.forEach((r) => {
-    if (r instanceof Error || typeof r === "string") {
-      fn.mockRejectedValueOnce(r);
-    } else {
-      const body = r.text ?? JSON.stringify(r.json);
-      fn.mockResolvedValueOnce({
-        ok: r.ok ?? true,
-        status: r.status ?? 200,
-        json: async () => r.json,
-        text: async () => body,
+  const queue = [...responses];
+  fn.mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/api/growth/ops")) {
+      fn.mock.calls.pop();
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, ops: EMPTY_OPS }),
+        text: async () => JSON.stringify({ success: true, ops: EMPTY_OPS }),
       });
     }
+    const r = queue.shift();
+    if (!r) return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    if (r instanceof Error || typeof r === "string") {
+      return Promise.reject(r);
+    }
+    const body = r.text ?? JSON.stringify(r.json);
+    return Promise.resolve({
+      ok: r.ok ?? true,
+      status: r.status ?? 200,
+      json: async () => r.json,
+      text: async () => body,
+    });
   });
   vi.stubGlobal("fetch", fn);
   return fn;

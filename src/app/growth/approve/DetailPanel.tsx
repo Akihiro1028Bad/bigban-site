@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import type { ArticleHypothesis } from "@/lib/growth/approve";
+import type { PendingActivity, PendingActivityStatus } from "@/lib/growth/activity";
 
 import { ArtboardView } from "./ArtboardView";
 import { bodyImageUrlsOf } from "./detailBodyImages";
@@ -125,6 +126,63 @@ function readMinutesOf(chars: number): number {
 /** 本番に更新ラベルは無いため、予約時刻があれば簡易ラベルにする(欠落耐性)。 */
 function scheduledLabelOf(item: PendingItem): string | null {
   return item.scheduledAtMs != null ? "予約済み" : null;
+}
+
+function activityStatusLabel(status: PendingActivityStatus): string {
+  const labels: Record<PendingActivityStatus, string> = {
+    idle: "待機",
+    requested: "依頼中",
+    running: "処理中",
+    presented: "提示中",
+    failed: "失敗",
+  };
+  return labels[status];
+}
+
+function activityStatusColor(status: PendingActivityStatus): string {
+  if (status === "failed") return "var(--p-red)";
+  if (status === "presented") return "var(--p-green)";
+  if (status === "requested" || status === "running") return "var(--p-purple)";
+  return "var(--p-text-3)";
+}
+
+function ActivityPanel({ activities }: { activities: readonly PendingActivity[] }) {
+  if (activities.length === 0) return null;
+  return (
+    <section
+      className="mt-3 rounded-[10px] p-3"
+      style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
+      aria-label="AI依頼状況"
+    >
+      <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold" style={{ color: "var(--p-text)" }}>
+        <IconSparkles size={14} />
+        AI依頼状況
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {activities.map((activity) => {
+          const color = activityStatusColor(activity.status);
+          return (
+            <div key={activity.kind} className="flex min-w-0 items-start gap-2 text-[12px]">
+              <span className="min-w-[92px] font-medium" style={{ color: "var(--p-text-2)" }}>
+                {activity.label}
+              </span>
+              <span
+                className={activity.status === "requested" || activity.status === "running" ? "approve-pulse" : undefined}
+                style={{ color }}
+              >
+                {activityStatusLabel(activity.status)}
+              </span>
+              {activity.summary ? (
+                <span className="min-w-0 flex-1 truncate" style={{ color: "var(--p-text-3)" }}>
+                  {activity.summary}
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export interface DetailPanelProps {
@@ -337,6 +395,7 @@ export function DetailPanel({
             ))}
           </div>
         )}
+        <ActivityPanel activities={item.activities ?? []} />
       </div>
 
       <nav

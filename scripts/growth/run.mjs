@@ -20,14 +20,11 @@ import {
   writeFileSync,
   mkdirSync,
   existsSync,
-  statSync,
-  rmSync,
-  openSync,
-  writeSync,
-  closeSync,
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { acquireLock, releaseLock } from "./lockfile.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
@@ -153,31 +150,13 @@ const REVISE_DAILY_CAP = Number(process.env.GROWTH_REVISE_DAILY_CAP || "50");
 // より長くして、claude 実行中に reaper が起きても次の起動が割り込まないようにしている。
 const LOCK_STALE_MS = 30 * 60 * 1000; // 30分超のロックは死んだプロセスとみなす
 
-/** O_EXCL で排他的にロックファイルを作る。既存なら false。成功で true。 */
-function createLockExclusive() {
-  try {
-    const fd = openSync(REVISE_LOCK, "wx"); // 既存なら EEXIST で例外
-    writeSync(fd, String(process.pid));
-    closeSync(fd);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** 多重起動防止のロック取得。取れなければ false。stale(>30分)なロックは奪って再取得。 */
 function acquireReviseLock() {
-  mkdirSync(tmpDir, { recursive: true });
-  if (createLockExclusive()) return true;
-  // 既存ロックあり。stale(>30分)なら奪って再取得(競合に負ければ false)。
-  const ageMs = Date.now() - statSync(REVISE_LOCK).mtimeMs;
-  if (ageMs < LOCK_STALE_MS) return false;
-  rmSync(REVISE_LOCK, { force: true });
-  return createLockExclusive();
+  return acquireLock(REVISE_LOCK, { staleMs: LOCK_STALE_MS });
 }
 
 function releaseReviseLock() {
-  rmSync(REVISE_LOCK, { force: true });
+  releaseLock(REVISE_LOCK);
 }
 
 /** 1日あたりの実行上限。超えていれば false。 */
@@ -432,9 +411,45 @@ function peekShouldRunLoop() {
   return shouldRunLoopFromPeek(res.stdout ?? "", res.status);
 }
 
+function workerLogArgs(command, fields) {
+  const args = ["run", "--silent", "growth:worker-log", "--", command];
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null || value === "") continue;
+    args.push(`--${key}`, String(value));
+  }
+  return args;
+}
+
+function runWorkerLog(command, fields) {
+  const npm = isWin ? "npm.cmd" : "npm";
+  const res = spawnSync(npm, workerLogArgs(command, fields), {
+    encoding: "utf-8",
+    shell: isWin,
+    env: { ...process.env },
+  });
+  if ((res.status ?? 0) !== 0) {
+    process.stderr.write(`[worker-log] ${command} に失敗しました: ${(res.stderr ?? "").trim()}\n`);
+    return "disabled";
+  }
+  return (res.stdout ?? "").trim().split("\n").filter(Boolean).pop() ?? "disabled";
+}
+
+function logSkipped(detail) {
+  runWorkerLog("start", {
+    mode,
+    status: "skipped",
+    kind: "job",
+    name: `${mode} skipped`,
+    "target-type": "system",
+    detail,
+    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+  });
+}
+
 // lock 系ループは高頻度起動。多重起動を lockfile で防ぎ、依頼ありの実作業だけ1日上限に数える。
 if (cfg.lock) {
   if (!acquireReviseLock()) {
+    logSkipped("既に実行中のためスキップ");
     process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
     process.exit(0);
   }
@@ -445,6 +460,7 @@ if (cfg.lock) {
   }
   if (!underDailyCap()) {
     releaseReviseLock();
+    logSkipped(`本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップ`);
     process.stdout.write(`${mode}: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
     process.exit(0);
   }
@@ -482,6 +498,17 @@ function notifyLoopFail(kind, { exitCode, detail } = {}) {
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
+const runStartedAt = new Date().toISOString();
+const workerRunPageId = runWorkerLog("start", {
+  mode,
+  status: "running",
+  kind: "job",
+  name: `${mode} running`,
+  "target-type": "system",
+  "started-at": runStartedAt,
+  resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+  detail: `${AGENT}${CODEX_MODEL ? ` ${CODEX_MODEL}` : ""}`,
+});
 const child = spawn(agentCommand, args, {
   stdio: ["pipe", "inherit", "inherit"],
   shell: isWin,
@@ -491,6 +518,18 @@ child.stdin.end();
 child.on("exit", async (code) => {
   if (cfg.lock) releaseReviseLock();
   const exitCode = code ?? 0;
+  runWorkerLog("finish", {
+    "page-id": workerRunPageId,
+    mode,
+    status: exitCode === 0 ? "success" : "failed",
+    kind: "job",
+    name: `${mode} ${exitCode === 0 ? "success" : "failed"}`,
+    "target-type": "system",
+    "started-at": runStartedAt,
+    "finished-at": new Date().toISOString(),
+    "exit-code": exitCode,
+    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+  });
   // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
   // agent の出力には依存せず、スナップショット + Notion から通知を組み立てる。
   // 異常終了(exit≠0)でも、失敗を**沈黙させない**ためにエラー通知を送る。
@@ -519,6 +558,19 @@ child.on("exit", async (code) => {
 });
 child.on("error", (err) => {
   if (cfg.lock) releaseReviseLock();
+  runWorkerLog("finish", {
+    "page-id": workerRunPageId,
+    mode,
+    status: "failed",
+    kind: "job",
+    name: `${mode} spawn-error`,
+    "target-type": "system",
+    "started-at": runStartedAt,
+    "finished-at": new Date().toISOString(),
+    "exit-code": 1,
+    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+    detail: err.message,
+  });
   process.stderr.write(`${agentCommand} の起動に失敗しました: ${err.message}\n`);
   // agent 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
   if (mode === "weekly") {
