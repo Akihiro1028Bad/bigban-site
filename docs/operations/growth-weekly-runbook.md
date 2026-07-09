@@ -198,14 +198,14 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 
 1. **GA4 管理画面 → 管理 → イベント** を開く(対象プロパティ = 本番サイト)。
 2. 計測したい導線ごとにイベントを用意する:
-   - **予約クリック**: 予約ボタン(外部 RESERVA `https://reserva.be/tpbt` への遷移)。`click`(送信先ドメイン=reserva.be)または `outbound click` を条件にカスタムイベントを作成。
+   - **予約クリック**: 予約ボタン(内部の予約案内ページ `https://www.thepicklebang.com/reserve` への遷移)。**外部離脱ではなく内部遷移**になったため、`page_view`(page_location に `/reserve` を含む)を条件にカスタムイベントを作成する。旧「reserva.be への outbound click」条件は発火しないので使わない。/reserve への到達＝予約意図の上流指標として測る(RESERVA→labola 切替後も /reserve が受けるため指標が安定する)。
    - **LINE 追加**: 公式 LINE への遷移(外部リンククリック)。
    - **Instagram 遷移**: 公式 Instagram への遷移(外部リンククリック)。
 3. 作成した各イベントを **「キーイベントとしてマークする」** で key event に指定する。
 4. 反映には数時間〜1日かかる。反映後、GA4 Data API の `keyEvents` 指標に値が入り、週次計測ループが取り込む。
 5. 成功指標「予約クリック◯件/月」は、この予約クリック key event の月次合計で読む。
 
-> 注: サイト側の CTA リンクは既に `RESERVE_URL`(`src/constants/site.ts`)と `EXTERNAL_LINK_PROPS` で実装済み。GA4 側の key event 指定だけが未了の人手作業。
+> 注: 予約導線は内部の予約案内ページ `/reserve`(`https://www.thepicklebang.com/reserve`)に集約済み(旧: 外部 RESERVA 直リンク。RESERVA→labola 切替を /reserve ページが吸収するため内部化)。/reserve ページ内の RESERVA/labola ボタン自体は `src/app/[locale]/reserve/` が持ち、`RESERVE_URL`(`src/constants/site.ts` = 外部 reserva.be)はそこで使う。GA4 側の key event 指定(上記の /reserve `page_view`)だけが未了の人手作業。LINE / Instagram は従来どおり外部リンク。
 
 ## slug汚染の回復（セルフヒール・#26）
 
