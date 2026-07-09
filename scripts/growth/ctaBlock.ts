@@ -55,3 +55,17 @@ function matchCtaWrapper(html: string): Cta | null {
 export function parseCta(html: string): Cta | null {
   return matchCtaAnchor(html) ?? matchCtaWrapper(html);
 }
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Cta を正準 CTA HTML に直列化する(parseCta の逆変換)。サニタイザ(STRICT)往復で保持される形。 */
+export function serializeCta(cta: Cta): string {
+  const cls = cta.variant === "ghost" ? "cta cta--ghost" : "cta";
+  return `<a class="${cls}" href="${escapeHtml(cta.href)}">${escapeHtml(cta.label)}</a>`;
+}
