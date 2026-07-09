@@ -1,7 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { buildDigestMessage, buildFailureMessage, extractReportSummary } from "./digest";
+import {
+  buildDigestMessage,
+  buildFailureMessage,
+  clampAltText,
+  extractReportSummary,
+  LINE_ALT_TEXT_MAX,
+} from "./digest";
 import type { DigestInput } from "./digest";
 import type { NotionBlock } from "./notion";
 
@@ -302,5 +308,22 @@ describe("extractReportSummary", () => {
       discussion: ["有効"],
       dataNotes: [],
     });
+  });
+});
+
+describe("clampAltText", () => {
+  it("上限以内はそのまま返す", () => {
+    expect(clampAltText("短い本文", 400)).toBe("短い本文");
+  });
+  it("上限ちょうどはそのまま返す", () => {
+    const text = "あ".repeat(400);
+    expect(clampAltText(text)).toBe(text);
+  });
+  it("上限超過は末尾を…で丸めて上限に収める", () => {
+    const text = "あ".repeat(500);
+    const out = clampAltText(text);
+    expect(out.length).toBe(LINE_ALT_TEXT_MAX);
+    expect(out.endsWith("…")).toBe(true);
+    expect(out).toBe("あ".repeat(399) + "…");
   });
 });

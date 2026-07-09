@@ -178,6 +178,18 @@ export function buildDigestMessage(input: DigestInput): string {
   return lines.join("\n");
 }
 
+/** LINE Flex メッセージの altText の文字数上限。 */
+export const LINE_ALT_TEXT_MAX = 400;
+
+/**
+ * Flex の altText を LINE の上限(400字)に収める。全文は Flex 本文側にあるため、
+ * altText は超過分を末尾「…」で丸める(上限超過だと LINE が Flex 送信を丸ごと拒否するため)。
+ */
+export function clampAltText(text: string, max: number = LINE_ALT_TEXT_MAX): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}
+
 /**
  * 週次の自動実行が異常終了したときに LINE へ送る失敗通知の本文。
  * スナップショットや Notion を読まずに送れるよう、ログの場所だけを伝える。

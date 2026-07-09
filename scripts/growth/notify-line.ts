@@ -13,7 +13,7 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildDigestMessage, buildFailureMessage, extractReportSummary } from "./digest";
+import { buildDigestMessage, buildFailureMessage, clampAltText, extractReportSummary } from "./digest";
 import { buildDigestFlex } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
@@ -155,7 +155,8 @@ async function main(): Promise<void> {
   // テキストは Flex 非対応環境向けの altText(フォールバック)として活用する。
   const summaryLine = await failureSummaryLine();
   const baseAltText = buildDigestMessage(digestInput);
-  const altText = summaryLine ? `${baseAltText}\n\n${summaryLine}` : baseAltText;
+  // Flex の altText は LINE の 400 字上限に収める(全文は Flex 本文側にある)。
+  const altText = clampAltText(summaryLine ? `${baseAltText}\n\n${summaryLine}` : baseAltText);
   const flex = buildDigestFlex(digestInput);
   if (summaryLine) {
     flex.body?.contents.push({
