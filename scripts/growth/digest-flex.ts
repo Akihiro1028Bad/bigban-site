@@ -173,10 +173,58 @@ function actionTexts(input: DigestInput): FlexComponent[] {
   return [heading, ...items];
 }
 
+function reportSummaryTexts(input: DigestInput): FlexComponent[] {
+  const contents: FlexComponent[] = [];
+  const discussion = input.reportSummary?.discussion ?? [];
+  if (discussion.length > 0) {
+    contents.push({
+      type: "text",
+      text: "■ 論点",
+      weight: "bold",
+      size: "sm",
+      color: COLOR_HEADING,
+    });
+    discussion.forEach((line) => {
+      contents.push({ type: "text", text: `・${line}`, size: "sm", color: COLOR_FLAT, wrap: true });
+    });
+  }
+
+  const dataNotes = input.reportSummary?.dataNotes ?? [];
+  if (dataNotes.length > 0) {
+    contents.push({
+      type: "text",
+      text: "■ データ注意",
+      weight: "bold",
+      size: "sm",
+      color: COLOR_HEADING,
+    });
+    dataNotes.forEach((line) => {
+      contents.push({ type: "text", text: `・${line}`, size: "sm", color: COLOR_FLAT, wrap: true });
+    });
+  }
+
+  return contents;
+}
+
+function passphraseText(input: DigestInput): FlexText | undefined {
+  const passphrase = input.passphrase?.trim();
+  if (!passphrase) return undefined;
+  return {
+    type: "text",
+    text: `🔑 合言葉: ${passphrase}`,
+    weight: "bold",
+    size: "sm",
+    color: COLOR_HEADING,
+    wrap: true,
+  };
+}
+
 function footerButtons(input: DigestInput): FlexBox | undefined {
-  const buttons: FlexButton[] = [];
+  const contents: FlexComponent[] = [];
+  const passphrase = passphraseText(input);
+  if (passphrase) contents.push(passphrase);
   if (input.approveUrl) {
-    buttons.push({
+    contents.push({
       type: "button",
       style: "primary",
       height: "sm",
@@ -184,15 +232,15 @@ function footerButtons(input: DigestInput): FlexBox | undefined {
     });
   }
   if (input.reportUrl) {
-    buttons.push({
+    contents.push({
       type: "button",
       style: "secondary",
       height: "sm",
       action: { type: "uri", label: "📄 レポートを見る", uri: input.reportUrl },
     });
   }
-  if (buttons.length === 0) return undefined;
-  return { type: "box", layout: "vertical", spacing: "sm", contents: buttons };
+  if (contents.length === 0) return undefined;
+  return { type: "box", layout: "vertical", spacing: "sm", contents };
 }
 
 /** 週次ダイジェストを Flex の bubble にする。 */
@@ -217,6 +265,7 @@ export function buildDigestFlex(input: DigestInput): FlexBubble {
     ...metricRows(input),
     ...actionTexts(input),
     { type: "text", text: `承認待ち ${input.pendingCount}件`, weight: "bold", size: "sm", color: COLOR_HEADING },
+    ...reportSummaryTexts(input),
   ];
 
   const body: FlexBox = {

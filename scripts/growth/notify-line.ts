@@ -13,11 +13,11 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildDigestMessage, buildFailureMessage } from "./digest";
+import { buildDigestMessage, buildFailureMessage, extractReportSummary } from "./digest";
 import { buildDigestFlex } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
-import { getLatestReport, queryDataSource } from "./notion";
+import { getLatestReport, listBlockChildren, queryDataSource } from "./notion";
 import {
   FAILURE_LOG_PATH,
   FAILURE_WINDOW_MS,
@@ -33,6 +33,7 @@ import {
 } from "./notify-build";
 import { jstDateString } from "./period";
 import { buildTokenExpiryWarning, parseExpiresAt } from "./token-expiry";
+import type { ReportSummary } from "./digest";
 
 const DEFAULT_WEEKLY_LOG = "data/weekly-cron.log";
 
@@ -101,6 +102,7 @@ async function main(): Promise<void> {
   let topActions: string[] = [];
   let pendingCount = 0;
   let reportUrl: string | null = null;
+  let reportSummary: ReportSummary | undefined;
 
   const notionToken = process.env.NOTION_TOKEN;
   if (notionToken) {
@@ -122,6 +124,15 @@ async function main(): Promise<void> {
     reportUrl = report
       ? buildPublicNotionUrl(process.env.NOTION_PUBLIC_DOMAIN, report.id)
       : null;
+    if (report) {
+      try {
+        const children = await listBlockChildren(report.id, opts);
+        reportSummary = extractReportSummary(children.blocks);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`週次レポート本文の要約取得を省略します: ${message}\n`);
+      }
+    }
   } else {
     process.stderr.write("NOTION_TOKEN 未設定のため承認待ち・レポートURLは省略します。\n");
   }
@@ -136,6 +147,8 @@ async function main(): Promise<void> {
     reportUrl,
     approveUrl,
     warnings: tokenWarnings(),
+    reportSummary,
+    passphrase: process.env.APPROVE_SECRET,
     // 実行時 SHA(#219): run.mjs が pull 後に渡す。デプロイ側 SHA とのスキュー確認用。
     sha: process.env.GROWTH_RUN_SHA,
   };

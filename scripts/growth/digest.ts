@@ -5,6 +5,8 @@
  * 入出力のみに依存(I/O なし)させ、テスト容易性とカバレッジを確保する。
  */
 
+import type { NotionBlock } from "./notion";
+
 export interface MetricValue {
   current: number;
   prior: number;
@@ -31,9 +33,22 @@ export interface DigestInput {
   warnings?: string[];
   /** 実行時の短縮 SHA(#219)。デプロイ側 SHA とのスキュー確認用。空/未指定なら非表示。 */
   sha?: string;
+  /** Notionレポート本文から抽出した質的な要約。空/未指定なら非表示。 */
+  reportSummary?: ReportSummary;
+  /** APPROVE_SECRET。空/未設定なら非表示。 */
+  passphrase?: string | null;
 }
 
 const MAX_TOP_ACTIONS = 3;
+const MAX_SUMMARY_LINES = 3;
+const MAX_SUMMARY_CHARS = 120;
+
+export interface ReportSummary {
+  discussion: string[];
+  dataNotes: string[];
+}
+
+type SummarySection = keyof ReportSummary;
 
 function formatInt(n: number): string {
   return Math.round(n)
@@ -54,6 +69,62 @@ function positionPhrase(m: MetricValue): string {
   if (m.deltaPct === null) return "(前週データなし)";
   if (m.current === m.prior) return "前週から横ばい";
   return m.current < m.prior ? "前週より改善" : "前週より悪化";
+}
+
+function plainTextOf(block: NotionBlock): string {
+  const payload = block[block.type];
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return "";
+
+  const richText = (payload as Record<string, unknown>).rich_text;
+  if (!Array.isArray(richText)) return "";
+
+  return richText
+    .map((item) => {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) return "";
+      const plainText = (item as Record<string, unknown>).plain_text;
+      return typeof plainText === "string" ? plainText : "";
+    })
+    .join("");
+}
+
+function sectionForHeading(text: string): SummarySection | null {
+  if (text.includes("論点")) return "discussion";
+  if (text.includes("データ注意")) return "dataNotes";
+  return null;
+}
+
+function truncateSummaryLine(line: string): string {
+  return line.length > MAX_SUMMARY_CHARS
+    ? `${line.slice(0, MAX_SUMMARY_CHARS - 1)}…`
+    : line;
+}
+
+function addSummaryLine(summary: ReportSummary, section: SummarySection, text: string): void {
+  if (summary[section].length >= MAX_SUMMARY_LINES) return;
+  const line = text.trim();
+  if (!line) return;
+  summary[section].push(truncateSummaryLine(line));
+}
+
+export function extractReportSummary(blocks: readonly NotionBlock[]): ReportSummary {
+  const summary: ReportSummary = { discussion: [], dataNotes: [] };
+  let currentSection: SummarySection | null = null;
+
+  blocks.forEach((block) => {
+    if (block.type === "heading_2" || block.type === "heading_3") {
+      currentSection = sectionForHeading(plainTextOf(block));
+      return;
+    }
+
+    if (
+      currentSection &&
+      (block.type === "paragraph" || block.type === "bulleted_list_item")
+    ) {
+      addSummaryLine(summary, currentSection, plainTextOf(block));
+    }
+  });
+
+  return summary;
 }
 
 export function buildDigestMessage(input: DigestInput): string {
@@ -83,8 +154,23 @@ export function buildDigestMessage(input: DigestInput): string {
   }
 
   lines.push("", `承認待ち ${input.pendingCount}件`);
+
+  const discussion = input.reportSummary?.discussion ?? [];
+  if (discussion.length > 0) {
+    lines.push("", "■ 論点");
+    discussion.forEach((line) => lines.push(`・${line}`));
+  }
+
+  const dataNotes = input.reportSummary?.dataNotes ?? [];
+  if (dataNotes.length > 0) {
+    lines.push("", "■ データ注意");
+    dataNotes.forEach((line) => lines.push(`・${line}`));
+  }
+
   if (input.reportUrl) lines.push(`レポートを見る → ${input.reportUrl}`);
   if (input.approveUrl) lines.push(`承認する → ${input.approveUrl}`);
+  const passphrase = input.passphrase?.trim();
+  if (passphrase) lines.push(`🔑 合言葉: ${passphrase}`);
 
   const sha = input.sha?.trim();
   if (sha) lines.push("", `実行 SHA: ${sha}`);

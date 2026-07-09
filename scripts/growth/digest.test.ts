@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { buildDigestMessage, buildFailureMessage } from "./digest";
+import { buildDigestMessage, buildFailureMessage, extractReportSummary } from "./digest";
 import type { DigestInput } from "./digest";
+import type { NotionBlock } from "./notion";
 
 function baseInput(overrides: Partial<DigestInput> = {}): DigestInput {
   return {
@@ -101,6 +102,50 @@ describe("buildDigestMessage", () => {
     const empty = buildDigestMessage(baseInput({ warnings: [] }));
     expect(empty.startsWith("📊")).toBe(true);
   });
+
+  it("レポート要約がある場合は論点とデータ注意を含める", () => {
+    const msg = buildDigestMessage(
+      baseInput({
+        reportSummary: {
+          discussion: ["A", "B"],
+          dataNotes: ["推測を含む"],
+        },
+      })
+    );
+
+    expect(msg).toContain("■ 論点");
+    expect(msg).toContain("・A");
+    expect(msg).toContain("・B");
+    expect(msg).toContain("■ データ注意");
+    expect(msg).toContain("・推測を含む");
+  });
+
+  it("レポート要約が未指定または空なら論点とデータ注意を出さない", () => {
+    const omitted = buildDigestMessage(baseInput());
+    expect(omitted).not.toContain("■ 論点");
+    expect(omitted).not.toContain("■ データ注意");
+
+    const empty = buildDigestMessage(
+      baseInput({ reportSummary: { discussion: [], dataNotes: [] } })
+    );
+    expect(empty).not.toContain("■ 論点");
+    expect(empty).not.toContain("■ データ注意");
+  });
+
+  it("合言葉がある場合は承認リンク付近に表示する", () => {
+    const msg = buildDigestMessage(baseInput({ passphrase: " ピックルバン " }));
+
+    expect(msg).toContain("承認する → https://example.com/growth/approve?token=abc");
+    expect(msg).toContain("🔑 合言葉: ピックルバン");
+  });
+
+  it("合言葉が未指定・空なら表示しない", () => {
+    const omitted = buildDigestMessage(baseInput());
+    expect(omitted).not.toContain("🔑 合言葉:");
+
+    const empty = buildDigestMessage(baseInput({ passphrase: "  " }));
+    expect(empty).not.toContain("🔑 合言葉:");
+  });
 });
 
 describe("buildDigestMessage の実行 SHA(#219)", () => {
@@ -126,5 +171,136 @@ describe("buildFailureMessage", () => {
     expect(msg).toContain("❌");
     expect(msg).toContain("今週の自動実行に失敗しました");
     expect(msg).toContain("data/weekly-cron.log");
+  });
+});
+
+function heading(id: string, text: string, level: "heading_2" | "heading_3" = "heading_2"): NotionBlock {
+  return { id, type: level, [level]: { rich_text: [{ plain_text: text }] } };
+}
+
+function paragraph(text: string): NotionBlock {
+  return { id: `p-${text}`, type: "paragraph", paragraph: { rich_text: [{ plain_text: text }] } };
+}
+
+function listItem(text: string): NotionBlock {
+  return {
+    id: `li-${text}`,
+    type: "bulleted_list_item",
+    bulleted_list_item: { rich_text: [{ plain_text: text }] },
+  };
+}
+
+describe("extractReportSummary", () => {
+  it("論点/データ注意セクションの要点を抽出する", () => {
+    const blocks = [
+      heading("h2a", "今週の論点"),
+      listItem("A"),
+      listItem("B"),
+      heading("h2b", "データ注意"),
+      paragraph("推測を含む"),
+    ];
+
+    expect(extractReportSummary(blocks)).toEqual({
+      discussion: ["A", "B"],
+      dataNotes: ["推測を含む"],
+    });
+  });
+
+  it("各セクション最大3行、超過は落とす", () => {
+    const blocks = [
+      heading("h2a", "論点"),
+      listItem("1"),
+      listItem("2"),
+      listItem("3"),
+      listItem("4"),
+    ];
+
+    expect(extractReportSummary(blocks).discussion).toEqual(["1", "2", "3"]);
+  });
+
+  it("120字超は119字+…に切る", () => {
+    const long = "あ".repeat(130);
+    const blocks = [heading("h2a", "論点"), paragraph(long)];
+
+    expect(extractReportSummary(blocks).discussion[0]).toBe("あ".repeat(119) + "…");
+  });
+
+  it("該当見出しが無ければ空配列", () => {
+    expect(extractReportSummary([heading("h2a", "今週の数字"), paragraph("x")])).toEqual({
+      discussion: [],
+      dataNotes: [],
+    });
+  });
+
+  it("heading_3表記、連結rich_text、空行、見出し無し先頭段落、未対応blockを扱う", () => {
+    const blocks: NotionBlock[] = [
+      paragraph("見出し前は無視"),
+      heading("h3a", "主要な", "heading_3"),
+      {
+        id: "p-empty",
+        type: "paragraph",
+        paragraph: { rich_text: [{ plain_text: " " }] },
+      },
+      {
+        id: "to-do",
+        type: "to_do",
+        to_do: { rich_text: [{ plain_text: "未対応は無視" }] },
+      },
+      {
+        id: "p-joined",
+        type: "paragraph",
+        paragraph: { rich_text: [{ plain_text: "論点" }, { plain_text: "ではない本文" }] },
+      },
+      {
+        id: "h3b",
+        type: "heading_3",
+        heading_3: { rich_text: [{ plain_text: "データ" }, { plain_text: "注意メモ" }] },
+      },
+      {
+        id: "li-empty-rich",
+        type: "bulleted_list_item",
+        bulleted_list_item: { rich_text: [] },
+      },
+      listItem("数字は暫定"),
+    ];
+
+    expect(extractReportSummary(blocks)).toEqual({
+      discussion: [],
+      dataNotes: ["数字は暫定"],
+    });
+  });
+
+  it("Notionブロックのpayloadやrich_textが壊れていても落とさない", () => {
+    const blocks: NotionBlock[] = [
+      { id: "h-bad-string", type: "heading_2", heading_2: "論点" },
+      paragraph("無効見出し後は入らない"),
+      { id: "h-bad-null", type: "heading_2", heading_2: null },
+      { id: "h-bad-array", type: "heading_2", heading_2: [] },
+      heading("h-good", "論点"),
+      { id: "p-no-rich", type: "paragraph", paragraph: {} },
+      {
+        id: "p-bad-rich",
+        type: "paragraph",
+        paragraph: { rich_text: "本文" },
+      },
+      {
+        id: "p-bad-items",
+        type: "paragraph",
+        paragraph: {
+          rich_text: [
+            null,
+            [],
+            "x",
+            { plain_text: 123 },
+            { plain_text: "有効" },
+          ],
+        },
+      },
+    ];
+
+    expect(extractReportSummary(blocks)).toEqual({
+      discussion: ["有効"],
+      dataNotes: [],
+    });
   });
 });

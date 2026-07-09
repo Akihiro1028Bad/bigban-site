@@ -158,4 +158,50 @@ describe("buildDigestFlex", () => {
     expect(joined).toContain("3. c");
     expect(joined).not.toContain("4. d");
   });
+
+  it("レポート要約がある場合は論点とデータ注意をbodyに出す", () => {
+    const body = buildDigestFlex(
+      baseInput({
+        reportSummary: {
+          discussion: ["A", "B"],
+          dataNotes: ["推測を含む"],
+        },
+      })
+    ).body;
+    const joined = texts(body).join("\n");
+
+    expect(joined).toContain("■ 論点");
+    expect(joined).toContain("・A");
+    expect(joined).toContain("・B");
+    expect(joined).toContain("■ データ注意");
+    expect(joined).toContain("・推測を含む");
+  });
+
+  it("レポート要約が未指定または空ならbodyに出さない", () => {
+    const omitted = texts(buildDigestFlex(baseInput()).body).join("\n");
+    expect(omitted).not.toContain("■ 論点");
+    expect(omitted).not.toContain("■ データ注意");
+
+    const empty = texts(
+      buildDigestFlex(baseInput({ reportSummary: { discussion: [], dataNotes: [] } })).body
+    ).join("\n");
+    expect(empty).not.toContain("■ 論点");
+    expect(empty).not.toContain("■ データ注意");
+  });
+
+  it("合言葉がある場合はfooter付近に太字で表示する", () => {
+    const footer = buildDigestFlex(baseInput({ passphrase: " ピックルバン " })).footer;
+    const nodes = allTextNodes(footer);
+    const passphrase = nodes.find((node) => node.text === "🔑 合言葉: ピックルバン");
+
+    expect(passphrase?.weight).toBe("bold");
+  });
+
+  it("合言葉が未指定・空ならfooterに出さない", () => {
+    const omitted = texts(buildDigestFlex(baseInput()).footer).join("\n");
+    expect(omitted).not.toContain("🔑 合言葉:");
+
+    const empty = texts(buildDigestFlex(baseInput({ passphrase: "  " })).footer).join("\n");
+    expect(empty).not.toContain("🔑 合言葉:");
+  });
 });
