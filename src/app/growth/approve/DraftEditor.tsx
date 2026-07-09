@@ -367,7 +367,7 @@ function CtaNodeView({ node, updateAttributes, deleteNode }: ReactNodeViewProps)
 
   return (
     <NodeViewWrapper
-      className="my-2 overflow-hidden rounded-lg border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)]"
+      className="relative my-2 rounded-lg border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)]"
       data-cta="true"
       data-cta-variant={cta.variant}
     >
