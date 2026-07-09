@@ -16,7 +16,7 @@
  * 純ロジックは draftEditorContent.ts に切り出してテスト済み。
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Extension, Mark, Node, mergeAttributes } from "@tiptap/core";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 import {
@@ -32,6 +32,15 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 
 import {
+  CTA_DESTINATIONS,
+  parseCta,
+  serializeCta,
+  validateCta,
+  type Cta,
+  type CtaVariant,
+} from "@/lib/growth/ctaBlock";
+
+import {
   classifyPreservedBlock,
   countDraftCharacters,
   DECORATION_OPTIONS,
@@ -44,6 +53,7 @@ import {
 import {
   IconBolt,
   IconCalendar,
+  IconEdit,
   IconExternalLink,
   IconFileText,
   IconImage,
@@ -68,10 +78,11 @@ interface PreservedBlockOptions {
 
 // 画像/表/埋め込み/CTA/スケジュール等を「保持専用」のアトミックブロックとして扱う。
 // outerHTML を attrs に持ち、編集はせず移動/削除のみ可能にする(新規作成は次Epic)。
+// #P2-CTA: CTA(a.cta / div.cta)は「保持専用」から編集可能な Cta ノードへ移したため、
+// ここには含めない(下の Cta ノードが parseHTML で拾う)。
 const PRESERVE_SELECTORS = [
   "figure",
   "table",
-  "div.cta",
   "div.schedule",
   "a.embed",
 ];
@@ -267,6 +278,279 @@ const PreservedBlock = Node.create<PreservedBlockOptions>({
   },
   addNodeView() {
     return ReactNodeViewRenderer(PreservedBlockView);
+  },
+});
+
+// #P2-CTA: CTA(<a class="cta">ボタン)を編集可能なアトミックブロックとして扱う。
+// 変換ロジック(parse/serialize/検証/宛先プリセット)はすべて @/lib/growth/ctaBlock に委譲し、
+// ここは TipTap の結線とインライン編集 UI のみを担う。attrs <-> Cta は下の変換で往復する。
+function ctaFromAttrs(attrs: Record<string, unknown>): Cta {
+  const variant: CtaVariant = attrs.variant === "ghost" ? "ghost" : "primary";
+  return {
+    label: String(attrs.label ?? ""),
+    href: String(attrs.href ?? ""),
+    variant,
+  };
+}
+
+const CUSTOM_DESTINATION = "__custom__";
+
+// #P2-CTA: 本文中の CTA を「実プレビュー + 編集/削除ヘッダ」で見せる React nodeView。
+// PreservedBlockView(掴み所/ヘッダ帯)と装飾ポップオーバー(#179)の様式に合わせる。
+function CtaNodeView({ node, updateAttributes, deleteNode }: ReactNodeViewProps) {
+  const [open, setOpen] = useState(false);
+  // href が既定宛先に一致していても「自由URL…」を明示選択できるようにするための強制フラグ。
+  const [freeMode, setFreeMode] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const labelFieldId = useId();
+  const destFieldId = useId();
+  const hrefFieldId = useId();
+
+  const cta = ctaFromAttrs(node.attrs);
+  const matched = freeMode ? undefined : CTA_DESTINATIONS.find((d) => d.url === cta.href);
+  const showCustomInput = matched === undefined;
+  const selectValue = matched ? matched.key : CUSTOM_DESTINATION;
+  const validation = validateCta(cta);
+  const previewClass = cta.variant === "ghost" ? "cta cta--ghost" : "cta";
+
+  // ポップオーバー外クリックで閉じる(装飾ポップオーバーと同じ挙動)。
+  useEffect(() => {
+    if (!open) return;
+    function handleDocClick(event: MouseEvent): void {
+      // NOTE: TipTap の Node import が DOM の Node を隠すため globalThis.Node を明示。
+      const target = event.target as globalThis.Node | null;
+      if (target && !containerRef.current?.contains(target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleDocClick);
+    return () => document.removeEventListener("mousedown", handleDocClick);
+  }, [open]);
+
+  function handleLabelChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    updateAttributes({ label: event.target.value });
+  }
+  function handleHrefChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    updateAttributes({ href: event.target.value });
+  }
+  function handleDestinationChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const key = event.target.value;
+    if (key === CUSTOM_DESTINATION) {
+      setFreeMode(true);
+      return;
+    }
+    setFreeMode(false);
+    const dest = CTA_DESTINATIONS.find((d) => d.key === key);
+    if (dest) updateAttributes({ href: dest.url });
+  }
+  function handleVariantChange(variant: CtaVariant): void {
+    updateAttributes({ variant });
+  }
+  function handleClose(): void {
+    // 下書きなので保存はブロックしない。検証結果は開いている間ずっと赤字で警告する。
+    setOpen(false);
+  }
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === "Escape") setOpen(false);
+  }
+
+  const headerButtonClass =
+    "inline-flex shrink-0 items-center gap-1 rounded border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)] px-2 py-1 text-xs text-[var(--p-text-2)] hover:text-[var(--p-text)]";
+  const fieldClass =
+    "w-full rounded border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)] px-2 py-1 text-xs text-[var(--p-text)] focus:outline-none focus:ring-1 focus:ring-[var(--p-accent)]";
+  const labelClass = "mb-1 block text-[11px] font-semibold text-[var(--p-text-2)]";
+  function variantButtonClass(active: boolean): string {
+    const base =
+      "flex-1 rounded border px-2 py-1 text-xs text-[var(--p-text-2)] hover:text-[var(--p-text)]";
+    return active
+      ? `${base} border-[var(--p-accent)] bg-[var(--p-accent-weak)] text-[var(--p-accent-ink)]`
+      : `${base} border-[var(--p-border-strong)]`;
+  }
+
+  return (
+    <NodeViewWrapper
+      className="my-2 overflow-hidden rounded-lg border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)]"
+      data-cta="true"
+      data-cta-variant={cta.variant}
+    >
+      {/* ヘッダ帯: 掴み所 + 種別ラベル + 編集/削除。PreservedBlockView と同じ構造。 */}
+      <div className="flex items-center gap-2 border-b border-[var(--p-border)] bg-[var(--p-bg-elevated)] px-2 py-1.5">
+        <span
+          data-drag-handle
+          contentEditable={false}
+          aria-hidden="true"
+          title="ドラッグして移動"
+          className="shrink-0 cursor-grab select-none leading-none text-[var(--p-text-3)] hover:text-[var(--p-text-2)] active:cursor-grabbing"
+        >
+          ⠿
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-[var(--p-text-2)]">
+          <IconBolt size={15} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="text-xs font-semibold text-[var(--p-text)]">CTA</span>
+          <span className="ml-2 truncate text-[11px] text-[var(--p-text-3)]">
+            {cta.variant === "ghost" ? "二次ボタン" : "一次ボタン"}
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-label="このCTAを編集"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className={headerButtonClass}
+        >
+          <IconEdit size={13} /> 編集
+        </button>
+        <button
+          type="button"
+          aria-label="このCTAを削除"
+          onClick={deleteNode}
+          className="shrink-0 rounded border border-[var(--p-border-strong)] bg-[var(--p-bg-raised)] px-2 py-1 text-xs text-[var(--p-text-2)] hover:text-[var(--p-red)]"
+        >
+          削除
+        </button>
+      </div>
+      {/* 本文: 実際の CTA ボタンのプレビュー(.approve-article a.cta の既存スタイルが当たる)。 */}
+      <div className="relative min-w-0 p-3 text-[var(--p-text)]">
+        <a className={previewClass}>{cta.label.trim() === "" ? "（文言未設定）" : cta.label}</a>
+        {open ? (
+          <div
+            ref={containerRef}
+            role="dialog"
+            aria-label="CTA を編集"
+            aria-modal="false"
+            onKeyDown={handleKeyDown}
+            className="absolute left-3 top-full z-30 mt-1 w-72 rounded-md border border-[var(--p-border-strong)] bg-[var(--p-bg-elevated)] p-3 shadow-2xl"
+          >
+            <div className="mb-2">
+              <label htmlFor={labelFieldId} className={labelClass}>
+                文言
+              </label>
+              <input
+                id={labelFieldId}
+                type="text"
+                value={cta.label}
+                onChange={handleLabelChange}
+                className={fieldClass}
+              />
+            </div>
+            <div className="mb-2">
+              <label htmlFor={destFieldId} className={labelClass}>
+                宛先
+              </label>
+              <select
+                id={destFieldId}
+                value={selectValue}
+                onChange={handleDestinationChange}
+                className={fieldClass}
+              >
+                {CTA_DESTINATIONS.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {d.label}
+                  </option>
+                ))}
+                <option value={CUSTOM_DESTINATION}>自由URL…</option>
+              </select>
+              {showCustomInput ? (
+                <input
+                  id={hrefFieldId}
+                  type="text"
+                  value={cta.href}
+                  onChange={handleHrefChange}
+                  placeholder="https://..."
+                  aria-label="自由URL"
+                  className={`${fieldClass} mt-1`}
+                />
+              ) : null}
+              <p className="mt-1 truncate text-[10px] text-[var(--p-text-3)]">
+                → {cta.href.trim() === "" ? "（未設定）" : cta.href}
+              </p>
+            </div>
+            <div className="mb-2">
+              <span className={labelClass}>種別</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  aria-pressed={cta.variant === "primary"}
+                  onClick={() => handleVariantChange("primary")}
+                  className={variantButtonClass(cta.variant === "primary")}
+                >
+                  一次
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={cta.variant === "ghost"}
+                  onClick={() => handleVariantChange("ghost")}
+                  className={variantButtonClass(cta.variant === "ghost")}
+                >
+                  二次
+                </button>
+              </div>
+            </div>
+            {validation.ok ? null : (
+              <ul className="mb-2 list-disc pl-4 text-[11px] text-[var(--p-red)]">
+                {validation.errors.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={deleteNode}
+                className="rounded border border-[var(--p-border-strong)] px-2 py-1 text-xs text-[var(--p-text-2)] hover:text-[var(--p-red)]"
+              >
+                削除
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded border border-[var(--p-accent)] bg-[var(--p-accent-weak)] px-3 py-1 text-xs text-[var(--p-accent-ink)]"
+              >
+                完了
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+const Cta = Node.create({
+  name: "cta",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      label: { default: "予約する" },
+      href: { default: "https://www.thepicklebang.com/reserve" },
+      variant: { default: "primary" },
+    };
+  },
+  parseHTML() {
+    // a.cta(現行) / div.cta(旧フォーマット)を parseCta で構造化。CTA でなければマッチ拒否。
+    return ["a.cta", "div.cta"].map((tag) => ({
+      tag,
+      getAttrs: (el: HTMLElement) => {
+        const parsed = parseCta(el.outerHTML);
+        return parsed
+          ? { label: parsed.label, href: parsed.href, variant: parsed.variant }
+          : false;
+      },
+    }));
+  },
+  renderHTML({ node }) {
+    // 直列化は serializeCta(正準 <a class="cta..." href>label</a>)に委譲。
+    const template = document.createElement("template");
+    template.innerHTML = serializeCta(ctaFromAttrs(node.attrs));
+    const el = template.content.firstElementChild;
+    return (el ? (el as unknown as DOMOutputSpec) : ["div", {}]) as DOMOutputSpec;
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(CtaNodeView);
   },
 });
 
@@ -589,6 +873,7 @@ export function DraftEditor({
         onPickImage: onPickImage ?? null,
         onRegenImage: onRegenImage ?? null,
       }),
+      Cta,
       ParagraphLead,
       DecorationCallout,
       BadgeMark,
@@ -720,6 +1005,30 @@ export function DraftEditor({
 
         {/* 装飾(ポップオーバー) */}
         <DecorationMenu editor={editor} />
+
+        {/* CTA 挿入: 既定 CTA を挿入。挿入直後は本文の「編集」からインライン編集できる。 */}
+        <button
+          type="button"
+          aria-label="CTAを挿入"
+          title="CTAボタンを挿入"
+          onClick={() =>
+            editor
+              .chain()
+              .focus()
+              .insertContent({
+                type: "cta",
+                attrs: {
+                  label: "予約する",
+                  href: "https://www.thepicklebang.com/reserve",
+                  variant: "primary",
+                },
+              })
+              .run()
+          }
+          className={`${tbBtn} gap-1`}
+        >
+          <IconBolt size={14} /> CTA
+        </button>
 
         {divider}
 
