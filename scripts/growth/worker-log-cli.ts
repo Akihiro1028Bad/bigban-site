@@ -4,10 +4,12 @@ import "dotenv/config";
 
 import {
   buildWorkerLogProps,
+  selectHeartbeatPageId,
+  WORKER_LOG_PROPS,
   type WorkerRunStatus,
   type WorkerTargetType,
 } from "../../src/lib/growth/workerLog";
-import { createPage, updatePageProps, type NotionApiOptions } from "./notion";
+import { createPage, queryDataSource, updatePageProps, type NotionApiOptions } from "./notion";
 import { defaultFetch } from "./http";
 
 const DS_ENV = "GROWTH_WORKER_LOG_DS";
@@ -72,6 +74,49 @@ async function createLog(command: string): Promise<void> {
   process.stdout.write(`${id}\n`);
 }
 
+async function upsertHeartbeat(): Promise<void> {
+  const ds = dataSourceId();
+  if (!ds) {
+    process.stdout.write("disabled\n");
+    return;
+  }
+  const now = new Date().toISOString();
+  const mode = arg("mode") ?? "heartbeat";
+  const runStatus = "heartbeat";
+  const options = notionOptions();
+  const result = await queryDataSource(
+    ds,
+    {
+      filter: { property: WORKER_LOG_PROPS.kind, select: { equals: "heartbeat" } },
+      sorts: [{ property: WORKER_LOG_PROPS.recordedAt, direction: "descending" }],
+      pageSize: 25,
+    },
+    options
+  );
+  const props = buildWorkerLogProps({
+    name: arg("name") ?? `${mode} ${runStatus}`,
+    kind: arg("kind") ?? "heartbeat",
+    status: runStatus,
+    mode,
+    workerId: workerId(),
+    targetPageId: arg("target-page-id"),
+    targetTitle: arg("target-title"),
+    targetType: targetType(arg("target-type")),
+    startedAt: arg("started-at") ?? now,
+    finishedAt: arg("finished-at"),
+    recordedAt: arg("recorded-at") ?? now,
+    exitCode: arg("exit-code") ? Number(arg("exit-code")) : null,
+    resumeCommand: arg("resume"),
+    detail: arg("detail"),
+    evidenceKey: arg("evidence-key"),
+  });
+  const existing = selectHeartbeatPageId(result.pages, workerId());
+  const id = existing
+    ? await updatePageProps(existing, props, options)
+    : await createPage(ds, props, options);
+  process.stdout.write(`${id}\n`);
+}
+
 async function finish(): Promise<void> {
   const pageId = arg("page-id");
   if (!pageId || pageId === "disabled") return;
@@ -101,7 +146,11 @@ async function finish(): Promise<void> {
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "";
-  if (command === "start" || command === "heartbeat" || command === "reconcile") {
+  if (command === "heartbeat") {
+    await upsertHeartbeat();
+    return;
+  }
+  if (command === "start" || command === "reconcile") {
     await createLog(command);
     return;
   }

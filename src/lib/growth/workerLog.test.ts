@@ -6,6 +6,7 @@ import {
   currentTargetsFromRuns,
   growthOpsViewFromPages,
   reconcileFindingFromPage,
+  selectHeartbeatPageId,
   workerRunFromPage,
   workerStatusFromRuns,
 } from "./workerLog";
@@ -29,6 +30,75 @@ function runPage(over: Partial<Record<string, unknown>> = {}): NotionPage {
     ...over,
   });
 }
+
+function heartbeatPage(id: string, worker: string): NotionPage {
+  return page(id, {
+    "種別": { select: { name: "heartbeat" } },
+    "Worker": { rich_text: [{ plain_text: worker }] },
+  });
+}
+
+describe("selectHeartbeatPageId", () => {
+  it("同一workerのheartbeat行のidを返す", () => {
+    expect(selectHeartbeatPageId([heartbeatPage("p1", "mac-A"), heartbeatPage("p2", "mac-B")], "mac-B")).toBe(
+      "p2"
+    );
+  });
+
+  it("種別がheartbeatでない行は無視する", () => {
+    expect(
+      selectHeartbeatPageId(
+        [
+          page("j", {
+            "種別": { select: { name: "job" } },
+            "Worker": { rich_text: [{ plain_text: "mac-A" }] },
+          }),
+        ],
+        "mac-A"
+      )
+    ).toBeNull();
+  });
+
+  it("該当workerが無ければnull", () => {
+    expect(selectHeartbeatPageId([heartbeatPage("p1", "mac-A")], "mac-X")).toBeNull();
+  });
+
+  it("Workerと種別の欠落・型不一致・空pagesを安全に無視する", () => {
+    expect(
+      selectHeartbeatPageId(
+        [
+          page("missing-worker", {
+            "種別": { select: { name: "heartbeat" } },
+          }),
+          page("missing-kind", {
+            "Worker": { rich_text: [{ plain_text: "mac-A" }] },
+          }),
+          page("bad-shape", {
+            "種別": { select: null },
+            "Worker": { rich_text: [{ plain_text: undefined }] },
+          }),
+        ],
+        "mac-A"
+      )
+    ).toBeNull();
+    expect(selectHeartbeatPageId([], "mac-A")).toBeNull();
+  });
+
+  it("Workerのrich_textを連結してtrimした値で比較し、最初の一致を返す", () => {
+    expect(
+      selectHeartbeatPageId(
+        [
+          page("first", {
+            "種別": { select: { name: "heartbeat" } },
+            "Worker": { rich_text: [{ plain_text: " mac" }, { plain_text: "-A " }] },
+          }),
+          heartbeatPage("second", "mac-A"),
+        ],
+        "mac-A"
+      )
+    ).toBe("first");
+  });
+});
 
 describe("workerRunFromPage", () => {
   it("Notionページから現在処理対象を読める run view を作る", () => {

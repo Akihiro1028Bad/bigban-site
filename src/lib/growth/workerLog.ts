@@ -104,6 +104,18 @@ function readNumber(page: NotionPage, prop: string): number | null {
   return typeof value?.number === "number" ? value.number : null;
 }
 
+export function selectHeartbeatPageId(pages: readonly NotionPage[], workerId: string): string | null {
+  for (const page of pages) {
+    if (
+      readSelect(page, WORKER_LOG_PROPS.kind) === "heartbeat" &&
+      readRichText(page, WORKER_LOG_PROPS.worker) === workerId
+    ) {
+      return page.id;
+    }
+  }
+  return null;
+}
+
 function validTargetType(value: string): WorkerTargetType {
   return value === "article" || value === "proposal" || value === "system" ? value : "system";
 }
