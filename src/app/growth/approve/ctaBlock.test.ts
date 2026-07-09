@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { parseCta, serializeCta } from "@/lib/growth/ctaBlock";
+import { CTA_DESTINATIONS, parseCta, serializeCta, validateCta } from "@/lib/growth/ctaBlock";
 
 import { sanitizeDraftHtml } from "./draftEditorContent";
 
@@ -71,5 +71,34 @@ describe("serializeCta", () => {
     const cta = { label: "予約", href: "https://reserva.be/tpbt", variant: "ghost" as const };
     const round = parseCta(sanitizeDraftHtml(serializeCta(cta)));
     expect(round).toEqual(cta);
+  });
+});
+
+describe("CTA_DESTINATIONS", () => {
+  it("予約は内部/reserveページ(RESERVA→labola切替を吸収)", () => {
+    const reserve = CTA_DESTINATIONS.find((d) => d.key === "reserve");
+    expect(reserve?.url).toBe("https://www.thepicklebang.com/reserve");
+  });
+  it("5宛先(予約/Instagram/アクセス/問い合わせ/トップ)を持つ", () => {
+    expect(CTA_DESTINATIONS.map((d) => d.key).sort())
+      .toEqual(["access", "contact", "instagram", "reserve", "top"]);
+  });
+});
+
+describe("validateCta", () => {
+  it("文言必須・href形式OKなら ok", () => {
+    expect(validateCta({ label: "予約", href: "https://www.thepicklebang.com/reserve", variant: "primary" }))
+      .toEqual({ ok: true, errors: [] });
+  });
+  it("文言が空なら error", () => {
+    expect(validateCta({ label: "  ", href: "https://x", variant: "primary" }).ok).toBe(false);
+  });
+  it("内部アンカー(/#contact)も許可", () => {
+    expect(validateCta({ label: "問い合わせ", href: "/#contact", variant: "ghost" }).ok).toBe(true);
+  });
+  it("不正な href(javascript:)は error", () => {
+    const r = validateCta({ label: "x", href: "javascript:alert(1)", variant: "primary" });
+    expect(r.ok).toBe(false);
+    expect(r.errors).toContain("リンク先の形式が不正です");
   });
 });

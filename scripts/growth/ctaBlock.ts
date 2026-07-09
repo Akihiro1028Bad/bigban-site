@@ -69,3 +69,29 @@ export function serializeCta(cta: Cta): string {
   const cls = cta.variant === "ghost" ? "cta cta--ghost" : "cta";
   return `<a class="${cls}" href="${escapeHtml(cta.href)}">${escapeHtml(cta.label)}</a>`;
 }
+
+export interface CtaDestination {
+  key: string;
+  label: string;
+  url: string;
+}
+
+// CTA 宛先の単一ソース(canon・オーナー確認済み 2026-07-09)。予約は内部 /reserve ページ経由で
+// RESERVA(7月)→labola(8月)の切替を吸収するため、8月切替時に CTA URL を直す必要はない(/reserve が吸収)。
+export const CTA_DESTINATIONS: readonly CtaDestination[] = [
+  { key: "reserve", label: "予約", url: "https://www.thepicklebang.com/reserve" },
+  { key: "instagram", label: "公式Instagram", url: "https://www.instagram.com/thepicklebangtheory/" },
+  { key: "access", label: "アクセス（施設案内）", url: "https://www.thepicklebang.com/about" },
+  { key: "contact", label: "問い合わせ", url: "https://www.thepicklebang.com/#contact" },
+  { key: "top", label: "公式サイト", url: "https://www.thepicklebang.com/" },
+];
+
+/** CTA の文言必須・href 形式(http(s) 完全URL または内部パス/アンカー)を検証する。 */
+export function validateCta(cta: Cta): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (cta.label.trim() === "") errors.push("文言を入力してください");
+  const href = cta.href.trim();
+  const valid = /^https?:\/\/\S+$/.test(href) || /^\/[^\s]*$/.test(href);
+  if (!valid) errors.push("リンク先の形式が不正です");
+  return { ok: errors.length === 0, errors };
+}
