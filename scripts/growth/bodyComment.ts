@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 
+import { parseCta } from "./ctaBlock";
 import { splitTopLevelBlocks } from "./decorate";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 import { selectStaleJobIds } from "./staleJob";
@@ -75,6 +76,12 @@ function nonTextLabel(tag: string): string {
 export function extractReviewLines(bodyHtml: string): ReviewLine[] {
   const lines: ReviewLine[] = [];
   splitTopLevelBlocks(bodyHtml).forEach((block, blockIndex) => {
+    const cta = parseCta(block.html);
+    if (cta) {
+      const label = cta.label.trim();
+      lines.push({ blockIndex, tag: "cta", text: label, excerpt: label || null, commentable: label !== "" });
+      return;
+    }
     if (isNonTextTag(block.tag)) {
       lines.push({
         blockIndex,

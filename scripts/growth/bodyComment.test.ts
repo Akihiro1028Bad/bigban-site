@@ -83,6 +83,31 @@ describe("extractReviewLines", () => {
   });
 });
 
+describe("extractReviewLines CTA対応", () => {
+  const body = '<p>本文です。</p><p><a class="cta" href="https://www.thepicklebang.com/reserve">今すぐ予約する</a></p>';
+
+  it("CTAをコメント可能行(tag:cta)として返す", () => {
+    const cta = extractReviewLines(body).find((l) => l.tag === "cta");
+    expect(cta).toMatchObject({ tag: "cta", text: "今すぐ予約する", excerpt: "今すぐ予約する", commentable: true });
+  });
+
+  it("CTA文言をアンカーにコメントできる(anchorExists)", () => {
+    const cta = extractReviewLines(body).find((l) => l.tag === "cta")!;
+    expect(anchorExists(body, cta.blockIndex, "今すぐ予約する")).toBe(true);
+  });
+
+  it("通常のテキスト文は従来どおり分割される", () => {
+    const lines = extractReviewLines(body);
+    expect(lines.some((l) => l.tag === "p" && l.text === "本文です。" && l.commentable)).toBe(true);
+  });
+
+  it("CTAの文言が空なら安全側でコメント不可にする", () => {
+    const emptyCtaBody = '<p><a class="cta" href="https://www.thepicklebang.com/reserve">   </a></p>';
+    const cta = extractReviewLines(emptyCtaBody).find((l) => l.tag === "cta");
+    expect(cta).toMatchObject({ tag: "cta", text: "", excerpt: null, commentable: false });
+  });
+});
+
 describe("anchorExists", () => {
   it("blockIndex のブロックに一意に存在すれば true", () => {
     expect(anchorExists(BODY, 1, "一文目です。")).toBe(true);
