@@ -81,3 +81,10 @@ npm run growth:reconcile
 ## 注意
 
 `run.mjs` 単体では、多くのモードで処理対象記事を実行前に特定できない。そのため v1 の run 履歴は `system` 対象として記録し、記事単位の進捗は Notion 記事行の activity から表示する。より詳細な証跡が必要な場合は、各 `next` CLI の JSON 出力を worker log に橋渡しする。
+
+## Notion 行の蓄積（storage）
+
+- **heartbeat は worker 毎に1行を upsert**（既存行を `updatePageProps` で更新）する。毎サイクル追記しないので heartbeat で行が無制限に増えることはない（daemon が高頻度でも heartbeat 行は worker 数分だけ）。
+- **job イベント**（`start`/`finish` の `running`/`success`/`failed`/`skipped`）と **reconcile** は意味のある証跡として**追記**する。実作業と 1 日上限に比例した件数で、`run.mjs` は「依頼なし」時は書き込まない。
+- 現状**自動の retention（古い行の削除）は無い**。長期運用で job/reconcile 行が増えたら、`記録時刻` が古い行を定期削除する掃除を追加する余地がある（未実装）。
+- Notion 制限の目安: API はレート 3req/秒・1,000req/5分、読み取りは 100 行/ページ。DB 行数のハード上限は非公表だが、大規模化すると動作が重くなるため上記の upsert / 追記方針で行数を抑えている。
