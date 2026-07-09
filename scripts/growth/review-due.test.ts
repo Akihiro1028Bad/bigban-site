@@ -111,4 +111,35 @@ describe("reviewEndpointForPage", () => {
       })
     ).toBe("columns");
   });
+
+  it("env 未指定なら process.env から endpoint を読む", () => {
+    const previous = process.env.GROWTH_MICROCMS_ENDPOINT;
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    try {
+      expect(reviewEndpointForPage(pageWithMedia("コラム"))).toBe("columns");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GROWTH_MICROCMS_ENDPOINT;
+      } else {
+        process.env.GROWTH_MICROCMS_ENDPOINT = previous;
+      }
+    }
+  });
+
+  it("媒体 select が null でも従来通り column 扱い", () => {
+    expect(
+      reviewEndpointForPage(
+        {
+          id: "page-null-media",
+          url: "",
+          properties: {
+            "媒体": { select: null },
+          },
+        },
+        {
+          GROWTH_MICROCMS_ENDPOINT: "columns",
+        }
+      )
+    ).toBe("columns");
+  });
 });

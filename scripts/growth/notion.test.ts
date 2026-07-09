@@ -207,6 +207,15 @@ describe("listBlockChildren", () => {
     expect(init.body).toBeUndefined();
   });
 
+  it("startCursor があれば start_cursor クエリを付ける", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ results: [] }));
+
+    await listBlockChildren("p1", { token: TOKEN, fetchFn }, { pageSize: 25, startCursor: "cur-1" });
+
+    const [url] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.notion.com/v1/blocks/p1/children?page_size=25&start_cursor=cur-1");
+  });
+
   it("欠落フィールドに既定値を補う", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({}));
 

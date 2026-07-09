@@ -27,6 +27,50 @@ describe("draftsAuto", () => {
     expect(isDraftsAutoTarget(page("下書き作成済み", "content-id"))).toBe(false);
   });
 
+  it("ステータスや下書きIDプロパティが欠落していても安全に判定する", () => {
+    expect(
+      isDraftsAutoTarget({
+        id: "missing-status",
+        url: "",
+        properties: {
+          "下書きID": { rich_text: [] },
+        },
+      })
+    ).toBe(false);
+    expect(
+      isDraftsAutoTarget({
+        id: "missing-draft-id",
+        url: "",
+        properties: {
+          "ステータス": { select: { name: "承認" } },
+        },
+      })
+    ).toBe(true);
+    expect(
+      isDraftsAutoTarget({
+        id: "missing-plain-text",
+        url: "",
+        properties: {
+          "ステータス": { select: { name: "承認" } },
+          "下書きID": { rich_text: [{ plain_text: undefined }] },
+        },
+      })
+    ).toBe(true);
+  });
+
+  it("select が null でも対象外にする", () => {
+    expect(
+      isDraftsAutoTarget({
+        id: "null-select",
+        url: "",
+        properties: {
+          "ステータス": { select: null },
+          "下書きID": { rich_text: [] },
+        },
+      })
+    ).toBe(false);
+  });
+
   it("対象件数を数える", () => {
     expect(
       countDraftsAutoTargets([

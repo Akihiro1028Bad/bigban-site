@@ -58,9 +58,7 @@ function plainTextFromRichText(value: unknown): string {
     .trim();
 }
 
-function blockText(block: Record<string, unknown>): string {
-  const type = block.type;
-  if (typeof type !== "string") return "";
+function blockText(block: Record<string, unknown>, type: string): string {
   const body = asRecord(block[type]);
   return plainTextFromRichText(body?.rich_text);
 }
@@ -71,7 +69,7 @@ function previewBlockOf(block: unknown): ProposalArtifactBlock | null {
   const id = record.id;
   const type = record.type;
   if (typeof id !== "string" || typeof type !== "string" || !SUPPORTED_TYPES.has(type)) return null;
-  const text = blockText(record);
+  const text = blockText(record, type);
   if (!text) return null;
   return { id, type, text };
 }
