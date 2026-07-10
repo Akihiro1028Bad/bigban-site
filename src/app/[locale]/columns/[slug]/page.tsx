@@ -105,14 +105,17 @@ export async function generateMetadata({
   // OGP: 公開版のみ (プレビューは noindex)。対向 locale が存在すれば alternates。
   const otherLocale: Locale = locale === "ja" ? "en" : "ja";
   const other = await getColumnDetail({ locale: otherLocale, slug });
-  if (other) {
-    meta.alternates = {
-      languages: {
-        ja: buildColumnUrl("ja", slug),
-        en: buildColumnUrl("en", slug),
-      },
-    };
-  }
+  meta.alternates = {
+    canonical: buildColumnUrl(locale, slug),
+    ...(other
+      ? {
+          languages: {
+            ja: buildColumnUrl("ja", slug),
+            en: buildColumnUrl("en", slug),
+          },
+        }
+      : {}),
+  };
   return meta;
 }
 

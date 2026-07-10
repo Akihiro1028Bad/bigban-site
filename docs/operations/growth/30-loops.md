@@ -27,7 +27,7 @@ Codex 工程は既定で `danger-full-access`。制限したい環境だけ `GRO
 
 - **メディア一覧/アップロード API**(#142): `/api/growth/media` GET=一覧・POST=アップロード。microCMS **MANAGEMENT API**(`{domain}.microcms-management.io/api/v1/media`)。
 - 純ロジック `src/lib/growth/media.ts`(list/upload のみ・**delete は作らない**・サイズ5MB/MIMEホワイトリスト検証・`sanitizeFileName`・`isMicrocmsAssetUrl`)。
-- **アイキャッチ差し替え**(#143): `EyecatchPicker.tsx` でメディア選択/アップロード → `/api/growth/draft/eyecatch` が **CONTENTキー**で `patchDraft({eyecatch})` ＋ Notion ミラー `アイキャッチURL` 更新 → プレビュー再取得。`eyecatchUrl` は `images.microcms-assets.io` 厳密一致。
+- **アイキャッチ差し替え**(#143): `EyecatchPicker.tsx` でメディア選択/アップロード → `/api/growth/draft/eyecatch` が **単一APIキー**で `patchDraft({eyecatch})` ＋ Notion ミラー `アイキャッチURL` 更新 → プレビュー再取得。`eyecatchUrl` は `images.microcms-assets.io` 厳密一致。
 
 ## アイキャッチ AI 再生成(#144)
 
@@ -39,7 +39,7 @@ Codex 工程は既定で `danger-full-access`。制限したい環境だけ `GRO
 
 - **差し替え**(#145): `BodyImagePicker.tsx` がプレビューの本文画像を一覧 → メディア選択/アップロード → `bodyImageEdit.ts` で該当 `<img src>` を差し替え → `/api/growth/draft/edit` で保存。
 - **AI再生成**(#156): `BodyImagePicker` の各画像「AIで再生成」→ `/api/growth/body-image/regen` が Notion に依頼記録(**対象src**＝その時点の画像URLで「どの画像か」を持つ・**インデックスは使わない**)。
-  - PC の `npm run growth:regen-body-loop`(`run.mjs regen-body`)が `gen-body-image`→`upload-media`→`growth:body-image-regen done <pageId> <targetSrc> <url>` で本文HTMLの当該 `<img>` を `replaceBodyImageBySrc` で差し替え ＋ CONTENTキーで `patchDraft({bodyHtml})` ＋ Notion ミラー(本文HTML #95)更新 ＋ LINE通知。
+  - PC の `npm run growth:regen-body-loop`(`run.mjs regen-body`)が `gen-body-image`→`upload-media`→`growth:body-image-regen done <pageId> <targetSrc> <url>` で本文HTMLの当該 `<img>` を `replaceBodyImageBySrc` で差し替え ＋ 単一APIキーで `patchDraft({bodyHtml})` ＋ Notion ミラー(本文HTML #95)更新 ＋ LINE通知。
   - 新規挿入依頼も同じ Notion キュー・同じ `regen-body` ループで処理する。対象は `placeholder:<id>` として記録し、完了時に `growth:body-image-regen done <pageId> <placeholderId> <url> --alt "<説明>"` が pending figure を実画像 figure へ置換する。
   - 依頼後に本文が変わり対象src が消えたら**失敗通知**(沈黙させない)。
   - 純ロジック `scripts/growth/body-image-regen.ts`(`replaceBodyImageBySrc`/`isMicrocmsAssetUrl` 含む)、CLI/`gen-body-image`/run.mjs はカバレッジ除外。
@@ -59,7 +59,7 @@ Codex 工程は既定で `danger-full-access`。制限したい環境だけ `GRO
 - 承認画面の下書きプレビューに「装飾アシスタント」カード(`DecorationAssistant.tsx`)。
 - 「装飾を提案」→ `/api/growth/decorate` が Notion に依頼記録。
 - PC の `npm run growth:decorate-loop`(`run.mjs decorate`)が headless agent で本文(Notion ミラー #95)をトップレベル要素ごとに見て【箇所ごとの装飾提案】(op=add/change/remove × decoration=note/caution/highlight/blockquote)を作り、`growth:decorate present <pageId> <json>` が **zod 検証**して Notion `装飾提案` に書く(提示中)。
-- 人が採用/却下 →「採用分を反映」で**決定的な `applyDecoration`**(許可リスト内の固定変換)で本文へ反映 → 既存 `/api/growth/draft/edit`(CONTENTキー・STRICT再サニタイズ)で保存。
+- 人が採用/却下 →「採用分を反映」で**決定的な `applyDecoration`**(許可リスト内の固定変換)で本文へ反映 → 既存 `/api/growth/draft/edit`(単一APIキー・STRICT再サニタイズ)で保存。
 - **安全の要＝AIに生HTMLを出させない**(提案はメタのみ・HTMLはシステムが生成)。アンカーはブロックindex＋抜粋照合(不一致は「要確認」で弾く・誤適用防止)。
 - 純ロジック `scripts/growth/decorate.ts`(`splitTopLevelBlocks`/`applyDecoration`/`applyDecorations`/`previewDecoration`/`DecorationProposalSchema`/`parseProposals`(安全側[])/`decorateViewOf` 等・`src/lib/growth/decorate.ts` 再エクスポート)、CLI/run.mjs はカバレッジ除外。
 - list/table/cta は初手対象外(随伴バックログ)。

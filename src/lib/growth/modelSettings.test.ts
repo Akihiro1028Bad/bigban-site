@@ -16,8 +16,8 @@ function page(properties: NotionPage["properties"]): NotionPage {
 }
 
 describe("工程別AIモデル設定", () => {
-  it("10工程に品質優先の推奨デフォルトを持つ", () => {
-    expect(MODEL_PHASES).toHaveLength(10);
+  it("画像プロンプト設計を独立させた9工程に品質優先の推奨デフォルトを持つ", () => {
+    expect(MODEL_PHASES).toHaveLength(9);
     expect(MODEL_PHASES.find((phase) => phase.id === "weekly")).toMatchObject({
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -33,12 +33,20 @@ describe("工程別AIモデル設定", () => {
       model: "gpt-5.5",
       effort: "high",
     });
+    expect(MODEL_PHASES.find((phase) => phase.id === "image-prompt")).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      modes: ["image-prompt", "regen", "regen-body"],
+    });
   });
 
   it("autoモードは手動工程と設定を共有する", () => {
     expect(modelPhaseIdForMode("drafts-auto")).toBe("drafts");
     expect(modelPhaseIdForMode("initiatives-auto")).toBe("initiatives");
-    expect(modelPhaseIdForMode("regen-body")).toBe("regen-body");
+    expect(modelPhaseIdForMode("image-prompt")).toBe("image-prompt");
+    expect(modelPhaseIdForMode("regen")).toBe("image-prompt");
+    expect(modelPhaseIdForMode("regen-body")).toBe("image-prompt");
     expect(modelPhaseIdForMode("unknown")).toBeNull();
   });
 
@@ -116,17 +124,17 @@ describe("工程別AIモデル設定", () => {
   it("Notion保存用プロパティを組み立てる", () => {
     expect(
       buildModelSettingProps({
-        phaseId: "regen",
-        provider: "claude",
-        model: "claude-sonnet-5",
-        effort: "medium",
+        phaseId: "image-prompt",
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
       }),
     ).toEqual({
-      "工程ID": { title: [{ text: { content: "regen" } }] },
-      "工程名": { rich_text: [{ text: { content: "アイキャッチ再生成" } }] },
-      "プロバイダー": { select: { name: "claude" } },
-      "モデル": { rich_text: [{ text: { content: "claude-sonnet-5" } }] },
-      "推論強度": { select: { name: "medium" } },
+      "工程ID": { title: [{ text: { content: "image-prompt" } }] },
+      "工程名": { rich_text: [{ text: { content: "画像プロンプト設計" } }] },
+      "プロバイダー": { select: { name: "codex" } },
+      "モデル": { rich_text: [{ text: { content: "gpt-5.6-sol" } }] },
+      "推論強度": { select: { name: "high" } },
     });
   });
 });

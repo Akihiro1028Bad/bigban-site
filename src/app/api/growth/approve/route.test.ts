@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/growth/notion", () => ({
+  getPage: vi.fn(),
   queryDataSource: vi.fn(),
   updatePageSelect: vi.fn(),
   defaultFetch: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { queryDataSource, updatePageSelect } from "@/lib/growth/notion";
+import { getPage, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
 import { GET, POST } from "./route";
 
 const SECRET = "approve-secret-token";
@@ -41,6 +42,7 @@ beforeEach(() => {
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(queryDataSource).mockReset();
+  vi.mocked(getPage).mockReset();
   vi.mocked(updatePageSelect).mockReset();
 });
 
@@ -156,6 +158,23 @@ describe("GET", () => {
 
 describe("POST", () => {
   it("decisions を Notion に反映し件数を返す", async () => {
+    vi.mocked(getPage)
+      .mockResolvedValueOnce({
+        id: "38099efa-346b-8122-9681-f4d2cc321a31",
+        url: "",
+        properties: {
+          "施策名": { title: [{ plain_text: "施策" }] },
+          "ステータス": { select: { name: "未処理" } },
+        },
+      })
+      .mockResolvedValueOnce({
+        id: "5adab8b1f1824123b9639463a2580d4a",
+        url: "",
+        properties: {
+          "タイトル案": { title: [{ plain_text: "記事" }] },
+          "ステータス": { select: { name: "提案中" } },
+        },
+      });
     vi.mocked(updatePageSelect).mockResolvedValue("ok");
     const res = await POST(
       postRequest(SECRET, {
@@ -175,6 +194,26 @@ describe("POST", () => {
       "承認",
       expect.anything()
     );
+  });
+
+  it.each(["生成中", "公開済み"])("記事が%sへ進んだ後の遅延decisionは409で拒否する", async (status) => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31",
+      url: "",
+      properties: {
+        "タイトル案": { title: [{ plain_text: "記事" }] },
+        "ステータス": { select: { name: status } },
+      },
+    });
+
+    const res = await POST(
+      postRequest(SECRET, {
+        decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "提案中" }],
+      })
+    );
+
+    expect(res.status).toBe(409);
+    expect(updatePageSelect).not.toHaveBeenCalled();
   });
 
   it("不正なボディは 400", async () => {
@@ -225,6 +264,14 @@ describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {
   });
 
   it("POST は token 無しでも反映する(検証スキップ)", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31",
+      url: "",
+      properties: {
+        "施策名": { title: [{ plain_text: "施策" }] },
+        "ステータス": { select: { name: "未処理" } },
+      },
+    });
     vi.mocked(updatePageSelect).mockResolvedValue("ok");
     const res = await POST(
       postRequest(null, {

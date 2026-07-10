@@ -88,7 +88,7 @@ beforeEach(() => {
   delete process.env.GROWTH_LEARNING_LOG_DS;
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
-  process.env.MICROCMS_CONTENT_API_KEY = "content-key";
+  process.env.MICROCMS_API_KEY = "content-key";
   vi.mocked(after).mockClear();
   vi.mocked(createPage).mockReset();
   vi.mocked(createPage).mockResolvedValue("learning-log-page");
@@ -102,7 +102,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.NOTION_TOKEN;
   delete process.env.MICROCMS_SERVICE_DOMAIN;
-  delete process.env.MICROCMS_CONTENT_API_KEY;
+  delete process.env.MICROCMS_API_KEY;
   delete process.env.APPROVE_SECRET;
   delete process.env.GROWTH_LEARNING_LOG_DS;
   delete process.env.GROWTH_MICROCMS_ENDPOINT;
@@ -260,8 +260,8 @@ describe("POST /api/growth/draft/edit", () => {
     expect(res.status).toBe(500);
   });
 
-  it("MICROCMS_CONTENT_API_KEY 未設定は 500(管理キーにフォールバックしない)", async () => {
-    delete process.env.MICROCMS_CONTENT_API_KEY;
+  it("MICROCMS_API_KEY 未設定は 500(管理キーにフォールバックしない)", async () => {
+    delete process.env.MICROCMS_API_KEY;
     const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>x</p>" }));
     expect(res.status).toBe(500);
   });

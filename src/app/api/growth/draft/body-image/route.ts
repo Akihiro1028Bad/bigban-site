@@ -7,7 +7,7 @@
  * - `targetSrc`・`newUrl` はともに **microCMS アセット URL に限定**(任意 URL 拒否)。
  * - 差し替えは `replaceBodyImageBySrc`(src 一致の先頭1枚・関数形式置換)を流用する。
  * - 差し替え後 `sanitizeNewsHtml(STRICT_HTML_CONFIG)` を再適用(XSS 最終段)。
- * - 書き込みは content API キーで `patchDraft`(管理キーは使わない)。status=draft のみ。公開しない。
+ * - 書き込みは 単一APIキーで `patchDraft`(同じ単一APIキーを使用)。status=draft のみ。公開しない。
  * - #95: Notion ミラー(下書き本文HTML)を先に更新 → microCMS 同期。同期失敗はミラーを旧本文へ戻す。
  * - 認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate)。
  */
@@ -44,7 +44,7 @@ function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null
 
 function microcmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } | null {
   const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
-  const apiKey = process.env.MICROCMS_CONTENT_API_KEY;
+  const apiKey = process.env.MICROCMS_API_KEY;
   if (!serviceDomain || !apiKey) return null;
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }

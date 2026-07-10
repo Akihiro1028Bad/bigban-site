@@ -5,9 +5,16 @@
 
 ## 下書き生成(`growth:drafts`)
 
-- 承認記事を**コンテンツ作成チーム(執筆担当＋編集者)**で執筆→ HTML →投入スペック JSON をステージ→ `growth:publish-draft` で同期投入。
+- 承認記事を**コンテンツ作成チーム(執筆担当＋編集者)**で執筆→ HTML →投入スペック JSON をステージ→ `growth:image-prompt` で画像関連フィールドだけを設計→ `growth:publish-draft` で同期投入。
+- 画像プロンプト設計は承認画面 `AIモデル` の独立設定を使う（既定 Codex / `gpt-5.6-sol` / `high`）。アイキャッチ再生成・本文画像再生成も同じ設定を共有し、実際に描画する `gpt-image-2` は変更しない。
+- 画像設計AIは sidecar JSON だけを出力し、検証CLIが `eyecatchAction` と `images[]` だけを反映する。本文・Notion情報・根拠台帳は変更できない。
 - 投入は **create(冪等PUT)→ アイキャッチ生成→ upload → eyecatch添付 → Notion ステータス更新** を直列・同期で実行。
 - タイトルは Notion `タイトル案` をそのまま使う(#176・AIで作り直さない)。良くしたい場合は承認画面のタイトル修正ループ(#139B)で。
+
+## 根拠台帳の永続化と参考資料欄(#根拠台帳)
+
+- 執筆時の**根拠台帳(source_ledger)**は従来「執筆の内部足場」で実行終了と同時に消えていたが、投入スペックの `sourceLedger`(camelCase・任意)に同梱すると `growth:publish-draft` が Notion 記事ネタ行の **`根拠台帳` プロパティへ自動保存**する(読者非公開・監査用)。統計の帰属には**発行年**を必須化(`publishedYear`・style-guide §10)。Notion 側プロパティ未追加でも投入は成功する(欠落耐性=台帳抜きリトライ＋警告)。
+- **参考資料欄**(読者公開)は別物で、統計・健康系の記事のみ本文HTML末尾に置く**独立ブロック**。基本はテキスト表記(出典名＋発行年)、リンク化は連盟・官公庁などの公式ドメインのトップ級 URL に限る。AI 免責文の削除(publish 時 `removeAiDisclaimer`)に巻き込まれないよう免責文とは別ブロックにする。条件・形式の正典は style-guide §15、生成手順は drafts.md 手順2-4。純ロジックは `scripts/growth/sourceLedger.ts`。
 
 ## 本文画像(Epic #59 / 構成案からの指示で生成)
 
@@ -27,7 +34,7 @@
 - 手動編集は **Vercel から microCMS を直接読み書き**(AI修正ループとは別系統)。
 - メディアは保持のみ(この Epic では新規作成しない)。
 - `DraftEditor.tsx` はカバレッジ除外、純ロジックは `draftEditorContent.ts`。
-- 前提: Notion「記事ネタ案」に `下書きID`/`下書きプレビューキー`、Vercel に `MICROCMS_CONTENT_API_KEY`。
+- 前提: Notion「記事ネタ案」に `下書きID`/`下書きプレビューキー`、Vercel に `MICROCMS_API_KEY`。
 - 運用は runbook の「承認画面で下書きをプレビュー＋手動リッチ編集」節。
 
 ## プロンプト変更時のA/B検証(必須)

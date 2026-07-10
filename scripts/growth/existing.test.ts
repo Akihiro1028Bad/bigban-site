@@ -87,6 +87,7 @@ function ideaPage(opts: {
   articleType?: string | null;
   media?: string | null;
   metrics?: string | null;
+  evidence?: string;
 }): NotionPage {
   const props: Record<string, unknown> = {
     "タイトル案": title(opts.title),
@@ -112,6 +113,7 @@ function ideaPage(opts: {
   } else if (opts.metrics) {
     props["成績データ"] = text(opts.metrics);
   }
+  if (opts.evidence) props["根拠"] = text(opts.evidence);
   return {
     id: opts.id,
     url: `https://notion.so/${opts.id}`,
@@ -478,6 +480,49 @@ describe("summarizeExisting", () => {
     expect(md).toContain("通常の承認行");
     expect(md).not.toContain("却下理由:");
     expect(md).not.toContain("公開後判定:");
+  });
+
+  it("コールドスタート実験を既存行で識別し、未判定の公開記事を観測中と明示する", () => {
+    const md = summarizeExisting({
+      period,
+      nowMs: fixedNowMs,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "cold-start",
+          title: "船橋から通える屋内コート",
+          status: "公開済み",
+          weekStart: "2026-06-08",
+          evidence: "【コールドスタート実験】GSC実績を根拠に選定",
+        }),
+      ],
+    });
+
+    expect(md).toContain("コールドスタート実験");
+    expect(md).toContain("公開後判定: 未判定（観測中）");
+  });
+
+  it("コールドスタート実験の公開後判定を次の派生判断へ渡す", () => {
+    const md = summarizeExisting({
+      period,
+      nowMs: fixedNowMs,
+      reportsForWeek: [],
+      proposals: [],
+      ideas: [
+        ideaPage({
+          id: "cold-start-success",
+          title: "市川の初心者ガイド",
+          status: "公開済み",
+          weekStart: "2026-06-08",
+          evidence: "【コールドスタート実験】GSC実績を根拠に選定",
+          postJudgement: "成功",
+        }),
+      ],
+    });
+
+    expect(md).toContain("コールドスタート実験");
+    expect(md).toContain("公開後判定: 成功");
   });
 
   it("公開済み記事があるとき記事タイプ別の成績サマリを含む(#221 伸ばす学習)", () => {

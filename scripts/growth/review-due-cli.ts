@@ -103,9 +103,9 @@ async function main(): Promise<void> {
   const pages = await publishedPages(options);
 
   const domain = requireEnv("MICROCMS_SERVICE_DOMAIN");
-  const microKey = process.env.MICROCMS_CONTENT_API_KEY ?? process.env.MICROCMS_API_KEY;
+  const microKey = process.env.MICROCMS_API_KEY;
   if (!microKey) {
-    throw new Error("MICROCMS_CONTENT_API_KEY(または MICROCMS_API_KEY)が未設定です。");
+    throw new Error("MICROCMS_API_KEYが未設定です。");
   }
 
   const nowMs = Date.now();

@@ -44,7 +44,7 @@ beforeEach(() => {
   flags.authEnabled = false;
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
-  process.env.MICROCMS_CONTENT_API_KEY = "content-key";
+  process.env.MICROCMS_API_KEY = "content-key";
   vi.mocked(getPage).mockReset().mockResolvedValue(pageWith("g-abc"));
   vi.mocked(patchDraft).mockReset().mockResolvedValue("g-abc");
 });
@@ -52,7 +52,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.NOTION_TOKEN;
   delete process.env.MICROCMS_SERVICE_DOMAIN;
-  delete process.env.MICROCMS_CONTENT_API_KEY;
+  delete process.env.MICROCMS_API_KEY;
   delete process.env.APPROVE_SECRET;
   delete process.env.GROWTH_MICROCMS_ENDPOINT;
 });
@@ -126,7 +126,7 @@ describe("POST /api/growth/draft/excerpt", () => {
   });
 
   it("CONTENT キー未設定は 500", async () => {
-    delete process.env.MICROCMS_CONTENT_API_KEY;
+    delete process.env.MICROCMS_API_KEY;
     expect((await POST(postRequest(null, { pageId: PAGE_ID, excerpt: "x" }))).status).toBe(500);
   });
 

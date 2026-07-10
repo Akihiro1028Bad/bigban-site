@@ -81,6 +81,7 @@ const COLOR_DOWN = "#dc2626"; // 赤(悪化)
 const COLOR_FLAT = "#6b7280"; // グレー(横ばい/データなし)
 const COLOR_WARN = "#d97706"; // amber(警告)
 const COLOR_HEADING = "#111827";
+const COLOR_SUMMARY_BG = "#f3f4f6"; // 薄いグレー(今週のまとめボックス背景)
 
 function formatInt(n: number): string {
   return Math.round(n)
@@ -173,6 +174,37 @@ function actionTexts(input: DigestInput): FlexComponent[] {
   return [heading, ...items];
 }
 
+/** AI が書いた LINE 要約を、薄いグレー背景のカードにまとめる。空なら undefined。 */
+function lineSummaryBox(input: DigestInput): FlexBox | undefined {
+  const lineSummary = input.reportSummary?.lineSummary ?? [];
+  if (lineSummary.length === 0) return undefined;
+
+  const heading: FlexText = {
+    type: "text",
+    text: "■ 今週のまとめ",
+    weight: "bold",
+    size: "sm",
+    color: COLOR_HEADING,
+  };
+  const items: FlexText[] = lineSummary.map((line) => ({
+    type: "text",
+    text: line,
+    size: "sm",
+    color: COLOR_HEADING,
+    wrap: true,
+  }));
+
+  return {
+    type: "box",
+    layout: "vertical",
+    spacing: "sm",
+    backgroundColor: COLOR_SUMMARY_BG,
+    cornerRadius: "md",
+    paddingAll: "md",
+    contents: [heading, ...items],
+  };
+}
+
 function reportSummaryTexts(input: DigestInput): FlexComponent[] {
   const contents: FlexComponent[] = [];
   const discussion = input.reportSummary?.discussion ?? [];
@@ -228,7 +260,7 @@ function footerButtons(input: DigestInput): FlexBox | undefined {
       type: "button",
       style: "primary",
       height: "sm",
-      action: { type: "uri", label: "✅ 承認する", uri: input.approveUrl },
+      action: { type: "uri", label: "ダッシュボードを開く", uri: input.approveUrl },
     });
   }
   if (input.reportUrl) {
@@ -251,7 +283,7 @@ export function buildDigestFlex(input: DigestInput): FlexBubble {
     contents: [
       {
         type: "text",
-        text: `📊 今週のグロース`,
+        text: `📊 週次サイト報告`,
         weight: "bold",
         size: "lg",
         color: COLOR_HEADING,
@@ -260,12 +292,15 @@ export function buildDigestFlex(input: DigestInput): FlexBubble {
     ],
   };
 
+  const summaryBox = lineSummaryBox(input);
   const bodyContents: FlexComponent[] = [
     ...warningTexts(input),
+    ...(summaryBox ? [summaryBox] : []),
     ...metricRows(input),
     ...actionTexts(input),
-    { type: "text", text: `承認待ち ${input.pendingCount}件`, weight: "bold", size: "sm", color: COLOR_HEADING },
-    ...reportSummaryTexts(input),
+    { type: "text", text: `確認待ち ${input.pendingCount}件`, weight: "bold", size: "sm", color: COLOR_HEADING },
+    // フォールバック: LINE要約が無いときだけ従来の論点・データ注意を出す。
+    ...(summaryBox ? [] : reportSummaryTexts(input)),
   ];
 
   const body: FlexBox = {

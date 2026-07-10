@@ -79,8 +79,7 @@ beforeEach(() => {
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
-  process.env.MICROCMS_MANAGEMENT_API_KEY = "mgmt-key";
-  process.env.MICROCMS_CONTENT_API_KEY = "content-key";
+  process.env.MICROCMS_API_KEY = "single-key";
   vi.mocked(getPage).mockReset();
   vi.mocked(updatePageSelect).mockReset();
   vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
@@ -92,8 +91,7 @@ afterEach(() => {
   delete process.env.APPROVE_SECRET;
   delete process.env.NOTION_TOKEN;
   delete process.env.MICROCMS_SERVICE_DOMAIN;
-  delete process.env.MICROCMS_MANAGEMENT_API_KEY;
-  delete process.env.MICROCMS_CONTENT_API_KEY;
+  delete process.env.MICROCMS_API_KEY;
   delete process.env.GROWTH_MICROCMS_ENDPOINT;
   vi.restoreAllMocks();
 });
@@ -112,7 +110,7 @@ describe("POST /api/growth/publish", () => {
       "news",
       "my-article",
       { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
     // タイトル同期 → 公開の順(公開後に title を変えない)。
     expect(vi.mocked(patchDraft).mock.invocationCallOrder[0]).toBeLessThan(
@@ -138,7 +136,7 @@ describe("POST /api/growth/publish", () => {
       "columns",
       "my-article",
       { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
   });
 
@@ -188,12 +186,33 @@ describe("POST /api/growth/publish", () => {
     expect(patchDraft).not.toHaveBeenCalled();
   });
 
-  it("MICROCMS_CONTENT_API_KEY 未設定は 500(タイトル最終同期に必要)", async () => {
-    delete process.env.MICROCMS_CONTENT_API_KEY;
+  it("MICROCMS_API_KEY 未設定は 500(タイトル最終同期に必要)", async () => {
+    delete process.env.MICROCMS_API_KEY;
     vi.mocked(getPage).mockResolvedValue(READY);
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
     expect(res.status).toBe(500);
     expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("MICROCMS_API_KEY 1つだけでタイトル同期と公開を実行できる", async () => {
+    delete process.env.MICROCMS_API_KEY;
+    process.env.MICROCMS_API_KEY = "single-key";
+
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.anything(),
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.objectContaining({ apiKey: "single-key" })
+    );
   });
 
   it("タイトル案が空でも公開はする(title 同期はスキップ)", async () => {
@@ -211,7 +230,7 @@ describe("POST /api/growth/publish", () => {
       "news",
       "my-article",
       { bodyHtml: "<p>本文</p>" },
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
     expect(publishContent).toHaveBeenCalled();
   });
@@ -234,7 +253,7 @@ describe("POST /api/growth/publish", () => {
         title: "公開する承認タイトル",
         bodyHtml: expect.not.stringContaining("AIが作成した下書き"),
       }),
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
     expect(publishContent).toHaveBeenCalled();
   });
@@ -254,7 +273,7 @@ describe("POST /api/growth/publish", () => {
       "news",
       "my-article",
       { bodyHtml: "<p>本文</p>" },
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
     expect(publishContent).toHaveBeenCalled();
   });
@@ -276,7 +295,7 @@ describe("POST /api/growth/publish", () => {
       "news",
       "my-article",
       { title: "公開する承認タイトル" },
-      expect.objectContaining({ apiKey: "content-key" })
+      expect.objectContaining({ apiKey: "single-key" })
     );
     expect(publishContent).toHaveBeenCalled();
   });
@@ -333,7 +352,7 @@ describe("POST /api/growth/publish", () => {
   });
 
   it("microCMS 管理キーが無ければ 500", async () => {
-    delete process.env.MICROCMS_MANAGEMENT_API_KEY;
+    delete process.env.MICROCMS_API_KEY;
     expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(500);
   });
 

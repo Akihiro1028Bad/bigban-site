@@ -84,9 +84,9 @@ function notionOptions(): NotionApiOptions {
 function contentOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } {
   return {
     serviceDomain: requireEnv("MICROCMS_SERVICE_DOMAIN"),
-    // 下書きへの書き込みは content API キーに限定する(security H-1)。
+    // 下書きへの書き込みは 単一APIキーに限定する(security H-1)。
     // 削除も可能な MANAGEMENT キーへはフォールバックしない(最小権限)。
-    apiKey: requireEnv("MICROCMS_CONTENT_API_KEY"),
+    apiKey: requireEnv("MICROCMS_API_KEY"),
     fetchFn: defaultFetch,
   };
 }

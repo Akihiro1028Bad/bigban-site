@@ -12,7 +12,8 @@ import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { DRAFT_READY_STATUS, parseDecisions, toPendingItems } from "@/lib/growth/approve";
-import { defaultFetch, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
+import { defaultFetch, getPage, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
+import type { NotionPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,28 @@ function ideaStatusFilter(): unknown {
 // 成果物化済も残し、growth:initiatives 実行後に成果物リンクを確認できるようにする。
 function proposalStatusFilter(): unknown {
   return { or: [statusFilter("未処理"), statusFilter("承認"), statusFilter("成果物化済")] };
+}
+
+function currentStatus(page: NotionPage): string {
+  const property = page.properties[STATUS_PROP] as
+    | { select?: { name?: string } | null }
+    | undefined;
+  return property?.select?.name ?? "";
+}
+
+function isAllowedTransition(page: NotionPage, next: string): boolean {
+  const current = currentStatus(page);
+  if ("タイトル案" in page.properties) {
+    if (current === "提案中") return next === "承認" || next === "却下";
+    if (current === "承認" || current === "却下") return next === "提案中";
+    return false;
+  }
+  if ("施策名" in page.properties) {
+    if (current === "未処理") return next === "承認" || next === "却下";
+    if (current === "承認" || current === "却下") return next === "未処理";
+    if (current === "成果物化済") return next === "クローズ";
+  }
+  return false;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -105,6 +128,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const pages = await Promise.all(decisions.map((decision) => getPage(decision.id, options)));
+    const invalid = decisions.find((decision, index) => !isAllowedTransition(pages[index], decision.decision));
+    if (invalid) {
+      return NextResponse.json(
+        { success: false, error: "現在の処理段階ではこのステータスへ変更できません。画面を更新してください。" },
+        { status: 409 }
+      );
+    }
     for (const decision of decisions) {
       await updatePageSelect(decision.id, STATUS_PROP, decision.decision, options);
     }

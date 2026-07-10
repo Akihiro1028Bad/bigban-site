@@ -129,4 +129,16 @@ describe("removeAiDisclaimer", () => {
 
     expect(removeAiDisclaimer(input)).toEqual({ body: input, removed: false });
   });
+
+  it("参考資料欄(マーク非含有の独立ブロック)は免責文削除後も残る(#根拠台帳 D5)", () => {
+    const references = `<h2>参考資料</h2><ul><li>SFIA の 2024 年レポート</li><li><a href="https://japanpickleball.org/">日本ピックルボール協会（2024）</a></li></ul>`;
+    const input = `<h2>見出し</h2><p>本文です。</p>${references}<p>${DISCLAIMER}</p>`;
+
+    const result = removeAiDisclaimer(input);
+
+    expect(result.body).toBe(`<h2>見出し</h2><p>本文です。</p>${references}`);
+    expect(result.body).toContain("参考資料");
+    expect(result.body).toContain("japan");
+    expect(result.removed).toBe(true);
+  });
 });

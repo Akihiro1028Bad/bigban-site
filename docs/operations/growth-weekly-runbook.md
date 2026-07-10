@@ -30,7 +30,7 @@ headless agent(承認画面「AIモデル」の工程別設定に応じて Claud
 | 記事下書き生成 | Claude / `claude-opus-4-8` | `high` |
 | 施策成果物化 | Codex / `gpt-5.5` | `high` |
 | 構成案・タイトル修正 | Claude / `claude-opus-4-8` | `high` |
-| アイキャッチ・本文画像再生成 | Claude / `claude-sonnet-5` | `medium` |
+| 画像プロンプト設計（初回・再生成共通） | Codex / `gpt-5.6-sol` | `high` |
 | 記事アドバイス | Claude / `claude-opus-4-8` | `high` |
 | 装飾提案 | Codex / `gpt-5.5` | `medium` |
 | アドバイス反映・本文コメント修正 | Claude / `claude-opus-4-8` | `high` |
@@ -139,12 +139,13 @@ npm run growth:weekly
 data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ページ)追加:
 - プロパティ: レポート(`週次レポート YYYY-MM-DD〜YYYY-MM-DD`)/ 対象週開始 / セッション / セッション前週比% / クリック_GSC / 表示回数 / 平均掲載順位 / 施策提案数(今回の総数)/ ステータス=`新規`
 - ページ本文の構成:
-  1. KPI 状況(実指標と代理指標を区別)
-  2. 最大ボトルネック(最大3件。事実 / 原因仮説 / 反証材料 / 不足データ)
-  3. **今週の優先 上位5〜8件**(カテゴリ横断・優先度の高い順。各: 対象ファネル・カテゴリ・根拠・確度)。これが人間がまず見る要約
-  4. 日本一に向けた評価軸(予約稼働 / 口コミ / 体験と継続 / 認知 / コミュニティ。比較不能は明記)
-  5. 論点(チームで割れた点)
-  6. データの注意点(取得失敗・データ不足があれば明記)
+  1. **LINE要約**(見出し `LINE要約`・heading_2/3。3〜5行・各100字以内の平易な日本語。1行目=今週の結論、残り=理由と来週の動き。数字の羅列はしない)。LINE通知が最優先で表示する要約
+  2. KPI 状況(実指標と代理指標を区別)
+  3. 最大ボトルネック(最大3件。事実 / 原因仮説 / 反証材料 / 不足データ)
+  4. **今週の優先 上位5〜8件**(カテゴリ横断・優先度の高い順。各: 対象ファネル・カテゴリ・根拠・確度)。これが人間がまず見る要約
+  5. 日本一に向けた評価軸(予約稼働 / 口コミ / 体験と継続 / 認知 / コミュニティ。比較不能は明記)
+  6. 論点(チームで割れた点)
+  7. データの注意点(取得失敗・データ不足があれば明記)
 
 ### 6. 施策を各 DB に登録する(成果物は作らない)
 
@@ -157,6 +158,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 **(a) コンテンツ → 「記事ネタ案」DB**(`collection://5adab8b1-f182-4123-b963-9463a2580d4a`)
 - タイトル案 / 概要(1〜2文)/ 優先度 / 対象週開始 / ステータス=`提案中`。本文に狙うクエリ・読者像・根拠
 - 検出したボトルネックに記事が有効な場合だけ作る。流入増加だけで予約ファネルとの接続を説明できない案は作らない。本命1件＋補欠2件を基本上限とする
+- **コールドスタート実験枠**: 公開済み記事0件かつ生きている記事案0件の場合は、GSCに実績のある検索機会から通常枠とは別に最大1件だけ提案してよい。`根拠` の先頭へ `【コールドスタート実験】` を付け、対象クエリと impressions/clicks/CTR/position、想定CTA、公開28日の成功指標を記録する。提案中・承認済み・下書き・公開後未判定の実験がある間は追加しない。28日レビュー確定までは派生案を出さず、成功なら隣接意図へ展開、様子見なら改稿/観測延長、要改稿なら同方向を増やさない。新しいNotionプロパティは追加しない
 
 **(b) コンテンツ以外カテゴリ → 「施策提案」DB**(`collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`)
 - 施策名 / カテゴリ / 確度 / インパクト / 工数 / 週キー / 施策ID / 根拠 / 想定アクション / ステータス=`未処理`(優先度スコアは自動計算)
@@ -179,8 +181,8 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として全執筆エージェントに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
 1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
 2. 各案を **コンテンツ作成チーム** で執筆
-3. **投入スペックをステージ**(エージェントはここまで): 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction(§9の宇宙人の行為), imagePath, images[], notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。eyecatchAction は §9「宇宙人マスコット × コスミック」に沿う。**構成案に画像指示 `[画像:<スタイル>: <説明>]` または `[画像:<スタイル>: <説明> | 文字: <textSpec>]` があれば**、本文HTMLの該当箇所に `{{IMG:1}}`(以降連番)を置き、`images:[{index,style,description,textSpec?}]` を入れる。`[画像:なし]` は画像なし指定として扱う(上限3枚・超過はスキップ報告)
-4. **投入を同期実行**: 記事ごとに `npm run growth:publish-draft -- .growth-tmp/<slug>.json`。スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
+3. **投入スペックをステージ**: 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction:"pending", imagePath, images[], notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。**構成案に画像指示 `[画像:<スタイル>: <説明>]` または `[画像:<スタイル>: <説明> | 文字: <textSpec>]` があれば**、本文HTMLの該当箇所に `{{IMG:1}}`(以降連番)を置き、`images:[{index,style,description,textSpec?}]` を入れる。`[画像:なし]` は画像なし指定として扱う(上限3枚・超過はスキップ報告)
+4. **画像プロンプト設計→投入を同期実行**: 記事ごとに `npm run growth:image-prompt -- .growth-tmp/<slug>.json` を実行し、承認画面の「画像プロンプト設計」で選択したモデル(GPT-5.6 Sol既定)が画像関連フィールドだけを具体化する。検証済みsidecarだけが元specへ反映され、本文・Notion情報・根拠台帳は変更できない。成功後に `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。画像プロンプト設計が失敗した場合は投入しない。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
 5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` にして `npm run growth:notify-drafts -- <json>` を実行。各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功時のみ**実行。`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
 
 **コンテンツ作成チームの工程**
@@ -320,8 +322,8 @@ Notion 管理画面で「記事ネタ案」DB(`5adab8b1-f182-4123-b963-9463a2580
 | `アイキャッチ再生成依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも構成案修正/差し替え等の既存機能は壊れない**（読み出しは欠落耐性）。
-> 再生成は **OpenAI 画像生成**を使うため PC に `OPENAI_API_KEY`、アップロードに `MICROCMS_MANAGEMENT_API_KEY`、
-> 差し替えに `MICROCMS_CONTENT_API_KEY`（最小権限。**MANAGEMENT へはフォールバックしない**・security H-1）が必要（いずれも PC 側）。
+> 再生成は **OpenAI 画像生成**を使うため PC に `OPENAI_API_KEY`、microCMSへのアップロード・差し替えに
+> 単一の `MICROCMS_API_KEY` が必要（PC側・server-only）。
 
 ### 運用の流れ
 
@@ -355,8 +357,8 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `本文画像再生成対象` | テキスト(rich text) | 差し替え対象の本文画像URL(その時点の src・microCMS アセット) |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能（差し替え・アイキャッチ再生成等）は壊れない**（読み出しは欠落耐性）。
-> 必要キーはアイキャッチ再生成と同じ（PC に `OPENAI_API_KEY`、アップロードに `MICROCMS_MANAGEMENT_API_KEY`、
-> 差し替えに `MICROCMS_CONTENT_API_KEY`。最小権限・**MANAGEMENT へはフォールバックしない**・security H-1）。
+> 必要キーはアイキャッチ再生成と同じ（PC に `OPENAI_API_KEY`、microCMS操作用の単一
+> `MICROCMS_API_KEY`。server-only）。
 > 本文HTMLは Notion ミラー(`下書き本文HTML` #95)を正本に差し替えるため、下書きプレビュー（#141/#95）が機能していること。
 
 ### 運用の流れ
@@ -414,7 +416,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 
 **安全の要**: AI は「どの要素に・どの装飾を・なぜ」だけを返し、**生 HTML は出さない**。実際の装飾HTMLは
 決定的な `applyDecoration` が許可リスト内の固定変換（`note`/`caution`/`highlight` の `<aside>`、`blockquote`）で生成し、
-保存は既存 `/api/growth/draft/edit`（CONTENTキー・サーバ側 STRICT 再サニタイズ）に乗せる。アンカーは
+保存は既存 `/api/growth/draft/edit`（単一APIキー・サーバ側 STRICT 再サニタイズ）に乗せる。アンカーは
 ブロックindex＋抜粋（excerpt）照合で、本文が変わっていれば「要確認」で弾く（誤適用防止）。list/table/cta は初手では対象外。
 
 ### 事前セットアップ：Notion「記事ネタ案」DB に4プロパティを追加（1回だけ・手動）
@@ -427,7 +429,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `装飾依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性）。
-> 提案生成は承認画面の「AIモデル」設定に従う。Codex工程は既定で `GROWTH_CODEX_APPROVAL=never` / `GROWTH_CODEX_SANDBOX=danger-full-access` として起動する。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_CONTENT_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
+> 提案生成は承認画面の「AIモデル」設定に従う。Codex工程は既定で `GROWTH_CODEX_APPROVAL=never` / `GROWTH_CODEX_SANDBOX=danger-full-access` として起動する。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
 
 ### 運用の流れ
 
@@ -457,7 +459,7 @@ AI は使わない（純粋なデータ結線）。
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性）。
 > PC に GA4 関連の環境変数（`GROWTH_GA4_PROPERTY_ID` ほか週次レポートと同じ Google OAuth 一式）、`NOTION_TOKEN`、
-> microCMS 読み取りの `MICROCMS_SERVICE_DOMAIN`＋`MICROCMS_CONTENT_API_KEY`、LINE 通知に `LINE_*` が必要。**強権キー（MANAGEMENT）は不要**。
+> microCMS 読み取りの `MICROCMS_SERVICE_DOMAIN`＋`MICROCMS_API_KEY`、LINE 通知に `LINE_*` が必要。**強権キー（MANAGEMENT）は不要**。
 
 ### 運用の流れ
 
@@ -518,7 +520,7 @@ AI は使わない（純粋なデータ結線）。
 ### 失敗・沈黙させない
 - 予約しても公開できない状態（アイキャッチ／本文欠落）になった記事は、`publish-due` が公開せずスキップする（壊れた記事を予約だけで公開しない）。
 - 生成中・公開済みの記事は段階ガード（#H9）で予約 API も 409 で弾く（競合・二重公開を防ぐ）。
-- 公開（管理 API）には `MICROCMS_MANAGEMENT_API_KEY`、タイトル同期に `MICROCMS_CONTENT_API_KEY`、`NOTION_TOKEN`、通知に `LINE_*` が PC 側に必要。
+- 公開とタイトル同期には単一の `MICROCMS_API_KEY`、Notion更新には `NOTION_TOKEN`、通知には `LINE_*` がPC側に必要。
 
 ## 承認画面で下書きをプレビュー＋手動リッチ編集（Epic #72）
 
@@ -533,7 +535,7 @@ AI は使わない（純粋なデータ結線）。
    | `下書きID` | テキスト(rich text) | microCMS の contentId(下書き特定用・publish-draft が書く) |
    | `下書きプレビューキー` | テキスト(rich text) | microCMS の draftKey(下書き読取に必要・同上) |
 
-2. **Vercel に環境変数 `MICROCMS_CONTENT_API_KEY` を設定**（編集の書き込み用）。**管理キーは使わない**（content API キーのみ。権限を絞る）。
+2. **Vercel に環境変数 `MICROCMS_API_KEY` を設定**（読み取り・編集・公開・メディア操作と共通の単一キー、server-only）。
 
 ### 承認画面のパイプライン盤と「生成中」可視化（Epic #105 / #107 / #108）
 

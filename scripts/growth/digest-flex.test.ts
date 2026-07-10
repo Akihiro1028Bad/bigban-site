@@ -51,14 +51,14 @@ describe("buildDigestFlex", () => {
     expect(texts(bubble.header).join("")).toContain("2026-06-08〜06-14");
   });
 
-  it("body に指標・今週やること・承認待ち件数を含む", () => {
+  it("body に指標・今週やること・確認待ち件数を含む", () => {
     const body = buildDigestFlex(baseInput()).body;
     const joined = texts(body).join("\n");
     expect(joined).toContain("サイト訪問");
     expect(joined).toContain("777");
     expect(joined).toContain("今週やること");
     expect(joined).toContain("成果を数える設定を入れる");
-    expect(joined).toContain("承認待ち 3件");
+    expect(joined).toContain("確認待ち 3件");
   });
 
   it("増は緑・減は赤・横ばいはグレーで色分けする", () => {
@@ -121,8 +121,9 @@ describe("buildDigestFlex", () => {
       (c): c is FlexButton => c.type === "button"
     );
     expect(buttons).toHaveLength(2);
-    const approve = buttons.find((b) => b.action.label.includes("承認"));
-    expect(approve?.action.uri).toBe("https://example.com/growth/approve");
+    const dashboard = buttons.find((b) => b.action.label.includes("ダッシュボード"));
+    expect(dashboard?.action.label).toBe("ダッシュボードを開く");
+    expect(dashboard?.action.uri).toBe("https://example.com/growth/approve");
     const report = buttons.find((b) => b.action.label.includes("レポート"));
     expect(report?.action.uri).toBe("https://xxx.notion.site/report");
   });
@@ -146,7 +147,7 @@ describe("buildDigestFlex", () => {
       baseInput({ metrics: {}, topActions: [] })
     ).body;
     const joined = texts(body).join("\n");
-    expect(joined).toContain("承認待ち 3件");
+    expect(joined).toContain("確認待ち 3件");
     expect(joined).not.toContain("今週やること");
   });
 
@@ -159,10 +160,51 @@ describe("buildDigestFlex", () => {
     expect(joined).not.toContain("4. d");
   });
 
-  it("レポート要約がある場合は論点とデータ注意をbodyに出す", () => {
+  it("LINE要約がある場合は今週のまとめボックスを薄いグレー背景で出す", () => {
     const body = buildDigestFlex(
       baseInput({
         reportSummary: {
+          lineSummary: ["検索流入は伸びたが予約導線が弱い週でした"],
+          discussion: [],
+          dataNotes: [],
+        },
+      })
+    ).body;
+
+    const summaryBox = (body?.contents ?? []).find(
+      (c): c is FlexBox =>
+        c.type === "box" && texts(c).some((t) => t.includes("今週のまとめ"))
+    );
+    expect(summaryBox?.backgroundColor).toBe("#f3f4f6");
+    expect(summaryBox?.cornerRadius).toBe("md");
+    expect(summaryBox?.paddingAll).toBe("md");
+    expect(texts(summaryBox).join("\n")).toContain("■ 今週のまとめ");
+    expect(texts(summaryBox).join("\n")).toContain("検索流入は伸びたが予約導線が弱い週でした");
+  });
+
+  it("LINE要約がある場合はフォールバックの論点・データ注意を出さない", () => {
+    const joined = texts(
+      buildDigestFlex(
+        baseInput({
+          reportSummary: {
+            lineSummary: ["今週のまとめ本文"],
+            discussion: ["A", "B"],
+            dataNotes: ["推測を含む"],
+          },
+        })
+      ).body
+    ).join("\n");
+
+    expect(joined).toContain("■ 今週のまとめ");
+    expect(joined).not.toContain("■ 論点");
+    expect(joined).not.toContain("■ データ注意");
+  });
+
+  it("LINE要約が空のときだけ論点とデータ注意をbodyにフォールバック表示する", () => {
+    const body = buildDigestFlex(
+      baseInput({
+        reportSummary: {
+          lineSummary: [],
           discussion: ["A", "B"],
           dataNotes: ["推測を含む"],
         },
@@ -170,6 +212,7 @@ describe("buildDigestFlex", () => {
     ).body;
     const joined = texts(body).join("\n");
 
+    expect(joined).not.toContain("■ 今週のまとめ");
     expect(joined).toContain("■ 論点");
     expect(joined).toContain("・A");
     expect(joined).toContain("・B");
@@ -179,12 +222,16 @@ describe("buildDigestFlex", () => {
 
   it("レポート要約が未指定または空ならbodyに出さない", () => {
     const omitted = texts(buildDigestFlex(baseInput()).body).join("\n");
+    expect(omitted).not.toContain("■ 今週のまとめ");
     expect(omitted).not.toContain("■ 論点");
     expect(omitted).not.toContain("■ データ注意");
 
     const empty = texts(
-      buildDigestFlex(baseInput({ reportSummary: { discussion: [], dataNotes: [] } })).body
+      buildDigestFlex(
+        baseInput({ reportSummary: { lineSummary: [], discussion: [], dataNotes: [] } })
+      ).body
     ).join("\n");
+    expect(empty).not.toContain("■ 今週のまとめ");
     expect(empty).not.toContain("■ 論点");
     expect(empty).not.toContain("■ データ注意");
   });

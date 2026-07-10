@@ -35,6 +35,7 @@
 | initiatives | `growth:initiatives` | 承認施策→Notion本文に文案/仕様書 | runbook「施策実行モード」 |
 | initiatives-auto | `growth:initiatives-auto` | opt-in: 承認済み施策がある時だけ施策実行 | runbook「施策実行モード」 |
 | revise | `growth:revise-loop` | 構成案/タイトルの修正ループ(#40/#139B) | [30-loops.md](30-loops.md) |
+| image-prompt | `growth:image-prompt -- <spec.json>` | 初回下書きの画像プロンプト設計（本文は変更しない） | [20-draft.md](20-draft.md) |
 | regen | `growth:regen-loop` | アイキャッチ AI 再生成(#144) | [30-loops.md](30-loops.md) |
 | regen-body | `growth:regen-body-loop` | 本文画像 AI 再生成(#156) | [30-loops.md](30-loops.md) |
 | advise | `growth:advise-loop` | スタイリング・アドバイザー(#146・read-only) | [30-loops.md](30-loops.md) |
@@ -59,6 +60,6 @@
 
 ## セキュリティ(強権限 API)
 
-- **`MICROCMS_MANAGEMENT_API_KEY` は server-only**(`NEXT_PUBLIC_` 禁止・クライアントへ渡さない)。
+- **`MICROCMS_API_KEY` は server-only**(`NEXT_PUBLIC_` 禁止・クライアントへ渡さない)。
 - ⚠️ **本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON にする**(承認画面が強権限 API を叩くため。gate は実装済み・開発段階はオフ)。
 - 横断的なセキュリティハードニング(safeEqual・featureFlags分離・依存CVE 等)は #7 に集約。

@@ -19,6 +19,17 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(weekly).toContain("記事が有効");
   });
 
+  it("公開記事0件では実データに基づくコールドスタート実験枠を1件だけ許可する", () => {
+    expect(weekly).toContain("コールドスタート実験枠");
+    expect(weekly).toContain("公開済み記事が0件");
+    expect(weekly).toContain("生きている記事案も0件");
+    expect(weekly).toContain("最大1件");
+    expect(weekly).toContain("GSC");
+    expect(weekly).toContain("観測中の実験記事");
+    expect(weekly).toContain("28日");
+    expect(weekly).toContain("派生案を出さない");
+  });
+
   it("共通基準が予約ファネルと実指標・代理指標を区別する", () => {
     expect(goals).toContain("認知 → 興味 → 予約意図 → 予約完了 → コート稼働 → 再予約・継続");
     expect(goals).toContain("コート予約率 = 予約済みコート枠 ÷ 販売可能コート枠");

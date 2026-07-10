@@ -43,9 +43,7 @@ async function main(): Promise<void> {
   const maxDelete = Number(arg("--max") ?? "20");
 
   const serviceDomain = requireEnv("MICROCMS_SERVICE_DOMAIN");
-  const apiKey =
-    process.env.MICROCMS_MANAGEMENT_API_KEY ??
-    requireEnv("MICROCMS_CONTENT_API_KEY");
+  const apiKey = requireEnv("MICROCMS_API_KEY");
   const http: SelfHealHttpOptions = { serviceDomain, apiKey, fetchFn: defaultFetch };
 
   const result = await selfHeal(

@@ -158,6 +158,16 @@ export const PROMPT_REGISTRY: readonly PromptPhaseMeta[] = [
     sourceKind: "prompt",
   }),
   meta({
+    path: "scripts/growth/prompts/image-prompt.md",
+    label: "画像プロンプト設計",
+    group: "実行プロンプト",
+    order: 85,
+    purpose: "初回下書きの画像生成モデルへ渡す行為・スタイル・説明を独立モデルで設計する",
+    stage: "画像プロンプト設計",
+    whenItRuns: "下書き投入specを作成した後、画像生成前に実行する(growth:image-prompt)",
+    sourceKind: "prompt",
+  }),
+  meta({
     path: "scripts/growth/prompts/regen-eyecatch.md",
     label: "アイキャッチ再生成",
     group: "実行プロンプト",

@@ -267,7 +267,8 @@ describe("ColumnDetailPage", () => {
       params: Promise.resolve({ locale: "ja", slug: "x" }),
       searchParams: Promise.resolve({}),
     });
-    expect(meta.alternates).toBeUndefined();
+    expect(meta.alternates?.canonical).toContain("/columns/x");
+    expect(meta.alternates?.languages).toBeUndefined();
   });
 
   it("プレビュー: contentId のみ(draftKey 欠落)は公開版へフォールバック", async () => {

@@ -58,6 +58,14 @@ describe("validateUpload", () => {
     const r = validateUpload({ size: 100, type: "image/png", head: svg });
     expect(r).toEqual({ ok: false, error: expect.stringContaining("偽装") });
   });
+
+  it("申告MIMEとマジックバイトの画像形式が違う場合は弾く", () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(validateUpload({ size: 100, type: "image/jpeg", head: png })).toEqual({
+      ok: false,
+      error: expect.stringContaining("一致"),
+    });
+  });
 });
 
 describe("detectImageMime", () => {

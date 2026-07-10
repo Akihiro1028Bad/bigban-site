@@ -54,7 +54,7 @@ public/
 
 **設計の共通原則**: pull型(承認画面=Vercel は Notion に依頼を書くだけ／重い処理は常時稼働PCのループが拾う) / 承認画面は基本 Notion を読むだけ / 純ロジック分離(`scripts/growth/*.ts`＋`src/lib/growth/*` 再エクスポート・CLI/run.mjs/gen-* はカバレッジ除外) / 欠落耐性 / 段階ガード(#H9)。
 
-**セキュリティ**: `MICROCMS_MANAGEMENT_API_KEY` は **server-only**(`NEXT_PUBLIC_` 禁止)。⚠️ 本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON。横断ハードニングは #7。
+**セキュリティ**: `MICROCMS_API_KEY` は **server-only**(`NEXT_PUBLIC_` 禁止)。⚠️ 本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON。横断ハードニングは #7。
 
 **分割ドキュメント**:
 - 正典・絶対禁止・実行モード一覧: `docs/operations/growth/00-canon.md`

@@ -96,6 +96,12 @@ const MODES = {
     allow: [...COMMON, "Bash"],
     lock: true,
   },
+  // 初回下書きの画像関連フィールドだけを独立モデルで設計する。
+  // 提案は sidecar JSON に限定し、終了後に検証CLIが元specへ安全に反映する。
+  "image-prompt": {
+    prompt: "image-prompt.md",
+    allow: [...COMMON, "Read", "Write", "Bash"],
+  },
   // アイキャッチ AI 再生成(#144)。決定的処理は growth:eyecatch-regen CLI、claude は
   // 指示→英語の行為に翻案して画像生成・アップロードを回す。revise と同じ lock/上限を共有。
   regen: {
@@ -180,7 +186,7 @@ const mode = process.argv[2];
 const cfg = MODES[mode];
 if (!cfg) {
   process.stderr.write(
-    `使い方: node scripts/growth/run.mjs <weekly|drafts|drafts-auto|initiatives|initiatives-auto|revise|regen|regen-body|advise|decorate|apply|comment-revise>\n`
+    `使い方: node scripts/growth/run.mjs <weekly|drafts|drafts-auto|initiatives|initiatives-auto|revise|image-prompt|regen|regen-body|advise|decorate|apply|comment-revise>\n`
   );
   process.exit(1);
 }
@@ -194,8 +200,9 @@ const FALLBACK_MODEL_SETTINGS = {
   initiatives: { provider: "codex", model: "gpt-5.5", effort: "high" },
   "initiatives-auto": { provider: "codex", model: "gpt-5.5", effort: "high" },
   revise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
-  regen: { provider: "claude", model: "claude-sonnet-5", effort: "medium" },
-  "regen-body": { provider: "claude", model: "claude-sonnet-5", effort: "medium" },
+  "image-prompt": { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
+  regen: { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
+  "regen-body": { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
   advise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
   decorate: { provider: "codex", model: "gpt-5.5", effort: "medium" },
   apply: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
@@ -275,7 +282,14 @@ if (AGENT === "claude" && !CLAUDE_EFFORTS.has(claudeEffort)) {
 }
 
 const promptBody = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
-const prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${promptBody}` : promptBody;
+const imagePromptSpecPath = mode === "image-prompt" ? process.argv[3] || "" : "";
+const imagePromptProposalPath = imagePromptSpecPath ? `${imagePromptSpecPath}.image-prompt.json` : "";
+const imagePromptInput =
+  mode === "image-prompt"
+    ? `\n\n<input_json>\n${JSON.stringify({ specPath: imagePromptSpecPath, proposalPath: imagePromptProposalPath })}\n</input_json>`
+    : "";
+const basePrompt = `${promptBody}${imagePromptInput}`;
+const prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${basePrompt}` : basePrompt;
 
 function buildClaudeArgs() {
   // プロンプトは stdin で渡すので引数には含めない
@@ -322,6 +336,11 @@ if (process.env.GROWTH_DRYRUN) {
   process.exit(0);
 }
 
+if (mode === "image-prompt" && !imagePromptSpecPath) {
+  process.stderr.write("image-prompt には <spec.json> が必要です。\n");
+  process.exit(1);
+}
+
 /** npm スクリプトを実行し、終了コードを resolve する。env で追加の環境変数を渡せる。 */
 function runNpm(scriptName, env = {}) {
   return new Promise((resolve) => {
@@ -360,6 +379,9 @@ const RESUME_COMMANDS = {
   initiatives: "npm run growth:initiatives",
   "initiatives-auto": "npm run growth:initiatives-auto",
   revise: "npm run growth:revise-loop",
+  "image-prompt": imagePromptSpecPath
+    ? `npm run growth:image-prompt -- ${imagePromptSpecPath}`
+    : "npm run growth:image-prompt -- <spec.json>",
   regen: "npm run growth:regen-loop",
   "regen-body": "npm run growth:regen-body-loop",
   advise: "npm run growth:advise-loop",
@@ -598,7 +620,15 @@ child.stdin.write(prompt);
 child.stdin.end();
 child.on("exit", async (code) => {
   if (cfg.lock) releaseReviseLock();
-  const exitCode = code ?? 0;
+  let exitCode = code ?? 0;
+  if (mode === "image-prompt" && exitCode === 0) {
+    const applied = spawnSync(
+      isWin ? "npm.cmd" : "npm",
+      ["run", "--silent", "growth:image-prompt-spec", "--", "apply", imagePromptSpecPath, imagePromptProposalPath],
+      { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } },
+    );
+    exitCode = applied.status ?? 1;
+  }
   runWorkerLog("finish", {
     "page-id": workerRunPageId,
     mode,

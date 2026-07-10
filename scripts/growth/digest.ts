@@ -42,13 +42,24 @@ export interface DigestInput {
 const MAX_TOP_ACTIONS = 3;
 const MAX_SUMMARY_LINES = 3;
 const MAX_SUMMARY_CHARS = 120;
+const MAX_LINE_SUMMARY_LINES = 5;
+const MAX_LINE_SUMMARY_CHARS = 100;
 
 export interface ReportSummary {
+  /** AI が LINE 向けに書いた平易な要約(3〜5行・各100字以内)。最優先で表示する。 */
+  lineSummary: string[];
   discussion: string[];
   dataNotes: string[];
 }
 
 type SummarySection = keyof ReportSummary;
+
+/** セクション別の行数・文字数上限。lineSummary は他より長く許容する。 */
+const SECTION_LIMITS: Record<SummarySection, { maxLines: number; maxChars: number }> = {
+  lineSummary: { maxLines: MAX_LINE_SUMMARY_LINES, maxChars: MAX_LINE_SUMMARY_CHARS },
+  discussion: { maxLines: MAX_SUMMARY_LINES, maxChars: MAX_SUMMARY_CHARS },
+  dataNotes: { maxLines: MAX_SUMMARY_LINES, maxChars: MAX_SUMMARY_CHARS },
+};
 
 function formatInt(n: number): string {
   return Math.round(n)
@@ -88,26 +99,26 @@ function plainTextOf(block: NotionBlock): string {
 }
 
 function sectionForHeading(text: string): SummarySection | null {
+  if (text.includes("LINE要約")) return "lineSummary";
   if (text.includes("論点")) return "discussion";
   if (text.includes("データ注意")) return "dataNotes";
   return null;
 }
 
-function truncateSummaryLine(line: string): string {
-  return line.length > MAX_SUMMARY_CHARS
-    ? `${line.slice(0, MAX_SUMMARY_CHARS - 1)}…`
-    : line;
+function truncateSummaryLine(line: string, maxChars: number): string {
+  return line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line;
 }
 
 function addSummaryLine(summary: ReportSummary, section: SummarySection, text: string): void {
-  if (summary[section].length >= MAX_SUMMARY_LINES) return;
+  const { maxLines, maxChars } = SECTION_LIMITS[section];
+  if (summary[section].length >= maxLines) return;
   const line = text.trim();
   if (!line) return;
-  summary[section].push(truncateSummaryLine(line));
+  summary[section].push(truncateSummaryLine(line, maxChars));
 }
 
 export function extractReportSummary(blocks: readonly NotionBlock[]): ReportSummary {
-  const summary: ReportSummary = { discussion: [], dataNotes: [] };
+  const summary: ReportSummary = { lineSummary: [], discussion: [], dataNotes: [] };
   let currentSection: SummarySection | null = null;
 
   blocks.forEach((block) => {
@@ -130,7 +141,14 @@ export function extractReportSummary(blocks: readonly NotionBlock[]): ReportSumm
 export function buildDigestMessage(input: DigestInput): string {
   const warnings = input.warnings ?? [];
   const head = warnings.length > 0 ? [...warnings, ""] : [];
-  const lines: string[] = [...head, `📊 今週のグロース (${input.periodLabel})`, ""];
+  const lines: string[] = [...head, `📊 週次サイト報告 (${input.periodLabel})`, ""];
+
+  const lineSummary = input.reportSummary?.lineSummary ?? [];
+  if (lineSummary.length > 0) {
+    lines.push("■ 今週のまとめ");
+    lineSummary.forEach((line) => lines.push(line));
+    lines.push("");
+  }
 
   const m = input.metrics;
   if (m.sessions) {
@@ -153,22 +171,25 @@ export function buildDigestMessage(input: DigestInput): string {
     });
   }
 
-  lines.push("", `承認待ち ${input.pendingCount}件`);
+  lines.push("", `確認待ち ${input.pendingCount}件`);
 
-  const discussion = input.reportSummary?.discussion ?? [];
-  if (discussion.length > 0) {
-    lines.push("", "■ 論点");
-    discussion.forEach((line) => lines.push(`・${line}`));
-  }
+  // フォールバック: LINE要約が空のときだけ従来の論点・データ注意を出す(重複と長文化を防ぐ)。
+  if (lineSummary.length === 0) {
+    const discussion = input.reportSummary?.discussion ?? [];
+    if (discussion.length > 0) {
+      lines.push("", "■ 論点");
+      discussion.forEach((line) => lines.push(`・${line}`));
+    }
 
-  const dataNotes = input.reportSummary?.dataNotes ?? [];
-  if (dataNotes.length > 0) {
-    lines.push("", "■ データ注意");
-    dataNotes.forEach((line) => lines.push(`・${line}`));
+    const dataNotes = input.reportSummary?.dataNotes ?? [];
+    if (dataNotes.length > 0) {
+      lines.push("", "■ データ注意");
+      dataNotes.forEach((line) => lines.push(`・${line}`));
+    }
   }
 
   if (input.reportUrl) lines.push(`レポートを見る → ${input.reportUrl}`);
-  if (input.approveUrl) lines.push(`承認する → ${input.approveUrl}`);
+  if (input.approveUrl) lines.push(`ダッシュボードを開く → ${input.approveUrl}`);
   const passphrase = input.passphrase?.trim();
   if (passphrase) lines.push(`🔑 合言葉: ${passphrase}`);
 

@@ -89,17 +89,25 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(dryRun("weekly", { GROWTH_AGENT: "claude" })).toContain("growth:learning-log:recent");
   });
 
-  it("regen は再生成プロンプトと --model を付ける(#144)", () => {
-    const out = dryRun("regen");
-    expect(out).toContain("regen-eyecatch.md");
-    expect(out).toContain("--model claude-sonnet-5");
-    expect(out).toContain("--effort medium");
+  it("画像プロンプト設計は既定で Codex GPT-5.6 Sol / high を使う", () => {
+    const out = dryRun("image-prompt");
+    expect(out).toContain("image-prompt.md");
+    expect(out).toContain("codex -a never exec");
+    expect(out).toContain("--model gpt-5.6-sol");
+    expect(out).toContain('model_reasoning_effort="high"');
   });
 
-  it("regen-body は本文画像再生成プロンプトと --model を付ける(#156)", () => {
+  it("regen は画像プロンプト設計と同じ GPT-5.6 Sol 設定を使う(#144)", () => {
+    const out = dryRun("regen");
+    expect(out).toContain("regen-eyecatch.md");
+    expect(out).toContain("--model gpt-5.6-sol");
+    expect(out).toContain('model_reasoning_effort="high"');
+  });
+
+  it("regen-body は画像プロンプト設計と同じ GPT-5.6 Sol 設定を使う(#156)", () => {
     const out = dryRun("regen-body");
     expect(out).toContain("regen-body-image.md");
-    expect(out).toContain("--model claude-sonnet-5");
+    expect(out).toContain("--model gpt-5.6-sol");
   });
 
   it("advise はアドバイスプロンプトと --model を付ける(#146)", () => {
@@ -132,6 +140,7 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
     "initiatives",
     "initiatives-auto",
     "revise",
+    "image-prompt",
     "regen",
     "regen-body",
     "advise",

@@ -4,7 +4,7 @@
  * GET  : microCMS MANAGEMENT API でメディアを一覧する(limit/offset)。
  * POST : multipart/form-data の `file` を MANAGEMENT API へアップロードし URL を返す。
  *
- * 提供は **list / upload のみ**(delete 等は作らない)。`MICROCMS_MANAGEMENT_API_KEY` は
+ * 提供は **list / upload のみ**(delete 等は作らない)。`MICROCMS_API_KEY` は
  * 削除も可能な強権限のため **server-only**(このルートでのみ参照・クライアントへ渡さない)。
  *
  * 強権限 API のため、APPROVE_AUTH_ENABLED=false でも fail-closed にする。
@@ -36,7 +36,7 @@ function serverError(): Response {
 /** MANAGEMENT API の接続情報(server-only)。未設定は null。 */
 function managementOptions(): ManagementOptions | null {
   const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
-  const apiKey = process.env.MICROCMS_MANAGEMENT_API_KEY;
+  const apiKey = process.env.MICROCMS_API_KEY;
   if (!serviceDomain || !apiKey) return null;
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }

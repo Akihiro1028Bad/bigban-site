@@ -83,6 +83,7 @@ const UNSET_ARTICLE_TYPE = "タイプ未設定";
 const COLUMN_MEDIA_LABEL = "コラム";
 const NEWS_MEDIA_LABEL = "ニュース";
 const REVIEW_LABEL_FALLBACK: ReviewLabel[] = ["未計測"];
+export const COLD_START_EXPERIMENT_MARKER = "【コールドスタート実験】";
 
 function isLiveIdea(page: NotionPage): boolean {
   return !DEAD_STATUSES.has(selectName(page, "ステータス"));
@@ -148,15 +149,26 @@ function ideaLines(ideas: NotionPage[]): string[] {
 
     const reason = richText(page, "却下理由");
     const postJudgement = selectName(page, "公開後判定");
+    const isColdStartExperiment = richText(page, "根拠").includes(
+      COLD_START_EXPERIMENT_MARKER
+    );
+    const extras: string[] = [];
+
+    if (isColdStartExperiment) extras.push("コールドスタート実験");
 
     if (postJudgement === "要改稿") {
       const tail = reason ? `公開後判定: 要改稿 / 却下理由: ${reason}` : `公開後判定: 要改稿`;
-      return `${head}\n  - ${tail}`;
+      extras.push(tail);
+    } else if ((status === "却下" || status === "見送り") && reason) {
+      extras.push(`却下理由: ${reason}`);
+    } else if (isColdStartExperiment && status === PUBLISHED_STATUS) {
+      extras.push(
+        postJudgement && postJudgement !== "未判定"
+          ? `公開後判定: ${postJudgement}`
+          : "公開後判定: 未判定（観測中）"
+      );
     }
-    if ((status === "却下" || status === "見送り") && reason) {
-      return `${head}\n  - 却下理由: ${reason}`;
-    }
-    return head;
+    return extras.length > 0 ? `${head}\n  - ${extras.join(" / ")}` : head;
   });
 }
 

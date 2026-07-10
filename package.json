@@ -21,6 +21,8 @@
     "growth:notify-drafts": "tsx scripts/growth/notify-drafts.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
     "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
+    "growth:image-prompt": "node scripts/growth/run.mjs image-prompt",
+    "growth:image-prompt-spec": "tsx scripts/growth/image-prompt-spec-cli.ts",
     "growth:self-heal": "tsx scripts/growth/self-heal-cli.ts",
     "growth:publish-draft": "tsx scripts/growth/publish-draft-cli.ts",
     "growth:notify-line": "tsx scripts/growth/notify-line.ts",

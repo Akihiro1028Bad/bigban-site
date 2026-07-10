@@ -133,15 +133,9 @@ async function main(): Promise<void> {
   // (secret/draftKey は URL 用途には不要。draftKey は下の要約取得でのみ使う)。
   const ctx: PreviewCtx = {
     serviceDomain: process.env.MICROCMS_SERVICE_DOMAIN ?? null,
-    // 管理API・コンテンツAPIはキーが別物。それぞれ適切なキーを優先し、無ければ相互フォールバック。
-    managementApiKey:
-      process.env.MICROCMS_MANAGEMENT_API_KEY ??
-      process.env.MICROCMS_CONTENT_API_KEY ??
-      null,
-    contentApiKey:
-      process.env.MICROCMS_CONTENT_API_KEY ??
-      process.env.MICROCMS_MANAGEMENT_API_KEY ??
-      null,
+    // 読み取り・コンテンツ・管理APIで同じサーバー専用キーを使う。
+    managementApiKey: process.env.MICROCMS_API_KEY ?? null,
+    contentApiKey: process.env.MICROCMS_API_KEY ?? null,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
   };
 

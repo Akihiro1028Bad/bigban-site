@@ -5,7 +5,7 @@
  * 公開は取り消しづらい外向き操作のため最強権限:
  *  - **認証必須＋ APPROVE_AUTH_ENABLED ゲート**: 認証が無効(オフ)なら常に拒否する(本番で ON にする)。
  *  - 公開前検証: 下書きID・アイキャッチ必須・本文非空。未充足は 400 で弾く。
- *  - 公開(ステータス変更)は **Management API**(MICROCMS_MANAGEMENT_API_KEY・公開ステータス変更権限)で行う。
+ *  - 公開(ステータス変更)は **Management API**(MICROCMS_API_KEY・公開ステータス変更権限)で行う。
  *    Content API の `?status=publish` では公開できない(#167 不具合の修正)。
  */
 
@@ -52,15 +52,15 @@ function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null
 function microcmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } | null {
   const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
   // 公開ステータス変更は Management API キー(公開ステータス変更権限が必要)。
-  const apiKey = process.env.MICROCMS_MANAGEMENT_API_KEY;
+  const apiKey = process.env.MICROCMS_API_KEY;
   if (!serviceDomain || !apiKey) return null;
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }
 
-// #176: 公開直前のタイトル最終同期(本文書き込み)は content API キーで行う(管理キーは使わない=#76)。
+// #176: 公開直前のタイトル最終同期(本文書き込み)は 単一APIキーで行う(同じ単一APIキーを使用=#76)。
 function contentMicrocmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } | null {
   const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
-  const apiKey = process.env.MICROCMS_CONTENT_API_KEY;
+  const apiKey = process.env.MICROCMS_API_KEY;
   if (!serviceDomain || !apiKey) return null;
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }

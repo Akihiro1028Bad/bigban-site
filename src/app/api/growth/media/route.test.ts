@@ -42,14 +42,14 @@ beforeEach(() => {
   flags.authEnabled = true;
   process.env.APPROVE_SECRET = "secret-token";
   process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
-  process.env.MICROCMS_MANAGEMENT_API_KEY = "mgmt-key";
+  process.env.MICROCMS_API_KEY = "mgmt-key";
   vi.mocked(fetchMediaList).mockReset();
   vi.mocked(uploadMediaBlob).mockReset();
 });
 
 afterEach(() => {
   delete process.env.MICROCMS_SERVICE_DOMAIN;
-  delete process.env.MICROCMS_MANAGEMENT_API_KEY;
+  delete process.env.MICROCMS_API_KEY;
   delete process.env.APPROVE_SECRET;
 });
 
@@ -71,7 +71,7 @@ describe("GET /api/growth/media", () => {
   });
 
   it("MANAGEMENT キー未設定は 500", async () => {
-    delete process.env.MICROCMS_MANAGEMENT_API_KEY;
+    delete process.env.MICROCMS_API_KEY;
     const res = await GET(getReq("secret-token"));
     expect(res.status).toBe(500);
     expect(fetchMediaList).not.toHaveBeenCalled();
@@ -162,7 +162,7 @@ describe("POST /api/growth/media", () => {
   });
 
   it("MANAGEMENT キー未設定は 500", async () => {
-    delete process.env.MICROCMS_MANAGEMENT_API_KEY;
+    delete process.env.MICROCMS_API_KEY;
     const res = await POST(postReq(form(pngFile()), "secret-token"));
     expect(res.status).toBe(500);
   });

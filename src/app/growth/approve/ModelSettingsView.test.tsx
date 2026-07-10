@@ -37,6 +37,17 @@ const DATA = {
       effort: "high" as const,
       source: "default" as const,
     },
+    {
+      id: "image-prompt" as const,
+      phaseId: "image-prompt" as const,
+      label: "画像プロンプト設計",
+      description: "画像モデルへ渡す指示を設計する",
+      modes: ["image-prompt", "regen", "regen-body"],
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      source: "default" as const,
+    },
   ],
   catalog: [
     { id: "gpt-5.6-sol", provider: "codex" as const, label: "GPT-5.6 Sol", note: "分析向け" },
@@ -74,9 +85,12 @@ describe("ModelSettingsView", () => {
     expect(await screen.findByRole("heading", { name: "AIモデル設定" })).toBeInTheDocument();
     expect(screen.getByText("週次分析・提案")).toBeInTheDocument();
     expect(screen.getByText("記事下書き生成")).toBeInTheDocument();
+    expect(screen.getByText("画像プロンプト設計")).toBeInTheDocument();
     expect(screen.getByText("保存済み")).toBeInTheDocument();
-    expect(screen.getByText("推奨値")).toBeInTheDocument();
+    expect(screen.getAllByText("推奨値")).toHaveLength(2);
     expect(screen.getByLabelText("週次分析・提案のモデル")).toHaveValue("gpt-5.6-sol");
+    expect(screen.getByLabelText("画像プロンプト設計のモデル")).toHaveValue("gpt-5.6-sol");
+    expect(screen.getByText("growth:image-prompt / growth:regen / growth:regen-body")).toBeInTheDocument();
   });
 
   it("Notion未接続時は推奨値と保存できない理由を表示する", async () => {

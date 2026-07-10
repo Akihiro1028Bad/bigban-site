@@ -29,10 +29,10 @@ function baseInput(overrides: Partial<DigestInput> = {}): DigestInput {
 }
 
 describe("buildDigestMessage", () => {
-  it("数字を行動文に翻訳し、やること・承認待ち・2つのURLを含む", () => {
+  it("数字を行動文に翻訳し、やること・確認待ち・2つのURLを含む", () => {
     const msg = buildDigestMessage(baseInput());
 
-    expect(msg).toContain("📊 今週のグロース (2026-06-08〜06-14)");
+    expect(msg).toContain("📊 週次サイト報告 (2026-06-08〜06-14)");
     expect(msg).toContain("サイト訪問 777回 (前週データなし)");
     expect(msg).toContain("検索からの訪問 404回 前週より14%減");
     expect(msg).toContain("検索結果に出た回数 1,492回 前週より4%増");
@@ -40,9 +40,9 @@ describe("buildDigestMessage", () => {
     expect(msg).toContain("■ 今週やること");
     expect(msg).toContain("1. 成果を数える設定を入れる");
     expect(msg).toContain("3. トップに予約ボタン");
-    expect(msg).toContain("承認待ち 20件");
+    expect(msg).toContain("確認待ち 20件");
     expect(msg).toContain("レポートを見る → https://xxx.notion.site/report");
-    expect(msg).toContain("承認する → https://example.com/growth/approve?token=abc");
+    expect(msg).toContain("ダッシュボードを開く → https://example.com/growth/approve?token=abc");
   });
 
   it("順位が改善・横ばいの表現を出し分ける", () => {
@@ -81,8 +81,8 @@ describe("buildDigestMessage", () => {
     );
     expect(msg).not.toContain("■ 今週やること");
     expect(msg).not.toContain("レポートを見る");
-    expect(msg).not.toContain("承認する →");
-    expect(msg).toContain("承認待ち 20件");
+    expect(msg).not.toContain("ダッシュボードを開く →");
+    expect(msg).toContain("確認待ち 20件");
   });
 
   it("やることは最大3件に丸める", () => {
@@ -99,7 +99,7 @@ describe("buildDigestMessage", () => {
     );
     const head = msg.split("\n")[0];
     expect(head).toBe("⚠ トークンの失効が近づいています");
-    expect(msg).toContain("📊 今週のグロース");
+    expect(msg).toContain("📊 週次サイト報告");
   });
 
   it("警告が空配列・未指定なら警告行を出さない", () => {
@@ -109,16 +109,52 @@ describe("buildDigestMessage", () => {
     expect(empty.startsWith("📊")).toBe(true);
   });
 
-  it("レポート要約がある場合は論点とデータ注意を含める", () => {
+  it("LINE要約がある場合は今週のまとめを指標より前に出す", () => {
     const msg = buildDigestMessage(
       baseInput({
         reportSummary: {
+          lineSummary: ["検索流入は伸びたが予約導線が弱い週でした", "来週は予約ボタンを強化する"],
+          discussion: ["A"],
+          dataNotes: ["推測を含む"],
+        },
+      })
+    );
+
+    expect(msg).toContain("■ 今週のまとめ");
+    expect(msg).toContain("検索流入は伸びたが予約導線が弱い週でした");
+    expect(msg).toContain("来週は予約ボタンを強化する");
+    // まとめ見出しは指標(サイト訪問)より前に出る
+    expect(msg.indexOf("■ 今週のまとめ")).toBeLessThan(msg.indexOf("サイト訪問"));
+  });
+
+  it("LINE要約がある場合はフォールバックの論点・データ注意を出さない", () => {
+    const msg = buildDigestMessage(
+      baseInput({
+        reportSummary: {
+          lineSummary: ["今週のまとめ本文"],
           discussion: ["A", "B"],
           dataNotes: ["推測を含む"],
         },
       })
     );
 
+    expect(msg).toContain("■ 今週のまとめ");
+    expect(msg).not.toContain("■ 論点");
+    expect(msg).not.toContain("■ データ注意");
+  });
+
+  it("LINE要約が空のときだけ論点とデータ注意をフォールバック表示する", () => {
+    const msg = buildDigestMessage(
+      baseInput({
+        reportSummary: {
+          lineSummary: [],
+          discussion: ["A", "B"],
+          dataNotes: ["推測を含む"],
+        },
+      })
+    );
+
+    expect(msg).not.toContain("■ 今週のまとめ");
     expect(msg).toContain("■ 論点");
     expect(msg).toContain("・A");
     expect(msg).toContain("・B");
@@ -126,14 +162,16 @@ describe("buildDigestMessage", () => {
     expect(msg).toContain("・推測を含む");
   });
 
-  it("レポート要約が未指定または空なら論点とデータ注意を出さない", () => {
+  it("レポート要約が未指定または空なら今週のまとめ・論点・データ注意を出さない", () => {
     const omitted = buildDigestMessage(baseInput());
+    expect(omitted).not.toContain("■ 今週のまとめ");
     expect(omitted).not.toContain("■ 論点");
     expect(omitted).not.toContain("■ データ注意");
 
     const empty = buildDigestMessage(
-      baseInput({ reportSummary: { discussion: [], dataNotes: [] } })
+      baseInput({ reportSummary: { lineSummary: [], discussion: [], dataNotes: [] } })
     );
+    expect(empty).not.toContain("■ 今週のまとめ");
     expect(empty).not.toContain("■ 論点");
     expect(empty).not.toContain("■ データ注意");
   });
@@ -141,7 +179,7 @@ describe("buildDigestMessage", () => {
   it("合言葉がある場合は承認リンク付近に表示する", () => {
     const msg = buildDigestMessage(baseInput({ passphrase: " ピックルバン " }));
 
-    expect(msg).toContain("承認する → https://example.com/growth/approve?token=abc");
+    expect(msg).toContain("ダッシュボードを開く → https://example.com/growth/approve?token=abc");
     expect(msg).toContain("🔑 合言葉: ピックルバン");
   });
 
@@ -207,9 +245,49 @@ describe("extractReportSummary", () => {
     ];
 
     expect(extractReportSummary(blocks)).toEqual({
+      lineSummary: [],
       discussion: ["A", "B"],
       dataNotes: ["推測を含む"],
     });
+  });
+
+  it("LINE要約セクション(h2/h3)の段落・箇条書きを抽出する", () => {
+    const h2 = extractReportSummary([
+      heading("h2s", "LINE要約"),
+      paragraph("検索流入は伸びたが予約導線が弱い週でした"),
+      listItem("来週は予約ボタンを強化する"),
+    ]);
+    expect(h2.lineSummary).toEqual([
+      "検索流入は伸びたが予約導線が弱い週でした",
+      "来週は予約ボタンを強化する",
+    ]);
+
+    const h3 = extractReportSummary([
+      heading("h3s", "LINE要約", "heading_3"),
+      paragraph("一行目"),
+    ]);
+    expect(h3.lineSummary).toEqual(["一行目"]);
+  });
+
+  it("LINE要約は最大5行、超過は落とす", () => {
+    const blocks = [
+      heading("h2s", "LINE要約"),
+      paragraph("1"),
+      paragraph("2"),
+      paragraph("3"),
+      paragraph("4"),
+      paragraph("5"),
+      paragraph("6"),
+    ];
+
+    expect(extractReportSummary(blocks).lineSummary).toEqual(["1", "2", "3", "4", "5"]);
+  });
+
+  it("LINE要約は100字超を99字+…に切る", () => {
+    const long = "あ".repeat(105);
+    const blocks = [heading("h2s", "LINE要約"), paragraph(long)];
+
+    expect(extractReportSummary(blocks).lineSummary[0]).toBe("あ".repeat(99) + "…");
   });
 
   it("各セクション最大3行、超過は落とす", () => {
@@ -233,6 +311,7 @@ describe("extractReportSummary", () => {
 
   it("該当見出しが無ければ空配列", () => {
     expect(extractReportSummary([heading("h2a", "今週の数字"), paragraph("x")])).toEqual({
+      lineSummary: [],
       discussion: [],
       dataNotes: [],
     });
@@ -271,6 +350,7 @@ describe("extractReportSummary", () => {
     ];
 
     expect(extractReportSummary(blocks)).toEqual({
+      lineSummary: [],
       discussion: [],
       dataNotes: ["数字は暫定"],
     });
@@ -305,6 +385,7 @@ describe("extractReportSummary", () => {
     ];
 
     expect(extractReportSummary(blocks)).toEqual({
+      lineSummary: [],
       discussion: ["有効"],
       dataNotes: [],
     });

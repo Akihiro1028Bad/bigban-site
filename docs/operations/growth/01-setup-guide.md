@@ -113,8 +113,7 @@
 | `GROWTH_GA4_KEYEVENTS_SINCE` | （任意）CV 計測開始日 | △ | △ | ✗ |
 | `OPENAI_API_KEY` | 画像生成 | △ | ✅ | ✗ |
 | `MICROCMS_SERVICE_DOMAIN` | microCMS サービス名 | △ | ✅ | ✅ |
-| `MICROCMS_MANAGEMENT_API_KEY` | メディア/下書き書き込み | △ | ✅ | ⚠️後述 |
-| `MICROCMS_CONTENT_API_KEY` | （任意）下書き content 書き込み専用 | △ | △ | △ |
+| `MICROCMS_API_KEY` | 読み取り・下書き・公開・メディア操作 | △ | ✅ | ✅ |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE push 送信 | △ | ✅ | ✗ |
 | `LINE_GROUP_ID` | 通知先グループ | △ | ✅ | ✗ |
 | `GROWTH_NOTIFY_LEVEL` | LINE push 範囲（未設定=週次のみ / `all`=全通知） | △ | △ | ✗ |
@@ -129,7 +128,7 @@
 
 ### 2-2. 特に注意する変数
 
-- **`MICROCMS_MANAGEMENT_API_KEY` は server-only**。`NEXT_PUBLIC_` を付けて**クライアントに渡してはいけません**（強権限キーの漏洩防止・#7）。Vercel に置く場合も通常のサーバー環境変数として扱い、`NEXT_PUBLIC_` プレフィックスは絶対に付けないこと。
+- **microCMSキーは `MICROCMS_API_KEY` 1つだけ**です。読み取り・下書き更新・公開・メディア操作に必要な権限を付与し、自宅PCとVercelへ同じ値を設定します。server-only とし、`NEXT_PUBLIC_` を付けて**クライアントに渡してはいけません**。
 - **`GROWTH_LEARNING_LOG_DS`（学習ログ DB の data source ID）は現状 Mac のみ設定済み**で、**自宅 PC・Vercel には未設定**です。この状態だと**学習ログの追記が静かにスキップ**されます（本処理は止まりません＝欠落耐性）。学習ログを本番で記録したい場合は、手順 4 で作成する学習ログ DB の data source ID を自宅 PC の `.env` にも設定してください。
 - **AIモデル設定はNotionで共有**します。承認画面 `AIモデル` で保存した設定を自宅PC workerも読むため、「AIモデル設定」DBを`NOTION_TOKEN`の内部インテグレーションへ共有してください。`GROWTH_MODEL_SETTINGS_DS`はDBを差し替える場合だけ設定し、通常は未設定でコード内の既定IDを使います。
 - **モデル設定のenvは一時上書き用**です。優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。通常運用では`GROWTH_AGENT`を未設定にし、工程別のプロバイダー選択を有効にします。
@@ -471,7 +470,7 @@ Vercel の承認画面を本番公開する前に、必ず次を確認してく�
 
 - [ ] **`APPROVE_AUTH_ENABLED` を必ず ON**（未設定＝ON でも可・`false` にしない）。承認画面は強権限 API を叩くため、合言葉ゲートが必須です。`false` のままだと本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。
 - [ ] **`APPROVE_SECRET`（合言葉）を Vercel に設定**し、推測されにくい語にしてある。
-- [ ] **`MICROCMS_MANAGEMENT_API_KEY` に `NEXT_PUBLIC_` を付けていない**（server-only・クライアントへ渡さない）。
+- [ ] **`MICROCMS_API_KEY` に `NEXT_PUBLIC_` を付けていない**（server-only・クライアントへ渡さない）。
 - [ ] **`NOTION_TOKEN` が Vercel（承認画面用）と自宅 PC（通知用）で同じ値**になっている。
 - [ ] Google OAuth 同意画面を**「本番（公開）」に昇格済み**（テストのままだと 7 日で失効）。
 - [ ] 週次レポート DB を **Web 公開済み**で、ログインなしで開ける。

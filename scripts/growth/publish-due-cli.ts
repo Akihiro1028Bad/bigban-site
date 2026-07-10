@@ -148,11 +148,10 @@ async function notifyLine(text: string): Promise<void> {
 async function main(): Promise<void> {
   const notionOpts = notionOptions();
   const serviceDomain = requireEnv("MICROCMS_SERVICE_DOMAIN");
-  const managementKey = requireEnv("MICROCMS_MANAGEMENT_API_KEY");
-  const contentKey = process.env.MICROCMS_CONTENT_API_KEY ?? managementKey;
+  const microcmsApiKey = requireEnv("MICROCMS_API_KEY");
   const retry = resolveRetryConfig(process.env);
-  const managementOpts = { serviceDomain, apiKey: managementKey, fetchFn: defaultFetch, retry };
-  const contentOpts = { serviceDomain, apiKey: contentKey, fetchFn: defaultFetch, retry };
+  const managementOpts = { serviceDomain, apiKey: microcmsApiKey, fetchFn: defaultFetch, retry };
+  const contentOpts = { serviceDomain, apiKey: microcmsApiKey, fetchFn: defaultFetch, retry };
 
   // 予約が入っているページを取得(到来判定・公開可否は純ロジックで)。
   const { pages } = await queryDataSource(

@@ -5,7 +5,7 @@
  * 記事の下書きのアイキャッチへ差し替える。
  *
  * - `eyecatchUrl` は **microCMS アセット(`*.microcms-assets.io`・https)に限定**(任意 URL 拒否)。
- * - 書き込みは **content API キー**(`MICROCMS_CONTENT_API_KEY`)で `patchDraft`(管理キーは使わない)。
+ * - 書き込みは **単一APIキー**(`MICROCMS_API_KEY`)で `patchDraft`(同じ単一APIキーを使用)。
  * - #95/#141 整合: プレビュー正本の Notion ミラー(`アイキャッチURL`)を先に更新 → microCMS 下書きへ同期。
  * - status=draft の PATCH のみ。公開はしない。認可は承認 API と同じ(`APPROVE_AUTH_ENABLED` で gate)。
  */
@@ -46,7 +46,7 @@ function notionOptions(): { token: string; fetchFn: typeof defaultFetch } | null
 
 function microcmsOptions(): { serviceDomain: string; apiKey: string; fetchFn: typeof defaultFetch } | null {
   const serviceDomain = process.env.MICROCMS_SERVICE_DOMAIN;
-  const apiKey = process.env.MICROCMS_CONTENT_API_KEY;
+  const apiKey = process.env.MICROCMS_API_KEY;
   if (!serviceDomain || !apiKey) return null;
   return { serviceDomain, apiKey, fetchFn: defaultFetch };
 }

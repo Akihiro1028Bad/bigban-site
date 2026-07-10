@@ -68,6 +68,11 @@ import {
   shouldSendFailureNotice,
   type NotifyThrottleRecord,
 } from "./notify-throttle";
+import {
+  buildSourceLedgerProps,
+  parseSourceLedger,
+  updatePagePropsWithLedgerFallback,
+} from "./sourceLedger";
 import { runStages, type Stage } from "./pipeline";
 import { evaluatePublishGate, resolveGateArticleType } from "./publishGate";
 
@@ -108,6 +113,8 @@ interface DraftSpec {
   /** 本文画像(#63)。構成案の画像指示から下書きモードがステージする。 */
   images?: DraftImageInput[];
   notion?: { pageId: string; property: string; value: string };
+  /** 根拠台帳(#根拠台帳)。読者非公開・監査用に Notion 行へ保存する(任意・欠落耐性)。 */
+  sourceLedger?: unknown;
 }
 
 /** best-effort で LINE に通知する(送れなくても失敗にしない=沈黙させない補助)。 */
@@ -145,9 +152,7 @@ async function main(): Promise<void> {
   const ENDPOINT = growthEndpoint(media);
 
   const serviceDomain = requireEnv("MICROCMS_SERVICE_DOMAIN");
-  const contentKey =
-    process.env.MICROCMS_CONTENT_API_KEY ??
-    requireEnv("MICROCMS_MANAGEMENT_API_KEY");
+  const contentKey = requireEnv("MICROCMS_API_KEY");
   const microOpts = {
     serviceDomain,
     apiKey: contentKey,
@@ -179,7 +184,7 @@ async function main(): Promise<void> {
     }
     return uploadMedia(filePath, {
       serviceDomain,
-      apiKey: requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+      apiKey: requireEnv("MICROCMS_API_KEY"),
       fetchFn: defaultFetch,
       readFile,
     });
@@ -301,7 +306,7 @@ async function main(): Promise<void> {
         run: async () => {
           eyecatchUrl = await uploadMedia(imagePath, {
             serviceDomain,
-            apiKey: requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+            apiKey: requireEnv("MICROCMS_API_KEY"),
             fetchFn: defaultFetch,
             readFile,
           });
@@ -327,26 +332,42 @@ async function main(): Promise<void> {
         try {
           draftKey = await fetchDraftKey(ENDPOINT, contentId, {
             serviceDomain,
-            apiKey: requireEnv("MICROCMS_MANAGEMENT_API_KEY"),
+            apiKey: requireEnv("MICROCMS_API_KEY"),
             fetchFn: defaultFetch,
           });
         } catch (error: unknown) {
           const m = error instanceof Error ? error.message : String(error);
           process.stderr.write(`(draftKey 取得に失敗・プレビューキーなしで継続: ${m})\n`);
         }
-        await updatePageProps(
-          notion.pageId,
-          {
-            [notion.property]: { select: { name: notion.value } },
-            ...buildDraftLinkProps(contentId, draftKey),
-            // #95: 公開キーで下書きを読まない方針のため、確定本文HTML(画像置換後)を
-            // Notion にミラーし、承認画面のプレビューはこの値を読む。
-            ...buildBodyMirrorProps(String(spec.payload.bodyHtml ?? "")),
-            // #141: アイキャッチURLも Notion へミラーし、承認画面のプレビューが表示できるようにする。
-            ...buildEyecatchMirrorProps(eyecatchUrl),
-          },
-          { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch }
-        );
+        // #根拠台帳: 台帳を検証し、除外があれば沈黙させず LINE 通知する(投入は落とさない)。
+        const { entries: ledgerEntries, warnings: ledgerWarnings } =
+          parseSourceLedger(spec.sourceLedger);
+        for (const w of ledgerWarnings) {
+          process.stderr.write(`${w}\n`);
+          await notifyLineBestEffort(w);
+        }
+
+        const notionOpts = { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch };
+        const baseProps: Record<string, unknown> = {
+          [notion.property]: { select: { name: notion.value } },
+          ...buildDraftLinkProps(contentId, draftKey),
+          // #95: 公開キーで下書きを読まない方針のため、確定本文HTML(画像置換後)を
+          // Notion にミラーし、承認画面のプレビューはこの値を読む。
+          ...buildBodyMirrorProps(String(spec.payload.bodyHtml ?? "")),
+          // #141: アイキャッチURLも Notion へミラーし、承認画面のプレビューが表示できるようにする。
+          ...buildEyecatchMirrorProps(eyecatchUrl),
+        };
+        // #根拠台帳: 同じ PATCH に台帳をマージして保存する(API 呼び出しを増やさない)。
+        // 「根拠台帳」プロパティ未追加でも本体保存は成功させる(欠落耐性=台帳抜きでリトライ)。
+        const ledgerResult = await updatePagePropsWithLedgerFallback({
+          baseProps,
+          ledgerProps: buildSourceLedgerProps(ledgerEntries),
+          update: (props) => updatePageProps(notion.pageId, props, notionOpts),
+        });
+        if (ledgerResult.warning) {
+          process.stderr.write(`${ledgerResult.warning}\n`);
+          await notifyLineBestEffort(ledgerResult.warning);
+        }
       },
     });
   }

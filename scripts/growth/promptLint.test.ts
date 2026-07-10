@@ -99,4 +99,13 @@ describe("記事ネタ案ルールの共通化", () => {
     expect(shared).toContain("成功指標");
     expect(shared).toContain("想定CTA");
   });
+
+  it("共通記事案ルールはコールドスタート実験を識別し28日観測する", () => {
+    const shared = readFileSync(path.join(promptsDir, "shared/article-idea.md"), "utf-8");
+
+    expect(shared).toContain("コールドスタート実験");
+    expect(shared).toContain("【コールドスタート実験】");
+    expect(shared).toContain("公開28日");
+    expect(shared).toContain("最大1件");
+  });
 });

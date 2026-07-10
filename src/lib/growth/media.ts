@@ -70,6 +70,9 @@ export function validateUpload(
     if (detected === null || !(MEDIA_ALLOWED_MIME as readonly string[]).includes(detected)) {
       return { ok: false, error: "ファイルの中身が画像ではありません(拡張子/MIME の偽装)。" };
     }
+    if (detected !== input.type) {
+      return { ok: false, error: "申告されたMIMEとファイルの画像形式が一致しません。" };
+    }
   }
   return { ok: true };
 }
