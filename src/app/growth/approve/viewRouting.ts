@@ -3,12 +3,13 @@
  * proto MainView 語彙へ統一(施策/記事/プロンプト/成績/公開キュー/運用)。旧 proposals|articles|prompts は廃止。
  */
 
-export type ApproveView = "proposal" | "approve" | "prompt" | "performance" | "queue" | "ops";
+export type ApproveView = "proposal" | "approve" | "prompt" | "models" | "performance" | "queue" | "ops";
 
 export const APPROVE_VIEWS: readonly ApproveView[] = [
   "proposal",
   "approve",
   "prompt",
+  "models",
   "performance",
   "queue",
   "ops",

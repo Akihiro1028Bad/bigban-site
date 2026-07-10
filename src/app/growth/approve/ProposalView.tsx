@@ -38,7 +38,7 @@ const STATUS_META: Record<ProposalTriageStatus, { label: string; tone: string }>
 const ORDER: ProposalTriageStatus[] = ["pending", "adopted", "completed", "rejected"];
 
 /** 種別フィルタの選択肢("all" + 全 ProposalKind)。 */
-const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "site", "event", "other"];
+const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "site", "event", "other", "system"];
 
 interface ProposalViewProps {
   /** 表示対象の施策(親で検索/優先度ソート済み)。 */

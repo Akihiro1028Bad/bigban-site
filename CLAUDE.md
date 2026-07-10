@@ -50,7 +50,7 @@ public/
 
 **絶対禁止(全モード)**: 本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(料金・正確な所要分 等。列挙の正典は `scripts/growth/facility-context.json` の `doNotWrite`)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。
 
-**実行**: 自宅 PC の headless `claude -p`(`scripts/growth/run.mjs`)。動作確認は `GROWTH_DRYRUN=1`。下書き系の既定モデルは `claude-opus-4-8`。
+**実行**: 自宅 PC の headless agent(`scripts/growth/run.mjs`)。承認画面 `AIモデル` の工程別設定に応じて Claude Code CLI / Codex CLI を選ぶ。動作確認は `GROWTH_DRYRUN=1`。
 
 **設計の共通原則**: pull型(承認画面=Vercel は Notion に依頼を書くだけ／重い処理は常時稼働PCのループが拾う) / 承認画面は基本 Notion を読むだけ / 純ロジック分離(`scripts/growth/*.ts`＋`src/lib/growth/*` 再エクスポート・CLI/run.mjs/gen-* はカバレッジ除外) / 欠落耐性 / 段階ガード(#H9)。
 

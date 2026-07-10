@@ -3,7 +3,7 @@
  *
  * - KIND_META / approveOutcomeFor は proto `approve-proto/proposalKind.ts` を逐語移植。
  *   tone は theme(`approve/theme/approveTheme.css`)に実在する `--p-*` トークンをそのまま指す。
- * - kindFromCategory は「種別を Notion に persist しない」方針の要。既存 category(6値)から
+ * - kindFromCategory は「種別を Notion に persist しない」方針の要。既存 category(7値)から
  *   決定的に派生する(実データ駆動・BE 変更ゼロ)。
  * - JSXアイコンは UI 側に置き、ここは型専用 import に保つ。
  */
@@ -15,6 +15,7 @@ export const KIND_META: Record<ProposalKind, { label: string; tone: string }> = 
   site: { label: "サイト", tone: "var(--p-purple)" },
   event: { label: "イベント", tone: "var(--p-green)" },
   other: { label: "その他", tone: "var(--p-text-3)" },
+  system: { label: "システム改善", tone: "var(--p-teal)" },
 };
 
 /** 承認したら何になるか(種別ごとに変わる出口)。 */
@@ -38,6 +39,8 @@ export function approveOutcomeFor(kind: ProposalKind = "article"): ApproveOutcom
       return { buttonLabel: "承認して開催準備へ", preview: "開催準備タスク", toast: "開催準備タスクを作成しました", done: "開催準備タスクとして登録済み" };
     case "other":
       return { buttonLabel: "承認してタスク化", preview: "タスク", toast: "タスクに登録しました", done: "タスクとして起票済み" };
+    case "system":
+      return { buttonLabel: "承認して改善タスク化", preview: "改善タスク", toast: "改善タスクに登録しました", done: "改善タスクとして登録済み" };
     case "article":
     default:
       return { buttonLabel: "承認して記事化", preview: "記事ドラフト生成キュー", toast: "記事生成パイプラインに送りました", done: "記事生成パイプラインへ送出済み" };
@@ -45,13 +48,14 @@ export function approveOutcomeFor(kind: ProposalKind = "article"): ApproveOutcom
 }
 
 /**
- * 既存 category(6値)→ 種別を決定的に派生(#214・`categoryForKind` と往復整合)。
+ * 既存 category(7値)→ 種別を決定的に派生(#214・`categoryForKind` と往復整合)。
  *
  * `proposalForm.ts` の `categoryForKind`(種別→カテゴリ)と対称になるよう写像する:
  * - `コンテンツ` → article(記事化)
  * - `イベント` → event(開催準備)
  * - `サイトデザイン`/`サイト表示内容`/`追加機能` → site(実装タスク化)
  * - `MEO` → other(タスク化)
+ * - `システム改善` → system(改善タスク化)
  * - 未知/空 → article(欠落耐性)
  *
  * 以前は「イベント以外を全て article」に落としており、MEO・サイト系・追加機能の施策が
@@ -65,6 +69,7 @@ const CATEGORY_TO_KIND: Readonly<Record<string, ProposalKind>> = {
   サイト表示内容: "site",
   追加機能: "site",
   MEO: "other",
+  システム改善: "system",
 };
 
 export function kindFromCategory(category: string): ProposalKind {

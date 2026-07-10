@@ -78,6 +78,11 @@ describe("validateProposalForm", () => {
       const r = validateProposalForm({ name: "その他施策", kind: "other" });
       expect(r.ok && r.payload.category).toBe("MEO");
     });
+
+    it("system は category=システム改善 へ写像", () => {
+      const r = validateProposalForm({ name: "改善施策", kind: "system" });
+      expect(r.ok && r.payload.category).toBe("システム改善");
+    });
   });
 
   describe("note 任意", () => {

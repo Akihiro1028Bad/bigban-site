@@ -60,6 +60,13 @@ describe("ProposalDetailBody", () => {
     expect(screen.getByText(/GBP投稿文案/)).toBeInTheDocument();
   });
 
+  it("システム改善は改善タスク化と diff/要件案確認の次アクションを表示する", () => {
+    render(<ProposalDetailBody item={proposal({ subtitle: "システム改善" })} kind="system" />);
+
+    expect(screen.getByText("改善タスク")).toBeInTheDocument();
+    expect(screen.getByText(/diff案・要件案/)).toBeInTheDocument();
+  });
+
   it("成果物化済み施策は成果物リンクと承認日時を表示する", () => {
     render(
       <ProposalDetailBody

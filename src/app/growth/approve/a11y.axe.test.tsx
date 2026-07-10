@@ -96,16 +96,21 @@ vi.mock("./api", async () => {
 
 const PROMPTS_SAMPLE: PromptsData = {
   facilityContext: '{"open":false}',
+  warnings: [],
   groups: [
     {
-      group: "分析",
+      group: "実行プロンプト",
       phases: [
         {
+          path: "scripts/growth/prompts/weekly.md",
           filename: "weekly.md",
           label: "週次分析",
-          group: "分析",
+          group: "実行プロンプト",
           order: 1,
+          purpose: "週次分析の実行テンプレート",
+          stage: "週次分析",
           whenItRuns: "週次の分析をするとき",
+          sourceKind: "prompt",
           content: "週次の指示本文",
         },
       ],

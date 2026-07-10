@@ -72,6 +72,7 @@ import type { BodyImageRegenInput, BodyImageRegenTarget } from "./bodyRegenReque
 import { buildBodyRegenBody } from "./bodyRegenRequest";
 import { BodyImageRegenModal } from "./BodyImageRegenModal";
 import { PromptsView } from "./PromptsView";
+import { ModelSettingsView } from "./ModelSettingsView";
 import { ProposalView } from "./ProposalView";
 import { ProposalFormModal } from "./ProposalFormModal";
 import { nextReviewId } from "./reviewNav";
@@ -1229,6 +1230,7 @@ export function ApproveClient() {
     proposal: "施策",
     approve: "記事",
     prompt: "プロンプト",
+    models: "AIモデル",
     performance: "成績",
     queue: "公開キュー",
     ops: "運用",
@@ -1243,6 +1245,7 @@ export function ApproveClient() {
           segment={segment}
           segments={topBarSegments}
           query={query}
+          searchPlaceholder={activeView === "prompt" ? "資料を検索…" : "記事を検索…"}
           awaitingCount={counts.awaiting}
           publishedTotal={counts.publishedTotal}
           onSegmentChange={handleSegmentChange}
@@ -1375,7 +1378,9 @@ export function ApproveClient() {
                 onOpenForm={() => setProposalFormOpen(true)}
               />
             ) : activeView === "prompt" ? (
-              <PromptsView token={token} />
+              <PromptsView token={token} query={query} />
+            ) : activeView === "models" ? (
+              <ModelSettingsView token={token} />
             ) : activeView === "performance" ? (
               <PerformanceBoard items={ideas} />
             ) : activeView === "queue" ? (

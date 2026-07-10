@@ -8,6 +8,13 @@ import type { PendingItem } from "@/lib/growth/approve";
 import type { PromptGroup } from "@/lib/growth/promptRegistry";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import type { GrowthOpsView } from "@/lib/growth/workerLog";
+import type {
+  ModelCatalogItem,
+  ModelEffort,
+  ModelPhaseSetting,
+  ModelProvider,
+  ModelSettingInput,
+} from "@/lib/growth/modelSettings";
 
 import { authHeaders } from "./authHeaders";
 
@@ -19,6 +26,8 @@ export const PROPOSAL_ARTIFACT_URL = "/api/growth/proposal-artifact";
 
 export const OPS_URL = "/api/growth/ops";
 
+export const MODEL_SETTINGS_URL = "/api/growth/model-settings";
+
 export interface ProposalArtifactBlock {
   id: string;
   type: string;
@@ -28,7 +37,47 @@ export interface ProposalArtifactBlock {
 /** プロンプト確認タブのデータ(前提情報の生テキスト＋フェーズ群)。 */
 export interface PromptsData {
   facilityContext: string | null;
+  warnings: string[];
   groups: PromptGroup[];
+}
+
+export interface ModelSettingsData {
+  storageAvailable: boolean;
+  warning: string | null;
+  settings: ModelPhaseSetting[];
+  catalog: ModelCatalogItem[];
+  efforts: Record<ModelProvider, readonly ModelEffort[]>;
+}
+
+export async function fetchModelSettings(token: string): Promise<ModelSettingsData> {
+  const res = await fetch(MODEL_SETTINGS_URL, { headers: authHeaders(token) });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success) {
+    throw new Error(json.error ?? "AIモデル設定の取得に失敗しました。");
+  }
+  return {
+    storageAvailable: json.storageAvailable === true,
+    warning: typeof json.warning === "string" ? json.warning : null,
+    settings: Array.isArray(json.settings) ? (json.settings as ModelPhaseSetting[]) : [],
+    catalog: Array.isArray(json.catalog) ? (json.catalog as ModelCatalogItem[]) : [],
+    efforts: json.efforts as Record<ModelProvider, readonly ModelEffort[]>,
+  };
+}
+
+export async function putModelSetting(
+  token: string,
+  input: ModelSettingInput,
+): Promise<ModelPhaseSetting> {
+  const res = await fetch(MODEL_SETTINGS_URL, {
+    method: "PUT",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify(input),
+  });
+  const json = await readJsonObject(res);
+  if (!res.ok || !json.success || !json.setting) {
+    throw new Error(json.error ?? "AIモデル設定の保存に失敗しました。");
+  }
+  return json.setting as ModelPhaseSetting;
 }
 
 /**
@@ -48,6 +97,7 @@ export async function fetchPrompts(token: string): Promise<PromptsData> {
   // 外部レスポンスを鵜呑みにせず最小限の形チェックをしてから返す(壊れた本文での描画時例外を防ぐ)。
   return {
     facilityContext: typeof json.facilityContext === "string" ? json.facilityContext : null,
+    warnings: Array.isArray(json.warnings) ? (json.warnings as string[]) : [],
     groups: Array.isArray(json.groups) ? (json.groups as PromptGroup[]) : [],
   };
 }

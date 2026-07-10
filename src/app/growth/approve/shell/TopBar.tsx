@@ -20,6 +20,7 @@ interface TopBarProps {
   segment: ShellSegmentKey;
   segments: Segment[];
   query: string;
+  searchPlaceholder?: string;
   awaitingCount: number;
   publishedTotal: number;
   onSegmentChange: (key: ShellSegmentKey) => void;
@@ -38,6 +39,7 @@ export function TopBar({
   segment,
   segments,
   query,
+  searchPlaceholder = "記事を検索…",
   awaitingCount,
   publishedTotal,
   onSegmentChange,
@@ -112,10 +114,11 @@ export function TopBar({
           <IconSearch size={15} />
         </span>
         <input
+          aria-label="検索"
           ref={searchRef}
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="記事を検索…"
+          placeholder={searchPlaceholder}
           className="h-[34px] w-full rounded-[9px] pl-8 pr-12 text-[13px] outline-none"
           style={{
             background: "var(--p-bg-input)",

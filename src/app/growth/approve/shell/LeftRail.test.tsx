@@ -5,12 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import { LeftRail } from "./LeftRail";
 
 describe("LeftRail", () => {
-  it("6 view を nav/button で出し、アクティブに aria-current=page", () => {
+  it("7 view を nav/button で出し、アクティブに aria-current=page", () => {
     render(<LeftRail view="approve" articleCount={2} proposalCount={1} queueReadyCount={3} opsIssueCount={0} onChange={vi.fn()} />);
     expect(screen.getByRole("navigation", { name: "情報源" })).toBeInTheDocument();
     const article = screen.getByRole("button", { name: "記事" });
     expect(article).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: "施策" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: "AIモデル" })).toBeInTheDocument();
   });
 
   it("各 view のバッジ(施策/記事/公開キュー)を出す", () => {

@@ -14,6 +14,7 @@ export const PROPOSAL_CATEGORIES = [
   "サイト表示内容",
   "追加機能",
   "イベント",
+  "システム改善",
 ] as const;
 
 export interface ProposalInput {

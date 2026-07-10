@@ -60,6 +60,19 @@ describe("TopBar", () => {
     expect(onQueryChange).toHaveBeenCalled();
   });
 
+  it("検索入力はplaceholderに依存しないaccessible nameを持つ", () => {
+    setup({ searchPlaceholder: "資料を検索…" });
+    expect(screen.getByRole("textbox", { name: "検索" })).toHaveAttribute(
+      "placeholder",
+      "資料を検索…",
+    );
+  });
+
+  it("検索 placeholder を view に応じて差し替えられる", () => {
+    setup({ searchPlaceholder: "資料を検索…" });
+    expect(screen.getByPlaceholderText("資料を検索…")).toBeInTheDocument();
+  });
+
   it("統計ピル(あなた待ち/公開済み)を表示する", () => {
     setup();
     expect(screen.getByTitle("あなたのアクション待ち")).toHaveTextContent("1");

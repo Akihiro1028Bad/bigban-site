@@ -84,7 +84,7 @@ describe("proposalToItem", () => {
 });
 
 describe("PROPOSAL_CATEGORIES", () => {
-  it("施策提案の6カテゴリを持つ", () => {
+  it("施策提案の7カテゴリを持つ", () => {
     expect(PROPOSAL_CATEGORIES).toEqual([
       "コンテンツ",
       "MEO",
@@ -92,6 +92,7 @@ describe("PROPOSAL_CATEGORIES", () => {
       "サイト表示内容",
       "追加機能",
       "イベント",
+      "システム改善",
     ]);
   });
 });

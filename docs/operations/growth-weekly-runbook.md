@@ -1,7 +1,7 @@
 # グロース運用 指示書(AI 実行用ランブック)
 
 THE PICKLE BANG THEORY のグロース運用を AI が行うための手順書。
-headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex CLI)でこの手順を渡して実行する想定。設計の「② AI が分析 → ③ 成果物」を担う。
+headless agent(承認画面「AIモデル」の工程別設定に応じて Claude Code CLI / Codex CLI を選択)でこの手順を渡して実行する想定。設計の「② AI が分析 → ③ 成果物」を担う。
 
 - 設計書: [2026-06-12-growth-loop-mvp-design.md](../superpowers/specs/2026-06-12-growth-loop-mvp-design.md)
 - データ取得実装: `scripts/growth/`(`npm run growth:fetch`)
@@ -17,8 +17,36 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 
 承認のサイクル: 週次モードが提案を出す → 人間が Notion で `承認`/`却下` → **下書きモード/施策実行モードを手動実行、または daemon の opt-in 自動で反映**。webhook は使わず、実行時に Notion を読む。
 
-> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives` / opt-in 自動 `GROWTH_DRAFTS_AUTO=1 GROWTH_INITIATIVES_AUTO=1 npm run growth:daemon`(いずれも内部で headless agent に該当モードの指示を渡す。既定は Claude、Codex は `GROWTH_AGENT=codex` 指定時のみ)。
+> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives` / opt-in 自動 `GROWTH_DRAFTS_AUTO=1 GROWTH_INITIATIVES_AUTO=1 npm run growth:daemon`(いずれも内部で工程別に設定された headless agent へ該当モードの指示を渡す)。
 > Worker の状態・直近失敗・reconcile は `docs/operations/growth/worker-observability.md` を参照。
+
+## 工程別AIモデル
+
+承認画面の `AIモデル` で、工程ごとにプロバイダー・モデル・推論強度を保存する。設定は Notion「AIモデル設定」DBを介してVercelと自宅PC workerで共有され、**次回のAI起動から**反映される。実行中の処理は変更しない。
+
+| 工程 | 推奨プロバイダー / モデル | 推論強度 |
+|---|---|---|
+| 週次分析・提案 | Codex / `gpt-5.6-sol` | `xhigh` |
+| 記事下書き生成 | Claude / `claude-opus-4-8` | `high` |
+| 施策成果物化 | Codex / `gpt-5.5` | `high` |
+| 構成案・タイトル修正 | Claude / `claude-opus-4-8` | `high` |
+| アイキャッチ・本文画像再生成 | Claude / `claude-sonnet-5` | `medium` |
+| 記事アドバイス | Claude / `claude-opus-4-8` | `high` |
+| 装飾提案 | Codex / `gpt-5.5` | `medium` |
+| アドバイス反映・本文コメント修正 | Claude / `claude-opus-4-8` | `high` |
+
+設定の優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。`GROWTH_AGENT` を指定すると全工程のプロバイダーを強制するが、通常運用では未設定にする。Notionが一時的に読めない場合もコード内推奨値へフォールバックして処理を継続する。
+
+週次分析だけを一時的に上書きする場合は、`.env` または実行時に次を設定する。下書き・修正・装飾など他モードには漏れない。
+
+```env
+GROWTH_WEEKLY_CODEX_MODEL=gpt-5.6-sol
+GROWTH_WEEKLY_CODEX_REASONING_EFFORT=xhigh
+```
+
+```bash
+npm run growth:weekly
+```
 
 ## 出力先(確定)
 
@@ -26,7 +54,8 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 |------|----|
 | 週次レポート | Notion DB「週次グロースレポート」 data source: `collection://27d6794f-4133-4cd4-9407-491d95c1b82b`(URL: https://app.notion.com/p/f6b304f1375347e39f718ce30dbdef93) |
 | 記事ネタ案(コンテンツの承認ゲート) | Notion DB「記事ネタ案」 data source: `collection://5adab8b1-f182-4123-b963-9463a2580d4a`(URL: https://app.notion.com/p/057f4e5afac243a885a323d1f4b492ba) |
-| 施策提案(コンテンツ以外5カテゴリの承認ゲート) | Notion DB「施策提案」 data source: `collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`(URL: https://app.notion.com/p/af87618b81e94943a8519b4124185114)。承認は「今週の承認待ち」ビューで `ステータス` を1タップ変更 |
+| 施策提案(コンテンツ以外6カテゴリの承認ゲート) | Notion DB「施策提案」 data source: `collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`(URL: https://app.notion.com/p/af87618b81e94943a8519b4124185114)。承認は「今週の承認待ち」ビューで `ステータス` を1タップ変更 |
+| AIモデル設定 | Notion DB「AIモデル設定」 data source: `collection://d6b79283-f892-4d75-b998-332ccb6dc22e`(URL: https://app.notion.com/p/4b2f1c3e75ae4ed3aedbbd4527987911)。承認画面 `AIモデル` から更新 |
 | 記事下書き | microCMS(MCP 経由・**下書きのみ**)。**承認済みネタ案のみ**下書き化 |
 
 ## 基本原則(厳守)
@@ -39,6 +68,8 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 
 ## 週次モード(自動・毎週木曜朝)
 
+週次分析の正典は [growth-goals.md](../../scripts/growth/prompts/shared/growth-goals.md)。最重要目標をコート予約率・稼働率の向上、長期目標を「日本一のピックルボールコート」とし、後者は広告上の断定ではなく、予約稼働・口コミ・体験と継続・認知・コミュニティの評価軸として追う。比較可能なデータがなければ `未計測` / `比較データ不足` と記録する。
+
 ### 1. データ取得
 - `npm run growth:fetch` を実行する
 - 標準出力の JSON、または `data/snapshots/<実行日>.json` を読む
@@ -46,6 +77,9 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 - `errors` が空でないソースは「データ取得失敗」として扱い、レポートにその旨を明記(推測で数字を埋めない)
 
 ### 2. データの読み解き
+- 最初に取得失敗、計測期間、4週トレンドの有無、実予約データの有無を確認する
+- `認知 → 興味 → 予約意図 → 予約完了 → コート稼働 → 再予約・継続` の順に確認し、提案前にボトルネックを最大3件へ絞る
+- 各ボトルネックには、確認できる事実・原因仮説・反証材料・不足データを付ける
 - GA4: セッション・ユーザー・エンゲージメント率・キーイベント、チャネル別/デバイス別/人気ページ/ランディングページ、各前週比
 - GSC: クリック・表示・CTR・掲載順位、上位クエリ/上位ページ/クエリ×ページ/デバイス別、各前週比
 - 特に注目すべきシグナル:
@@ -53,6 +87,14 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
   - 掲載順位が 5〜15 位のクエリ(あと一押しで上位化しうる)
   - 前週比で大きく動いたチャネル・ページ
   - 対応するページが無い流入クエリ(新規コンテンツの好機)
+
+指標は呼び分ける。分子と分母が揃わない場合は算出せず、代理指標を実予約と同一視しない。
+
+```text
+コート予約率 = 予約済みコート枠 ÷ 販売可能コート枠
+予約転換率 = 予約完了数 ÷ 予約ページ訪問数
+予約意図率 = /reserve 到達数 ÷ サイト訪問数
+```
 
 ### 3. 外部文脈の補強(Web 検索)
 複数のスケールで横断的に調べ、施策の妥当性やネタの裏付けに使う(新しいデータパイプラインは作らない)。
@@ -66,7 +108,7 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 
 ### 4. 施策立案 ―― 「プロのマーケターチーム」で分析する
 
-単一視点で結論を出さず、**役割の異なる専門家サブエージェントを並列起動して多角的に分析 → マーケティングディレクターが統合**する。Task/Agent ツールで各ロールを並列ディスパッチし、各自に「2.のデータ」「3.の外部文脈」を渡す。
+単一視点で結論を出さず、**役割の異なる専門家サブエージェントを並列起動して多角的に分析 → マーケティングディレクターが統合**する。Task/Agent ツールで各ロールを並列ディスパッチし、各自に「2.のデータと最大3件のボトルネック」「3.の外部文脈」を渡す。自由な案出しではなく、特定したボトルネックを解消する案を求める。
 
 **分析チーム(並列・各自が所見を返す)**
 
@@ -77,7 +119,7 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 | CRO/コンバージョン担当 | 来店・予約への転換 | GA4: 導線・離脱・デバイス・キーイベント計測・予約導線 |
 | ブランド戦略家 | 長期ポジショニング | ブランド世界観との整合、トーン、安っぽくならないか |
 
-各ロールの返答は「発見 / 根拠(数字・クエリ名)/ 推奨施策 / 確度」に圧縮させる。チーム全体で**6カテゴリ**(コンテンツ / MEO / サイトデザイン / サイト表示内容 / 追加機能 / イベント)を視野に入れる。
+各ロールの返答は「対象ファネル / ボトルネック / 発見 / 根拠(数字・クエリ名)/ 推奨施策 / 予約への作用 / 確度」に圧縮させる。チーム全体で**6カテゴリ**(コンテンツ / MEO / サイトデザイン / サイト表示内容 / 追加機能 / イベント)を視野に入れる。
 
 > **学習ループ(分析の前に必ず行う)**: 「施策提案」DB と「記事ネタ案」DB から、過去の `却下` 理由(判断者メモ)と `検証結果`(効果あり/なし)を読み、傾向を踏まえて提案する。オーナーが嫌う方向・効かなかった施策は繰り返さない。
 
@@ -85,6 +127,7 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 - 各所見を突き合わせ重複を排除。**カテゴリごとに最大5件**(良い施策が無ければ0〜2件でよい)
 - **質が量に優先。5件埋めるために弱い施策を足さない**(根拠の薄い施策は出さない)
 - 各施策に必ず付ける: 施策名(平易)/ カテゴリ / 根拠(数字・クエリ名)/ 確度(高中低)/ インパクト(大中小)/ 工数(軽中重)/ 想定アクション
+- 既存プロパティの中で、対象ファネル / 解消するボトルネック / 予約への作用 / 成功指標 / 検証予定日 / 人間の次アクションが判断できるようにする。DB プロパティは追加しない
 - **施策も記事案と対称に「仮説」を必須化する(改善案#5)**: 各施策に次の3つを必ず付ける(記事の S4 と対称・空欄で出さない):
   - `仮説`(text): この施策で何がどう良くなるか(例「GBP 週次投稿でローカル指名検索の CTR が上がる」)。根拠(どの数字がそう示すか)とセットで。
   - `成功指標`(text): 効いたと判断する基準(例「『市川 ピックルボール』の GBP 経由アクション +20%/月」)。測る面を明記(GA4/GSC/GBP/予約 等)。
@@ -96,10 +139,12 @@ headless agent(既定は `claude -p`、`GROWTH_AGENT=codex` の時だけ Codex C
 data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ページ)追加:
 - プロパティ: レポート(`週次レポート YYYY-MM-DD〜YYYY-MM-DD`)/ 対象週開始 / セッション / セッション前週比% / クリック_GSC / 表示回数 / 平均掲載順位 / 施策提案数(今回の総数)/ ステータス=`新規`
 - ページ本文の構成:
-  1. サマリー(今週の数字と前週比を平易に。良かった点・気になる点)
-  2. **今週の優先 上位5〜8件**(カテゴリ横断・優先度の高い順。各: カテゴリ・根拠・確度)。これが人間がまず見る要約
-  3. 論点(チームで割れた点)
-  4. データの注意点(取得失敗・データ不足があれば明記)
+  1. KPI 状況(実指標と代理指標を区別)
+  2. 最大ボトルネック(最大3件。事実 / 原因仮説 / 反証材料 / 不足データ)
+  3. **今週の優先 上位5〜8件**(カテゴリ横断・優先度の高い順。各: 対象ファネル・カテゴリ・根拠・確度)。これが人間がまず見る要約
+  4. 日本一に向けた評価軸(予約稼働 / 口コミ / 体験と継続 / 認知 / コミュニティ。比較不能は明記)
+  5. 論点(チームで割れた点)
+  6. データの注意点(取得失敗・データ不足があれば明記)
 
 ### 6. 施策を各 DB に登録する(成果物は作らない)
 
@@ -111,8 +156,9 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 
 **(a) コンテンツ → 「記事ネタ案」DB**(`collection://5adab8b1-f182-4123-b963-9463a2580d4a`)
 - タイトル案 / 概要(1〜2文)/ 優先度 / 対象週開始 / ステータス=`提案中`。本文に狙うクエリ・読者像・根拠
+- 検出したボトルネックに記事が有効な場合だけ作る。流入増加だけで予約ファネルとの接続を説明できない案は作らない。本命1件＋補欠2件を基本上限とする
 
-**(b) その他5カテゴリ → 「施策提案」DB**(`collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`)
+**(b) コンテンツ以外カテゴリ → 「施策提案」DB**(`collection://3503f4bc-b1c4-4927-91ce-7609a6c4e460`)
 - 施策名 / カテゴリ / 確度 / インパクト / 工数 / 週キー / 施策ID / 根拠 / 想定アクション / ステータス=`未処理`(優先度スコアは自動計算)
 - **仮説3点(改善案#5・任意プロパティ・欠落耐性)**: `仮説` / `成功指標` / `検証予定日`(date)も書く。プロパティ未追加でも登録は動く(承認画面・review-due が読む側で吸収)。これらは記事案の S4 と対称の効果測定用。
 - **重複防止**: 登録前に既存 DB を `施策ID` と内容で照合し、既出・過去に `却下` された施策は再提案しない
@@ -174,6 +220,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 | サイトデザイン | 改善仕様書(課題・狙い・変更箇所・参考イメージ。実装は人間判断) |
 | 追加機能 | 仕様書(目的・要件・計測方法。実装は人間判断) |
 | イベント | アイデアの肉付けまで(告知文・チラシは作らない) |
+| システム改善 | diff案または要件案(対象ファイル/根拠/変更前/変更後/適用手順、または要件案/受け入れ条件/実装フロー)。自動適用しない |
 
 3. 各行の `ステータス` を `成果物化済` に更新し、`承認日時` と `成果物リンク`を記録
    - コンテンツ: `成果物リンク` は作成した記事ネタ案ページ URL。元施策ページ本文には「記事ネタ案へ移行済み」と次アクションを短く残す
@@ -343,7 +390,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `アドバイス依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性・ステータスなし＝依頼導線だけ表示）。
-> 分析は既定では **Claude（サブスク・追加課金なし）**。Codex 検証時は `GROWTH_AGENT=codex` とし、`workspace-write` で `tsx` IPC / Notion fetch が塞がる環境では `GROWTH_CODEX_SANDBOX=danger-full-access` を検証用に使う。PC に `NOTION_TOKEN`、通知に LINE（`LINE_GROUP_ID`/`LINE_CHANNEL_ACCESS_TOKEN`）が必要。
+> 工程ごとのAIは承認画面の「AIモデル」設定に従う。Codex工程は自宅PCのheadless workerでNotion/MCP・外部API・子プロセスを使うため、既定で `GROWTH_CODEX_APPROVAL=never` / `GROWTH_CODEX_SANDBOX=danger-full-access` として起動する。制限が必要な環境だけ `workspace-write` などを明示する。PC に `NOTION_TOKEN`、通知に LINE（`LINE_GROUP_ID`/`LINE_CHANNEL_ACCESS_TOKEN`）が必要。
 > **read-only なので OpenAI/microCMS キーは不要**。本文は Notion ミラー `下書き本文HTML`(#95) を読む（下書きプレビューが機能していること）。
 
 ### 運用の流れ
@@ -380,7 +427,7 @@ microCMS Media へ upload → 本文HTMLの当該 `<img src>` を差し替え �
 | `装飾依頼時刻` | 日付(date) | stale-lock 回収・タイムアウト判定用 |
 
 > プロパティ名は完全一致で作ること。**未追加でも既存機能は壊れない**（読み出しは欠落耐性）。
-> 提案生成は既定では **Claude（サブスク・追加課金なし）**。Codex 検証時は `GROWTH_AGENT=codex` とし、必要に応じて `GROWTH_CODEX_SANDBOX=danger-full-access` を使う。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_CONTENT_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
+> 提案生成は承認画面の「AIモデル」設定に従う。Codex工程は既定で `GROWTH_CODEX_APPROVAL=never` / `GROWTH_CODEX_SANDBOX=danger-full-access` として起動する。PC に `NOTION_TOKEN`、LINE 通知に `LINE_*`、反映の保存に Vercel 側 `MICROCMS_CONTENT_API_KEY`（既存 draft/edit）が必要。**強権キー（MANAGEMENT）は不要**。
 
 ### 運用の流れ
 

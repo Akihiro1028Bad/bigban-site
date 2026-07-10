@@ -62,7 +62,7 @@ export type ProposalStatus = "pending" | "rejected" | "adopted";
  * 施策の種別＝承認後アウトカムのルーティング先。未設定は "article" 相当(欠落耐性・後方互換)。
  * Notion に persist せず、既存 category から kindFromCategory で決定的に派生する(#P5a)。
  */
-export type ProposalKind = "article" | "site" | "event" | "other";
+export type ProposalKind = "article" | "site" | "event" | "other" | "system";
 
 /**
  * proposalKind==="site" の詳細(将来/UI 用の optional)。

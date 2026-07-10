@@ -13,6 +13,8 @@
  * Windows の claude.cmd 起動でも安定させるため)。
  */
 
+import "dotenv/config";
+
 import { spawn, spawnSync } from "node:child_process";
 import {
   appendFileSync,
@@ -34,17 +36,21 @@ const FAILURE_LOG_PATH = "data/growth-failures.log";
 // 共通の許可ツール。Claude headless では Notion が mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
 
-// 執筆(下書きモード)は記事品質の勝負所なので既定で Opus 4.8 に固定する(#247)。
-// GROWTH_DRAFTS_MODEL で上書き可能。
-const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "claude-opus-4-8";
-// 週次(ネタ出し)は下流(記事品質)全体の上限を決めるため既定で Opus 4.8 に固定する。
-// GROWTH_WEEKLY_MODEL で上書き可能。
-const WEEKLY_MODEL = process.env.GROWTH_WEEKLY_MODEL || "claude-opus-4-8";
+// 旧環境変数は手動上書き用として維持する。無指定時は工程別の共有設定を使う。
+const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "";
+const WEEKLY_MODEL = process.env.GROWTH_WEEKLY_MODEL || "";
 
-const AGENT = process.env.GROWTH_AGENT || "claude";
 const CODEX_APPROVAL = process.env.GROWTH_CODEX_APPROVAL || "never";
-const CODEX_SANDBOX = process.env.GROWTH_CODEX_SANDBOX || "workspace-write";
-const CODEX_MODEL = process.env.GROWTH_CODEX_MODEL || "";
+// 自宅PCのheadless workerはNotion/MCP・ネットワーク・子プロセスを使うため、
+// Codex工程は非対話の完全アクセスを既定とする。必要なら環境変数で制限できる。
+const CODEX_SANDBOX = process.env.GROWTH_CODEX_SANDBOX || "danger-full-access";
+const COMMON_CODEX_MODEL = process.env.GROWTH_CODEX_MODEL || "";
+const COMMON_CODEX_REASONING_EFFORT = process.env.GROWTH_CODEX_REASONING_EFFORT || "";
+const WEEKLY_CODEX_MODEL = process.env.GROWTH_WEEKLY_CODEX_MODEL || "";
+const WEEKLY_CODEX_REASONING_EFFORT =
+  process.env.GROWTH_WEEKLY_CODEX_REASONING_EFFORT || "";
+const CODEX_REASONING_EFFORTS = new Set(["minimal", "low", "medium", "high", "xhigh"]);
+const CLAUDE_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 const CODEX_RUNTIME_PREAMBLE = `
 <runtime>
@@ -67,15 +73,13 @@ const MODES = {
       "Bash(npm run growth:existing)",
       "Bash(npm run growth:learning-log:recent)",
     ],
-    model: WEEKLY_MODEL,
   },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
-  drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"], model: DRAFTS_MODEL },
+  drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"] },
   // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけ drafts.md を起動する。
   "drafts-auto": {
     prompt: "drafts.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
@@ -90,7 +94,6 @@ const MODES = {
   revise: {
     prompt: "revise-outline.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // アイキャッチ AI 再生成(#144)。決定的処理は growth:eyecatch-regen CLI、claude は
@@ -98,7 +101,6 @@ const MODES = {
   regen: {
     prompt: "regen-eyecatch.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // 本文画像 AI 再生成(#156)。決定的処理は growth:body-image-regen CLI、claude は
@@ -106,7 +108,6 @@ const MODES = {
   "regen-body": {
     prompt: "regen-body-image.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // 記事スタイリング・アドバイザー(#146)。決定的処理は growth:advise CLI、claude は
@@ -114,7 +115,6 @@ const MODES = {
   advise: {
     prompt: "advise.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // 記事装飾アシスタント(#147)。決定的処理は growth:decorate CLI、claude は本文をトップレベル
@@ -122,7 +122,6 @@ const MODES = {
   decorate: {
     prompt: "decorate.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // アドバイス採用→本文反映(#165)。決定的処理は growth:advise-apply CLI、claude は採用された
@@ -130,7 +129,6 @@ const MODES = {
   apply: {
     prompt: "advise-apply.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
   // 本文インラインコメント→AI修正(#182)。決定的処理は growth:comment-revise CLI、claude は
@@ -138,7 +136,6 @@ const MODES = {
   "comment-revise": {
     prompt: "comment-revise.md",
     allow: [...COMMON, "Bash"],
-    model: DRAFTS_MODEL,
     lock: true,
   },
 };
@@ -188,15 +185,97 @@ if (!cfg) {
   process.exit(1);
 }
 
+const isWin = process.platform === "win32";
+
+const FALLBACK_MODEL_SETTINGS = {
+  weekly: { provider: "codex", model: "gpt-5.6-sol", effort: "xhigh" },
+  drafts: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  "drafts-auto": { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  initiatives: { provider: "codex", model: "gpt-5.5", effort: "high" },
+  "initiatives-auto": { provider: "codex", model: "gpt-5.5", effort: "high" },
+  revise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  regen: { provider: "claude", model: "claude-sonnet-5", effort: "medium" },
+  "regen-body": { provider: "claude", model: "claude-sonnet-5", effort: "medium" },
+  advise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  decorate: { provider: "codex", model: "gpt-5.5", effort: "medium" },
+  apply: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  "comment-revise": { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+};
+
+function resolveSharedModelSetting() {
+  const fallback = FALLBACK_MODEL_SETTINGS[mode];
+  if (process.env.GROWTH_MODEL_SETTINGS_DISABLE === "1") return fallback;
+  const npm = isWin ? "npm.cmd" : "npm";
+  const result = spawnSync(
+    npm,
+    ["run", "--silent", "growth:model-settings", "--", "resolve", mode],
+    { encoding: "utf-8", shell: isWin, env: { ...process.env } },
+  );
+  if (result.status !== 0) {
+    process.stderr.write("[model-settings] 設定解決に失敗したためランナー既定値を使用します。\n");
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(result.stdout.trim());
+    if (
+      (parsed.provider === "claude" || parsed.provider === "codex") &&
+      typeof parsed.model === "string" &&
+      typeof parsed.effort === "string"
+    ) {
+      return parsed;
+    }
+  } catch {
+    // 壊れた設定出力は fallback へ落とす。
+  }
+  process.stderr.write("[model-settings] 設定出力が不正なためランナー既定値を使用します。\n");
+  return fallback;
+}
+
+const sharedModelSetting = resolveSharedModelSetting();
+// 既存の週次Claude上書きは、GROWTH_AGENT 未指定でもClaude選択として扱う。
+const AGENT = process.env.GROWTH_AGENT || (mode === "weekly" && WEEKLY_MODEL ? "claude" : sharedModelSetting.provider);
 if (AGENT !== "claude" && AGENT !== "codex") {
   process.stderr.write(`GROWTH_AGENT は claude または codex を指定してください: ${AGENT}\n`);
   process.exit(1);
 }
 
+const compatibleModel = sharedModelSetting.provider === AGENT ? sharedModelSetting.model : null;
+const compatibleEffort = sharedModelSetting.provider === AGENT ? sharedModelSetting.effort : null;
+const codexModel =
+  mode === "weekly"
+    ? WEEKLY_CODEX_MODEL || COMMON_CODEX_MODEL || compatibleModel || "gpt-5.5"
+    : COMMON_CODEX_MODEL || compatibleModel || "gpt-5.5";
+const codexReasoningEffort =
+  mode === "weekly"
+    ? WEEKLY_CODEX_REASONING_EFFORT || COMMON_CODEX_REASONING_EFFORT || compatibleEffort || "high"
+    : COMMON_CODEX_REASONING_EFFORT || compatibleEffort || "high";
+const claudeModel =
+  (mode === "weekly" ? WEEKLY_MODEL : DRAFTS_MODEL) || compatibleModel || "claude-opus-4-8";
+const claudeEffort =
+  (mode === "weekly"
+    ? process.env.GROWTH_WEEKLY_CLAUDE_EFFORT
+    : process.env.GROWTH_CLAUDE_EFFORT) || compatibleEffort || "high";
+
+if (
+  AGENT === "codex" &&
+  codexReasoningEffort &&
+  !CODEX_REASONING_EFFORTS.has(codexReasoningEffort)
+) {
+  process.stderr.write(
+    `Codex 推論強度が不正です: ${codexReasoningEffort} (minimal/low/medium/high/xhigh)\n`
+  );
+  process.exit(1);
+}
+
+if (AGENT === "claude" && !CLAUDE_EFFORTS.has(claudeEffort)) {
+  process.stderr.write(
+    `Claude 推論強度が不正です: ${claudeEffort} (low/medium/high/xhigh/max)\n`
+  );
+  process.exit(1);
+}
+
 const promptBody = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
 const prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${promptBody}` : promptBody;
-
-const isWin = process.platform === "win32";
 
 function buildClaudeArgs() {
   // プロンプトは stdin で渡すので引数には含めない
@@ -209,17 +288,17 @@ function buildClaudeArgs() {
     "--disallowedTools",
     ...DISALLOW,
   ];
-  // モデル指定があるモードは --model を付ける
-  if (cfg.model) {
-    claudeArgs.push("--model", cfg.model);
-  }
+  claudeArgs.push("--model", claudeModel, "--effort", claudeEffort);
   return claudeArgs;
 }
 
 function buildCodexArgs() {
   const codexArgs = ["-a", CODEX_APPROVAL, "exec", "--sandbox", CODEX_SANDBOX, "-C", process.cwd()];
-  if (CODEX_MODEL) {
-    codexArgs.push("--model", CODEX_MODEL);
+  if (codexModel) {
+    codexArgs.push("--model", codexModel);
+  }
+  if (codexReasoningEffort) {
+    codexArgs.push("-c", `model_reasoning_effort="${codexReasoningEffort}"`);
   }
   codexArgs.push("-");
   return codexArgs;
@@ -227,6 +306,8 @@ function buildCodexArgs() {
 
 const agentCommand = AGENT === "codex" ? "codex" : "claude";
 const args = AGENT === "codex" ? buildCodexArgs() : buildClaudeArgs();
+const activeModel = AGENT === "codex" ? codexModel : claudeModel;
+const activeEffort = AGENT === "codex" ? codexReasoningEffort : claudeEffort;
 
 if (process.env.GROWTH_DRYRUN) {
   const promptLabel = AGENT === "codex" ? `${cfg.prompt}+codex-runtime` : cfg.prompt;
@@ -507,7 +588,7 @@ const workerRunPageId = runWorkerLog("start", {
   "target-type": "system",
   "started-at": runStartedAt,
   resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
-  detail: `${AGENT}${CODEX_MODEL ? ` ${CODEX_MODEL}` : ""}`,
+  detail: `${AGENT} ${activeModel} ${activeEffort}`,
 });
 const child = spawn(agentCommand, args, {
   stdio: ["pipe", "inherit", "inherit"],

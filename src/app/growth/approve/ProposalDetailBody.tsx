@@ -26,12 +26,21 @@ export const KIND_ICON: Record<ProposalKind, (props: { size?: number }) => React
   site: IconLayout,
   event: IconCalendar,
   other: IconBolt,
+  system: IconBolt,
 } as const;
 
 interface ProposalDetailBodyProps {
   item: PendingItem;
   kind: ProposalKind;
   token?: string;
+}
+
+type ArtifactPreviewStatus = "idle" | "loading" | "ready" | "empty" | "error";
+
+interface ArtifactPreviewState {
+  key: string | null;
+  blocks: ProposalArtifactBlock[];
+  status: Exclude<ArtifactPreviewStatus, "loading">;
 }
 
 interface FieldProps {
@@ -129,6 +138,8 @@ function nextActionFor(category: string, kind: ProposalKind): string {
       return "目的・要件・計測方法を確認し、実装可否と着手順を決める。";
     case "イベント":
       return "企画内容を確認し、日程・対象・告知方法・当日の運用を決める。";
+    case "システム改善":
+      return "Notion本文の diff案・要件案を確認し、実装タスク化するか、次の開発スコープへ入れる。";
     case "コンテンツ":
       return "記事化後の下書きを確認し、公開キューへ進める。";
     default:
@@ -178,45 +189,56 @@ function ArtifactBlockView({ block }: { block: ProposalArtifactBlock }): ReactEl
 }
 
 function ArtifactPreview({ pageId, token }: { pageId: string; token?: string }): ReactElement | null {
-  const [blocks, setBlocks] = useState<ProposalArtifactBlock[]>([]);
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const requestKey = token === undefined ? null : pageId;
+  const [state, setState] = useState<ArtifactPreviewState>({
+    key: null,
+    blocks: [],
+    status: "idle",
+  });
+  const view =
+    requestKey === null
+      ? { blocks: [] as ProposalArtifactBlock[], status: "idle" as ArtifactPreviewStatus }
+      : state.key === requestKey
+        ? state
+        : { blocks: [] as ProposalArtifactBlock[], status: "loading" as ArtifactPreviewStatus };
 
   useEffect(() => {
-    if (token === undefined) return;
+    if (token === undefined || requestKey === null) return;
     let isActive = true;
-    setStatus("loading");
-    setBlocks([]);
     fetchProposalArtifact(token, pageId)
       .then((nextBlocks) => {
         if (!isActive) return;
-        setBlocks(nextBlocks);
-        setStatus(nextBlocks.length > 0 ? "ready" : "empty");
+        setState({
+          key: requestKey,
+          blocks: nextBlocks,
+          status: nextBlocks.length > 0 ? "ready" : "empty",
+        });
       })
       .catch(() => {
         if (!isActive) return;
-        setStatus("error");
+        setState({ key: requestKey, blocks: [], status: "error" });
       });
     return () => {
       isActive = false;
     };
-  }, [pageId, token]);
+  }, [pageId, requestKey, token]);
 
-  if (status === "idle") return null;
-  if (status === "loading") {
+  if (view.status === "idle") return null;
+  if (view.status === "loading") {
     return (
       <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--p-text-3)" }}>
         成果物を読み込み中...
       </p>
     );
   }
-  if (status === "error") {
+  if (view.status === "error") {
     return (
       <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--p-red)" }}>
         成果物を読み込めませんでした。Notionリンクから確認してください。
       </p>
     );
   }
-  if (status === "empty") {
+  if (view.status === "empty") {
     return (
       <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--p-text-3)" }}>
         Notion本文に表示できる成果物がありません。
@@ -228,7 +250,7 @@ function ArtifactPreview({ pageId, token }: { pageId: string; token?: string }):
       className="flex max-h-[360px] flex-col gap-2 overflow-y-auto rounded-[10px] px-3 py-3"
       style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
     >
-      {blocks.map((block) => (
+      {view.blocks.map((block) => (
         <ArtifactBlockView key={block.id} block={block} />
       ))}
     </div>

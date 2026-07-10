@@ -13,37 +13,126 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 import { fetchPrompts } from "./api";
-import { renderPromptMarkdown } from "./promptMarkdown";
+import { extractPromptHeadings, renderPromptMarkdown } from "./promptMarkdown";
 import { IconArrowLeft, IconFileText } from "./ui/icons";
 
 // 前提情報(facility-context)を選択中であることを表す擬似キー(フェーズのファイル名とは衝突しない)。
-const FACILITY_KEY = "__facility__";
+const FACILITY_KEY = "scripts/growth/facility-context.json";
 
 interface PromptsViewProps {
   token: string;
+  query: string;
 }
 
 interface SelectableItem {
-  key: string;
+  path: string;
   label: string;
   content: string;
   meta: string;
+  group: string;
+  purpose: string;
+  stage: string;
   // 前提情報(facility-context.json)は JSON なので生表示、フェーズプロンプト(*.md)は Markdown 整形。
   kind: "markdown" | "json";
 }
 
-export function PromptsView({ token }: PromptsViewProps) {
+function initialDocPathFromUrl(): string | null {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("doc");
+}
+
+function initialDisplayModeFromUrl(): "rendered" | "raw" {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
+  if (typeof window === "undefined") return "rendered";
+  return new URLSearchParams(window.location.search).get("raw") === "1" ? "raw" : "rendered";
+}
+
+function initialHashFromUrl(): string {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
+  if (typeof window === "undefined") return "";
+  return window.location.hash;
+}
+
+function buildDocUrl(pathname: string, targetHref?: string): URL {
+  const url = targetHref
+    ? new URL(targetHref, window.location.origin)
+    : new URL(window.location.href);
+  url.searchParams.set("doc", pathname);
+  if (!targetHref) url.hash = "";
+  return url;
+}
+
+function pushDocParam(pathname: string, targetHref?: string): URL {
+  const url = buildDocUrl(pathname, targetHref);
+  const nextLocation = `${url.pathname}${url.search}${url.hash}`;
+  const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextLocation !== currentLocation) {
+    window.history.pushState(null, "", nextLocation);
+  }
+  return url;
+}
+
+function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase();
+}
+
+function matchesQuery(item: SelectableItem, query: string): boolean {
+  if (query === "") return true;
+  const haystack = `${item.label} ${item.path} ${item.meta} ${item.purpose} ${item.stage} ${item.content}`.toLowerCase();
+  return haystack.includes(query);
+}
+
+export function PromptsView({ token, query }: PromptsViewProps) {
   const { data, status, error } = useQuery({
     queryKey: ["growth-prompts", token],
     queryFn: () => fetchPrompts(token),
   });
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(initialDocPathFromUrl);
+  // null は「まだカテゴリを操作していない」。初期URL復元時だけ選択資料のgroupから表示カテゴリを導出する。
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<"rendered" | "raw">(initialDisplayModeFromUrl);
+  const [activeHash, setActiveHash] = useState(initialHashFromUrl);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   // 狭幅(lg未満)の1ペイン制御: 一覧で項目を選ぶと詳細へ、戻るで一覧へ。lg以上は常に両ペイン。
-  const [showDetailMobile, setShowDetailMobile] = useState(false);
+  const [showDetailMobile, setShowDetailMobile] = useState(
+    () => initialDocPathFromUrl() !== null,
+  );
+
+  useEffect(() => {
+    function handlePopState(): void {
+      const params = new URLSearchParams(window.location.search);
+      const docPath = params.get("doc");
+      setSelectedPath(docPath);
+      setDisplayMode(params.get("raw") === "1" ? "raw" : "rendered");
+      setActiveHash(window.location.hash);
+      setShowDetailMobile(docPath !== null);
+      if (!docPath || !data) return;
+      const group = data.groups.find((candidate) =>
+        candidate.phases.some((phase) => phase.path === docPath),
+      );
+      if (group) setActiveGroup(group.group);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [data]);
+
+  useEffect(() => {
+    if (!data || !selectedPath || displayMode !== "rendered" || activeHash === "") return;
+    let headingId: string;
+    try {
+      headingId = decodeURIComponent(activeHash.slice(1));
+    } catch {
+      return;
+    }
+    if (headingId === "") return;
+    const heading = document.getElementById(headingId);
+    heading?.scrollIntoView?.({ block: "start" });
+  }, [activeHash, data, displayMode, selectedPath]);
 
   if (status === "pending") {
     return (
@@ -67,20 +156,26 @@ export function PromptsView({ token }: PromptsViewProps) {
   const facilityItem: SelectableItem | null =
     data.facilityContext !== null
       ? {
-          key: FACILITY_KEY,
+          path: FACILITY_KEY,
           label: "前提情報",
           content: data.facilityContext,
           meta: "全フェーズ共通の前提(facility-context.json)。下書きの冒頭で正典として注入されます。",
+          group: "ピン留め",
+          purpose: "施設の現況、確定事実、書いてはいけない未確定情報を定義する単一ソース",
+          stage: "全工程",
           kind: "json",
         }
       : null;
 
   const phaseItems: SelectableItem[] = data.groups.flatMap((g) =>
     g.phases.map((p) => ({
-      key: p.filename,
+      path: p.path,
       label: p.label,
       content: p.content,
       meta: p.whenItRuns,
+      group: g.group,
+      purpose: p.purpose,
+      stage: p.stage,
       kind: "markdown",
     })),
   );
@@ -95,19 +190,89 @@ export function PromptsView({ token }: PromptsViewProps) {
     );
   }
 
-  const selected = allItems.find((i) => i.key === selectedKey) ?? allItems[0];
+  const selected = allItems.find((i) => i.path === selectedPath) ?? allItems[0];
+  const registeredPaths = new Set(phaseItems.map((item) => item.path));
+  const normalizedQuery = normalizeQuery(query);
+  const filteredGroups = data.groups
+    .map((group) => ({
+      group: group.group,
+      phases: group.phases.filter((phase) =>
+        matchesQuery(
+          {
+            path: phase.path,
+            label: phase.label,
+            content: phase.content,
+            meta: phase.whenItRuns,
+            group: group.group,
+            purpose: phase.purpose,
+            stage: phase.stage,
+            kind: "markdown",
+          },
+          normalizedQuery,
+        ),
+      ),
+    }))
+    .filter((group) => group.phases.length > 0);
+  const visibleGroupName =
+    activeGroup ?? (selected.kind === "markdown" ? selected.group : "実行プロンプト");
+  const visibleGroups =
+    normalizedQuery === ""
+      ? filteredGroups.filter((group) => group.group === visibleGroupName)
+      : filteredGroups;
+  const groupCounts = new Map(data.groups.map((group) => [group.group, group.phases.length]));
+  const headings =
+    selected.kind === "markdown" && displayMode === "rendered"
+      ? extractPromptHeadings(selected.content)
+      : [];
 
-  function select(key: string): void {
-    setSelectedKey(key);
-    setShowDetailMobile(true);
+  function select(pathname: string, targetHref?: string, shouldShowDetail = true): void {
+    setSelectedPath(pathname);
+    const next = phaseItems.find((item) => item.path === pathname);
+    if (next) setActiveGroup(next.group);
+    const target = pushDocParam(pathname, targetHref);
+    setDisplayMode(target.searchParams.get("raw") === "1" ? "raw" : "rendered");
+    setActiveHash(target.hash);
+    setShowDetailMobile(shouldShowDetail);
+  }
+
+  function handleGroupChange(groupName: string): void {
+    setActiveGroup(groupName);
+    const first = phaseItems.find((item) => item.group === groupName);
+    if (!first) return;
+    select(first.path, undefined, false);
+  }
+
+  function handleDisplayMode(nextMode: "rendered" | "raw"): void {
+    const url = new URL(window.location.href);
+    if (nextMode === "raw") url.searchParams.set("raw", "1");
+    else url.searchParams.delete("raw");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    setDisplayMode(nextMode);
   }
 
   function handleCopy(): void {
     // 成功した時だけ「コピー済み」にする(失敗時に成功表示を出さない)。
     navigator.clipboard.writeText(selected.content).then(
-      () => setCopiedKey(selected.key),
+      () => setCopiedKey(selected.path),
       () => setCopiedKey(null),
     );
+  }
+
+  function handleMarkdownClick(event: MouseEvent<HTMLDivElement>): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const link = target.closest<HTMLAnchorElement>("a[data-doc-path], a[data-missing-doc-path]");
+    if (!link) return;
+    if (link.dataset.missingDocPath) {
+      event.preventDefault();
+      return;
+    }
+    const docPath = link.dataset.docPath;
+    if (!docPath || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    select(docPath, link.href);
   }
 
   return (
@@ -124,8 +289,48 @@ export function PromptsView({ token }: PromptsViewProps) {
           <IconFileText size={16} style={{ color: "var(--p-accent)" }} />
           <span className="text-[14px] font-semibold">プロンプト</span>
           <span className="ml-auto text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
-            実テンプレ全文
+            {phaseItems.length}件
           </span>
+        </div>
+        {data.warnings.length > 0 ? (
+          <div
+            role="alert"
+            className="mx-3 mt-3 rounded-[10px] px-3 py-2 text-[12px] leading-relaxed"
+            style={{ background: "var(--p-amber-weak)", color: "var(--p-amber)" }}
+          >
+            {data.warnings.map((warning) => (
+              <div key={warning}>{warning}</div>
+            ))}
+          </div>
+        ) : null}
+        <div
+          className="flex gap-1 overflow-x-auto px-3 py-3"
+          role="group"
+          aria-label="資料カテゴリ"
+          style={{ borderBottom: "1px solid var(--p-border)" }}
+        >
+          {data.groups.map((group) => {
+            const active = visibleGroupName === group.group && normalizedQuery === "";
+            return (
+              <button
+                key={group.group}
+                type="button"
+                aria-pressed={active}
+                onClick={() => handleGroupChange(group.group)}
+                className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-medium"
+                style={{
+                  background: active ? "var(--p-bg-raised)" : "var(--p-bg-input)",
+                  border: "1px solid var(--p-border)",
+                  color: active ? "var(--p-text)" : "var(--p-text-2)",
+                }}
+              >
+                {group.group}{" "}
+                <span style={{ color: active ? "var(--p-accent)" : "var(--p-text-3)" }}>
+                  {groupCounts.get(group.group) ?? 0}
+                </span>
+              </button>
+            );
+          })}
         </div>
         {facilityItem ? (
           <section className="py-1">
@@ -137,12 +342,12 @@ export function PromptsView({ token }: PromptsViewProps) {
             </div>
             <ListButton
               item={facilityItem}
-              isActive={selected.key === facilityItem.key}
-              onSelect={() => select(facilityItem.key)}
+              isActive={selected.path === facilityItem.path}
+              onSelect={() => select(facilityItem.path)}
             />
           </section>
         ) : null}
-        {data.groups.map((group) => (
+        {visibleGroups.map((group) => (
           <section key={group.group} className="py-1">
             <div
               className="px-4 py-[7px] text-[11px] font-semibold uppercase tracking-wider"
@@ -152,20 +357,28 @@ export function PromptsView({ token }: PromptsViewProps) {
             </div>
             {group.phases.map((phase) => (
               <ListButton
-                key={phase.filename}
+                key={phase.path}
                 item={{
-                  key: phase.filename,
+                  path: phase.path,
                   label: phase.label,
                   content: phase.content,
                   meta: phase.whenItRuns,
+                  group: group.group,
+                  purpose: phase.purpose,
+                  stage: phase.stage,
                   kind: "markdown",
                 }}
-                isActive={selected.key === phase.filename}
-                onSelect={() => select(phase.filename)}
+                isActive={selected.path === phase.path}
+                onSelect={() => select(phase.path)}
               />
             ))}
           </section>
         ))}
+        {visibleGroups.length === 0 ? (
+          <p className="px-4 py-6 text-[13px]" style={{ color: "var(--p-text-3)" }}>
+            一致する資料がありません。
+          </p>
+        ) : null}
       </nav>
 
       <section
@@ -184,12 +397,12 @@ export function PromptsView({ token }: PromptsViewProps) {
             <IconArrowLeft size={14} /> 一覧
           </button>
         </div>
-        <div className="px-6 py-5">
-          <div className="mb-2 flex items-start gap-2">
+        <div className="sticky top-0 z-10 px-5 py-4 lg:px-6" style={{ background: "var(--p-bg)", borderBottom: "1px solid var(--p-border)" }}>
+          <div className="flex items-start gap-2">
             <div className="min-w-0">
               <h3 className="text-[16px] font-semibold">{selected.label}</h3>
-              <p className="mt-1 text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
-                {selected.meta}
+              <p className="mt-1 break-all text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+                {selected.path}
               </p>
             </div>
             <button
@@ -197,12 +410,79 @@ export function PromptsView({ token }: PromptsViewProps) {
               onClick={handleCopy}
               className="approve-btn-ghost ml-auto shrink-0"
             >
-              {copiedKey === selected.key ? "コピー済み" : "コピー"}
+              {copiedKey === selected.path ? "コピー済み" : "コピー"}
             </button>
           </div>
+          <div className="mt-3 grid gap-2 text-[13px] leading-relaxed md:grid-cols-3">
+            <p style={{ color: "var(--p-text-2)" }}>
+              <span className="font-semibold" style={{ color: "var(--p-text)" }}>用途: </span>
+              {selected.purpose}
+            </p>
+            <p style={{ color: "var(--p-text-2)" }}>
+              <span className="font-semibold" style={{ color: "var(--p-text)" }}>対象工程: </span>
+              {selected.stage}
+            </p>
+            <p style={{ color: "var(--p-text-2)" }}>
+              <span className="font-semibold" style={{ color: "var(--p-text)" }}>利用タイミング: </span>
+              {selected.meta}
+            </p>
+          </div>
+          {selected.kind === "markdown" ? (
+            <div className="mt-3 flex items-center gap-2" role="group" aria-label="表示形式">
+              {(["rendered", "raw"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={displayMode === mode}
+                  onClick={() => handleDisplayMode(mode)}
+                  className="rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium"
+                  style={{
+                    background: displayMode === mode ? "var(--p-bg-raised)" : "var(--p-bg-input)",
+                    border: "1px solid var(--p-border)",
+                    color: displayMode === mode ? "var(--p-text)" : "var(--p-text-2)",
+                  }}
+                >
+                  {mode === "rendered" ? "Rendered" : "Raw"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="px-5 py-5 lg:px-6">
+          {headings.length > 0 ? (
+            <nav
+              aria-label="目次"
+              className="mb-4 max-w-[860px] rounded-[10px] px-3 py-2 text-[13px] leading-relaxed"
+              style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
+            >
+              <div className="mb-1 font-semibold">目次</div>
+              {headings.map((heading) => (
+                <a
+                  key={heading.id}
+                  href={`#${heading.id}`}
+                  className={`block py-1 ${heading.level === 3 ? "pl-4" : ""}`}
+                  style={{ color: "var(--p-text-2)" }}
+                >
+                  {heading.text}
+                </a>
+              ))}
+            </nav>
+          ) : null}
           {selected.kind === "json" ? (
             <pre
-              className="mt-3 whitespace-pre-wrap break-words rounded-[12px] p-4 text-[12.5px] leading-relaxed"
+              className="max-w-[860px] whitespace-pre-wrap break-words rounded-[12px] p-4 text-[14px] leading-7"
+              style={{
+                background: "var(--p-bg-input)",
+                border: "1px solid var(--p-border)",
+                color: "var(--p-text-2)",
+                fontFamily: "var(--p-mono)",
+              }}
+            >
+              {selected.content}
+            </pre>
+          ) : displayMode === "raw" ? (
+            <pre
+              className="max-w-[860px] whitespace-pre-wrap break-words rounded-[12px] p-4 text-[14px] leading-7"
               style={{
                 background: "var(--p-bg-input)",
                 border: "1px solid var(--p-border)",
@@ -214,12 +494,18 @@ export function PromptsView({ token }: PromptsViewProps) {
             </pre>
           ) : (
             <div
-              className="prose prose-invert prose-sm mt-3 max-w-none"
+              className="prose prose-invert max-w-[860px] text-[14px] leading-7"
+              onClick={handleMarkdownClick}
               // Markdown を整形表示。生 HTML タグはエスケープ済み(promptMarkdown で DOMPurify 通し済み)。
-              dangerouslySetInnerHTML={{ __html: renderPromptMarkdown(selected.content) }}
+              dangerouslySetInnerHTML={{
+                __html: renderPromptMarkdown(selected.content, {
+                  currentPath: selected.kind === "markdown" ? selected.path : undefined,
+                  registeredPaths,
+                }),
+              }}
             />
           )}
-          <p className="mt-3 text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
+          <p className="mt-4 text-[12px]" style={{ color: "var(--p-text-3)" }}>
             読み取り専用 ・ デプロイ時点のリポジトリ内容です
           </p>
         </div>
@@ -251,7 +537,7 @@ function ListButton({ item, isActive, onSelect }: ListButtonProps) {
       )}
       <span className="text-[13px] font-medium">{item.label}</span>
       <span className="truncate text-[11.5px]" style={{ color: "var(--p-text-3)" }}>
-        {item.meta}
+        {item.path}
       </span>
     </button>
   );

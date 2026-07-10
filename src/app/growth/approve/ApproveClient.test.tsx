@@ -108,7 +108,9 @@ vi.mock("./DraftEditor", () => {
 // プロンプト確認タブは自前で fetch するため、ApproveClient の結線検証では軽量スタブに差し替える
 // (中身は PromptsView.test.tsx で個別に検証済み)。
 vi.mock("./PromptsView", () => ({
-  PromptsView: ({ token }: { token: string }) => <div>プロンプト確認スタブ:{token}</div>,
+  PromptsView: ({ token, query }: { token: string; query: string }) => (
+    <div>プロンプト確認スタブ:{token}:{query}</div>
+  ),
 }));
 
 import { ApproveClient } from "./ApproveClient";
@@ -3582,6 +3584,16 @@ describe("ApproveClient シェル操作(#proto P1)", () => {
     await userEvent.type(screen.getByPlaceholderText("記事を検索…"), "夏の集客");
     await waitFor(() => expect(screen.queryByText("冬記事")).not.toBeInTheDocument());
     expect(screen.getByText("猛暑記事")).toBeInTheDocument();
+  });
+
+  it("プロンプト view では TopBar 検索を資料検索として PromptsView へ渡す", async () => {
+    flags.authEnabled = false;
+    window.history.replaceState(null, "", "/?view=prompt");
+    mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
+    render(<ApproveClient />);
+    await screen.findByText("プロンプト確認スタブ::");
+    await userEvent.type(screen.getByPlaceholderText("資料を検索…"), "canon");
+    expect(screen.getByText("プロンプト確認スタブ::canon")).toBeInTheDocument();
   });
 
   it("更新ボタンで盤を再取得する", async () => {

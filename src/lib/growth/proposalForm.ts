@@ -28,6 +28,9 @@ const OTHER_CATEGORY = "MEO";
 /** event 種別を写像する既定カテゴリ。 */
 const EVENT_CATEGORY = "イベント";
 
+/** system 種別を写像する既定カテゴリ。 */
+const SYSTEM_CATEGORY = "システム改善";
+
 export interface ProposalFormInput {
   name: string;
   kind: ProposalKind;
@@ -59,6 +62,7 @@ function isKnownCategory(value: string): boolean {
  * - event : "イベント"
  * - site  : "サイトデザイン"
  * - other : "MEO"(#214・kindFromCategory と往復整合)
+ * - system: "システム改善"(weekly のシステム振り返りカテゴリ)
  */
 export function categoryForKind(kind: ProposalKind, selected?: string): string {
   switch (kind) {
@@ -68,6 +72,8 @@ export function categoryForKind(kind: ProposalKind, selected?: string): string {
       return SITE_CATEGORY;
     case "other":
       return OTHER_CATEGORY;
+    case "system":
+      return SYSTEM_CATEGORY;
     case "article":
     default: {
       const trimmed = (selected ?? "").trim();

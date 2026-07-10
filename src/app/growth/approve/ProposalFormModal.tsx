@@ -31,7 +31,7 @@ import type { ProposalKind } from "./types";
 import { IconPlus } from "./ui/icons";
 import { Kbd } from "./ui/primitives";
 
-const KIND_KEYS: ProposalKind[] = ["article", "site", "event", "other"];
+const KIND_KEYS: ProposalKind[] = ["article", "site", "event", "other", "system"];
 
 const FIELD_STYLE = {
   background: "var(--p-bg-input)",

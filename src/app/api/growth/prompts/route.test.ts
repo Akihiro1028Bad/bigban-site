@@ -15,6 +15,8 @@ vi.mock("@/config/featureFlags", () => ({
 
 import { readdir, readFile } from "node:fs/promises";
 
+import { PROMPT_REGISTRY } from "@/lib/growth/promptRegistry";
+
 import { GET } from "./route";
 
 const BASE = "http://localhost/api/growth/prompts";
@@ -67,7 +69,7 @@ describe("GET /api/growth/prompts", () => {
     mockReaddir(
       ["weekly.md", "drafts.md", "README.txt"],
       ["example-trend.md"],
-      ["article-idea.md"],
+      ["article-idea.md", "growth-goals.md"],
     );
     mockReadFile();
 
@@ -76,26 +78,75 @@ describe("GET /api/growth/prompts", () => {
     const json = (await res.json()) as {
       success: boolean;
       facilityContext: string | null;
-      groups: { group: string; phases: { filename: string }[] }[];
+      warnings: string[];
+      groups: { group: string; phases: { filename: string; path: string }[] }[];
     };
     expect(json.success).toBe(true);
     expect(json.facilityContext).toBe('{"open":false}');
+    expect(json.warnings).toEqual([]);
     const byGroup = Object.fromEntries(
-      json.groups.map((g) => [g.group, g.phases.map((p) => p.filename)]),
+      json.groups.map((g) => [g.group, g.phases.map((p) => p.path)]),
     );
-    expect(byGroup["分析"]).toEqual(["weekly.md"]);
-    expect(byGroup["執筆"]).toEqual(["drafts.md"]);
-    expect(byGroup["文体の例"]).toEqual(["example-trend.md"]);
-    // 参考ドキュメント(CLAUDE.md 先頭 + style-guide / ai-news-prompt / runbook)
-    expect(byGroup["参考ドキュメント"]).toEqual([
-      "CLAUDE.md",
-      "growth-article-style.md",
-      "ai-news-prompt.md",
-      "article-idea.md",
-      "growth-weekly-runbook.md",
+    for (const group of new Set(PROMPT_REGISTRY.map((entry) => entry.group))) {
+      expect(byGroup[group]).toEqual(
+        PROMPT_REGISTRY.filter((entry) => entry.group === group)
+          .sort((a, b) => a.order - b.order)
+          .map((entry) => entry.path),
+      );
+    }
+  });
+
+  it("登録済み資料はディレクトリ列挙結果に依存せずマニフェストから全件読み込む", async () => {
+    mockReaddir([], [], []);
+    mockReadFile();
+
+    const res = await GET(getReq());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      groups: { phases: { path: string }[] }[];
+    };
+    expect(json.groups.flatMap((group) => group.phases.map((phase) => phase.path))).toEqual(
+      expect.arrayContaining(PROMPT_REGISTRY.map((entry) => entry.path)),
+    );
+  });
+
+  it("sourceKind=prompt の登録ファイルが1件でも欠落したら500", async () => {
+    mockReaddir(["weekly.md"], [], []);
+    mockReadFile(["scripts/growth/prompts/drafts.md"]);
+
+    const res = await GET(getReq());
+    expect(res.status).toBe(500);
+  });
+
+  it("shared / example の登録ファイル欠落はファイル単位のwarningにする", async () => {
+    mockReaddir([], [], []);
+    mockReadFile([
+      "scripts/growth/prompts/shared/article-idea.md",
+      "scripts/growth/prompts/examples/example-trend.md",
     ]);
-    // 運用・セットアップ(microCMS 手動運用マニュアルのみ)
-    expect(byGroup["運用・セットアップ"]).toEqual(["news-admin-manual.md"]);
+
+    const res = await GET(getReq());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { warnings: string[] };
+    expect(json.warnings).toEqual(
+      expect.arrayContaining([
+        "任意資料 scripts/growth/prompts/shared/article-idea.md を読み込めませんでした。",
+        "任意資料 scripts/growth/prompts/examples/example-trend.md を読み込めませんでした。",
+      ]),
+    );
+  });
+
+  it("未登録Markdownはマニフェスト読込とは別の補完スキャンでその他に追加する", async () => {
+    mockReaddir(["unregistered.md"], [], []);
+    mockReadFile();
+
+    const res = await GET(getReq());
+    const json = (await res.json()) as {
+      groups: { group: string; phases: { path: string }[] }[];
+    };
+    expect(json.groups.find((group) => group.group === "その他")?.phases).toEqual([
+      expect.objectContaining({ path: "scripts/growth/prompts/unregistered.md" }),
+    ]);
   });
 
   it("examples ディレクトリが無くても他は返す", async () => {
@@ -108,25 +159,60 @@ describe("GET /api/growth/prompts", () => {
 
     const res = await GET(getReq());
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { groups: { group: string }[] };
-    expect(json.groups.some((g) => g.group === "文体の例")).toBe(false);
-    expect(json.groups.some((g) => g.group === "分析")).toBe(true);
+    const json = (await res.json()) as { warnings: string[]; groups: { group: string }[] };
+    expect(json.warnings).toContain("任意資料 scripts/growth/prompts/examples を読み込めませんでした。");
+    expect(json.groups.some((g) => g.group === "文体例")).toBe(true);
+    expect(json.groups.some((g) => g.group === "実行プロンプト")).toBe(true);
   });
 
-  it("一部の参考ドキュメントが読めなくても残りは返す", async () => {
+  it("任意ディレクトリ全体欠落時は登録個別warningだけにしdir warningを重複させない", async () => {
+    vi.mocked(readdir).mockImplementation((async (dir: string) => {
+      if (String(dir).endsWith("examples")) throw new Error("ENOENT examples");
+      return [];
+    }) as unknown as typeof readdir);
+    vi.mocked(readFile).mockImplementation((async (p: string) => {
+      if (String(p).includes("scripts/growth/prompts/examples/")) {
+        throw new Error(`ENOENT ${p}`);
+      }
+      if (String(p).endsWith("facility-context.json")) return '{"open":false}';
+      return `<<${String(p).split("/").pop()}>>`;
+    }) as unknown as typeof readFile);
+
+    const res = await GET(getReq());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { warnings: string[] };
+    const exampleWarnings = json.warnings.filter((warning) =>
+      warning.includes("scripts/growth/prompts/examples"),
+    );
+    expect(exampleWarnings).toHaveLength(
+      PROMPT_REGISTRY.filter((entry) => entry.sourceKind === "example").length,
+    );
+    expect(exampleWarnings).not.toContain(
+      "任意資料 scripts/growth/prompts/examples を読み込めませんでした。",
+    );
+  });
+
+  it("一部の参考ドキュメントが読めなくても残りと warning を返す", async () => {
     mockReaddir(["weekly.md"], []);
     mockReadFile(["ai-news-prompt.md"]); // 1点だけ欠落
 
     const res = await GET(getReq());
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
-      groups: { group: string; phases: { filename: string }[] }[];
+      warnings: string[];
+      groups: { group: string; phases: { path: string }[] }[];
     };
-    const refs = json.groups.find((g) => g.group === "参考ドキュメント");
-    expect(refs?.phases.map((p) => p.filename)).toEqual([
+    expect(json.warnings).toContain(
+      "任意資料 docs/operations/ai-news-prompt.md を読み込めませんでした。",
+    );
+    expect(json.warnings.join(" ")).not.toContain(process.cwd());
+    const refs = json.groups.find((g) => g.group === "正典・共通ルール");
+    expect(refs?.phases.map((p) => p.path)).toEqual([
       "CLAUDE.md",
-      "growth-article-style.md",
-      "growth-weekly-runbook.md",
+      "AGENTS.md",
+      "docs/operations/growth/00-canon.md",
+      "docs/operations/growth-article-style.md",
+      "scripts/growth/prompts/shared/article-idea.md",
     ]);
   });
 
@@ -136,12 +222,19 @@ describe("GET /api/growth/prompts", () => {
 
     const res = await GET(getReq());
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { success: boolean; facilityContext: string | null };
+    const json = (await res.json()) as {
+      success: boolean;
+      facilityContext: string | null;
+      warnings: string[];
+    };
     expect(json.success).toBe(true);
     expect(json.facilityContext).toBeNull();
+    expect(json.warnings).toContain(
+      "任意資料 scripts/growth/facility-context.json を読み込めませんでした。",
+    );
   });
 
-  it("プロンプトディレクトリが読めなければ 500", async () => {
+  it("補完スキャンのディレクトリが読めなくても登録済み資料を返しwarningにする", async () => {
     vi.mocked(readdir).mockImplementation((async (dir: string) => {
       if (String(dir).endsWith("examples")) return [];
       throw new Error("ENOENT");
@@ -149,8 +242,14 @@ describe("GET /api/growth/prompts", () => {
     mockReadFile();
 
     const res = await GET(getReq());
-    expect(res.status).toBe(500);
-    const json = (await res.json()) as { success: boolean };
-    expect(json.success).toBe(false);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { success: boolean; warnings: string[] };
+    expect(json.success).toBe(true);
+    expect(json.warnings).toEqual(
+      expect.arrayContaining([
+        "任意資料 scripts/growth/prompts を読み込めませんでした。",
+        "任意資料 scripts/growth/prompts/shared を読み込めませんでした。",
+      ]),
+    );
   });
 });

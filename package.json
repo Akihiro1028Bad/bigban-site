@@ -40,6 +40,7 @@
     "growth:learning-log": "tsx scripts/growth/learning-log-cli.ts",
     "growth:learning-log:recent": "tsx scripts/growth/learning-log-cli.ts recent 4",
     "growth:worker-log": "tsx scripts/growth/worker-log-cli.ts",
+    "growth:model-settings": "tsx scripts/growth/model-settings-cli.ts",
     "growth:reconcile": "tsx scripts/growth/reconcile-cli.ts",
     "growth:publish-due": "tsx scripts/growth/publish-due-cli.ts",
     "growth:review-due": "tsx scripts/growth/review-due-cli.ts",

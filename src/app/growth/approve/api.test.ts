@@ -7,20 +7,94 @@ import { setupMswServer } from "@/test/msw/setup";
 import {
   BOARD_URL,
   fetchBoard,
+  fetchModelSettings,
   fetchOps,
   fetchProposalArtifact,
   fetchPrompts,
   postDecision,
+  putModelSetting,
   postRevert,
   postRevise,
   postReviseApply,
   postReviseEdit,
   PROMPTS_URL,
   OPS_URL,
+  MODEL_SETTINGS_URL,
   PROPOSAL_ARTIFACT_URL,
 } from "./api";
 
 setupMswServer();
+
+describe("AIモデル設定API", () => {
+  it("GETで設定・カタログ・推論強度を返す", async () => {
+    const payload = {
+      success: true,
+      storageAvailable: true,
+      warning: null,
+      settings: [{ id: "weekly" }],
+      catalog: [{ id: "gpt-5.6-sol" }],
+      efforts: { codex: ["high"], claude: ["high"] },
+    };
+    server.use(http.get(MODEL_SETTINGS_URL, () => HttpResponse.json(payload)));
+    await expect(fetchModelSettings("tok")).resolves.toEqual({
+      storageAvailable: true,
+      warning: null,
+      settings: payload.settings,
+      catalog: payload.catalog,
+      efforts: payload.efforts,
+    });
+  });
+
+  it("GETの配列欠落は空配列へ落とし、失敗はerror文言を返す", async () => {
+    server.use(
+      http.get(MODEL_SETTINGS_URL, () =>
+        HttpResponse.json({ success: true, efforts: { codex: [], claude: [] } }),
+      ),
+    );
+    await expect(fetchModelSettings("tok")).resolves.toEqual({
+      storageAvailable: false,
+      warning: null,
+      settings: [],
+      catalog: [],
+      efforts: { codex: [], claude: [] },
+    });
+    server.use(
+      http.get(MODEL_SETTINGS_URL, () =>
+        HttpResponse.json({ success: false, error: "設定NG" }, { status: 500 }),
+      ),
+    );
+    await expect(fetchModelSettings("tok")).rejects.toThrow("設定NG");
+  });
+
+  it("PUTで1工程を保存し、レスポンス設定を返す", async () => {
+    let body: unknown;
+    const setting = {
+      phaseId: "weekly" as const,
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "xhigh" as const,
+    };
+    server.use(
+      http.put(MODEL_SETTINGS_URL, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ success: true, setting: { ...setting, id: "weekly" } });
+      }),
+    );
+    await expect(putModelSetting("tok", setting)).resolves.toMatchObject({ id: "weekly" });
+    expect(body).toEqual(setting);
+  });
+
+  it("PUT失敗・setting欠落は既定エラー", async () => {
+    const setting = {
+      phaseId: "weekly" as const,
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "xhigh" as const,
+    };
+    server.use(http.put(MODEL_SETTINGS_URL, () => HttpResponse.json({ success: true })));
+    await expect(putModelSetting("tok", setting)).rejects.toThrow("AIモデル設定の保存に失敗しました。");
+  });
+});
 
 describe("fetchBoard", () => {
   it("success レスポンスから items を返す", async () => {
@@ -183,19 +257,25 @@ describe("fetchPrompts", () => {
         HttpResponse.json({
           success: true,
           facilityContext: "{}",
+          warnings: ["任意資料 docs/x.md を読み込めませんでした。"],
           groups: [{ group: "分析", phases: [] }],
         })
       )
     );
     await expect(fetchPrompts("tok")).resolves.toEqual({
       facilityContext: "{}",
+      warnings: ["任意資料 docs/x.md を読み込めませんでした。"],
       groups: [{ group: "分析", phases: [] }],
     });
   });
 
-  it("facilityContext/groups 欠落時は null / 空配列に既定化する", async () => {
+  it("facilityContext/warnings/groups 欠落時は null / 空配列に既定化する", async () => {
     server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: true })));
-    await expect(fetchPrompts("tok")).resolves.toEqual({ facilityContext: null, groups: [] });
+    await expect(fetchPrompts("tok")).resolves.toEqual({
+      facilityContext: null,
+      warnings: [],
+      groups: [],
+    });
   });
 
   it("Authorization: Bearer ヘッダで token を送る", async () => {

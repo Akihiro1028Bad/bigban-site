@@ -15,7 +15,7 @@
 | 場所 / サービス | 役割 |
 |---|---|
 | **Mac（開発機）** | コードの開発・修正。ここでは本番の週次自動実行は**しない**（後述、二重実行防止）。 |
-| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（headless agent 実行。既定は `claude -p`、任意で Codex CLI）を回す本番実行機。 |
+| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（headless agent 実行。承認画面 `AIモデル` の工程別設定に応じて Claude Code CLI / Codex CLI を選択）を回す本番実行機。 |
 | **Vercel（承認画面 + サイト）** | 公開サイトと承認画面 `/growth/approve` をホスト。承認画面は **Notion に「依頼」を書くだけ**（重い処理はしない）。 |
 | **Notion（4つの DB）** | データの中核。①記事ネタ案 ②施策提案 ③週次グロースレポート ④学習ログ。 |
 | **microCMS** | 記事本文の CMS。AI は**下書きまで**を作る（本番公開は人間が手動）。 |
@@ -104,7 +104,12 @@
 | `GROWTH_GOOGLE_REFRESH_TOKEN` | GA4/GSC 取得用トークン | △ | ✅ | ✗ |
 | `GROWTH_GOOGLE_TOKEN_EXPIRES_AT` | （任意）トークン失効予定 | △ | △ | ✗ |
 | `GROWTH_LEARNING_LOG_DS` | 学習ログ DB の data source ID | ✅(設定済) | ⚠️未設定 | ⚠️未設定 |
-| `GROWTH_WEEKLY_MODEL` | （任意）週次モデル上書き | △ | △ | ✗ |
+| `GROWTH_MODEL_SETTINGS_DS` | （任意）AIモデル設定DBの data source ID | △ | △ | △ |
+| `GROWTH_AGENT` | （任意）全工程のagent強制 | △ | △ | ✗ |
+| `GROWTH_WEEKLY_MODEL` | （任意）週次Claudeモデル上書き | △ | △ | ✗ |
+| `GROWTH_CLAUDE_EFFORT` / `GROWTH_WEEKLY_CLAUDE_EFFORT` | （任意）Claude推論強度上書き | △ | △ | ✗ |
+| `GROWTH_CODEX_MODEL` / `GROWTH_CODEX_REASONING_EFFORT` | （任意）Codex共通設定上書き | △ | △ | ✗ |
+| `GROWTH_WEEKLY_CODEX_MODEL` / `_REASONING_EFFORT` | （任意）週次Codex設定上書き | △ | △ | ✗ |
 | `GROWTH_GA4_KEYEVENTS_SINCE` | （任意）CV 計測開始日 | △ | △ | ✗ |
 | `OPENAI_API_KEY` | 画像生成 | △ | ✅ | ✗ |
 | `MICROCMS_SERVICE_DOMAIN` | microCMS サービス名 | △ | ✅ | ✅ |
@@ -126,6 +131,8 @@
 
 - **`MICROCMS_MANAGEMENT_API_KEY` は server-only**。`NEXT_PUBLIC_` を付けて**クライアントに渡してはいけません**（強権限キーの漏洩防止・#7）。Vercel に置く場合も通常のサーバー環境変数として扱い、`NEXT_PUBLIC_` プレフィックスは絶対に付けないこと。
 - **`GROWTH_LEARNING_LOG_DS`（学習ログ DB の data source ID）は現状 Mac のみ設定済み**で、**自宅 PC・Vercel には未設定**です。この状態だと**学習ログの追記が静かにスキップ**されます（本処理は止まりません＝欠落耐性）。学習ログを本番で記録したい場合は、手順 4 で作成する学習ログ DB の data source ID を自宅 PC の `.env` にも設定してください。
+- **AIモデル設定はNotionで共有**します。承認画面 `AIモデル` で保存した設定を自宅PC workerも読むため、「AIモデル設定」DBを`NOTION_TOKEN`の内部インテグレーションへ共有してください。`GROWTH_MODEL_SETTINGS_DS`はDBを差し替える場合だけ設定し、通常は未設定でコード内の既定IDを使います。
+- **モデル設定のenvは一時上書き用**です。優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。通常運用では`GROWTH_AGENT`を未設定にし、工程別のプロバイダー選択を有効にします。
 - **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
 - **`APPROVE_AUTH_ENABLED` は Vercel 本番で ON 必須**。未設定＝ON（フェイルセーフ）ですが、`false` にすると本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。詳細は「手順 8」。
 - **クォート**: 値に空白や記号（`< > | ( ) &` 等）を含む場合は必ずダブルクォートで囲むこと。未クォートだとシェルスクリプトが壊れます（例: `RESEND_FROM`）。
@@ -155,20 +162,20 @@
    ```powershell
    git --version
    ```
-3. **Headless agent CLI**: 既定運用は Claude Code CLI。Codex 併用検証をする場合は Codex CLI も入れ、初回だけ対話ログインする。
+3. **Headless agent CLI**: 工程ごとにClaude Code CLIとCodex CLIを使い分けるため、両方を入れて初回ログインする。
    ```powershell
    npm install -g @anthropic-ai/claude-code
    claude --version
    claude          # 初回は対話起動。Mac と同じ Anthropic アカウントで /login → その後 /exit
    ```
-   > **確認**: ログインは Mac と同一アカウントで。Notion 連携（headless で使う `mcp__claude_ai_Notion`）はアカウントに紐づくため、同じアカウントなら Windows でも使えます。
+   > **確認**: ログインは Mac と同一アカウントで。Claude 工程で使う Notion 連携（`mcp__claude_ai_Notion`）はアカウントに紐づくため、同じアカウントなら Windows でも使えます。
 
-   Codex を併用する場合:
+   Codex:
    ```powershell
    codex --version
    codex mcp login notion
    ```
-   > **確認**: `GROWTH_AGENT` 未設定なら Claude のまま。Codex は `GROWTH_AGENT=codex` を付けたときだけ使います。
+   > **確認**: `GROWTH_AGENT` 未設定なら承認画面の工程別設定を使います。指定した場合は全工程のプロバイダーを強制します。
 
 ### 手順 3-2: リポジトリを取得する
 
@@ -334,7 +341,7 @@ Codex 併用の dry-run:
 $env:GROWTH_DRYRUN=1; $env:GROWTH_AGENT="codex"; npm run growth:advise-loop; Remove-Item Env:\GROWTH_DRYRUN; Remove-Item Env:\GROWTH_AGENT
 ```
 
-> **確認**: `[dry-run] ... codex -a never exec --sandbox workspace-write ...` が表示されれば Codex 起動形の組み立ては OK。実走で `tsx` IPC / Notion fetch が塞がる場合だけ `GROWTH_CODEX_SANDBOX=danger-full-access` を検証用に指定します。
+> **確認**: `[dry-run] ... codex -a never exec --sandbox danger-full-access ...` が表示されれば Codex 起動形の組み立ては OK。制限したい環境だけ `GROWTH_CODEX_SANDBOX=workspace-write` などを明示します。
 
 ### 手順 7-3: LINE 通知の本文確認（送信せず表示）
 
