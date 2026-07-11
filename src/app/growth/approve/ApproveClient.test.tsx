@@ -2057,7 +2057,9 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
       await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       const drawer = await openConsultDrawer(dialog);
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(await within(drawer).findByText("## A 改")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -3076,7 +3078,9 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("完成待ち");
-      await vi.advanceTimersByTimeAsync(5100); // 1回ポーリング
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100); // 1回ポーリング
+      });
       // トースト span は「🎉 …」を含むため部分一致で照合する。
       const toast = await screen.findByText(/「完成待ち」の下書きが完成しました/);
       expect(toast).toBeInTheDocument();
@@ -3110,8 +3114,10 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("進行中");
-      await vi.advanceTimersByTimeAsync(5100);
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(await screen.findByText(/最新情報を取得できていません/)).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "再試行" }));
       await waitFor(() =>
@@ -3221,7 +3227,9 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("継続記事");
-      await vi.advanceTimersByTimeAsync(5100); // poll 失敗
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100); // poll 失敗
+      });
       // 盤は前回値を保ち、トーストは出ない。
       expect(screen.getByText("継続記事")).toBeInTheDocument();
       expect(screen.queryByText(/下書きが完成しました/)).not.toBeInTheDocument();
@@ -4789,7 +4797,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         { json: draftWithRegen({ bodyRegen: { status: "なし", targetSrc: "" } }) }
       );
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       await waitFor(() =>
         expect(screen.queryByText(/AI再生成 処理中/)).not.toBeInTheDocument()
       );
@@ -4822,7 +4832,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       await waitFor(() => {
         expect(replacePreservedPendingFigure).toHaveBeenCalledWith(
@@ -4862,7 +4874,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4897,7 +4911,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4932,7 +4948,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(replacePreservedPendingFigure).not.toHaveBeenCalled();
       expect(
@@ -4976,7 +4994,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4993,7 +5013,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: false },
       });
       expect(await screen.findByText(/AI再生成 依頼中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 依頼中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5009,7 +5031,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: false },
       });
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5023,7 +5047,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: true, exists: false, draft: null },
       });
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5038,7 +5064,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         new Error("network")
       );
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();

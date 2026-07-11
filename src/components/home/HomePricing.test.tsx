@@ -122,6 +122,7 @@ describe("HomePricing", () => {
       </NextIntlClientProvider>
     );
     const link = document.querySelector('a[href="/about#contact"]');
+    link?.addEventListener("click", (event) => event.preventDefault());
     await userEvent.click(link!);
     expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
   });
