@@ -97,7 +97,7 @@ describe("DashboardView", () => {
         setupMissing: false,
         worker: { status: "unknown", workerId: "w", lastHeartbeatAt: null, currentJob: null },
         currentTargets: [],
-        recentRuns: [{ id: "ok", mode: "weekly", status: "completed", targetPageId: null, targetTitle: "週次処理", targetType: "system", startedAt: "2026-07-11T00:00:00Z", finishedAt: null, recordedAt: "2026-07-11T01:00:00Z", elapsedMs: null, exitCode: 0, resumeCommand: null, detail: null }],
+        recentRuns: [{ id: "ok", mode: "weekly", status: "success", targetPageId: null, targetTitle: "週次処理", targetType: "system", startedAt: "2026-07-11T00:00:00Z", finishedAt: null, recordedAt: "2026-07-11T01:00:00Z", elapsedMs: null, exitCode: 0, resumeCommand: null, detail: null }],
         recentFailures: [],
         reconcileFindings: [],
       }}
