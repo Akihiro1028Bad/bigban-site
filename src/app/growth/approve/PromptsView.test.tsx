@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,6 +185,7 @@ describe("PromptsView", () => {
     fireEvent.click(await screen.findByRole("button", { name: /下書き生成/ }));
     fireEvent.click(screen.getByRole("button", { name: "コピー" }));
     expect(writeText).toHaveBeenCalledWith("## 下書き見出し\n\n下書きの指示本文");
+    expect(await screen.findByRole("button", { name: "コピー済み" })).toBeInTheDocument();
   });
 
   it("コピーに失敗したら『コピー済み』表示にしない", async () => {
@@ -304,7 +305,9 @@ describe("PromptsView", () => {
       "",
       "/growth/approve?view=prompt&doc=docs%2Foperations%2Fgrowth%2F00-canon.md",
     );
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     expect(await screen.findByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "プロンプト本文" }).className).toContain("block");
 
@@ -313,7 +316,9 @@ describe("PromptsView", () => {
       "",
       "/growth/approve?view=prompt&doc=scripts%2Fgrowth%2Fprompts%2Fweekly.md",
     );
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     expect(await screen.findByRole("heading", { level: 2, name: "週次分析" })).toBeInTheDocument();
   });
 
@@ -402,6 +407,7 @@ describe("PromptsView", () => {
     const missing = screen.getByRole("link", { name: "未登録" });
     expect(fireEvent.click(missing)).toBe(false);
     const registered = screen.getByRole("link", { name: "正典" });
+    registered.addEventListener("click", (event) => event.preventDefault(), { once: true });
     fireEvent.click(registered, { ctrlKey: true });
     expect(screen.getByRole("heading", { level: 2, name: "週次分析" })).toBeInTheDocument();
   });
@@ -422,9 +428,13 @@ describe("PromptsView", () => {
     renderWithClient(<PromptsView token="t" query="" />);
     fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
     window.history.replaceState(null, "", "/growth/approve?view=prompt&raw=1");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    expect(screen.getByText(/週次の指示本文/)).toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(screen.getByText('{"open":false}')).toBeInTheDocument();
     window.history.replaceState(null, "", "/growth/approve?view=prompt&doc=unknown.md");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
   });
 });

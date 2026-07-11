@@ -2057,7 +2057,9 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
       await userEvent.click(screen.getByRole("button", { name: "猛暑記事" }));
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       const drawer = await openConsultDrawer(dialog);
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(await within(drawer).findByText("## A 改")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -2477,7 +2479,9 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
 
     const dialog = await openIdeaPanel();
     expect(await within(dialog).findByText("読み込み中…")).toBeInTheDocument();
-    release(jsonResponse({ success: true, exists: false, draft: null }));
+    await act(async () => {
+      release(jsonResponse({ success: true, exists: false, draft: null }));
+    });
     expect(await within(dialog).findByText(/見つかりませんでした/)).toBeInTheDocument();
   });
 
@@ -2692,6 +2696,11 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
         draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
       }),
       pending,
+      jsonResponse({
+        success: true,
+        exists: true,
+        draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+      }),
     ];
     const fn = vi.fn((input: RequestInfo | URL) => {
       if (isOpsRequest(input)) {
@@ -2712,7 +2721,10 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
     expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
-    release(jsonResponse({ success: true }));
+    await act(async () => {
+      release(jsonResponse({ success: true }));
+    });
+    expect(await screen.findByText("保存しました")).toBeInTheDocument();
   });
 
   it("エディタのAI画像挿入はプレースホルダ入り本文を保存してから placeholderId で再生成依頼する", async () => {
@@ -3076,7 +3088,9 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("完成待ち");
-      await vi.advanceTimersByTimeAsync(5100); // 1回ポーリング
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100); // 1回ポーリング
+      });
       // トースト span は「🎉 …」を含むため部分一致で照合する。
       const toast = await screen.findByText(/「完成待ち」の下書きが完成しました/);
       expect(toast).toBeInTheDocument();
@@ -3110,8 +3124,10 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("進行中");
-      await vi.advanceTimersByTimeAsync(5100);
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(await screen.findByText(/最新情報を取得できていません/)).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "再試行" }));
       await waitFor(() =>
@@ -3221,7 +3237,9 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
       );
       render(<ApproveClient />);
       await screen.findByText("継続記事");
-      await vi.advanceTimersByTimeAsync(5100); // poll 失敗
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100); // poll 失敗
+      });
       // 盤は前回値を保ち、トーストは出ない。
       expect(screen.getByText("継続記事")).toBeInTheDocument();
       expect(screen.queryByText(/下書きが完成しました/)).not.toBeInTheDocument();
@@ -3820,7 +3838,9 @@ describe("ApproveClient 運用オブザーバビリティ", () => {
     await screen.findByText("市川ページ");
     await selectView(/運用状況/);
     expect(await screen.findByText("運用状態を読み込み中…")).toBeInTheDocument();
-    release(jsonResponse({ success: true, ops: EMPTY_OPS }));
+    await act(async () => {
+      release(jsonResponse({ success: true, ops: EMPTY_OPS }));
+    });
   });
 
   it("運用タブで ops 取得エラーを表示する", async () => {
@@ -4033,15 +4053,21 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110/#213)", () 
     flags.authEnabled = false;
     let release!: (v: unknown) => void;
     const pending = new Promise((r) => { release = r; });
-    const fn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
-        })
-      )
-      .mockReturnValueOnce(pending); // 下書き取得は保留のまま
+    const responses = [
+      jsonResponse({
+        success: true,
+        items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
+      }),
+      pending,
+    ];
+    const fn = vi.fn((input: RequestInfo | URL) => {
+      if (isOpsRequest(input)) {
+        fn.mock.calls.pop();
+        return opsFetchResult();
+      }
+      const next = responses.shift();
+      return next instanceof Promise ? next : Promise.resolve(next);
+    });
     vi.stubGlobal("fetch", fn);
 
     render(<ApproveClient />);
@@ -4051,7 +4077,9 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110/#213)", () 
     expect(within(dialog).queryByRole("button", { name: /下書きを編集/ })).not.toBeInTheDocument();
     // 取得中に詳細パネルを閉じる(#proto P3a: 記事はペイン内 region・「← 一覧」で選択解除)。
     await userEvent.click(await screen.findByRole("button", { name: "← 一覧" }));
-    release(jsonResponse(draftReady110("<p>A</p>").json));
+    await act(async () => {
+      release(jsonResponse(draftReady110("<p>A</p>").json));
+    });
     // ワークスペースは開かない。
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
@@ -4789,7 +4817,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         { json: draftWithRegen({ bodyRegen: { status: "なし", targetSrc: "" } }) }
       );
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       await waitFor(() =>
         expect(screen.queryByText(/AI再生成 処理中/)).not.toBeInTheDocument()
       );
@@ -4822,7 +4852,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       await waitFor(() => {
         expect(replacePreservedPendingFigure).toHaveBeenCalledWith(
@@ -4862,7 +4894,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4897,7 +4931,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4932,7 +4968,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(replacePreservedPendingFigure).not.toHaveBeenCalled();
       expect(
@@ -4976,7 +5014,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
       const dialog = await screen.findByRole("region", { name: "詳細: 猛暑記事" });
       await userEvent.click(await within(dialog).findByRole("button", { name: "下書きを編集" }));
 
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
 
       expect(
         await screen.findByText("画像の生成が完了しました。保存前にプレビューで本文を確認してください。")
@@ -4993,7 +5033,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: false },
       });
       expect(await screen.findByText(/AI再生成 依頼中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 依頼中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5009,7 +5051,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: false },
       });
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5023,7 +5067,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         json: { success: true, exists: false, draft: null },
       });
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -5038,7 +5084,9 @@ describe("ApproveClient AI再生成の依頼中表示+ポーリング(#166)", ()
         new Error("network")
       );
       expect(await screen.findByText(/AI再生成 処理中/)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5100);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+      });
       expect(screen.getByText(/AI再生成 処理中/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();

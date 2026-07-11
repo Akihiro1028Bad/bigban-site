@@ -79,6 +79,9 @@ describe("HyroxFacility", () => {
     expect(
       screen.getByRole("heading", { name: "FACILITY" })
     ).toBeInTheDocument();
+    for (const image of document.querySelectorAll("img")) {
+      expect(image).toHaveAttribute("alt", "");
+    }
   });
 
   it("施設写真9枚とドット9つを表示する", () => {

@@ -16,7 +16,8 @@ export function useToasts() {
 
   const pushToast = useCallback((message: string, tone: "success" | "error" = "success"): void => {
     toastSeq.current += 1;
-    setToasts((prev) => [...prev, { id: `toast-${toastSeq.current}`, message, tone }]);
+    const id = `toast-${toastSeq.current}`;
+    setToasts((prev) => [...prev, { id, message, tone }]);
   }, []);
 
   // #108: 完成検知など、呼び出し側が一意 id を決めて複数件まとめて積む。
