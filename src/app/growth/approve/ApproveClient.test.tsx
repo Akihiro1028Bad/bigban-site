@@ -2479,7 +2479,9 @@ describe("ApproveClient 下書きプレビュー(#75)", () => {
 
     const dialog = await openIdeaPanel();
     expect(await within(dialog).findByText("読み込み中…")).toBeInTheDocument();
-    release(jsonResponse({ success: true, exists: false, draft: null }));
+    await act(async () => {
+      release(jsonResponse({ success: true, exists: false, draft: null }));
+    });
     expect(await within(dialog).findByText(/見つかりませんでした/)).toBeInTheDocument();
   });
 
@@ -2694,6 +2696,11 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
         draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
       }),
       pending,
+      jsonResponse({
+        success: true,
+        exists: true,
+        draft: { title: "T", displayMode: "html", bodyHtml: "<p>元</p>", body: "" },
+      }),
     ];
     const fn = vi.fn((input: RequestInfo | URL) => {
       if (isOpsRequest(input)) {
@@ -2714,7 +2721,10 @@ describe("ApproveClient 下書き手動編集(#77)", () => {
     await userEvent.click(within(getWorkspace()).getByRole("button", { name: "保存" }));
 
     expect(await within(getWorkspace()).findByRole("button", { name: "保存中…" })).toBeDisabled();
-    release(jsonResponse({ success: true }));
+    await act(async () => {
+      release(jsonResponse({ success: true }));
+    });
+    expect(await screen.findByText("保存しました")).toBeInTheDocument();
   });
 
   it("エディタのAI画像挿入はプレースホルダ入り本文を保存してから placeholderId で再生成依頼する", async () => {
@@ -3828,7 +3838,9 @@ describe("ApproveClient 運用オブザーバビリティ", () => {
     await screen.findByText("市川ページ");
     await selectView(/運用状況/);
     expect(await screen.findByText("運用状態を読み込み中…")).toBeInTheDocument();
-    release(jsonResponse({ success: true, ops: EMPTY_OPS }));
+    await act(async () => {
+      release(jsonResponse({ success: true, ops: EMPTY_OPS }));
+    });
   });
 
   it("運用タブで ops 取得エラーを表示する", async () => {
@@ -4059,7 +4071,9 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110/#213)", () 
     expect(within(dialog).queryByRole("button", { name: /下書きを編集/ })).not.toBeInTheDocument();
     // 取得中に詳細パネルを閉じる(#proto P3a: 記事はペイン内 region・「← 一覧」で選択解除)。
     await userEvent.click(await screen.findByRole("button", { name: "← 一覧" }));
-    release(jsonResponse(draftReady110("<p>A</p>").json));
+    await act(async () => {
+      release(jsonResponse(draftReady110("<p>A</p>").json));
+    });
     // ワークスペースは開かない。
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "記事を編集" })).not.toBeInTheDocument()
