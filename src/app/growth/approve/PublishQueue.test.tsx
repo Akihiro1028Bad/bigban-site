@@ -116,7 +116,8 @@ describe("PublishQueue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /まとめて予約/ }));
     const dialog = screen.getByRole("dialog", { name: "公開日時を予約" });
-    fireEvent.click(within(dialog).getByRole("button", { name: /今夜 21:00/ }));
+    // 実行環境が21時以降なら、過去時刻を避ける仕様で先頭プリセットは「明日」になる。
+    fireEvent.click(within(dialog).getByRole("button", { name: /(?:今夜|明日) 21:00/ }));
 
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     const scheduleCalls = fetchMock.mock.calls.filter((c) => c[0] === "/api/growth/publish/schedule");
