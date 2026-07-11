@@ -33,6 +33,8 @@ interface TopBarProps {
   onOpenProposal: () => void;
   density: Density;
   onToggleDensity: () => void;
+  showSegments?: boolean;
+  showSearch?: boolean;
 }
 
 export function TopBar({
@@ -52,6 +54,8 @@ export function TopBar({
   onOpenProposal,
   density,
   onToggleDensity,
+  showSegments = true,
+  showSearch = true,
 }: TopBarProps) {
   return (
     <header
@@ -74,7 +78,7 @@ export function TopBar({
         </span>
       </div>
 
-      <div
+      {showSegments ? <div
         className="hidden items-center gap-[2px] rounded-[9px] p-[3px] md:flex"
         style={{ background: "var(--p-bg-input)", border: "1px solid var(--p-border)" }}
         role="group"
@@ -104,9 +108,9 @@ export function TopBar({
             </button>
           );
         })}
-      </div>
+      </div> : null}
 
-      <div className="relative ml-auto min-w-0 flex-1 sm:w-[260px] sm:flex-none">
+      {showSearch ? <div className="relative ml-auto min-w-0 flex-1 sm:w-[260px] sm:flex-none">
         <span
           className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
           style={{ color: "var(--p-text-3)" }}
@@ -129,7 +133,7 @@ export function TopBar({
         <span className="absolute right-2 top-1/2 -translate-y-1/2">
           <Kbd>/</Kbd>
         </span>
-      </div>
+      </div> : <div className="ml-auto" />}
 
       <div className="hidden items-center gap-3 lg:flex">
         <span

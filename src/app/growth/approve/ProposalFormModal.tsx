@@ -41,6 +41,8 @@ const FIELD_STYLE = {
 
 interface ProposalFormModalProps {
   token: string;
+  initialName?: string;
+  initialNote?: string;
   onClose: () => void;
   onAdded: (item: AddedProposal) => void;
 }
@@ -53,11 +55,11 @@ function segmentStyle(active: boolean): React.CSSProperties {
   };
 }
 
-export function ProposalFormModal({ token, onClose, onAdded }: ProposalFormModalProps) {
+export function ProposalFormModal({ token, initialName = "", initialNote = "", onClose, onAdded }: ProposalFormModalProps) {
   const [kind, setKind] = useState<ProposalKind>("article");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName);
   const [category, setCategory] = useState<string>(PROPOSAL_CATEGORIES[0]);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(initialNote);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

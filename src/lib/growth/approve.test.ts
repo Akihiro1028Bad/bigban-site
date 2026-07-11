@@ -172,6 +172,19 @@ describe("toPendingItems", () => {
     expect(item.artifactUrl).toBe("https://notion.so/page");
   });
 
+  it("実行済み施策は実行完了日時を持つ", () => {
+    const page = proposal("p1", "市川ページ", "サイト表示内容");
+    page.properties["ステータス"] = { type: "select", select: { name: "実行済み" } };
+    page.properties["実行完了日時"] = { type: "date", date: { start: "2026-07-11T10:00:00.000Z" } };
+
+    const [item] = toPendingItems([page], []);
+
+    expect(item).toMatchObject({
+      stage: "executed",
+      executedAtMs: Date.parse("2026-07-11T10:00:00.000Z"),
+    });
+  });
+
   it("記事ネタ案は優先度と概要・構成案(outline)・修正状態を持つ", () => {
     const [item] = toPendingItems([], [idea("i1", "猛暑×屋内", "夏向けの集客記事")]);
 

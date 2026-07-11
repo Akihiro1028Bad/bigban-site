@@ -158,6 +158,7 @@ describe("PublishQueue", () => {
           el?.tagName === "SPAN" && (el.textContent ?? "").replace(/\s+/g, " ").trim() === `予約 ${label}`
       )
     ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "公開予定" })).toHaveTextContent("1件");
 
     fireEvent.click(screen.getByRole("button", { name: /予約を解除/ }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());

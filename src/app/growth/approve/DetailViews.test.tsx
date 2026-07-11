@@ -38,8 +38,9 @@ describe("PromptView", () => {
   it("Markdown の生成メモは整形表示する(#212)", () => {
     const { container } = render(<PromptView prompt={"## 見出し\n\n- **A**\n- B"} />);
     // 生成メモ本体(prose コンテナ)の中だけを検証する(冒頭の説明ボックスと混ざらないように)。
-    const memo = container.querySelector(".prose");
+    const memo = container.querySelector(".prompt-markdown");
     if (!memo) throw new Error("memo container not found");
+    expect(memo).not.toHaveClass("approve-article");
     // 見出し・箇条書き・強調が HTML 要素として整形される(リテラルの ## / ** は残らない)。
     expect(memo.querySelector("h2")).toHaveTextContent("見出し");
     expect(memo.querySelector("ul")).toBeInTheDocument();

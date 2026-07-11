@@ -128,6 +128,14 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
   const nextLabel = scheduled[0]?.scheduledAtMs != null
     ? formatSchedule(new Date(scheduled[0].scheduledAtMs))
     : undefined;
+  const scheduleDays = Array.from(
+    scheduled.reduce<Map<string, number>>((days, item) => {
+      if (item.scheduledAtMs == null) return days;
+      const label = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short" }).format(new Date(item.scheduledAtMs));
+      days.set(label, (days.get(label) ?? 0) + 1);
+      return days;
+    }, new Map()),
+  );
 
   return (
     <section aria-label="公開キュー" className="mx-auto max-w-[860px] px-6 py-7">
@@ -146,6 +154,15 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
         />
         <SummaryCard color="var(--p-amber)" label="要対応" value={blocked.length} />
       </div>
+
+      {scheduleDays.length > 0 ? (
+        <section aria-label="公開予定" className="mb-6 rounded-[12px] p-4" style={{ background: "linear-gradient(135deg, var(--p-teal-weak), var(--p-bg-elevated))", border: "1px solid var(--p-border)" }}>
+          <div className="flex items-center gap-2 text-[12px] font-semibold"><IconCalendar size={14} style={{ color: "var(--p-teal)" }} /> 公開予定</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {scheduleDays.map(([label, count]) => <div key={label} className="rounded-[10px] px-3 py-2" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}><div className="text-[11px]" style={{ color: "var(--p-text-3)" }}>{label}</div><div className="mt-1 text-[13px] font-semibold">{count}件</div></div>)}
+          </div>
+        </section>
+      ) : null}
 
       <Section
         dot="var(--p-green)"

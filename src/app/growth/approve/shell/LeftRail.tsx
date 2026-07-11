@@ -6,7 +6,7 @@
 
 import type { ReactNode } from "react";
 
-import { IconBolt, IconCalendar, IconChart, IconFileText, IconInbox, IconList, IconRefresh } from "@/app/growth/approve/ui/icons";
+import { IconBolt, IconCalendar, IconChart, IconInbox, IconLayout, IconList, IconRefresh } from "@/app/growth/approve/ui/icons";
 import type { ApproveView } from "@/app/growth/approve/viewRouting";
 
 interface RailItem {
@@ -14,6 +14,11 @@ interface RailItem {
   label: string;
   icon: ReactNode;
   badge?: number;
+}
+
+interface RailGroup {
+  label: string;
+  items: RailItem[];
 }
 
 interface LeftRailProps {
@@ -27,23 +32,31 @@ interface LeftRailProps {
 }
 
 export function LeftRail({ view, articleCount, proposalCount, queueReadyCount, opsIssueCount, onChange }: LeftRailProps) {
-  const items: RailItem[] = [
-    { key: "proposal", label: "施策", icon: <IconList size={18} />, badge: proposalCount },
-    { key: "approve", label: "記事", icon: <IconInbox size={18} />, badge: articleCount },
-    { key: "prompt", label: "プロンプト", icon: <IconFileText size={18} /> },
-    { key: "models", label: "AIモデル", icon: <IconBolt size={18} /> },
-    { key: "performance", label: "成績", icon: <IconChart size={18} /> },
-    { key: "queue", label: "公開キュー", icon: <IconCalendar size={18} />, badge: queueReadyCount },
-    { key: "ops", label: "運用", icon: <IconRefresh size={18} />, badge: opsIssueCount },
+  const groups: RailGroup[] = [
+    { label: "OVERVIEW", items: [{ key: "home", label: "ホーム", icon: <IconLayout size={18} /> }] },
+    { label: "WORKFLOW", items: [
+      { key: "proposal", label: "施策", icon: <IconList size={18} />, badge: proposalCount },
+      { key: "approve", label: "記事制作", icon: <IconInbox size={18} />, badge: articleCount },
+      { key: "queue", label: "公開", icon: <IconCalendar size={18} />, badge: queueReadyCount },
+    ] },
+    { label: "INSIGHT", items: [{ key: "performance", label: "成績", icon: <IconChart size={18} /> }] },
+    { label: "SYSTEM", items: [
+      { key: "settings", label: "AI設定", icon: <IconBolt size={18} /> },
+      { key: "ops", label: "運用状況", icon: <IconRefresh size={18} />, badge: opsIssueCount },
+    ] },
   ];
 
   return (
     <nav
       aria-label="情報源"
-      className="flex w-[60px] shrink-0 flex-col gap-1 px-2 py-3 sm:w-[156px] sm:px-2.5"
+      className="flex w-[60px] shrink-0 flex-col overflow-y-auto px-2 py-3 sm:w-[184px] sm:px-3"
       style={{ borderRight: "1px solid var(--p-border)", background: "var(--p-bg-elevated)" }}
     >
-      {items.map((it) => {
+      {groups.map((group) => <div key={group.label} className="mb-3 flex flex-col gap-1">
+        <div className="hidden px-2 pb-1 text-[9px] font-semibold tracking-[0.18em] sm:block" style={{ color: "var(--p-text-3)" }}>
+          {group.label}
+        </div>
+        {group.items.map((it) => {
         const active = it.key === view;
         return (
           <button
@@ -76,7 +89,8 @@ export function LeftRail({ view, articleCount, proposalCount, queueReadyCount, o
             ) : null}
           </button>
         );
-      })}
+        })}
+      </div>)}
     </nav>
   );
 }

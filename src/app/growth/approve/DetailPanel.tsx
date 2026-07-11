@@ -31,8 +31,10 @@ import { OutlineView } from "./OutlineView";
 import type { OutlineViewSection } from "./OutlineView";
 import type { OutlineSection } from "./outline";
 import { QualityChecklist } from "./QualityChecklist";
+import { ProgressStepper } from "./ui/ProgressStepper";
 import type { PendingItem } from "./types";
 import type { BoardStage } from "./ui/boardStage";
+import { STAGE_META } from "./ui/boardStage";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -327,6 +329,14 @@ export function DetailPanel({
   const chars = draft !== null ? bodyCharCount(bodyHtml, body) : 0;
   const readMinutes = readMinutesOf(chars);
   const scheduledLabel = scheduledLabelOf(item);
+  const articleStepIndex: Record<BoardStage, number> = {
+    idea: 0,
+    outline_review: 0,
+    generating: 2,
+    draft_review: 3,
+    scheduled: 3,
+    published: 4,
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col" role="region" aria-label={`詳細: ${item.title}`}>
@@ -368,6 +378,14 @@ export function DetailPanel({
         </div>
 
         <h1 className="mt-3 text-[19px] font-semibold leading-snug tracking-tight">{item.title}</h1>
+
+        <div className="mt-4 rounded-[12px] p-3" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+          <ProgressStepper label="記事制作進捗" steps={["提案", "承認", "生成", "下書き", "公開"]} currentIndex={articleStepIndex[stage]} />
+          <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3 text-[11.5px]" style={{ borderColor: "var(--p-border)", color: "var(--p-text-3)" }}>
+            <span>次にやること</span>
+            <span className="font-medium" style={{ color: "var(--p-text-2)" }}>{stage === "published" ? "成績を確認する" : stage === "draft_review" ? "本文と画像を確認する" : stage === "generating" ? "生成完了を待つ" : stage === "scheduled" ? "予約時刻を確認する" : `${STAGE_META[stage].label}を進める`}</span>
+          </div>
+        </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <MetaStat icon={<IconFileText size={13} />} title="文字数">

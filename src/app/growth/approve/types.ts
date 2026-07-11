@@ -48,15 +48,17 @@ export interface PendingItem {
   // 施策実行モードの成果物確認用。Notion 本文へのリンクと承認日時。
   artifactUrl?: string;
   approvedAtMs?: number | null;
+  // 施策実行管理用。実行済みへ進めた日時。
+  executedAtMs?: number | null;
   /** 記事/施策に紐づく AI 依頼・提案の表示用アクティビティ。 */
   activities?: PendingActivity[];
 }
 
 // 即時保存モデルでのカードごとの選択(承認/却下)。
-export type Choice = "承認" | "却下";
+export type Choice = "承認" | "却下" | "実行中" | "実行済み";
 
 /** 施策トリアージの状態。 */
-export type ProposalStatus = "pending" | "rejected" | "adopted";
+export type ProposalStatus = "pending" | "rejected" | "adopted" | "completed" | "running" | "executed";
 
 /**
  * 施策の種別＝承認後アウトカムのルーティング先。未設定は "article" 相当(欠落耐性・後方互換)。

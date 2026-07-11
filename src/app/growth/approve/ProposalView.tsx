@@ -23,19 +23,22 @@ import { motion } from "framer-motion";
 import { KIND_META, approveOutcomeFor, kindFromCategory } from "@/lib/growth/proposalKind";
 
 import { ProposalDetailBody, KIND_ICON } from "./ProposalDetailBody";
+import { ProgressStepper } from "./ui/ProgressStepper";
 import type { Choice, PendingItem, ProposalKind } from "./types";
 import { IconArrowLeft, IconArrowRight, IconCheck, IconList, IconPlus, IconX } from "./ui/icons";
 
 /** 施策のトリアージ状態(本番の決定モデルから導出)。 */
-type ProposalTriageStatus = "pending" | "rejected" | "adopted" | "completed";
+type ProposalTriageStatus = "pending" | "rejected" | "adopted" | "completed" | "running" | "executed";
 
 const STATUS_META: Record<ProposalTriageStatus, { label: string; tone: string }> = {
   pending: { label: "未処理", tone: "var(--p-amber)" },
   adopted: { label: "承認済み", tone: "var(--p-green)" },
   completed: { label: "成果物化済", tone: "var(--p-accent)" },
+  running: { label: "実行中", tone: "var(--p-accent)" },
+  executed: { label: "実行済み", tone: "var(--p-green)" },
   rejected: { label: "却下", tone: "var(--p-text-3)" },
 };
-const ORDER: ProposalTriageStatus[] = ["pending", "adopted", "completed", "rejected"];
+const ORDER: ProposalTriageStatus[] = ["pending", "adopted", "completed", "running", "executed", "rejected"];
 
 /** 種別フィルタの選択肢("all" + 全 ProposalKind)。 */
 const KIND_FILTER_OPTIONS: Array<ProposalKind | "all"> = ["all", "article", "site", "event", "other", "system"];
@@ -52,7 +55,7 @@ interface ProposalViewProps {
   /** 一覧で施策を選んだ(=詳細を開く)。 */
   onActivate: (id: string) => void;
   /** 承認する(=記事化 等・種別で出口が変わる)。実ハンドラ(decide 承認)へ結線。 */
-  onApprove: (item: PendingItem) => void;
+  onApprove: (item: PendingItem, decision?: Choice) => void | Promise<void>;
   /** 未処理に戻す(却下/承認の取り消し)。実ハンドラ(undo)へ結線。 */
   onReopen: (item: PendingItem) => void;
   /** 却下する。実ハンドラ(decide 却下)へ結線(本番は理由メモを持たない)。 */
@@ -75,10 +78,22 @@ function statusOf(item: PendingItem, decided: Record<string, Choice | undefined>
   const choice = decided[item.id];
   if (choice === "承認") return "adopted";
   if (choice === "却下") return "rejected";
+  if (choice === "実行中") return "running";
+  if (choice === "実行済み") return "executed";
   if (item.stage === "approved") return "adopted";
   if (item.stage === "completed") return "completed";
+  if (item.stage === "in_progress") return "running";
+  if (item.stage === "executed") return "executed";
   if (item.stage === "rejected") return "rejected";
   return "pending";
+}
+
+function formatDate(ms: number): string {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
 }
 
 export function ProposalView({
@@ -111,6 +126,10 @@ export function ProposalView({
     status,
     items: filteredProposals.filter((p) => statusOf(p, decided) === status),
   })).filter((g) => g.items.length > 0);
+  const statusCounts = ORDER.map((status) => ({
+    status,
+    count: filteredProposals.filter((item) => statusOf(item, decided) === status).length,
+  }));
 
   return (
     <section aria-label="施策レーン" className="flex h-full min-h-0">
@@ -124,6 +143,15 @@ export function ProposalView({
           <button type="button" onClick={onOpenForm} className="approve-btn-ghost ml-auto">
             <IconPlus size={13} /> 手動で追加
           </button>
+        </div>
+
+        <div aria-label="施策ステータス集計" className="grid grid-cols-3 gap-1.5 px-3 py-3" style={{ borderBottom: "1px solid var(--p-border)" }}>
+          {statusCounts.map(({ status, count }) => (
+            <div key={status} className="rounded-[9px] px-2 py-2" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+              <div className="text-[15px] font-semibold tabular-nums">{count}</div>
+              <div className="truncate text-[9.5px]" style={{ color: STATUS_META[status].tone }}>{STATUS_META[status].label}</div>
+            </div>
+          ))}
         </div>
 
         {/* 種別フィルタ chip 行 */}
@@ -201,6 +229,7 @@ export function ProposalView({
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[13.5px] font-medium">{p.title}</span>
+                    {p.score != null ? <span className="ml-auto shrink-0 text-[10px] tabular-nums" style={{ color: "var(--p-accent)" }}>優先度 {p.score}</span> : null}
                   </span>
                   {p.subtitle && (
                     <span
@@ -235,6 +264,7 @@ export function ProposalView({
               onApprove(active);
               setShowDetailMobile(false);
             }}
+            onProgress={(decision) => onApprove(active, decision)}
             onReopen={() => {
               onReopen(active);
               setShowDetailMobile(false);
@@ -257,14 +287,41 @@ interface ProposalDetailProps {
   status: ProposalTriageStatus;
   token: string;
   onApprove: () => void;
+  onProgress: (decision: Extract<Choice, "実行中" | "実行済み">) => void | Promise<void>;
   onReopen: () => void;
   onReject: () => void;
   onBack: () => void;
 }
 
-function ProposalDetail({ item, kind, status, token, onApprove, onReopen, onReject, onBack }: ProposalDetailProps) {
+function ProposalDetail({ item, kind, status, token, onApprove, onProgress, onReopen, onReject, onBack }: ProposalDetailProps) {
+  const [isProgressSaving, setIsProgressSaving] = useState(false);
   const DetailKindIcon = KIND_ICON[kind];
   const outcome = approveOutcomeFor(kind);
+  const progressIndex: Record<ProposalTriageStatus, number> = {
+    pending: 0,
+    rejected: 0,
+    adopted: 1,
+    completed: 2,
+    running: 3,
+    executed: 4,
+  };
+  const nextAction: Record<ProposalTriageStatus, string> = {
+    pending: "内容と仮説を確認し、承認するか判断します。",
+    rejected: "必要なら未処理へ戻して、内容を再検討します。",
+    adopted: "成果物が作成されるまで待ち、完成後に内容を確認します。",
+    completed: "成果物を確認し、実行を開始するか完了として記録します。",
+    running: "実際の反映や運用が完了したら、実行済みに更新します。",
+    executed: "観測期間後に成果を確認し、次の施策へつなげます。",
+  };
+  async function handleProgress(decision: Extract<Choice, "実行中" | "実行済み">): Promise<void> {
+    if (isProgressSaving) return;
+    setIsProgressSaving(true);
+    try {
+      await onProgress(decision);
+    } finally {
+      setIsProgressSaving(false);
+    }
+  }
   return (
     <motion.div
       key={item.id}
@@ -295,9 +352,16 @@ function ProposalDetail({ item, kind, status, token, onApprove, onReopen, onReje
           </span>
         )}
         <h1 className="mt-3 text-[19px] font-semibold leading-snug tracking-tight">{item.title}</h1>
+        <div className="mt-4">
+          <ProgressStepper label="施策進捗" steps={["提案", "承認", "成果物化", "実行中", "実行済み"]} currentIndex={progressIndex[status]} />
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <section className="mb-5 rounded-[12px] p-4" style={{ background: "linear-gradient(135deg, var(--p-accent-weak), var(--p-bg-raised))", border: "1px solid var(--p-border-strong)" }}>
+          <div className="text-[10px] font-semibold tracking-[0.15em]" style={{ color: "var(--p-accent)" }}>次にやること</div>
+          <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--p-text-2)" }}>{nextAction[status]}</p>
+        </section>
         <ProposalDetailBody item={item} kind={kind} token={token} />
       </div>
 
@@ -319,8 +383,36 @@ function ProposalDetail({ item, kind, status, token, onApprove, onReopen, onReje
             </button>
           </div>
         ) : status === "completed" ? (
-          <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-accent)" }}>
-            <IconCheck size={13} /> 成果物化済み
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-accent)" }}>
+              <IconCheck size={13} /> 成果物化済み。実行状態を更新できます。
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void handleProgress("実行中")} disabled={isProgressSaving} className="approve-btn-ghost disabled:opacity-50">
+                実行中にする
+              </button>
+              <button type="button" onClick={() => void handleProgress("実行済み")} disabled={isProgressSaving} className="approve-btn-primary disabled:opacity-50">
+                実行済みにする
+              </button>
+            </div>
+          </div>
+        ) : status === "running" ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--p-accent)" }}>
+              <IconCheck size={13} /> 実行中
+            </div>
+            <button type="button" onClick={() => void handleProgress("実行済み")} disabled={isProgressSaving} className="approve-btn-primary self-start disabled:opacity-50">
+              実行済みにする
+            </button>
+          </div>
+        ) : status === "executed" ? (
+          <div className="flex flex-col gap-1.5 text-[12px]" style={{ color: "var(--p-green)" }}>
+            <div className="flex items-center gap-1.5">
+              <IconCheck size={13} /> 実行済み
+            </div>
+            {item.executedAtMs == null ? null : (
+              <div style={{ color: "var(--p-text-3)" }}>完了日時 {formatDate(item.executedAtMs)}</div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col">

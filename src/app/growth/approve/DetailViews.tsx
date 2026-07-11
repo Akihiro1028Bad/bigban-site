@@ -55,7 +55,7 @@ export function PromptView({ prompt, refs }: PromptViewProps) {
         >
           {/* #212: 生成メモも左ペインと同じ Markdown 整形で表示する(プレーンは段落として描画)。 */}
           <div
-            className="prose prose-invert prose-sm max-w-none"
+            className="prompt-markdown max-w-none"
             dangerouslySetInnerHTML={{ __html: renderPromptMarkdown(prompt) }}
           />
         </div>

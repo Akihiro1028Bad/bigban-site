@@ -61,6 +61,37 @@
   letter-spacing: 0.1px;
 }
 
+.console-card,
+.console-panel {
+  border: 1px solid var(--p-border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--p-bg-elevated), var(--p-bg-raised));
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.16);
+}
+.console-card {
+  padding: 16px;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.console-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--p-border-strong);
+  background: var(--p-bg-raised);
+}
+.console-card:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+}
+.console-panel { padding: 18px; }
+.console-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--p-text-2);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .04em;
+}
+
 /* 編集モーダル root: トークン継承＋基本の色/フォントだけ与える(レイアウトは各要素の Tailwind に委ねる)。 */
 .approve-theme-scope {
   color: var(--p-text);
@@ -298,6 +329,129 @@
   font-size: 12.5px;
   color: var(--p-text-3);
   text-align: center;
+}
+
+/* プロンプト／参考ドキュメント専用の Markdown タイポグラフィ。
+   growth.css はサイト本体の Typography plugin を意図的に読み込まないため、`prose` に
+   依存せずここで完結させる。記事プレビューとリッチエディタ(`.approve-article`)には
+   このクラスを付けないため、本文の表示・編集スタイルへ波及しない。 */
+.prompt-markdown {
+  color: var(--p-text-2);
+  font-size: 14px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.prompt-markdown > :first-child { margin-top: 0; }
+.prompt-markdown > :last-child { margin-bottom: 0; }
+.prompt-markdown h1,
+.prompt-markdown h2,
+.prompt-markdown h3,
+.prompt-markdown h4 {
+  color: var(--p-text);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.prompt-markdown h1 {
+  margin: 0 0 1em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid var(--p-border-strong);
+  font-size: 24px;
+}
+.prompt-markdown h2 {
+  margin: 2.1em 0 0.75em;
+  padding: 0.15em 0 0.15em 0.65em;
+  border-left: 3px solid var(--p-accent);
+  font-size: 19px;
+}
+.prompt-markdown h3 {
+  margin: 1.7em 0 0.6em;
+  font-size: 16px;
+}
+.prompt-markdown h4 {
+  margin: 1.4em 0 0.5em;
+  font-size: 14px;
+}
+.prompt-markdown p { margin: 0 0 1em; }
+.prompt-markdown strong {
+  color: var(--p-text);
+  font-weight: 700;
+}
+.prompt-markdown ul,
+.prompt-markdown ol {
+  margin: 0 0 1.2em;
+  padding-left: 1.6em;
+}
+.prompt-markdown ul { list-style: disc; }
+.prompt-markdown ol { list-style: decimal; }
+.prompt-markdown li { margin: 0.35em 0; }
+.prompt-markdown li::marker { color: var(--p-accent); }
+.prompt-markdown li > ul,
+.prompt-markdown li > ol { margin: 0.35em 0; }
+.prompt-markdown a {
+  color: var(--p-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--p-accent) 45%, transparent);
+  text-underline-offset: 3px;
+}
+.prompt-markdown a:hover { text-decoration-color: var(--p-accent); }
+.prompt-markdown blockquote {
+  margin: 1.4em 0;
+  padding: 0.8em 1em;
+  border-left: 3px solid var(--p-accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--p-accent-weak);
+  color: var(--p-text-2);
+}
+.prompt-markdown blockquote > :last-child { margin-bottom: 0; }
+.prompt-markdown code {
+  border: 1px solid var(--p-border);
+  border-radius: 5px;
+  background: var(--p-bg-input);
+  padding: 0.1em 0.35em;
+  color: var(--p-text);
+  font-family: var(--p-mono);
+  font-size: 0.9em;
+}
+.prompt-markdown pre {
+  margin: 1.3em 0;
+  overflow-x: auto;
+  border: 1px solid var(--p-border);
+  border-radius: 10px;
+  background: var(--p-bg-input);
+  padding: 14px 16px;
+  color: var(--p-text-2);
+  line-height: 1.65;
+}
+.prompt-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 12.5px;
+}
+.prompt-markdown hr {
+  margin: 2em 0;
+  border: 0;
+  border-top: 1px solid var(--p-border-strong);
+}
+.prompt-markdown table {
+  width: 100%;
+  margin: 1.4em 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.prompt-markdown th,
+.prompt-markdown td {
+  border: 1px solid var(--p-border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.prompt-markdown th {
+  background: var(--p-bg-raised);
+  color: var(--p-text);
+  font-weight: 700;
 }
 
 /* 記事本文の装飾クラス(#UI: リッチエディタ内でその場で見える管理画面版)。

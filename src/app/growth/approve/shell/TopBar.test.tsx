@@ -31,6 +31,8 @@ function setup(over: Partial<Parameters<typeof TopBar>[0]> = {}) {
       onOpenProposal={onOpenProposal}
       density="comfortable"
       onToggleDensity={onToggleDensity}
+      showSegments
+      showSearch
       {...over}
     />,
   );
@@ -71,6 +73,12 @@ describe("TopBar", () => {
   it("検索 placeholder を view に応じて差し替えられる", () => {
     setup({ searchPlaceholder: "資料を検索…" });
     expect(screen.getByPlaceholderText("資料を検索…")).toBeInTheDocument();
+  });
+
+  it("不要な画面では段階フィルタと検索を隠せる", () => {
+    setup({ showSegments: false, showSearch: false });
+    expect(screen.queryByRole("group", { name: "段階フィルタ" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "検索" })).not.toBeInTheDocument();
   });
 
   it("統計ピル(あなた待ち/公開済み)を表示する", () => {

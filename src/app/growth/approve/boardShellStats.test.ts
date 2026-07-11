@@ -46,6 +46,16 @@ describe("deriveShellCounts", () => {
     expect(c.awaiting).toBe(0);
     expect(c.segmentCounts.all).toBe(0);
   });
+
+  it("実行管理段階の施策は未処理件数に含めない", () => {
+    const c = deriveShellCounts([
+      item({ id: "completed", kind: "proposal", stage: "completed" }),
+      item({ id: "running", kind: "proposal", stage: "in_progress" }),
+      item({ id: "executed", kind: "proposal", stage: "executed" }),
+    ], {});
+    expect(c.proposalPending).toBe(0);
+    expect(c.awaiting).toBe(0);
+  });
 });
 
 describe("syncAgoLabel", () => {

@@ -3,7 +3,6 @@
  * 構成案 / プロンプト・参照 / プレビュー / 画像。
  */
 "use client";
-
 import { useState } from "react";
 
 import { stripTags } from "./bodyBlocks";
@@ -291,4 +290,3 @@ export function ImagesView({
     </div>
   );
 }
-

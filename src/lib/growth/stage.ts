@@ -19,6 +19,8 @@ export type ProposalStage =
   | "untouched" // 未処理
   | "approved" // 承認
   | "completed" // 成果物化済
+  | "in_progress" // 実行中
+  | "executed" // 実行済み
   | "rejected"; // 却下
 
 export type Stage = ArticleStage | ProposalStage;
@@ -50,6 +52,8 @@ const PROPOSAL_STAGE_BY_STATUS: Record<string, ProposalStage> = {
   未処理: "untouched",
   承認: "approved",
   成果物化済: "completed",
+  実行中: "in_progress",
+  実行済み: "executed",
   却下: "rejected",
 };
 

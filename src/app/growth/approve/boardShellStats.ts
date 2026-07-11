@@ -24,7 +24,13 @@ export interface ShellCounts {
 
 // published/rejected は「あなたのアクション待ち」に含まない段階。isActionable は
 // isAwaitingDownstream(queued/generating/approved)のみ除外するため、ここで追加除外する。
-const TERMINAL_STAGES: ReadonlySet<string> = new Set(["published", "rejected"]);
+const TERMINAL_STAGES: ReadonlySet<string> = new Set([
+  "published",
+  "rejected",
+  "completed",
+  "in_progress",
+  "executed",
+]);
 
 /** TopBar 段階セグメント / 統計ピル / LeftRail バッジの件数を一括算出する。 */
 export function deriveShellCounts(

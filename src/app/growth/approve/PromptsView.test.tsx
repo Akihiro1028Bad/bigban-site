@@ -106,6 +106,8 @@ describe("PromptsView", () => {
     // Markdown は整形表示: 見出しは h2、本文は生の "## " を含む pre ではない
     const heading = screen.getByRole("heading", { level: 2, name: "下書き見出し" });
     expect(heading).toBeInTheDocument();
+    expect(heading.closest(".prompt-markdown")).not.toBeNull();
+    expect(heading.closest(".approve-article")).toBeNull();
     expect(screen.getByText("下書きの指示本文")).toBeInTheDocument();
     expect(container.querySelector("pre")).toBeNull();
     // meta「下書きを作るとき」は右ペインとボタンの両方に出るため getAllByText で確認
@@ -223,7 +225,7 @@ describe("PromptsView", () => {
     );
     vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
     renderWithClient(<PromptsView token="t" query="" />);
-    expect(await screen.findByRole("heading", { level: 3, name: "下書き生成" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "下書き生成" })).toBeInTheDocument();
     expect(screen.getAllByText("scripts/growth/prompts/drafts.md").length).toBeGreaterThan(0);
     expect(screen.getByText("承認済みの記事ネタを下書きHTMLへ変換する")).toBeInTheDocument();
     expect(screen.getAllByText("下書き生成").length).toBeGreaterThan(0);
@@ -275,7 +277,7 @@ describe("PromptsView", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("heading", { level: 3, name: "グロース正典" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
   });
 
   it("資料選択時に doc query を更新し、既存 view query は保持する", async () => {
@@ -303,7 +305,7 @@ describe("PromptsView", () => {
       "/growth/approve?view=prompt&doc=docs%2Foperations%2Fgrowth%2F00-canon.md",
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
-    expect(await screen.findByRole("heading", { level: 3, name: "グロース正典" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "プロンプト本文" }).className).toContain("block");
 
     window.history.replaceState(
@@ -312,7 +314,7 @@ describe("PromptsView", () => {
       "/growth/approve?view=prompt&doc=scripts%2Fgrowth%2Fprompts%2Fweekly.md",
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
-    expect(await screen.findByRole("heading", { level: 3, name: "週次分析" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "週次分析" })).toBeInTheDocument();
   });
 
   it("rendered/raw 切替と H2/H3 目次を表示する", async () => {
@@ -367,7 +369,7 @@ describe("PromptsView", () => {
     renderWithClient(<PromptsView token="t" query="" />);
     fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
     fireEvent.click(screen.getByRole("link", { name: "正典" }));
-    expect(screen.getByRole("heading", { level: 3, name: "グロース正典" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("doc")).toBe(
       "docs/operations/growth/00-canon.md",
     );
@@ -387,7 +389,7 @@ describe("PromptsView", () => {
     );
     link.focus();
     await user.keyboard("{Enter}");
-    expect(await screen.findByRole("heading", { level: 3, name: "グロース正典" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
     expect(pushState).toHaveBeenCalled();
   });
 });

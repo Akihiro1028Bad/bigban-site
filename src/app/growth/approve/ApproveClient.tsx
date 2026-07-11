@@ -71,13 +71,14 @@ import type { BodyImageInsertChoice } from "./BodyImageInsertModal";
 import type { BodyImageRegenInput, BodyImageRegenTarget } from "./bodyRegenRequest";
 import { buildBodyRegenBody } from "./bodyRegenRequest";
 import { BodyImageRegenModal } from "./BodyImageRegenModal";
-import { PromptsView } from "./PromptsView";
-import { ModelSettingsView } from "./ModelSettingsView";
 import { ProposalView } from "./ProposalView";
 import { ProposalFormModal } from "./ProposalFormModal";
 import { nextReviewId } from "./reviewNav";
-import { decideInitialView, initialDraftFromUrl, parseView } from "./viewRouting";
-import type { ApproveView } from "./viewRouting";
+import { DashboardView } from "./DashboardView";
+import { SettingsView } from "./SettingsView";
+import { dashboardViewOf } from "./homeDashboard";
+import { decideInitialView, initialDraftFromUrl, parseSettingsSection, resolveLegacyView, viewLocation } from "./viewRouting";
+import type { ApproveView, SettingsSection } from "./viewRouting";
 import { deriveShellCounts, syncAgoLabel } from "./boardShellStats";
 import type { ShellSegmentKey } from "./boardShellStats";
 import { matchesSegment, SHELL_SEGMENTS } from "./shellNav";
@@ -126,15 +127,21 @@ function byScoreDesc(a: PendingItem, b: PendingItem): number {
 function initialViewFromUrl(): ApproveView | null {
   /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
   if (typeof window === "undefined") return null;
-  return parseView(new URLSearchParams(window.location.search).get("view"));
+  const raw = new URLSearchParams(window.location.search).get("view");
+  return resolveLegacyView(raw).view ?? "home";
+}
+
+function initialSettingsSectionFromUrl(): SettingsSection {
+  if (typeof window === "undefined") return "models";
+  const params = new URLSearchParams(window.location.search);
+  const legacy = resolveLegacyView(params.get("view"));
+  return legacy.section ?? parseSettingsSection(params.get("section"));
 }
 
 // タブ切替は履歴を汚さないよう replaceState で現在エントリを置換する(pushState にしない)。
 // 戻る/進むで ?view が変わるのは別ページ遷移時のみで、その際は再マウントで同期される。
-function writeViewParam(view: ApproveView): void {
-  const params = new URLSearchParams(window.location.search);
-  params.set("view", view);
-  window.history.replaceState(null, "", `?${params.toString()}`);
+function writeViewParam(view: ApproveView, settingsSection: SettingsSection): void {
+  window.history.replaceState(null, "", viewLocation(window.location.href, view, settingsSection));
 }
 
 export function ApproveClient() {
@@ -193,6 +200,7 @@ export function ApproveClient() {
   const [density, setDensity] = useState<Density>("comfortable");
   // #119: 表示タブ(施策/記事)。URL 指定があれば同期確定、無ければ null(読込後に自動選択)。
   const [view, setView] = useState<ApproveView | null>(initialViewFromUrl);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>(initialSettingsSectionFromUrl);
   // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
   // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
   const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
@@ -205,6 +213,7 @@ export function ApproveClient() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // #P5a: 施策作成モーダル(proto ProposalFormModal)の開閉。旧 AddProposalForm(inline details)を置換。
   const [proposalFormOpen, setProposalFormOpen] = useState(false);
+  const [proposalSeed, setProposalSeed] = useState<{ name: string; note: string } | null>(null);
   const [message, setMessage] = useState("");
   // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
   const [busy, setBusy] = useState(authDisabled);
@@ -286,7 +295,15 @@ export function ApproveClient() {
     setView(next);
     setViewPinned(true);
     setFocusedIndex(-1);
-    writeViewParam(next);
+    writeViewParam(next, settingsSection);
+  }, [settingsSection]);
+
+  const changeSettingsSection = useCallback((next: SettingsSection): void => {
+    setSettingsSection(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "settings");
+    url.searchParams.set("section", next);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   // #proto P1: 段階セグメント変更。非 approve view で段階を選んだら approve view へ遷移しフィルタ適用。
@@ -722,7 +739,7 @@ export function ApproveClient() {
   const boardGroups = groupByBoardStage(visibleIdeas);
 
   // #proto P1: 表示中 view(未確定時は施策を既定描画)。
-  const activeView: ApproveView = view ?? "proposal";
+  const activeView: ApproveView = view ?? "home";
   const opsIssueCount =
     (opsQuery.data?.recentFailures.length ?? 0) +
     (opsQuery.data?.reconcileFindings.length ?? 0) +
@@ -743,6 +760,7 @@ export function ApproveClient() {
     )
     .slice(0, 5);
   const currentWorkerTarget = opsQuery.data?.currentTargets[0] ?? activityTargets[0] ?? null;
+  const dashboardSummary = dashboardViewOf(items, decided);
 
   // #proto P2: 検索絞り込みで active view が0件になったら SearchEmpty を出す
   // (元データはあるのに検索で消えた状態を「該当なし」として明示する)。
@@ -1124,6 +1142,9 @@ export function ApproveClient() {
   // 親が配置する。2段タブ DetailPanel(proto 移植)へ本番データ・主操作・相談導線を結線する。
   function renderDetailPanel(item: PendingItem) {
     const stage = deriveBoardStage(item);
+    const savedDecision = decided[item.id];
+    const articleDecision: "承認" | "却下" | undefined =
+      savedDecision === "承認" || savedDecision === "却下" ? savedDecision : undefined;
     // 本文編集の起点(下書きを編集)は draft ready のときだけ DetailPanel が描画する。
     // ready でないときは空文字(この経路は UI 到達しない)。
     const readyBodyHtml = draftState.status === "ready" ? draftState.draft.bodyHtml : "";
@@ -1131,7 +1152,7 @@ export function ApproveClient() {
       <DetailPanel
         item={item}
         stage={stage}
-        badgeLabel={detailBadge(item, decided[item.id]).label}
+        badgeLabel={detailBadge(item, articleDecision).label}
         kindLabel={KIND_BADGE[item.kind]}
         details={item.details}
         tab={detailTab}
@@ -1145,7 +1166,7 @@ export function ApproveClient() {
         onRevert={() => openConfirm(item)}
         revertDisabled={isReviseBusy(item.reviseStatus)}
         decisionsDisabled={isReviseBusy(item.reviseStatus)}
-        decision={decided[item.id]}
+        decision={articleDecision}
         onUndo={() => void undo(item)}
         onEdit={() => startEditDraft(readyBodyHtml)}
         prompt={item.subtitle || "この記事の生成メモはまだありません。"}
@@ -1227,13 +1248,13 @@ export function ApproveClient() {
   }));
   // #proto P1: 各 view の tabpanel a11y ラベル(従来のセクション region と別に panel 全体を識別)。
   const viewPanelLabel: Record<ApproveView, string> = {
+    home: "ホーム",
     proposal: "施策",
-    approve: "記事",
-    prompt: "プロンプト",
-    models: "AIモデル",
+    approve: "記事制作",
+    settings: "AI設定",
     performance: "成績",
-    queue: "公開キュー",
-    ops: "運用",
+    queue: "公開",
+    ops: "運用状況",
   };
 
   // #proto P1: proto 固定シェル(position:fixed; inset:0)。MotionConfig で OS の motion 設定を尊重。
@@ -1245,7 +1266,7 @@ export function ApproveClient() {
           segment={segment}
           segments={topBarSegments}
           query={query}
-          searchPlaceholder={activeView === "prompt" ? "資料を検索…" : "記事を検索…"}
+          searchPlaceholder={activeView === "settings" ? "資料を検索…" : activeView === "proposal" ? "施策を検索…" : "記事を検索…"}
           awaitingCount={counts.awaiting}
           publishedTotal={counts.publishedTotal}
           onSegmentChange={handleSegmentChange}
@@ -1255,9 +1276,14 @@ export function ApproveClient() {
           syncStale={sync.stale}
           syncing={syncing}
           onRefresh={() => void pollBoard()}
-          onOpenProposal={() => changeView("proposal")}
+          onOpenProposal={() => {
+            setProposalSeed(null);
+            setProposalFormOpen(true);
+          }}
           density={density}
           onToggleDensity={handleToggleDensity}
+          showSegments={activeView === "approve"}
+          showSearch={activeView === "approve" || activeView === "proposal" || (activeView === "settings" && settingsSection === "prompts")}
         />
 
         {currentWorkerTarget ? (
@@ -1309,7 +1335,22 @@ export function ApproveClient() {
             {/* #Task2: 盤が完全空 かつ 施策/記事 view のときは、その view の通常コンテンツの代わりに
                 空状態(達成感メッセージ＋施策追加フォーム)を出す。プロンプト/成績/公開キューは
                 各自が空を扱えるため通常描画のままにし、ナビ移動を妨げない。 */}
-            {boardEmpty && (activeView === "approve" || activeView === "proposal") ? (
+            {activeView === "home" ? (
+              <DashboardView
+                summary={dashboardSummary}
+                ops={opsQuery.data ?? null}
+                isOpsLoading={opsQuery.isLoading}
+                opsError={opsQuery.error ? toMessage(opsQuery.error, "運用状態の取得に失敗しました。") : null}
+                onNavigate={(next, nextSegment) => {
+                  if (nextSegment) setSegment(nextSegment);
+                  changeView(next);
+                }}
+                onAddProposal={() => {
+                  setProposalSeed(null);
+                  setProposalFormOpen(true);
+                }}
+              />
+            ) : boardEmpty && (activeView === "approve" || activeView === "proposal") ? (
               <EmptyGateContent token={token} onAdded={addProposal} />
             ) : activeView === "approve" ? (
               // #proto P3a: approve view は「単一リスト(左)＋詳細ペイン(右)」の2ペイン。
@@ -1372,17 +1413,27 @@ export function ApproveClient() {
                 decided={decided}
                 activeId={activeId}
                 onActivate={setActiveId}
-                onApprove={(item) => void decide(item, "承認")}
+                onApprove={(item, decision = "承認") => decide(item, decision)}
                 onReopen={(item) => void undo(item)}
                 onReject={(item) => void decide(item, "却下")}
-                onOpenForm={() => setProposalFormOpen(true)}
+                onOpenForm={() => {
+                  setProposalSeed(null);
+                  setProposalFormOpen(true);
+                }}
               />
-            ) : activeView === "prompt" ? (
-              <PromptsView token={token} query={query} />
-            ) : activeView === "models" ? (
-              <ModelSettingsView token={token} />
+            ) : activeView === "settings" ? (
+              <SettingsView token={token} query={query} section={settingsSection} onSectionChange={changeSettingsSection} />
             ) : activeView === "performance" ? (
-              <PerformanceBoard items={ideas} />
+              <PerformanceBoard
+                items={ideas}
+                onAddIdea={(item) => {
+                  setProposalSeed({
+                    name: `${item.title}の改善施策`,
+                    note: "成績ボードの観測結果をもとに、検索意図・タイトル・導線を再検討する。",
+                  });
+                  setProposalFormOpen(true);
+                }}
+              />
             ) : activeView === "queue" ? (
               <PublishQueue
                 items={ideas}
@@ -1424,7 +1475,12 @@ export function ApproveClient() {
         {proposalFormOpen ? (
           <ProposalFormModal
             token={token}
-            onClose={() => setProposalFormOpen(false)}
+            initialName={proposalSeed?.name}
+            initialNote={proposalSeed?.note}
+            onClose={() => {
+              setProposalFormOpen(false);
+              setProposalSeed(null);
+            }}
             onAdded={addProposal}
           />
         ) : null}

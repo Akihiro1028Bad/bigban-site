@@ -54,6 +54,14 @@ describe("deriveProposalStage", () => {
     expect(deriveProposalStage("成果物化済")).toBe("completed");
   });
 
+  it("実行中 → in_progress", () => {
+    expect(deriveProposalStage("実行中")).toBe("in_progress");
+  });
+
+  it("実行済み → executed", () => {
+    expect(deriveProposalStage("実行済み")).toBe("executed");
+  });
+
   it("未知ステータスは untouched に倒す", () => {
     expect(deriveProposalStage("謎")).toBe("untouched");
   });

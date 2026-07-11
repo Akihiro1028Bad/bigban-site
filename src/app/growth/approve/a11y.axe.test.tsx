@@ -278,8 +278,8 @@ describe("承認画面 a11y 監査(axe・jsdom 構造系のみ)", () => {
     });
     const { container } = render(<ApproveClient />);
     await login();
-    await selectView(/公開キュー/);
-    expect(screen.getByRole("main")).toHaveAttribute("aria-label", "公開キュー");
+    await selectView(/^公開$/);
+    expect(screen.getByRole("main")).toHaveAttribute("aria-label", "公開");
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
@@ -288,7 +288,8 @@ describe("承認画面 a11y 監査(axe・jsdom 構造系のみ)", () => {
     mockFetchSequence({ json: { success: true, items: [ideaItem()] } });
     const { container } = render(<ApproveClient />);
     await login();
-    await selectView(/プロンプト/);
+    await selectView(/AI設定/);
+    await userEvent.click(screen.getByRole("tab", { name: "プロンプト" }));
     // PromptsView 実体が描画されたことを確認してから監査する(スタブではない)。
     await screen.findByRole("navigation", { name: "プロンプト一覧" });
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();

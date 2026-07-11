@@ -1,9 +1,19 @@
 import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
-import { buildJobs, msUntilNextDue, selectDueJobs, type DaemonJob } from "./daemonSchedule";
+import {
+  buildJobs,
+  lastRunAfterAttempt,
+  msUntilNextDue,
+  restoreLastRun,
+  selectDueJobs,
+  type DaemonJob,
+} from "./daemonSchedule";
 
 const MIN_SLEEP_MS = 1_000;
 const MAX_SLEEP_MS = 60_000;
+const LAST_RUN_PATH = join(process.cwd(), ".growth-tmp", "daemon-last-run.json");
 
 let isStopping = false;
 let wakeSleep: (() => void) | null = null;
@@ -14,6 +24,21 @@ function timestamp(): string {
 
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
+}
+
+function loadLastRun(): unknown {
+  try {
+    return JSON.parse(readFileSync(LAST_RUN_PATH, "utf8")) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveLastRun(lastRun: Readonly<Record<string, number>>): void {
+  mkdirSync(dirname(LAST_RUN_PATH), { recursive: true });
+  const temporaryPath = `${LAST_RUN_PATH}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(lastRun)}\n`, "utf8");
+  renameSync(temporaryPath, LAST_RUN_PATH);
 }
 
 function writeHeartbeat(detail: string, currentJob = ""): void {
@@ -93,7 +118,8 @@ async function main(): Promise<void> {
   installSignalHandlers();
 
   const jobs = buildJobs(process.env);
-  const lastRun: Record<string, number> = {};
+  const lastRun = restoreLastRun(jobs, loadLastRun(), Date.now());
+  saveLastRun(lastRun);
 
   log("growth daemon jobs:");
   for (const job of jobs) {
@@ -114,7 +140,8 @@ async function main(): Promise<void> {
       const mark = exitCode === 0 ? "✓" : "✗";
       log(`[${timestamp()}] ${mark} ${job.name} (exit ${exitCode})`);
       writeHeartbeat(`idle exit=${exitCode}`, job.name);
-      lastRun[job.name] = Date.now();
+      lastRun[job.name] = lastRunAfterAttempt(job, Date.now(), exitCode === 0);
+      saveLastRun(lastRun);
     }
 
     if (isStopping) break;

@@ -32,6 +32,7 @@ export function splitPublishQueue(items: readonly PendingItem[]): PublishQueueSp
     if (item.scheduledAtMs != null) scheduled.push(item);
     else ready.push(item);
   }
+  scheduled.sort((a, b) => (a.scheduledAtMs ?? 0) - (b.scheduledAtMs ?? 0));
   return { ready, scheduled, blocked };
 }
 
@@ -72,11 +73,16 @@ export interface SchedulePreset {
 /**
  * proto の予約プリセット(今夜21:00 / 明日09:00 / 明日12:00 / 来週月曜09:00)を
  * `nowMs` 注入の決定的純関数として返す。
- * proto 同様「今夜21:00」は当日の21:00をそのまま指す(21時を過ぎていてもロールしない)。
+ * 「今夜21:00」が現在以前なら翌日21:00へ送り、過去時刻を返さない。
  */
 export function schedulePresets(nowMs: number): SchedulePreset[] {
+  const tonight = atTime(nowMs, 0, 21);
+  const isTomorrowNight = tonight.getTime() <= nowMs;
   return [
-    { label: "今夜 21:00", atMs: atTime(nowMs, 0, 21).getTime() },
+    {
+      label: isTomorrowNight ? "明日 21:00" : "今夜 21:00",
+      atMs: isTomorrowNight ? atTime(nowMs, 1, 21).getTime() : tonight.getTime(),
+    },
     { label: "明日 09:00", atMs: atTime(nowMs, 1, 9).getTime() },
     { label: "明日 12:00", atMs: atTime(nowMs, 1, 12).getTime() },
     { label: "来週月曜 09:00", atMs: nextMonday(nowMs).getTime() },

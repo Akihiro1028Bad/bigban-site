@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { DRAFT_READY_STATUS, parseDecisions, toPendingItems } from "@/lib/growth/approve";
-import { defaultFetch, getPage, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
+import { defaultFetch, getPage, queryDataSource, updatePageProps } from "@/lib/growth/notion";
 import type { NotionPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -20,6 +20,7 @@ export const runtime = "nodejs";
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460"; // 施策提案
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
+const EXECUTED_AT_PROP = "実行完了日時";
 
 function serverError(): Response {
   return NextResponse.json(
@@ -39,7 +40,7 @@ function statusFilter(value: string): unknown {
 }
 
 // #106/#167: パイプライン盤のため、記事は全段階(提案中/承認=生成待ち/生成中/下書き作成済み/公開済み)を
-// 横断取得する。却下・クローズはアーカイブ扱いで除外(盤から非表示)。公開済みは成否確認のため盤に残す。
+// 横断取得する。却下も取り消し操作のため盤に残す。公開済みは成否確認のため盤に残す。
 function ideaStatusFilter(): unknown {
   return {
     or: [
@@ -48,6 +49,7 @@ function ideaStatusFilter(): unknown {
       statusFilter("生成中"),
       statusFilter(DRAFT_READY_STATUS),
       statusFilter("公開済み"),
+      statusFilter("却下"),
     ],
   };
 }
@@ -55,7 +57,16 @@ function ideaStatusFilter(): unknown {
 // #106: 施策も未処理に加え承認を取得し、盤の施策レーンで段階表示できるようにする。
 // 成果物化済も残し、growth:initiatives 実行後に成果物リンクを確認できるようにする。
 function proposalStatusFilter(): unknown {
-  return { or: [statusFilter("未処理"), statusFilter("承認"), statusFilter("成果物化済")] };
+  return {
+    or: [
+      statusFilter("未処理"),
+      statusFilter("承認"),
+      statusFilter("成果物化済"),
+      statusFilter("実行中"),
+      statusFilter("実行済み"),
+      statusFilter("却下"),
+    ],
+  };
 }
 
 function currentStatus(page: NotionPage): string {
@@ -75,9 +86,19 @@ function isAllowedTransition(page: NotionPage, next: string): boolean {
   if ("施策名" in page.properties) {
     if (current === "未処理") return next === "承認" || next === "却下";
     if (current === "承認" || current === "却下") return next === "未処理";
-    if (current === "成果物化済") return next === "クローズ";
+    if (current === "成果物化済") return next === "実行中" || next === "実行済み" || next === "クローズ";
+    if (current === "実行中") return next === "実行済み" || next === "成果物化済";
+    if (current === "実行済み") return next === "実行中";
   }
   return false;
+}
+
+function decisionProps(decision: string): Record<string, unknown> {
+  const props: Record<string, unknown> = { [STATUS_PROP]: { select: { name: decision } } };
+  if (decision === "実行済み") {
+    props[EXECUTED_AT_PROP] = { date: { start: new Date().toISOString() } };
+  }
+  return props;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -137,7 +158,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     for (const decision of decisions) {
-      await updatePageSelect(decision.id, STATUS_PROP, decision.decision, options);
+      await updatePageProps(decision.id, decisionProps(decision.decision), options);
     }
   } catch {
     // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)

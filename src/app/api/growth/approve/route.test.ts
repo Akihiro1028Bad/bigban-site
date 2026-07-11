@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/growth/notion", () => ({
   getPage: vi.fn(),
   queryDataSource: vi.fn(),
+  updatePageProps: vi.fn(),
   updatePageSelect: vi.fn(),
   defaultFetch: vi.fn(),
 }));
@@ -16,7 +17,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { getPage, queryDataSource, updatePageSelect } from "@/lib/growth/notion";
+import { getPage, queryDataSource, updatePageProps, updatePageSelect } from "@/lib/growth/notion";
 import { GET, POST } from "./route";
 
 const SECRET = "approve-secret-token";
@@ -43,6 +44,7 @@ beforeEach(() => {
   process.env.NOTION_TOKEN = "secret_notion";
   vi.mocked(queryDataSource).mockReset();
   vi.mocked(getPage).mockReset();
+  vi.mocked(updatePageProps).mockReset();
   vi.mocked(updatePageSelect).mockReset();
 });
 
@@ -89,7 +91,7 @@ describe("GET", () => {
     expect(queryDataSource).toHaveBeenCalledTimes(2);
   });
 
-  it("記事は全段階(提案中/承認/生成中/下書き作成済み/公開済み)を横断取得する(#106/#167)", async () => {
+  it("記事は却下を含む全管理状態を横断取得する(#106/#167)", async () => {
     vi.mocked(queryDataSource)
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
@@ -102,11 +104,12 @@ describe("GET", () => {
         { property: "ステータス", select: { equals: "生成中" } },
         { property: "ステータス", select: { equals: "下書き作成済み" } },
         { property: "ステータス", select: { equals: "公開済み" } },
+        { property: "ステータス", select: { equals: "却下" } },
       ],
     });
   });
 
-  it("施策は未処理＋承認＋成果物化済を取得する(#106/#成果物確認)", async () => {
+  it("施策は却下を含む全管理状態を取得する", async () => {
     vi.mocked(queryDataSource)
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
       .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
@@ -117,6 +120,9 @@ describe("GET", () => {
         { property: "ステータス", select: { equals: "未処理" } },
         { property: "ステータス", select: { equals: "承認" } },
         { property: "ステータス", select: { equals: "成果物化済" } },
+        { property: "ステータス", select: { equals: "実行中" } },
+        { property: "ステータス", select: { equals: "実行済み" } },
+        { property: "ステータス", select: { equals: "却下" } },
       ],
     });
   });
@@ -175,7 +181,7 @@ describe("POST", () => {
           "ステータス": { select: { name: "提案中" } },
         },
       });
-    vi.mocked(updatePageSelect).mockResolvedValue("ok");
+    vi.mocked(updatePageProps).mockResolvedValue("ok");
     const res = await POST(
       postRequest(SECRET, {
         decisions: [
@@ -187,11 +193,10 @@ describe("POST", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ success: true, updated: 2 });
-    expect(updatePageSelect).toHaveBeenCalledTimes(2);
-    expect(updatePageSelect).toHaveBeenCalledWith(
+    expect(updatePageProps).toHaveBeenCalledTimes(2);
+    expect(updatePageProps).toHaveBeenCalledWith(
       "38099efa-346b-8122-9681-f4d2cc321a31",
-      "ステータス",
-      "承認",
+      { "ステータス": { select: { name: "承認" } } },
       expect.anything()
     );
   });
@@ -213,6 +218,7 @@ describe("POST", () => {
     );
 
     expect(res.status).toBe(409);
+    expect(updatePageProps).not.toHaveBeenCalled();
     expect(updatePageSelect).not.toHaveBeenCalled();
   });
 
@@ -221,6 +227,7 @@ describe("POST", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toMatch(/不正な id/);
+    expect(updatePageProps).not.toHaveBeenCalled();
     expect(updatePageSelect).not.toHaveBeenCalled();
   });
 
@@ -236,7 +243,15 @@ describe("POST", () => {
   });
 
   it("Notion 更新が失敗したら 502(詳細は返さない)", async () => {
-    vi.mocked(updatePageSelect).mockRejectedValue(new Error("Notion 500: secret detail"));
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31",
+      url: "",
+      properties: {
+        "施策名": { title: [{ plain_text: "施策" }] },
+        "ステータス": { select: { name: "未処理" } },
+      },
+    });
+    vi.mocked(updatePageProps).mockRejectedValue(new Error("Notion 500: secret detail"));
     const res = await POST(
       postRequest(SECRET, {
         decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" }],
@@ -246,6 +261,34 @@ describe("POST", () => {
     const json = await res.json();
     expect(json.error).toBe("更新中にエラーが発生しました");
     expect(json.error).not.toMatch(/secret detail/);
+  });
+
+  it("成果物化済の施策は実行済みに進められ、実行完了日時も保存する", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31",
+      url: "",
+      properties: {
+        "施策名": { title: [{ plain_text: "施策" }] },
+        "ステータス": { select: { name: "成果物化済" } },
+      },
+    });
+    vi.mocked(updatePageProps).mockResolvedValue("ok");
+
+    const res = await POST(
+      postRequest(SECRET, {
+        decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "実行済み" }],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updatePageProps).toHaveBeenCalledWith(
+      "38099efa-346b-8122-9681-f4d2cc321a31",
+      {
+        "ステータス": { select: { name: "実行済み" } },
+        "実行完了日時": { date: { start: expect.any(String) } },
+      },
+      expect.anything()
+    );
   });
 });
 
@@ -272,14 +315,14 @@ describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {
         "ステータス": { select: { name: "未処理" } },
       },
     });
-    vi.mocked(updatePageSelect).mockResolvedValue("ok");
+    vi.mocked(updatePageProps).mockResolvedValue("ok");
     const res = await POST(
       postRequest(null, {
         decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" }],
       })
     );
     expect(res.status).toBe(200);
-    expect(updatePageSelect).toHaveBeenCalledTimes(1);
+    expect(updatePageProps).toHaveBeenCalledTimes(1);
   });
 
   it("認証無効でも NOTION_TOKEN 未設定なら 500", async () => {

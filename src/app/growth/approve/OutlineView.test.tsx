@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-
 import { OutlineView } from "./OutlineView";
 import type { ArticleHypothesis } from "@/lib/growth/approve";
 
@@ -140,4 +139,3 @@ describe("OutlineView", () => {
     expect(screen.queryByText("想定CTA")).not.toBeInTheDocument();
   });
 });
-

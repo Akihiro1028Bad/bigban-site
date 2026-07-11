@@ -92,6 +92,8 @@ export interface PendingItem {
   artifactUrl?: string;
   /** 施策の承認日時(ms)。未記入は null/undefined。施策のみ。 */
   approvedAtMs?: number | null;
+  /** 施策の実行完了日時(ms)。未記入は null/undefined。施策のみ。 */
+  executedAtMs?: number | null;
   /** 記事/施策に紐づく AI 依頼・提案の表示用アクティビティ。 */
   activities?: PendingActivity[];
 }
@@ -189,9 +191,9 @@ const PRIORITY_RANK: Record<string, number> = { 高: 3, 中: 2, 低: 1 };
 export type PendingStatus = "未処理" | "提案中";
 
 /** ステータス更新で指定できる値。承認/却下に加え、取り消し用の承認待ち復帰、終了タスクのクローズ(#167)。 */
-export type DecisionValue = "承認" | "却下" | "クローズ" | PendingStatus;
+export type DecisionValue = "承認" | "却下" | "クローズ" | "成果物化済" | "実行中" | "実行済み" | PendingStatus;
 
-const DECISION_VALUES: readonly DecisionValue[] = ["承認", "却下", "クローズ", "未処理", "提案中"];
+const DECISION_VALUES: readonly DecisionValue[] = ["承認", "却下", "クローズ", "成果物化済", "実行中", "実行済み", "未処理", "提案中"];
 
 export interface Decision {
   id: string;
@@ -342,6 +344,7 @@ export function toPendingItems(
   const proposalItems: PendingItem[] = proposals.map((page) => {
     const artifactUrl = urlText(page, "成果物リンク") || page.url;
     const approvedAtMs = dateStartMs(page, "承認日時");
+    const executedAtMs = dateStartMs(page, "実行完了日時");
     return {
       id: page.id,
       kind: "proposal",
@@ -353,6 +356,7 @@ export function toPendingItems(
       proposalHypothesis: proposalHypothesisOf(page),
       ...(artifactUrl !== "" ? { artifactUrl } : {}),
       ...(approvedAtMs !== null ? { approvedAtMs } : {}),
+      ...(executedAtMs !== null ? { executedAtMs } : {}),
     };
   });
   const ideaItems: PendingItem[] = ideas.map((page) => {
@@ -404,7 +408,7 @@ export function parseDecisions(body: unknown): Decision[] {
       throw new Error("不正な id です。");
     }
     if (!DECISION_VALUES.includes(decision as DecisionValue)) {
-      throw new Error("decision は承認/却下/クローズ/未処理/提案中のみ指定できます。");
+      throw new Error("decision は承認/却下/クローズ/成果物化済/実行中/実行済み/未処理/提案中のみ指定できます。");
     }
     return { id, decision: decision as DecisionValue };
   });

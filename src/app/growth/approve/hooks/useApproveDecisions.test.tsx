@@ -85,4 +85,19 @@ describe("useApproveDecisions 失敗時トースト(#213)", () => {
 
     expect(onError).toHaveBeenCalledWith("取消NG");
   });
+
+  it("施策の実行済みへの更新を保存済み選択として保持する", async () => {
+    postDecisionMock.mockResolvedValue();
+    const onError = vi.fn();
+    const { result } = renderDecisions(onError);
+    const item: PendingItem = { ...ITEM, kind: "proposal", stage: "completed" };
+
+    await act(async () => {
+      await result.current.decide(item, "実行済み");
+    });
+
+    expect(postDecisionMock).toHaveBeenCalledWith("t", item.id, "実行済み");
+    expect(result.current.decided[item.id]).toBe("実行済み");
+    expect(onError).not.toHaveBeenCalled();
+  });
 });

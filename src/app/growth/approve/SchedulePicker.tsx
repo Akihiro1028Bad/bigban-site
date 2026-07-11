@@ -25,6 +25,16 @@ interface SchedulePickerProps {
   onConfirm: (label: string, atMs: number) => void;
 }
 
+function dateTimeLocalValue(atMs: number): string {
+  const date = new Date(atMs);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function hasScheduleExpired(atMs: number): boolean {
+  return atMs <= Date.now();
+}
+
 export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProps) {
   // Task3 純関数でプリセットを算出(日時計算はコンポーネントに書かない)。
   // Date.now() は useState の lazy initializer で「マウント時に一度だけ」評価し固定する
@@ -33,15 +43,26 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
   const presets = useMemo(() => schedulePresets(nowMs), [nowMs]);
 
   const [custom, setCustom] = useState("");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const customAtMs = custom ? new Date(custom).getTime() : Number.NaN;
+  const canConfirmCustom = Number.isFinite(customAtMs) && customAtMs > nowMs;
   const dialogRef = useDialog();
   const customInputId = useId();
 
-  const confirmPreset = (atMs: number) => onConfirm(formatSchedule(new Date(atMs)), atMs);
-  const confirmCustom = () => {
-    if (!custom) return;
-    const atMs = new Date(custom).getTime();
-    if (Number.isNaN(atMs)) return;
+  const handleConfirmPreset = (atMs: number) => {
+    if (hasScheduleExpired(atMs)) {
+      setScheduleError("選択した日時は過ぎています。別の日時を選んでください。");
+      return;
+    }
     onConfirm(formatSchedule(new Date(atMs)), atMs);
+  };
+  const handleConfirmCustom = () => {
+    if (!canConfirmCustom) return;
+    if (hasScheduleExpired(customAtMs)) {
+      setScheduleError("選択した日時は過ぎています。別の日時を選んでください。");
+      return;
+    }
+    onConfirm(formatSchedule(new Date(customAtMs)), customAtMs);
   };
 
   return (
@@ -97,9 +118,9 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
           <div className="grid grid-cols-2 gap-2">
             {presets.map((p) => (
               <button
-                key={p.atMs}
+                key={`${p.label}-${p.atMs}`}
                 type="button"
-                onClick={() => confirmPreset(p.atMs)}
+                onClick={() => handleConfirmPreset(p.atMs)}
                 className="flex items-center gap-2 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition-colors"
                 style={{
                   background: "var(--p-bg-raised)",
@@ -124,8 +145,12 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
             <input
               id={customInputId}
               type="datetime-local"
+              min={dateTimeLocalValue(nowMs)}
               value={custom}
-              onChange={(e) => setCustom(e.target.value)}
+              onChange={(e) => {
+                setCustom(e.target.value);
+                setScheduleError(null);
+              }}
               className="h-[36px] flex-1 rounded-[9px] px-2.5 text-[13px] outline-none"
               style={{
                 background: "var(--p-bg-input)",
@@ -136,14 +161,19 @@ export function SchedulePicker({ count, onClose, onConfirm }: SchedulePickerProp
             />
             <button
               type="button"
-              onClick={confirmCustom}
-              disabled={!custom}
+              onClick={handleConfirmCustom}
+              disabled={!canConfirmCustom}
               className="rounded-[9px] px-4 py-2 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: "var(--p-teal)", color: "#06140d" }}
             >
               予約
             </button>
           </div>
+          {scheduleError ? (
+            <p role="alert" className="text-[12px]" style={{ color: "var(--p-danger)" }}>
+              {scheduleError}
+            </p>
+          ) : null}
         </div>
       </motion.div>
     </div>

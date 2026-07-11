@@ -3,21 +3,47 @@
  * proto MainView 語彙へ統一(施策/記事/プロンプト/成績/公開キュー/運用)。旧 proposals|articles|prompts は廃止。
  */
 
-export type ApproveView = "proposal" | "approve" | "prompt" | "models" | "performance" | "queue" | "ops";
+export type ApproveView = "home" | "proposal" | "approve" | "queue" | "performance" | "settings" | "ops";
+export type SettingsSection = "models" | "prompts";
 
 export const APPROVE_VIEWS: readonly ApproveView[] = [
+  "home",
   "proposal",
   "approve",
-  "prompt",
-  "models",
-  "performance",
   "queue",
+  "performance",
+  "settings",
   "ops",
 ];
 
 /** `?view` の生値を ApproveView に正規化する。未知/欠落は null。 */
 export function parseView(raw: string | null | undefined): ApproveView | null {
   return APPROVE_VIEWS.includes(raw as ApproveView) ? (raw as ApproveView) : null;
+}
+
+export function parseSettingsSection(raw: string | null | undefined): SettingsSection {
+  return raw === "prompts" ? "prompts" : "models";
+}
+
+export function resolveLegacyView(raw: string | null | undefined): {
+  view: ApproveView | null;
+  section: SettingsSection | null;
+} {
+  if (raw === "prompt") return { view: "settings", section: "prompts" };
+  if (raw === "models") return { view: "settings", section: "models" };
+  return { view: parseView(raw), section: null };
+}
+
+export function viewLocation(
+  currentHref: string,
+  view: ApproveView,
+  settingsSection: SettingsSection,
+): string {
+  const url = new URL(currentHref);
+  url.searchParams.set("view", view);
+  if (view === "settings") url.searchParams.set("section", settingsSection);
+  else url.searchParams.delete("section");
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /**
@@ -40,11 +66,9 @@ export function initialDraftFromUrl(): string | null {
  */
 export function decideInitialView(
   param: string | null | undefined,
-  counts: { proposalPending: number; awaiting: number },
+  _counts: { proposalPending: number; awaiting: number },
 ): ApproveView {
-  const parsed = parseView(param);
-  if (parsed) return parsed;
-  if (counts.proposalPending > 0) return "proposal";
-  if (counts.awaiting > 0) return "approve";
-  return "performance";
+  const resolved = resolveLegacyView(param);
+  if (resolved.view) return resolved.view;
+  return "home";
 }

@@ -400,7 +400,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
         <div className="sticky top-0 z-10 px-5 py-4 lg:px-6" style={{ background: "var(--p-bg)", borderBottom: "1px solid var(--p-border)" }}>
           <div className="flex items-start gap-2">
             <div className="min-w-0">
-              <h3 className="text-[16px] font-semibold">{selected.label}</h3>
+              <h2 className="text-[16px] font-semibold">{selected.label}</h2>
               <p className="mt-1 break-all text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
                 {selected.path}
               </p>
@@ -494,7 +494,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
             </pre>
           ) : (
             <div
-              className="prose prose-invert max-w-[860px] text-[14px] leading-7"
+              className="prompt-markdown max-w-[860px]"
               onClick={handleMarkdownClick}
               // Markdown を整形表示。生 HTML タグはエスケープ済み(promptMarkdown で DOMPurify 通し済み)。
               dangerouslySetInnerHTML={{

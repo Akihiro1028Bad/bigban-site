@@ -53,6 +53,13 @@ describe("splitPublishQueue", () => {
     expect(result.blocked).toEqual([]);
   });
 
+  it("予約済みは公開時刻の昇順に並べる", () => {
+    const later = makeItem({ id: "later", scheduledAtMs: 2_000 });
+    const earlier = makeItem({ id: "earlier", scheduledAtMs: 1_000 });
+
+    expect(splitPublishQueue([later, earlier]).scheduled).toEqual([earlier, later]);
+  });
+
   it("scheduledAtMs=0 は実値として scheduled へ(0 の境界)", () => {
     const item = makeItem({ id: "s0", scheduledAtMs: 0 });
     const result = splitPublishQueue([item]);
@@ -143,10 +150,20 @@ describe("schedulePresets", () => {
     expect(tonight.atMs).toBe(new Date(2026, 0, 25, 21, 0, 0, 0).getTime());
   });
 
-  it("21時を過ぎていても proto 同様に当日21:00のまま(ロールしない)", () => {
+  it("21時を過ぎていたら翌日21:00へ送り、ラベルも明日にする", () => {
     const sundayNight = new Date(2026, 0, 25, 22, 30, 0, 0).getTime();
     const [tonight] = schedulePresets(sundayNight);
-    expect(tonight.atMs).toBe(new Date(2026, 0, 25, 21, 0, 0, 0).getTime());
+    expect(tonight).toEqual({
+      label: "明日 21:00",
+      atMs: new Date(2026, 0, 26, 21, 0, 0, 0).getTime(),
+    });
+  });
+
+  it("ちょうど21時でも過去扱いを避けて翌日へ送る", () => {
+    const sundayAtNine = new Date(2026, 0, 25, 21, 0, 0, 0).getTime();
+    expect(schedulePresets(sundayAtNine)[0].atMs).toBe(
+      new Date(2026, 0, 26, 21, 0, 0, 0).getTime()
+    );
   });
 
   it("明日09:00 / 明日12:00 は翌日", () => {
