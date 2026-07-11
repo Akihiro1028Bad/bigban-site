@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import type { Plugin } from "vite";
@@ -44,6 +44,7 @@ export default defineConfig({
     globals: true,
     css: false,
     passWithNoTests: true,
+    exclude: [...configDefaults.exclude, ".claude/worktrees/**"],
     coverage: {
       provider: "istanbul",
       reporter: ["text", "lcov"],

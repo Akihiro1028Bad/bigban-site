@@ -29,6 +29,21 @@ function dryRun(mode: string, env: Record<string, string> = {}): string {
   });
 }
 
+function failedDryRun(mode: string, env: Record<string, string>) {
+  return spawnSync("node", [RUN, mode], {
+    env: {
+      ...process.env,
+      GROWTH_DRYRUN: "1",
+      GROWTH_AGENT: "",
+      GROWTH_MODEL_SETTINGS_DISABLE: "1",
+      GROWTH_CODEX_REASONING_EFFORT: "",
+      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "",
+      ...env,
+    },
+    encoding: "utf-8",
+  });
+}
+
 function runWithStubbedCodex(mode: string, env: Record<string, string> = {}) {
   const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-bin-"));
   const stubPath = path.join(binDir, "codex");
@@ -206,12 +221,13 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
   });
 
   it("不正な Codex 推論強度は agent 起動前に拒否する", () => {
-    expect(() =>
-      dryRun("weekly", {
-        GROWTH_AGENT: "codex",
-        GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "maximum",
-      })
-    ).toThrow();
+    const result = failedDryRun("weekly", {
+      GROWTH_AGENT: "codex",
+      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "maximum",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Codex 推論強度が不正です: maximum");
   });
 
   it("GROWTH_CODEX_SANDBOX で Codex sandbox を指定できる", () => {
@@ -227,7 +243,10 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
   });
 
   it("不正な GROWTH_AGENT は非0終了する", () => {
-    expect(() => dryRun("advise", { GROWTH_AGENT: "openai" })).toThrow();
+    const result = failedDryRun("advise", { GROWTH_AGENT: "openai" });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("GROWTH_AGENT は claude または codex を指定してください");
   });
 
   it("drafts-auto は drafts.md を使い Codex でも起動できる", () => {
