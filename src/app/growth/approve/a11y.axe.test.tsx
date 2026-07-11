@@ -21,7 +21,7 @@
  * mockFetchSequence・login・selectView)。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 
@@ -255,6 +255,9 @@ describe("承認画面 a11y 監査(axe・jsdom 構造系のみ)", () => {
     await login();
     await selectView(/施策/);
     await screen.findByRole("region", { name: "施策レーン" });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 

@@ -4053,15 +4053,21 @@ describe("ApproveClient 盤→編集ワークスペース統合(#110/#213)", () 
     flags.authEnabled = false;
     let release!: (v: unknown) => void;
     const pending = new Promise((r) => { release = r; });
-    const fn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
-        })
-      )
-      .mockReturnValueOnce(pending); // 下書き取得は保留のまま
+    const responses = [
+      jsonResponse({
+        success: true,
+        items: [ideaItem({ id: "i1", title: "下書きA", stage: "drafted", isDraftReady: true, contentId: "g-1" })],
+      }),
+      pending,
+    ];
+    const fn = vi.fn((input: RequestInfo | URL) => {
+      if (isOpsRequest(input)) {
+        fn.mock.calls.pop();
+        return opsFetchResult();
+      }
+      const next = responses.shift();
+      return next instanceof Promise ? next : Promise.resolve(next);
+    });
     vi.stubGlobal("fetch", fn);
 
     render(<ApproveClient />);

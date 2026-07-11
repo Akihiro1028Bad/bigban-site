@@ -123,7 +123,7 @@ export default function HyroxFacility() {
                 >
                   <Image
                     src={src}
-                    alt={photoAlts[i]}
+                    alt={photoAlts[i] ?? ""}
                     fill
                     sizes="(min-width: 1280px) 1216px, 100vw"
                     className="object-cover"
