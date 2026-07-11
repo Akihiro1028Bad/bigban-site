@@ -98,12 +98,19 @@
 
 | 変数名 | 用途 | Mac | 自宅PC | Vercel |
 |---|---|:---:|:---:|:---:|
+| `NEXT_PUBLIC_SITE_URL` | sitemap・OGP・承認URL | ✅ | ✅ | ✅ |
+| `NEXT_PUBLIC_MAINTENANCE` | `true` でteaserへ転送 | △ | ✗ | ✅ |
+| `GOOGLE_SITE_VERIFICATION` | Search Console HTMLタグ認証 | △ | ✗ | △ |
+| `RESEND_API_KEY` / `RESEND_FROM` / `CONTACT_TO_EMAIL` | メール登録・お問い合わせ送信 | △ | ✗ | ✅ |
+| `USE_CMS_NEWS` / `USE_CMS_COLUMNS` | ニュース・コラムの公開フラグ | △ | ✗ | ✅ |
+| `GROWTH_MICROCMS_ENDPOINT` | コラムのmicroCMS公開先（本番=`columns`） | △ | ✅ | ✅ |
 | `GROWTH_GA4_PROPERTY_ID` | GA4 プロパティ ID | △ | ✅ | ✗ |
 | `GROWTH_GSC_SITE_URL` | Search Console プロパティ URL | △ | ✅ | ✗ |
 | `GROWTH_GOOGLE_CLIENT_ID` / `_SECRET` | OAuth クライアント情報 | △ | ✅ | ✗ |
 | `GROWTH_GOOGLE_REFRESH_TOKEN` | GA4/GSC 取得用トークン | △ | ✅ | ✗ |
 | `GROWTH_GOOGLE_TOKEN_EXPIRES_AT` | （任意）トークン失効予定 | △ | △ | ✗ |
-| `GROWTH_LEARNING_LOG_DS` | 学習ログ DB の data source ID | ✅(設定済) | ⚠️未設定 | ⚠️未設定 |
+| `GROWTH_LEARNING_LOG_DS` | 学習ログ DB の data source ID | △ | △ | △ |
+| `GROWTH_WORKER_LOG_DS` | Worker運用ログ DB の data source ID | △ | △ | △ |
 | `GROWTH_MODEL_SETTINGS_DS` | （任意）AIモデル設定DBの data source ID | △ | △ | △ |
 | `GROWTH_AGENT` | （任意）全工程のagent強制 | △ | △ | ✗ |
 | `GROWTH_WEEKLY_MODEL` | （任意）週次Claudeモデル上書き | △ | △ | ✗ |
@@ -114,14 +121,16 @@
 | `OPENAI_API_KEY` | 画像生成 | △ | ✅ | ✗ |
 | `MICROCMS_SERVICE_DOMAIN` | microCMS サービス名 | △ | ✅ | ✅ |
 | `MICROCMS_API_KEY` | 読み取り・下書き・公開・メディア操作 | △ | ✅ | ✅ |
+| `MICROCMS_WEBHOOK_SECRET` | microCMS Webhook署名検証 | △ | ✗ | ✅ |
+| `MICROCMS_DRAFT_SECRET` | microCMSプレビュー入口の認証 | △ | ✗ | ✅ |
+| `MICROCMS_DRAFT_ALLOWED_ORIGINS` | プレビュー元Origin制限 | △ | ✗ | △ |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE push 送信 | △ | ✅ | ✗ |
 | `LINE_GROUP_ID` | 通知先グループ | △ | ✅ | ✗ |
 | `GROWTH_NOTIFY_LEVEL` | LINE push 範囲（未設定=週次のみ / `all`=全通知） | △ | △ | ✗ |
 | `NOTION_PUBLIC_DOMAIN` | 公開レポートの notion.site ドメイン | △ | ✅ | ✗ |
 | `NOTION_TOKEN` | 承認画面/通知が DB を読み書き | △ | ✅ | ✅ |
-| `NEXT_PUBLIC_SITE_URL` | 承認 URL の組み立て | ✅ | ✅ | ✅ |
 | `APPROVE_AUTH_ENABLED` | 承認画面の合言葉認証 | ✗ | ✗ | ⚠️本番ON必須 |
-| `APPROVE_SECRET` | 承認画面の合言葉 | ✗ | ✗ | ✅ |
+| `APPROVE_SECRET` | 承認画面の合言葉・週次LINE通知 | △ | ✅ | ✅ |
 
 凡例: ✅=必須 / △=任意・環境に応じて / ✗=不要 / ⚠️=特記あり（下記）。
 ※ Mac は「開発・動作確認をしたい場合に一式そろえる」位置づけ。本番の週次自動実行は自宅 PC が担うため、Mac 側は必須ではありません。
@@ -129,11 +138,14 @@
 ### 2-2. 特に注意する変数
 
 - **microCMSキーは `MICROCMS_API_KEY` 1つだけ**です。読み取り・下書き更新・公開・メディア操作に必要な権限を付与し、自宅PCとVercelへ同じ値を設定します。server-only とし、`NEXT_PUBLIC_` を付けて**クライアントに渡してはいけません**。
-- **`GROWTH_LEARNING_LOG_DS`（学習ログ DB の data source ID）は現状 Mac のみ設定済み**で、**自宅 PC・Vercel には未設定**です。この状態だと**学習ログの追記が静かにスキップ**されます（本処理は止まりません＝欠落耐性）。学習ログを本番で記録したい場合は、手順 4 で作成する学習ログ DB の data source ID を自宅 PC の `.env` にも設定してください。
+- **コラム分離後の本番は `GROWTH_MICROCMS_ENDPOINT=columns` を自宅PCとVercelの両方に設定**します。PCは下書き生成・定期公開、Vercelは承認画面からの編集・画像差し替え・公開で参照します。`USE_CMS_COLUMNS=true` はWeb表示のフラグであり、公開先指定とは役割が異なります。
+- **`GROWTH_LEARNING_LOG_DS` は本番の学習ログを記録したい環境へ設定**します。PC側のAI処理に加え、Vercelの下書き編集APIからも記録するため、完全運用では両方へ同じ値を設定します。未設定時は静かにスキップされ、本処理は止まりません。
+- **`GROWTH_WORKER_LOG_DS` はPC側のheartbeat記録に必要**です。承認画面の運用タブに同じログを表示する場合はVercelにも同じ値を設定します。`GROWTH_WORKER_ID`はPC側だけで構いません。
 - **AIモデル設定はNotionで共有**します。承認画面 `AIモデル` で保存した設定を自宅PC workerも読むため、「AIモデル設定」DBを`NOTION_TOKEN`の内部インテグレーションへ共有してください。`GROWTH_MODEL_SETTINGS_DS`はDBを差し替える場合だけ設定し、通常は未設定でコード内の既定IDを使います。
 - **モデル設定のenvは一時上書き用**です。優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。通常運用では`GROWTH_AGENT`を未設定にし、工程別のプロバイダー選択を有効にします。
 - **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
 - **`APPROVE_AUTH_ENABLED` は Vercel 本番で ON 必須**。未設定＝ON（フェイルセーフ）ですが、`false` にすると本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。詳細は「手順 8」。
+- **`APPROVE_SECRET` はVercelと自宅PCに同じ値を設定**します。Vercelは承認APIの認証、PCは週次LINEダイジェストへの合言葉表示に使います。
 - **クォート**: 値に空白や記号（`< > | ( ) &` 等）を含む場合は必ずダブルクォートで囲むこと。未クォートだとシェルスクリプトが壊れます（例: `RESEND_FROM`）。
 
 ### 2-3. Notion DB の開発/本番分離について（未決・将来課題）
@@ -276,7 +288,7 @@ OAuth 同意画面のステータスが**「テスト」のままだと、付与
 
 ## 手順 6: LINE 通知 + 承認ページを設定する
 
-> ここは LINE 通知と承認ページの初期構築手順です。通知は自宅 PC、承認ページは Vercel で動きます。**`NOTION_TOKEN` は両環境に同じ値**を、**`APPROVE_SECRET` は Vercel 側のみ**設定します。
+> ここは LINE 通知と承認ページの初期構築手順です。通知は自宅 PC、承認ページは Vercel で動きます。**`NOTION_TOKEN` と `APPROVE_SECRET` は両環境に同じ値**を設定します。
 
 ### 手順 6-1: LINE Messaging API を用意する
 
@@ -296,7 +308,7 @@ OAuth 同意画面のステータスが**「テスト」のままだと、付与
 
 - 覚えやすい語でよいが**社外秘**として扱い、LINE グループ（信頼できるメンバー）内でのみ共有する。
 - ⚠️ セキュリティ: 承認 API にレート制限は無いため、短い/推測しやすい語は総当たりのリスクがあります。承認操作は「Notion のステータス変更（可逆）」のみで金銭・個人情報は扱いませんが、心配なら推測されにくい長めの語句にする（例 `openssl rand -hex 16` の出力）。
-- 合言葉を変更したら、Vercel の `APPROVE_SECRET` を更新して再デプロイする。
+- 合言葉を変更したら、Vercel と自宅PCの `APPROVE_SECRET` を同時に更新し、Vercelを再デプロイする。
 
 ### 手順 6-3: Vercel に環境変数を設定する
 
@@ -304,8 +316,12 @@ Vercel の **Production 環境変数**に次を設定し、再デプロイする
 
 - `NOTION_TOKEN`（手順 4-1・自宅 PC と同じ値）
 - `APPROVE_SECRET`（手順 6-2）
-- `APPROVE_AUTH_ENABLED`（本番では ON。詳細は手順 8。未設定＝ON なので通常は触らなくてよい）
-- `MICROCMS_SERVICE_DOMAIN` / `NEXT_PUBLIC_SITE_URL` 等、承認画面や下書きプレビューが必要とする値（手順 2-1 の Vercel 列を参照）
+- `APPROVE_AUTH_ENABLED=true`（本番では ON。未設定＝ONだが、意図を明確にするため明示を推奨）
+- `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_MAINTENANCE`
+- `MICROCMS_SERVICE_DOMAIN` / `MICROCMS_API_KEY` / `MICROCMS_WEBHOOK_SECRET` / `MICROCMS_DRAFT_SECRET`
+- `USE_CMS_NEWS=true` / `USE_CMS_COLUMNS=true` / `GROWTH_MICROCMS_ENDPOINT=columns`
+- お問い合わせを使う場合: `RESEND_API_KEY` / `RESEND_FROM` / `CONTACT_TO_EMAIL`
+- 任意: `MICROCMS_DRAFT_ALLOWED_ORIGINS` / `GOOGLE_SITE_VERIFICATION` / `GROWTH_LEARNING_LOG_DS` / `GROWTH_WORKER_LOG_DS` / `GROWTH_MODEL_SETTINGS_DS`
 
 > **確認**: 承認 URL をブラウザで開き、合言葉を入力して「入る」→ 承認待ちが一覧表示されれば承認ページ OK。500 が出る場合は Vercel の `NOTION_TOKEN` 未設定を疑う。
 
@@ -380,23 +396,23 @@ npm run growth:weekly     # 分析→Notion 3DB 書き込み→自動で notify-
 
 ### 手順 8-0: 応答ループは「常駐デーモン」でまとめて回す（推奨・簡単）
 
-承認画面からの依頼（構成修正・アイキャッチ/本文画像の再生成・アドバイス・装飾・コメント修正）を拾う **プル型ループ7種＋公開キュー（publish-due）＋滞留検知（stall-check）** は、個別にタスク登録しなくても、**1コマンドの常駐デーモン**でまとめて回せます。下書き生成も手動を避けたい場合は、`GROWTH_DRAFTS_AUTO=1` で opt-in できます。
+承認画面からの依頼を拾う **プル型ループ7種＋下書き/施策の対象検知＋公開キュー＋滞留検知＋日次成績同期＋週次レビュー抽出** は、個別にタスク登録しなくても、**1コマンドの常駐デーモン**でまとめて回せます。
 
 ```powershell
 npm run growth:daemon
 ```
 
-- 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分）。依頼が無いループは軽い `peek` だけで空振りし、headless agent 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。
-- `GROWTH_DRAFTS_AUTO=1` を付けると、`drafts-auto` もデーモンに追加されます。既定5分間隔で「承認済み/生成中 かつ 下書きID未作成」の記事だけを軽く `peek` し、対象がある時だけ `growth:drafts` 相当の下書き生成を起動します。対象が無い時は headless agent を起動しません。
-- `GROWTH_INITIATIVES_AUTO=1` を付けると、`initiatives-auto` もデーモンに追加されます。既定5分間隔で「承認済み」の施策だけを軽く `peek` し、対象がある時だけ `growth:initiatives` 相当の施策成果物化を起動します。対象が無い時は headless agent を起動しません。
+- 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分・metrics=24時間・review-due/proposal-review-due=7日）。依頼が無いループは軽い `peek` だけで空振りし、headless agent 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。
+- `GROWTH_DRAFTS_AUTO` が未設定でも、既定5分間隔で「承認済み/生成中 かつ 下書きID未作成」の記事だけを軽く `peek` し、対象がある時だけ `growth:drafts` 相当の下書き生成を起動します。対象が無い時は headless agent を起動しません。止めたい場合だけ `GROWTH_DRAFTS_AUTO=0` を設定します。
+- `GROWTH_INITIATIVES_AUTO` が未設定でも、既定5分間隔で「承認済み」の施策だけを軽く `peek` し、対象がある時だけ `growth:initiatives` 相当の施策成果物化を起動します。対象が無い時は headless agent を起動しません。止めたい場合だけ `GROWTH_INITIATIVES_AUTO=0` を設定します。
 - デーモンは git pull しません。デプロイ後や週途中のコード更新を反映したい場合は、自宅PCで手動 `git pull --ff-only` するか、デーモンを再起動して最新化してください。
 - デーモンやタスクスケジューラで回すコマンドは、soft fail も後で追えるよう `>> data\*.log 2>&1` でログファイルへリダイレクトしてください。ハード失敗は別途 `data\growth-failures.log` に構造化追記されます。
 - 7つのプル型ループは元々**1つのロックを共有**（同時に2つは動かない）ので、デーモンが逐次実行するのと整合します。**このデーモンを使えば下の 8-4（個別タスク登録）は不要**です。
-- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_DRAFTS_EVERY_MS` / `GROWTH_DAEMON_INITIATIVES_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
+- 間隔は環境変数で調整可: `GROWTH_DAEMON_PULL_EVERY_MS` / `GROWTH_DAEMON_DRAFTS_EVERY_MS` / `GROWTH_DAEMON_INITIATIVES_EVERY_MS` / `GROWTH_DAEMON_PUBLISH_EVERY_MS` / `GROWTH_DAEMON_STALL_EVERY_MS` / `GROWTH_DAEMON_METRICS_EVERY_MS` / `GROWTH_DAEMON_REVIEW_EVERY_MS`。`Ctrl+C` で安全停止（実行中ジョブの完了後に終了）。
 - **常駐させる**: Mac を常時つけっぱなしなら launchd/ログイン項目に、Windows ならタスクスケジューラで「ログオン時に起動」に登録すれば起動時に自動で常駐します。これで**Windowsで7個のタスクを個別登録する手間が消えます**。
-- 対象外（デーモンに既定では含めない）: `weekly`（週次・8-2 で別途スケジュール）、`drafts`/`initiatives`（承認後の重い処理＝既定は手動。`GROWTH_DRAFTS_AUTO=1` / `GROWTH_INITIATIVES_AUTO=1` で opt-in 可）。
+- 対象外: `weekly`（週次・8-2 で別途スケジュール）。`drafts`/`initiatives` は対象が見つかった時だけデーモンが起動します。
 
-> つまり最小構成は **①週次だけタスク登録（8-2）＋②`growth:daemon` を常駐** の2つだけ。以下の 8-1〜8-4 は「デーモンを使わず個別登録したい場合」の手順です。
+> つまり本番のWindowsタスクは **①週次だけタスク登録（8-2）＋②`growth:daemon` を常駐** の2つだけ。日次metricsと週次レビューを別タスクに登録する必要もありません。以下の 8-1〜8-4 は「デーモンを使わず個別登録したい場合」の手順です。
 
 ### 手順 8-1: 起動用バッチを作る
 
@@ -437,25 +453,26 @@ pull 型の各ループも、承認/依頼を拾えるようタスク登録し�
 - **設定タブで「既に実行中の場合は新しいインスタンスを開始しない」**を選ぶ（二重起動防止）。
 - 他のループ（regen / regen-body / advise / decorate 等）も必要に応じて同様に登録できます。全モードの一覧は [`00-canon.md`](00-canon.md) の「実行モード一覧」、詳細は [`30-loops.md`](30-loops.md) を参照。
 
-### 手順 8-5: 承認後の実行（手動 / opt-in 自動）
+### 手順 8-5: 承認後の実行（既定は自動検知）
 
-下書き生成・施策実行は**人間の承認が前提**なので、既定では手動実行です:
+下書き生成・施策実行は**人間の承認が前提**です。デーモンは未設定でも承認済み対象を軽量検知し、対象がある時だけ自動実行します。すぐ処理したい場合は手動でも実行できます:
 
 ```powershell
 npm run growth:drafts        # 承認した記事 → microCMS 下書き + 画像
 npm run growth:initiatives   # 承認した施策 → Notion 本文に文案/仕様書
 ```
 
-手動実行を避けたい場合は、デーモン起動時に下書き自動生成や施策自動成果物化を opt-in します:
+自動検知を止めたい場合だけ、Windowsの `.env` に明示します:
 
-```powershell
-$env:GROWTH_DRAFTS_AUTO="1"; $env:GROWTH_INITIATIVES_AUTO="1"; npm run growth:daemon
+```dotenv
+GROWTH_DRAFTS_AUTO=0
+GROWTH_INITIATIVES_AUTO=0
 ```
 
 Codex で動かす場合:
 
 ```powershell
-$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; $env:GROWTH_DRAFTS_AUTO="1"; $env:GROWTH_INITIATIVES_AUTO="1"; npm run growth:daemon
+$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; npm run growth:daemon
 ```
 
 この場合も `weekly` は自動巡回に含めません。`drafts-auto` は `growth:drafts-auto-peek`、`initiatives-auto` は `growth:initiatives-auto-peek` で対象件数を確認し、0件なら何も起動しません。
@@ -470,8 +487,10 @@ Vercel の承認画面を本番公開する前に、必ず次を確認してく�
 
 - [ ] **`APPROVE_AUTH_ENABLED` を必ず ON**（未設定＝ON でも可・`false` にしない）。承認画面は強権限 API を叩くため、合言葉ゲートが必須です。`false` のままだと本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。
 - [ ] **`APPROVE_SECRET`（合言葉）を Vercel に設定**し、推測されにくい語にしてある。
+- [ ] **自宅PCにもVercelと同じ `APPROVE_SECRET`** を設定し、週次LINE通知から承認画面へ入れる。
 - [ ] **`MICROCMS_API_KEY` に `NEXT_PUBLIC_` を付けていない**（server-only・クライアントへ渡さない）。
 - [ ] **`NOTION_TOKEN` が Vercel（承認画面用）と自宅 PC（通知用）で同じ値**になっている。
+- [ ] コラム分離後は **`USE_CMS_COLUMNS=true` と `GROWTH_MICROCMS_ENDPOINT=columns`** をVercelへ、後者を自宅PCへ設定している。
 - [ ] Google OAuth 同意画面を**「本番（公開）」に昇格済み**（テストのままだと 7 日で失効）。
 - [ ] 週次レポート DB を **Web 公開済み**で、ログインなしで開ける。
 - [ ] [`00-canon.md`](00-canon.md) の「絶対禁止」を運用者全員が理解している。

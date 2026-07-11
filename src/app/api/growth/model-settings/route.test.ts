@@ -100,6 +100,20 @@ describe("/api/growth/model-settings", () => {
     });
   });
 
+  it("Notion token未設定のPUTは500", async () => {
+    delete process.env.NOTION_TOKEN;
+    const res = await PUT(request("PUT", { phaseId: "weekly", provider: "codex", model: "gpt-5.6-sol", effort: "high" }));
+    expect(res.status).toBe(500);
+  });
+
+  it("JSON読込がError以外で失敗したPUTも400", async () => {
+    const req = request("PUT", {});
+    vi.spyOn(req, "json").mockRejectedValue("bad-json");
+    const res = await PUT(req);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "不正な設定です。" });
+  });
+
   it("PUTは既存工程を更新する", async () => {
     vi.mocked(queryDataSource).mockResolvedValue({
       hasMore: false,

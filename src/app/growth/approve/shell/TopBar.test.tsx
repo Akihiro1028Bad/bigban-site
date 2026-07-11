@@ -81,6 +81,12 @@ describe("TopBar", () => {
     expect(screen.queryByRole("textbox", { name: "検索" })).not.toBeInTheDocument();
   });
 
+  it("表示フラグ未指定時は段階フィルタと検索を表示する", () => {
+    setup({ showSegments: undefined, showSearch: undefined });
+    expect(screen.getByRole("group", { name: "段階フィルタ" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "検索" })).toBeInTheDocument();
+  });
+
   it("統計ピル(あなた待ち/公開済み)を表示する", () => {
     setup();
     expect(screen.getByTitle("あなたのアクション待ち")).toHaveTextContent("1");

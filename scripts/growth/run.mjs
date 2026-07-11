@@ -27,6 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { acquireLock, releaseLock } from "./lockfile.mjs";
+import { exitCodeOrFailure } from "./processExit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
@@ -350,7 +351,7 @@ function runNpm(scriptName, env = {}) {
       shell: isWin,
       env: { ...process.env, ...env },
     });
-    proc.on("exit", (code) => resolve(code ?? 0));
+    proc.on("exit", (code) => resolve(exitCodeOrFailure(code)));
     proc.on("error", (err) => {
       process.stderr.write(`${scriptName} の起動に失敗しました: ${err.message}\n`);
       resolve(1);
@@ -620,7 +621,7 @@ child.stdin.write(prompt);
 child.stdin.end();
 child.on("exit", async (code) => {
   if (cfg.lock) releaseReviseLock();
-  let exitCode = code ?? 0;
+  let exitCode = exitCodeOrFailure(code);
   if (mode === "image-prompt" && exitCode === 0) {
     const applied = spawnSync(
       isWin ? "npm.cmd" : "npm",

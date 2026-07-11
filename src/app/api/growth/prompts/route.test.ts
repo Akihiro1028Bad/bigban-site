@@ -149,6 +149,15 @@ describe("GET /api/growth/prompts", () => {
     ]);
   });
 
+  it("未登録Markdownの読込失敗はwarningにして除外する", async () => {
+    mockReaddir(["unregistered.md"], [], []);
+    mockReadFile(["unregistered.md"]);
+    const res = await GET(getReq());
+    const json = (await res.json()) as { warnings: string[]; groups: { phases: { path: string }[] }[] };
+    expect(json.warnings).toContain("任意資料 scripts/growth/prompts/unregistered.md を読み込めませんでした。");
+    expect(json.groups.flatMap((group) => group.phases).some((phase) => phase.path.endsWith("unregistered.md"))).toBe(false);
+  });
+
   it("examples ディレクトリが無くても他は返す", async () => {
     vi.mocked(readdir).mockImplementation((async (dir: string) => {
       if (String(dir).endsWith("examples")) throw new Error("ENOENT");

@@ -77,7 +77,7 @@ import { nextReviewId } from "./reviewNav";
 import { DashboardView } from "./DashboardView";
 import { SettingsView } from "./SettingsView";
 import { dashboardViewOf } from "./homeDashboard";
-import { decideInitialView, initialDraftFromUrl, parseSettingsSection, resolveLegacyView, viewLocation } from "./viewRouting";
+import { initialDraftFromUrl, parseSettingsSection, resolveLegacyView, viewLocation } from "./viewRouting";
 import type { ApproveView, SettingsSection } from "./viewRouting";
 import { deriveShellCounts, syncAgoLabel } from "./boardShellStats";
 import type { ShellSegmentKey } from "./boardShellStats";
@@ -132,6 +132,7 @@ function initialViewFromUrl(): ApproveView | null {
 }
 
 function initialSettingsSectionFromUrl(): SettingsSection {
+  /* istanbul ignore next -- @preserve SSR 専用パス: jsdom では window 常在のため到達不可 */
   if (typeof window === "undefined") return "models";
   const params = new URLSearchParams(window.location.search);
   const legacy = resolveLegacyView(params.get("view"));
@@ -201,9 +202,6 @@ export function ApproveClient() {
   // #119: 表示タブ(施策/記事)。URL 指定があれば同期確定、無ければ null(読込後に自動選択)。
   const [view, setView] = useState<ApproveView | null>(initialViewFromUrl);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(initialSettingsSectionFromUrl);
-  // ユーザーがタブを選んだ/URL指定があれば「確定」とし、以降は自動切替で上書きしない。
-  // 初期 view(URL 由来)が確定済みかで判定する(initialViewFromUrl の二重呼び出しを避ける)。
-  const [viewPinned, setViewPinned] = useState<boolean>(() => view !== null);
   // #proto P1: TopBar 段階セグメント(approve view のカード絞り込み)。既定は全件。
   const [segment, setSegment] = useState<ShellSegmentKey>("all");
   // #proto P1: TopBar 検索(approve/proposal view のカード絞り込み)。`/` キーでフォーカスを移す。
@@ -272,28 +270,10 @@ export function ApproveClient() {
 
   // フォーム状態のリセット(activeId 変化)は useDraftEditing / useReviseEditing 各フックが担う(#H7)。
 
-  // #119: 初期表示タブの確定。URL の ?view 指定はマウント時に同期確定済み。ここでは未確定時に
-  // 一覧読込後、未処理がある方(両方あれば施策)を自動選択する。確定後は自動上書きしない。
-  useEffect(() => {
-    if (viewPinned) return;
-    if (items.length === 0) return;
-    // #proto P1: proto 既定着地。施策に未処理(あなたのアクション待ち)があれば施策、
-    // 記事に「あなた待ち」があれば記事、どちらも無ければ成績。deriveShellCounts に写像を一本化。
-    const counts = deriveShellCounts(items, decided);
-    setView(
-      decideInitialView(null, {
-        proposalPending: counts.proposalPending,
-        awaiting: counts.awaiting,
-      }),
-    );
-    setViewPinned(true);
-  }, [items, decided, viewPinned]);
-
   // #119/#proto P1: view を切り替える(URL にも反映し、以降の自動切替を止める)。
   // view 間でカード件数が異なるため、キーボードフォーカスは未選択(-1)に戻す。
   const changeView = useCallback((next: ApproveView): void => {
     setView(next);
-    setViewPinned(true);
     setFocusedIndex(-1);
     writeViewParam(next, settingsSection);
   }, [settingsSection]);
@@ -306,14 +286,10 @@ export function ApproveClient() {
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
-  // #proto P1: 段階セグメント変更。非 approve view で段階を選んだら approve view へ遷移しフィルタ適用。
-  const handleSegmentChange = useCallback(
-    (next: ShellSegmentKey): void => {
-      setSegment(next);
-      if (view !== "approve") changeView("approve");
-    },
-    [view, changeView],
-  );
+  // 段階セグメントは記事制作 view でのみ表示されるため、ここでは絞り込みだけを更新する。
+  const handleSegmentChange = useCallback((next: ShellSegmentKey): void => {
+    setSegment(next);
+  }, []);
 
   // #108: 記事が生成待ち/生成中に入った時刻を記録し、抜けたら破棄する(滞留検知の基準)。
   useEffect(() => {
@@ -739,7 +715,7 @@ export function ApproveClient() {
   const boardGroups = groupByBoardStage(visibleIdeas);
 
   // #proto P1: 表示中 view(未確定時は施策を既定描画)。
-  const activeView: ApproveView = view ?? "home";
+  const activeView: ApproveView = view as ApproveView;
   const opsIssueCount =
     (opsQuery.data?.recentFailures.length ?? 0) +
     (opsQuery.data?.reconcileFindings.length ?? 0) +

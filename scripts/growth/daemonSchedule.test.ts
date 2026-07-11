@@ -93,6 +93,7 @@ describe("buildInitialLastRun", () => {
     expect(restoreLastRun(built, { pull: "bad", metrics: -1, removed: 5_000 }, 10_000)).toEqual({
       metrics: 10_000,
     });
+    expect(restoreLastRun(built, [], 10_000)).toEqual({ metrics: 10_000 });
   });
 });
 

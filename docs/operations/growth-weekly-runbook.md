@@ -13,11 +13,11 @@ headless agent(承認画面「AIモデル」の工程別設定に応じて Claud
 |--------|------|-----------|
 | **週次モード** | 自動・毎週木曜朝 | データ分析 → 週次レポート(Notion)→ 施策を提案(コンテンツは「記事ネタ案」DB、その他は「施策提案」DB に `提案中`/`未処理`)。**下書き・成果物は作らない** |
 | **下書きモード** | 手動・承認後にいつでも | 「記事ネタ案」DB の `承認` を拾い、コンテンツ+画像チームで microCMS 下書きを作る |
-| **施策実行モード** | 手動または opt-in 自動・承認後にいつでも | 「施策提案」DB の `承認` を拾い、コンテンツ施策は「記事ネタ案」DBへ移行、その他はカテゴリ別に成果物(文案/仕様書)を Notion 本文に作る |
+| **施策実行モード** | daemonの自動検知または手動・承認後にいつでも | 「施策提案」DB の `承認` を拾い、コンテンツ施策は「記事ネタ案」DBへ移行、その他はカテゴリ別に成果物(文案/仕様書)を Notion 本文に作る |
 
-承認のサイクル: 週次モードが提案を出す → 人間が Notion で `承認`/`却下` → **下書きモード/施策実行モードを手動実行、または daemon の opt-in 自動で反映**。webhook は使わず、実行時に Notion を読む。
+承認のサイクル: 週次モードが提案を出す → 人間が Notion で `承認`/`却下` → **daemon が対象を自動検知して下書き/施策実行へ反映**。webhook は使わず、実行時に Notion を読む。必要なら手動実行もでき、自動検知は環境変数へ `0` を明示した場合だけ止まる。
 
-> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 手動 `npm run growth:drafts` / `npm run growth:initiatives` / opt-in 自動 `GROWTH_DRAFTS_AUTO=1 GROWTH_INITIATIVES_AUTO=1 npm run growth:daemon`(いずれも内部で工程別に設定された headless agent へ該当モードの指示を渡す)。
+> 実行例(PC 側、想定): 週次 `npm run growth:weekly` / 常駐 `npm run growth:daemon` / 手動再実行 `npm run growth:drafts` / `npm run growth:initiatives`（いずれも内部で工程別に設定された headless agent へ該当モードの指示を渡す）。
 > Worker の状態・直近失敗・reconcile は `docs/operations/growth/worker-observability.md` を参照。
 
 ## 工程別AIモデル
@@ -463,7 +463,7 @@ AI は使わない（純粋なデータ結線）。
 
 ### 運用の流れ
 
-1. **定期実行(PC・自動)**: cron 等で `npm run growth:metrics` を回す（例: 1日1回）。GA4 `topPages`（pagePath→表示数/ユーザー数・今週/前週）を取得し、
+1. **定期実行(PC・自動)**: 常駐中の `npm run growth:daemon` が `growth:metrics` を24時間ごとに回す。GA4 `topPages`（pagePath→表示数/ユーザー数・今週/前週）を取得し、
    公開済み記事ごとに microCMS を contentId で引いて `slug`/`locale` から pagePath を組み立て、GA4 行と突き合わせ、`成績データ`＋`成績更新時刻` を Notion へ書く。更新があれば **LINE 通知**。
 2. **閲覧(あなた)**: 承認画面の「記事」タブ上部の「成績ボード」で合計表示数・ユーザー数・記事別ランキング（表示数降順＋前週比）を見る。
    計測データが無いうちは「まだ計測データがありません」と出る（実行後に反映）。
@@ -481,7 +481,7 @@ AI は使わない（純粋なデータ結線）。
 `公開後判定`(select)・`判定メモ`(テキスト)・`28日判定日`・`56日判定日`・`90日判定日`(日付)。※計測強化 S4 で追加済み。
 
 ### 運用の流れ
-1. **定期実行(PC・自動)**: cron 等で `npm run growth:review-due` を回す（例: 週1回）。公開済み記事ごとに microCMS `publishedAt` から経過日を出し、到来済みで未記録（その判定日が空）の最大マイルストーンを選ぶ。
+1. **定期実行(PC・自動)**: 常駐中の `npm run growth:daemon` が `growth:review-due` と施策版 `growth:proposal-review-due` を7日ごとに回す。記事側は公開済み記事ごとに microCMS `publishedAt` から経過日を出し、到来済みで未記録（その判定日が空）の最大マイルストーンを選ぶ。
 2. 選ばれた記事は `成績データ` を `reviewLabels`（CTR弱い/順位あと少し/要改稿 等）で読み、`判定メモ` に「`[28日レビュー] CTR弱い・順位あと少し ／成功指標: …`」の候補を書き、その `判定日` を当日でマークする（次回は二重に拾わない）。
 3. **LINE 通知**: 「今週レビューすべき記事」を一覧でまとめて送る。
 4. **あなた**: 承認画面/Notion で `判定メモ` を見て `公開後判定` を最終決定（要改稿なら構成案修正ループや再下書きへ）。

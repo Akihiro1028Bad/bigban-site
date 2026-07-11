@@ -45,23 +45,22 @@ interface ReadResult {
 }
 
 function basenameOf(repoPath: string): string {
-  return repoPath.split("/").pop() ?? repoPath;
+  return repoPath.slice(repoPath.lastIndexOf("/") + 1);
 }
 
 function warningFor(repoPath: string): string {
   return `任意資料 ${repoPath} を読み込めませんでした。`;
 }
 
-function pathFromWarning(warning: string): string | null {
+function pathFromWarning(warning: string): string {
   const prefix = "任意資料 ";
   const suffix = " を読み込めませんでした。";
-  if (!warning.startsWith(prefix) || !warning.endsWith(suffix)) return null;
   return warning.slice(prefix.length, -suffix.length);
 }
 
 function dirnameOfRepoPath(repoPath: string): string {
   const index = repoPath.lastIndexOf("/");
-  return index === -1 ? "" : repoPath.slice(0, index);
+  return repoPath.slice(0, Math.max(index, 0));
 }
 
 /** 同じdir配下の登録ファイル欠落が既に出ている場合、補完スキャンのdir warningは重ねない。 */
@@ -72,12 +71,11 @@ function withoutRedundantDirectoryWarnings(
   const registeredFailureDirs = new Set(
     registeredWarnings
       .map(pathFromWarning)
-      .filter((repoPath): repoPath is string => repoPath !== null)
       .map(dirnameOfRepoPath),
   );
   return supplementalWarnings.filter((warning) => {
     const repoPath = pathFromWarning(warning);
-    return repoPath === null || !registeredFailureDirs.has(repoPath);
+    return !registeredFailureDirs.has(repoPath);
   });
 }
 

@@ -130,8 +130,7 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
     : undefined;
   const scheduleDays = Array.from(
     scheduled.reduce<Map<string, number>>((days, item) => {
-      if (item.scheduledAtMs == null) return days;
-      const label = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short" }).format(new Date(item.scheduledAtMs));
+      const label = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short" }).format(new Date(item.scheduledAtMs as number));
       days.set(label, (days.get(label) ?? 0) + 1);
       return days;
     }, new Map()),

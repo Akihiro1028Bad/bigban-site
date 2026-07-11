@@ -66,6 +66,21 @@ describe("AIモデル設定API", () => {
     await expect(fetchModelSettings("tok")).rejects.toThrow("設定NG");
   });
 
+  it("GETはwarning文字列を保持し、失敗文言欠落時は既定エラーを返す", async () => {
+    server.use(
+      http.get(MODEL_SETTINGS_URL, () =>
+        HttpResponse.json({ success: true, warning: "Notion未設定", efforts: {} }),
+      ),
+    );
+    await expect(fetchModelSettings("tok")).resolves.toMatchObject({ warning: "Notion未設定" });
+    server.use(
+      http.get(MODEL_SETTINGS_URL, () =>
+        HttpResponse.json({ success: false }, { status: 500 }),
+      ),
+    );
+    await expect(fetchModelSettings("tok")).rejects.toThrow("AIモデル設定の取得に失敗しました。");
+  });
+
   it("PUTで1工程を保存し、レスポンス設定を返す", async () => {
     let body: unknown;
     const setting = {

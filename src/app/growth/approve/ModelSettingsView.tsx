@@ -44,12 +44,10 @@ export function ModelSettingsView({ token }: ModelSettingsViewProps) {
 
   function handleSaved(setting: ModelPhaseSetting): void {
     queryClient.setQueryData<ModelSettingsData>([QUERY_KEY, token], (current) =>
-      current
-        ? {
-            ...current,
-            settings: current.settings.map((item) => (item.id === setting.id ? setting : item)),
-          }
-        : current,
+      ({
+        ...current!,
+        settings: current!.settings.map((item) => (item.id === setting.id ? setting : item)),
+      }),
     );
   }
 

@@ -80,12 +80,12 @@ function isAllowedTransition(page: NotionPage, next: string): boolean {
   const current = currentStatus(page);
   if ("タイトル案" in page.properties) {
     if (current === "提案中") return next === "承認" || next === "却下";
-    if (current === "承認" || current === "却下") return next === "提案中";
+    if (["承認", "却下"].includes(current)) return next === "提案中";
     return false;
   }
   if ("施策名" in page.properties) {
     if (current === "未処理") return next === "承認" || next === "却下";
-    if (current === "承認" || current === "却下") return next === "未処理";
+    if (["承認", "却下"].includes(current)) return next === "未処理";
     if (current === "成果物化済") return next === "実行中" || next === "実行済み" || next === "クローズ";
     if (current === "実行中") return next === "実行済み" || next === "成果物化済";
     if (current === "実行済み") return next === "実行中";

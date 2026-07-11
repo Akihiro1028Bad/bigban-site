@@ -290,6 +290,59 @@ describe("POST", () => {
       expect.anything()
     );
   });
+
+  it.each([
+    ["記事", "承認", "提案中"],
+    ["記事", "却下", "提案中"],
+    ["施策", "承認", "未処理"],
+    ["施策", "却下", "未処理"],
+    ["施策", "未処理", "却下"],
+    ["施策", "成果物化済", "実行中"],
+    ["施策", "成果物化済", "クローズ"],
+    ["施策", "実行中", "実行済み"],
+    ["施策", "実行中", "成果物化済"],
+    ["施策", "実行済み", "実行中"],
+  ])("%sの%sから%sへの有効な遷移を許可する", async (kind, current, decision) => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31",
+      url: "",
+      properties: {
+        [kind === "記事" ? "タイトル案" : "施策名"]: { title: [{ plain_text: kind }] },
+        "ステータス": { select: { name: current } },
+      },
+    });
+    vi.mocked(updatePageProps).mockResolvedValue("ok");
+    const res = await POST(postRequest(SECRET, {
+      decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision }],
+    }));
+    expect(res.status).toBe(200);
+  });
+
+  it("種別を判定できないページの更新は拒否する", async () => {
+    vi.mocked(getPage).mockResolvedValue({ id: "38099efa-346b-8122-9681-f4d2cc321a31", url: "", properties: {} });
+    const res = await POST(postRequest(SECRET, {
+      decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" }],
+    }));
+    expect(res.status).toBe(409);
+  });
+
+  it("実行済み施策を未許可の状態へは遷移させない", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31", url: "",
+      properties: { "施策名": { title: [{ plain_text: "施策" }] }, "ステータス": { select: { name: "実行済み" } } },
+    });
+    const res = await POST(postRequest(SECRET, { decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "クローズ" }] }));
+    expect(res.status).toBe(409);
+  });
+
+  it("未知の施策状態からの遷移は拒否する", async () => {
+    vi.mocked(getPage).mockResolvedValue({
+      id: "38099efa-346b-8122-9681-f4d2cc321a31", url: "",
+      properties: { "施策名": { title: [{ plain_text: "施策" }] }, "ステータス": { select: { name: "未知" } } },
+    });
+    const res = await POST(postRequest(SECRET, { decisions: [{ id: "38099efa-346b-8122-9681-f4d2cc321a31", decision: "承認" }] }));
+    expect(res.status).toBe(409);
+  });
 });
 
 describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {

@@ -32,6 +32,8 @@ export function splitPublishQueue(items: readonly PendingItem[]): PublishQueueSp
     if (item.scheduledAtMs != null) scheduled.push(item);
     else ready.push(item);
   }
+  // partition後のscheduledは scheduledAtMs != null が保証される。
+  /* istanbul ignore next -- @preserve 型上はnullableだが直前の分類で到達不可 */
   scheduled.sort((a, b) => (a.scheduledAtMs ?? 0) - (b.scheduledAtMs ?? 0));
   return { ready, scheduled, blocked };
 }

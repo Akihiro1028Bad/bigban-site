@@ -392,4 +392,39 @@ describe("PromptsView", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "グロース正典" })).toBeInTheDocument();
     expect(pushState).toHaveBeenCalled();
   });
+
+  it("未登録資料リンクは遷移せず、修飾キー付きリンクはブラウザ操作に委ねる", async () => {
+    const data = structuredClone(SAMPLE);
+    data.groups[0].phases[0].content += "\n\n[未登録](docs/operations/missing.md)";
+    vi.mocked(fetchPrompts).mockResolvedValue(data);
+    renderWithClient(<PromptsView token="t" query="" />);
+    fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
+    const missing = screen.getByRole("link", { name: "未登録" });
+    expect(fireEvent.click(missing)).toBe(false);
+    const registered = screen.getByRole("link", { name: "正典" });
+    fireEvent.click(registered, { ctrlKey: true });
+    expect(screen.getByRole("heading", { level: 2, name: "週次分析" })).toBeInTheDocument();
+  });
+
+  it("raw指定で初期表示し、該当なし検索も表示する", async () => {
+    window.history.replaceState(null, "", "/growth/approve?view=prompt&raw=1");
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    const first = renderWithClient(<PromptsView token="t" query="" />);
+    fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
+    expect(await screen.findByText(/週次の指示本文/)).toBeInTheDocument();
+    first.unmount();
+    renderWithClient(<PromptsView token="t" query="絶対に一致しない資料" />);
+    expect(await screen.findByText("一致する資料がありません。")).toBeInTheDocument();
+  });
+
+  it("popstateでdocなし・raw表示・未知groupを安全に反映する", async () => {
+    vi.mocked(fetchPrompts).mockResolvedValue(SAMPLE);
+    renderWithClient(<PromptsView token="t" query="" />);
+    fireEvent.click(await screen.findByRole("button", { name: /週次分析/ }));
+    window.history.replaceState(null, "", "/growth/approve?view=prompt&raw=1");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(screen.getByText(/週次の指示本文/)).toBeInTheDocument();
+    window.history.replaceState(null, "", "/growth/approve?view=prompt&doc=unknown.md");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
 });

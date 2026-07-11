@@ -145,7 +145,8 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
               const className = `text-sm uppercase tracking-widest transition-colors hover:text-text-light ${
                 activeSection === item.id ? "text-accent" : "text-text-gray"
               }`;
-              const ja = t(`${item.id}Ja`);
+              const jaKey = `${item.id}Ja`;
+              const ja = t.has(jaKey) ? t(jaKey) : "";
               const label = (
                 <span className="flex flex-col items-center leading-tight">
                   <span>{t(item.id)}</span>

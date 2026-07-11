@@ -196,7 +196,8 @@ export default function MobileMenu({
               className="relative flex flex-1 flex-col gap-0.5 px-3 py-3"
             >
               {navItems.map((nav) => {
-                const ja = t(`${nav.id}Ja`);
+                const jaKey = `${nav.id}Ja`;
+                const ja = t(jaKey);
                 const isActive = activeSection === nav.id;
                 return (
                   <motion.div key={nav.id} variants={ITEM_VARIANTS}>

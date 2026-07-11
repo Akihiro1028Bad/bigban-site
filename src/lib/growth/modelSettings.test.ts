@@ -119,6 +119,19 @@ describe("工程別AIモデル設定", () => {
         }),
       ),
     ).toBeNull();
+
+    const invalidProperties: NotionPage["properties"][] = [
+      {},
+      { "工程ID": { title: "bad" } },
+      { "工程ID": { title: [null] } },
+      { "工程ID": { title: [{ plain_text: 1 }] } },
+      { "プロバイダー": null },
+      { "プロバイダー": { select: null } },
+      { "プロバイダー": { select: { name: 1 } } },
+    ];
+    for (const properties of invalidProperties) {
+      expect(modelSettingFromPage(page(properties))).toBeNull();
+    }
   });
 
   it("Notion保存用プロパティを組み立てる", () => {
@@ -136,5 +149,14 @@ describe("工程別AIモデル設定", () => {
       "モデル": { rich_text: [{ text: { content: "gpt-5.6-sol" } }] },
       "推論強度": { select: { name: "high" } },
     });
+
+    expect(() =>
+      buildModelSettingProps({
+        phaseId: "unknown" as never,
+        provider: "codex",
+        model: "gpt-5.5",
+        effort: "high",
+      }),
+    ).toThrow("未知の工程です。");
   });
 });

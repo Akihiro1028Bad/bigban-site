@@ -78,6 +78,12 @@ describe("ModelSettingsView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("取得失敗");
   });
 
+  it("Error以外の取得失敗は既定文言を表示する", async () => {
+    vi.mocked(fetchModelSettings).mockRejectedValue("down");
+    renderWithClient(<ModelSettingsView token="t" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("取得に失敗しました。");
+  });
+
   it("工程ごとの現在モデルと設定元を表示する", async () => {
     vi.mocked(fetchModelSettings).mockResolvedValue(DATA);
     renderWithClient(<ModelSettingsView token="t" />);
@@ -143,5 +149,31 @@ describe("ModelSettingsView", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "記事下書き生成を保存" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("保存できません");
+  });
+
+  it("推論強度を変更すると保存可能になる", async () => {
+    vi.mocked(fetchModelSettings).mockResolvedValue(DATA);
+    renderWithClient(<ModelSettingsView token="t" />);
+    const effort = await screen.findByLabelText("週次分析・提案の推論強度");
+    fireEvent.change(effort, { target: { value: "medium" } });
+    expect(effort).toHaveValue("medium");
+    expect(screen.getByRole("button", { name: "週次分析・提案を保存" })).toBeEnabled();
+  });
+
+  it("Error以外の保存失敗は既定文言を表示する", async () => {
+    vi.mocked(fetchModelSettings).mockResolvedValue(DATA);
+    vi.mocked(putModelSetting).mockRejectedValue("down");
+    renderWithClient(<ModelSettingsView token="t" />);
+    fireEvent.change(await screen.findByLabelText("週次分析・提案の推論強度"), { target: { value: "medium" } });
+    fireEvent.click(screen.getByRole("button", { name: "週次分析・提案を保存" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存に失敗しました。");
+  });
+
+  it("切替先にモデルと推論強度が無い場合も空値で安全に表示する", async () => {
+    vi.mocked(fetchModelSettings).mockResolvedValue({ ...DATA, catalog: DATA.catalog.filter((item) => item.provider === "codex"), efforts: { ...DATA.efforts, claude: [] } });
+    renderWithClient(<ModelSettingsView token="t" />);
+    fireEvent.change(await screen.findByLabelText("週次分析・提案のプロバイダー"), { target: { value: "claude" } });
+    expect(screen.getByLabelText("週次分析・提案のモデル").querySelectorAll("option")).toHaveLength(0);
+    expect(screen.getByLabelText("週次分析・提案の推論強度").querySelectorAll("option")).toHaveLength(0);
   });
 });

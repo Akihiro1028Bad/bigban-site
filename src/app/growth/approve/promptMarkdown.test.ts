@@ -109,6 +109,23 @@ describe("renderPromptMarkdown", () => {
     );
   });
 
+  it("相対パス正規化・リンクtitle・空見出し・重複見出しを扱う", () => {
+    const html = renderPromptMarkdown(
+      '## !!!\n\n## !!!\n\n[資料](./sub/../doc.md "説明")',
+      {
+        currentPath: "docs/operations/base.md",
+        registeredPaths: new Set(["docs/operations/doc.md"]),
+      },
+    );
+    expect(html).toContain('id="section"');
+    expect(html).toContain('id="section-2"');
+    expect(html).toContain('title="説明"');
+    expect(renderPromptMarkdown("[root](docs/file.md)")).toContain("data-missing-doc-path");
+    expect(renderPromptMarkdown("[relative](file.md)", { currentPath: "base.md" })).toContain(
+      'data-missing-doc-path="file.md"',
+    );
+  });
+
   it("外部URLは通常リンクのまま、未登録repo相対リンクはブラウザ相対URLにしない", () => {
     const html = renderPromptMarkdown(
       "[外部](https://example.com/a) [未登録](docs/operations/missing.md)",

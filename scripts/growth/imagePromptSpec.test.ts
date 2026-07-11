@@ -20,6 +20,7 @@ describe("画像プロンプト提案の安全な反映", () => {
           index: 1,
           style: "mascot",
           description: "宇宙人が初めてのサーブを練習する様子",
+          textSpec: "文字なし",
         },
       ],
     });
@@ -32,6 +33,7 @@ describe("画像プロンプト提案の安全な反映", () => {
           index: 1,
           style: "mascot",
           description: "宇宙人が初めてのサーブを練習する様子",
+          textSpec: "文字なし",
         },
       ],
     });
@@ -74,5 +76,34 @@ describe("画像プロンプト提案の安全な反映", () => {
       eyecatchAction: "holding a glowing pickleball paddle",
       images: [],
     });
+  });
+
+  it("複数画像のindex順序を比較し、textSpec省略も保持する", () => {
+    const result = applyImagePromptProposal(
+      { ...draft, images: [{ index: 2 }, { index: 1 }] },
+      {
+        eyecatchAction: "playing pickleball",
+        images: [
+          { index: 2, style: "court", description: "コート" },
+          { index: 1, style: "flow", description: "流れ" },
+        ],
+      },
+    );
+    expect(result.images).toEqual([
+      { index: 2, style: "court", description: "コート" },
+      { index: 1, style: "flow", description: "流れ" },
+    ]);
+  });
+
+  it("specと画像indexの不正な入力を拒否する", () => {
+    const proposal = { eyecatchAction: "playing", images: [] };
+    expect(() => applyImagePromptProposal(null, proposal)).toThrow(/オブジェクト/);
+    expect(() => applyImagePromptProposal({ ...draft, images: {} }, proposal)).toThrow(/配列/);
+    expect(() =>
+      applyImagePromptProposal({ ...draft, images: [null] }, proposal),
+    ).toThrow(/オブジェクト/);
+    expect(() =>
+      applyImagePromptProposal({ ...draft, images: [{ index: 0 }] }, proposal),
+    ).toThrow(/index/);
   });
 });

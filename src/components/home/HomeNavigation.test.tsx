@@ -138,7 +138,9 @@ describe("HomeNavigation", () => {
     expect(columnLink).toHaveAttribute("href", "/columns");
     expect(nav).toContainElement(columnLink);
     const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
-    expect(links.indexOf("コラム")).toBe(links.indexOf("NEWS") + 1);
+    const newsIndex = links.findIndex((text) => text?.includes("NEWS"));
+    const columnsIndex = links.findIndex((text) => text?.includes("コラム"));
+    expect(columnsIndex).toBe(newsIndex + 1);
   });
 
   it("英語ロケールでは COLUMN ラベル", () => {

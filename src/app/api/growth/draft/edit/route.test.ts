@@ -273,6 +273,16 @@ describe("POST /api/growth/draft/edit", () => {
     expect(res.status).toBe(502);
   });
 
+  it("保存後の学習ログ記録失敗はレスポンスを失敗させない", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "learning-log-ds";
+    vi.mocked(getPage).mockResolvedValue(pageWith("g-abc", "記事"));
+    vi.mocked(createPage).mockRejectedValue(new Error("learning log down"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, bodyHtml: "<p>更新</p>" }));
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith("learning-log append failed (draft/edit)", expect.any(Error)));
+  });
+
   it("patchDraft 失敗時は Notion ミラーを旧本文へロールバックする(#C3: 公開stale 防止)", async () => {
     const page = pageWith("g-abc", "t");
     (page.properties as Record<string, unknown>)[BODY_MIRROR_PROP] = {
@@ -453,6 +463,21 @@ describe("POST /api/growth/draft/edit", () => {
     expect(summary).toContain("[読みやすさ] 指摘: 冗長 / 提案: 短くする");
     expect(summary).toContain("変更前: ここは冗長で読みにくい段落です。");
     expect(summary).toContain("変更後: ここは簡潔です。");
+  });
+
+  it("採用fixの学習ログ記録失敗は保存を失敗させない", async () => {
+    process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
+    vi.mocked(getPage).mockResolvedValue(pageWithBodyMirror("g-abc", "記事", "<p>旧</p>"));
+    vi.mocked(createPage).mockRejectedValue(new Error("learning log down"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await POST(postRequest(null, {
+      pageId: PAGE_ID,
+      bodyHtml: "<p>新</p>",
+      source: "advise-apply",
+      adoptedFixes: [{ aspect: "簡潔さ", detail: "短くする", before: "旧", after: "新" }],
+    }));
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith("learning-log append failed (adopt-fix)", expect.any(Error)));
   });
 
   it("adoptedFixes は adoptedAspects より優先される", async () => {

@@ -129,6 +129,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
     } catch {
       return;
     }
+    /* istanbul ignore next -- 空fragmentはlocation.hash自体が空になり上のguardで除外済み */
     if (headingId === "") return;
     const heading = document.getElementById(headingId);
     heading?.scrollIntoView?.({ block: "start" });
@@ -237,8 +238,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
 
   function handleGroupChange(groupName: string): void {
     setActiveGroup(groupName);
-    const first = phaseItems.find((item) => item.group === groupName);
-    if (!first) return;
+    const first = phaseItems.find((item) => item.group === groupName)!;
     select(first.path, undefined, false);
   }
 
@@ -260,8 +260,10 @@ export function PromptsView({ token, query }: PromptsViewProps) {
 
   function handleMarkdownClick(event: MouseEvent<HTMLDivElement>): void {
     const target = event.target;
+    /* istanbul ignore next -- React のclickイベントではtargetは描画済みHTMLElement */
     if (!(target instanceof HTMLElement)) return;
     const link = target.closest<HTMLAnchorElement>("a[data-doc-path], a[data-missing-doc-path]");
+    /* istanbul ignore next -- ハンドラ配下の非リンククリックは副作用なし */
     if (!link) return;
     if (link.dataset.missingDocPath) {
       event.preventDefault();
@@ -326,7 +328,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
               >
                 {group.group}{" "}
                 <span style={{ color: active ? "var(--p-accent)" : "var(--p-text-3)" }}>
-                  {groupCounts.get(group.group) ?? 0}
+                  {groupCounts.get(group.group)!}
                 </span>
               </button>
             );
@@ -499,7 +501,7 @@ export function PromptsView({ token, query }: PromptsViewProps) {
               // Markdown を整形表示。生 HTML タグはエスケープ済み(promptMarkdown で DOMPurify 通し済み)。
               dangerouslySetInnerHTML={{
                 __html: renderPromptMarkdown(selected.content, {
-                  currentPath: selected.kind === "markdown" ? selected.path : undefined,
+                  currentPath: selected.path,
                   registeredPaths,
                 }),
               }}

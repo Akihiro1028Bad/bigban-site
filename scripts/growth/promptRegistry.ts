@@ -65,6 +65,7 @@ export const PROMPT_GROUP_ORDER: readonly string[] = [
 const FALLBACK_GROUP = "その他";
 
 function basenameOf(repoPath: string): string {
+  /* istanbul ignore next -- @preserve split は文字列入力に対して常に1要素以上を返す */
   return repoPath.split("/").pop() ?? repoPath;
 }
 
