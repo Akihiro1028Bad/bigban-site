@@ -132,7 +132,7 @@ svg, math, details, video, audio (RICH モードでも明示的に拒否)
 **CTA ボタン**
 - `cta` — 一次 CTA (背景塗り)
   ```html
-  <a href="https://reserva.be/tpbt" class="cta">今すぐ予約する</a>
+  <a href="https://www.thepicklebang.com/reserve" class="cta">今すぐ予約する</a>
   ```
 - `cta--ghost` — 二次 CTA (枠線のみ)
   ```html
@@ -284,7 +284,7 @@ svg, math, details, video, audio (RICH モードでも明示的に拒否)
   "excerpt": "GW期間中 (4/29-5/6) に体験会・大会・トークイベントを開催します。事前予約制、参加費無料の枠もあります。",
   "category": ["イベント情報", "キャンペーン"],
   "displayMode": ["html"],
-  "bodyHtml": "<p class=\"lead\">2026年GW期間 (4/29-5/6) に <mark>連日</mark> 特別イベントを開催します。</p><h2>スケジュール</h2><ol class=\"schedule\"><li class=\"schedule-item\"><time datetime=\"2026-04-29\">04/29</time><h3>OPEN DAY</h3><p>無料体験会 10:00-18:00</p></li><li class=\"schedule-item\"><time datetime=\"2026-05-03\">05/03</time><h3>初心者カップ</h3><p>定員 32名 (先着順)</p></li></ol><aside class=\"note\">予約は前日 18:00 まで受付。</aside><aside class=\"caution\">満員時はキャンセル待ちとなります。</aside><p><a class=\"cta\" href=\"https://reserva.be/tpbt\">今すぐ予約する</a></p>",
+  "bodyHtml": "<p class=\"lead\">2026年GW期間 (4/29-5/6) に <mark>連日</mark> 特別イベントを開催します。</p><h2>スケジュール</h2><ol class=\"schedule\"><li class=\"schedule-item\"><time datetime=\"2026-04-29\">04/29</time><h3>OPEN DAY</h3><p>無料体験会 10:00-18:00</p></li><li class=\"schedule-item\"><time datetime=\"2026-05-03\">05/03</time><h3>初心者カップ</h3><p>定員 32名 (先着順)</p></li></ol><aside class=\"note\">予約は前日 18:00 まで受付。</aside><aside class=\"caution\">満員時はキャンセル待ちとなります。</aside><p><a class=\"cta\" href=\"https://www.thepicklebang.com/reserve\">今すぐ予約する</a></p>",
   "body": null,
   "publishedAt": "2026-04-26T00:00:00+09:00"
 }

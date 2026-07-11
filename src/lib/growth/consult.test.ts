@@ -1,0 +1,168 @@
+import { describe, expect, it } from "vitest";
+
+import { isConsultBusy, mapLoopStatus, overallViewFrom, reviseViewFrom, sentenceViewFrom, STAGE_KINDS } from "./consult";
+import type { AdviceView } from "@/lib/growth/advise";
+import type { BodyCommentView } from "@/lib/growth/bodyComment";
+
+describe("mapLoopStatus", () => {
+  it("依頼中→requested / 処理中→processing / 提示中→presenting / 失敗→failed", () => {
+    expect(mapLoopStatus("依頼中")).toBe("requested");
+    expect(mapLoopStatus("処理中")).toBe("processing");
+    expect(mapLoopStatus("提示中")).toBe("presenting");
+    expect(mapLoopStatus("失敗")).toBe("failed");
+  });
+
+  it("なし/undefined/未知 は null（ビューに出さない）", () => {
+    expect(mapLoopStatus("なし")).toBeNull();
+    expect(mapLoopStatus(undefined)).toBeNull();
+    expect(mapLoopStatus("謎")).toBeNull();
+  });
+});
+
+describe("isConsultBusy", () => {
+  it("requested/processing/presenting は再依頼不可（busy=true）", () => {
+    expect(isConsultBusy("requested")).toBe(true);
+    expect(isConsultBusy("processing")).toBe(true);
+    expect(isConsultBusy("presenting")).toBe(true);
+  });
+
+  it("failed/null は再依頼可（busy=false）", () => {
+    expect(isConsultBusy("failed")).toBe(false);
+    expect(isConsultBusy(null)).toBe(false);
+  });
+});
+
+describe("STAGE_KINDS", () => {
+  it("構成案段階=revise のみ / 下書き段階=overall+sentence", () => {
+    expect(STAGE_KINDS.outline).toEqual(["revise"]);
+    expect(STAGE_KINDS.draft).toEqual(["overall", "sentence"]);
+  });
+});
+
+describe("overallViewFrom", () => {
+  const advice = { summary: "良い", scores: [{ axis: "構成", score: 4 }], strengths: ["短文"], fixes: [] };
+
+  it("提示中: status=presenting・advice/raw/requestedAtMs を透過し apply も載せる", () => {
+    const view: AdviceView = { status: "提示中", advice, raw: "{...}", requestedAtMs: 1000 };
+    const apply = { status: "なし" as const, proposal: [], raw: "" };
+    const r = overallViewFrom(view, apply);
+    expect(r).toEqual({ kind: "overall", status: "presenting", advice, raw: "{...}", requestedAtMs: 1000, apply });
+  });
+
+  it("依頼中: status=requested・advice=null", () => {
+    const view: AdviceView = { status: "依頼中", advice: null, raw: "" };
+    const r = overallViewFrom(view, undefined);
+    expect(r?.status).toBe("requested");
+    expect(r?.advice).toBeNull();
+    expect(r?.requestedAtMs).toBeNull();
+    expect(r?.apply).toBeNull();
+  });
+
+  it("なし/undefined は null（未依頼）", () => {
+    expect(overallViewFrom({ status: "なし", advice: null, raw: "" }, undefined)).toBeNull();
+    expect(overallViewFrom(undefined, undefined)).toBeNull();
+  });
+
+  it("raw が空文字あるいは undefined なら空文字で返す", () => {
+    const view1: AdviceView = { status: "処理中", advice: null, raw: "" };
+    const r1 = overallViewFrom(view1, undefined);
+    expect(r1?.raw).toBe("");
+
+    const view2: AdviceView = { status: "失敗", advice: null, raw: "error message" };
+    const r2 = overallViewFrom(view2, undefined);
+    expect(r2?.raw).toBe("error message");
+
+    // raw が undefined の場合
+    const viewWithoutRaw = { status: "処理中", advice: null } as AdviceView;
+    const r3 = overallViewFrom(viewWithoutRaw, undefined);
+    expect(r3?.raw).toBe("");
+  });
+
+  it("requestedAtMs が undefined なら null で返す", () => {
+    const view: AdviceView = { status: "提示中", advice, raw: "test" };
+    const r = overallViewFrom(view, undefined);
+    expect(r?.requestedAtMs).toBeNull();
+  });
+
+  it("apply が undefined なら null で返す", () => {
+    const view: AdviceView = { status: "提示中", advice, raw: "test" };
+    const r = overallViewFrom(view, undefined);
+    expect(r?.apply).toBeNull();
+  });
+});
+
+describe("reviseViewFrom", () => {
+  it("提示中: presenting・現構成/構成案/タイトル案を透過", () => {
+    const r = reviseViewFrom({
+      reviseStatus: "提示中",
+      outline: "現構成",
+      reviseProposal: "新構成",
+      reviseTitleProposal: "新タイトル",
+      reviseRequestedAtMs: 2000,
+    });
+    expect(r).toEqual({
+      kind: "revise",
+      status: "presenting",
+      currentOutline: "現構成",
+      outlineProposal: "新構成",
+      titleProposal: "新タイトル",
+      requestedAtMs: 2000,
+    });
+  });
+
+  it("依頼中: requested・欠落フィールドは空文字/null", () => {
+    const r = reviseViewFrom({ reviseStatus: "依頼中" });
+    expect(r?.status).toBe("requested");
+    expect(r?.currentOutline).toBe("");
+    expect(r?.outlineProposal).toBe("");
+    expect(r?.titleProposal).toBe("");
+    expect(r?.requestedAtMs).toBeNull();
+  });
+
+  it("なし/undefined は null（未依頼）", () => {
+    expect(reviseViewFrom({ reviseStatus: "なし" })).toBeNull();
+    expect(reviseViewFrom({})).toBeNull();
+  });
+});
+
+describe("sentenceViewFrom", () => {
+  const proposal = [{ commentIndex: 0, before: "古い文", after: "新しい文" }];
+
+  it("提示中: presenting・proposal/raw を透過", () => {
+    const r = sentenceViewFrom({ status: "提示中", comments: [], proposal, raw: "" });
+    expect(r).toEqual({ kind: "sentence", status: "presenting", proposal, raw: "" });
+  });
+
+  it("失敗: failed・raw に理由", () => {
+    const r = sentenceViewFrom({ status: "失敗", comments: [], proposal: [], raw: "解釈失敗" });
+    expect(r?.status).toBe("failed");
+    expect(r?.raw).toBe("解釈失敗");
+  });
+
+  it("なし/undefined は null（未依頼）", () => {
+    expect(sentenceViewFrom({ status: "なし", comments: [], proposal: [], raw: "" })).toBeNull();
+    expect(sentenceViewFrom(undefined)).toBeNull();
+  });
+
+  it("処理中: 依頼中・空の proposal/raw でもデフォルト値で生成", () => {
+    const r = sentenceViewFrom({ status: "処理中", comments: [], proposal: [], raw: "" });
+    expect(r?.status).toBe("processing");
+    expect(r?.proposal).toEqual([]);
+    expect(r?.raw).toBe("");
+  });
+
+  it("依頼中: proposal/raw が非空で透過", () => {
+    const proposal = [{ commentIndex: 1, before: "文A", after: "文B" }];
+    const r = sentenceViewFrom({ status: "依頼中", comments: [], proposal, raw: "processing" });
+    expect(r?.status).toBe("requested");
+    expect(r?.proposal).toBe(proposal);
+    expect(r?.raw).toBe("processing");
+  });
+
+  it("提示中: proposal/raw 欠落は []/'' にフォールバック", () => {
+    const r = sentenceViewFrom({ status: "提示中", comments: [] } as unknown as BodyCommentView);
+    expect(r?.status).toBe("presenting");
+    expect(r?.proposal).toEqual([]);
+    expect(r?.raw).toBe("");
+  });
+});

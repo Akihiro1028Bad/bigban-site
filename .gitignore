@@ -13,6 +13,7 @@ build/
 
 # env
 .env
+.env.production
 .env.local
 .env.development.local
 .env.test.local
@@ -30,6 +31,9 @@ yarn-error.log*
 # IDE
 .vscode/
 .idea/
+
+# local assistant app settings
+.claude/
 
 # turbopack
 .turbo/
@@ -60,3 +64,6 @@ secrets/
 
 # local data artifacts (growth images, snapshots)
 data/
+
+# growth loop: ステージ用一時ファイル・revise の lockfile / 実行カウント(管理外)
+/.growth-tmp/

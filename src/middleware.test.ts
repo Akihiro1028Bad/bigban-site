@@ -121,5 +121,29 @@ describe("middleware", () => {
       expect(config.matcher).toBeDefined();
       expect(Array.isArray(config.matcher)).toBe(true);
     });
+
+    // matcher は「ミドルウェアを動かすパス」を表す否定先読み正規表現。
+    // JS RegExp として評価し、対象/除外を直接検証する(#102 回帰テスト)。
+    async function runsMiddleware(pathname: string): Promise<boolean> {
+      const { config } = await import("./middleware");
+      const pattern = (config.matcher as string[])[0];
+      return new RegExp(`^${pattern}$`).test(pathname);
+    }
+
+    it("i18n 対象パス(/, /ja/about)はミドルウェアを通す", async () => {
+      expect(await runsMiddleware("/")).toBe(true);
+      expect(await runsMiddleware("/ja/about")).toBe(true);
+      expect(await runsMiddleware("/en/news")).toBe(true);
+    });
+
+    it("/draft-frame は i18n ミドルウェアの対象外(#102)", async () => {
+      // iframe プレビュールートが locale 付きへ書き換えられ 404 になる事象の回帰防止。
+      expect(await runsMiddleware("/draft-frame")).toBe(false);
+    });
+
+    it("既存の除外(/growth/approve, /api/...)も対象外のまま", async () => {
+      expect(await runsMiddleware("/growth/approve")).toBe(false);
+      expect(await runsMiddleware("/api/growth/draft")).toBe(false);
+    });
   });
 });

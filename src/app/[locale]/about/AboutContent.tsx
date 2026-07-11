@@ -81,12 +81,15 @@ function SectionHeader({ number, labelEn, id }: SectionHeaderProps) {
 interface AboutContentProps {
   newsItems?: NewsItem[];
   locale?: "ja" | "en";
+  /** COLUMN ナビリンク表示フラグ(server で isCmsColumnsEnabled() を渡す)。既定 false。 */
+  showColumns?: boolean;
 }
 
 /* istanbul ignore next -- @preserve デフォルト引数は呼び出し側で常に props を渡すため到達不可 */
 export default function AboutContent({
   newsItems = [],
   locale = "ja",
+  showColumns = false,
 }: AboutContentProps = {}) {
   const t = useTranslations("About");
   const categories = useCategories();
@@ -153,7 +156,7 @@ export default function AboutContent({
 
   return (
     <main className="bg-deep-black min-h-screen">
-      <HomeNavigation />
+      <HomeNavigation showColumns={showColumns} />
 
       {/* Hero */}
       <section className="pt-[calc(7rem+var(--promo-banner-h))] pb-12 lg:pt-[calc(8rem+var(--promo-banner-h))] lg:pb-16">

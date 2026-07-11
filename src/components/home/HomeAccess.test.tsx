@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeAccess from "./HomeAccess";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("HomeAccess", () => {
   it('セクションID "access" を持つ', () => {
@@ -84,5 +90,19 @@ describe("HomeAccess", () => {
     );
     const section = document.getElementById("access");
     expect(section?.className).toContain("bg-off-white");
+  });
+
+  it("「Googleマップで開く」リンクを表示しクリックで access_click を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeAccess />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByText(/Googleマップで開く/).closest("a");
+    expect(link).toHaveAttribute("href", "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7");
+    expect(link).toHaveAttribute("target", "_blank");
+    await userEvent.click(link!);
+    expect(trackCtaClick).toHaveBeenCalledWith("access", "home_access");
   });
 });

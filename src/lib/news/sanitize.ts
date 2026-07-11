@@ -59,6 +59,9 @@ const COMMON_ALLOWED_ATTR = [
   // 値検証は uponSanitizeAttribute フック内で行う
   "data-embed-provider",
   "data-embed-id",
+  // 本文画像生成プレースホルダ (<figure data-pending="img-...">)
+  // 値検証は uponSanitizeAttribute フック内で行う
+  "data-pending",
 ];
 
 // 注: ALLOWED_URI_REGEXP オプションは DOMPurify 3.x + jsdom env で
@@ -149,6 +152,7 @@ const ISO_DATETIME_REGEX =
 // SNS 埋め込みトークンの ID は基本英数字 + ハイフン + アンダースコア (DoS / 注入対策)
 // プロバイダ固有の厳密検証 (例: YouTube は 11 文字固定) は registry 側で行う
 const EMBED_ID_GENERIC_REGEX = /^[A-Za-z0-9_-]{1,64}$/;
+const PENDING_ID_REGEX = /^img-[A-Za-z0-9-]{6,64}$/;
 const EMBED_PROVIDER_SET = new Set(EMBED_PROVIDER_IDS);
 
 // DOMPurify.addHook はモジュール評価のたびに呼ぶと同じ DOMPurify インスタンスに
@@ -225,6 +229,13 @@ function registerHooksOnce(): void {
     }
     if (data.attrName === "data-embed-id") {
       if (tag !== "A" || !EMBED_ID_GENERIC_REGEX.test(data.attrValue)) {
+        data.keepAttr = false;
+      }
+      return;
+    }
+
+    if (data.attrName === "data-pending") {
+      if (tag !== "FIGURE" || !PENDING_ID_REGEX.test(data.attrValue)) {
         data.keepAttr = false;
       }
       return;

@@ -1,0 +1,336 @@
+// @vitest-environment node
+import { describe, it, expect } from "vitest";
+
+import {
+  buildPreviewUrl,
+  previewUrlOrNull,
+  buildDraftNotifyMessage,
+  buildDraftFailureMessage,
+  classifyDraftFailure,
+  buildDraftFlex,
+  type DraftNotifyItem,
+  type DraftFlexItem,
+} from "./draft-notify";
+
+describe("buildDraftFailureMessage", () => {
+  const msg = buildDraftFailureMessage({
+    failedStage: "create",
+    error: "504 gateway timeout",
+    specPath: ".growth-tmp/roadmap.json",
+  });
+
+  it("外部障害の可能性と再開可能であることを伝える", () => {
+    expect(msg).toContain("下書き");
+    expect(msg).toMatch(/外部障害|未作成|失敗/);
+    expect(msg).toContain("再開");
+  });
+
+  it("失敗した工程・理由・ステージ済みパスを含む", () => {
+    expect(msg).toContain("create");
+    expect(msg).toContain("504 gateway timeout");
+    expect(msg).toContain(".growth-tmp/roadmap.json");
+  });
+
+  it("再開手順（コマンド）を含む", () => {
+    expect(msg).toContain("npm run growth:publish-draft");
+    expect(msg).toContain("npm run growth:drafts");
+  });
+});
+
+describe("classifyDraftFailure（失敗原因の分類 / #58）", () => {
+  it("自前タイムアウトは timeout", () => {
+    expect(classifyDraftFailure("リクエストがタイムアウトしました (45000ms)")).toBe(
+      "timeout"
+    );
+    expect(classifyDraftFailure("504 gateway timeout")).toBe("timeout");
+  });
+
+  it("4xx は client（送信内容の問題）", () => {
+    expect(
+      classifyDraftFailure(
+        "microCMS コンテンツ API に失敗しました (HTTP 422): unprocessable"
+      )
+    ).toBe("client");
+  });
+
+  it("5xx は external（外部障害）", () => {
+    expect(
+      classifyDraftFailure(
+        "microCMS コンテンツ API に失敗しました (HTTP 503): service unavailable"
+      )
+    ).toBe("external");
+  });
+
+  it("ネットワーク等の不明なエラーは external にフォールバック", () => {
+    expect(classifyDraftFailure("ECONNRESET")).toBe("external");
+  });
+});
+
+describe("buildDraftFailureMessage の原因別文言（#58）", () => {
+  const base = { failedStage: "create", specPath: ".growth-tmp/x.json" };
+
+  it("timeout は『外部障害』と断定せずタイムアウトと伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "リクエストがタイムアウトしました (45000ms)",
+    });
+    expect(msg).toMatch(/タイムアウト/);
+    expect(msg).not.toContain("外部障害");
+    expect(msg).toContain("再開");
+  });
+
+  it("client(4xx) は送信内容の問題と伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "microCMS コンテンツ API に失敗しました (HTTP 422): bad",
+    });
+    expect(msg).toMatch(/送信内容/);
+    expect(msg).not.toContain("外部障害");
+  });
+
+  it("external(5xx) は従来どおり外部障害の可能性を伝える", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "microCMS コンテンツ API に失敗しました (HTTP 503): down",
+    });
+    expect(msg).toContain("外部障害");
+  });
+
+  it("category を明示指定すれば error 文字列に依らずその分類で出す", () => {
+    const msg = buildDraftFailureMessage({
+      ...base,
+      error: "なんらかのエラー",
+      category: "timeout",
+    });
+    expect(msg).toMatch(/タイムアウト/);
+  });
+});
+
+describe("previewUrlOrNull", () => {
+  const base = {
+    siteUrl: "https://www.thepicklebang.com",
+    contentId: "abc123",
+  };
+
+  it("siteUrl と contentId が揃っていれば承認画面リンクを返す", () => {
+    expect(previewUrlOrNull(base)).toBe(
+      "https://www.thepicklebang.com/growth/approve?view=approve&draft=abc123"
+    );
+  });
+
+  it("siteUrl が無ければ null（通知は続行させるため）", () => {
+    expect(previewUrlOrNull({ ...base, siteUrl: null })).toBeNull();
+    expect(previewUrlOrNull({ ...base, siteUrl: undefined })).toBeNull();
+    expect(previewUrlOrNull({ ...base, siteUrl: "" })).toBeNull();
+  });
+});
+
+describe("buildPreviewUrl", () => {
+  it("承認画面(記事ビュー)の対象記事へ飛ぶ URL を組み立てる", () => {
+    const url = buildPreviewUrl({
+      siteUrl: "https://www.thepicklebang.com",
+      contentId: "abc123",
+    });
+    expect(url).toBe(
+      "https://www.thepicklebang.com/growth/approve?view=approve&draft=abc123"
+    );
+  });
+
+  it("siteUrl の末尾スラッシュを正規化する", () => {
+    const url = buildPreviewUrl({
+      siteUrl: "https://www.thepicklebang.com/",
+      contentId: "id",
+    });
+    expect(url).toContain("https://www.thepicklebang.com/growth/approve?");
+    expect(url).not.toContain(".com//growth");
+  });
+
+  it("contentId を URL エンコードする", () => {
+    const url = buildPreviewUrl({
+      siteUrl: "https://example.com",
+      contentId: "a b/=?",
+    });
+    expect(url).toContain("draft=a+b%2F%3D%3F");
+  });
+});
+
+describe("buildDraftNotifyMessage", () => {
+  const withUrl: DraftNotifyItem = {
+    title: "本八幡で始めるピックルボール",
+    contentId: "c1",
+    previewUrl: "https://www.thepicklebang.com/growth/approve?view=approve&draft=c1",
+  };
+  const noUrl: DraftNotifyItem = {
+    title: "雨の日でも続けられる屋内コート",
+    contentId: "c2",
+    previewUrl: null,
+  };
+
+  it("件数とタイトル・承認画面リンクを含むメッセージを作る", () => {
+    const msg = buildDraftNotifyMessage([withUrl]);
+    expect(msg).toContain("下書きを1件作成しました");
+    expect(msg).toContain("本八幡で始めるピックルボール");
+    expect(msg).toContain(withUrl.previewUrl as string);
+    // 飛び先が承認画面と分かる文言にする(microCMS プレビューではない)。
+    expect(msg).toContain("承認画面:");
+  });
+
+  it("承認画面リンクが無い記事は下書きIDで案内する", () => {
+    const msg = buildDraftNotifyMessage([noUrl]);
+    expect(msg).toContain("雨の日でも続けられる屋内コート");
+    expect(msg).toContain("c2");
+    expect(msg).toContain("承認画面リンクは取得できませんでした");
+  });
+
+  it("複数記事を番号付きでまとめる", () => {
+    const msg = buildDraftNotifyMessage([withUrl, noUrl]);
+    expect(msg).toContain("下書きを2件作成しました");
+    expect(msg).toContain("1. ");
+    expect(msg).toContain("2. ");
+  });
+
+  it("空配列のときは作成なしのメッセージを返す", () => {
+    const msg = buildDraftNotifyMessage([]);
+    expect(msg).toContain("下書きは作成されませんでした");
+  });
+});
+
+describe("buildDraftFlex", () => {
+  const full: DraftFlexItem = {
+    title: "本八幡の屋内コート",
+    excerpt: "雨でも続けられる屋内ピックルボール。",
+    category: "お知らせ",
+    eyecatchUrl: "https://img.example/cover.png",
+    previewUrl: "https://www.thepicklebang.com/growth/approve?view=approve&draft=c1",
+    contentId: "c1",
+  };
+
+  it("カルーセル(記事ごとに1バブル)を組み立てる", () => {
+    const flex = buildDraftFlex([full, { ...full, contentId: "c2", title: "2本目" }]);
+    expect(flex.type).toBe("carousel");
+    expect(flex.contents).toHaveLength(2);
+    expect(flex.contents.every((b) => b.type === "bubble")).toBe(true);
+  });
+
+  it("各カードに hero画像・カテゴリバッジ・タイトル・抜粋・プレビューボタンを入れる", () => {
+    const [bubble] = buildDraftFlex([full]).contents;
+
+    // hero(アイキャッチ・16:9)
+    expect(bubble.hero).toEqual({
+      type: "image",
+      url: full.eyecatchUrl,
+      size: "full",
+      aspectRatio: "16:9",
+      aspectMode: "cover",
+    });
+
+    const body = bubble.body!.contents;
+    // 先頭はカテゴリバッジ(ピル)
+    const badge = body[0];
+    expect(badge.type).toBe("box");
+    const pillText = JSON.stringify(badge);
+    expect(pillText).toContain("お知らせ");
+    // タイトル(太字・2行まで)
+    const title = body.find((c) => c.type === "text" && c.text === full.title);
+    expect(title).toMatchObject({ weight: "bold", maxLines: 2 });
+    // 抜粋(グレー・3行まで)
+    const excerpt = body.find((c) => c.type === "text" && c.text === full.excerpt);
+    expect(excerpt).toMatchObject({ maxLines: 3 });
+
+    // フッターは承認画面ボタン(uri)
+    const footerBtn = bubble.footer!.contents[0];
+    expect(footerBtn).toMatchObject({
+      type: "button",
+      action: { type: "uri", label: "承認画面で開く", uri: full.previewUrl },
+    });
+  });
+
+  it("アイキャッチが無ければ hero を省略する", () => {
+    const [bubble] = buildDraftFlex([{ ...full, eyecatchUrl: null }]).contents;
+    expect(bubble.hero).toBeUndefined();
+  });
+
+  it("カテゴリが空ならバッジを出さず、本文はタイトルから始まる", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "" }]).contents;
+    const first = bubble.body!.contents[0];
+    expect(first).toMatchObject({ type: "text", text: full.title });
+  });
+
+  it("抜粋が空なら抜粋テキストを入れない", () => {
+    const [bubble] = buildDraftFlex([{ ...full, excerpt: "" }]).contents;
+    const texts = bubble.body!.contents.filter((c) => c.type === "text");
+    // タイトルのみ(抜粋なし)
+    expect(texts).toHaveLength(1);
+    expect(texts[0]).toMatchObject({ text: full.title });
+  });
+
+  it("承認画面リンクが無ければボタンの代わりに下書きIDを案内する", () => {
+    const [bubble] = buildDraftFlex([{ ...full, previewUrl: null }]).contents;
+    const footer = bubble.footer!.contents[0];
+    expect(footer.type).toBe("text");
+    expect(JSON.stringify(footer)).toContain("c1");
+    expect(JSON.stringify(footer)).toContain("承認画面リンクは取得できませんでした");
+  });
+
+  it("12件を超えるときは先頭12バブルに制限する", () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({
+      ...full,
+      contentId: `c${i}`,
+      title: `記事${i}`,
+    }));
+    expect(buildDraftFlex(many).contents).toHaveLength(12);
+  });
+
+  it("0件なら空のカルーセル(呼び出し側がテキストへフォールバック)", () => {
+    const flex = buildDraftFlex([]);
+    expect(flex).toEqual({ type: "carousel", contents: [] });
+  });
+
+  // Bug2: LINE は空 text(空文字列)を 400 で弾く。全 text フィールドを空ガードする。
+  it("タイトルが空でも空 text を出さず、contentId でフォールバックする", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "", title: "" }]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.some((t) => t === "")).toBe(false);
+    // フォールバックに contentId を含む(沈黙させない)
+    expect(JSON.stringify(bubble)).toContain("c1");
+  });
+
+  it("タイトルが空白のみでも空 text を出さない", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "", title: "   " }]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.some((t) => t === "")).toBe(false);
+  });
+
+  it("カテゴリが空白のみでもバッジを出さない(空 text を送らない)", () => {
+    const [bubble] = buildDraftFlex([{ ...full, category: "   " }]).contents;
+    const first = bubble.body!.contents[0];
+    expect(first).toMatchObject({ type: "text", text: full.title });
+  });
+
+  it("すべての空フィールド(title/category/excerpt空)でも Flex に空 text を1つも含めない", () => {
+    const [bubble] = buildDraftFlex([
+      { ...full, title: "", category: "", excerpt: "", eyecatchUrl: null, previewUrl: null },
+    ]).contents;
+    const texts = collectTexts(bubble);
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.some((t) => t === "")).toBe(false);
+  });
+});
+
+/** バブル配下の全 text コンポーネントの text 値を収集する(空 text 検出用)。 */
+function collectTexts(node: unknown): string[] {
+  const out: string[] = [];
+  const walk = (n: unknown): void => {
+    if (!n || typeof n !== "object") return;
+    const obj = n as Record<string, unknown>;
+    if (obj.type === "text" && typeof obj.text === "string") {
+      out.push(obj.text);
+    }
+    for (const value of Object.values(obj)) {
+      if (Array.isArray(value)) value.forEach(walk);
+      else if (value && typeof value === "object") walk(value);
+    }
+  };
+  walk(node);
+  return out;
+}

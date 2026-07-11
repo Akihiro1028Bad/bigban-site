@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import CourtPriceTable from "@/components/pricing/CourtPriceTable";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 export default function HomePricing() {
@@ -70,6 +71,7 @@ export default function HomePricing() {
               {t("privateFacilityNote")}
               <Link
                 href="/about#contact"
+                onClick={() => trackCtaClick("price", "home_pricing")}
                 className="text-accent hover:underline"
               >
                 {t("contactUs")}

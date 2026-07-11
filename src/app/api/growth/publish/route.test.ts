@@ -1,0 +1,497 @@
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/growth/notion", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/growth/notion")>();
+  return { ...actual, getPage: vi.fn(), updatePageSelect: vi.fn(), defaultFetch: vi.fn() };
+});
+vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn(), patchDraft: vi.fn() }));
+vi.mock("@/lib/microcms/columnsQueries", () => ({ getColumnSlugs: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/lib/microcms/queries", () => ({ getNewsSlugs: vi.fn().mockResolvedValue([]) }));
+
+const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
+vi.mock("@/config/featureFlags", () => ({
+  get APPROVE_AUTH_ENABLED() {
+    return flags.authEnabled;
+  },
+}));
+
+import { patchDraft, publishContent } from "@/lib/growth/content";
+import { getNewsSlugs } from "@/lib/microcms/queries";
+import { getPage, updatePageSelect } from "@/lib/growth/notion";
+import { POST } from "./route";
+
+const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
+const SECRET = "open-sesame";
+const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
+
+function postReq(token: string | null, body: unknown, raw?: string): Request {
+  const url = new URL("http://localhost/api/growth/publish");
+  if (token !== null) url.searchParams.set("token", token);
+  return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
+}
+
+function page(
+  opts: {
+    contentId?: string;
+    eyecatch?: string;
+    body?: string;
+    title?: string;
+    media?: string;
+    bodyRegenStatus?: string;
+    eyecatchRegenStatus?: string;
+  } = {}
+) {
+  const properties: Record<string, unknown> = {};
+  if (opts.contentId !== undefined) {
+    properties["下書きID"] = { rich_text: [{ plain_text: opts.contentId }] };
+  }
+  if (opts.eyecatch !== undefined) {
+    properties["アイキャッチURL"] = { type: "url", url: opts.eyecatch };
+  }
+  if (opts.body !== undefined) {
+    properties["下書き本文HTML"] = { rich_text: [{ plain_text: opts.body }] };
+  }
+  if (opts.title !== undefined) {
+    properties["タイトル案"] = { type: "title", title: [{ plain_text: opts.title }] };
+  }
+  if (opts.media !== undefined) {
+    properties["媒体"] = { type: "select", select: { name: opts.media } };
+  }
+  if (opts.bodyRegenStatus !== undefined) {
+    properties["本文画像再生成ステータス"] = { type: "select", select: { name: opts.bodyRegenStatus } };
+  }
+  if (opts.eyecatchRegenStatus !== undefined) {
+    properties["アイキャッチ再生成ステータス"] = { type: "select", select: { name: opts.eyecatchRegenStatus } };
+  }
+  return { id: PAGE_ID, url: "", properties };
+}
+
+const READY = page({
+  contentId: "my-article",
+  eyecatch: "https://images.microcms-assets.io/x.png",
+  body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+  title: "公開する承認タイトル",
+});
+
+beforeEach(() => {
+  flags.authEnabled = true;
+  process.env.APPROVE_SECRET = SECRET;
+  process.env.NOTION_TOKEN = "secret_notion";
+  process.env.MICROCMS_SERVICE_DOMAIN = "thepicklebang";
+  process.env.MICROCMS_API_KEY = "single-key";
+  vi.mocked(getPage).mockReset();
+  vi.mocked(updatePageSelect).mockReset();
+  vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
+  vi.mocked(patchDraft).mockReset().mockResolvedValue("my-article");
+  vi.mocked(getNewsSlugs).mockReset().mockResolvedValue([]);
+});
+
+afterEach(() => {
+  delete process.env.APPROVE_SECRET;
+  delete process.env.NOTION_TOKEN;
+  delete process.env.MICROCMS_SERVICE_DOMAIN;
+  delete process.env.MICROCMS_API_KEY;
+  delete process.env.GROWTH_MICROCMS_ENDPOINT;
+  vi.restoreAllMocks();
+});
+
+describe("POST /api/growth/publish", () => {
+  it("認証有効＋正規トークン＋検証OKで公開し、ステータスを公開済みにする(200・媒体欠落=コラム既定・env未設定でnews)", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    // 媒体欠落 → コラム既定 → env(GROWTH_MICROCMS_ENDPOINT)未設定 → news フォールバック。
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
+    // #176: 公開直前に Notion タイトル案を microCMS 下書きの title へ最終同期する(content キー)。
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    // タイトル同期 → 公開の順(公開後に title を変えない)。
+    expect(vi.mocked(patchDraft).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(publishContent).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("媒体=コラム + env=columns なら columns へ publish(記事ごとの媒体を解決)", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+        title: "公開する承認タイトル",
+        media: "コラム",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("columns", "my-article", expect.anything());
+    expect(patchDraft).toHaveBeenCalledWith(
+      "columns",
+      "my-article",
+      { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+  });
+
+  it("媒体=ニュースなら env=columns でも常に news へ publish(告知は必ず news)", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+        title: "公開する承認タイトル",
+        media: "ニュース",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it("媒体欠落 + env=columns ならコラム既定で columns へ publish", async () => {
+    process.env.GROWTH_MICROCMS_ENDPOINT = "columns";
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalledWith("columns", "my-article", expect.anything());
+  });
+
+  it("既に公開済みなら 409(冪等・二重公開や手直しタイトルの再上書きを防ぐ・#SPEC-14)", async () => {
+    const published = {
+      id: PAGE_ID,
+      url: "",
+      properties: {
+        ...READY.properties,
+        ステータス: { type: "select", select: { name: "公開済み" } },
+      },
+    };
+    vi.mocked(getPage).mockResolvedValue(published);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(patchDraft).not.toHaveBeenCalled();
+  });
+
+  it("MICROCMS_API_KEY 未設定は 500(タイトル最終同期に必要)", async () => {
+    delete process.env.MICROCMS_API_KEY;
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(500);
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("MICROCMS_API_KEY 1つだけでタイトル同期と公開を実行できる", async () => {
+    delete process.env.MICROCMS_API_KEY;
+    process.env.MICROCMS_API_KEY = "single-key";
+
+    vi.mocked(getPage).mockResolvedValue(READY);
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.anything(),
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+  });
+
+  it("タイトル案が空でも公開はする(title 同期はスキップ)", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+        title: "   ",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("公開直前にAI免責注記を除去した本文をtitleと一緒にPATCHする", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      expect.objectContaining({
+        title: "公開する承認タイトル",
+        bodyHtml: expect.not.stringContaining("AIが作成した下書き"),
+      }),
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("AI免責注記あり・タイトル案が空なら除去済み本文だけをPATCHして公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p>${DISCLAIMER}</p>`,
+        title: "   ",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { bodyHtml: "<p>本文</p>" },
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("免責文が除去対象ブロックでなければ title だけをPATCHして公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>AIが作成した<span>下書き</span>です。</p>",
+        title: "公開する承認タイトル",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      "news",
+      "my-article",
+      { title: "公開する承認タイトル" },
+      expect.objectContaining({ apiKey: "single-key" })
+    );
+    expect(publishContent).toHaveBeenCalled();
+  });
+
+  it("タイトル同期も免責除去も不要ならPATCHせず公開する", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p><p>AIが作成した<span>下書き</span>です。</p>",
+        title: "   ",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
+  });
+
+  it("APPROVE_AUTH_ENABLED が無効なら常に 401(公開は最強権限)", async () => {
+    flags.authEnabled = false;
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(401);
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("トークン不一致は 401", async () => {
+    expect((await POST(postReq("wrong", { pageId: PAGE_ID }))).status).toBe(401);
+  });
+
+  it("トークン無しは 401", async () => {
+    expect((await POST(postReq(null, { pageId: PAGE_ID }))).status).toBe(401);
+  });
+
+  it("NOTION_TOKEN 未設定は 500", async () => {
+    delete process.env.NOTION_TOKEN;
+    expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(500);
+  });
+
+  it("APPROVE_SECRET 未設定は 401", async () => {
+    delete process.env.APPROVE_SECRET;
+    expect((await POST(postReq("anything", { pageId: PAGE_ID }))).status).toBe(401);
+  });
+
+  it("壊れた JSON は 400", async () => {
+    expect((await POST(postReq(SECRET, null, "{壊れ"))).status).toBe(400);
+  });
+
+  it("不正な pageId は 400", async () => {
+    expect((await POST(postReq(SECRET, { pageId: "x" }))).status).toBe(400);
+  });
+
+  it("microCMS 管理キーが無ければ 500", async () => {
+    delete process.env.MICROCMS_API_KEY;
+    expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(500);
+  });
+
+  it("下書きID が無ければ 400", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ eyecatch: "https://images.microcms-assets.io/x.png", body: "<p>本文</p>" }));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(400);
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("アイキャッチが無ければ 400", async () => {
+    vi.mocked(getPage).mockResolvedValue(page({ contentId: "my-article", body: "<p>本文</p>" }));
+    expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(400);
+  });
+
+  it("本文が空なら 400", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({ contentId: "my-article", eyecatch: "https://images.microcms-assets.io/x.png", body: "   " })
+    );
+    expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(400);
+  });
+
+  it("本文に pending figure が残っていたら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><figure data-pending="img-abc123"><figcaption>生成中</figcaption></figure>`,
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("公開直前ゲートで block があれば 409 で公開しない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("公開前チェック");
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("slug取得が失敗しても壊れリンク検査だけスキップして公開を続行する", async () => {
+    vi.mocked(getNewsSlugs).mockRejectedValue(new Error("microCMS slug fetch failed"));
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<p>本文</p><p><a href="/ja/news/missing-slug">関連記事</a></p><p>${DISCLAIMER}</p>`,
+        title: "公開する承認タイトル",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(getNewsSlugs).toHaveBeenCalled();
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
+  });
+
+  it("本文画像再生成が処理中なら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        bodyRegenStatus: "処理中",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("アイキャッチ再生成が依頼中なら 409 で公開書き込みしない", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "my-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: "<p>本文</p>",
+        title: "公開する承認タイトル",
+        eyecatchRegenStatus: "依頼中",
+      })
+    );
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "画像生成の完了を待ってから公開してください。",
+    });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("公開処理が失敗したら 502", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(publishContent).mockRejectedValue(new Error("microcms down"));
+    expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(502);
+  });
+
+  it("microCMS 公開後に Notion ステータス更新だけ失敗したら partial success として明示する", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(updatePageSelect).mockRejectedValue(new Error("notion down"));
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(207);
+    expect(await res.json()).toEqual({
+      success: false,
+      partial: "notion-status",
+      error: "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。",
+    });
+    expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
+  });
+});

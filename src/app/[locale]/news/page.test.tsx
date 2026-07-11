@@ -31,6 +31,7 @@ vi.mock("next-intl", () => ({
 }));
 vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: isCmsNewsEnabledMock,
+  isCmsColumnsEnabled: () => false,
 }));
 vi.mock("@/components/home/HomeNavigation", () => ({
   default: () => null,

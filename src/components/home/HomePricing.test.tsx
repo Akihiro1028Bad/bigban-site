@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomePricing from "./HomePricing";
 
 import type React from "react";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
@@ -106,5 +112,17 @@ describe("HomePricing", () => {
     );
     const section = document.getElementById("pricing");
     expect(section?.className).toContain("bg-deep-black");
+  });
+
+  it("お問い合わせCTAクリックで price_click を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const link = document.querySelector('a[href="/about#contact"]');
+    await userEvent.click(link!);
+    expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
   });
 });
