@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { RESERVE_PATH } from "@/constants/site";
 import { useMagneticButton } from "@/hooks/useMagneticButton";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 export default function HomeHero() {
@@ -88,6 +89,7 @@ export default function HomeHero() {
               <Link
                 ref={ref as React.RefObject<HTMLAnchorElement>}
                 href={RESERVE_PATH}
+                onClick={() => trackCtaClick("reserveEntry", "home_hero", t("cta"))}
                 className="inline-block bg-accent px-8 py-3 text-sm font-bold tracking-widest text-deep-black transition-transform"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}

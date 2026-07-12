@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 export default function HyroxPicklePromo() {
@@ -41,6 +42,7 @@ export default function HyroxPicklePromo() {
             </p>
             <Link
               href="/"
+              onClick={() => trackCtaClick("contentClick", "hyrox_pickle_promo", "home")}
               className="mt-7 inline-block self-start bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
             >
               {t("cta")}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 export type SubscriptionStatus = "idle" | "submitting" | "success" | "error";
 
@@ -30,7 +31,13 @@ export function useEmailSubscription(): UseEmailSubscriptionResult {
         body: JSON.stringify({ email }),
       });
 
-      setStatus(response.ok ? "success" : "error");
+      if (response.ok) {
+        trackCtaClick("newsletterSignup", "footer_newsletter");
+        setStatus("success");
+        return;
+      }
+
+      setStatus("error");
     } catch {
       setStatus("error");
     }

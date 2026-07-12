@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { forwardRef } from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeHero from "./HomeHero";
 
 import type { ReactElement } from "react";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: forwardRef<HTMLAnchorElement, Record<string, unknown>>(
@@ -61,6 +67,15 @@ describe("HomeHero", () => {
     expect(cta).toBeInTheDocument();
     expect(cta).toHaveAttribute("href", "/reserve");
     expect(cta).not.toHaveAttribute("target", "_blank");
+  });
+
+  it("CTAクリックで予約入口を計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithProvider(<HomeHero />);
+
+    await userEvent.click(screen.getByRole("link", { name: /RESERVE A COURT/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith("reserveEntry", "home_hero", "RESERVE A COURT");
   });
 
   it("スクロールインジケーター（SCROLL）を表示する", () => {

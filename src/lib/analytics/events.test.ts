@@ -3,11 +3,16 @@ import { describe, expect, it } from "vitest";
 import { CTA_EVENTS, ctaEventParams, formEntryLabel } from "./events";
 
 describe("CTA_EVENTS", () => {
-  it("6つの key イベント名を持つ(GA4 キーイベント化対象)", () => {
+  it("公開導線の key イベント名を持つ(GA4 キーイベント化対象)", () => {
     expect(CTA_EVENTS).toEqual({
       instagram: "instagram_click",
       line: "line_click",
       reservation: "reservation_click",
+      reserveEntry: "reserve_entry_click",
+      contactSubmit: "contact_submit",
+      newsletterSignup: "newsletter_signup",
+      externalLink: "external_link_click",
+      contentClick: "content_click",
       access: "access_click",
       price: "price_click",
       newsCta: "news_cta_click",

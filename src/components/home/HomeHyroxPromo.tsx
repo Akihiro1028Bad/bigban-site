@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 export default function HomeHyroxPromo() {
@@ -65,6 +66,7 @@ export default function HomeHyroxPromo() {
 
             <Link
               href="/hyrox"
+              onClick={() => trackCtaClick("contentClick", "home_hyrox_promo", "hyrox")}
               className="mt-8 inline-flex items-center gap-2 self-start bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-all hover:gap-3 hover:bg-accent/90"
             >
               {t("cta")}

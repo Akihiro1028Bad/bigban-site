@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import { RESERVE_PATH } from "@/constants/site";
@@ -7,6 +8,11 @@ import HyroxServices from "./HyroxServices";
 import jaMessages from "../../../messages/ja.json";
 
 import type React from "react";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
@@ -42,6 +48,20 @@ describe("HyroxServices", () => {
     for (const link of links) {
       expect(link).toHaveAttribute("href", RESERVE_PATH);
     }
+  });
+
+  it("各サービスの予約クリックをサービス別に計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<HyroxServices />);
+    const links = screen.getAllByRole("link", { name: /予約する/ });
+
+    for (const link of links) {
+      await userEvent.click(link);
+    }
+
+    expect(trackCtaClick).toHaveBeenNthCalledWith(1, "reserveEntry", "hyrox_services_rental", "予約する");
+    expect(trackCtaClick).toHaveBeenNthCalledWith(2, "reserveEntry", "hyrox_services_trial", "予約する");
+    expect(trackCtaClick).toHaveBeenNthCalledWith(3, "reserveEntry", "hyrox_services_group", "予約する");
   });
 
   it("items が配列でない場合も見出しを描画する（フォールバック）", () => {

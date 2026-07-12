@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
 import { RESERVE_PATH } from "@/constants/site";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 // サービス key と写真を 1:1 で明示的に紐づける。
@@ -95,6 +96,7 @@ export default function HyroxServices() {
                 {/* 予約案内ページ(/reserve)へ誘導 */}
                 <Link
                   href={RESERVE_PATH}
+                  onClick={() => trackCtaClick("reserveEntry", `hyrox_services_${item.key}`, t("reserveCta"))}
                   aria-label={`${item.titleEn} ${t("reserveCta")}`}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 border border-accent/30 px-5 py-3 text-accent transition-colors hover:bg-accent hover:text-deep-black"
                 >

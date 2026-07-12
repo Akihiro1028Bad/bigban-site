@@ -65,8 +65,7 @@ describe("HomeContact", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
-    // 送信意図を reservation_click として計測(カテゴリを label に)。
-    expect(trackCtaClick).toHaveBeenCalledWith("reservation", "home_contact", "court");
+    expect(trackCtaClick).toHaveBeenCalledWith("contactSubmit", "home_contact", "court");
   });
 
   it("送信成功時に成功メッセージを表示する", async () => {
@@ -114,6 +113,7 @@ describe("HomeContact", () => {
     await waitFor(() => {
       expect(screen.getByText(/失敗/)).toBeInTheDocument();
     });
+    expect(trackCtaClick).not.toHaveBeenCalled();
   });
 
   it("送信失敗時にエラーメッセージを表示する", async () => {

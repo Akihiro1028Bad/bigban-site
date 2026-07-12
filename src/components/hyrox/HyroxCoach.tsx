@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { COACH_INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
 
@@ -85,6 +86,7 @@ export default function HyroxCoach() {
             <a
               href={COACH_INSTAGRAM_URL}
               {...EXTERNAL_LINK_PROPS}
+              onClick={() => trackCtaClick("instagram", "hyrox_coach", "coach")}
               aria-label={t("instagramAria")}
               className="mt-3 inline-flex items-center gap-2 text-xs text-text-gray transition-colors hover:text-accent"
             >

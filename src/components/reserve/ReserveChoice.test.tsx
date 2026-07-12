@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import {
   RESERVE_URL,
@@ -8,6 +9,11 @@ import {
   LABOLA_SCHOOL_URL,
 } from "@/constants/site";
 import ReserveChoice from "./ReserveChoice";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("ReserveChoice", () => {
   it("利用月で予約先が分かれる案内文を表示する", () => {
@@ -65,6 +71,41 @@ describe("ReserveChoice", () => {
     expect(link).toHaveAttribute("href", LABOLA_SCHOOL_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("4種類の外部予約クリックを reservation_click として計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<ReserveChoice />);
+
+    await userEvent.click(screen.getByRole("link", { name: /7月末までの予約/ }));
+    await userEvent.click(screen.getByRole("link", { name: /8月以降の予約/ }));
+    await userEvent.click(screen.getByRole("link", { name: /エリアの予約/ }));
+    await userEvent.click(screen.getByRole("link", { name: /レッスンの予約/ }));
+
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      1,
+      "reservation",
+      "reserve_choice_july",
+      "7月末までの予約",
+    );
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      2,
+      "reservation",
+      "reserve_choice_august",
+      "8月以降の予約",
+    );
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      3,
+      "reservation",
+      "reserve_choice_hyrox_area",
+      "エリアの予約",
+    );
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      4,
+      "reservation",
+      "reserve_choice_hyrox_lesson",
+      "レッスンの予約",
+    );
   });
 
   it("ユーザー向け文言にシステム名（RESERVA / labola）を露出しない", () => {

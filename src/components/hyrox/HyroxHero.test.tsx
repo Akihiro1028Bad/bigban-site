@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import { RESERVE_PATH } from "@/constants/site";
 import HyroxHero from "./HyroxHero";
 
 import type React from "react";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
@@ -29,6 +35,15 @@ describe("HyroxHero", () => {
     renderWithIntl(<HyroxHero />);
     const link = screen.getByRole("link", { name: "今すぐ予約" });
     expect(link).toHaveAttribute("href", RESERVE_PATH);
+  });
+
+  it("予約ボタンのクリックで予約入口を計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<HyroxHero />);
+
+    await userEvent.click(screen.getByRole("link", { name: "今すぐ予約" }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith("reserveEntry", "hyrox_hero", "今すぐ予約");
   });
 
   it("3枚のヒーロー画像をフェード表示する", () => {

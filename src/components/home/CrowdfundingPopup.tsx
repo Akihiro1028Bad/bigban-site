@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { CAMPFIRE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 const EASE: [number, number, number, number] = [0.25, 0.46, 0.45, 0.94];
 
@@ -133,6 +134,7 @@ export default function CrowdfundingPopup({
               <a
                 href={CAMPFIRE_URL}
                 {...EXTERNAL_LINK_PROPS}
+                onClick={() => trackCtaClick("externalLink", "crowdfunding_popup", "campfire")}
                 aria-label={t("ctaAriaLabel")}
                 className="block bg-accent text-deep-black font-bold uppercase tracking-widest text-sm px-8 py-3 text-center hover:bg-accent/90 motion-safe:transition-colors"
               >

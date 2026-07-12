@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { makeParsedColumnItem } from "../../../__mocks__/columns-fixtures";
 import { ColumnCard } from "./ColumnCard";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("ColumnCard", () => {
   it("タイトルとカテゴリ名(ja)を表示する", () => {
@@ -26,6 +32,16 @@ describe("ColumnCard", () => {
     const item = makeParsedColumnItem({ slug: "x" });
     render(<ColumnCard item={item} locale="ja" />);
     expect(screen.getByRole("link")).toHaveAttribute("href", "/columns/x");
+  });
+
+  it("カードクリックを content_click として計測する", async () => {
+    trackCtaClick.mockClear();
+    const item = makeParsedColumnItem({ slug: "tracked-column", title: "計測コラム" });
+    render(<ColumnCard item={item} locale="ja" />);
+
+    await userEvent.click(screen.getByRole("link"));
+
+    expect(trackCtaClick).toHaveBeenCalledWith("contentClick", "column_card", "tracked-column");
   });
 
   it("カテゴリ未設定でもタイトルは表示する(欠落耐性)", () => {

@@ -9,6 +9,7 @@ import Autoplay from "embla-carousel-autoplay";
 
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 const FACILITY_IMAGES = [
   { src: "/images/facility.webp", altKey: "court" as const },
@@ -269,6 +270,7 @@ export default function HomeFacility() {
               {feature.key === "trainingArea" ? (
                 <Link
                   href="/hyrox"
+                  onClick={() => trackCtaClick("contentClick", "home_facility_hyrox", "hyrox")}
                   className="text-text-light text-sm lg:text-base hover:text-accent transition-colors"
                 >
                   {t(`features.${feature.key}`)}

@@ -13,6 +13,8 @@ import CrewCard from "@/components/about/CrewCard";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { CAMPFIRE_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import { NEWS_CATEGORIES } from "@/constants/news";
+import { formEntryLabel } from "@/lib/analytics/events";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 import type { FormEvent } from "react";
 import type { NewsItem } from "@/lib/microcms/schema";
@@ -145,6 +147,7 @@ export default function AboutContent({
         return;
       }
 
+      trackCtaClick("contactSubmit", "about_contact", formEntryLabel(body.category));
       setStatus("success");
     } catch {
       setStatus("error");
@@ -257,6 +260,7 @@ export default function AboutContent({
               href={`https://www.instagram.com/${t("founder.instagram").replace(/^@/, "")}/`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackCtaClick("instagram", "about_founder", t("founder.instagram"))}
               className="inline-flex items-center gap-1.5 mt-3 text-text-light/90 text-sm hover:text-accent transition-colors"
             >
               <InstagramIcon className="w-4 h-4" />
@@ -472,6 +476,7 @@ export default function AboutContent({
                       <Link
                         key={item.id}
                         href={href}
+                        onClick={() => trackCtaClick("contentClick", "about_news_card", item.slug)}
                         className="group block border-l-2 border-accent/20 pl-6 lg:pl-8 motion-safe:transition-colors hover:border-accent"
                       >
                         <div className="flex flex-col md:flex-row md:items-start md:gap-6">
@@ -518,6 +523,7 @@ export default function AboutContent({
                   })}
                   <Link
                     href={locale === "ja" ? "/news" : "/en/news"}
+                    onClick={() => trackCtaClick("contentClick", "about_news_view_all", "news")}
                     className="inline-flex items-center gap-2 text-text-light text-sm tracking-wide"
                   >
                     {locale === "ja" ? "すべてのニュースを見る" : "View all news"}
@@ -536,6 +542,7 @@ export default function AboutContent({
                     <a
                       href={CAMPFIRE_URL}
                       {...EXTERNAL_LINK_PROPS}
+                      onClick={() => trackCtaClick("externalLink", "about_news_campfire", "campfire")}
                       className="group inline-flex items-center gap-2 text-accent text-sm tracking-wide"
                     >
                       {t("news.crowdfundingLink")}{" "}
@@ -552,6 +559,7 @@ export default function AboutContent({
                     <a
                       href="https://prtimes.jp/main/html/rd/p/000000003.000179043.html"
                       {...EXTERNAL_LINK_PROPS}
+                      onClick={() => trackCtaClick("externalLink", "about_news_prtimes", "prtimes")}
                       className="group inline-flex items-center gap-2 text-accent text-sm tracking-wide"
                     >
                       {t("news.prTimes")}{" "}
@@ -591,6 +599,7 @@ export default function AboutContent({
                     href="https://www.instagram.com/thepicklebangtheory"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackCtaClick("instagram", "about_contact", "official")}
                     className="text-lg text-text-light hover:text-accent transition-colors"
                   >
                     @thepicklebangtheory
