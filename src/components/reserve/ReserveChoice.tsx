@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import {
   RESERVE_URL,
   LABOLA_PICKLEBALL_URL,
@@ -18,6 +19,7 @@ interface ChoiceCard {
   descKey: string;
   ctaKey: string;
   href: string;
+  location: string;
 }
 
 // 7月分(RESERVA)と8月分(labola)はどちらも同等の選択肢のため同一スタイルで表示する。
@@ -28,6 +30,7 @@ const JULY_CARD: ChoiceCard = {
   descKey: "julyDesc",
   ctaKey: "julyCta",
   href: RESERVE_URL,
+  location: "reserve_choice_july",
 };
 
 const AUGUST_CARD: ChoiceCard = {
@@ -36,6 +39,7 @@ const AUGUST_CARD: ChoiceCard = {
   descKey: "augDesc",
   ctaKey: "augCta",
   href: LABOLA_PICKLEBALL_URL,
+  location: "reserve_choice_august",
 };
 
 const PICKLEBALL_CARDS: readonly ChoiceCard[] = [JULY_CARD, AUGUST_CARD];
@@ -48,6 +52,7 @@ const HYROX_AREA_CARD: ChoiceCard = {
   descKey: "hyroxAreaDesc",
   ctaKey: "hyroxAreaCta",
   href: LABOLA_HYROX_URL,
+  location: "reserve_choice_hyrox_area",
 };
 
 const HYROX_LESSON_CARD: ChoiceCard = {
@@ -56,6 +61,7 @@ const HYROX_LESSON_CARD: ChoiceCard = {
   descKey: "lessonDesc",
   ctaKey: "lessonCta",
   href: LABOLA_SCHOOL_URL,
+  location: "reserve_choice_hyrox_lesson",
 };
 
 const HYROX_CARDS: readonly ChoiceCard[] = [HYROX_AREA_CARD, HYROX_LESSON_CARD];
@@ -89,6 +95,7 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
           <a
             href={card.href}
             {...EXTERNAL_LINK_PROPS}
+            onClick={() => trackCtaClick("reservation", card.location, t(card.ctaKey))}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3.5 text-sm font-bold tracking-[0.15em] text-deep-black transition-all hover:gap-3 hover:bg-accent/90 sm:mt-8 sm:py-4"
           >
             {t(card.ctaKey)}

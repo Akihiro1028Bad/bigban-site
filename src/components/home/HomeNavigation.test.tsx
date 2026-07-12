@@ -56,10 +56,16 @@ const NAV_ITEMS = [
   { label: "ACCESS", href: "/#access" },
 ];
 
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
 describe("HomeNavigation", () => {
   beforeEach(() => {
     // デフォルトでポップアップを非表示にし、既存テストとの競合を防ぐ
     sessionStorage.setItem("bigban-crowdfunding-dismissed", "true");
+    trackCtaClick.mockClear();
   });
 
   it("ロゴ画像を表示する", () => {
@@ -232,6 +238,28 @@ describe("HomeNavigation", () => {
     );
     expect(mobileReserve).toBeDefined();
     expect(mobileReserve).toHaveAttribute("href", "/reserve");
+  });
+
+  it("予約ボタンクリックを配置別に reserve_entry_click として計測する", () => {
+    renderWithIntl(<HomeNavigation />);
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    const [mobileReserve, desktopReserve] = reserveLinks;
+
+    fireEvent.click(mobileReserve);
+    fireEvent.click(desktopReserve);
+
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      1,
+      "reserveEntry",
+      "home_nav_mobile",
+      "予約",
+    );
+    expect(trackCtaClick).toHaveBeenNthCalledWith(
+      2,
+      "reserveEntry",
+      "home_nav_desktop",
+      "予約",
+    );
   });
 
   it("ハンバーガーメニューの開閉", () => {

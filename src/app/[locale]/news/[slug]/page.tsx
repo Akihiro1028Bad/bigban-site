@@ -8,6 +8,7 @@ import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import { NewsArticleJsonLd } from "@/components/news/NewsArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import StructuredData from "@/components/StructuredData";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
@@ -225,14 +226,18 @@ export default async function NewsDetailPage({
         </div>
         {item.externalLink && (
           <div className="mt-10">
-            <a
+            <TrackedLink
               href={item.externalLink.url}
+              eventKey="externalLink"
+              location="news_external_link"
+              label={item.slug}
+              external
               {...EXTERNAL_LINK_PROPS}
               className="inline-flex items-center gap-2 px-6 py-3 border border-accent text-accent text-sm tracking-wider hover:bg-accent hover:text-deep-black transition-colors"
             >
               {item.externalLink.label}
               <span>→</span>
-            </a>
+            </TrackedLink>
           </div>
         )}
         </article>

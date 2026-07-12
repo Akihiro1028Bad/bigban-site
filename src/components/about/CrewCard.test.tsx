@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import CrewCard from "./CrewCard";
 import jaMessages from "../../../messages/ja.json";
@@ -20,6 +21,11 @@ vi.mock("next/image", () => ({
       />
     );
   },
+}));
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
 }));
 
 function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
@@ -54,6 +60,19 @@ describe("CrewCard", () => {
     );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("Instagramクリックを計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<CrewCard member={mockMember} />);
+
+    await userEvent.click(screen.getByRole("link", { name: /@yasuko_the_pickleballer/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "instagram",
+      "about_crew",
+      "@yasuko_the_pickleballer",
+    );
   });
 
   it("Instagramがない場合はリンクを表示しない", () => {

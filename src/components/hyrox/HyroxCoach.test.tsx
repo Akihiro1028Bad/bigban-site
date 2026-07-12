@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxCoach from "./HyroxCoach";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("HyroxCoach", () => {
   it("セクションタイトル CREW を表示する", () => {
@@ -63,6 +69,19 @@ describe("HyroxCoach", () => {
       "https://www.instagram.com/tac_monk/"
     );
     expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("Instagramクリックを計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<HyroxCoach />);
+
+    await userEvent.click(screen.getByRole("link", { name: /Instagram/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "instagram",
+      "hyrox_coach",
+      "coach",
+    );
   });
 
   it("ポートレート画像に alt を設定する", () => {

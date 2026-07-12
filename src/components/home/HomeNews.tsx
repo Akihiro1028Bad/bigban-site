@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
-import { Link } from "@/i18n/navigation";
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { NewsCard } from "@/components/news/NewsCard";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
@@ -59,12 +59,15 @@ export default async function HomeNews({ locale }: HomeNewsProps) {
         </div>
 
         <div className="mt-12 lg:mt-16 text-center">
-          <Link
+          <TrackedLink
             href="/news"
+            eventKey="contentClick"
+            location="home_news_view_all"
+            label="news"
             className="inline-block bg-accent text-deep-black px-8 py-3 text-xs sm:text-sm font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
           >
             {t("viewAll")}
-          </Link>
+          </TrackedLink>
         </div>
       </div>
     </section>

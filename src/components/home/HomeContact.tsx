@@ -33,9 +33,6 @@ export default function HomeContact() {
     const formData = new FormData(e.currentTarget);
     const body = Object.fromEntries(formData.entries());
 
-    // 来店/予約に近い行動として問い合わせ送信意図を計測(カテゴリを label に)。
-    trackCtaClick("reservation", "home_contact", formEntryLabel(body.category));
-
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
@@ -48,6 +45,7 @@ export default function HomeContact() {
         return;
       }
 
+      trackCtaClick("contactSubmit", "home_contact", formEntryLabel(body.category));
       setStatus("success");
     } catch {
       setStatus("error");

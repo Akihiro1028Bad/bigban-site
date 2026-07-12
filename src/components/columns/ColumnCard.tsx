@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import {
   columnCategoryColor,
   columnCategoryName,
@@ -36,8 +36,11 @@ export function ColumnCard({ item, locale }: ColumnCardProps) {
   const date = formatDate(dateIso);
 
   return (
-    <Link
+    <TrackedLink
       href={buildHref(locale, item.slug)}
+      eventKey="contentClick"
+      location="column_card"
+      label={item.slug}
       className="group block border border-text-gray/10 hover:border-accent/60 transition-colors"
     >
       <div className="relative aspect-[16/9] bg-deep-black overflow-hidden">
@@ -82,6 +85,6 @@ export function ColumnCard({ item, locale }: ColumnCardProps) {
           {item.title}
         </h3>
       </div>
-    </Link>
+    </TrackedLink>
   );
 }
