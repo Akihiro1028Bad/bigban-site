@@ -219,6 +219,8 @@ describe("buildSportsActivityLocation", () => {
 
     expect(schema.description).toContain("本八幡");
     expect(schema.description).toContain("ピックルボール");
+    expect(schema.description).toContain("6:00-23:00");
+    expect(schema.description).not.toContain("24時間");
   });
 
   it("sloganにキャッチコピーを含む", async () => {

@@ -186,7 +186,7 @@ describe("MobileMenu", () => {
     const ig = screen.getByRole("link", { name: "THE PICKLE BANG THEORY の Instagram" });
     expect(ig).toHaveAttribute("href", "https://www.instagram.com/thepicklebangtheory");
     expect(ig).toHaveAttribute("target", "_blank");
-    expect(screen.getByText("本八幡駅 徒歩1分・24時間利用可")).toBeInTheDocument();
+    expect(screen.getByText("本八幡駅 徒歩1分・6:00-23:00営業")).toBeInTheDocument();
   });
 
   it("言語トグルで onSwitchLocale が呼ばれる（EN/JP 両方）", () => {
