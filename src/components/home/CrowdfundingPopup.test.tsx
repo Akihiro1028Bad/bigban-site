@@ -21,6 +21,11 @@ vi.mock("next/image", () => ({
   },
 }));
 
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
 function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
   const messages = locale === "ja" ? jaMessages : enMessages;
   return render(
@@ -136,6 +141,19 @@ describe("CrowdfundingPopup", () => {
     expect(ctaLink).toHaveAttribute("href", CAMPFIRE_URL);
     expect(ctaLink).toHaveAttribute("target", "_blank");
     expect(ctaLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("CTAクリックを external_link_click として計測する", () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<CrowdfundingPopup isOpen={true} onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("link", { name: /CAMP-FIRE/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "externalLink",
+      "crowdfunding_popup",
+      "campfire",
+    );
   });
 
   it("aria-modal, role=dialog, aria-labelledbyが設定されている", () => {

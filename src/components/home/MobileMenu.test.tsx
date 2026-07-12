@@ -125,8 +125,14 @@ const NAV = [
   { name: "ACCESS", href: "/#access" },
 ];
 
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
 afterEach(() => {
   document.body.style.overflow = "";
+  trackCtaClick.mockClear();
 });
 
 describe("MobileMenu", () => {
@@ -187,6 +193,31 @@ describe("MobileMenu", () => {
     expect(ig).toHaveAttribute("href", "https://www.instagram.com/thepicklebangtheory");
     expect(ig).toHaveAttribute("target", "_blank");
     expect(screen.getByText("本八幡駅 徒歩1分・6:00-23:00営業")).toBeInTheDocument();
+  });
+
+  it("Instagramクリックを計測する", () => {
+    renderMenu();
+
+    fireEvent.click(screen.getByRole("link", { name: "THE PICKLE BANG THEORY の Instagram" }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "instagram",
+      "mobile_menu",
+      "official",
+    );
+  });
+
+  it("RESERVEクリックで予約入口を計測し onLinkClick を呼ぶ", () => {
+    const { onLinkClick } = renderMenu();
+
+    fireEvent.click(screen.getByRole("link", { name: /RESERVE/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      "mobile_menu_reserve",
+      "予約",
+    );
+    expect(onLinkClick).toHaveBeenCalledTimes(1);
   });
 
   it("言語トグルで onSwitchLocale が呼ばれる（EN/JP 両方）", () => {
