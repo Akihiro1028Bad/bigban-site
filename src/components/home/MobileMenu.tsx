@@ -10,6 +10,7 @@ import { INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
 import { NAV_ITEMS } from "@/constants/navigation";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import LanguageToggle from "./LanguageToggle";
 
 interface MobileMenuProps {
@@ -253,6 +254,7 @@ export default function MobileMenu({
               <a
                 href={INSTAGRAM_URL}
                 {...EXTERNAL_LINK_PROPS}
+                onClick={() => trackCtaClick("instagram", "mobile_menu", "official")}
                 aria-label={t("instagramAria")}
                 className="flex items-center gap-2 text-text-gray transition-colors hover:text-accent"
               >
@@ -267,7 +269,10 @@ export default function MobileMenu({
             <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3">
               <Link
                 href={reserveHref}
-                onClick={onLinkClick}
+                onClick={() => {
+                  trackCtaClick("reserveEntry", "mobile_menu_reserve", t("reserveJa"));
+                  onLinkClick();
+                }}
                 className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-deep-black hover:gap-3 motion-safe:transition-all"
               >
                 <span className="text-sm font-bold tracking-[0.2em]">

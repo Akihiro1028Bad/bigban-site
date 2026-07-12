@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { resolveCategories } from "@/lib/news/categories";
 import type { NewsItem } from "@/lib/microcms/schema";
 
@@ -31,8 +31,11 @@ export function NewsCard({ item, locale }: NewsCardProps) {
   const date = formatDate(dateIso);
 
   return (
-    <Link
+    <TrackedLink
       href={buildHref(locale, item.slug)}
+      eventKey="contentClick"
+      location="news_card"
+      label={item.slug}
       className="group block border border-text-gray/10 hover:border-accent/60 transition-colors"
     >
       <div className="relative aspect-[16/9] bg-deep-black overflow-hidden">
@@ -81,6 +84,6 @@ export function NewsCard({ item, locale }: NewsCardProps) {
           {item.title}
         </h3>
       </div>
-    </Link>
+    </TrackedLink>
   );
 }

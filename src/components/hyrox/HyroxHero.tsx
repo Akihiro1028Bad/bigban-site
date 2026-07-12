@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
 import { RESERVE_PATH } from "@/constants/site";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 // ヒーロー背景のフェード切替画像（1枚目は LCP のため priority）
 const HERO_IMAGES = [
@@ -115,6 +116,7 @@ export default function HyroxHero() {
         >
           <Link
             href={RESERVE_PATH}
+            onClick={() => trackCtaClick("reserveEntry", "hyrox_hero", t("reserveCta"))}
             className="inline-block bg-accent px-8 py-3 text-xs font-bold uppercase tracking-widest text-deep-black transition-colors hover:bg-accent/90"
           >
             {t("reserveCta")}

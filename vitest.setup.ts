@@ -1,5 +1,38 @@
 import "@testing-library/jest-dom/vitest";
 import { vi, afterEach } from "vitest";
+import {
+  createElement,
+  forwardRef,
+  type AnchorHTMLAttributes,
+  type ReactNode,
+} from "react";
+
+interface MockLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  href: string;
+  children?: ReactNode;
+}
+
+vi.mock("@/i18n/navigation", () => {
+  const Link = forwardRef<HTMLAnchorElement, MockLinkProps>(
+    ({ children, href, ...props }, ref) =>
+      createElement("a", { ...props, href, ref }, children),
+  );
+  Link.displayName = "MockIntlLink";
+
+  return {
+    Link,
+    redirect: vi.fn(),
+    usePathname: () => "/",
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+    }),
+    getPathname: ({ href }: { href: string }) => href,
+  };
+});
 
 // node 環境テスト(scripts 配下など)では window が存在しないため、
 // jsdom 環境のときだけ matchMedia のモックを設定する。

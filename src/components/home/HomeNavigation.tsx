@@ -8,6 +8,7 @@ import { useActiveSection } from "@/hooks/useActiveSection";
 import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_PATH } from "@/constants/site";
 import { NAV_ITEMS, SECTION_IDS } from "@/constants/navigation";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
@@ -176,6 +177,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
               右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
           <Link
             href={reserveTo}
+            onClick={() => trackCtaClick("reserveEntry", "home_nav_mobile", t("reserveJa"))}
             className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black md:hidden"
           >
             <span className="text-[11px] font-bold tracking-widest">
@@ -194,6 +196,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
             />
             <Link
               href={reserveTo}
+              onClick={() => trackCtaClick("reserveEntry", "home_nav_desktop", t("reserveJa"))}
               className="inline-flex items-center gap-1.5 bg-accent text-deep-black px-5 py-2"
             >
               <span className="text-xs font-bold tracking-widest">

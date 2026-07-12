@@ -1,8 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import HomeServices from "./HomeServices";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
@@ -148,6 +154,23 @@ describe("HomeServices", () => {
     );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("CTAクリックを導線別に計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeServices />
+      </NextIntlClientProvider>
+    );
+
+    await userEvent.click(screen.getByText("RESERVE"));
+    await userEvent.click(screen.getByText("BOOK A LESSON"));
+    await userEvent.click(screen.getByText("VIEW EVENTS"));
+
+    expect(trackCtaClick).toHaveBeenNthCalledWith(1, "reserveEntry", "home_services_court", "RESERVE");
+    expect(trackCtaClick).toHaveBeenNthCalledWith(2, "reservation", "home_services_lesson", "BOOK A LESSON");
+    expect(trackCtaClick).toHaveBeenNthCalledWith(3, "externalLink", "home_services_events", "VIEW EVENTS");
   });
 
   it("data-service-row属性で背景色が交互になる（奇数:bg-deep-black, 偶数:bg-off-white）", () => {

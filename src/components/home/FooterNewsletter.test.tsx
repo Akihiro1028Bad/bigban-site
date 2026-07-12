@@ -6,6 +6,11 @@ import jaMessages from "../../../messages/ja.json";
 import FooterNewsletter from "./FooterNewsletter";
 
 const fetchMock = vi.fn();
+const trackCtaClick = vi.fn();
+
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 function renderWithIntl() {
   return render(
@@ -23,6 +28,7 @@ describe("FooterNewsletter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     fetchMock.mockReset();
+    trackCtaClick.mockReset();
   });
 
   it("見出しとフォームを表示する", () => {
@@ -55,6 +61,7 @@ describe("FooterNewsletter", () => {
       "/api/subscribe",
       expect.objectContaining({ method: "POST" }),
     );
+    expect(trackCtaClick).toHaveBeenCalledWith("newsletterSignup", "footer_newsletter");
   });
 
   it("submit 失敗時にエラーメッセージを表示する", async () => {
@@ -69,5 +76,6 @@ describe("FooterNewsletter", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(/登録に失敗/);
     });
+    expect(trackCtaClick).not.toHaveBeenCalled();
   });
 });

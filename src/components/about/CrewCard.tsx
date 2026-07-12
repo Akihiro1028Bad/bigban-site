@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 export interface CrewMember {
   name: string;
@@ -56,6 +57,7 @@ export default function CrewCard({ member }: CrewCardProps) {
             href={`https://www.instagram.com/${member.ig.replace(/^@/, "")}/`}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackCtaClick("instagram", "about_crew", member.ig)}
             className="inline-flex items-center gap-1 text-text-gray text-[10px] sm:text-xs mt-1 hover:text-accent motion-safe:transition-colors truncate max-w-full"
           >
             <InstagramIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />

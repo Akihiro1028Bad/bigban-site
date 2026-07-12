@@ -114,6 +114,7 @@ export default function HomeAbout() {
 
             <Link
               href="/about"
+              onClick={() => trackCtaClick("contentClick", "home_about_read_more", "about")}
               className="inline-flex items-center gap-2 text-accent text-sm tracking-[0.15em] hover:gap-3 transition-all duration-300"
             >
               {t("readMore")}

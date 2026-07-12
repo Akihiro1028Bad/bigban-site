@@ -7,6 +7,11 @@ import HomeFacility from "./HomeFacility";
 
 import type React from "react";
 
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...props }: Record<string, unknown>) => (
     <a href={href as string} {...props}>{children as React.ReactNode}</a>
@@ -138,6 +143,23 @@ describe("HomeFacility", () => {
     );
     const link = screen.getByRole("link", { name: /トレーニングエリア/ });
     expect(link).toHaveAttribute("href", "/hyrox");
+  });
+
+  it("trainingArea リンククリックを content_click として計測する", () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: /トレーニングエリア/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_facility_hyrox",
+      "hyrox",
+    );
   });
 
   it("FACILITY タイトルを表示する", () => {

@@ -1,3 +1,5 @@
+import { TrackedLink } from "@/components/analytics/TrackedLink";
+
 interface EmbedShellProps {
   /** iframe の src として使う URL */
   iframeUrl: string;
@@ -81,15 +83,19 @@ export function EmbedShell({
         フォールバックリンク: SR / クローラ / iframe 描画失敗時用に
         常に DOM に存在させる (visually-hidden)。
       */}
-      <a
+      <TrackedLink
         data-testid="embed-fallback-link"
         href={fallbackHref}
+        eventKey="externalLink"
+        location="embed_fallback"
+        label={fallbackHref}
+        external
         target="_blank"
         rel="noopener noreferrer"
         className="sr-only"
       >
         {fallbackLabel}
-      </a>
+      </TrackedLink>
     </figure>
   );
 }

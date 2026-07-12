@@ -20,6 +20,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPushMock }),
   useSearchParams: () => new URLSearchParams(""),
 }));
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ children, href, ...props }: Record<string, unknown>) => (
+    <a href={href as string} {...props}>
+      {children as React.ReactNode}
+    </a>
+  ),
+}));
 vi.mock("next-intl/server", () => ({
   setRequestLocale: vi.fn(),
   getTranslations: async () => (k: string) =>

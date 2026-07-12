@@ -116,6 +116,23 @@ describe("HomeAbout", () => {
     expect(link).toHaveAttribute("href", "/about");
   });
 
+  it("詳しく見るクリックで content_click を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeAbout />
+      </NextIntlClientProvider>
+    );
+
+    await userEvent.click(screen.getByRole("link", { name: /詳しく見る/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_about_read_more",
+      "about",
+    );
+  });
+
   it("Instagramリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NewsCard } from "./NewsCard";
 import { makeParsedNewsItem } from "../../../__mocks__/microcms-fixtures";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("NewsCard", () => {
   it("タイトル/日付/カテゴリバッジ", () => {
@@ -40,6 +46,20 @@ describe("NewsCard", () => {
       <NewsCard item={makeParsedNewsItem({ slug: "x" })} locale="ja" />,
     );
     expect(screen.getByRole("link")).toHaveAttribute("href", "/news/x");
+  });
+
+  it("カードクリックを content_click として計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NewsCard
+        item={makeParsedNewsItem({ slug: "tracked-news", title: "計測記事" })}
+        locale="ja"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("link"));
+
+    expect(trackCtaClick).toHaveBeenCalledWith("contentClick", "news_card", "tracked-news");
   });
 
   it("eyecatch あり img描画", () => {

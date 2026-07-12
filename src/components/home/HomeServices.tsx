@@ -11,6 +11,7 @@ import {
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 interface ServiceConfig {
   number: string;
@@ -113,6 +114,13 @@ export default function HomeServices() {
                   <a
                     href={service.ctaUrl}
                     {...EXTERNAL_LINK_PROPS}
+                    onClick={() =>
+                      trackCtaClick(
+                        service.key === "service02" ? "reservation" : "externalLink",
+                        service.key === "service02" ? "home_services_lesson" : "home_services_events",
+                        t(`${service.key}.cta`),
+                      )
+                    }
                     className="inline-block mt-6 bg-accent text-deep-black px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-colors"
                   >
                     {t(`${service.key}.cta`)}
@@ -120,6 +128,7 @@ export default function HomeServices() {
                 ) : (
                   <Link
                     href={service.ctaUrl}
+                    onClick={() => trackCtaClick("reserveEntry", "home_services_court", t(`${service.key}.cta`))}
                     className="inline-block mt-6 bg-accent text-deep-black px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-colors"
                   >
                     {t(`${service.key}.cta`)}

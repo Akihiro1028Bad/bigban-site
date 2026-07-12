@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
 import PlayerCard, { type Player } from "./PlayerCard";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 const activePlayer: Player = {
   name: "山田 太郎",
@@ -44,6 +50,19 @@ describe("PlayerCard", () => {
     );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("IGリンククリックを計測する", async () => {
+    trackCtaClick.mockClear();
+    renderCard(activePlayer);
+
+    await userEvent.click(screen.getByText(activePlayer.ig).closest("a")!);
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "instagram",
+      "about_player",
+      activePlayer.ig,
+    );
   });
 
   it("IGリンク内にInstagramアイコンを表示する", () => {
