@@ -126,6 +126,29 @@ describe("HomeNavigation", () => {
     expect(newsLink?.textContent).toContain("NEWS");
   });
 
+  it("既定(showColumns 未指定)ではCOLUMNリンクを出さない (USE_CMS_COLUMNS=false と同時デプロイ前)", () => {
+    renderWithIntl(<HomeNavigation />);
+    expect(screen.queryByRole("link", { name: "コラム" })).not.toBeInTheDocument();
+  });
+
+  it("showColumns=true でCOLUMNリンクをNEWSの直後に出す(ja=コラム)", () => {
+    renderWithIntl(<HomeNavigation showColumns />);
+    const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
+    const columnLink = screen.getByRole("link", { name: "コラム" });
+    expect(columnLink).toHaveAttribute("href", "/columns");
+    expect(nav).toContainElement(columnLink);
+    const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
+    const newsIndex = links.findIndex((text) => text?.includes("NEWS"));
+    const columnsIndex = links.findIndex((text) => text?.includes("コラム"));
+    expect(columnsIndex).toBe(newsIndex + 1);
+  });
+
+  it("英語ロケールでは COLUMN ラベル", () => {
+    renderWithIntl(<HomeNavigation showColumns />, "en");
+    const columnLink = screen.getByRole("link", { name: "COLUMN" });
+    expect(columnLink).toHaveAttribute("href", "/columns");
+  });
+
   it("アクティブセクション(concept)をハイライトする", () => {
     renderWithIntl(<HomeNavigation />);
     const conceptLink = screen.getByRole("link", { name: "CONCEPT" });

@@ -9,7 +9,14 @@ import type { ReactElement } from "react";
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, onClick, ...props }: Record<string, unknown>) => (
-    <a href={href as string} onClick={onClick as React.MouseEventHandler} {...props}>
+    <a
+      href={href as string}
+      onClick={(event) => {
+        event.preventDefault();
+        (onClick as React.MouseEventHandler | undefined)?.(event);
+      }}
+      {...props}
+    >
       {children as React.ReactNode}
     </a>
   ),

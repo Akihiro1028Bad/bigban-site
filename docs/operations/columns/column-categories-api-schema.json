@@ -1,0 +1,32 @@
+{
+  "apiFields": [
+    {
+      "fieldId": "name",
+      "name": "表示名(ja)",
+      "kind": "text",
+      "required": true,
+      "initialValue": null
+    },
+    {
+      "fieldId": "nameEn",
+      "name": "表示名(en)",
+      "kind": "text",
+      "required": false,
+      "initialValue": null
+    },
+    {
+      "fieldId": "color",
+      "name": "チップ色(HEX)",
+      "kind": "text",
+      "required": false,
+      "initialValue": null
+    },
+    {
+      "fieldId": "order",
+      "name": "並び順",
+      "kind": "number",
+      "required": false
+    }
+  ],
+  "customFields": []
+}

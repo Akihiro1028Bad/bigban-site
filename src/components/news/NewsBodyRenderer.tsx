@@ -19,7 +19,8 @@ interface NewsBodyRendererProps {
   locale?: Locale;
 }
 
-const PROSE_CLASS = [
+// グロース承認画面のプレビュー(#proto)が本番と同一の本文スタイルを再利用するため export する。
+export const PROSE_CLASS = [
   "prose prose-invert max-w-none",
   "prose-headings:text-text-light prose-headings:font-bold",
   "prose-h2:text-xl lg:prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-4",

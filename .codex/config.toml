@@ -1,0 +1,6 @@
+[mcp_servers.figma]
+command = "npx"
+args = [
+    "-y",
+    "@anthropic-ai/figma-mcp-server@latest",
+]

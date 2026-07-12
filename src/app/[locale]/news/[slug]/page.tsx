@@ -11,7 +11,7 @@ import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 import StructuredData from "@/components/StructuredData";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
-import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
 import { EXTERNAL_LINK_PROPS, SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
 import {
@@ -162,7 +162,7 @@ export default async function NewsDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <NewsArticleJsonLd item={item} locale={locale} />
       <StructuredData
         data={buildBreadcrumb(locale, [

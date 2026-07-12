@@ -178,7 +178,7 @@ https://www.thepicklebang.com/api/draft/enable?secret=${MICROCMS_DRAFT_SECRET}&c
 「申し込む」「詳細はこちら」のような **アクション導線** を強調する黄色塗りボタン。
 
 ```html
-<p><a href="https://reserva.be/tpbt" class="cta">今すぐ申し込む</a></p>
+<p><a href="https://www.thepicklebang.com/reserve" class="cta">今すぐ申し込む</a></p>
 
 <p><a href="https://example.com" class="cta cta--ghost">詳細を見る</a></p>
 ```

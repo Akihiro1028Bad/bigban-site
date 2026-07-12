@@ -226,7 +226,7 @@ html[data-browser="ios-safari"] .site-header-bg {
     line-height: 1.4;
   }
 
-  /* === Highlight / mark — 蛍光ペン風 (loud な背景色を回避) === */
+  /* === Highlight / mark — 蛍光ペン風 (loud な背景色を回避)。インライン用 === */
   .prose :where(mark, .highlight) {
     background: linear-gradient(
       transparent 65%,
@@ -234,6 +234,26 @@ html[data-browser="ios-safari"] .site-header-bg {
     );
     color: inherit;
     padding: 0 0.1em;
+  }
+
+  /* === Highlight callout (aside.highlight) — 装飾アシスタント(#147)が段落まるごとを
+     ハイライトする際のブロック表示。インラインの蛍光ペン(上)が複数行ブロックに当たって
+     崩れていた(#164)ため、note/caution と同系統のブロック・コールアウトとして別定義する。
+     specificity が `.prose aside.highlight` > `.prose :where(mark, .highlight)` なので、
+     上のインライン用グラデーション背景はここで上書きされる。 === */
+  .prose aside.highlight {
+    background: rgba(246, 255, 84, 0.08);
+    border-left: 3px solid var(--color-accent);
+    padding: 1rem 1.25rem;
+    margin: 2rem 0;
+    border-radius: 0 4px 4px 0;
+    color: var(--color-text-light);
+  }
+  .prose aside.highlight > :where(p):first-child {
+    margin-top: 0;
+  }
+  .prose aside.highlight > :where(p):last-child {
+    margin-bottom: 0;
   }
 
   /* === Note / Caution callouts (blockquote と差別化) === */

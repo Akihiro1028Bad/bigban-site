@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
 export default function HomeAbout() {
@@ -97,6 +98,7 @@ export default function HomeAbout() {
               href={`https://www.instagram.com/${t("founderInstagram").replace(/^@/, "")}/`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackCtaClick("instagram", "home_about")}
               className="inline-flex items-center gap-1.5 text-text-light/90 text-sm mb-8 hover:text-accent transition-colors"
             >
               <InstagramIcon className="w-4 h-4" />

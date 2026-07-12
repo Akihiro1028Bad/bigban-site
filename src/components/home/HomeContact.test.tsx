@@ -3,6 +3,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import HomeContact from "./HomeContact";
 
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   global.fetch = vi.fn();
@@ -60,6 +65,8 @@ describe("HomeContact", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
+    // 送信意図を reservation_click として計測(カテゴリを label に)。
+    expect(trackCtaClick).toHaveBeenCalledWith("reservation", "home_contact", "court");
   });
 
   it("送信成功時に成功メッセージを表示する", async () => {

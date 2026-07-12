@@ -1,0 +1,181 @@
+{
+  "apiFields": [
+    {
+      "fieldId": "title",
+      "name": "タイトル",
+      "kind": "text",
+      "required": true,
+      "initialValue": null
+    },
+    {
+      "fieldId": "slug",
+      "name": "スラッグ",
+      "kind": "text",
+      "required": true,
+      "patternMatchValidation": {
+        "regexp": {
+          "pattern": "^[a-z0-9-]+$"
+        }
+      },
+      "initialValue": null
+    },
+    {
+      "fieldId": "locale",
+      "name": "ロケール",
+      "kind": "select",
+      "required": false,
+      "multipleSelect": false,
+      "selectInitialValue": [
+        "loc-ja"
+      ],
+      "selectItems": [
+        {
+          "id": "loc-ja",
+          "value": "ja"
+        },
+        {
+          "id": "loc-en",
+          "value": "en"
+        }
+      ]
+    },
+    {
+      "fieldId": "articleType",
+      "name": "記事タイプ",
+      "kind": "select",
+      "required": false,
+      "multipleSelect": false,
+      "selectInitialValue": [],
+      "selectItems": [
+        {
+          "id": "atype-acquire",
+          "value": "獲得"
+        },
+        {
+          "id": "atype-relief",
+          "value": "不安解消"
+        },
+        {
+          "id": "atype-asset",
+          "value": "資産"
+        },
+        {
+          "id": "atype-compare",
+          "value": "比較"
+        },
+        {
+          "id": "atype-event",
+          "value": "イベント"
+        }
+      ]
+    },
+    {
+      "fieldId": "excerpt",
+      "name": "要約",
+      "kind": "textArea",
+      "required": false,
+      "initialValue": null
+    },
+    {
+      "fieldId": "displayMode",
+      "name": "表示タイプ",
+      "kind": "select",
+      "required": false,
+      "multipleSelect": false,
+      "selectInitialValue": [
+        "disp-html"
+      ],
+      "selectItems": [
+        {
+          "id": "disp-html",
+          "value": "html"
+        },
+        {
+          "id": "disp-rich",
+          "value": "rich"
+        }
+      ]
+    },
+    {
+      "fieldId": "bodyHtml",
+      "name": "本文html",
+      "kind": "textArea",
+      "required": false,
+      "initialValue": null
+    },
+    {
+      "fieldId": "body",
+      "name": "本文リッチテキスト",
+      "kind": "richEditorV2",
+      "required": false,
+      "richEditorV2Options": [
+        "headerOne",
+        "headerTwo",
+        "headerThree",
+        "undo",
+        "redo",
+        "bold",
+        "listBullet",
+        "listOrdered",
+        "image",
+        "clean",
+        "customClass"
+      ],
+      "customClassList": [
+        {
+          "id": "cls-cta",
+          "name": "CTAボタン",
+          "value": "cta"
+        },
+        {
+          "id": "cls-cta-ghost",
+          "name": "CTAボタン (枠線)",
+          "value": "cta--ghost"
+        },
+        {
+          "id": "cls-lead",
+          "name": "リード文",
+          "value": "lead"
+        },
+        {
+          "id": "cls-note",
+          "name": "補足コールアウト",
+          "value": "note"
+        },
+        {
+          "id": "cls-caution",
+          "name": "注意喚起",
+          "value": "caution"
+        },
+        {
+          "id": "cls-badge",
+          "name": "バッジ",
+          "value": "badge"
+        },
+        {
+          "id": "cls-highlight",
+          "name": "強調",
+          "value": "highlight"
+        },
+        {
+          "id": "cls-schedule",
+          "name": "スケジュール ol",
+          "value": "schedule"
+        },
+        {
+          "id": "cls-schedule-item",
+          "name": "スケジュール li",
+          "value": "schedule-item "
+        }
+      ]
+    },
+    {
+      "fieldId": "eyecatch",
+      "name": "アイキャッチ画像",
+      "kind": "media",
+      "required": false,
+      "initialValue": null
+    }
+  ],
+  "customFields": []
+}
