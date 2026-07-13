@@ -15,6 +15,7 @@ import {
   getLatestReport,
   getPage,
   listBlockChildren,
+  queryAllDataSource,
   queryDataSource,
   updatePageProps,
   updatePageSelect,
@@ -96,6 +97,42 @@ describe("queryDataSource", () => {
     await expect(
       queryDataSource(DS, {}, { token: TOKEN, fetchFn })
     ).rejects.toThrow(/401.*unauthorized/);
+  });
+});
+
+describe("queryAllDataSource", () => {
+  it("next_cursor をたどって全ページを返す", async () => {
+    const page1 = { id: "p1", url: "https://notion.so/p1", properties: {} };
+    const page2 = { id: "p2", url: "https://notion.so/p2", properties: {} };
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(ok({ results: [page1], has_more: true, next_cursor: "cur1" }))
+      .mockResolvedValueOnce(ok({ results: [page2], has_more: false, next_cursor: null }));
+
+    const pages = await queryAllDataSource(
+      DS,
+      { filter: { property: "状態" }, pageSize: 100 },
+      { token: TOKEN, fetchFn }
+    );
+
+    expect(pages).toEqual([page1, page2]);
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body as string)).toEqual({
+      filter: { property: "状態" },
+      page_size: 100,
+    });
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body as string)).toEqual({
+      filter: { property: "状態" },
+      page_size: 100,
+      start_cursor: "cur1",
+    });
+  });
+
+  it("has_more なのに next_cursor が無ければ停止せず拒否する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ has_more: true }));
+
+    await expect(queryAllDataSource(DS, {}, { token: TOKEN, fetchFn })).rejects.toThrow(
+      "next_cursor"
+    );
   });
 });
 

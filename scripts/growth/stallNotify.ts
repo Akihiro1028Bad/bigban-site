@@ -11,6 +11,8 @@
 export interface StallMessageInput {
   /** 滞留した生成待ち/生成中の記事タイトル。 */
   generatingTitles: readonly string[];
+  /** 依頼時刻ありで timeout を超えた pull 型ループ行。 */
+  staleLoopTitles: readonly string[];
   /** wedge(依頼時刻なしで reap 不能)行のタイトル。 */
   wedgeTitles: readonly string[];
   /** 滞留とみなすしきい値(分)。 */
@@ -24,8 +26,9 @@ function titleLine(title: string): string {
 /** 滞留・wedge の LINE 本文。対象が無ければ null(通知不要)。 */
 export function buildStallMessage(input: StallMessageInput): string | null {
   const hasGenerating = input.generatingTitles.length > 0;
+  const hasStaleLoop = input.staleLoopTitles.length > 0;
   const hasWedge = input.wedgeTitles.length > 0;
-  if (!hasGenerating && !hasWedge) return null;
+  if (!hasGenerating && !hasStaleLoop && !hasWedge) return null;
 
   const lines = [
     `⚠️ グロースの処理が ${input.thresholdMinutes}分 以上 滞留しています(自宅PCの巡回停止の疑い)。`,
@@ -33,6 +36,10 @@ export function buildStallMessage(input: StallMessageInput): string | null {
   if (hasGenerating) {
     lines.push("", "■ 生成待ち/生成中のまま止まっている記事:");
     for (const t of input.generatingTitles) lines.push(titleLine(t));
+  }
+  if (hasStaleLoop) {
+    lines.push("", "■ 依頼時刻からタイムアウトした行(自動回収対象):");
+    for (const t of input.staleLoopTitles) lines.push(titleLine(t));
   }
   if (hasWedge) {
     lines.push("", "■ 依頼時刻が無く自動回収できない行(手動確認が必要):");

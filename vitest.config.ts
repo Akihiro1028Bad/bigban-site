@@ -90,6 +90,8 @@ export default defineConfig({
         "scripts/growth/notify-pull-fail-cli.ts",
         "scripts/growth/notify-loop-fail-cli.ts",
         "scripts/growth/stall-check-cli.ts",
+        // pull 型AI終了後の Notion 状態を問い合わせる薄い I/O 入口。純ロジックは loopState.ts で検証する。
+        "scripts/growth/loop-state-cli.ts",
         "scripts/growth/prompt-lint-cli.ts",
         "scripts/growth/article-eval-cli.ts",
         "scripts/growth/column-category-cli.ts",

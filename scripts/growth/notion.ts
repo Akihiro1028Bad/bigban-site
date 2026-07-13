@@ -145,6 +145,29 @@ export async function queryDataSource(
   };
 }
 
+/** data source の next_cursor を最後までたどり、該当ページをすべて返す。 */
+export async function queryAllDataSource(
+  dataSourceId: string,
+  body: Omit<QueryDataSourceBody, "startCursor">,
+  options: NotionApiOptions
+): Promise<NotionPage[]> {
+  const pages: NotionPage[] = [];
+  let startCursor: string | undefined;
+  while (true) {
+    const result = await queryDataSource(
+      dataSourceId,
+      { ...body, ...(startCursor === undefined ? {} : { startCursor }) },
+      options
+    );
+    pages.push(...result.pages);
+    if (!result.hasMore) return pages;
+    if (!result.nextCursor) {
+      throw new Error("Notion API が has_more=true なのに next_cursor を返しませんでした。");
+    }
+    startCursor = result.nextCursor;
+  }
+}
+
 /** Notion rich_text の書き込み 1 要素。content は最大 2000 文字。 */
 export interface NotionRichTextItem {
   text: { content: string };

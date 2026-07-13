@@ -15,19 +15,11 @@ import "dotenv/config";
 
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
-import { queryDataSource, type NotionApiOptions, type NotionPage } from "./notion";
+import { queryAllDataSource, type NotionApiOptions } from "./notion";
+import { detectStalls } from "./stallDetection";
 import { buildStallMessage } from "./stallNotify";
-import {
-  selectStalledGeneratingIds,
-  selectWedgeJobIds,
-  type GeneratingRow,
-  type StaleJobRow,
-} from "./staleJob";
-import { formatWedgeTitle, WEDGE_LOOPS } from "./wedgeLoops";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
-const STATUS_PROP = "ステータス";
-const TITLE_PROP = "タイトル案";
 // generating(#108)/reaper(#40)と同じ 15分しきい値に合わせる。
 const STALL_TIMEOUT_MS = 15 * 60 * 1000;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
@@ -36,32 +28,6 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} が未設定です。`);
   return value;
-}
-
-function selectOf(page: NotionPage, prop: string): string {
-  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
-  return value?.select?.name ?? "";
-}
-
-function titleOf(page: NotionPage): string {
-  const value = page.properties[TITLE_PROP] as { title?: { plain_text?: string }[] } | undefined;
-  return (value?.title ?? []).map((r) => r.plain_text ?? "").join("").trim();
-}
-
-function dateMsOf(page: NotionPage, prop: string): number | null {
-  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
-  const start = value?.date?.start;
-  if (!start) return null;
-  const ms = Date.parse(start);
-  return Number.isNaN(ms) ? null : ms;
-}
-
-/** Notion システムプロパティ last_edited_time(型に無いので narrow に読む)。 */
-function lastEditedMsOf(page: NotionPage): number | null {
-  const raw = (page as { last_edited_time?: string }).last_edited_time;
-  if (!raw) return null;
-  const ms = Date.parse(raw);
-  return Number.isNaN(ms) ? null : ms;
 }
 
 async function notifyLine(text: string): Promise<void> {
@@ -78,35 +44,18 @@ async function notifyLine(text: string): Promise<void> {
 
 async function main(): Promise<void> {
   const opts: NotionApiOptions = { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch };
-  const { pages } = await queryDataSource(IDEA_DS, { pageSize: 100 }, opts);
+  const pages = await queryAllDataSource(IDEA_DS, { pageSize: 100 }, opts);
 
-  const byId = new Map(pages.map((p) => [p.id, p]));
-
-  // #220-3: 生成待ち/生成中のまま lastEdited から滞留している行。
-  const generatingRows: (GeneratingRow & { id: string })[] = pages.map((p) => ({
-    id: p.id,
-    status: selectOf(p, STATUS_PROP),
-    lastEditedMs: lastEditedMsOf(p),
-  }));
-  const stalledIds = selectStalledGeneratingIds(generatingRows, Date.now(), STALL_TIMEOUT_MS);
-
-  // #220-4: 全 pull 型ループを横断し、busy なのに依頼時刻が無く時間 reap できない wedge 行を拾う。
-  const wedgeTitles: string[] = [];
-  for (const loop of WEDGE_LOOPS) {
-    const rows: (StaleJobRow & { id: string })[] = pages.map((p) => ({
-      id: p.id,
-      status: selectOf(p, loop.statusProp),
-      requestedAtMs: dateMsOf(p, loop.requestedAtProp),
-    }));
-    for (const id of selectWedgeJobIds(rows)) {
-      wedgeTitles.push(formatWedgeTitle(titleOf(byId.get(id) as NotionPage), loop.label));
-    }
-  }
-
-  const generatingTitles = stalledIds.map((id) => titleOf(byId.get(id) as NotionPage));
+  const nowMs = Date.now();
+  const { generatingTitles, staleLoopTitles, wedgeTitles } = detectStalls(
+    pages,
+    nowMs,
+    STALL_TIMEOUT_MS
+  );
 
   const message = buildStallMessage({
     generatingTitles,
+    staleLoopTitles,
     wedgeTitles,
     thresholdMinutes: Math.round(STALL_TIMEOUT_MS / 60_000),
   });
