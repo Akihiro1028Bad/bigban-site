@@ -12,12 +12,15 @@ import {
   applyRowFromPage,
   applyStatusOf,
   applyViewOf,
+  auditAdviceAnchors,
   buildApplyClearProps,
   buildApplyFailProps,
   buildApplyPresentProps,
   buildApplyProcessingProps,
   buildApplyRequestProps,
   classifyFix,
+  FIX_REASON_AMBIGUOUS,
+  FIX_REASON_CROSS_BLOCK,
   FIX_REASON_EXCLUDED,
   FIX_REASON_NO_ANCHOR,
   FIX_REASON_NO_QUOTE,
@@ -25,6 +28,7 @@ import {
   isApplicableArea,
   MAX_ADOPTED,
   parseApplyProposal,
+  resolveAnchor,
   selectApplicableFixes,
   selectableAdoptIndexes,
   selectStaleApplyIds,
@@ -95,6 +99,47 @@ describe("classifyFix", () => {
       reason: FIX_REASON_NO_ANCHOR,
     });
   });
+  it("複数段落に一致する引用は理由を分ける", () => {
+    expect(classifyFix(fix({ quote: "同じ" }), "<p>同じ</p><p>同じ</p>")).toEqual({
+      applicable: false,
+      reason: FIX_REASON_AMBIGUOUS,
+    });
+  });
+  it("段落をまたぐ引用は理由を分ける", () => {
+    expect(classifyFix(fix({ quote: "前半 後半" }), "<p>前半</p><p>後半</p>")).toEqual({
+      applicable: false,
+      reason: FIX_REASON_CROSS_BLOCK,
+    });
+  });
+  it("本文の実体参照と引用の実文字を正規化して照合する", () => {
+    expect(classifyFix(fix({ quote: "Q&A の解説" }), "<p>Q&amp;A の解説です。</p>")).toEqual({
+      applicable: true,
+      quote: "Q&A の解説",
+      blockIndex: 0,
+    });
+  });
+});
+
+describe("resolveAnchor", () => {
+  it("空または不在の引用はnoneを返す", () => {
+    expect(resolveAnchor(BODY, "   ")).toEqual({ status: "none" });
+    expect(resolveAnchor(BODY, "存在しない文字列")).toEqual({ status: "none" });
+  });
+  it("一意の引用はuniqueを返す", () => {
+    expect(resolveAnchor(BODY, "導入の段落")).toEqual({ status: "unique", blockIndex: 1 });
+  });
+  it("引用中の実体参照風文字列と不等号をプレーンテキストとして照合する", () => {
+    expect(resolveAnchor("<p>Use &amp;amp; and 1 &lt; 2 &gt; 0</p>", "Use &amp; and 1 < 2 > 0")).toEqual({
+      status: "unique",
+      blockIndex: 0,
+    });
+  });
+  it("複数ブロックに一致する引用はmultipleを返す", () => {
+    expect(resolveAnchor("<p>同じ</p><p>同じ</p>", "同じ")).toEqual({ status: "multiple" });
+  });
+  it("複数段落にまたがる引用はcross-blockを返す", () => {
+    expect(resolveAnchor("<p>前半</p><p>後半</p>", "前半 後半")).toEqual({ status: "cross-block" });
+  });
 });
 
 describe("findAnchorBlock", () => {
@@ -107,6 +152,47 @@ describe("findAnchorBlock", () => {
     expect(findAnchorBlock(BODY, "存在しない文字列")).toBe(-1);
     const dup = "<p>同じ段落</p><p>同じ段落</p>";
     expect(findAnchorBlock(dup, "同じ段落")).toBe(-1);
+  });
+});
+
+describe("auditAdviceAnchors", () => {
+  it("quote が一意にアンカーする fix は対象外(空配列)", () => {
+    expect(auditAdviceAnchors([fix({ quote: "導入の段落" })], BODY)).toEqual([]);
+  });
+  it("除外カテゴリ・quote 空の fix は対象外(ノイズにしない)", () => {
+    expect(
+      auditAdviceAnchors(
+        [fix({ area: "正確性", quote: "導入の段落" }), fix({ quote: "" }), fix({})],
+        BODY
+      )
+    ).toEqual([]);
+  });
+  it("複数一致は multiple / 段落またぎは cross-block / 不在は none を理由付きで返す", () => {
+    expect(auditAdviceAnchors([fix({ quote: "同じ" })], "<p>同じ</p><p>同じ</p>")).toEqual([
+      { index: 0, area: "文体", quote: "同じ", status: "multiple", reason: FIX_REASON_AMBIGUOUS },
+    ]);
+    expect(auditAdviceAnchors([fix({ quote: "前半 後半" })], "<p>前半</p><p>後半</p>")).toEqual([
+      {
+        index: 0,
+        area: "文体",
+        quote: "前半 後半",
+        status: "cross-block",
+        reason: FIX_REASON_CROSS_BLOCK,
+      },
+    ]);
+    expect(auditAdviceAnchors([fix({ quote: "存在しない" })], BODY)).toEqual([
+      { index: 0, area: "文体", quote: "存在しない", status: "none", reason: FIX_REASON_NO_ANCHOR },
+    ]);
+  });
+  it("混在時は対象 fix の index だけを正しく返す", () => {
+    const fixes: AdviceFix[] = [
+      fix({ quote: "導入の段落" }), // 一意 → 対象外
+      fix({ area: "正確性", quote: "導入の段落" }), // 除外カテゴリ → 対象外
+      fix({ quote: "存在しない" }), // 不在 → index 2 が返る
+    ];
+    const audits = auditAdviceAnchors(fixes, BODY);
+    expect(audits.map((a) => a.index)).toEqual([2]);
+    expect(audits[0].reason).toBe(FIX_REASON_NO_ANCHOR);
   });
 });
 

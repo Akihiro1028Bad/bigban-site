@@ -31,6 +31,7 @@ import {
   serializeAdvice,
   type AdviceRow,
 } from "./advise";
+import { auditAdviceAnchors } from "./advise-apply";
 import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
@@ -164,11 +165,21 @@ async function present(pageId: string, jsonPath: string, options: NotionApiOptio
   const advice = parseAdvice(raw);
   if (!advice) throw new Error("アドバイスJSONが不正です(スキーマ検証に失敗)。");
   const adviceJson = serializeAdvice(advice);
-  const title = adviceRowFromPage(await getPage(pageId, options)).title;
+  const row = adviceRowFromPage(await getPage(pageId, options));
+  // present 前の自己検証: quote が一意にアンカーしない fix を警告(沈黙させない・提示自体は続行)。
+  const audits = row.bodyHtml ? auditAdviceAnchors(advice.fixes, row.bodyHtml) : [];
+  if (audits.length > 0) {
+    console.warn(
+      `[advise:present] アンカー不一致の fix が ${audits.length} 件あります(助言表示のみ・自動反映不可):`
+    );
+    for (const audit of audits) {
+      console.warn(`  - fix#${audit.index} [${audit.area}] ${audit.reason}`);
+    }
+  }
   await write(pageId, buildAdvicePresentProps(adviceJson), options);
   await notifyFlex(
-    buildAdvicePresentMessage(title, approveUrl()),
-    buildAdvicePresentFlex(title, approveUrl())
+    buildAdvicePresentMessage(row.title, approveUrl()),
+    buildAdvicePresentFlex(row.title, approveUrl())
   );
 }
 
