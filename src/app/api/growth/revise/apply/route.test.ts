@@ -98,6 +98,21 @@ describe("POST /api/growth/revise/apply", () => {
     expect(p["タイトル案"]).toEqual({ title: [{ text: { content: "新タイトル" } }] });
   });
 
+  it("apply: 選択済み outline を修正案の代わりに保存し、タイトルを除外できる", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("提示中", "## 全文修正", "新タイトル"));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+    const res = await POST(postRequest(null, { pageId: PAGE_ID, action: "apply", outline: "## 選択反映", applyTitle: false }));
+    expect(res.status).toBe(200);
+    const [, props] = vi.mocked(updatePageProps).mock.calls[0];
+    expect((props as Record<string, unknown>)["構成案"]).toEqual({ rich_text: [{ text: { content: "## 選択反映" } }] });
+    expect((props as Record<string, unknown>)["タイトル案"]).toBeUndefined();
+  });
+
+  it("apply: outline が空文字または上限超過なら 400", async () => {
+    expect((await POST(postRequest(null, { pageId: PAGE_ID, action: "apply", outline: "  " }))).status).toBe(400);
+    expect((await POST(postRequest(null, { pageId: PAGE_ID, action: "apply", outline: "a".repeat(20_001) }))).status).toBe(400);
+  });
+
   it("discard: 構成案は触らず修正状態だけクリアする", async () => {
     vi.mocked(getPage).mockResolvedValue(page("提示中", "x"));
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);

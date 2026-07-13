@@ -139,6 +139,9 @@ function clearedReviseProps(): Record<string, unknown> {
  * 「反映」: 提案がある方だけ(構成案=`修正案`→`構成案` / タイトル=`修正タイトル案`→`タイトル案`)を
  * 上書きし、修正状態を全クリアする(1 PATCH 用)。両方 null は呼び出し側でガードする。
  */
+/** 構成案の手動編集・選択反映で共用する最大文字数。 */
+export const OUTLINE_MAX_LENGTH = 20_000;
+
 export function buildReviseApplyProps(
   proposal: string | null,
   titleProposal: string | null

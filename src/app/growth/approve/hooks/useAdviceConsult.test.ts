@@ -233,6 +233,17 @@ describe("applyNow", () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it("提示案をすべて選択解除した場合は何もしない(early return)", async () => {
+    const fetchFn = mockFetch();
+    const { view } = setup({ bodyHtml: BODY, adviceApply: APPLY_VIEW });
+    act(() => view.result.current.toggleApplySelect(0));
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(view.result.current.error).toBe("");
+  });
+
   it("反映できる案が無ければ error を出し fetch しない", async () => {
     const fetchFn = mockFetch();
     const view = setup({
@@ -435,5 +446,268 @@ describe("applyNow", () => {
       await view.result.current.applyNow();
     });
     expect(view.result.current.error).toBe("反映に失敗しました。");
+  });
+});
+
+describe("提示後の案ごとの選択と却下ログ", () => {
+  const TWO_PROPOSALS: AdviceApplyView = {
+    status: "提示中",
+    raw: "",
+    proposal: [
+      { fixIndex: 0, before: "<p>導入です。</p>", after: "<p>新しい導入です。</p>" },
+      { fixIndex: 1, before: "<p>ここは重要です。読んでください。</p>", after: "<p>重要です。</p>" },
+    ],
+  };
+
+  const ADVICE: AdviceView = {
+    status: "提示中",
+    raw: "",
+    advice: {
+      summary: "全体",
+      scores: [],
+      strengths: [],
+      fixes: [
+        { area: "読みやすさ", severity: "中", quote: "導入です。", reason: "冗長", suggestion: "短くする" },
+        { area: "文体", severity: "中", quote: "読んでください", reason: "指示的", suggestion: "和らげる" },
+      ],
+    },
+  };
+
+  it("applySelected は全選択で始まり、toggle・pageId・proposal の変化でリセットする", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ pageId, adviceApply }: { pageId: string; adviceApply: AdviceApplyView }) =>
+        useAdviceConsult({ pageId, token: TOKEN, adviceApply, onChanged }),
+      { initialProps: { pageId: "page-A", adviceApply: TWO_PROPOSALS } },
+    );
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0, 1]));
+    act(() => view.result.current.toggleApplySelect(1));
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0]));
+
+    view.rerender({ pageId: "page-B", adviceApply: TWO_PROPOSALS });
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0, 1]));
+    act(() => view.result.current.toggleApplySelect(0));
+    act(() => view.result.current.toggleApplySelect(0));
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0, 1]));
+    view.rerender({
+      pageId: "page-B",
+      adviceApply: { ...TWO_PROPOSALS, proposal: [TWO_PROPOSALS.proposal[1]] },
+    });
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([1]));
+  });
+
+  it("同じ記事で提示案だけが変わっても選択を新しい案の全選択へ戻す", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ adviceApply }: { adviceApply: AdviceApplyView }) =>
+        useAdviceConsult({ pageId: "page-A", token: TOKEN, adviceApply, onChanged }),
+      { initialProps: { adviceApply: TWO_PROPOSALS } },
+    );
+    act(() => view.result.current.toggleApplySelect(1));
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0]));
+
+    view.rerender({
+      adviceApply: { ...TWO_PROPOSALS, proposal: [TWO_PROPOSALS.proposal[1]] },
+    });
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([1]));
+  });
+
+  it("同じ fixIndex の提示内容が更新された場合も全選択へ戻す", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ adviceApply }: { adviceApply: AdviceApplyView }) =>
+        useAdviceConsult({ pageId: "page-A", token: TOKEN, adviceApply, onChanged }),
+      { initialProps: { adviceApply: TWO_PROPOSALS } },
+    );
+    act(() => view.result.current.toggleApplySelect(1));
+
+    view.rerender({
+      adviceApply: {
+        ...TWO_PROPOSALS,
+        proposal: TWO_PROPOSALS.proposal.map((item) =>
+          item.fixIndex === 1 ? { ...item, after: "<p>更新された案です。</p>" } : item,
+        ),
+      },
+    });
+
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set([0, 1]));
+  });
+
+  it("提示案が消えた場合も同じ記事の選択を空集合へ戻す", () => {
+    const onChanged = vi.fn();
+    const view = renderHook(
+      ({ adviceApply }: { adviceApply?: AdviceApplyView }) =>
+        useAdviceConsult({ pageId: "page-A", token: TOKEN, adviceApply, onChanged }),
+      { initialProps: { adviceApply: TWO_PROPOSALS } as { adviceApply?: AdviceApplyView } },
+    );
+    view.rerender({ adviceApply: undefined });
+    expect(new Set(view.result.current.applySelected)).toEqual(new Set());
+  });
+
+  it("applyNow は選択分だけを保存し、非選択の案を却下ログへ送る", async () => {
+    const fetchFn = mockFetch(
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+    );
+    const { view } = setup({ bodyHtml: BODY, adviceApply: TWO_PROPOSALS, advice: ADVICE });
+    act(() => view.result.current.toggleApplySelect(1));
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    const save = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(save.bodyHtml).toContain("新しい導入です。");
+    expect(save.bodyHtml).toContain("読んでください。");
+    expect(save.adoptedFixes).toHaveLength(1);
+    expect(fetchFn.mock.calls[2][0]).toBe("/api/growth/learning-log/reject");
+    expect(JSON.parse((fetchFn.mock.calls[2][1] as RequestInit).body as string)).toEqual({
+      pageId: PAGE_ID,
+      source: "advise-apply",
+      rejectedFixes: [{
+        aspect: "文体",
+        detail: "指摘: 指示的 / 提案: 和らげる（対象: 読んでください）",
+        before: "<p>ここは重要です。読んでください。</p>",
+        after: "<p>重要です。</p>",
+      }],
+    });
+  });
+
+  it("applyNow は全選択なら却下ログを送らない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { view } = setup({ bodyHtml: BODY, adviceApply: TWO_PROPOSALS, advice: ADVICE });
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn.mock.calls.map(([url]) => url)).not.toContain("/api/growth/learning-log/reject");
+  });
+
+  it("submitApply は成功時だけ非採用の適用可能 fix を却下ログへ送り、適用不能 fix は除く", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { view } = setup({
+      bodyHtml: BODY,
+      advice: {
+        ...ADVICE,
+        advice: { ...ADVICE.advice!, fixes: [...ADVICE.advice!.fixes, { area: "構成", severity: "低", reason: "対象なし", suggestion: "直す" }] },
+      },
+    });
+    act(() => view.result.current.toggleAdopt(0));
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    expect(fetchFn.mock.calls[1][0]).toBe("/api/growth/learning-log/reject");
+    const rejected = JSON.parse((fetchFn.mock.calls[1][1] as RequestInit).body as string).rejectedFixes;
+    expect(rejected).toEqual([{
+      aspect: "文体",
+      detail: "指摘: 指示的 / 提案: 和らげる（対象: 読んでください）",
+      before: "読んでください",
+      after: "和らげる",
+    }]);
+  });
+
+  it("submitApply の依頼失敗時は却下ログを送らない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: false }, false, 400));
+    const { view } = setup({ bodyHtml: BODY, advice: ADVICE });
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(view.result.current.error).toBe("反映依頼に失敗しました。"));
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("submitApply は本文が無い成功時、却下ログを送らない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { view } = setup({ advice: ADVICE });
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/advise/apply");
+  });
+
+  it("submitApply は advice が無くても本文があれば空の却下候補を処理する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { view } = setup({ bodyHtml: BODY });
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/advise/apply");
+  });
+
+  it("submitApply は提案が空でも適用可能な fix の空の suggestion を詳細へ記録する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { view } = setup({
+      bodyHtml: BODY,
+      advice: {
+        status: "提示中",
+        raw: "",
+        advice: {
+          summary: "全体",
+          scores: [],
+          strengths: [],
+          fixes: [{ area: "読みやすさ", severity: "中", quote: "導入です。", reason: "冗長", suggestion: "" }],
+        },
+      },
+    });
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    const rejected = JSON.parse((fetchFn.mock.calls[1][1] as RequestInit).body as string).rejectedFixes;
+    expect(rejected).toEqual([{
+      aspect: "読みやすさ",
+      detail: "指摘: 冗長 / 提案: （対象: 導入です。）",
+      before: "導入です。",
+      after: "",
+    }]);
+  });
+
+  it("submitApply は採用済み・不適用 fix を却下ログから除外する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { view } = setup({
+      bodyHtml: BODY,
+      advice: {
+        ...ADVICE,
+        advice: {
+          ...ADVICE.advice!,
+          fixes: [
+            ADVICE.advice!.fixes[0],
+            { area: "タイトル", severity: "低", quote: "読んでください", reason: "対象外", suggestion: "変更" },
+          ],
+        },
+      },
+    });
+    act(() => view.result.current.toggleAdopt(0));
+    act(() => view.result.current.submitApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/advise/apply");
+  });
+
+  it("dismissApply は成功時に提示案すべてを却下ログへ送り、却下ログ失敗はエラーにしない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: false }, false, 500));
+    const { onChanged, view } = setup({ adviceApply: TWO_PROPOSALS, advice: ADVICE });
+    act(() => view.result.current.dismissApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    expect(fetchFn.mock.calls[1][0]).toBe("/api/growth/learning-log/reject");
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(view.result.current.error).toBe("");
+  });
+
+  it("dismissApply は quote が空白でも対象表記なしの詳細を却下ログへ残す", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const { view } = setup({
+      adviceApply: { status: "提示中", raw: "", proposal: [TWO_PROPOSALS.proposal[0]] },
+      advice: {
+        ...ADVICE,
+        advice: {
+          ...ADVICE.advice!,
+          fixes: [{ ...ADVICE.advice!.fixes[0], quote: "   " }],
+        },
+      },
+    });
+    act(() => view.result.current.dismissApply());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    const rejected = JSON.parse((fetchFn.mock.calls[1][1] as RequestInit).body as string).rejectedFixes;
+    expect(rejected[0].detail).toBe("指摘: 冗長 / 提案: 短くする");
+  });
+
+  it("dismissApply の片付け失敗時は却下ログを送らない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: false }, false, 400));
+    const { view } = setup({ adviceApply: TWO_PROPOSALS, advice: ADVICE });
+    act(() => view.result.current.dismissApply());
+    await waitFor(() => expect(view.result.current.error).toBe("反映の片付けに失敗しました。"));
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,9 +9,12 @@
 | 種別 | 発火点 | 記録内容 |
 |---|---|---|
 | `編集` | `POST /api/growth/draft/edit` 保存成功(after) | 手動リッチ編集の前後差分要約(無変更は記録しない)。 |
-| `採否` | 同上(client が `source=advise-apply`/`comment-revise` を付与) | 採用した fix の観点(fix ごとに 1 行)。却下は記録しない。 |
+| `採否` | 同上(client が `source=advise-apply`/`comment-revise` を付与) | 採用した fix の観点(fix ごとに 1 行)。 |
+| `不採用` | `POST /api/growth/learning-log/reject` | 承認画面で反映しなかった案を fix ごとに 1 行記録する。 |
 | `画像試行` | `growth:body-image-regen`/`growth:eyecatch-regen` の done/fail | style・成否・直近 4 週累積回数。 |
 | `工程失敗` | `run.mjs` の notifyLoopFail / pull 失敗 / weekly 異常終了 | mode・exit code・detail 末尾。`growth:learning-log -- append-fail` 経由。 |
+
+> Notion「学習ログ」DB の `種別` select に `不採用` オプションを手動追加する必要がある。
 
 ## 純ロジックと CLI
 

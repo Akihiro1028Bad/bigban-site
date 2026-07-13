@@ -26,6 +26,7 @@ import type { PendingItem } from "../types";
 import { useAdviceConsult } from "./useAdviceConsult";
 import { useBodyCommentConsult } from "./useBodyCommentConsult";
 import type { useReviseEditing } from "./useReviseEditing";
+import type { RejectedFixPayload, ReviseApplyPayload } from "../consult/ReviseProposalBody";
 
 interface UseConsultParams {
   item: PendingItem;
@@ -63,9 +64,14 @@ interface UseConsultReturn {
   onAdviceSubmitApply: () => void;
   onAdviceDismissApply: () => void;
   onAdviceApplyNow: () => void;
-  onReviseApply: () => void;
-  onReviseDiscard: () => void;
-  onSentenceApplyAll: () => void;
+  onAdviceToggleApplySelect: (fixIndex: number) => void;
+  adviceApplySelected: ReadonlySet<number>;
+  onReviseApply: (payload?: ReviseApplyPayload) => void;
+  onReviseDiscard: (rejected?: RejectedFixPayload[]) => void;
+  onSentenceApplySelected: () => void;
+  onSentenceDismissAll: () => void;
+  onSentenceToggleSelect: (commentIndex: number) => void;
+  sentenceSelected: Set<number>;
   onToggleAdopt: (index: number) => void;
   onSetAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
   adopted: ReadonlySet<number>;
@@ -203,9 +209,14 @@ export function useConsult({
     onAdviceSubmitApply: advice.submitApply,
     onAdviceDismissApply: advice.dismissApply,
     onAdviceApplyNow: () => void advice.applyNow(),
-    onReviseApply: () => void revise.applyRevise(item, "apply"),
-    onReviseDiscard: () => void revise.applyRevise(item, "discard"),
-    onSentenceApplyAll: () => void bodyCommentConsult.applyNow(),
+    onAdviceToggleApplySelect: advice.toggleApplySelect,
+    adviceApplySelected: advice.applySelected,
+    onReviseApply: (payload) => void (payload ? revise.applyRevise(item, "apply", payload) : revise.applyRevise(item, "apply")),
+    onReviseDiscard: (rejected) => void (rejected ? revise.applyRevise(item, "discard", rejected) : revise.applyRevise(item, "discard")),
+    onSentenceApplySelected: () => void bodyCommentConsult.applyNow(),
+    onSentenceDismissAll: () => void bodyCommentConsult.dismissAll(),
+    onSentenceToggleSelect: bodyCommentConsult.toggleSelect,
+    sentenceSelected: bodyCommentConsult.selected,
     onToggleAdopt: advice.toggleAdopt,
     onSetAdoptedBulk: advice.setAdoptedBulk,
     adopted: advice.adopted,

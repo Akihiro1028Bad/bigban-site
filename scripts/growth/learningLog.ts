@@ -7,11 +7,12 @@ import type { TopLevelBlock } from "./decorate";
 import type { NotionApiOptions, NotionPage } from "./notion";
 
 // ── イベント種別・discriminated union(spec §3.4.3) ──
-export type LearningEventKind = "編集" | "採否" | "画像試行" | "工程失敗";
+export type LearningEventKind = "編集" | "採否" | "不採用" | "画像試行" | "工程失敗";
 
 export const LEARNING_EVENT_KINDS: readonly LearningEventKind[] = [
   "編集",
   "採否",
+  "不採用",
   "画像試行",
   "工程失敗",
 ];
@@ -21,6 +22,7 @@ export type LearningImageResult = "成功" | "失敗" | "リトライ";
 export type LearningEvent =
   | { kind: "編集"; pageId: string; title: string; before: string; after: string }
   | { kind: "採否"; pageId: string; title: string; aspect: string; before: string; after: string }
+  | { kind: "不採用"; pageId: string; title: string; aspect: string; before: string; after: string }
   | { kind: "画像試行"; pageId: string; title: string; style: string; result: "成功" | "失敗"; attempt: number }
   | { kind: "工程失敗"; mode: string; exitCode: number | null; detail: string };
 
@@ -34,6 +36,14 @@ export const LearningEventSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("採否"),
+    pageId: z.string(),
+    title: z.string(),
+    aspect: z.string(),
+    before: z.string(),
+    after: z.string(),
+  }),
+  z.object({
+    kind: z.literal("不採用"),
     pageId: z.string(),
     title: z.string(),
     aspect: z.string(),
@@ -303,6 +313,8 @@ function buildArticleEventTitle(
       return `編集: ${editHeadline ?? "変更"} (${titleHead})`;
     case "採否":
       return `採用: ${event.aspect || "観点なし"} (${titleHead})`;
+    case "不採用":
+      return `不採用: ${event.aspect || "観点なし"} (${titleHead})`;
     case "画像試行":
       return `画像${event.result}: ${event.style} ×${event.attempt} (${titleHead})`;
   }
@@ -331,6 +343,7 @@ export function buildLearningLogProps(
         [LEARNING_LOG_PROPS.target]: { rich_text: [] },
       };
     case "採否":
+    case "不採用":
       return {
         ...props,
         [LEARNING_LOG_PROPS.articleTitle]: { rich_text: chunkRichText(event.title) },
@@ -424,6 +437,7 @@ export interface LearningLogSummary {
   countByKind: Record<LearningEventKind | "その他", number>;
   editRegionHeatmap: Record<string, number>;
   adoptAspectHeatmap: Record<string, number>;
+  rejectAspectHeatmap: Record<string, number>;
   imageRetryTop: { key: string; style: string; pageId: string; maxAttempt: number }[];
   failModeFrequency: Record<string, number>;
 }
@@ -432,6 +446,7 @@ function emptyCountByKind(): Record<LearningEventKind | "その他", number> {
   return {
     編集: 0,
     採否: 0,
+    不採用: 0,
     画像試行: 0,
     工程失敗: 0,
     その他: 0,
@@ -468,6 +483,7 @@ export function summarizeLearningLog(
   const countByKind = emptyCountByKind();
   const editRegionHeatmap: Record<string, number> = {};
   const adoptAspectHeatmap: Record<string, number> = {};
+  const rejectAspectHeatmap: Record<string, number> = {};
   const imageRetries = new Map<
     string,
     { key: string; style: string; pageId: string; maxAttempt: number }
@@ -483,6 +499,9 @@ export function summarizeLearningLog(
         break;
       case "採否":
         incrementCount(adoptAspectHeatmap, targetOrUnknown(row.target));
+        break;
+      case "不採用":
+        incrementCount(rejectAspectHeatmap, targetOrUnknown(row.target));
         break;
       case "画像試行": {
         const key = `${row.pageId}::${row.target}`;
@@ -504,6 +523,7 @@ export function summarizeLearningLog(
     countByKind,
     editRegionHeatmap,
     adoptAspectHeatmap,
+    rejectAspectHeatmap,
     imageRetryTop: [...imageRetries.values()]
       .sort((a, b) => b.maxAttempt - a.maxAttempt)
       .slice(0, 10),

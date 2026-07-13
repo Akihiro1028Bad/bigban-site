@@ -25,6 +25,7 @@ import { IconWand, IconX } from "../ui/icons";
 import { AdviceResultBody } from "./AdviceResultBody";
 import { ReviseProposalBody } from "./ReviseProposalBody";
 import { SentenceFixBody } from "./SentenceFixBody";
+import type { RejectedFixPayload, ReviseApplyPayload } from "./ReviseProposalBody";
 
 // ─── Kind ラベル ────────────────────────────────────────────────────────────────
 
@@ -50,12 +51,22 @@ interface ConsultCardProps {
   onAdviceDismissApply: () => void;
   /** overall: 反映案を本文に即時反映する（#165 ApplyNow）。 */
   onAdviceApplyNow: () => void;
+  /** overall: 提示後の反映案を選択/解除する。 */
+  onAdviceToggleApplySelect: (fixIndex: number) => void;
+  /** overall: 本文へ反映する提示案の index 集合。 */
+  adviceApplySelected: ReadonlySet<number>;
   /** revise: 修正案を反映する。 */
-  onReviseApply: () => void;
+  onReviseApply: (payload: ReviseApplyPayload) => void;
   /** revise: 修正案をやり直す。 */
-  onReviseDiscard: () => void;
-  /** sentence: 全修正案を本文に反映する。 */
-  onSentenceApplyAll: () => void;
+  onReviseDiscard: (rejected: RejectedFixPayload[]) => void;
+  /** sentence: 選択した修正案を本文に反映する。 */
+  onSentenceApplySelected: () => void;
+  /** sentence: 全修正案を却下する。 */
+  onSentenceDismissAll: () => void;
+  /** sentence: 修正案の選択を切り替える。 */
+  onSentenceToggleSelect: (commentIndex: number) => void;
+  /** sentence: 選択中の修正案インデックス。 */
+  sentenceSelected: Set<number>;
   /** 失敗時に同じ内容で再依頼する。 */
   onRetry: () => void;
   // ── overall / AdviceResultBody 用 ─────────────────────────────────────────
@@ -79,6 +90,8 @@ interface ApplyFlowProps {
   onSubmitApply: () => void;
   onDismissApply: () => void;
   onApplyNow: () => void;
+  onToggleApplySelect: (fixIndex: number) => void;
+  applySelected: ReadonlySet<number>;
   onReload: () => void;
 }
 
@@ -90,6 +103,8 @@ function AdviceApplySection({
   onSubmitApply,
   onDismissApply,
   onApplyNow,
+  onToggleApplySelect,
+  applySelected,
   onReload,
 }: ApplyFlowProps) {
   const applyStatus = apply?.status ?? "なし";
@@ -150,14 +165,30 @@ function AdviceApplySection({
       >
         <h5 className="text-[11px] font-bold" style={{ color: "var(--p-accent-ink)" }}>反映案（元 → 新）</h5>
         <ul className="mt-1 space-y-2">
-          {proposal.map((item, i) => (
-            <li key={i} className="rounded-[8px] p-1.5" style={{ border: "1px solid var(--p-border)" }}>
+          {proposal.map((item) => {
+            const isSelected = applySelected.has(item.fixIndex);
+            return (
+            <li
+              key={item.fixIndex}
+              className="rounded-[8px] p-1.5"
+              style={{ border: "1px solid var(--p-border)", opacity: isSelected ? 1 : 0.55 }}
+            >
+              <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-[11px]" style={{ color: "var(--p-text-2)" }}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleApplySelect(item.fixIndex)}
+                  aria-label={`反映案${item.fixIndex + 1}を反映`}
+                />
+                この案を反映
+              </label>
               <p className="text-[10px]" style={{ color: "var(--p-text-3)" }}>元</p>
               <p className="text-[11px] line-through" style={{ color: "var(--p-text-3)" }}>{item.before}</p>
               <p className="mt-1 text-[10px]" style={{ color: "var(--p-text-3)" }}>新</p>
               <p className="text-[11px]" style={{ color: "var(--p-text)" }}>{item.after}</p>
             </li>
-          ))}
+            );
+          })}
         </ul>
         <div className="mt-2 flex justify-end gap-2">
           <button
@@ -171,12 +202,12 @@ function AdviceApplySection({
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || applySelected.size === 0}
             onClick={() => void onApplyNow()}
             className="approve-btn-primary rounded-[8px] px-3 py-1 text-[11px] font-semibold"
             style={{ background: "var(--p-accent)", color: "#0a0c10" }}
           >
-            本文に反映する
+            選択した {applySelected.size} 件を本文に反映
           </button>
         </div>
       </div>
@@ -216,9 +247,14 @@ export function ConsultCard({
   onAdviceSubmitApply,
   onAdviceDismissApply,
   onAdviceApplyNow,
+  onAdviceToggleApplySelect,
+  adviceApplySelected,
   onReviseApply,
   onReviseDiscard,
-  onSentenceApplyAll,
+  onSentenceApplySelected,
+  onSentenceDismissAll,
+  onSentenceToggleSelect,
+  sentenceSelected,
   onRetry,
   adopted,
   selectable,
@@ -326,6 +362,8 @@ export function ConsultCard({
             onSubmitApply={onAdviceSubmitApply}
             onDismissApply={onAdviceDismissApply}
             onApplyNow={onAdviceApplyNow}
+            onToggleApplySelect={onAdviceToggleApplySelect}
+            applySelected={adviceApplySelected}
             onReload={onReload}
           />
           <div className="mt-2 flex justify-end">
@@ -359,7 +397,10 @@ export function ConsultCard({
         <SentenceFixBody
           proposal={view.proposal}
           busy={busy}
-          onApplyAll={onSentenceApplyAll}
+          selected={sentenceSelected}
+          onToggleSelect={onSentenceToggleSelect}
+          onApplySelected={onSentenceApplySelected}
+          onDismissAll={onSentenceDismissAll}
         />
       )}
     </section>
