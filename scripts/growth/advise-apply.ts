@@ -22,6 +22,7 @@ import { z } from "zod";
 
 import type { AdviceFix } from "./advise";
 import { splitTopLevelBlocks } from "./decorate";
+import { normalizeHtmlAnchorText, normalizePlainAnchorText } from "./htmlText";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 import { selectStaleJobIds } from "./staleJob";
 
@@ -53,7 +54,9 @@ export function isApplicableArea(area: string): boolean {
 /** 反映できない理由(承認画面で「なぜチェックできないか」を表示する=#178)。 */
 export const FIX_REASON_EXCLUDED = "助言のみ（事実・タイトル・リンク等は自動反映の対象外）";
 export const FIX_REASON_NO_QUOTE = "引用がないため自動反映できません";
-export const FIX_REASON_NO_ANCHOR = "引用が本文に一致せず要確認（本文が変わった可能性）";
+export const FIX_REASON_NO_ANCHOR = "引用が本文に見つかりません（引用の表記ゆれの可能性）";
+export const FIX_REASON_AMBIGUOUS = "引用が複数の段落に一致します（引用を長く一意にしてください）";
+export const FIX_REASON_CROSS_BLOCK = "引用が複数段落にまたがっています（1段落内を引用してください）";
 
 /**
  * fix が本文へ自動反映できるか(不可なら理由付き)。3条件: 反映可能カテゴリ・quote 非空・一意アンカー。
@@ -63,32 +66,85 @@ export type FixClassification =
   | { applicable: true; quote: string; blockIndex: number }
   | { applicable: false; reason: string };
 
+const ANCHOR_REASON: Record<Exclude<AnchorResolution["status"], "unique">, string> = {
+  none: FIX_REASON_NO_ANCHOR,
+  multiple: FIX_REASON_AMBIGUOUS,
+  "cross-block": FIX_REASON_CROSS_BLOCK,
+};
+
 export function classifyFix(fix: AdviceFix, bodyHtml: string): FixClassification {
   if (!isApplicableArea(fix.area)) return { applicable: false, reason: FIX_REASON_EXCLUDED };
   const quote = (fix.quote ?? "").trim();
   if (!quote) return { applicable: false, reason: FIX_REASON_NO_QUOTE };
-  const blockIndex = findAnchorBlock(bodyHtml, quote);
-  if (blockIndex < 0) return { applicable: false, reason: FIX_REASON_NO_ANCHOR };
-  return { applicable: true, quote, blockIndex };
+  const anchor = resolveAnchor(bodyHtml, quote);
+  if (anchor.status !== "unique") return { applicable: false, reason: ANCHOR_REASON[anchor.status] };
+  return { applicable: true, quote, blockIndex: anchor.blockIndex };
 }
 
 // ── テキスト正規化 / アンカー照合 ──────────────────────────────────
-/** タグ・空白を畳んだ正規化テキスト(照合用)。 */
-function normalizeText(html: string): string {
-  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+export type AnchorResolution =
+  | { status: "unique"; blockIndex: number }
+  | { status: "none" }
+  | { status: "multiple" }
+  | { status: "cross-block" };
+
+/**
+ * quote が本文のどのトップレベルブロックに当たるかを解決する。
+ * unique=一意/none=どこにも無い/multiple=複数一致/cross-block=段落をまたぐ。
+ */
+export function resolveAnchor(bodyHtml: string, quote: string): AnchorResolution {
+  const q = normalizePlainAnchorText(quote);
+  if (!q) return { status: "none" };
+  const blockTexts = splitTopLevelBlocks(bodyHtml).map((b) => normalizeHtmlAnchorText(b.html));
+  const hitIndexes = blockTexts.reduce<number[]>((acc, t, i) => {
+    if (t.includes(q)) acc.push(i);
+    return acc;
+  }, []);
+  if (hitIndexes.length === 1) return { status: "unique", blockIndex: hitIndexes[0] };
+  if (hitIndexes.length > 1) return { status: "multiple" };
+  const stripWs = (s: string) => s.replace(/\s/g, "");
+  if (stripWs(blockTexts.join("")).includes(stripWs(q))) return { status: "cross-block" };
+  return { status: "none" };
+}
+
+/** 一意に当たったブロック index を返す(それ以外は -1)。後方互換の薄いラッパ。 */
+export function findAnchorBlock(bodyHtml: string, quote: string): number {
+  const r = resolveAnchor(bodyHtml, quote);
+  return r.status === "unique" ? r.blockIndex : -1;
+}
+
+// ── present 時の自己検証(生成契約のバックストップ) ──────────────────────
+/** present 時のアンカー自己検証(1 fix ぶん)。quote があるのに一意に当たらないものだけを列挙する。 */
+export interface AnchorAudit {
+  index: number;
+  area: string;
+  quote: string;
+  status: Exclude<AnchorResolution["status"], "unique">;
+  reason: string;
 }
 
 /**
- * quote(正規化)を含むトップレベルブロックの index を返す。
- * 0 件 / 複数該当は -1(=要確認)。一意に当たったときだけ採用候補にする。
+ * アドバイスの各 fix の quote が本文へ一意にアンカーするかを検査する(観測用)。
+ * 反映対象カテゴリ かつ quote 非空 なのに一意に当たらない fix **だけ**を返す。
+ * 除外カテゴリ・quote 空の fix は元から「助言のみ」なので対象外(ノイズにしない)。
  */
-export function findAnchorBlock(bodyHtml: string, quote: string): number {
-  const q = normalizeText(quote);
-  if (!q) return -1;
-  const hits = splitTopLevelBlocks(bodyHtml)
-    .map((b, i) => ({ i, text: normalizeText(b.html) }))
-    .filter((b) => b.text.includes(q));
-  return hits.length === 1 ? hits[0].i : -1;
+export function auditAdviceAnchors(fixes: readonly AdviceFix[], bodyHtml: string): AnchorAudit[] {
+  const audits: AnchorAudit[] = [];
+  fixes.forEach((fix, index) => {
+    if (!isApplicableArea(fix.area)) return;
+    const quote = (fix.quote ?? "").trim();
+    if (!quote) return;
+    const anchor = resolveAnchor(bodyHtml, quote);
+    if (anchor.status === "unique") return;
+    audits.push({
+      index,
+      area: fix.area,
+      quote,
+      status: anchor.status,
+      reason: ANCHOR_REASON[anchor.status],
+    });
+  });
+  return audits;
 }
 
 // ── 採用候補(quote 必須＋反映可能カテゴリ＋一意アンカー) ──────────────────
@@ -192,9 +248,9 @@ export interface ApplyResult {
  * 一致が 0 件 / 複数のときは弾く(本文が変わった or 特定不能 = 要確認)。誤適用防止。
  */
 export function applyAdviceItem(bodyHtml: string, item: AdviceApplyItem): ApplyResult {
-  const beforeNorm = normalizeText(item.before);
+  const beforeNorm = normalizeHtmlAnchorText(item.before);
   const blocks = splitTopLevelBlocks(bodyHtml);
-  const matches = blocks.filter((b) => normalizeText(b.html) === beforeNorm);
+  const matches = blocks.filter((b) => normalizeHtmlAnchorText(b.html) === beforeNorm);
   if (matches.length === 0) {
     return { html: bodyHtml, applied: false, reason: "対象の段落が見つかりません(本文が変わった可能性)。要確認。" };
   }
