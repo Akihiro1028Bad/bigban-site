@@ -31,7 +31,6 @@ import {
   parseBodyRegenTarget,
   replaceBodyImageBySrc,
   replaceBodyImagePlaceholder,
-  selectStaleBodyRegenIds,
 } from "./body-image-regen";
 import { bodyImageFigureHtml, isPlaceholderId } from "./body-image-insert";
 import { patchDraft } from "./content";
@@ -40,10 +39,12 @@ import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { appendLearningLog, buildLearningLogFailNotice } from "./learningLog";
 import { pushFlexMessage, pushTextMessage } from "./line";
+import { reapStaleRows } from "./loopReaper";
 import {
   buildBodyMirrorProps,
   createPage,
   getPage,
+  queryAllDataSource,
   queryDataSource,
   updatePageProps,
   type NotionApiOptions,
@@ -110,7 +111,7 @@ function endpointForPage(page: NotionPage): string {
 }
 
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<BodyRegenRow[]> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
     { filter: statusFilter(value), pageSize: 100 },
     options
@@ -271,13 +272,11 @@ async function reap(options: NotionApiOptions): Promise<void> {
     ...(await rowsByStatus("処理中", options)),
     ...(await rowsByStatus("依頼中", options)),
   ];
-  const staleIds = new Set(selectStaleBodyRegenIds(rows, Date.now(), BODY_REGEN_TIMEOUT_MS));
-  for (const row of rows) {
-    if (!staleIds.has(row.id)) continue;
+  await reapStaleRows(rows, Date.now(), BODY_REGEN_TIMEOUT_MS, async (row) => {
     await write(row.id, buildBodyRegenFailProps(), options);
     await notify(buildBodyRegenFailMessage(row.title, REAP_REASON));
     process.stderr.write(`reaped(失敗化): ${row.id}\n`);
-  }
+  });
 }
 
 /** 依頼中を1件ロック(処理中)し、claude が処理する JSON を標準出力する。無ければ空。 */

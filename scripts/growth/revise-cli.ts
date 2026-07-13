@@ -23,9 +23,10 @@ import path from "node:path";
 import type { FlexContainer } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage } from "./line";
+import { reapStaleRows } from "./loopReaper";
 import {
   getPage,
-  queryDataSource,
+  queryAllDataSource,
   updatePageProps,
   type NotionApiOptions,
 } from "./notion";
@@ -38,7 +39,6 @@ import {
   REVISE_PROPS,
   REVISE_TIMEOUT_MS,
   reviseRowFromPage,
-  selectStaleReviseIds,
   type ReviseRow,
 } from "./revise";
 import {
@@ -102,7 +102,7 @@ function statusFilter(value: string): unknown {
 }
 
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<ReviseRow[]> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
     { filter: statusFilter(value), pageSize: 100 },
     options
@@ -136,16 +136,14 @@ async function reap(options: NotionApiOptions): Promise<void> {
     ...(await rowsByStatus("処理中", options)),
     ...(await rowsByStatus("依頼中", options)),
   ];
-  const staleIds = new Set(selectStaleReviseIds(rows, Date.now(), REVISE_TIMEOUT_MS));
-  for (const row of rows) {
-    if (!staleIds.has(row.id)) continue;
+  await reapStaleRows(rows, Date.now(), REVISE_TIMEOUT_MS, async (row) => {
     await write(row.id, buildReviseFailProps(REAP_REASON), options);
     await notifyFlex(
       buildReviseFailMessage(row.title, REAP_REASON),
       buildReviseFailFlex({ title: row.title, approveUrl: approveUrl(), reason: REAP_REASON })
     );
     process.stderr.write(`reaped(失敗化): ${row.id}\n`);
-  }
+  });
 }
 
 /** 依頼中を1件ロック(処理中)し、claude が処理する JSON を標準出力する。無ければ空。 */

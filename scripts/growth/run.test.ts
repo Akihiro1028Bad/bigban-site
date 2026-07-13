@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -63,6 +63,73 @@ function runWithStubbedCodex(mode: string, env: Record<string, string> = {}) {
     },
     encoding: "utf-8",
   });
+}
+
+const PULL_MODES = [
+  ["revise", "growth:revise"],
+  ["regen", "growth:eyecatch-regen"],
+  ["regen-body", "growth:body-image-regen"],
+  ["advise", "growth:advise"],
+  ["decorate", "growth:decorate"],
+  ["apply", "growth:advise-apply"],
+  ["comment-revise", "growth:comment-revise"],
+] as const;
+
+function runLockedModeWithStubs(options: {
+  mode: string;
+  settledExitCodes?: readonly number[];
+  reapExitCode?: number;
+  stateDir?: string;
+  peekCount?: number;
+}) {
+  const mode = options.mode ?? "revise";
+  const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-loop-bin-"));
+  const stateDir = options.stateDir ?? path.join(binDir, "state");
+  const callLog = path.join(binDir, "calls.log");
+  const settledCount = path.join(binDir, "settled-count");
+  const codexPath = path.join(binDir, "codex");
+  const npmPath = path.join(binDir, "npm");
+  writeFileSync(codexPath, `#!/bin/sh\necho codex >> "${callLog}"\ncat >/dev/null\nexit 0\n`, {
+    mode: 0o755,
+  });
+  writeFileSync(
+    npmPath,
+    `#!/bin/sh
+echo "npm $*" >> "${callLog}"
+case "$*" in
+  *"-- reap"*) exit ${options.reapExitCode ?? 0} ;;
+  *"-- peek"*) echo ${options.peekCount ?? 1}; exit 0 ;;
+  *"growth:loop-state -- assert-settled"*)
+    count=$(cat "${settledCount}" 2>/dev/null || echo 0)
+    count=$((count + 1))
+    echo "$count" > "${settledCount}"
+    case "$count" in
+      1) exit ${options.settledExitCodes?.[0] ?? 0} ;;
+      *) exit ${options.settledExitCodes?.[1] ?? options.settledExitCodes?.[0] ?? 0} ;;
+    esac
+    ;;
+  *"growth:worker-log"*) echo disabled; exit 0 ;;
+  *) exit 0 ;;
+esac
+`,
+    { mode: 0o755 }
+  );
+  const result = spawnSync("node", [RUN, mode], {
+    cwd: binDir,
+    env: {
+      ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+      GROWTH_AGENT: "codex",
+      GROWTH_MODEL_SETTINGS_DISABLE: "1",
+      GROWTH_SKIP_PULL: "1",
+      GROWTH_STATE_DIR: stateDir,
+      GROWTH_REVISE_DAILY_CAP: "9999",
+      GROWTH_CODEX_MODEL: "",
+      GROWTH_CODEX_REASONING_EFFORT: "",
+    },
+    encoding: "utf-8",
+  });
+  return { result, calls: execFileSync("cat", [callLog], { encoding: "utf-8" }), stateDir };
 }
 
 describe("run.mjs dry-run の --model(#247)", () => {
@@ -144,6 +211,98 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain("codex -a never exec");
     expect(out).toContain("--model gpt-5.5");
     expect(out).toContain('model_reasoning_effort="medium"');
+  });
+});
+
+describe("run.mjs Claude のファイル生成権限", () => {
+  it.each(["drafts", "drafts-auto", "revise", "advise", "decorate", "apply", "comment-revise"])(
+    "mode=%s は Write を allowedTools に含む",
+    (mode) => {
+      const out = dryRun(mode, { GROWTH_AGENT: "claude" });
+      expect(out).toMatch(/--allowedTools .*\bWrite\b/);
+    }
+  );
+});
+
+describe("run.mjs pull 型ループの回収と完了確認", () => {
+  it.each(PULL_MODES)("mode=%s は reap → 事前確認 → peek → AI → 事後確認の順で実行する", (mode, script) => {
+    const { result, calls, stateDir } = runLockedModeWithStubs({ mode });
+
+    expect(result.status).toBe(0);
+    const reap = calls.indexOf(`${script} -- reap`);
+    const precondition = calls.indexOf(`growth:loop-state -- assert-settled ${mode}`);
+    const peek = calls.indexOf(`${script} -- peek`);
+    const codex = calls.indexOf("codex");
+    const postcondition = calls.lastIndexOf(`growth:loop-state -- assert-settled ${mode}`);
+    expect(reap).toBeGreaterThanOrEqual(0);
+    expect(reap).toBeLessThan(precondition);
+    expect(precondition).toBeLessThan(peek);
+    expect(peek).toBeLessThan(codex);
+    expect(codex).toBeLessThan(postcondition);
+    expect(existsSync(path.join(stateDir, "revise-count.json"))).toBe(true);
+  });
+
+  it("AI 終了後に処理中が残っていれば成功扱いしない", () => {
+    const { result, calls } = runLockedModeWithStubs({ mode: "revise", settledExitCodes: [0, 1] });
+
+    expect(calls).toContain("growth:loop-state -- assert-settled revise");
+    expect(result.status).not.toBe(0);
+  });
+
+  it("reap 後に既存の処理中行が残っていれば AI を起動しない", () => {
+    const { result, calls } = runLockedModeWithStubs({ mode: "revise", settledExitCodes: [1] });
+
+    expect(result.status).not.toBe(0);
+    expect(calls).not.toContain("growth:revise -- peek");
+    expect(calls).not.toContain("codex");
+  });
+
+  it("reap が失敗すればロックを解放し、AI を起動しない", () => {
+    const first = runLockedModeWithStubs({ mode: "revise", reapExitCode: 1 });
+    const second = runLockedModeWithStubs({ mode: "revise", stateDir: first.stateDir });
+
+    expect(first.result.status).not.toBe(0);
+    expect(first.calls).not.toContain("codex");
+    expect(second.result.status).toBe(0);
+    expect(second.calls).toContain("growth:revise -- reap");
+    expect(second.calls).toContain("codex");
+  });
+
+  it.each(["drafts-auto", "initiatives-auto"])(
+    "reap を持たない %s には pull 型の回収・状態検証を適用しない",
+    (mode) => {
+      const { result, calls } = runLockedModeWithStubs({ mode });
+
+      expect(result.status).toBe(0);
+      expect(calls).not.toContain("-- reap");
+      expect(calls).not.toContain("growth:loop-state");
+    }
+  );
+
+  it.each([
+    ["drafts-auto", "growth:drafts-auto-peek"],
+    ["initiatives-auto", "growth:initiatives-auto-peek"],
+  ])("%s は専用peek=0なら AI を起動せずスキップする", (mode, peekScript) => {
+    const { result, calls } = runLockedModeWithStubs({ mode, peekCount: 0 });
+
+    expect(result.status).toBe(0);
+    expect(calls).toContain(`${peekScript} -- peek`);
+    expect(calls).not.toContain("codex");
+  });
+});
+
+describe("pull 型CLIの全ページ回収", () => {
+  it.each(PULL_MODES)("mode=%s のCLIは queryAllDataSource で reap 対象を取得する", (_mode, script) => {
+    const packageJson = JSON.parse(readFileSync(path.resolve("package.json"), "utf-8")) as {
+      scripts: Record<string, string>;
+    };
+    const command = packageJson.scripts[script];
+    const cliPath = command?.split(" ").at(-1);
+
+    expect(cliPath).toBeTruthy();
+    const source = readFileSync(path.resolve(cliPath as string), "utf-8");
+    expect(source).toContain("queryAllDataSource");
+    expect(source).toContain("reapStaleRows");
   });
 });
 
