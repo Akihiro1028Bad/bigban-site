@@ -50,6 +50,7 @@
     "growth:notify-pull-fail": "tsx scripts/growth/notify-pull-fail-cli.ts",
     "growth:notify-loop-fail": "tsx scripts/growth/notify-loop-fail-cli.ts",
     "growth:stall-check": "tsx scripts/growth/stall-check-cli.ts",
+    "growth:loop-state": "tsx scripts/growth/loop-state-cli.ts",
     "growth:prompt-lint": "tsx scripts/growth/prompt-lint-cli.ts",
     "growth:article-eval": "tsx scripts/growth/article-eval-cli.ts",
     "growth:column-category": "tsx scripts/growth/column-category-cli.ts",

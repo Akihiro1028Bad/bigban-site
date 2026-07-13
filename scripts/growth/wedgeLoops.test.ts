@@ -14,6 +14,15 @@ describe("WEDGE_LOOPS(全 pull 型ループの wedge 検知対象・#220-4)", ()
     expect(WEDGE_LOOPS).toHaveLength(7);
     const labels = WEDGE_LOOPS.map((l) => l.label);
     expect(new Set(labels).size).toBe(7); // ラベル重複なし
+    expect(WEDGE_LOOPS.map((loop) => loop.mode)).toEqual([
+      "revise",
+      "advise",
+      "decorate",
+      "regen",
+      "regen-body",
+      "apply",
+      "comment-revise",
+    ]);
   });
 
   it("各ループの status / requestedAt プロパティ名が正典(*_PROPS)と一致する", () => {

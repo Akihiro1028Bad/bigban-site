@@ -21,6 +21,8 @@ import { REVISE_PROPS } from "./revise";
 
 /** wedge 検知対象ループ1件(表示ラベルと Notion プロパティ名ペア)。 */
 export interface WedgeLoop {
+  /** run.mjs が使用する実行モード名。 */
+  mode: string;
   /** 通知に載せる日本語ラベル。 */
   label: string;
   /** ステータス(select)のプロパティ名。busy 判定(依頼中/処理中)は staleJob.ts と共通。 */
@@ -31,25 +33,44 @@ export interface WedgeLoop {
 
 /** 全 pull 型ループ。stall-check はこれを回して wedge を横断検知する。 */
 export const WEDGE_LOOPS: readonly WedgeLoop[] = [
-  { label: "構成案修正", statusProp: REVISE_PROPS.status, requestedAtProp: REVISE_PROPS.requestedAt },
-  { label: "アドバイス", statusProp: ADVISE_PROPS.status, requestedAtProp: ADVISE_PROPS.requestedAt },
-  { label: "装飾", statusProp: DECORATE_PROPS.status, requestedAtProp: DECORATE_PROPS.requestedAt },
   {
+    mode: "revise",
+    label: "構成案修正",
+    statusProp: REVISE_PROPS.status,
+    requestedAtProp: REVISE_PROPS.requestedAt,
+  },
+  {
+    mode: "advise",
+    label: "アドバイス",
+    statusProp: ADVISE_PROPS.status,
+    requestedAtProp: ADVISE_PROPS.requestedAt,
+  },
+  {
+    mode: "decorate",
+    label: "装飾",
+    statusProp: DECORATE_PROPS.status,
+    requestedAtProp: DECORATE_PROPS.requestedAt,
+  },
+  {
+    mode: "regen",
     label: "アイキャッチ再生成",
     statusProp: REGEN_PROPS.status,
     requestedAtProp: REGEN_PROPS.requestedAt,
   },
   {
+    mode: "regen-body",
     label: "本文画像再生成",
     statusProp: BODY_REGEN_PROPS.status,
     requestedAtProp: BODY_REGEN_PROPS.requestedAt,
   },
   {
+    mode: "apply",
     label: "アドバイス反映",
     statusProp: ADVISE_APPLY_PROPS.status,
     requestedAtProp: ADVISE_APPLY_PROPS.requestedAt,
   },
   {
+    mode: "comment-revise",
     label: "本文コメント",
     statusProp: BODY_COMMENT_PROPS.status,
     requestedAtProp: BODY_COMMENT_PROPS.requestedAt,

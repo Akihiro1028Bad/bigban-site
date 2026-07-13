@@ -25,13 +25,13 @@ import {
   buildBodyCommentProcessingProps,
   parseBodyCommentRequest,
   parseBodyCommentProposal,
-  selectStaleBodyCommentIds,
   serializeBodyCommentProposal,
 } from "./bodyComment";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
+import { reapStaleRows } from "./loopReaper";
 import { buildNoticeFlex } from "./notice-flex";
-import { getPage, queryDataSource, updatePageProps } from "./notion";
+import { getPage, queryAllDataSource, updatePageProps } from "./notion";
 import type { BodyComment, BodyCommentRow } from "./bodyComment";
 import type { FlexContainer } from "./digest-flex";
 import type { NotionApiOptions, NotionPage } from "./notion";
@@ -62,7 +62,7 @@ function approveUrl(): string {
 }
 
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<BodyCommentRow[]> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
     { filter: { property: BODY_COMMENT_PROPS.status, select: { equals: value } }, pageSize: 100 },
     options
@@ -121,13 +121,11 @@ async function reap(options: NotionApiOptions): Promise<void> {
     ...(await rowsByStatus("処理中", options)),
     ...(await rowsByStatus("依頼中", options)),
   ];
-  const staleIds = new Set(selectStaleBodyCommentIds(rows, Date.now(), BODY_COMMENT_TIMEOUT_MS));
-  for (const row of rows) {
-    if (!staleIds.has(row.id)) continue;
+  await reapStaleRows(rows, Date.now(), BODY_COMMENT_TIMEOUT_MS, async (row) => {
     await write(row.id, buildBodyCommentFailProps(REAP_REASON), options);
     await notify(`本文コメントの修正に失敗しました(${REAP_REASON})。`);
     process.stderr.write(`reaped(失敗化): ${row.id}\n`);
-  }
+  });
 }
 
 /** 依頼中を1件ロック(処理中)し、claude が書き換える JSON を標準出力する。無ければ空。 */

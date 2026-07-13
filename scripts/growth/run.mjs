@@ -31,7 +31,9 @@ import { exitCodeOrFailure } from "./processExit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
-const tmpDir = path.join(here, "..", "..", ".growth-tmp");
+const tmpDir = process.env.GROWTH_STATE_DIR
+  ? path.resolve(process.env.GROWTH_STATE_DIR)
+  : path.join(here, "..", "..", ".growth-tmp");
 const FAILURE_LOG_PATH = "data/growth-failures.log";
 
 // 共通の許可ツール。Claude headless では Notion が mcp__claude_ai_Notion になる。
@@ -76,11 +78,11 @@ const MODES = {
     ],
   },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
-  drafts: { prompt: "drafts.md", allow: [...COMMON, "Bash"] },
+  drafts: { prompt: "drafts.md", allow: [...COMMON, "Write", "Bash"] },
   // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけ drafts.md を起動する。
   "drafts-auto": {
     prompt: "drafts.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
@@ -94,7 +96,7 @@ const MODES = {
   // 5分間隔の高頻度起動なので lockfile で多重起動を防ぎ、1日上限で暴走も止める。
   revise: {
     prompt: "revise-outline.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
   // 初回下書きの画像関連フィールドだけを独立モデルで設計する。
@@ -121,28 +123,28 @@ const MODES = {
   // 本文を style-guide に照らして分析しアドバイスJSONを作る(read-only)。lock/上限を共有。
   advise: {
     prompt: "advise.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
   // 記事装飾アシスタント(#147)。決定的処理は growth:decorate CLI、claude は本文をトップレベル
   // 要素に分割し装飾提案(メタのみ・生HTML無し)を作る。反映は承認画面側。lock/上限を共有。
   decorate: {
     prompt: "decorate.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
   // アドバイス採用→本文反映(#165)。決定的処理は growth:advise-apply CLI、claude は採用された
   // fix の passage だけを書き換え before/after 案(メタ)を作る。反映は承認画面側。lock/上限を共有。
   apply: {
     prompt: "advise-apply.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
   // 本文インラインコメント→AI修正(#182)。決定的処理は growth:comment-revise CLI、claude は
   // コメントされた文を含むブロックだけを書き換え before/after 案(メタ)を作る。反映は承認画面側。lock/上限を共有。
   "comment-revise": {
     prompt: "comment-revise.md",
-    allow: [...COMMON, "Bash"],
+    allow: [...COMMON, "Write", "Bash"],
     lock: true,
   },
 };
@@ -404,6 +406,17 @@ const PEEK_COMMANDS = {
   "comment-revise": "growth:comment-revise",
 };
 
+/** stale 回収と終了後状態検証を持つ pull 型7ループ。auto生成系の peek とは分離する。 */
+const PULL_LOOP_COMMANDS = {
+  revise: "growth:revise",
+  regen: "growth:eyecatch-regen",
+  "regen-body": "growth:body-image-regen",
+  advise: "growth:advise",
+  decorate: "growth:decorate",
+  apply: "growth:advise-apply",
+  "comment-revise": "growth:comment-revise",
+};
+
 function cleanFailureField(value) {
   return String(value).replace(/[\t\r\n]+/g, " ").trim();
 }
@@ -515,6 +528,38 @@ function peekShouldRunLoop() {
   return shouldRunLoopFromPeek(res.stdout ?? "", res.status);
 }
 
+/**
+ * AI を起動する前に、決定的 CLI で stale 行を必ず回収する。
+ * reap が失敗した状態で新しい依頼を claim すると滞留を増やすため、失敗時は安全側で停止する。
+ */
+function reapBeforePeek() {
+  const scriptName = PULL_LOOP_COMMANDS[mode];
+  if (!scriptName) return true;
+  const npm = isWin ? "npm.cmd" : "npm";
+  const res = spawnSync(npm, ["run", "--silent", scriptName, "--", "reap"], {
+    stdio: ["ignore", "inherit", "inherit"],
+    shell: isWin,
+    env: { ...process.env },
+  });
+  return res.status === 0;
+}
+
+/** AI が正常終了しても、対象ループに「処理中」が残っていれば成功とはみなさない。 */
+function assertLoopSettled() {
+  if (!PULL_LOOP_COMMANDS[mode]) return 0;
+  const npm = isWin ? "npm.cmd" : "npm";
+  const res = spawnSync(
+    npm,
+    ["run", "--silent", "growth:loop-state", "--", "assert-settled", mode],
+    {
+      stdio: ["ignore", "inherit", "inherit"],
+      shell: isWin,
+      env: { ...process.env },
+    }
+  );
+  return res.status ?? 1;
+}
+
 function workerLogArgs(command, fields) {
   const args = ["run", "--silent", "growth:worker-log", "--", command];
   for (const [key, value] of Object.entries(fields)) {
@@ -556,6 +601,21 @@ if (cfg.lock) {
     logSkipped("既に実行中のためスキップ");
     process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
     process.exit(0);
+  }
+  if (PULL_LOOP_COMMANDS[mode] && !reapBeforePeek()) {
+    releaseReviseLock();
+    notifyLoopFail("reap-failed", { exitCode: 1, detail: "AI 起動前の stale 回収に失敗" });
+    process.exit(1);
+  }
+  // stale 回収後も既存の処理中行が残る場合、新しい依頼を claim すると今回分の
+  // postcondition と区別できない。安全側で AI 起動前に停止する。
+  if (PULL_LOOP_COMMANDS[mode] && assertLoopSettled() !== 0) {
+    releaseReviseLock();
+    notifyLoopFail("processing-remains", {
+      exitCode: 1,
+      detail: "stale 回収後も既存の処理中行が残っているため AI 起動を中断",
+    });
+    process.exit(1);
   }
   if (!peekShouldRunLoop()) {
     releaseReviseLock();
@@ -620,7 +680,6 @@ const child = spawn(agentCommand, args, {
 child.stdin.write(prompt);
 child.stdin.end();
 child.on("exit", async (code) => {
-  if (cfg.lock) releaseReviseLock();
   let exitCode = exitCodeOrFailure(code);
   if (mode === "image-prompt" && exitCode === 0) {
     const applied = spawnSync(
@@ -630,6 +689,11 @@ child.on("exit", async (code) => {
     );
     exitCode = applied.status ?? 1;
   }
+  if (cfg.lock && exitCode === 0) {
+    exitCode = assertLoopSettled();
+  }
+  // postcondition 確認までは共有ロックを保持し、別ループの claim との競合を防ぐ。
+  if (cfg.lock) releaseReviseLock();
   runWorkerLog("finish", {
     "page-id": workerRunPageId,
     mode,
