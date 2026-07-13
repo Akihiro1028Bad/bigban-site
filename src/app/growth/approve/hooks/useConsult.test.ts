@@ -597,7 +597,7 @@ describe("useConsult: 委譲コールバックの spy 実証", () => {
   });
 
   // ── アロー委譲: bodyCommentConsult.applyNow ──────────────────────────────
-  it("onSentenceApplyAll → bodyCommentConsult.applyNow を呼ぶ (spy で実証)", async () => {
+  it("onSentenceApplySelected → bodyCommentConsult.applyNow を呼ぶ (spy で実証)", async () => {
     const { result } = renderUseConsult({
       draft: {
         ...DRAFT_BASE,
@@ -607,7 +607,22 @@ describe("useConsult: 委譲コールバックの spy 実証", () => {
     });
 
     const spy = vi.spyOn(result.current.bodyCommentConsult, "applyNow");
-    await act(async () => result.current.onSentenceApplyAll());
+    await act(async () => result.current.onSentenceApplySelected());
+    expect(spy).toHaveBeenCalled();
+  });
+
+  // ── アロー委譲: bodyCommentConsult.dismissAll ───────────────────────────
+  it("onSentenceDismissAll → bodyCommentConsult.dismissAll を呼ぶ (spy で実証)", async () => {
+    const { result } = renderUseConsult({
+      draft: {
+        ...DRAFT_BASE,
+        bodyHtml: "",
+        bodyComment: { status: "提示中", comments: [], proposal: [], raw: "" },
+      },
+    });
+
+    const spy = vi.spyOn(result.current.bodyCommentConsult, "dismissAll");
+    await act(async () => result.current.onSentenceDismissAll());
     expect(spy).toHaveBeenCalled();
   });
 

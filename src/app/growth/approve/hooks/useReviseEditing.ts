@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OUTLINE_OVERALL_LINE } from "@/lib/growth/revise";
 
 import { fetchBoard, postRevise, postReviseApply, postReviseEdit } from "../api";
+import { authHeaders } from "../authHeaders";
 import { toMessage } from "../errorMessage";
 import {
   outlineSections,
@@ -19,6 +20,7 @@ import {
   type OutlineSection,
 } from "../outline";
 import type { PendingItem } from "../types";
+import type { RejectedFixPayload, ReviseApplyPayload } from "../consult/ReviseProposalBody";
 
 interface UseReviseEditingParams {
   token: string;
@@ -52,8 +54,8 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
       postReviseEdit(token, pageId, payload),
   });
   const reviseApplyMutation = useMutation({
-    mutationFn: ({ pageId, action }: { pageId: string; action: "apply" | "discard" }) =>
-      postReviseApply(token, pageId, action),
+    mutationFn: ({ pageId, action, payload }: { pageId: string; action: "apply" | "discard"; payload?: { outline?: string; applyTitle?: boolean } }) =>
+      postReviseApply(token, pageId, action, payload),
   });
 
   // #43: 承認待ち一覧を取り直す(修正ステータス/修正案の最新化)。手動取得のため失敗は
@@ -219,11 +221,35 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
   }
 
   // #43: 提示中の修正案を「反映」または「やり直し(破棄)」する。完了後に最新化する。
-  async function applyRevise(item: PendingItem, action: "apply" | "discard"): Promise<void> {
+  async function rejectFixes(pageId: string, source: string, rejected: RejectedFixPayload[]): Promise<void> {
+    for (let index = 0; index < rejected.length; index += 20) {
+      try {
+        await fetch("/api/growth/learning-log/reject", {
+          method: "POST",
+          headers: authHeaders(token, { "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            pageId,
+            source,
+            rejectedFixes: rejected.slice(index, index + 20),
+          }),
+        });
+      } catch {
+        // 学習ログはベストエフォート。本処理の成否へ影響させない。
+      }
+    }
+  }
+
+  // revise の採用側学習ログは今回のスコープ外。却下分だけを記録する。
+  async function applyRevise(item: PendingItem, action: "apply" | "discard", payload?: ReviseApplyPayload | RejectedFixPayload[]): Promise<void> {
     setReviseBusy(true);
     setReviseError("");
     try {
-      await reviseApplyMutation.mutateAsync({ pageId: item.id, action });
+      const rejected = Array.isArray(payload) ? payload : payload?.rejected ?? [];
+      const applyPayload = action === "apply" && payload && !Array.isArray(payload)
+        ? { ...(payload.outline !== undefined ? { outline: payload.outline } : {}), applyTitle: payload.applyTitle }
+        : undefined;
+      await reviseApplyMutation.mutateAsync({ pageId: item.id, action, payload: applyPayload });
+      await rejectFixes(item.id, action === "apply" ? "revise-apply" : "revise-discard", rejected);
       await refreshItems();
     } catch (error) {
       setReviseError(toMessage(error, "更新に失敗しました。"));
