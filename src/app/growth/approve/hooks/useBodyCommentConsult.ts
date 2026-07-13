@@ -47,8 +47,13 @@ interface UseBodyCommentConsultReturn {
   requestAi: () => Promise<void>;
   requestOverall: () => Promise<void>;
   dismiss: () => Promise<void>;
+  dismissAll: () => Promise<void>;
   applyNow: () => Promise<void>;
+  selected: Set<number>;
+  toggleSelect: (commentIndex: number) => void;
 }
+
+const REJECT_BATCH_SIZE = 20;
 
 export function useBodyCommentConsult({
   pageId,
@@ -64,20 +69,35 @@ export function useBodyCommentConsult({
   const [overallDraft, setOverallDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const proposal = bodyComment?.proposal ?? [];
+  const proposalKey = JSON.stringify(
+    proposal.map((item) => [item.commentIndex, item.before, item.after]),
+  );
+  const [selected, setSelected] = useState<Set<number>>(() => new Set(proposal.map((item) => item.commentIndex)));
 
   // 記事切替(pageId 変化)で前記事の行コメント下書き・入力欄状態を持ち越さない(別記事への
   // 誤送信を防ぐ)。React 公式「prop 変化時の state 調整」パターン(effect ではなく描画中に是正)。
   // prevPageId 初期値=現在の pageId のため初回マウントでは入らない。
   const [prevPageId, setPrevPageId] = useState(pageId);
-  if (pageId !== prevPageId) {
+  const [prevProposalKey, setPrevProposalKey] = useState(proposalKey);
+  if (pageId !== prevPageId || proposalKey !== prevProposalKey) {
     setPrevPageId(pageId);
+    setPrevProposalKey(proposalKey);
     setComments({});
     setOpenFor(null);
     setDraft("");
     setOverallDraft("");
+    setSelected(new Set(proposal.map((item) => item.commentIndex)));
   }
 
-  const proposal = bodyComment?.proposal ?? [];
+  function toggleSelect(commentIndex: number): void {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(commentIndex)) next.delete(commentIndex);
+      else next.add(commentIndex);
+      return next;
+    });
+  }
 
   function lineKey(blockIndex: number, excerpt: string): string {
     return `${blockIndex}::${excerpt}`;
@@ -156,9 +176,64 @@ export function useBodyCommentConsult({
     await post("/api/growth/body-comment/dismiss", { pageId }, "取り消しに失敗しました。");
   }
 
+  function fixDetails(items: typeof proposal) {
+    const postedComments = bodyComment?.comments ?? [];
+    return items.map((item) => {
+      const comment = postedComments[item.commentIndex];
+      return {
+        aspect: "インラインコメント",
+        detail: `コメント: ${comment?.comment ?? ""}（対象: ${comment?.excerpt ?? ""}）`,
+        before: item.before,
+        after: item.after,
+      };
+    });
+  }
+
+  async function reject(items: typeof proposal): Promise<void> {
+    if (items.length === 0) return;
+    const rejectedFixes = fixDetails(items);
+    for (let index = 0; index < rejectedFixes.length; index += REJECT_BATCH_SIZE) {
+      try {
+        await fetch("/api/growth/learning-log/reject", {
+          method: "POST",
+          headers: authHeaders(token, { "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            pageId,
+            source: "comment-revise",
+            rejectedFixes: rejectedFixes.slice(index, index + REJECT_BATCH_SIZE),
+          }),
+        });
+      } catch {
+        // 学習ログはベストエフォート。本処理の成否へ影響させない。
+      }
+    }
+  }
+
+  async function dismissAll(): Promise<void> {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/growth/body-comment/dismiss", {
+        method: "POST",
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ pageId }),
+      });
+      const json = await readJsonObject(res);
+      if (!res.ok || !json.success) throw new Error((json.error as string) ?? "取り消しに失敗しました。");
+      await reject(proposal);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "取り消しに失敗しました。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // 提示中の before/after 案を決定的に本文へ反映し、保存→片付け→再取得する。
   async function applyNow(): Promise<void> {
-    const { html, applied, skipped } = applyBodyCommentProposal(bodyHtml, proposal);
+    const chosen = proposal.filter((item) => selected.has(item.commentIndex));
+    if (chosen.length === 0) return;
+    const { html, applied, skipped } = applyBodyCommentProposal(bodyHtml, chosen);
     if (applied.length === 0) {
       setError("反映できる案がありませんでした（本文が変わった可能性・要確認）。");
       return;
@@ -169,17 +244,9 @@ export function useBodyCommentConsult({
     // 学習ログ詳細化: 観点だけでなくコメント本文・対象・変更前後も残す。applied は proposal の
     // commentIndex 値なので、同じ index の投稿コメント・proposal エントリから引く(対応が
     // 取れない場合は空文字でフォールバック)。
-    const postedComments = bodyComment?.comments ?? [];
-    const adoptedFixes = applied.map((commentIndex) => {
-      const comment = postedComments[commentIndex];
-      const item = proposal.find((p) => p.commentIndex === commentIndex);
-      return {
-        aspect: "インラインコメント",
-        detail: `コメント: ${comment?.comment ?? ""}（対象: ${comment?.excerpt ?? ""}）`,
-        before: item?.before ?? "",
-        after: item?.after ?? "",
-      };
-    });
+    const adoptedFixes = fixDetails(
+      applied.flatMap((commentIndex) => proposal.filter((item) => item.commentIndex === commentIndex)),
+    );
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
@@ -200,6 +267,7 @@ export function useBodyCommentConsult({
         headers: authHeaders(token, { "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
+      await reject(proposal.filter((item) => !selected.has(item.commentIndex)));
       if (skipped.length > 0) {
         setError(`${applied.length}件を反映しました（${skipped.length}件は本文不一致でスキップ）。`);
       }
@@ -228,6 +296,9 @@ export function useBodyCommentConsult({
     requestAi,
     requestOverall,
     dismiss,
+    dismissAll,
     applyNow,
+    selected,
+    toggleSelect,
   };
 }

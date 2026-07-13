@@ -3,7 +3,12 @@
 import { useState } from "react";
 
 import type { AdviceView } from "@/lib/growth/advise";
-import { applyAdviceItems, MAX_ADOPTED, type AdviceApplyView } from "@/lib/growth/adviseApply";
+import {
+  applyAdviceItems,
+  classifyFix,
+  MAX_ADOPTED,
+  type AdviceApplyView,
+} from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
 import { authHeaders } from "../authHeaders";
@@ -25,6 +30,8 @@ interface UseAdviceConsultReturn {
   adopted: ReadonlySet<number>;
   toggleAdopt: (index: number) => void;
   setAdoptedBulk: (indexes: readonly number[], adopt: boolean) => void;
+  applySelected: ReadonlySet<number>;
+  toggleApplySelect: (fixIndex: number) => void;
   requestAdvice: () => void;
   dismiss: () => void;
   submitApply: () => void;
@@ -49,18 +56,32 @@ export function useAdviceConsult({
   const [error, setError] = useState("");
   // #165: 本文反映で採用する fix の index 集合。
   const [adopted, setAdopted] = useState<ReadonlySet<number>>(new Set());
+  const proposalKey = JSON.stringify(
+    (adviceApply?.proposal ?? []).map((item) => [item.fixIndex, item.before, item.after]),
+  );
+  // 提示後の before/after 案は既定で全選択とし、人が反映対象を絞り込めるようにする。
+  const [applySelected, setApplySelected] = useState<ReadonlySet<number>>(
+    () => new Set(adviceApply?.proposal.map((item) => item.fixIndex) ?? []),
+  );
 
   // 記事切替(pageId 変化)で前記事の指示文・採用チェックを持ち越さない(別記事への誤送信を防ぐ)。
   // React 公式「prop 変化時の state 調整」パターン(effect ではなく描画中に是正)。
   // prevPageId 初期値=現在の pageId のため初回マウントでは入らない。
   const [prevPageId, setPrevPageId] = useState(pageId);
+  const [prevProposalKey, setPrevProposalKey] = useState(proposalKey);
   if (pageId !== prevPageId) {
     setPrevPageId(pageId);
     setInstruction("");
     setAdopted(new Set());
+    setPrevProposalKey(proposalKey);
+    setApplySelected(new Set(adviceApply?.proposal.map((item) => item.fixIndex) ?? []));
+  } else if (proposalKey !== prevProposalKey) {
+    // PC が新しい提示案を返したら、前の案の選択状態を持ち越さず全選択に戻す。
+    setPrevProposalKey(proposalKey);
+    setApplySelected(new Set(adviceApply?.proposal.map((item) => item.fixIndex) ?? []));
   }
 
-  async function postJson(path: string, body: unknown, fallback: string): Promise<void> {
+  async function postJson(path: string, body: unknown, fallback: string): Promise<boolean> {
     setBusy(true);
     setError("");
     try {
@@ -72,8 +93,10 @@ export function useAdviceConsult({
       const json = await readJsonObject(res);
       if (!res.ok || !json.success) throw new Error(json.error ?? fallback);
       onChanged();
+      return true;
     } catch (e) {
       setError(errMsg(e, fallback));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -112,22 +135,71 @@ export function useAdviceConsult({
     });
   }
 
+  function toggleApplySelect(fixIndex: number): void {
+    setApplySelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(fixIndex)) next.delete(fixIndex);
+      else next.add(fixIndex);
+      return next;
+    });
+  }
+
+  function fixDetail(fixIndex: number, before: string, after: string) {
+    const fix = advice?.advice?.fixes[fixIndex];
+    const quote = fix?.quote?.trim();
+    return {
+      aspect: fix?.area ?? "",
+      detail: `指摘: ${fix?.reason ?? ""} / 提案: ${fix?.suggestion ?? ""}${
+        quote ? `（対象: ${quote}）` : ""
+      }`,
+      before,
+      after,
+    };
+  }
+
+  async function reject(rejectedFixes: ReturnType<typeof fixDetail>[]): Promise<void> {
+    if (rejectedFixes.length === 0) return;
+    try {
+      await fetch("/api/growth/learning-log/reject", {
+        method: "POST",
+        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ pageId, source: "advise-apply", rejectedFixes }),
+      });
+    } catch {
+      // 学習ログはベストエフォート。本処理の成否へ影響させない。
+    }
+  }
+
   function submitApply(): void {
     void postJson(
       "/api/growth/advise/apply",
       { pageId, adoptedIndexes: [...adopted] },
       "反映依頼に失敗しました。"
-    );
+    ).then((isSuccess) => {
+      if (!isSuccess || !bodyHtml) return;
+      const rejectedFixes = (advice?.advice?.fixes ?? []).flatMap((fix, index) => {
+        const classification = classifyFix(fix, bodyHtml);
+        return classification.applicable && !adopted.has(index)
+          ? [fixDetail(index, classification.quote, fix.suggestion)]
+          : [];
+      });
+      void reject(rejectedFixes);
+    });
   }
 
   function dismissApply(): void {
-    void postJson("/api/growth/advise/apply/dismiss", { pageId }, "反映の片付けに失敗しました。");
+    void postJson("/api/growth/advise/apply/dismiss", { pageId }, "反映の片付けに失敗しました。").then((isSuccess) => {
+      if (!isSuccess) return;
+      void reject((adviceApply?.proposal ?? []).map((item) => fixDetail(item.fixIndex, item.before, item.after)));
+    });
   }
 
   /** 提示された before/after 案を決定的に本文へ反映し、保存→片付け→再取得する。 */
   async function applyNow(): Promise<void> {
     if (!bodyHtml || !adviceApply) return;
-    const { html, applied, skipped } = applyAdviceItems(bodyHtml, adviceApply.proposal);
+    const chosen = adviceApply.proposal.filter((item) => applySelected.has(item.fixIndex));
+    if (chosen.length === 0) return;
+    const { html, applied, skipped } = applyAdviceItems(bodyHtml, chosen);
     if (applied.length === 0) {
       setError("反映できる案がありませんでした（本文が変わった可能性・要確認）。");
       return;
@@ -139,16 +211,9 @@ export function useAdviceConsult({
     // fixIndex 値(=実際に反映できた案)なので、その proposal エントリを直接使い before/after を得る。
     // fix 本体(area/指摘)は fixIndex で引く(欠落時は空文字でフォールバック)。
     const appliedSet = new Set(applied);
-    const adoptedFixes = adviceApply.proposal
+    const adoptedFixes = chosen
       .filter((item) => appliedSet.has(item.fixIndex))
-      .map((item) => {
-        const fix = advice?.advice?.fixes[item.fixIndex];
-        const quote = fix?.quote?.trim();
-        const detail = `指摘: ${fix?.reason ?? ""} / 提案: ${fix?.suggestion ?? ""}${
-          quote ? `（対象: ${quote}）` : ""
-        }`;
-        return { aspect: fix?.area ?? "", detail, before: item.before, after: item.after };
-      });
+      .map((item) => fixDetail(item.fixIndex, item.before, item.after));
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
@@ -170,6 +235,9 @@ export function useAdviceConsult({
       });
       const clearJson = await readJsonObject(clearRes);
       if (!clearRes.ok || !clearJson.success) throw new Error(clearJson.error ?? "片付けに失敗しました。");
+      void reject(adviceApply.proposal
+        .filter((item) => !applySelected.has(item.fixIndex))
+        .map((item) => fixDetail(item.fixIndex, item.before, item.after)));
       if (skipped.length > 0) {
         setError(`${applied.length}件を反映しました（${skipped.length}件は本文不一致でスキップ）。`);
       }
@@ -189,6 +257,8 @@ export function useAdviceConsult({
     adopted,
     toggleAdopt,
     setAdoptedBulk,
+    applySelected,
+    toggleApplySelect,
     requestAdvice,
     dismiss,
     submitApply,

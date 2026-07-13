@@ -248,6 +248,11 @@ describe("反映案 parse/serialize/apply (Phase 2)", () => {
     expect(res.skipped[0].commentIndex).toBe(1);
     expect(res.skipped[0].reason).toContain("要確認");
   });
+  it("applyBodyCommentProposal: 任意のサブセットだけを反映できる", () => {
+    const res = applyBodyCommentProposal(BODY, [item]);
+    expect(res.applied).toEqual([0]);
+    expect(res.html).toContain("一文目だよ。");
+  });
 });
 
 describe("Notion props / status / view", () => {

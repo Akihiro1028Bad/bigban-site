@@ -1519,9 +1519,14 @@ export function ApproveClient() {
           onAdviceSubmitApply={consult.onAdviceSubmitApply}
           onAdviceDismissApply={consult.onAdviceDismissApply}
           onAdviceApplyNow={consult.onAdviceApplyNow}
+          onAdviceToggleApplySelect={consult.onAdviceToggleApplySelect}
+          adviceApplySelected={consult.adviceApplySelected}
           onReviseApply={consult.onReviseApply}
           onReviseDiscard={consult.onReviseDiscard}
-          onSentenceApplyAll={consult.onSentenceApplyAll}
+          onSentenceApplySelected={consult.onSentenceApplySelected}
+          onSentenceDismissAll={consult.onSentenceDismissAll}
+          onSentenceToggleSelect={consult.onSentenceToggleSelect}
+          sentenceSelected={consult.sentenceSelected}
           onRetry={consult.onRetry}
           adopted={consult.adopted}
           selectable={consult.selectable}

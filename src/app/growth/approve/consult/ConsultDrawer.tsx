@@ -29,6 +29,7 @@ import { STAGE_KINDS } from "@/lib/growth/consult";
 import { useDialog } from "../hooks/useDialog";
 import { Kbd } from "../ui/primitives";
 import { ConsultCard } from "./ConsultCard";
+import type { RejectedFixPayload, ReviseApplyPayload } from "./ReviseProposalBody";
 
 // ─── タブラベル ─────────────────────────────────────────────────────────────────
 
@@ -57,9 +58,14 @@ interface ConsultDrawerProps {
   onAdviceSubmitApply: () => void;
   onAdviceDismissApply: () => void;
   onAdviceApplyNow: () => void;
-  onReviseApply: () => void;
-  onReviseDiscard: () => void;
-  onSentenceApplyAll: () => void;
+  onAdviceToggleApplySelect: (fixIndex: number) => void;
+  adviceApplySelected: ReadonlySet<number>;
+  onReviseApply: (payload: ReviseApplyPayload) => void;
+  onReviseDiscard: (rejected: RejectedFixPayload[]) => void;
+  onSentenceApplySelected: () => void;
+  onSentenceDismissAll: () => void;
+  onSentenceToggleSelect: (commentIndex: number) => void;
+  sentenceSelected: Set<number>;
   onRetry: () => void;
   adopted: ReadonlySet<number>;
   selectable: boolean;
@@ -84,9 +90,14 @@ export function ConsultDrawer({
   onAdviceSubmitApply,
   onAdviceDismissApply,
   onAdviceApplyNow,
+  onAdviceToggleApplySelect,
+  adviceApplySelected,
   onReviseApply,
   onReviseDiscard,
-  onSentenceApplyAll,
+  onSentenceApplySelected,
+  onSentenceDismissAll,
+  onSentenceToggleSelect,
+  sentenceSelected,
   onRetry,
   adopted,
   selectable,
@@ -198,9 +209,14 @@ export function ConsultDrawer({
                         onAdviceSubmitApply={onAdviceSubmitApply}
                         onAdviceDismissApply={onAdviceDismissApply}
                         onAdviceApplyNow={onAdviceApplyNow}
+                        onAdviceToggleApplySelect={onAdviceToggleApplySelect}
+                        adviceApplySelected={adviceApplySelected}
                         onReviseApply={onReviseApply}
                         onReviseDiscard={onReviseDiscard}
-                        onSentenceApplyAll={onSentenceApplyAll}
+                        onSentenceApplySelected={onSentenceApplySelected}
+                        onSentenceDismissAll={onSentenceDismissAll}
+                        onSentenceToggleSelect={onSentenceToggleSelect}
+                        sentenceSelected={sentenceSelected}
                         onRetry={onRetry}
                         adopted={adopted}
                         selectable={selectable}

@@ -317,6 +317,14 @@ describe("applyAdviceItem / applyAdviceItems", () => {
     expect(result.skipped[0].fixIndex).toBe(1);
     expect(result.html).toContain("新・導入。");
   });
+  it("提示案のサブセットだけを渡すと、選択した案だけを反映する", () => {
+    const result = applyAdviceItems(BODY, [
+      { fixIndex: 1, before: "<p>これは導入の段落です。</p>", after: "<p>選択した案だけを反映。</p>" },
+    ]);
+    expect(result.applied).toEqual([1]);
+    expect(result.skipped).toEqual([]);
+    expect(result.html).toContain("選択した案だけを反映。");
+  });
 });
 
 describe("Notion props", () => {

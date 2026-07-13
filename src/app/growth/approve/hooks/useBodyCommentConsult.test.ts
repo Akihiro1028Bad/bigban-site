@@ -42,6 +42,19 @@ function setup(pageId: string) {
   );
 }
 
+const PROPOSAL: BodyCommentView = {
+  status: "提示中",
+  comments: [
+    { blockIndex: 0, excerpt: "ここは重要です。", comment: "具体的にする" },
+    { blockIndex: 0, excerpt: "ここは重要です。", comment: "短くする" },
+  ],
+  raw: "",
+  proposal: [
+    { commentIndex: 0, before: "<p>ここは重要です。</p>", after: "<p>ここが肝心です。</p>" },
+    { commentIndex: 1, before: "<p>ここが肝心です。</p>", after: "<p>ここは大切です。</p>" },
+  ],
+};
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("useBodyCommentConsult: pageId 変化での state リセット(記事跨ぎ持ち越し防止)", () => {
@@ -148,6 +161,202 @@ describe("useBodyCommentConsult: overall body comment", () => {
 });
 
 describe("useBodyCommentConsult: applyNow", () => {
+  it("proposal は初期状態で全選択、toggleSelect で選択を切り替える", () => {
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+
+    expect([...view.result.current.selected]).toEqual([0, 1]);
+    act(() => view.result.current.toggleSelect(1));
+    expect([...view.result.current.selected]).toEqual([0]);
+    act(() => view.result.current.toggleSelect(1));
+    expect([...view.result.current.selected]).toEqual([0, 1]);
+  });
+
+  it("pageId または proposal が変わると全選択へ戻す", () => {
+    const view = renderHook(
+      ({ pageId, bodyComment }: { pageId: string; bodyComment: BodyCommentView }) =>
+        useBodyCommentConsult({ pageId, token: TOKEN, bodyHtml: BODY, bodyComment, onChanged: vi.fn() }),
+      { initialProps: { pageId: "page-A", bodyComment: PROPOSAL } },
+    );
+
+    act(() => view.result.current.toggleSelect(1));
+    view.rerender({ pageId: "page-B", bodyComment: PROPOSAL });
+    expect([...view.result.current.selected]).toEqual([0, 1]);
+    act(() => view.result.current.toggleSelect(1));
+    view.rerender({
+      pageId: "page-B",
+      bodyComment: { ...PROPOSAL, proposal: [PROPOSAL.proposal[0]] },
+    });
+    expect([...view.result.current.selected]).toEqual([0]);
+  });
+
+  it("同じ commentIndex の提示内容が更新された場合も全選択へ戻す", () => {
+    const view = renderHook(
+      ({ bodyComment }: { bodyComment: BodyCommentView }) =>
+        useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment, onChanged: vi.fn() }),
+      { initialProps: { bodyComment: PROPOSAL } },
+    );
+
+    act(() => view.result.current.toggleSelect(1));
+    view.rerender({
+      bodyComment: {
+        ...PROPOSAL,
+        proposal: PROPOSAL.proposal.map((item) =>
+          item.commentIndex === 1 ? { ...item, after: "<p>更新された案です。</p>" } : item,
+        ),
+      },
+    });
+
+    expect([...view.result.current.selected]).toEqual([0, 1]);
+  });
+
+  it("選択分だけを保存し、非選択分を学習ログへ却下として送る", async () => {
+    const fetchFn = mockFetch(
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+    );
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+    act(() => view.result.current.toggleSelect(1));
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    const saveBody = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
+    expect(saveBody.bodyHtml).toContain("ここが肝心です。");
+    expect(saveBody.bodyHtml).not.toContain("ここは大切です。");
+    expect(saveBody.adoptedFixes).toHaveLength(1);
+    expect(fetchFn.mock.calls[2][0]).toBe("/api/growth/learning-log/reject");
+    expect(JSON.parse((fetchFn.mock.calls[2][1] as RequestInit).body as string)).toEqual({
+      pageId: "page-A",
+      source: "comment-revise",
+      rejectedFixes: [
+        {
+          aspect: "インラインコメント",
+          detail: "コメント: 短くする（対象: ここは重要です。）",
+          before: "<p>ここが肝心です。</p>",
+          after: "<p>ここは大切です。</p>",
+        },
+      ],
+    });
+  });
+
+  it("非選択がない場合は却下 API を呼ばず、却下失敗でも反映は成功扱い", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: true }));
+    const allSelected = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+    await act(async () => {
+      await allSelected.result.current.applyNow();
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+
+    const rejecting = mockFetch(
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+      jsonResponse({ success: false }, false),
+    );
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+    act(() => view.result.current.toggleSelect(1));
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+    expect(rejecting).toHaveBeenCalledTimes(3);
+    expect(view.result.current.error).toBe("");
+  });
+
+  it("却下 API のネットワーク例外も反映の成功状態へ影響させない", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockRejectedValueOnce(new Error("network"));
+    vi.stubGlobal("fetch", fetchFn);
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+    act(() => view.result.current.toggleSelect(1));
+
+    await act(async () => {
+      await view.result.current.applyNow();
+    });
+
+    expect(view.result.current.error).toBe("");
+  });
+
+  it("dismissAll は dismiss 成功後に全件を却下送信し、却下失敗は操作結果へ影響させない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }), jsonResponse({ success: false }, false));
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+
+    await act(async () => {
+      await view.result.current.dismissAll();
+    });
+
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/body-comment/dismiss");
+    expect(fetchFn.mock.calls[1][0]).toBe("/api/growth/learning-log/reject");
+    expect(JSON.parse((fetchFn.mock.calls[1][1] as RequestInit).body as string).rejectedFixes).toHaveLength(2);
+    expect(view.result.current.error).toBe("");
+  });
+
+  it("dismissAll は dismiss 失敗時に却下ログを送らない", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: false }, false, 500));
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: PROPOSAL, onChanged: vi.fn() }),
+    );
+
+    await act(async () => {
+      await view.result.current.dismissAll();
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[0][0]).toBe("/api/growth/body-comment/dismiss");
+    expect(view.result.current.error).toBe("取り消しに失敗しました。");
+  });
+
+  it("dismissAll は21件以上の却下案を20件ずつ分割して送る", async () => {
+    const manyProposal: BodyCommentView = {
+      ...PROPOSAL,
+      comments: Array.from({ length: 21 }, (_, index) => ({
+        blockIndex: index,
+        excerpt: `対象${index}`,
+        comment: `コメント${index}`,
+      })),
+      proposal: Array.from({ length: 21 }, (_, index) => ({
+        commentIndex: index,
+        before: `<p>前${index}</p>`,
+        after: `<p>後${index}</p>`,
+      })),
+    };
+    const fetchFn = mockFetch(
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+      jsonResponse({ success: true }),
+    );
+    const view = renderHook(() =>
+      useBodyCommentConsult({ pageId: "page-A", token: TOKEN, bodyHtml: BODY, bodyComment: manyProposal, onChanged: vi.fn() }),
+    );
+
+    await act(async () => {
+      await view.result.current.dismissAll();
+    });
+
+    expect(fetchFn.mock.calls.map(([url]) => url)).toEqual([
+      "/api/growth/body-comment/dismiss",
+      "/api/growth/learning-log/reject",
+      "/api/growth/learning-log/reject",
+    ]);
+    expect(JSON.parse((fetchFn.mock.calls[1][1] as RequestInit).body as string).rejectedFixes).toHaveLength(20);
+    expect(JSON.parse((fetchFn.mock.calls[2][1] as RequestInit).body as string).rejectedFixes).toHaveLength(1);
+  });
+
   it("保存 POST に comment-revise source と固定の採用観点を含める", async () => {
     const bodyComment: BodyCommentView = {
       status: "提示中",
