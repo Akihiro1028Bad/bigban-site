@@ -105,6 +105,66 @@ vi.mock("./DraftEditor", () => {
   };
 });
 
+describe("ConsultCard のアドバイス反映案選択", () => {
+  const view: OverallConsultView = {
+    kind: "overall",
+    status: "presenting",
+    advice: null,
+    raw: "",
+    requestedAtMs: null,
+    apply: {
+      status: "提示中",
+      raw: "",
+      proposal: [
+        { fixIndex: 0, before: "<p>元A</p>", after: "<p>新A</p>" },
+        { fixIndex: 1, before: "<p>元B</p>", after: "<p>新B</p>" },
+      ],
+    },
+  };
+
+  function renderApplyCard(applySelected: Set<number>, onAdviceToggleApplySelect = vi.fn()) {
+    return render(
+      <ConsultCard
+        view={view}
+        busy={false}
+        onReload={vi.fn()}
+        onAdviceDismiss={vi.fn()}
+        onAdviceSubmitApply={vi.fn()}
+        onAdviceDismissApply={vi.fn()}
+        onAdviceApplyNow={vi.fn()}
+        onAdviceToggleApplySelect={onAdviceToggleApplySelect}
+        adviceApplySelected={applySelected}
+        onReviseApply={vi.fn()}
+        onReviseDiscard={vi.fn()}
+        onSentenceApplySelected={vi.fn()}
+        onSentenceDismissAll={vi.fn()}
+        onSentenceToggleSelect={vi.fn()}
+        sentenceSelected={new Set()}
+        onRetry={vi.fn()}
+        adopted={new Set()}
+        selectable={false}
+        classifications={[]}
+        onToggleAdopt={vi.fn()}
+        onSetAdoptedBulk={vi.fn()}
+      />,
+    );
+  }
+
+  it("提示中の各案を選択でき、選択数をボタン表示と無効化へ反映する", async () => {
+    const onToggle = vi.fn();
+    const card = renderApplyCard(new Set([0, 1]), onToggle);
+    const first = screen.getByRole("checkbox", { name: "反映案1を反映" });
+    expect(first).toBeChecked();
+    expect(screen.getByRole("button", { name: "選択した 2 件を本文に反映" })).toBeEnabled();
+    await userEvent.click(first);
+    expect(onToggle).toHaveBeenCalledWith(0);
+
+    card.unmount();
+    renderApplyCard(new Set());
+    expect(screen.getByRole("button", { name: "選択した 0 件を本文に反映" })).toBeDisabled();
+  });
+});
+
 // プロンプト確認タブは自前で fetch するため、ApproveClient の結線検証では軽量スタブに差し替える
 // (中身は PromptsView.test.tsx で個別に検証済み)。
 vi.mock("./PromptsView", () => ({
@@ -114,8 +174,10 @@ vi.mock("./PromptsView", () => ({
 }));
 
 import { ApproveClient } from "./ApproveClient";
+import { ConsultCard } from "./consult/ConsultCard";
 import { replacePreservedImageSrc, replacePreservedPendingFigure } from "./DraftEditor";
 import { STUCK_THRESHOLD_MS } from "./generating";
+import type { OverallConsultView } from "@/lib/growth/consult";
 import type { GrowthOpsView } from "@/lib/growth/workerLog";
 
 const EMPTY_OPS: GrowthOpsView = {
@@ -1898,16 +1960,16 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     expect(within(drawer).getByText(/AIが処理中です/)).toBeInTheDocument();
 
     await userEvent.click(within(drawer).getByRole("button", { name: "再読み込み" }));
-    expect(await within(drawer).findByText("## A 改")).toBeInTheDocument();
+    expect(await within(drawer).findByRole("checkbox", { name: "Aの変更を反映" })).toBeInTheDocument();
 
-    await userEvent.click(within(drawer).getByRole("button", { name: "反映する" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "選択を反映（1）" }));
     // 反映後は依頼状態が「なし」へ戻り、相談カードは消える(待ち/提示が無くなる)。
     await waitFor(() =>
       expect(within(drawer).queryByText("## A 改")).not.toBeInTheDocument()
     );
     // 認証有効時は token をクエリで送る(送らないと 401 になる)。
     expect(fn.mock.calls[2][0]).toBe("/api/growth/revise/apply");
-    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply" });
+    expect(JSON.parse(fn.mock.calls[2][1].body)).toEqual({ pageId: "i1", action: "apply", outline: "## A 改", applyTitle: false });
   });
 
   it("元の構成案が未設定でも修正案の差分を表示する(#M4・outline欠落)", async () => {
@@ -1935,7 +1997,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     );
     const dialog = await openIdea();
     const drawer = await openConsultDrawer(dialog);
-    await userEvent.click(within(drawer).getByRole("button", { name: "やり直し" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "反映しない（破棄）" }));
     // 破棄後は提示が消え、依頼フォーム(修正を依頼)に戻る。
     await waitFor(() =>
       expect(within(drawer).queryByText("## A 改")).not.toBeInTheDocument()
@@ -1988,7 +2050,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     );
     const dialog = await openIdea();
     const drawer = await openConsultDrawer(dialog);
-    await userEvent.click(within(drawer).getByRole("button", { name: "反映する" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "選択を反映（1）" }));
     expect(
       await within(drawer).findByText("反映できるのは提示中のときだけです。")
     ).toBeInTheDocument();
@@ -2006,7 +2068,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     );
     const dialog = await openIdea();
     const drawer = await openConsultDrawer(dialog);
-    await userEvent.click(within(drawer).getByRole("button", { name: "反映する" }));
+    await userEvent.click(within(drawer).getByRole("button", { name: "選択を反映（1）" }));
     expect(await within(drawer).findByText("更新に失敗しました。")).toBeInTheDocument();
   });
 
@@ -2060,7 +2122,7 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5100);
       });
-      expect(await within(drawer).findByText("## A 改")).toBeInTheDocument();
+      expect(await within(drawer).findByRole("checkbox", { name: "Aの変更を反映" })).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -2109,7 +2171,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
     });
   });
 
-  it("提示中はタイトルの新旧比較を表示し、反映できる", async () => {
+  it("提示中はタイトル案を選択して反映できる", async () => {
     const fn = mockFetchSequence(
       {
         json: {
@@ -2134,10 +2196,11 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
     const drawer = await openConsultDrawer(dialog);
 
     expect(within(drawer).getByText("タイトルの修正案")).toBeInTheDocument();
-    expect(within(drawer).getByText("短い新タイトル")).toBeInTheDocument();
+    expect(within(drawer).getByText("タイトル案: 短い新タイトル")).toBeInTheDocument();
+    expect(within(drawer).getByRole("checkbox", { name: "タイトル案を反映" })).toBeChecked();
 
-    await userEvent.click(within(drawer).getByRole("button", { name: "反映する" }));
-    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "apply" });
+    await userEvent.click(within(drawer).getByRole("button", { name: "選択を反映（1）" }));
+    expect(JSON.parse(fn.mock.calls[1][1].body)).toEqual({ pageId: "i1", action: "apply", applyTitle: true });
   });
 
   it("タイトルのみの提示では構成案の新旧比較を出さない", async () => {
@@ -2146,7 +2209,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
       reviseTitleProposal: "新タイトル案",
     });
     expect(within(drawer).getByText("タイトルの修正案")).toBeInTheDocument();
-    expect(within(drawer).queryByText("元の構成案")).not.toBeInTheDocument();
+    expect(within(drawer).queryByRole("checkbox", { name: /変更を反映/ })).not.toBeInTheDocument();
   });
 
   it("構成案のみの提示ではタイトルの新旧比較を出さない", async () => {
@@ -2154,7 +2217,7 @@ describe("ApproveClient タイトルのAI修正(#139 B)", () => {
       reviseStatus: "提示中",
       reviseProposal: "## A 改",
     });
-    expect(within(drawer).getByText("元の構成案")).toBeInTheDocument();
+    expect(within(drawer).getByRole("checkbox", { name: "Aの変更を反映" })).toBeInTheDocument();
     expect(within(drawer).queryByText("タイトルの修正案")).not.toBeInTheDocument();
   });
 });

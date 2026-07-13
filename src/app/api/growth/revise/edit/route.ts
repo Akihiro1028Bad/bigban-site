@@ -19,6 +19,7 @@ import { articleEditGuard } from "@/lib/growth/stageGuard";
 import {
   buildOutlineEditProps,
   buildTitleEditProps,
+  OUTLINE_MAX_LENGTH,
   REVISE_BUSY_STATUSES,
 } from "@/lib/growth/revise";
 
@@ -55,8 +56,8 @@ export async function POST(request: Request): Promise<Response> {
   if (!hasOutline && !hasTitle) {
     return badRequest("構成案またはタイトルを入力してください。");
   }
-  if (hasOutline && outlineStr.length > 20000) {
-    return badRequest("構成案が長すぎます(20000字以内)。");
+  if (hasOutline && outlineStr.length > OUTLINE_MAX_LENGTH) {
+    return badRequest(`構成案が長すぎます(${OUTLINE_MAX_LENGTH}字以内)。`);
   }
 
   const options = notionOptions();

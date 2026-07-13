@@ -9,7 +9,7 @@ import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PendingItem } from "../types";
-import { postRevise } from "../api";
+import { postRevise, postReviseApply } from "../api";
 
 import { useReviseEditing } from "./useReviseEditing";
 
@@ -21,6 +21,7 @@ vi.mock("../api", () => ({
 }));
 
 const mockedPostRevise = vi.mocked(postRevise);
+const mockedPostReviseApply = vi.mocked(postReviseApply);
 
 const BASE_ITEM: PendingItem = {
   id: "page-1",
@@ -41,11 +42,11 @@ function createWrapper(): ({ children }: { children: ReactNode }) => ReactNode {
   };
 }
 
-function setup(openId = BASE_ITEM.id) {
+function setup(openId = BASE_ITEM.id, token = "token-1") {
   const setBoardData = vi.fn();
   const view = renderHook(
     ({ currentOpenId }: { currentOpenId: string | null }) =>
-      useReviseEditing({ token: "token-1", openId: currentOpenId, setBoardData }),
+      useReviseEditing({ token, openId: currentOpenId, setBoardData }),
     { initialProps: { currentOpenId: openId }, wrapper: createWrapper() }
   );
   return { setBoardData, view };
@@ -117,5 +118,45 @@ describe("記事切り替えリセット", () => {
     view.rerender({ currentOpenId: "page-2" });
 
     await waitFor(() => expect(view.result.current.outlineOverallPrompt).toBe(""));
+  });
+});
+
+describe("applyRevise", () => {
+  it("却下した修正を共通の認証ヘッダーで学習ログへ送る", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { view } = setup(BASE_ITEM.id, "認証トークン");
+
+    await act(async () => {
+      await view.result.current.applyRevise(BASE_ITEM, "discard", [
+        { aspect: "構成案修正", detail: "見出し", before: "前", after: "後" },
+      ]);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/growth/learning-log/reject", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer %E8%AA%8D%E8%A8%BC%E3%83%88%E3%83%BC%E3%82%AF%E3%83%B3",
+      },
+      body: JSON.stringify({
+        pageId: BASE_ITEM.id,
+        source: "revise-discard",
+        rejectedFixes: [{ aspect: "構成案修正", detail: "見出し", before: "前", after: "後" }],
+      }),
+    });
+  });
+
+  it("却下理由なしで破棄すると学習ログを送らない", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { view } = setup();
+
+    await act(async () => {
+      await view.result.current.applyRevise(BASE_ITEM, "discard");
+    });
+
+    expect(mockedPostReviseApply).toHaveBeenCalledWith("token-1", BASE_ITEM.id, "discard", undefined);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

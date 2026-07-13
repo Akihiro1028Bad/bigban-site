@@ -53,7 +53,7 @@ function page(properties: Record<string, unknown>): NotionPage {
 }
 
 describe("parseLearningEvent", () => {
-  it("4 種別の妥当 JSON を LearningEvent に変換する", () => {
+  it("5 種別の妥当 JSON を LearningEvent に変換する", () => {
     expect(
       parseLearningEvent(
         JSON.stringify({
@@ -87,6 +87,25 @@ describe("parseLearningEvent", () => {
       pageId: "idea-1",
       title: "記事タイトル",
       aspect: "読みやすさ",
+      before: "before",
+      after: "after",
+    });
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
+          kind: "不採用",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          aspect: "冗長",
+          before: "before",
+          after: "after",
+        })
+      )
+    ).toEqual({
+      kind: "不採用",
+      pageId: "idea-1",
+      title: "記事タイトル",
+      aspect: "冗長",
       before: "before",
       after: "after",
     });
@@ -144,6 +163,17 @@ describe("parseLearningEvent", () => {
     expect(
       parseLearningEvent(
         JSON.stringify({
+          kind: "不採用",
+          pageId: "idea-1",
+          title: "記事タイトル",
+          aspect: "冗長",
+          before: "before",
+        })
+      )
+    ).toBeNull();
+    expect(
+      parseLearningEvent(
+        JSON.stringify({
           kind: "画像試行",
           pageId: "idea-1",
           title: "記事タイトル",
@@ -157,7 +187,7 @@ describe("parseLearningEvent", () => {
 });
 
 describe("buildLearningLogTitle", () => {
-  it("4 種別のタイトルを生成する", () => {
+  it("5 種別のタイトルを生成する", () => {
     expect(
       buildLearningLogTitle(
         { kind: "編集", pageId: "idea-1", title: "初めてのピックルボール", before: "a", after: "b" },
@@ -174,6 +204,16 @@ describe("buildLearningLogTitle", () => {
         after: "b",
       })
     ).toBe("採用: 読みやすさ (初めてのピックルボール)");
+    expect(
+      buildLearningLogTitle({
+        kind: "不採用",
+        pageId: "idea-1",
+        title: "初めてのピックルボール",
+        aspect: "冗長",
+        before: "a",
+        after: "b",
+      })
+    ).toBe("不採用: 冗長 (初めてのピックルボール)");
     expect(
       buildLearningLogTitle({
         kind: "画像試行",
@@ -213,6 +253,16 @@ describe("buildLearningLogTitle", () => {
         after: "b",
       })
     ).toBe("採用: 観点なし (無題)");
+    expect(
+      buildLearningLogTitle({
+        kind: "不採用",
+        pageId: "idea-1",
+        title: "",
+        aspect: "",
+        before: "a",
+        after: "b",
+      })
+    ).toBe("不採用: 観点なし (無題)");
   });
 
   it("工程失敗の exitCode=null は exit ? にする", () => {
@@ -259,6 +309,22 @@ describe("buildLearningLogProps", () => {
     expect(richTextContent(props[LEARNING_LOG_PROPS.summary])).toBe("[導入] 80字短縮");
     expect(props).not.toHaveProperty(LEARNING_LOG_PROPS.result);
     expect(props).not.toHaveProperty(LEARNING_LOG_PROPS.count);
+  });
+
+  it("不採用イベントを Notion プロパティに変換する", () => {
+    const event: LearningEvent = {
+      kind: "不採用",
+      pageId: "idea-1",
+      title: "記事タイトル",
+      aspect: "冗長",
+      before: "<p>before</p>",
+      after: "<p>after</p>",
+    };
+    const props = buildLearningLogProps(event, NOW_ISO, "不採用(sentence): 冗長");
+
+    expect(selectName(props[LEARNING_LOG_PROPS.kind])).toBe("不採用");
+    expect(titleContent(props[LEARNING_LOG_PROPS.event])).toBe("不採用: 冗長 (記事タイトル)");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.target])).toBe("冗長");
   });
 
   it("採否イベントは対象に aspect を入れ、空 aspect なら空 rich_text にする", () => {
@@ -703,17 +769,19 @@ describe("summarizeLearningLog", () => {
     expect(summary.countByKind).toEqual({
       編集: 1,
       採否: 0,
+      不採用: 0,
       画像試行: 0,
       工程失敗: 0,
       その他: 0,
     });
   });
 
-  it("種別別件数は 4 種別とその他を初期化してカウントする", () => {
+  it("種別別件数は 5 種別とその他を初期化してカウントする", () => {
     const summary = summarizeLearningLog(
       [
         row({ kind: "編集" }),
         row({ kind: "採否" }),
+        row({ kind: "不採用" }),
         row({ kind: "画像試行" }),
         row({ kind: "工程失敗" }),
         row({ kind: "その他" }),
@@ -725,6 +793,7 @@ describe("summarizeLearningLog", () => {
     expect(summary.countByKind).toEqual({
       編集: 1,
       採否: 1,
+      不採用: 1,
       画像試行: 1,
       工程失敗: 1,
       その他: 1,
@@ -758,6 +827,20 @@ describe("summarizeLearningLog", () => {
     );
 
     expect(summary.adoptAspectHeatmap).toEqual({ 冗長: 2, 不明: 1 });
+  });
+
+  it("不採用イベントは target を aspect として集計し、空なら不明に寄せる", () => {
+    const summary = summarizeLearningLog(
+      [
+        row({ kind: "不採用", target: "冗長" }),
+        row({ kind: "不採用", target: "冗長" }),
+        row({ kind: "不採用", target: "" }),
+      ],
+      nowMs,
+      4
+    );
+
+    expect(summary.rejectAspectHeatmap).toEqual({ 冗長: 2, 不明: 1 });
   });
 
   it("画像試行は pageId と style ごとの最大回数を降順にし、上位 10 件に丸める", () => {
@@ -818,12 +901,14 @@ describe("summarizeLearningLog", () => {
       countByKind: {
         編集: 0,
         採否: 0,
+        不採用: 0,
         画像試行: 0,
         工程失敗: 0,
         その他: 0,
       },
       editRegionHeatmap: {},
       adoptAspectHeatmap: {},
+      rejectAspectHeatmap: {},
       imageRetryTop: [],
       failModeFrequency: {},
     });

@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
@@ -19,11 +20,18 @@ import {
   reviseTitleProposalOf,
 } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
-import { buildReviseApplyProps, buildReviseDiscardProps } from "@/lib/growth/revise";
+import { buildReviseApplyProps, buildReviseDiscardProps, OUTLINE_MAX_LENGTH } from "@/lib/growth/revise";
 
 export const runtime = "nodejs";
 
 type ReviseAction = "apply" | "discard";
+
+const requestSchema = z.object({
+  pageId: z.string(),
+  action: z.enum(["apply", "discard"]),
+  outline: z.string().max(OUTLINE_MAX_LENGTH).optional(),
+  applyTitle: z.boolean().optional(),
+});
 
 function badRequest(message: string): Response {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -48,12 +56,11 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return badRequest("不正なリクエストです。");
   }
-  const pageId = (body as { pageId?: unknown })?.pageId;
-  const action = (body as { action?: unknown })?.action;
+  const parsed = requestSchema.safeParse(body);
+  if (!parsed.success) return badRequest("不正なリクエストです。");
+  const { pageId, action, outline, applyTitle } = parsed.data;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
-  if (action !== "apply" && action !== "discard") {
-    return badRequest("action は apply / discard のみです。");
-  }
+  if (outline !== undefined && outline.trim() === "") return badRequest("構成案は空にできません。");
 
   const options = notionOptions();
   if (!options) {
@@ -72,10 +79,12 @@ export async function POST(request: Request): Promise<Response> {
       // #139 B: 構成案・タイトルのうち提案がある方だけ反映する(部分提案を許容)。
       const proposal = reviseProposalOf(page);
       const titleProposal = reviseTitleProposalOf(page);
-      if (!proposal && !titleProposal) return conflict("反映する修正案がありません。");
+      const selectedOutline = outline ?? (proposal || null);
+      const selectedTitle = applyTitle === false ? null : titleProposal || null;
+      if (!selectedOutline && !selectedTitle && !(outline !== undefined || applyTitle === false)) return conflict("反映する修正案がありません。");
       await updatePageProps(
         pageId,
-        buildReviseApplyProps(proposal || null, titleProposal || null),
+        buildReviseApplyProps(selectedOutline, selectedTitle),
         options
       );
     } else {

@@ -218,9 +218,10 @@ export async function postReviseEdit(
 export async function postReviseApply(
   token: string,
   pageId: string,
-  action: "apply" | "discard"
+  action: "apply" | "discard",
+  payload?: { outline?: string; applyTitle?: boolean },
 ): Promise<void> {
-  const res = await postJson(token, "/api/growth/revise/apply", { pageId, action });
+  const res = await postJson(token, "/api/growth/revise/apply", { pageId, action, ...payload });
   if (!res.ok) {
     throw new Error(res.error ?? "更新に失敗しました。");
   }
