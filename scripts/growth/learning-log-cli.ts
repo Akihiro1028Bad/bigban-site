@@ -69,6 +69,7 @@ function eventSummary(event: LearningEvent): { diffSummary: string; titleHeadlin
       };
     }
     case "採否":
+    case "不採用":
       return {
         diffSummary: formatEditDiffSummary(summarizeEditDiff(event.before, event.after)),
         isNoChangeEdit: false,
