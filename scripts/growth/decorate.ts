@@ -13,6 +13,7 @@
 import { z } from "zod";
 
 import type { FlexBubble } from "./digest-flex";
+import { normalizeHtmlAnchorText, normalizePlainAnchorText } from "./htmlText";
 import { buildNoticeFlex } from "./notice-flex";
 import { BODY_MIRROR_PROP, chunkRichText, type NotionPage } from "./notion";
 import { selectStaleJobIds } from "./staleJob";
@@ -207,14 +208,6 @@ function makePlain(inner: string): string {
   return `<p>${inner}</p>`;
 }
 
-/** タグ・空白を畳んだ正規化テキスト(抜粋照合用)。 */
-function normalizeText(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 export interface DecorateResult {
   html: string;
   applied: boolean;
@@ -253,7 +246,7 @@ function blockAt(html: string, index: number): TopLevelBlock | null {
 
 /** excerpt(正規化)が対象ブロックのテキストに含まれるか(照合ガード)。 */
 function excerptMatches(block: TopLevelBlock, excerpt: string): boolean {
-  return normalizeText(block.html).includes(normalizeText(excerpt));
+  return normalizeHtmlAnchorText(block.html).includes(normalizePlainAnchorText(excerpt));
 }
 
 /**
