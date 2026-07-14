@@ -366,6 +366,8 @@ export interface BodyCommentView {
   status: BodyCommentStatus;
   /** 投稿済みコメント(JSON が妥当なときのみ非空)。 */
   comments: BodyComment[];
+  /** 投稿済みの本文全体コメント。個別コメント依頼なら空。 */
+  overall?: string;
   /** 提示中で JSON が妥当なときのみ非空の before/after 案。 */
   proposal: BodyCommentProposalItem[];
   /** 結果欄の生テキスト(失敗理由など・表示用)。 */
@@ -375,9 +377,11 @@ export interface BodyCommentView {
 export function bodyCommentViewOf(page: NotionPage): BodyCommentView {
   const status = bodyCommentStatusOf(page);
   const raw = readRichTextPlain(page, BODY_COMMENT_PROPS.result);
+  const request = parseBodyCommentRequest(readRichTextPlain(page, BODY_COMMENT_PROPS.request));
   return {
     status,
-    comments: parseBodyComments(readRichTextPlain(page, BODY_COMMENT_PROPS.request)),
+    comments: request.comments,
+    overall: request.overall ?? "",
     proposal: status === "提示中" ? parseBodyCommentProposal(raw) : [],
     raw,
   };

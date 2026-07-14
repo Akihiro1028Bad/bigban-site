@@ -92,6 +92,40 @@ describe("requestAdvice", () => {
   });
 });
 
+describe("retryAdvice", () => {
+  it("Notionに保存された補足指示を同じ内容で再送する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { onChanged, view } = setup({
+      advice: {
+        status: "失敗",
+        advice: null,
+        instruction: "CTAと見出しを重点確認",
+        raw: "timeout",
+      },
+    });
+
+    act(() => view.result.current.retryAdvice());
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      pageId: PAGE_ID,
+      instruction: "CTAと見出しを重点確認",
+    });
+  });
+
+  it("保存済み補足指示がない場合は空文字で再送する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const { onChanged, view } = setup();
+
+    act(() => view.result.current.retryAdvice());
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ pageId: PAGE_ID, instruction: "" });
+  });
+});
+
 describe("dismiss / submitApply / dismissApply", () => {
   it("dismiss は片付け API を叩く", async () => {
     const fetchFn = mockFetch(jsonResponse({ success: true }));

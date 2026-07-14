@@ -45,6 +45,7 @@ interface UseBodyCommentConsultReturn {
   closeComposer: () => void;
   buildPayload: () => BodyComment[];
   requestAi: () => Promise<void>;
+  retryAi: () => Promise<void>;
   requestOverall: () => Promise<void>;
   dismiss: () => Promise<void>;
   dismissAll: () => Promise<void>;
@@ -162,6 +163,25 @@ export function useBodyCommentConsult({
     if (await post("/api/growth/body-comment", { pageId, comments: payload }, "依頼に失敗しました。")) {
       setComments({});
     }
+  }
+
+  /** 失敗した直近依頼を、Notionに保存された個別/全体コメントで再送する。 */
+  async function retryAi(): Promise<void> {
+    const overall = bodyComment?.overall?.trim() ?? "";
+    if (overall) {
+      await post("/api/growth/body-comment", { pageId, overall }, "依頼に失敗しました。");
+      return;
+    }
+    const storedComments = bodyComment?.comments ?? [];
+    if (storedComments.length === 0) {
+      setError("再依頼できる本文コメント指示がありません。");
+      return;
+    }
+    await post(
+      "/api/growth/body-comment",
+      { pageId, comments: storedComments },
+      "依頼に失敗しました。",
+    );
   }
 
   async function requestOverall(): Promise<void> {
@@ -294,6 +314,7 @@ export function useBodyCommentConsult({
     closeComposer,
     buildPayload,
     requestAi,
+    retryAi,
     requestOverall,
     dismiss,
     dismissAll,

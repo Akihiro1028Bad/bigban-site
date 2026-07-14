@@ -118,6 +118,8 @@ export function buildReviseRequestProps(
     [REVISE_PROPS.titleInstruction]: {
       rich_text: titleInstruction ? chunkRichText(titleInstruction) : [],
     },
+    [REVISE_PROPS.proposal]: { rich_text: [] },
+    [REVISE_PROPS.titleProposal]: { rich_text: [] },
     [REVISE_PROPS.status]: { select: { name: requested } },
     [REVISE_PROPS.requestedAt]: { date: { start: nowIso } },
   };
