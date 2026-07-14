@@ -205,6 +205,25 @@ describe("toPendingItems", () => {
     ]);
   });
 
+  it("保存済みの構成案・タイトル修正指示を再依頼用に反映する", () => {
+    const page = idea("i-retry", "T", "S");
+    page.properties["修正指示"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: '[{"line":1,"comment":"導入を短く"}]' }],
+    };
+    page.properties["修正タイトル指示"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: "初心者向けと明記" }],
+    };
+
+    const [item] = toPendingItems([], [page]);
+
+    expect(item).toMatchObject({
+      reviseInstructions: '[{"line":1,"comment":"導入を短く"}]',
+      reviseTitleInstruction: "初心者向けと明記",
+    });
+  });
+
   it("記事ネタ案の下書きID(contentId)を反映する(#75)", () => {
     const page = idea("i7", "T", "S");
     page.properties["下書きID"] = { type: "rich_text", rich_text: [{ plain_text: "g-xyz" }] };
@@ -394,10 +413,11 @@ describe("toPendingItems", () => {
         score: 0,
         outline: "",
         reviseStatus: "なし",
-        reviseProposal: "",
-        reviseTitleProposal: "",
-        reviseInstructions: "",
-        reviseRequestedAtMs: null,
+      reviseProposal: "",
+      reviseTitleProposal: "",
+      reviseInstructions: "",
+      reviseTitleInstruction: "",
+      reviseRequestedAtMs: null,
         contentId: "",
         isDraftReady: false,
         stage: "proposed",
@@ -453,10 +473,11 @@ describe("toPendingItems", () => {
         score: 0,
         outline: "",
         reviseStatus: "なし",
-        reviseProposal: "",
-        reviseTitleProposal: "",
-        reviseInstructions: "",
-        reviseRequestedAtMs: null,
+      reviseProposal: "",
+      reviseTitleProposal: "",
+      reviseInstructions: "",
+      reviseTitleInstruction: "",
+      reviseRequestedAtMs: null,
         contentId: "",
         isDraftReady: false,
         stage: "proposed",

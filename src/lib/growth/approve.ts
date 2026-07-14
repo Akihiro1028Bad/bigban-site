@@ -68,6 +68,8 @@ export interface PendingItem {
   reviseTitleProposal?: string;
   /** 直近に送った修正指示(行コメントの JSON)。記事のみ。 */
   reviseInstructions?: string;
+  /** 直近に送ったタイトル修正指示。失敗時の同内容再依頼に使う。記事のみ。 */
+  reviseTitleInstruction?: string;
   /** #C2 UI: 構成案修正の依頼時刻(ms)。経過/滞留表示用。記事のみ・未設定は null。 */
   reviseRequestedAtMs?: number | null;
   /** 生成済み下書きの microCMS contentId(空=未作成)。下書きプレビュー(#75)の有無判定に使う。記事のみ。 */
@@ -374,6 +376,7 @@ export function toPendingItems(
       reviseProposal: richText(page, REVISE_PROPS.proposal),
       reviseTitleProposal: richText(page, REVISE_PROPS.titleProposal),
       reviseInstructions: richText(page, REVISE_PROPS.instructions),
+      reviseTitleInstruction: richText(page, REVISE_PROPS.titleInstruction),
       reviseRequestedAtMs: dateStartMs(page, REVISE_PROPS.requestedAt),
       contentId,
       isDraftReady: selectName(page, STATUS_PROP) === DRAFT_READY_STATUS,

@@ -160,6 +160,82 @@ describe("useBodyCommentConsult: overall body comment", () => {
   });
 });
 
+describe("useBodyCommentConsult: retryAi", () => {
+  it("保存済みの個別コメントを同じ内容で再送する", async () => {
+    const onChanged = vi.fn();
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const stored = [{ blockIndex: 0, excerpt: "ここは重要です。", comment: "具体的にする" }];
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment: { status: "失敗", comments: stored, overall: "", proposal: [], raw: "timeout" },
+        onChanged,
+      }),
+    );
+
+    await act(async () => {
+      await view.result.current.retryAi();
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string)).toEqual({
+      pageId: "page-A",
+      comments: stored,
+    });
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("保存済みの全体コメントを同じ内容で再送する", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment: {
+          status: "失敗",
+          comments: [],
+          overall: "全体を簡潔にする",
+          proposal: [],
+          raw: "timeout",
+        },
+        onChanged: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await view.result.current.retryAi();
+    });
+
+    expect(JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string)).toEqual({
+      pageId: "page-A",
+      overall: "全体を簡潔にする",
+    });
+  });
+
+  it("保存済み指示が空ならPOSTせず明示エラーにする", async () => {
+    const fetchFn = mockFetch(jsonResponse({ success: true }));
+    const view = renderHook(() =>
+      useBodyCommentConsult({
+        pageId: "page-A",
+        token: TOKEN,
+        bodyHtml: BODY,
+        bodyComment: { status: "失敗", comments: [], overall: "", proposal: [], raw: "timeout" },
+        onChanged: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await view.result.current.retryAi();
+    });
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(view.result.current.error).toBe("再依頼できる本文コメント指示がありません。");
+  });
+});
+
 describe("useBodyCommentConsult: applyNow", () => {
   it("proposal は初期状態で全選択、toggleSelect で選択を切り替える", () => {
     const view = renderHook(() =>

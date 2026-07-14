@@ -25,6 +25,7 @@ export interface PendingItem {
   // #139 B: AI が提案した新タイトル(提示中に新旧比較で表示)。空=タイトル提案なし。
   reviseTitleProposal?: string;
   reviseInstructions?: string;
+  reviseTitleInstruction?: string;
   // #C2 UI: 構成案修正の依頼時刻(ms)。経過/滞留表示用。未設定は null。
   reviseRequestedAtMs?: number | null;
   // #75: 生成済み下書きの microCMS contentId(空/無=未作成)。下書きプレビューの有無判定に使う。

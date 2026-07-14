@@ -168,9 +168,9 @@ export function useConsult({
 
   // 失敗カードの「再依頼」。表示中モードに対応する依頼を呼ぶ(overall/revise/sentence)。
   function onRetry(): void {
-    if (activeMode === "overall") advice.requestAdvice();
-    else if (activeMode === "revise") void revise.requestRevise(item);
-    else void bodyCommentConsult.requestAi();
+    if (activeMode === "overall") advice.retryAdvice();
+    else if (activeMode === "revise") void revise.retryRevise(item);
+    else void bodyCommentConsult.retryAi();
   }
 
   // 待ち状態カードの「再読み込み」。revise は盤(item の reviseStatus)を、

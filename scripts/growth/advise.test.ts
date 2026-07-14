@@ -161,11 +161,13 @@ describe("adviceStatusOf / adviceViewOf", () => {
     const view = adviceViewOf(
       page({
         "アドバイスステータス": { select: { name: "失敗" } },
+        "アドバイス指示": { rich_text: [{ plain_text: "CTAも確認" }] },
         "アドバイス結果": { rich_text: [{ plain_text: "OpenAI 503" }] },
       })
     );
     expect(view.status).toBe("失敗");
     expect(view.advice).toBeNull();
+    expect(view.instruction).toBe("CTAも確認");
     expect(view.raw).toBe("OpenAI 503");
   });
 });

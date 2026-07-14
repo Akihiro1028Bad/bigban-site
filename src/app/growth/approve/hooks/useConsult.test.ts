@@ -118,6 +118,7 @@ function makeReviseMock(overrides: Partial<ReturnType<typeof useReviseEditing>> 
     setTitleInput: vi.fn(),
     setTitleRevisePrompt: vi.fn(),
     requestRevise: vi.fn().mockResolvedValue(undefined),
+    retryRevise: vi.fn().mockResolvedValue(undefined),
     startAddComment: vi.fn(),
     startEditComment: vi.fn(),
     cancelComment: vi.fn(),
@@ -474,7 +475,7 @@ describe("useConsult: busy の3分岐", () => {
 });
 
 describe("useConsult: onRetry の3分岐", () => {
-  it("mode='overall' のとき onRetry → advice.requestAdvice を呼ぶ(fetch が '/api/growth/advise' に POST)", async () => {
+  it("mode='overall' のとき onRetry → advice.retryAdvice を呼び保存済み指示をPOST", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -483,42 +484,59 @@ describe("useConsult: onRetry の3分岐", () => {
     } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderUseConsult({ draft: DRAFT_BASE });
+    const { result } = renderUseConsult({
+      draft: {
+        ...DRAFT_BASE,
+        advice: {
+          status: "失敗",
+          advice: null,
+          instruction: "CTAを重点確認",
+          raw: "timeout",
+        },
+      },
+    });
     expect(result.current.mode).toBe("overall");
 
-    // spy で advice.requestAdvice が実際に呼ばれることを実証
-    const spy = vi.spyOn(result.current.advice, "requestAdvice");
+    const spy = vi.spyOn(result.current.advice, "retryAdvice");
     await act(async () => result.current.onRetry());
     expect(spy).toHaveBeenCalled();
     // さらに fetch が /api/growth/advise に POST されることで委譲の実動作も確認
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/growth/advise",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ pageId: "page-001", instruction: "CTAを重点確認" }),
+      }),
     );
   });
 
-  it("mode='revise' のとき onRetry → revise.requestRevise(item) を呼ぶ", async () => {
+  it("mode='revise' のとき onRetry → revise.retryRevise(item) を呼ぶ", async () => {
     const reviseMock = makeReviseMock();
     const { result } = renderUseConsult({ draft: null, revise: reviseMock });
     expect(result.current.mode).toBe("revise");
 
     await act(async () => result.current.onRetry());
-    expect(reviseMock.requestRevise).toHaveBeenCalledWith(BASE_ITEM);
+    expect(reviseMock.retryRevise).toHaveBeenCalledWith(BASE_ITEM);
+    expect(reviseMock.requestRevise).not.toHaveBeenCalled();
   });
 
-  it("mode='sentence' のとき onRetry → bodyCommentConsult.requestAi を呼ぶ", async () => {
+  it("mode='sentence' のとき onRetry → bodyCommentConsult.retryAi を呼ぶ", async () => {
     const { result } = renderUseConsult({
       draft: {
         ...DRAFT_BASE,
-        bodyComment: { status: "依頼中", comments: [], proposal: [], raw: "" },
+        bodyComment: {
+          status: "失敗",
+          comments: [{ blockIndex: 0, excerpt: "重要です。", comment: "具体的に" }],
+          overall: "",
+          proposal: [],
+          raw: "timeout",
+        },
       },
     });
     act(() => result.current.setMode("sentence"));
     expect(result.current.mode).toBe("sentence");
 
-    // spy で bodyCommentConsult.requestAi が実際に呼ばれることを実証
-    // (buildPayload が空のため内部で早期 return するが、requestAi 自体は呼ばれる)
-    const spy = vi.spyOn(result.current.bodyCommentConsult, "requestAi");
+    const spy = vi.spyOn(result.current.bodyCommentConsult, "retryAi");
     await act(async () => result.current.onRetry());
     expect(spy).toHaveBeenCalled();
   });

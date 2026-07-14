@@ -186,6 +186,8 @@ export function adviceStatusOf(page: NotionPage): AdviceStatus {
 /** 承認画面の表示用ビュー: ステータス＋(提示中なら)パース済みアドバイス＋(失敗なら)生の理由。 */
 export interface AdviceView {
   status: AdviceStatus;
+  /** 直近の依頼で送った補足指示。失敗時の同内容再依頼に使う。 */
+  instruction?: string;
   /** 提示中で JSON が妥当なときのみ非 null。 */
   advice: Advice | null;
   /** 失敗時の理由など、結果欄の生テキスト(表示用)。 */
@@ -200,6 +202,7 @@ export function adviceViewOf(page: NotionPage): AdviceView {
   const raw = readRichTextPlain(page, ADVISE_PROPS.result);
   return {
     status,
+    instruction: readRichTextPlain(page, ADVISE_PROPS.instruction),
     advice: status === "提示中" ? parseAdvice(raw) : null,
     raw,
     requestedAtMs: readDateStartMs(page, ADVISE_PROPS.requestedAt),
