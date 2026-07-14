@@ -571,19 +571,33 @@ describe("pendingStatus", () => {
 });
 
 describe("buildRevertProps（構成からやり直す）", () => {
-  it("ステータスを提案中に、下書きリンク2件を空にするプロパティを返す", () => {
-    expect(buildRevertProps()).toEqual({
+  it("ステータスを提案中に戻し、下書きリンクと前回生成物を空にする", () => {
+    expect(buildRevertProps({ sourceContentId: "art_abc" })).toEqual({
       "ステータス": { select: { name: "提案中" } },
       "下書きID": { rich_text: [] },
       "下書きプレビューキー": { rich_text: [] },
+      "下書き本文HTML": { rich_text: [] },
+      "アイキャッチURL": { url: null },
+      "根拠台帳": { rich_text: [] },
+      "再生成元下書きID": { rich_text: [{ text: { content: "art_abc" } }] },
     });
   });
 
   it("ステータス値は pendingStatus('idea') と一致する（重複定義を避ける）", () => {
-    const props = buildRevertProps() as {
+    const props = buildRevertProps({ sourceContentId: "art_abc" }) as {
       "ステータス": { select: { name: string } };
     };
     expect(props["ステータス"].select.name).toBe(pendingStatus("idea"));
+  });
+
+  it("根拠台帳プロパティ未追加なら台帳クリアを含めない", () => {
+    expect(
+      buildRevertProps({ hasSourceLedger: false, sourceContentId: "art_abc" })["根拠台帳"]
+    ).toBeUndefined();
+  });
+
+  it("退避元IDが無い従来呼び出しでは再生成元IDを空にする", () => {
+    expect(buildRevertProps()["再生成元下書きID"]).toEqual({ rich_text: [] });
   });
 });
 

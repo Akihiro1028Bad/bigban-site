@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
 
-import { fetchContentSummary, fetchDraftKey } from "./draft-meta";
+import { fetchContentSlug, fetchContentSummary, fetchDraftKey } from "./draft-meta";
 import type { FetchFn } from "./http";
 
 describe("fetchDraftKey", () => {
@@ -97,6 +97,62 @@ describe("fetchDraftKey", () => {
         fetchFn,
       })
     ).rejects.toThrow("404");
+  });
+});
+
+describe("fetchContentSlug", () => {
+  it("下書きの元slugをdraftKey付きで取得する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ slug: "Pickleball Skill_Roadmap!" }),
+      text: async () => "",
+    });
+
+    const slug = await fetchContentSlug("news", "stable-content-id", "dk-old", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+
+    expect(slug).toBe("Pickleball Skill_Roadmap!");
+    expect(fetchFn.mock.calls[0][0]).toBe(
+      "https://thepicklebang.microcms.io/api/v1/news/stable-content-id?fields=slug&draftKey=dk-old"
+    );
+  });
+
+  it.each([{}, { slug: "" }])("slugが空または欠落していれば安全側で止める", async (json) => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => json,
+      text: async () => "",
+    });
+
+    await expect(
+      fetchContentSlug("news", "stable-content-id", "dk-old", {
+        serviceDomain: "thepicklebang",
+        apiKey: "key",
+        fetchFn,
+      })
+    ).rejects.toThrow(/slug/);
+  });
+
+  it("HTTPエラーは本文を制限して例外にする", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+      text: async () => "not found",
+    });
+
+    await expect(
+      fetchContentSlug("news", "missing", "dk-old", {
+        serviceDomain: "thepicklebang",
+        apiKey: "key",
+        fetchFn,
+      })
+    ).rejects.toThrow(/404.*not found/);
   });
 });
 
