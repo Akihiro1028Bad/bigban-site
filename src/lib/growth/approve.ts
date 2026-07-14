@@ -10,11 +10,13 @@ import {
   chunkRichText,
   DRAFT_LINK_PROPS,
   EYECATCH_MIRROR_PROP,
+  REBUILD_SOURCE_ID_PROP,
   type NotionPage,
 } from "./notion";
 import { type ArticleMetrics, METRICS_PROPS, parseMetrics } from "./metrics";
 import { PUBLISH_SCHEDULE_PROP } from "./publishQueue";
 import { OUTLINE_PROP, REVISE_PROPS, REVISE_STATUSES, type ReviseStatus } from "./revise";
+import { SOURCE_LEDGER_PROP } from "./sourceLedger";
 import {
   type ArticleStage,
   deriveArticleStage,
@@ -211,15 +213,25 @@ export function pendingStatus(kind: PendingKind): PendingStatus {
  * 「構成からやり直す」(下書き作成済み → 提案中)の Notion 更新プロパティを組み立てる純関数。
  *
  * - ステータスを記事の承認待ち(`提案中`=`pendingStatus("idea")`)へ戻す。
- * - 下書きリンク(`下書きID`/`下書きプレビューキー`)を空にし、`openHasDraft` を false にして
- *   古い下書き・アドバイス・装飾が提案中カラムで表示されないようにする(設計書 §2「なぜ contentId クリアが必要か」)。
- * - microCMS には一切触らない(Notion 書き込みのみ)。下書き本文HTML等のミラーは残置(contentId 空で非表示・再生成で上書き)。
+ * - 下書きリンクと前回生成物(本文・アイキャッチ・根拠台帳)を空にし、再生成時に古い成果物を
+ *   入力として参照できない状態へ戻す。
+ * - microCMS には一切触らない(Notion 書き込みのみ)。既存のmicroCMS下書きは次回の冪等PUTで上書きする。
  */
-export function buildRevertProps(): Record<string, unknown> {
+export function buildRevertProps(
+  options: { hasSourceLedger?: boolean; sourceContentId?: string } = {}
+): Record<string, unknown> {
   return {
     [STATUS_PROP]: { select: { name: pendingStatus("idea") } },
     [DRAFT_LINK_PROPS.contentId]: { rich_text: chunkRichText("") },
     [DRAFT_LINK_PROPS.draftKey]: { rich_text: chunkRichText("") },
+    [BODY_MIRROR_PROP]: { rich_text: chunkRichText("") },
+    [EYECATCH_MIRROR_PROP]: { url: null },
+    [REBUILD_SOURCE_ID_PROP]: {
+      rich_text: chunkRichText(options.sourceContentId ?? ""),
+    },
+    ...(options.hasSourceLedger !== false
+      ? { [SOURCE_LEDGER_PROP]: { rich_text: chunkRichText("") } }
+      : {}),
   };
 }
 

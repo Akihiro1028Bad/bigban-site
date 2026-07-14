@@ -229,17 +229,25 @@ function isLandingUncertain(error: unknown): boolean {
  * 下書き(status=draft)を **slug 由来の決定的 ID** で冪等に作成する。
  * 同一slugの再実行では PUT が 400(already exists)になるため PATCH で上書きする。
  * data.slug(文字列)が必須。返すのは生成した contentId。
+ * contentIdOverride は既存下書きの更新時だけ指定し、data.slug とは独立して扱う。
  */
 export async function createDraft(
   endpoint: string,
   data: Record<string, unknown>,
-  options: ContentApiOptions
+  options: ContentApiOptions,
+  contentIdOverride?: string
 ): Promise<string> {
   const slug = data.slug;
   if (typeof slug !== "string" || slug.trim() === "") {
     throw new Error("冪等な作成には文字列の slug が必要です。");
   }
-  const id = slugToContentId(slug);
+  if (
+    contentIdOverride !== undefined &&
+    (contentIdOverride === "" || slugToContentId(contentIdOverride) !== contentIdOverride)
+  ) {
+    throw new Error(`更新先contentIdが不正です: ${contentIdOverride}`);
+  }
+  const id = contentIdOverride ?? slugToContentId(slug);
   const url = `${contentUrl(options.serviceDomain, endpoint, id)}?status=draft`;
 
   try {

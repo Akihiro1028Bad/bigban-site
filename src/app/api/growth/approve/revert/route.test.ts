@@ -24,13 +24,14 @@ function postRequest(token: string | null, body: unknown): Request {
   return new Request(url, { method: "POST", body: JSON.stringify(body) });
 }
 
-function page(status: string, contentId = "art_abc") {
+function page(status: string, contentId = "art_abc", hasSourceLedger = true) {
   return {
     id: PAGE_ID,
     url: "",
     properties: {
       "ステータス": { select: { name: status } },
       "下書きID": { rich_text: [{ plain_text: contentId }] },
+      ...(hasSourceLedger ? { "根拠台帳": { rich_text: [{ plain_text: "旧台帳" }] } } : {}),
     },
   };
 }
@@ -48,7 +49,7 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/approve/revert", () => {
-  it("下書き作成済みを提案中に戻し、下書きリンクを空にして 200", async () => {
+  it("下書き作成済みを提案中に戻し、下書きリンクと前回生成物を空にして 200", async () => {
     vi.mocked(getPage).mockResolvedValue(page("下書き作成済み"));
     vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
 
@@ -61,7 +62,23 @@ describe("POST /api/growth/approve/revert", () => {
       "ステータス": { select: { name: "提案中" } },
       "下書きID": { rich_text: [] },
       "下書きプレビューキー": { rich_text: [] },
+      "下書き本文HTML": { rich_text: [] },
+      "アイキャッチURL": { url: null },
+      "根拠台帳": { rich_text: [] },
+      "再生成元下書きID": { rich_text: [{ text: { content: "art_abc" } }] },
     });
+  });
+
+  it("根拠台帳プロパティ未追加でも台帳以外をクリアして 200", async () => {
+    vi.mocked(getPage).mockResolvedValue(page("下書き作成済み", "art_abc", false));
+    vi.mocked(updatePageProps).mockResolvedValue(PAGE_ID);
+
+    const res = await POST(postRequest(null, { pageId: PAGE_ID }));
+
+    expect(res.status).toBe(200);
+    const props = vi.mocked(updatePageProps).mock.calls[0][1];
+    expect(props["根拠台帳"]).toBeUndefined();
+    expect(props["下書き本文HTML"]).toEqual({ rich_text: [] });
   });
 
   it("生成中の記事は 409 で弾く(#H9)", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildSourceLedgerProps,
+  hasReferenceEligibleSource,
   parseSourceLedger,
   renderSourceLedgerText,
   SOURCE_LEDGER_PROP,
@@ -14,6 +15,7 @@ const validEntry: SourceLedgerEntry = {
   sourceType: "search-result",
   source: "https://example.com/report",
   publishedYear: 2024,
+  referenceEligible: true,
   confidence: "high",
   usableInArticle: true,
   reason: "公式レポートの数値を引用",
@@ -69,7 +71,7 @@ describe("renderSourceLedgerText", () => {
   it("1行1エントリのパイプ区切りへ整形する", () => {
     const text = renderSourceLedgerText([validEntry]);
     expect(text).toBe(
-      "ピックルボールは全世界で急成長している | search-result | https://example.com/report | 2024 | high | true | 公式レポートの数値を引用"
+      "ピックルボールは全世界で急成長している | search-result | https://example.com/report | 2024 | true | high | true | 公式レポートの数値を引用"
     );
   });
 
@@ -80,6 +82,13 @@ describe("renderSourceLedgerText", () => {
     expect(text).toContain(" | - | ");
   });
 
+  it("referenceEligible欠落時はfalseで表示する", () => {
+    const { referenceEligible, ...legacyEntry } = validEntry;
+    void referenceEligible;
+
+    expect(renderSourceLedgerText([legacyEntry])).toContain(" | 2024 | false | high | ");
+  });
+
   it("複数エントリを改行で連結する", () => {
     const text = renderSourceLedgerText([validEntry, validEntry]);
     expect(text.split("\n")).toHaveLength(2);
@@ -87,6 +96,32 @@ describe("renderSourceLedgerText", () => {
 
   it("空配列は空文字を返す", () => {
     expect(renderSourceLedgerText([])).toBe("");
+  });
+});
+
+describe("hasReferenceEligibleSource", () => {
+  it("使用可能な外部ソースで参考資料対象が明示されていれば true", () => {
+    expect(hasReferenceEligibleSource([validEntry])).toBe(true);
+  });
+
+  it("発行年があっても一般的な主張は参考資料の根拠にしない", () => {
+    expect(hasReferenceEligibleSource([{ ...validEntry, referenceEligible: false }])).toBe(false);
+  });
+
+  it("発行年がない健康関連の主張でも参考資料対象なら true", () => {
+    expect(
+      hasReferenceEligibleSource([
+        { ...validEntry, publishedYear: undefined, referenceEligible: true },
+      ])
+    ).toBe(true);
+  });
+
+  it("未使用・施設情報・対象未指定は参考資料の根拠にしない", () => {
+    expect(hasReferenceEligibleSource([{ ...validEntry, usableInArticle: false }])).toBe(false);
+    expect(hasReferenceEligibleSource([{ ...validEntry, sourceType: "facility-context" }])).toBe(false);
+    const { referenceEligible, ...legacyEntry } = validEntry;
+    void referenceEligible;
+    expect(hasReferenceEligibleSource([legacyEntry])).toBe(false);
   });
 });
 
