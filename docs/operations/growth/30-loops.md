@@ -49,7 +49,7 @@ Codex 工程は既定で `danger-full-access`。制限したい環境だけ `GRO
 - 承認画面の下書きプレビューに「スタイリング・アドバイス」カード(`AdviceCard.tsx`)。
 - 「アドバイスを依頼」→ `/api/growth/advise` が Notion に依頼記録(依頼中)。
 - PC の `npm run growth:advise-loop`(`run.mjs advise`)が headless agent で本文(Notion ミラー `下書き本文HTML` #95 を読む・本文は送らない)を style-guide §11/§14/§15/§4/§12/§9 に照らして分析 → `growth:advise present <pageId> <jsonファイル>` が**アドバイスJSONを zod 検証**して Notion `アドバイス結果` に書く(提示中)＋LINE通知。
-- 承認画面は `/api/growth/draft` GET(`adviceViewOf` で advice も返す)で取得し、総評／観点別スコア／強み／直すべき点(引用＋理由＋修正案)を表示。「閉じる」=`/api/growth/advise/dismiss`。
+- 承認画面は `/api/growth/draft` GET(`adviceViewOf` で advice も返す)で取得し、総評／強み／直すべき点(引用＋理由＋修正案)を表示。主観的な点数は付けない。「閉じる」=`/api/growth/advise/dismiss`。
 - **read-only**: 本文・下書き・microCMS には一切書き込まない(書込先は Notion のみ・強権キー不要)。
 - 純ロジック `scripts/growth/advise.ts`(`AdviceSchema`/`parseAdvice`(安全側 null)/`serializeAdvice`/`adviceViewOf`/`adviceRowFromPage` 等・`src/lib/growth/advise.ts` 再エクスポート)、CLI/run.mjs はカバレッジ除外。
 - #128 `draftQuality.ts`(機械的○×)の**補完**(理由・改善案レイヤー)であり置換ではない。
