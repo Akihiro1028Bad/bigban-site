@@ -71,10 +71,12 @@ import {
 } from "./notify-throttle";
 import {
   buildSourceLedgerProps,
+  confirmedFactsFromEntries,
   hasReferenceEligibleSource,
   parseSourceLedger,
   updatePagePropsWithLedgerFallback,
 } from "./sourceLedger";
+import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
 import { runStages, type Stage } from "./pipeline";
 import {
   buildRebuildSourceClearProps,
@@ -82,7 +84,6 @@ import {
   rebuildSourceIdOf,
   validatedRebuildSourceId,
 } from "./rebuildDraft";
-import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
 import { evaluatePublishGate, resolveGateArticleType } from "./publishGate";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -203,23 +204,23 @@ async function main(): Promise<void> {
   const parsedLedger = parseSourceLedger(spec.sourceLedger);
   let rebuildSourceId = "";
 
-  // 構成案ゲート: Notion連携のある通常フローでは、投入直前に現在の構成案を読み直す。
-  // 取得失敗・空・本文との不一致は安全側で停止する。notion無しの手動specは後方互換でスキップ。
+  // Notion連携のある通常フローでは、承認済み構成案と再生成元情報を投入前に読み直す。
+  // notion無しの手動specは後方互換でスキップする。
   if (spec.notion) {
     stages.push({
-      name: "outline-gate",
+      name: "notion-context",
       run: async () => {
         const page = await getPage(spec.notion!.pageId, {
           token: requireEnv("NOTION_TOKEN"),
           fetchFn: defaultFetch,
         });
-        const gate = evaluateOutlineCompliance(
+        const outlineGate = evaluateOutlineCompliance(
           outlineFromPage(page),
           String(spec.payload.bodyHtml ?? ""),
           { allowGeneratedReferences: hasReferenceEligibleSource(parsedLedger.entries) }
         );
-        if (!gate.ok) {
-          throw new Error(`構成案ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);
+        if (!outlineGate.ok) {
+          throw new Error(`構成案ゲート不合格(投入中断): ${outlineGate.blockReasons.join(" / ")}`);
         }
         rebuildSourceId = validatedRebuildSourceId(rebuildSourceIdOf(page)) ?? "";
         if (rebuildSourceId !== "") {
@@ -250,7 +251,7 @@ async function main(): Promise<void> {
 
   // 品質ゲート(P1-B 案B): 投入前に draftQuality の block を判定し、1つでもあれば中断する。
   // 画像生成や microCMS 投入の前に止めることで、不合格の下書きを作らず API 課金も無駄にしない。
-  // block 例: §5 AI免責文欠落 / §13 doNotWrite の断定 / §15 壊れ内部リンク。
+  // block 例: §5 AI免責文欠落 / 明確な禁止表現 / 危険HTML / §15 壊れ内部リンク。
   // slug 取得失敗時はリンク検査だけを従来動作にフォールバックし、投入自体は止めない。
   // gate 不合格の失敗は既存の failedAt 経路で LINE 通知される。
   stages.push({
@@ -274,6 +275,7 @@ async function main(): Promise<void> {
         title: String(spec.payload.title ?? ""),
         articleType: resolveGateArticleType(spec.payload),
         knownNewsPaths,
+        confirmedFacts: confirmedFactsFromEntries(parsedLedger.entries),
       });
       if (!gate.ok) {
         throw new Error(`品質ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);

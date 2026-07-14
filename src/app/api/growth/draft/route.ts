@@ -30,6 +30,7 @@ import { decorateViewOf } from "@/lib/growth/decorate";
 import { regenViewOf } from "@/lib/growth/eyecatchRegen";
 import { knownArticlePathsForMedia } from "@/lib/growth/knownArticlePaths";
 import { defaultFetch, getPage } from "@/lib/growth/notion";
+import { confirmedFactsFromPage } from "@/lib/growth/sourceLedger";
 import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 
@@ -88,6 +89,7 @@ export async function GET(request: Request): Promise<Response> {
         displayMode: "html",
         bodyHtml,
         body: "",
+        confirmedFacts: confirmedFactsFromPage(page),
         // #H19: 既知の公開記事リンクパス(壊れ内部リンク検査用・取得不可なら未設定)。
         knownNewsPaths,
         // #141: アイキャッチURLミラー(未設定は空文字)。プレビューが画像表示に使う。

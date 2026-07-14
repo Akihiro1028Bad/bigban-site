@@ -19,6 +19,7 @@ export interface ArticleEvalInput {
   title: string;
   articleType?: ArticleType;
   knownNewsPaths?: ReadonlySet<string>;
+  confirmedFacts?: readonly string[];
 }
 
 export interface ArticleScore {
@@ -50,6 +51,7 @@ export function scoreArticle(input: ArticleEvalInput): ArticleScore {
     title: input.title,
     articleType: input.articleType,
     knownNewsPaths: input.knownNewsPaths,
+    confirmedFacts: input.confirmedFacts,
   });
   const block = checks.filter((c) => c.level === "block").length;
   const warn = checks.filter((c) => c.level === "warn").length;

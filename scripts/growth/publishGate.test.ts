@@ -28,22 +28,34 @@ describe("evaluatePublishGate", () => {
     expect(result.blockReasons.some((r) => r.includes("AI免責文"))).toBe(true);
   });
 
-  it("§13 の断定NG(料金)があれば block(理由に『断定NG』を含む)", () => {
+  it("公式料金・徒歩分数・長い承認済みタイトルは gate を通る", () => {
     const result = evaluatePublishGate({
-      title: "料金の話",
-      bodyHtml: `<p>1時間2,000円で遊べます。${DISCLAIMER}</p>`,
+      title: "ピックルボール、市川市でどこでできる？場所の選び方ガイド【体育館・クラブ・屋内専用施設】",
+      bodyHtml: `<h2>市民体育館</h2><p>一般230円・市外690円です。</p><h2>屋内専用施設</h2><p>本八幡駅から徒歩3分です。${DISCLAIMER}</p>`,
     });
-    expect(result.ok).toBe(false);
-    expect(result.blockReasons.some((r) => r.includes("断定NG"))).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.blockReasons).toEqual([]);
+  });
+
+  it("公式確認済みのイベント日時はwarnに留め、未確認ならblockする", () => {
+    const bodyHtml = `<h2>体験会</h2><p>体験会は7月20日に開催します。${DISCLAIMER}</p>`;
+    expect(evaluatePublishGate({ title: "体験会", bodyHtml }).ok).toBe(false);
+    expect(
+      evaluatePublishGate({
+        title: "体験会",
+        bodyHtml,
+        confirmedFacts: ["体験会は7月20日に開催します"],
+      }).ok
+    ).toBe(true);
   });
 
   it("複数の block を理由としてまとめて返す", () => {
     const result = evaluatePublishGate({
-      title: "営業時間と料金",
-      bodyHtml: `<p>営業時間は9時から。月額8,000円です。</p>`,
+      title: "禁止表現",
+      bodyHtml: `<script>alert(1)</script><p>24時間営業です。</p>`,
     });
     expect(result.ok).toBe(false);
-    // 免責文欠落 + 断定NG の2系統
+    // 免責文欠落 + 禁止表現 + HTML安全性
     expect(result.blockReasons.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -75,13 +87,13 @@ describe("evaluatePublishGate", () => {
     expect(result.blockReasons).toEqual([]);
   });
 
-  it("#218レビュー対応: 未確定の「徒歩5分」は gate でも従来どおり block(委譲の回帰確認)", () => {
+  it("徒歩5分は要出典 warn のため gate を止めない", () => {
     const result = evaluatePublishGate({
       title: "アクセスの話",
       bodyHtml: `<p>最寄り駅から徒歩5分ほどです。${DISCLAIMER}</p>`,
     });
-    expect(result.ok).toBe(false);
-    expect(result.blockReasons.some((r) => r.includes("断定NG"))).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.blockReasons).toEqual([]);
   });
 
   it("styleLint の文体注意 warn は blockReasons に入らない", () => {
@@ -139,7 +151,7 @@ describe("evaluateRegate", () => {
     });
     expect(result.ok).toBe(false);
     expect(result.newBlocks.some((r) => r.includes("AI免責文"))).toBe(true);
-    expect(result.newBlocks.some((r) => r.includes("断定NG"))).toBe(false);
+    expect(result.newBlocks.some((r) => r.includes("禁止表現"))).toBe(false);
   });
 
   it("既存 block だけなら ok=true", () => {

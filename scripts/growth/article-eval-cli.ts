@@ -11,11 +11,13 @@
 import { readFileSync } from "node:fs";
 
 import { compareArticles, type ArticleEvalInput } from "./articleEval";
+import { confirmedFactsFromEntries, parseSourceLedger } from "./sourceLedger";
 
 interface MaybeSpec {
   title?: unknown;
   bodyHtml?: unknown;
   payload?: { title?: unknown; bodyHtml?: unknown };
+  sourceLedger?: unknown;
 }
 
 function loadInput(file: string): ArticleEvalInput {
@@ -24,6 +26,7 @@ function loadInput(file: string): ArticleEvalInput {
   return {
     title: String(src.title ?? ""),
     bodyHtml: String(src.bodyHtml ?? ""),
+    confirmedFacts: confirmedFactsFromEntries(parseSourceLedger(raw.sourceLedger).entries),
   };
 }
 

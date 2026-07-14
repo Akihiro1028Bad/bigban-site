@@ -30,6 +30,8 @@ export interface DraftPreview {
   bodyComment?: BodyCommentView;
   // #H19: 既知の公開記事リンクパス(/ja/news/<slug>)。壊れ内部リンク検査に使う(取得不可なら未設定)。
   knownNewsPaths?: readonly string[];
+  // 確認済み情報源リストから復元した、可変情報のblock解除に使う事実。
+  confirmedFacts?: readonly string[];
 }
 
 // #75: 下書きプレビューの取得状態。

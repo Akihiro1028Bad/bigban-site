@@ -30,6 +30,7 @@ import { REGEN_BUSY_STATUSES, regenRowFromPage } from "@/lib/growth/eyecatchRege
 import { knownArticlePathsForMedia } from "@/lib/growth/knownArticlePaths";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 import { publishGateReason, resolveGateArticleType } from "@/lib/growth/publishGate";
+import { confirmedFactsFromPage } from "@/lib/growth/sourceLedger";
 import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 
@@ -147,7 +148,8 @@ export async function POST(request: Request): Promise<Response> {
       rawBody,
       ideaTitleOf(page).trim(),
       resolveGateArticleType({}),
-      knownNewsPaths
+      knownNewsPaths,
+      confirmedFactsFromPage(page)
     );
     if (gateReason) {
       return NextResponse.json(
