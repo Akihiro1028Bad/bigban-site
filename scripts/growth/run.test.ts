@@ -82,19 +82,21 @@ function runLockedModeWithStubs(options: {
   stateDir?: string;
   peekCount?: number;
   lockPid?: number;
+  claimPageId?: string;
 }) {
   const mode = options.mode ?? "revise";
   const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-loop-bin-"));
   const stateDir = options.stateDir ?? path.join(binDir, "state");
   const callLog = path.join(binDir, "calls.log");
   const settledCount = path.join(binDir, "settled-count");
+  const promptLog = path.join(binDir, "prompt.log");
   const codexPath = path.join(binDir, "codex");
   const npmPath = path.join(binDir, "npm");
   if (options.lockPid !== undefined) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(path.join(stateDir, "revise.lock"), String(options.lockPid));
   }
-  writeFileSync(codexPath, `#!/bin/sh\necho codex >> "${callLog}"\ncat >/dev/null\nexit 0\n`, {
+  writeFileSync(codexPath, `#!/bin/sh\necho codex >> "${callLog}"\ncat > "${promptLog}"\nexit 0\n`, {
     mode: 0o755,
   });
   writeFileSync(
@@ -104,6 +106,7 @@ echo "npm $*" >> "${callLog}"
 case "$*" in
   *"-- reap"*) exit ${options.reapExitCode ?? 0} ;;
   *"-- peek"*) echo ${options.peekCount ?? 1}; exit 0 ;;
+  *"-- claim"*) echo ${options.claimPageId ?? "page-1"}; exit 0 ;;
   *"growth:loop-state -- assert-settled"*)
     count=$(cat "${settledCount}" 2>/dev/null || echo 0)
     count=$((count + 1))
@@ -134,7 +137,12 @@ esac
     },
     encoding: "utf-8",
   });
-  return { result, calls: execFileSync("cat", [callLog], { encoding: "utf-8" }), stateDir };
+  return {
+    result,
+    calls: execFileSync("cat", [callLog], { encoding: "utf-8" }),
+    prompt: existsSync(promptLog) ? readFileSync(promptLog, "utf-8") : "",
+    stateDir,
+  };
 }
 
 describe("run.mjs dry-run の --model(#247)", () => {
@@ -174,6 +182,16 @@ describe("run.mjs dry-run の --model(#247)", () => {
 
   it("weekly は learning-log:recent を allowedTools に含む", () => {
     expect(dryRun("weekly", { GROWTH_AGENT: "claude" })).toContain("growth:learning-log:recent");
+  });
+
+  it.each(["drafts", "drafts-auto"])("%s は単一Claude執筆のため Task を許可しない", (mode) => {
+    const out = dryRun(mode, { GROWTH_AGENT: "claude" });
+    expect(out).toContain("--allowedTools");
+    expect(out).not.toMatch(/--allowedTools .*\bTask\b/);
+  });
+
+  it("weekly は並列分析のため Task を引き続き許可する", () => {
+    expect(dryRun("weekly", { GROWTH_AGENT: "claude" })).toMatch(/--allowedTools .*\bTask\b/);
   });
 
   it("画像プロンプト設計は既定で Codex GPT-5.6 Sol / high を使う", () => {
@@ -309,6 +327,18 @@ describe("run.mjs pull 型ループの回収と完了確認", () => {
     expect(result.status).toBe(0);
     expect(calls).toContain(`${peekScript} -- peek`);
     expect(calls).not.toContain("codex");
+  });
+
+  it("drafts-auto は1件をclaimし、そのpageIdだけをClaudeへ渡す", () => {
+    const { result, calls, prompt } = runLockedModeWithStubs({
+      mode: "drafts-auto",
+      claimPageId: "page-claimed",
+    });
+
+    expect(result.status).toBe(0);
+    expect(calls).toContain("growth:drafts-auto-peek -- claim");
+    expect(calls.indexOf("-- claim")).toBeLessThan(calls.indexOf("codex"));
+    expect(prompt).toContain('<draft_target page_id="page-claimed"');
   });
 });
 

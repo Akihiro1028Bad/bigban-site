@@ -178,16 +178,16 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 承認済みの記事ネタ案を、コンテンツ+画像チームで microCMS 下書きにする。週次モードとは独立に、**人間が承認した直後に実行できる**(承認の即時反映)。
 
 ### 手順
-0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として全執筆エージェントに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
-1. 「記事ネタ案」DB から `ステータス = 承認` の行をすべて取得(無ければ「承認済みなし」と報告して終了)
-2. 各案を **コンテンツ作成チーム** で執筆
+0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として同じClaudeプロセスに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
+1. 1回の実行では対象を1件だけclaimする。H2/H3を含む有効な構成案がある中断中の `生成中` を優先し、無ければ `ステータス = 承認` を1件取得する(無ければ「承認済みなし」と報告して終了)。構成不備の行は自動対象から除外するため、後続記事を止めない。`drafts-auto` は決定的CLIが先にpageIdを固定し、複数記事を同じClaudeセッションへ渡さない
+2. 各案を、同じClaudeプロセスが情報収集から本文まで1パスで執筆
 3. **投入スペックをステージ**: 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction:"pending", imagePath, images[], notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。**構成案に画像指示 `[画像:<スタイル>: <説明>]` または `[画像:<スタイル>: <説明> | 文字: <textSpec>]` があれば**、本文HTMLの該当箇所に `{{IMG:1}}`(以降連番)を置き、`images:[{index,style,description,textSpec?}]` を入れる。`[画像:なし]` は画像なし指定として扱う(上限3枚・超過はスキップ報告)
-4. **画像プロンプト設計→投入を同期実行**: 記事ごとに `npm run growth:image-prompt -- .growth-tmp/<slug>.json` を実行し、承認画面の「画像プロンプト設計」で選択したモデル(GPT-5.6 Sol既定)が画像関連フィールドだけを具体化する。検証済みsidecarだけが元specへ反映され、本文・Notion情報・根拠台帳は変更できない。成功後に `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。画像プロンプト設計が失敗した場合は投入しない。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
-5. **LINE 通知(下書き完了)**: 投入に成功した下書きを `[{"title":"...","contentId":"..."}, ...]` にして `npm run growth:notify-drafts -- <json>` を実行。各 contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへまとめて通知(draftKey が取れない記事はURLなしでフォールバック)。**1件以上成功時のみ**実行。`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
+4. **画像プロンプト設計→投入を同期実行**: 記事ごとに `npm run growth:image-prompt -- .growth-tmp/<slug>.json` を実行し、承認画面の「画像プロンプト設計」で選択したモデル(GPT-5.6 Sol既定)が画像関連フィールドだけを具体化する。検証済みsidecarだけが元specへ反映され、本文・Notion情報・根拠台帳は変更できない。成功後に `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。投入直前にNotionの現在の構成案を再読込し、本文H2/H3の名前・レベル・順序が一致しなければ停止する。その後、スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。画像プロンプト設計が失敗した場合は投入しない。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
+5. **LINE 通知(下書き完了)**: 投入に成功した1件を `[{"title":"...","contentId":"..."}]` にして `npm run growth:notify-drafts -- <json>` を実行。contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへ通知(draftKey が取れない記事はURLなしでフォールバック)。成功時のみ実行し、`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
 
-**コンテンツ作成チームの工程**
+**本文生成の工程**
 
-執筆工程の正典は [scripts/growth/prompts/drafts.md](../../scripts/growth/prompts/drafts.md) の手順2(ブリーフ→根拠台帳→構成→執筆(1パス・執筆カード)→校閲→編集者ゲートの6工程)とする。**ここには工程を再掲しない**(過去に二重記載が片側だけ更新されるドリフト事故があったため。工程を変えるときは drafts.md だけを更新する)。文体・品質の正典は [growth-article-style.md](./growth-article-style.md)(§1 人格(ガイド調) / §11 ルブリック / §14 執筆5原則)。
+執筆工程の正典は [scripts/growth/prompts/drafts.md](../../scripts/growth/prompts/drafts.md) とする。必要な重要事実を公式ページで確認し、同じClaudeプロセスが承認済み構成に沿って本文とspecを1パス生成する。別AI校閲・主観採点・自動全文リライトは行わない。安全性は [growth-article-style.md](./growth-article-style.md) §11 の決定的ゲートと承認画面での人手確認で担保する。
 
 **画像チームの工程**(プロのデザイナー・写真家・イラストレーターのチーム)
 

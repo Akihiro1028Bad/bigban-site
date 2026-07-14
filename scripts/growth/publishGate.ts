@@ -6,8 +6,8 @@
  * 承認画面UIが「公開」をブロックするのと同じ基準を、生成パイプライン(`publish-draft-cli.ts`)の
  * **投入前**にも適用し、不合格の下書きを黙って作らないようにする。
  *
- * block 例: §5 AI免責文の欠落 / §13 doNotWrite(未確定=料金・所要分)の断定 /
- *           §15 壊れた内部リンク(knownNewsPaths を渡したときのみ)。
+ * block 例: §5 AI免責文の欠落 / 明確な禁止表現 / 禁止HTML・危険属性 /
+ *           §15 壊れた内部リンク(knownNewsPaths を渡したときのみ)。料金・徒歩分数は warn。
  */
 
 import {
@@ -24,6 +24,7 @@ export interface PublishGateInput {
   articleType?: ArticleType;
   /** 既知の記事リンクパス。渡すと壊れた内部リンクを block にする。 */
   knownNewsPaths?: ReadonlySet<string>;
+  confirmedFacts?: readonly string[];
 }
 
 export interface PublishGateResult {
@@ -39,6 +40,7 @@ export interface RegateInput {
   title: string;
   articleType?: ArticleType;
   knownNewsPaths?: ReadonlySet<string>;
+  confirmedFacts?: readonly string[];
 }
 
 export interface RegateResult {
@@ -74,6 +76,7 @@ export function evaluatePublishGate(input: PublishGateInput): PublishGateResult 
     title: input.title,
     articleType: input.articleType,
     knownNewsPaths: input.knownNewsPaths,
+    confirmedFacts: input.confirmedFacts,
   });
   const blockReasons = checks
     .filter((c) => c.level === "block")
@@ -86,9 +89,10 @@ export function publishGateReason(
   bodyHtml: string,
   title: string,
   articleType?: ArticleType,
-  knownNewsPaths?: ReadonlySet<string>
+  knownNewsPaths?: ReadonlySet<string>,
+  confirmedFacts?: readonly string[]
 ): string | null {
-  const result = evaluatePublishGate({ bodyHtml, title, articleType, knownNewsPaths });
+  const result = evaluatePublishGate({ bodyHtml, title, articleType, knownNewsPaths, confirmedFacts });
   if (result.ok) return null;
   return result.blockReasons.join(" / ");
 }
@@ -103,12 +107,14 @@ export function evaluateRegate(input: RegateInput): RegateResult {
     title: input.title,
     articleType: input.articleType,
     knownNewsPaths: input.knownNewsPaths,
+    confirmedFacts: input.confirmedFacts,
   });
   const after = evaluatePublishGate({
     bodyHtml: input.after,
     title: input.title,
     articleType: input.articleType,
     knownNewsPaths: input.knownNewsPaths,
+    confirmedFacts: input.confirmedFacts,
   });
   const existing = new Set(before.blockReasons);
   const newBlocks = after.blockReasons.filter((reason) => !existing.has(reason));

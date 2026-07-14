@@ -1,5 +1,5 @@
 /**
- * 根拠台帳(source_ledger)の永続化ロジック(#根拠台帳)。
+ * 確認済み情報源リスト(sourceLedger)の永続化ロジック。
  *
  * 記事執筆時のリサーチ規律(drafts.md 手順2-2)で組んだ台帳を投入スペックに同梱し、
  * publish-draft が Notion 記事ネタ行のプロパティへ保存する(読者非公開・監査用)。
@@ -10,48 +10,43 @@
 
 import { z } from "zod";
 
-import { chunkRichText } from "./notion";
+import { chunkRichText, type NotionPage } from "./notion";
 
-/** 台帳の出典種別。executor が判断根拠として使う分類。 */
+/** 確認済み情報源の種別。旧specの search-result は再実行互換のため受理する。 */
 export const SOURCE_TYPES = [
   "facility-context",
+  "primary-note",
   "official-site",
   "search-result",
-  "not-used",
 ] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
-
-/** 出典の確からしさ(執筆AIの自己申告)。 */
-export const CONFIDENCES = ["high", "medium", "low"] as const;
-export type Confidence = (typeof CONFIDENCES)[number];
 
 /** Notion に保存する台帳プロパティ名(rich_text・任意・publish-draft が自動書き込み)。 */
 export const SOURCE_LEDGER_PROP = "根拠台帳";
 
 const entrySchema = z.object({
-  claim: z.string().min(1),
   sourceType: z.enum(SOURCE_TYPES),
   source: z.string().min(1),
-  /** 発行年。統計・数値主張は必須だがスキーマ上は任意(プロンプト規律で担保)。 */
-  publishedYear: z.number().int().optional(),
-  /** §15の参考資料欄の対象となる統計・数値・健康関連の主張か。旧specでは安全側で未指定。 */
-  referenceEligible: z.boolean().optional(),
-  confidence: z.enum(CONFIDENCES),
-  usableInArticle: z.boolean(),
-  reason: z.string().min(1),
+  confirmedFacts: z.array(z.string().min(1)).min(1),
 });
 
 export type SourceLedgerEntry = z.infer<typeof entrySchema>;
 
-/** §15の参考資料欄に使える、対象区分が明示された使用可能な外部根拠があるか。 */
+const legacyEntrySchema = z.object({
+  claim: z.string().min(1),
+  sourceType: z.enum(["facility-context", "official-site", "search-result", "not-used"]),
+  source: z.string().min(1),
+  confidence: z.enum(["high", "medium", "low"]),
+  usableInArticle: z.boolean(),
+});
+
+/** 参考資料見出しを許可できる、確認済みの外部情報源があるか。 */
 export function hasReferenceEligibleSource(
   entries: readonly SourceLedgerEntry[]
 ): boolean {
   return entries.some(
     (entry) =>
-      entry.usableInArticle &&
-      (entry.sourceType === "official-site" || entry.sourceType === "search-result") &&
-      entry.referenceEligible === true
+      entry.sourceType === "official-site" || entry.sourceType === "search-result"
   );
 }
 
@@ -60,6 +55,32 @@ export interface ParseSourceLedgerResult {
   entries: SourceLedgerEntry[];
   /** 除外・無視した項目の理由(沈黙させない #24。CLI が報告に出す)。 */
   warnings: string[];
+}
+
+/** 情報源単位のリストから、品質ゲートへ渡す確認済み事実だけを重複なく取り出す。 */
+export function confirmedFactsFromEntries(
+  entries: readonly SourceLedgerEntry[]
+): string[] {
+  return [...new Set(entries.flatMap((entry) => entry.confirmedFacts))];
+}
+
+/** Notionへ保存した1行1情報源の表示テキストから確認済み事実を復元する。 */
+export function confirmedFactsFromRenderedText(value: string): string[] {
+  const facts = value.split("\n").flatMap((line) => {
+    const parts = line.split(" | ");
+    if (parts.length < 3) return [];
+    return parts.slice(2).join(" | ").split("／").map((fact) => fact.trim()).filter(Boolean);
+  });
+  return [...new Set(facts)];
+}
+
+/** Notionページの分割rich_textに保存された確認済み事実を返す。 */
+export function confirmedFactsFromPage(page: NotionPage): string[] {
+  const value = page.properties[SOURCE_LEDGER_PROP] as
+    | { rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  const text = (value?.rich_text ?? []).map((part) => part.plain_text ?? "").join("");
+  return confirmedFactsFromRenderedText(text);
 }
 
 /**
@@ -80,12 +101,29 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
     };
   }
 
-  const entries: SourceLedgerEntry[] = [];
+  const parsedEntries: SourceLedgerEntry[] = [];
   const warnings: string[] = [];
   value.forEach((item, index) => {
     const result = entrySchema.safeParse(item);
     if (result.success) {
-      entries.push(result.data);
+      parsedEntries.push(result.data);
+      return;
+    }
+    const legacy = legacyEntrySchema.safeParse(item);
+    if (legacy.success) {
+      if (
+        legacy.data.sourceType === "not-used" ||
+        !legacy.data.usableInArticle ||
+        legacy.data.confidence === "low"
+      ) {
+        warnings.push(`${SOURCE_LEDGER_PROP}[${index}]: 未使用または低確度の旧項目を除外しました。`);
+        return;
+      }
+      parsedEntries.push({
+        sourceType: legacy.data.sourceType,
+        source: legacy.data.source,
+        confirmedFacts: [legacy.data.claim],
+      });
       return;
     }
     const reason = result.error.issues.map((issue) => issue.message).join(", ");
@@ -93,21 +131,23 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
       `${SOURCE_LEDGER_PROP}[${index}]: 不正な項目のため除外しました (${reason})。`
     );
   });
-  return { entries, warnings };
+  const grouped = new Map<string, SourceLedgerEntry>();
+  for (const entry of parsedEntries) {
+    const key = `${entry.sourceType}\u0000${entry.source}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...entry, confirmedFacts: [...entry.confirmedFacts] });
+      continue;
+    }
+    for (const fact of entry.confirmedFacts) {
+      if (!existing.confirmedFacts.includes(fact)) existing.confirmedFacts.push(fact);
+    }
+  }
+  return { entries: [...grouped.values()], warnings };
 }
 
 function renderEntry(entry: SourceLedgerEntry): string {
-  const year = entry.publishedYear === undefined ? "-" : String(entry.publishedYear);
-  return [
-    entry.claim,
-    entry.sourceType,
-    entry.source,
-    year,
-    String(entry.referenceEligible ?? false),
-    entry.confidence,
-    String(entry.usableInArticle),
-    entry.reason,
-  ].join(" | ");
+  return [entry.sourceType, entry.source, entry.confirmedFacts.join("／")].join(" | ");
 }
 
 /**

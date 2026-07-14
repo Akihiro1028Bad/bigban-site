@@ -9,9 +9,14 @@
 
 import "dotenv/config";
 
-import { countDraftsAutoTargets, draftsAutoQueryFilter } from "./draftsAuto";
+import {
+  countDraftsAutoTargets,
+  draftsAutoQueryFilter,
+  DRAFTS_AUTO_STATUS_PROP,
+  selectDraftsAutoTarget,
+} from "./draftsAuto";
 import { defaultFetch } from "./http";
-import { queryDataSource, type NotionApiOptions } from "./notion";
+import { queryDataSource, updatePageSelect, type NotionApiOptions } from "./notion";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 
@@ -34,12 +39,37 @@ async function peek(options: NotionApiOptions): Promise<void> {
   process.stdout.write(`${countDraftsAutoTargets(pages)}\n`);
 }
 
+async function claim(options: NotionApiOptions): Promise<void> {
+  const { pages } = await queryDataSource(
+    IDEA_DS,
+    { filter: draftsAutoQueryFilter(), pageSize: 100 },
+    options
+  );
+  const target = selectDraftsAutoTarget(pages);
+  if (!target) {
+    process.stdout.write("\n");
+    return;
+  }
+  const status = target.properties[DRAFTS_AUTO_STATUS_PROP] as
+    | { select?: { name?: string } | null }
+    | undefined;
+  if (status?.select?.name === "承認") {
+    await updatePageSelect(target.id, DRAFTS_AUTO_STATUS_PROP, "生成中", options);
+  }
+  process.stdout.write(`${target.id}\n`);
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "peek";
-  if (command !== "peek") {
-    throw new Error("使い方: drafts-auto-cli peek");
+  if (command === "peek") {
+    await peek(notionOptions());
+    return;
   }
-  await peek(notionOptions());
+  if (command === "claim") {
+    await claim(notionOptions());
+    return;
+  }
+  throw new Error("使い方: drafts-auto-cli <peek|claim>");
 }
 
 main().catch((error: unknown) => {

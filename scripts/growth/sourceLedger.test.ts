@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildSourceLedgerProps,
+  confirmedFactsFromEntries,
+  confirmedFactsFromPage,
+  confirmedFactsFromRenderedText,
   hasReferenceEligibleSource,
   parseSourceLedger,
   renderSourceLedgerText,
@@ -11,6 +14,12 @@ import {
 } from "./sourceLedger";
 
 const validEntry: SourceLedgerEntry = {
+  sourceType: "official-site",
+  source: "https://example.com/report",
+  confirmedFacts: ["2024年の公式レポートで競技人口を公表"],
+};
+
+const legacyEntry = {
   claim: "ピックルボールは全世界で急成長している",
   sourceType: "search-result",
   source: "https://example.com/report",
@@ -43,16 +52,44 @@ describe("parseSourceLedger", () => {
     expect(result.warnings).toEqual([]);
   });
 
-  it("publishedYear 省略でも任意なので受理する", () => {
-    const { publishedYear, ...withoutYear } = validEntry;
-    void publishedYear;
-    const result = parseSourceLedger([withoutYear]);
-    expect(result.entries).toEqual([withoutYear]);
+  it("同じ情報源の確認済み事実を1件へ集約する", () => {
+    const result = parseSourceLedger([
+      validEntry,
+      { ...validEntry, confirmedFacts: ["料金は一般230円"] },
+      { ...validEntry, confirmedFacts: ["料金は一般230円"] },
+    ]);
+    expect(result.entries).toEqual([
+      {
+        ...validEntry,
+        confirmedFacts: ["2024年の公式レポートで競技人口を公表", "料金は一般230円"],
+      },
+    ]);
     expect(result.warnings).toEqual([]);
   });
 
+  it("旧claim形式は確認済み情報源形式へ変換して再実行互換を保つ", () => {
+    const result = parseSourceLedger([legacyEntry]);
+    expect(result.entries).toEqual([
+      {
+        sourceType: "search-result",
+        source: legacyEntry.source,
+        confirmedFacts: [legacyEntry.claim],
+      },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("旧形式の未使用・low項目は保存しない", () => {
+    const result = parseSourceLedger([
+      { ...legacyEntry, usableInArticle: false },
+      { ...legacyEntry, confidence: "low" },
+    ]);
+    expect(result.entries).toEqual([]);
+    expect(result.warnings).toHaveLength(2);
+  });
+
   it("不正な項目は例外ではなく警告付きで除外し、正当な項目は残す", () => {
-    const broken = { ...validEntry, claim: "" };
+    const broken = { ...validEntry, confirmedFacts: [] };
     const result = parseSourceLedger([broken, validEntry]);
     expect(result.entries).toEqual([validEntry]);
     expect(result.warnings).toHaveLength(1);
@@ -67,26 +104,64 @@ describe("parseSourceLedger", () => {
   });
 });
 
+describe("confirmedFactsFromEntries", () => {
+  it("全情報源の確認済み事実を重複なく平坦化する", () => {
+    expect(
+      confirmedFactsFromEntries([
+        validEntry,
+        { ...validEntry, source: "https://example.com/other", confirmedFacts: [validEntry.confirmedFacts[0], "体験会は7月20日に開催します"] },
+      ])
+    ).toEqual(["2024年の公式レポートで競技人口を公表", "体験会は7月20日に開催します"]);
+  });
+
+  it("Notion保存済みテキストから確認済み事実を復元し、不正行は無視する", () => {
+    expect(
+      confirmedFactsFromRenderedText(
+        "official-site | https://example.com | 体験会は7月20日に開催します／参加費は500円\n不正行"
+      )
+    ).toEqual(["体験会は7月20日に開催します", "参加費は500円"]);
+  });
+
+  it("Notionページの分割された根拠台帳から確認済み事実を返す", () => {
+    expect(
+      confirmedFactsFromPage({
+        id: "page-1",
+        url: "",
+        properties: {
+          根拠台帳: {
+            rich_text: [
+              { plain_text: "official-site | https://example.com | 体験会は" },
+              { plain_text: "7月20日に開催します" },
+            ],
+          },
+        },
+      })
+    ).toEqual(["体験会は7月20日に開催します"]);
+    expect(confirmedFactsFromPage({ id: "page-2", url: "", properties: {} })).toEqual([]);
+    expect(
+      confirmedFactsFromPage({
+        id: "page-3",
+        url: "",
+        properties: { 根拠台帳: { rich_text: [{}] } },
+      })
+    ).toEqual([]);
+  });
+});
+
 describe("renderSourceLedgerText", () => {
-  it("1行1エントリのパイプ区切りへ整形する", () => {
+  it("1行1情報源の読みやすい形式へ整形する", () => {
     const text = renderSourceLedgerText([validEntry]);
     expect(text).toBe(
-      "ピックルボールは全世界で急成長している | search-result | https://example.com/report | 2024 | true | high | true | 公式レポートの数値を引用"
+      "official-site | https://example.com/report | 2024年の公式レポートで競技人口を公表"
     );
   });
 
-  it("publishedYear 欠落時は年を - で埋める", () => {
-    const { publishedYear, ...withoutYear } = validEntry;
-    void publishedYear;
-    const text = renderSourceLedgerText([withoutYear]);
-    expect(text).toContain(" | - | ");
-  });
-
-  it("referenceEligible欠落時はfalseで表示する", () => {
-    const { referenceEligible, ...legacyEntry } = validEntry;
-    void referenceEligible;
-
-    expect(renderSourceLedgerText([legacyEntry])).toContain(" | 2024 | false | high | ");
+  it("同じ情報源の複数事実は読点で連結する", () => {
+    expect(
+      renderSourceLedgerText([
+        { ...validEntry, confirmedFacts: ["一般230円", "市外690円"] },
+      ])
+    ).toBe("official-site | https://example.com/report | 一般230円／市外690円");
   });
 
   it("複数エントリを改行で連結する", () => {
@@ -100,28 +175,12 @@ describe("renderSourceLedgerText", () => {
 });
 
 describe("hasReferenceEligibleSource", () => {
-  it("使用可能な外部ソースで参考資料対象が明示されていれば true", () => {
+  it("確認済みの公式外部ソースがあれば true", () => {
     expect(hasReferenceEligibleSource([validEntry])).toBe(true);
   });
 
-  it("発行年があっても一般的な主張は参考資料の根拠にしない", () => {
-    expect(hasReferenceEligibleSource([{ ...validEntry, referenceEligible: false }])).toBe(false);
-  });
-
-  it("発行年がない健康関連の主張でも参考資料対象なら true", () => {
-    expect(
-      hasReferenceEligibleSource([
-        { ...validEntry, publishedYear: undefined, referenceEligible: true },
-      ])
-    ).toBe(true);
-  });
-
-  it("未使用・施設情報・対象未指定は参考資料の根拠にしない", () => {
-    expect(hasReferenceEligibleSource([{ ...validEntry, usableInArticle: false }])).toBe(false);
+  it("施設コンテキストだけなら false", () => {
     expect(hasReferenceEligibleSource([{ ...validEntry, sourceType: "facility-context" }])).toBe(false);
-    const { referenceEligible, ...legacyEntry } = validEntry;
-    void referenceEligible;
-    expect(hasReferenceEligibleSource([legacyEntry])).toBe(false);
   });
 });
 
