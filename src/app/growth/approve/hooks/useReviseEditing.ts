@@ -9,7 +9,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
-import { OUTLINE_OVERALL_LINE } from "@/lib/growth/revise";
+import { OUTLINE_OVERALL_LINE, parseReviseInstructions } from "@/lib/growth/revise";
 
 import { fetchBoard, postRevise, postReviseApply, postReviseEdit } from "../api";
 import { authHeaders } from "../authHeaders";
@@ -82,17 +82,11 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setOutlineOverallPrompt("");
   }, [openId]);
 
-  // #53/#139 B: セクションに溜めたコメントを {見出し, comment} へ展開し、タイトル指示と一緒に送る。
-  async function requestRevise(item: PendingItem): Promise<void> {
-    const sections = outlineSections(item.outline);
-    const overall = outlineOverallPrompt.trim();
-    const comments = overall
-      ? [{ line: OUTLINE_OVERALL_LINE, comment: overall }]
-      : sections.flatMap((section, i) =>
-          (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
-        );
-    const titleInstruction = titleRevisePrompt.trim();
-    // 構成案コメント0件かつタイトル指示なしのときは「修正を依頼」ボタンが無効なので到達しない。
+  async function submitReviseRequest(
+    item: PendingItem,
+    comments: { line: string; comment: string }[],
+    titleInstruction: string,
+  ): Promise<boolean> {
     setReviseBusy(true);
     setReviseError("");
     try {
@@ -105,14 +99,51 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
       setBoardData((prev) =>
         prev.map((it) => (it.id === item.id ? { ...it, reviseStatus: "依頼中" } : it))
       );
-      setDraftComments({});
-      setTitleRevisePrompt("");
-      setOutlineOverallPrompt("");
+      return true;
     } catch (error) {
       setReviseError(toMessage(error, "修正依頼に失敗しました。"));
+      return false;
     } finally {
       setReviseBusy(false);
     }
+  }
+
+  // #53/#139 B: セクションに溜めたコメントを {見出し, comment} へ展開し、タイトル指示と一緒に送る。
+  async function requestRevise(item: PendingItem): Promise<void> {
+    const sections = outlineSections(item.outline);
+    const overall = outlineOverallPrompt.trim();
+    const comments = overall
+      ? [{ line: OUTLINE_OVERALL_LINE, comment: overall }]
+      : sections.flatMap((section, i) =>
+          (draftComments[i] ?? []).map((comment) => ({ line: section.heading, comment }))
+        );
+    const titleInstruction = titleRevisePrompt.trim();
+    // 構成案コメント0件かつタイトル指示なしのときは「修正を依頼」ボタンが無効なので到達しない。
+    if (await submitReviseRequest(item, comments, titleInstruction)) {
+      setDraftComments({});
+      setTitleRevisePrompt("");
+      setOutlineOverallPrompt("");
+    }
+  }
+
+  /** 失敗した直近依頼を、Notionに保存された指示を使って同じ内容で再送する。 */
+  async function retryRevise(item: PendingItem): Promise<void> {
+    let comments: { line: string; comment: string }[] = [];
+    const rawInstructions = item.reviseInstructions?.trim() ?? "";
+    if (rawInstructions) {
+      try {
+        comments = parseReviseInstructions(rawInstructions);
+      } catch {
+        setReviseError("保存済みの修正指示を読み取れません。新しい指示を入力してください。");
+        return;
+      }
+    }
+    const titleInstruction = item.reviseTitleInstruction?.trim() ?? "";
+    if (comments.length === 0 && !titleInstruction) {
+      setReviseError("再依頼できる修正指示がありません。");
+      return;
+    }
+    await submitReviseRequest(item, comments, titleInstruction);
   }
 
   // #53: セクションごとのコメント追加/編集/削除(送信前の下書き操作)。
@@ -277,6 +308,7 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
     setTitleRevisePrompt,
     setOutlineOverallPrompt,
     requestRevise,
+    retryRevise,
     startAddComment,
     startEditComment,
     cancelComment,

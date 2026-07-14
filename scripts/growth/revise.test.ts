@@ -100,6 +100,10 @@ describe("parseReviseInstructions", () => {
 
 describe("buildReviseRequestProps（#139 B: 構成案/タイトルの並走）", () => {
   const CLEARED_TITLE = { "修正タイトル指示": { rich_text: [] } };
+  const CLEARED_RESULTS = {
+    "修正案": { rich_text: [] },
+    "修正タイトル案": { rich_text: [] },
+  };
 
   it("構成案コメントのみ: 修正指示を入れ、タイトル指示は空・依頼中・依頼時刻", () => {
     const json = serializeReviseInstructions([{ line: "見出し", comment: "短く" }]);
@@ -107,6 +111,7 @@ describe("buildReviseRequestProps（#139 B: 構成案/タイトルの並走）",
     expect(props).toEqual({
       "修正指示": { rich_text: [{ text: { content: json } }] },
       ...CLEARED_TITLE,
+      ...CLEARED_RESULTS,
       "修正ステータス": { select: { name: "依頼中" } },
       "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
     });
@@ -117,6 +122,7 @@ describe("buildReviseRequestProps（#139 B: 構成案/タイトルの並走）",
     expect(props).toEqual({
       "修正指示": { rich_text: [] },
       "修正タイトル指示": { rich_text: [{ text: { content: "もっと短く具体的に" } }] },
+      ...CLEARED_RESULTS,
       "修正ステータス": { select: { name: "依頼中" } },
       "修正依頼時刻": { date: { start: "2026-06-19T01:00:00.000Z" } },
     });
@@ -128,6 +134,7 @@ describe("buildReviseRequestProps（#139 B: 構成案/タイトルの並走）",
     expect(props).toMatchObject({
       "修正指示": { rich_text: [{ text: { content: json } }] },
       "修正タイトル指示": { rich_text: [{ text: { content: "タイトルも短く" } }] },
+      ...CLEARED_RESULTS,
     });
   });
 });

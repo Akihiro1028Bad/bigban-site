@@ -2008,11 +2008,20 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
   });
 
   it("失敗時は理由を出し、再依頼へ戻れる", async () => {
+    const savedComments = [{ line: "記事全体", comment: "章立てを整理" }];
     const fn = mockFetchSequence(
       {
         json: {
           success: true,
-          items: [ideaItem({ outline: "## A", reviseStatus: "失敗", reviseProposal: "タイムアウト" })],
+          items: [
+            ideaItem({
+              outline: "## A",
+              reviseStatus: "失敗",
+              reviseProposal: "タイムアウト",
+              reviseInstructions: JSON.stringify(savedComments),
+              reviseTitleInstruction: "探し方を主題にする",
+            }),
+          ],
         },
       },
       { json: { success: true } }
@@ -2026,6 +2035,11 @@ describe("ApproveClient 構成案修正の提示・反映(#43)", () => {
     await waitFor(() =>
       expect(fn.mock.calls[1][0]).toBe("/api/growth/revise")
     );
+    expect(JSON.parse(String((fn.mock.calls[1][1] as RequestInit).body))).toEqual({
+      pageId: "i1",
+      comments: savedComments,
+      titleInstruction: "探し方を主題にする",
+    });
   });
 
   it("失敗で理由が空なら既定文言を出す", async () => {

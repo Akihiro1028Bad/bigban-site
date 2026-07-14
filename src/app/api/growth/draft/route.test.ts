@@ -83,7 +83,13 @@ describe("GET /api/growth/draft", () => {
         bodyHtml: "<p>本文</p>",
         body: "",
         eyecatch: "",
-        advice: { status: "なし", advice: null, raw: "", requestedAtMs: null },
+        advice: {
+          status: "なし",
+          advice: null,
+          raw: "",
+          requestedAtMs: null,
+          instruction: "",
+        },
         adviceApply: { status: "なし", proposal: [], raw: "" },
         decorate: { status: "なし", proposals: [], raw: "", requestedAtMs: null },
         bodyRegen: {
@@ -94,7 +100,7 @@ describe("GET /api/growth/draft", () => {
           textSpec: "",
         },
         eyecatchRegen: { status: "なし", requestedAtMs: null },
-        bodyComment: { status: "なし", comments: [], proposal: [], raw: "" },
+        bodyComment: { status: "なし", comments: [], proposal: [], raw: "", overall: "" },
         knownNewsPaths: [],
       },
     });
@@ -215,7 +221,13 @@ describe("GET /api/growth/draft", () => {
     vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
     const res = await GET(getRequest(null, PAGE_ID));
     const json = await res.json();
-    expect(json.draft.advice).toEqual({ status: "なし", advice: null, raw: "", requestedAtMs: null });
+    expect(json.draft.advice).toEqual({
+      status: "なし",
+      advice: null,
+      raw: "",
+      requestedAtMs: null,
+      instruction: "",
+    });
   });
 
   it("getPage が throw したら 502", async () => {

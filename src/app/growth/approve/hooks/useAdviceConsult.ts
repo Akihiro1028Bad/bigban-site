@@ -33,6 +33,7 @@ interface UseAdviceConsultReturn {
   applySelected: ReadonlySet<number>;
   toggleApplySelect: (fixIndex: number) => void;
   requestAdvice: () => void;
+  retryAdvice: () => void;
   dismiss: () => void;
   submitApply: () => void;
   dismissApply: () => void;
@@ -104,6 +105,15 @@ export function useAdviceConsult({
 
   function requestAdvice(): void {
     void postJson("/api/growth/advise", { pageId, instruction: instruction.trim() }, "アドバイス依頼に失敗しました。");
+  }
+
+  /** 失敗した直近依頼を、Notionに保存された補足指示を保ったまま再送する。 */
+  function retryAdvice(): void {
+    void postJson(
+      "/api/growth/advise",
+      { pageId, instruction: advice?.instruction ?? "" },
+      "アドバイス依頼に失敗しました。",
+    );
   }
 
   function dismiss(): void {
@@ -260,6 +270,7 @@ export function useAdviceConsult({
     applySelected,
     toggleApplySelect,
     requestAdvice,
+    retryAdvice,
     dismiss,
     submitApply,
     dismissApply,

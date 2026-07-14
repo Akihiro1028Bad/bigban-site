@@ -109,6 +109,55 @@ describe("requestRevise", () => {
   });
 });
 
+describe("retryRevise", () => {
+  it("Notionに保存された構成案コメントとタイトル指示を同じ内容で再送する", async () => {
+    const { view } = setup();
+    const storedComments = [{ line: "記事全体", comment: "章立てを整理" }];
+    const item: PendingItem = {
+      ...BASE_ITEM,
+      reviseStatus: "失敗",
+      reviseInstructions: JSON.stringify(storedComments),
+      reviseTitleInstruction: "探し方を主題にする",
+    };
+
+    await act(async () => {
+      await view.result.current.retryRevise(item);
+    });
+
+    expect(mockedPostRevise).toHaveBeenCalledWith("token-1", {
+      pageId: BASE_ITEM.id,
+      comments: storedComments,
+      titleInstruction: "探し方を主題にする",
+    });
+  });
+
+  it("保存済み指示が空ならPOSTせず明示エラーにする", async () => {
+    const { view } = setup();
+
+    await act(async () => {
+      await view.result.current.retryRevise({ ...BASE_ITEM, reviseStatus: "失敗" });
+    });
+
+    expect(mockedPostRevise).not.toHaveBeenCalled();
+    expect(view.result.current.reviseError).toBe("再依頼できる修正指示がありません。");
+  });
+
+  it("保存済みコメントJSONが壊れていればPOSTせず明示エラーにする", async () => {
+    const { view } = setup();
+
+    await act(async () => {
+      await view.result.current.retryRevise({
+        ...BASE_ITEM,
+        reviseStatus: "失敗",
+        reviseInstructions: "{壊れ",
+      });
+    });
+
+    expect(mockedPostRevise).not.toHaveBeenCalled();
+    expect(view.result.current.reviseError).toBe("保存済みの修正指示を読み取れません。新しい指示を入力してください。");
+  });
+});
+
 describe("記事切り替えリセット", () => {
   it("openId が変わると全体指示をクリアする", async () => {
     const { view } = setup("page-1");

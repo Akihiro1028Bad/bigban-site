@@ -327,17 +327,29 @@ describe("Notion props / status / view", () => {
     const c: BodyComment = { blockIndex: 1, excerpt: "一文目です。", comment: "やわらかく" };
     const p = page({
       [BODY_COMMENT_PROPS.status]: { select: { name: "提示中" } },
-      [BODY_COMMENT_PROPS.request]: { rich_text: [{ plain_text: JSON.stringify([c]) }] },
+      [BODY_COMMENT_PROPS.request]: {
+        rich_text: [{ plain_text: JSON.stringify({ comments: [c] }) }],
+      },
       [BODY_COMMENT_PROPS.result]: { rich_text: [{ plain_text: "理由テキスト" }] },
     });
     const view = bodyCommentViewOf(p);
     expect(view.status).toBe("提示中");
     expect(view.comments).toEqual([c]);
+    expect(view.overall).toBe("");
     expect(view.raw).toBe("理由テキスト");
+  });
+  it("ビュー: 全体コメント形式も再依頼用に保持する", () => {
+    const p = page({
+      [BODY_COMMENT_PROPS.status]: { select: { name: "失敗" } },
+      [BODY_COMMENT_PROPS.request]: {
+        rich_text: [{ plain_text: JSON.stringify({ comments: [], overall: "全体を短く" }) }],
+      },
+    });
+    expect(bodyCommentViewOf(p)).toMatchObject({ comments: [], overall: "全体を短く" });
   });
   it("ビュー: プロパティ欠落でも落ちず なし/空 を返す", () => {
     const view = bodyCommentViewOf(page({}));
-    expect(view).toEqual({ status: "なし", comments: [], proposal: [], raw: "" });
+    expect(view).toEqual({ status: "なし", comments: [], overall: "", proposal: [], raw: "" });
   });
 
   it("ビュー: 提示中は before/after 案も解析して返す", () => {
