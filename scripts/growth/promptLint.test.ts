@@ -182,6 +182,31 @@ describe("下書き生成の構成案契約", () => {
     expect(drafts).toContain("`勝ち筋` と `成功指標` は本文生成へ渡さない");
   });
 
+  it("冒頭で検索意図へ直接答え、入力にない読者の行動や心理を作らない", () => {
+    expect(drafts).toContain("冒頭の1〜2文で、検索意図への答えを直接書く");
+    expect(drafts).toContain(
+      "読者が公式サイトを開いた、迷っている、身構えているなど、入力にない行動や心理を作らない"
+    );
+  });
+
+  it("確認済み事実を使い切らず、読者の判断に不要な情報を省く", () => {
+    expect(drafts).toContain("確認済み事実は素材であり、本文で使い切るチェックリストではない");
+    expect(drafts).toContain("場所選びや次の行動に影響しない事実は、正しくても省く");
+    expect(drafts).toContain("facility-context の `confirmed` はそのまま全文を渡さない");
+  });
+
+  it("重複説明と自施設のパンフレット化を避ける", () => {
+    expect(drafts).toContain("同じ事実を本文・表・まとめで繰り返さない");
+    expect(drafts).toContain(
+      "自施設の理念・スローガン・ショーコート等は、記事テーマと直接関係しなければ書かない"
+    );
+  });
+
+  it("CTAは強く勧めず、確認を促す穏やかな1文にする", () => {
+    expect(drafts).toContain("空き状況や詳細の確認を促す穏やかな1文");
+    expect(drafts).toContain("今すぐ・まずは・体験してみてください等で行動を迫らない");
+  });
+
   it("再生成では既存下書きのslugを維持し、取得不能なら投入を止める", () => {
     expect(drafts).toContain("既存下書きのslugを読み直し");
     expect(drafts).toContain("記事URLを維持");
