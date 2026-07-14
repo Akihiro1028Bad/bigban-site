@@ -13,7 +13,7 @@ describe("acquireLock", () => {
     const lockPath = path.join(dir, "worker.lock");
 
     try {
-      expect(acquireLock(lockPath)).toBe(true);
+      expect(acquireLock(lockPath).acquired).toBe(true);
       expect(readFileSync(lockPath, "utf8")).toBe(String(process.pid));
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -33,7 +33,7 @@ describe("acquireLock", () => {
         openSync,
         writeSync,
         closeSync,
-      })
+      }).acquired
     ).toBe(true);
 
     expect(mkdirSync).toHaveBeenCalledWith("/tmp/nested", { recursive: true });
@@ -82,7 +82,7 @@ describe("acquireLock", () => {
         closeSync,
         statSync,
         rmSync: vi.fn(),
-      })
+      }).acquired
     ).toBe(true);
     expect(openSync).toHaveBeenCalledTimes(2);
     expect(writeSync).toHaveBeenCalledWith(9, "123");
@@ -106,8 +106,10 @@ describe("acquireLock", () => {
         writeSync: vi.fn(),
         closeSync: vi.fn(),
         statSync: vi.fn().mockReturnValue({ mtimeMs: 9_000 }),
+        readFileSync: vi.fn().mockReturnValue("456"),
+        kill: vi.fn(),
         rmSync: vi.fn(),
-      })
+      }).acquired
     ).toBe(false);
   });
 
@@ -151,8 +153,10 @@ describe("acquireLock", () => {
         writeSync: vi.fn(),
         closeSync: vi.fn(),
         statSync: vi.fn().mockReturnValue({ mtimeMs: 1_000 }),
+        readFileSync: vi.fn().mockReturnValue("456"),
+        kill: vi.fn(),
         rmSync,
-      })
+      }).acquired
     ).toBe(true);
     expect(rmSync).toHaveBeenCalledWith("/tmp/test.lock", { force: true });
     expect(openSync).toHaveBeenCalledTimes(2);
@@ -165,9 +169,9 @@ describe("releaseLock", () => {
     const lockPath = path.join(dir, "worker.lock");
 
     try {
-      expect(acquireLock(lockPath)).toBe(true);
+      expect(acquireLock(lockPath).acquired).toBe(true);
       releaseLock(lockPath);
-      expect(acquireLock(lockPath)).toBe(true);
+      expect(acquireLock(lockPath).acquired).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -175,7 +179,12 @@ describe("releaseLock", () => {
 
   it("lock ファイルを force 削除する", () => {
     const rmSync = vi.fn();
-    releaseLock("/tmp/test.lock", { rmSync });
+    releaseLock("/tmp/test.lock", {
+      pid: 123,
+      mkdirSync: vi.fn(),
+      readFileSync: vi.fn().mockReturnValue("123"),
+      rmSync,
+    });
     expect(rmSync).toHaveBeenCalledWith("/tmp/test.lock", { force: true });
   });
 });
