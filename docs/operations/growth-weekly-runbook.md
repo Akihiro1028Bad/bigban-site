@@ -187,7 +187,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 
 **コンテンツ作成チームの工程**
 
-執筆工程の正典は [scripts/growth/prompts/drafts.md](../../scripts/growth/prompts/drafts.md) の手順2(ブリーフ→根拠台帳→構成→素稿→装飾→校閲→編集者ゲートの7工程)とする。**ここには工程を再掲しない**(過去に二重記載が片側だけ更新されるドリフト事故があったため。工程を変えるときは drafts.md だけを更新する)。文体・品質の正典は [growth-article-style.md](./growth-article-style.md)(§1 人格 / §11 ルブリック・修辞予算 / §14 執筆7原則)。
+執筆工程の正典は [scripts/growth/prompts/drafts.md](../../scripts/growth/prompts/drafts.md) の手順2(ブリーフ→根拠台帳→構成→執筆(1パス・執筆カード)→校閲→編集者ゲートの6工程)とする。**ここには工程を再掲しない**(過去に二重記載が片側だけ更新されるドリフト事故があったため。工程を変えるときは drafts.md だけを更新する)。文体・品質の正典は [growth-article-style.md](./growth-article-style.md)(§1 人格(ガイド調) / §11 ルブリック / §14 執筆5原則)。
 
 **画像チームの工程**(プロのデザイナー・写真家・イラストレーターのチーム)
 
