@@ -1,5 +1,5 @@
 /**
- * microCMS の管理API(コンテンツのメタ情報)から下書きの draftKey を取得する。
+ * microCMS の管理API/コンテンツAPIから下書きの draftKey とslugを取得する。
  *
  * 下書き作成API(content.ts createDraft)は contentId しか返さないため、
  * プレビューURL に必要な draftKey はこの管理API経由で引く。
@@ -44,6 +44,34 @@ export async function fetchDraftKey(
 
   const json = (await res.json()) as { draftKey?: string | null };
   return json.draftKey ?? null;
+}
+
+/** 再生成時に既存下書きの記事URLを維持するため、現在のslugを取得する。 */
+export async function fetchContentSlug(
+  endpoint: string,
+  contentId: string,
+  draftKey: string,
+  options: DraftMetaOptions
+): Promise<string> {
+  const params = new URLSearchParams({ fields: "slug", draftKey });
+  const url = `https://${options.serviceDomain}.microcms.io/api/v1/${endpoint}/${encodeURIComponent(
+    contentId
+  )}?${params.toString()}`;
+  const res = await options.fetchFn(url, {
+    method: "GET",
+    headers: { "X-MICROCMS-API-KEY": options.apiKey },
+  });
+
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`既存slugの取得に失敗しました (HTTP ${res.status}): ${body}`);
+  }
+
+  const json = (await res.json()) as { slug?: unknown };
+  if (typeof json.slug !== "string" || json.slug.trim() === "") {
+    throw new Error("既存下書きから有効なslugを取得できませんでした");
+  }
+  return json.slug;
 }
 
 export interface ContentSummary {
