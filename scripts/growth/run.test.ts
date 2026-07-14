@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -81,6 +81,7 @@ function runLockedModeWithStubs(options: {
   reapExitCode?: number;
   stateDir?: string;
   peekCount?: number;
+  lockPid?: number;
 }) {
   const mode = options.mode ?? "revise";
   const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-loop-bin-"));
@@ -89,6 +90,10 @@ function runLockedModeWithStubs(options: {
   const settledCount = path.join(binDir, "settled-count");
   const codexPath = path.join(binDir, "codex");
   const npmPath = path.join(binDir, "npm");
+  if (options.lockPid !== undefined) {
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(path.join(stateDir, "revise.lock"), String(options.lockPid));
+  }
   writeFileSync(codexPath, `#!/bin/sh\necho codex >> "${callLog}"\ncat >/dev/null\nexit 0\n`, {
     mode: 0o755,
   });
@@ -278,6 +283,22 @@ describe("run.mjs pull 型ループの回収と完了確認", () => {
       expect(calls).not.toContain("growth:loop-state");
     }
   );
+
+  it("死亡 PID の共有 lock を即時回収し、reconcile ログ後に処理を継続する", () => {
+    const { result, calls, stateDir } = runLockedModeWithStubs({
+      mode: "revise",
+      lockPid: 2_147_483_647,
+      peekCount: 0,
+    });
+
+    expect(result.status).toBe(0);
+    expect(calls.match(/growth:worker-log -- reconcile/g)).toHaveLength(1);
+    expect(calls).toContain("--status reconcile --kind info");
+    expect(calls).toContain("死亡 PID 2147483647");
+    expect(calls).toContain("growth:revise -- peek");
+    expect(calls).not.toContain("growth:notify-loop-fail");
+    expect(existsSync(path.join(stateDir, "revise.lock"))).toBe(false);
+  });
 
   it.each([
     ["drafts-auto", "growth:drafts-auto-peek"],
