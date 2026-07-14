@@ -40,6 +40,7 @@ function page(
     media?: string;
     bodyRegenStatus?: string;
     eyecatchRegenStatus?: string;
+    ledger?: string;
   } = {}
 ) {
   const properties: Record<string, unknown> = {};
@@ -63,6 +64,9 @@ function page(
   }
   if (opts.eyecatchRegenStatus !== undefined) {
     properties["アイキャッチ再生成ステータス"] = { type: "select", select: { name: opts.eyecatchRegenStatus } };
+  }
+  if (opts.ledger !== undefined) {
+    properties["根拠台帳"] = { rich_text: [{ plain_text: opts.ledger }] };
   }
   return { id: PAGE_ID, url: "", properties };
 }
@@ -138,6 +142,22 @@ describe("POST /api/growth/publish", () => {
       { title: "公開する承認タイトル", bodyHtml: "<p>本文</p>" },
       expect.objectContaining({ apiKey: "single-key" })
     );
+  });
+
+  it("確認済み情報源に一致するイベント日時は公開前ゲートを通る", async () => {
+    vi.mocked(getPage).mockResolvedValue(
+      page({
+        contentId: "event-article",
+        eyecatch: "https://images.microcms-assets.io/x.png",
+        body: `<h2>体験会</h2><p>体験会は7月20日に開催します。${DISCLAIMER}</p>`,
+        title: "体験会のお知らせ",
+        ledger: "official-site | https://example.com/event | 体験会は7月20日に開催します",
+      })
+    );
+
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    expect(res.status).toBe(200);
+    expect(publishContent).toHaveBeenCalled();
   });
 
   it("媒体=ニュースなら env=columns でも常に news へ publish(告知は必ず news)", async () => {

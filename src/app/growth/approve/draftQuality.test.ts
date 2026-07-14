@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   countByLevel,
-  detectDoNotWrite,
+  detectCitationRequired,
+  detectProhibitedClaims,
+  detectUnsafeHtml,
   DISCLAIMER_MARK,
   draftPlainText,
   draftQuality,
@@ -34,7 +36,7 @@ describe("draftQuality", () => {
   it("十分な下書き(免責あり・断定なし)は全項目 ok・公開ブロックなし", () => {
     const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + DISCLAIMER;
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "短いタイトル" });
-    for (const label of ["文字数", "見出し", "画像", "内部リンク", "タイトル長", "AI免責文", "断定NG(可変情報)"]) {
+    for (const label of ["文字数", "見出し", "画像", "内部リンク", "文体注意", "要出典", "禁止表現", "HTML安全性", "AI免責文"]) {
       expect(pick(checks, label).level).toBe("ok");
     }
     expect(hasBlockingCheck(checks)).toBe(false);
@@ -52,17 +54,17 @@ describe("draftQuality", () => {
     expect(pick(draftQuality({ bodyHtml: "", body, title: "t", articleType: "cornerstone" }), "文字数").level).toBe("warn");
   });
 
-  it("見出し/画像/内部リンク/タイトル長 の不足は warn", () => {
+  it("見出し/画像/内部リンク の不足は warn、承認済みタイトルの長さは再評価しない", () => {
     const checks = draftQuality({
       bodyHtml: "<p>短い</p>",
       body: "短い",
-      title: "あ".repeat(QUALITY_THRESHOLDS.maxTitleLen + 1),
+      title: "ピックルボール、市川市でどこでできる？場所の選び方ガイド【体育館・クラブ・屋内専用施設】",
     });
     expect(pick(checks, "見出し").level).toBe("warn");
     expect(pick(checks, "画像").level).toBe("warn");
     expect(pick(checks, "画像").value).toBe("0 / 3");
     expect(pick(checks, "内部リンク").level).toBe("warn");
-    expect(pick(checks, "タイトル長").level).toBe("warn");
+    expect(checks.find((check) => check.label === "タイトル長")).toBeUndefined();
   });
 
   it("内部リンクは thepicklebang.com とルート相対(/...)を数え、外部は除く", () => {
@@ -93,26 +95,87 @@ describe("draftQuality", () => {
     expect(pick(withoutDisclaimer, "AI免責文").level).toBe("block");
   });
 
-  it("§13 断定NG(料金/所要分)は block(#217: 未確定情報のみ)", () => {
+  it("料金/所要分は要出典 warn だが block しない", () => {
     const base = { bodyHtml: "", title: "t" } as const;
-    expect(pick(draftQuality({ ...base, body: `月額5,000円${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩5分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `徒歩10分の距離${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
-    expect(pick(draftQuality({ ...base, body: `駅から徒歩 3 分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    for (const body of [
+      `一般230円・市外690円です。${DISCLAIMER}`,
+      `コート料金は平日4,980円です。${DISCLAIMER}`,
+      `本八幡駅から徒歩5分です。${DISCLAIMER}`,
+      `駅から徒歩 3 分です。${DISCLAIMER}`,
+    ]) {
+      const checks = draftQuality({ ...base, body });
+      expect(pick(checks, "要出典").level).toBe("warn");
+      expect(hasBlockingCheck(checks)).toBe(false);
+    }
   });
 
-  it("#217: 公表済み事実(営業時間6:00-23:00・3面)は block しない", () => {
+  it("料金/所要分が無ければ要出典チェックは ok", () => {
     const base = { bodyHtml: "", title: "t" } as const;
-    expect(pick(draftQuality({ ...base, body: `営業時間は6:00-23:00です${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
-    expect(pick(draftQuality({ ...base, body: `コート3面を完備${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
+    expect(pick(draftQuality({ ...base, body: `屋内コートです。${DISCLAIMER}` }), "要出典").level).toBe("ok");
   });
 
-  it("#218レビュー対応: 確定値「徒歩1分」(CTA必須文)は block しない", () => {
+  it("明確な禁止表現は block する", () => {
     const base = { bodyHtml: "", title: "t" } as const;
-    expect(pick(draftQuality({ ...base, body: `本八幡駅から徒歩1分${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
-    expect(pick(draftQuality({ ...base, body: `徒歩１分でアクセス${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("ok");
-    // 「1」で始まる複数桁(徒歩11分)は先読みが「1分」に一致しないため従来どおり block
-    expect(pick(draftQuality({ ...base, body: `徒歩11分ほど${DISCLAIMER}` }), "断定NG(可変情報)").level).toBe("block");
+    for (const body of [
+      "24時間営業です",
+      "国内最大規模です",
+      "キャンペーン価格です",
+      "クーポンコードを配布します",
+      "体験会は7月20日に開催します",
+      "ラウンジスペースを利用できます",
+    ]) {
+      expect(pick(draftQuality({ ...base, body: `${body}${DISCLAIMER}` }), "禁止表現").level).toBe("block");
+    }
+  });
+
+  it("公式確認済みの可変情報は要出典warnに留める", () => {
+    const body = `体験会は7月20日に開催します。${DISCLAIMER}`;
+    const checks = draftQuality({
+      bodyHtml: "",
+      body,
+      title: "体験会",
+      confirmedFacts: ["体験会は7月20日に開催します"],
+    });
+
+    expect(pick(checks, "禁止表現").level).toBe("ok");
+    expect(pick(checks, "要出典").level).toBe("warn");
+  });
+
+  it("句点なし・確認済み事実側が長い場合も可変情報の一致を判定する", () => {
+    expect(
+      detectProhibitedClaims("体験会は7月20日に開催します", ["体験会は7月20日に開催します"])
+    ).toEqual([]);
+    expect(
+      detectProhibitedClaims("クーポンコードを配布します", [
+        "現在はクーポンコードを配布します",
+      ])
+    ).toEqual([]);
+    expect(detectProhibitedClaims("体験会は7月20日に開催します", ["短い"])).toEqual([
+      "未確定イベント",
+    ]);
+  });
+
+  it("禁止表現を否定・訂正する文章は block しない", () => {
+    const base = { bodyHtml: "", title: "t" } as const;
+    for (const body of [
+      "24時間営業ではありません",
+      "国内最大規模ではありません",
+      "体験会は7月20日に開催しません",
+      "ラウンジスペースは利用できません",
+    ]) {
+      expect(pick(draftQuality({ ...base, body: `${body}${DISCLAIMER}` }), "禁止表現").level).toBe("ok");
+    }
+  });
+
+  it("禁止HTML・危険属性は block する", () => {
+    const checks = draftQuality({
+      bodyHtml: `<script>alert(1)</script><p onclick="alert(1)">本文${DISCLAIMER}</p>`,
+      body: "",
+      title: "t",
+    });
+    expect(pick(checks, "HTML安全性").level).toBe("block");
+    expect(pick(checks, "HTML安全性").value).toContain("script");
+    expect(pick(checks, "HTML安全性").value).toContain("onclick");
   });
 
   it("body が空なら bodyHtml からタグを除いて判定する", () => {
@@ -225,23 +288,29 @@ describe("draftQuality: 内部リンク先(#H19)", () => {
   });
 });
 
-describe("detectDoNotWrite", () => {
-  it("該当カテゴリのラベルを返す(#217: 料金・所要分のみ)", () => {
-    expect(detectDoNotWrite("本八幡駅から徒歩7分・月額3000円")).toEqual(["料金", "所要時間"]);
+describe("品質ゲートの事実・HTML検出", () => {
+  it("料金・所要時間を要出典として返す", () => {
+    expect(detectCitationRequired("本八幡駅から徒歩7分・月額3000円")).toEqual(["料金", "所要時間"]);
   });
-  it("#217: 公表済みの面数・営業時間は検出しない", () => {
-    expect(detectDoNotWrite("コート3面・営業時間6:00-23:00")).toEqual([]);
+  it("要出典対象が無ければ空", () => {
+    expect(detectCitationRequired("市川の屋内コートで打てる")).toEqual([]);
   });
-  it("#218レビュー対応: 確定値「徒歩1分」は検出しない(全角１も)", () => {
-    expect(detectDoNotWrite("本八幡駅から徒歩1分")).toEqual([]);
-    expect(detectDoNotWrite("徒歩１分")).toEqual([]);
+  it("明確な禁止表現を返す", () => {
+    expect(
+      detectProhibitedClaims(
+        "24時間営業で国内最大規模です。体験会は7月20日に開催します。ラウンジスペースを利用できます"
+      )
+    ).toEqual(["24時間営業", "国内最大", "未確定イベント", "ラウンジ利用"]);
   });
-  it("#218レビュー対応: 徒歩10分・駅から3分は従来どおり検出する", () => {
-    expect(detectDoNotWrite("徒歩10分")).toEqual(["所要時間"]);
-    expect(detectDoNotWrite("駅から3分")).toEqual(["所要時間"]);
+  it("安全なHTMLは空、禁止タグとイベント属性を返す", () => {
+    expect(detectUnsafeHtml("<h2>見出し</h2><p>本文</p>")).toEqual([]);
+    expect(detectUnsafeHtml('<iframe src="x"></iframe><p onload="x">本文</p>')).toEqual(["iframe", "onload"]);
   });
-  it("該当なしは空", () => {
-    expect(detectDoNotWrite("市川の屋内コートで打てる")).toEqual([]);
+
+  it("禁止属性と重複イベント属性を重複なしで返す", () => {
+    expect(
+      detectUnsafeHtml('<p style="color:red" onclick="a"><span onclick="b">本文</span></p>')
+    ).toEqual(["style", "onclick"]);
   });
 });
 
@@ -281,7 +350,7 @@ describe("countByLevel", () => {
     const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + `最高です。${DISCLAIMER}`;
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "文体チェック" });
 
-    expect(countByLevel(checks)).toEqual({ block: 0, warn: 1, ok: 7 });
+    expect(countByLevel(checks)).toEqual({ block: 0, warn: 1, ok: 9 });
   });
 });
 

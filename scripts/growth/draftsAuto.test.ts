@@ -4,16 +4,18 @@ import {
   countDraftsAutoTargets,
   draftsAutoQueryFilter,
   isDraftsAutoTarget,
+  selectDraftsAutoTarget,
 } from "./draftsAuto";
 import type { NotionPage } from "./notion";
 
-function page(status: string, draftId = ""): NotionPage {
+function page(status: string, draftId = "", outline = "## 見出し\n### 詳細"): NotionPage {
   return {
     id: `${status}-${draftId || "empty"}`,
     url: "",
     properties: {
       "ステータス": { select: { name: status } },
       "下書きID": { rich_text: draftId ? [{ plain_text: draftId }] : [] },
+      "構成案": { rich_text: outline ? [{ plain_text: outline }] : [] },
     },
   };
 }
@@ -80,6 +82,23 @@ describe("draftsAuto", () => {
         page("提案中"),
       ])
     ).toBe(2);
+  });
+
+  it("1セッション用の対象は生成中を優先し、無ければ承認の先頭1件だけを返す", () => {
+    const approved = page("承認");
+    const generating = page("生成中");
+    expect(selectDraftsAutoTarget([approved, generating])).toBe(generating);
+    expect(selectDraftsAutoTarget([approved, page("提案中")])).toBe(approved);
+    expect(selectDraftsAutoTarget([page("提案中")])).toBeNull();
+  });
+
+  it("構成案にH2/H3がない生成中は除外し、後続の承認済み記事を返す", () => {
+    const invalidGenerating = page("生成中", "", "説明だけ");
+    const approved = page("承認");
+
+    expect(selectDraftsAutoTarget([invalidGenerating, approved])).toBe(approved);
+    expect(countDraftsAutoTargets([invalidGenerating, approved])).toBe(1);
+    expect(selectDraftsAutoTarget([invalidGenerating])).toBeNull();
   });
 
   it("Notion query 用の軽量 filter を返す", () => {

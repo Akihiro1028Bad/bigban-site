@@ -321,6 +321,7 @@ export function DetailPanel({
           body,
           title: item.title,
           knownNewsPaths: draft.knownNewsPaths ? new Set(draft.knownNewsPaths) : undefined,
+          confirmedFacts: draft.confirmedFacts,
         })
       : [];
   const hasBlock = countByLevel(checks).block > 0;

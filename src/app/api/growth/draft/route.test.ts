@@ -82,6 +82,7 @@ describe("GET /api/growth/draft", () => {
         displayMode: "html",
         bodyHtml: "<p>本文</p>",
         body: "",
+        confirmedFacts: [],
         eyecatch: "",
         advice: {
           status: "なし",
@@ -104,6 +105,19 @@ describe("GET /api/growth/draft", () => {
         knownNewsPaths: [],
       },
     });
+  });
+
+  it("保存済み確認済み情報源からconfirmedFactsを返す", async () => {
+    const page = pageWithMirror("<p>体験会は7月20日に開催します</p>");
+    page.properties["根拠台帳"] = {
+      rich_text: [
+        { plain_text: "official-site | https://example.com | 体験会は7月20日に開催します" },
+      ],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+
+    const json = await (await GET(getRequest(null, PAGE_ID))).json();
+    expect(json.draft.confirmedFacts).toEqual(["体験会は7月20日に開催します"]);
   });
 
   it("#H19: 公開記事 slug を /ja/news/<slug> パスにして knownNewsPaths に入れる(ja のみ)", async () => {

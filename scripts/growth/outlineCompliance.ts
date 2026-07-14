@@ -15,7 +15,6 @@ export interface OutlineComplianceResult {
 }
 
 export interface OutlineComplianceOptions {
-  /** §15の条件を満たす根拠台帳があり、末尾の参考資料欄を自動生成してよいか。 */
   allowGeneratedReferences?: boolean;
 }
 
@@ -48,27 +47,19 @@ function normalizeHeading(value: string): string {
 }
 
 function outlineHeadings(outline: string): Heading[] {
-  const lines = outline.replace(/<br\s*\/?\s*>/gi, "\n").split(/\r?\n/);
   const headings: Heading[] = [];
-  for (const line of lines) {
+  for (const line of outline.replace(/<br\s*\/?\s*>/gi, "\n").split(/\r?\n/)) {
     const match = line.trim().match(/^(#{2,3})\s+(.+)$/);
     if (!match) continue;
-    headings.push({
-      level: match[1].length as 2 | 3,
-      text: normalizeHeading(match[2]),
-    });
+    headings.push({ level: match[1].length as 2 | 3, text: normalizeHeading(match[2]) });
   }
   return headings;
 }
 
 function bodyHeadings(bodyHtml: string): Heading[] {
   const headings: Heading[] = [];
-  const pattern = /<h([23])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/gi;
-  for (const match of bodyHtml.matchAll(pattern)) {
-    headings.push({
-      level: Number(match[1]) as 2 | 3,
-      text: normalizeHeading(match[2]),
-    });
+  for (const match of bodyHtml.matchAll(/<h([23])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/gi)) {
+    headings.push({ level: Number(match[1]) as 2 | 3, text: normalizeHeading(match[2]) });
   }
   return headings;
 }
@@ -95,7 +86,6 @@ function withoutGeneratedReferences(
   return actual;
 }
 
-/** Notionページの分割rich_textから現在の構成案を取得する。 */
 export function outlineFromPage(page: NotionPage): string {
   const prop = page.properties[OUTLINE_PROP] as
     | { rich_text?: Array<{ plain_text?: string }> }
@@ -113,7 +103,6 @@ export function evaluateOutlineCompliance(
   if (expected.length === 0) {
     return { ok: false, blockReasons: ["構成案にH2/H3見出しがありません"] };
   }
-
   const actual = withoutGeneratedReferences(
     expected,
     bodyHeadings(bodyHtml),
@@ -127,7 +116,6 @@ export function evaluateOutlineCompliance(
       ],
     };
   }
-
   const blockReasons: string[] = [];
   expected.forEach((heading, index) => {
     const found = actual[index];

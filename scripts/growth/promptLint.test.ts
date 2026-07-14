@@ -115,26 +115,98 @@ describe("下書き生成の構成案契約", () => {
     path.join(process.cwd(), "scripts/growth/prompts/drafts.md"),
     "utf-8"
   );
+  const publishDraftCli = readFileSync(
+    path.join(process.cwd(), "scripts/growth/publish-draft-cli.ts"),
+    "utf-8"
+  );
 
-  it("現在の構成案を必須入力とし、見出しと順序を維持する", () => {
-    expect(drafts).toContain("現在の `構成案` を必ず読む");
-    expect(drafts).toContain("見出しレベル・見出し名・順序");
-    expect(drafts).toContain("構成を再設計しない");
+  it("現在の構成案を入力として使い、決定的ゲートでも見出し一致を守る", () => {
+    expect(drafts).toContain("現在の `構成案`");
+    expect(drafts).toContain("執筆入力として使う");
+    expect(drafts).toContain("H2/H3の見出し名・レベル・順序を変更しない");
+    expect(publishDraftCli).toContain("evaluateOutlineCompliance");
+    expect(publishDraftCli).toContain("outlineFromPage(page)");
+  });
+
+  it("1回のClaudeセッションでは対象記事を1件だけ処理する", () => {
+    expect(drafts).toContain("1回の実行で1件だけ");
+    expect(drafts).toContain("複数件を同じClaudeセッションで処理しない");
+  });
+
+  it("禁止する表現と創作の範囲を具体的に示す", () => {
+    expect(drafts).toContain(
+      "根拠のない最大級表現、過度に不安や焦りを促す表現、確認できない事実・体験談の創作はしない。"
+    );
+    expect(drafts).not.toContain("煽り・誇張・創作なし");
   });
 
   it("前回本文と根拠台帳を参照しない", () => {
     expect(drafts).toContain("`下書き本文HTML` と `根拠台帳` は読まない");
   });
 
-  it("参考資料対象を発行年とは別の項目で明示する", () => {
-    expect(drafts).toContain("`reference_eligible`");
-    expect(drafts).toContain("`referenceEligible`");
-    expect(drafts).toContain("統計・数値・健康関連");
+  it("確認済み情報源はURLと重要事実だけの最小形式にする", () => {
+    expect(drafts).toContain("`confirmedFacts`");
+    expect(drafts).not.toContain("`confidence`");
+    expect(drafts).not.toContain("`reason`");
+    expect(drafts).not.toContain("`usableInArticle`");
+  });
+
+  it("単一Claudeの1パス執筆で、別AI校閲・採点・自動リライトを行わない", () => {
+    expect(drafts).toContain("同じ Claude プロセス");
+    expect(drafts).toContain("1パス");
+    expect(drafts).not.toContain("記事ブリーフを確定");
+    expect(drafts).not.toContain("校閲(別エージェント");
+    expect(drafts).not.toContain("編集者ゲート");
+    expect(drafts).not.toContain("最大2周");
+  });
+
+  it("確認済み情報源リストは重要事実だけを本文と同じ1回の出力で保存する", () => {
+    expect(drafts).toContain("重要事実だけ");
+    expect(drafts).toContain("実際に本文で使用した重要事実だけ");
+    expect(drafts).toContain("検索結果の要約だけでは使用可能にしない");
+    expect(drafts).toContain("確認できなかった候補は本文にもリストにも入れない");
+  });
+
+  it("調査対象を列挙項目に限定せず、重要事実だけ公式情報で確認する", () => {
+    expect(drafts).toContain("承認済み構成案と記事テーマに必要な情報を調査する");
+    expect(drafts).toContain("これらに限らず、読者の判断に役立つ具体的な情報があれば調査してよい");
+    expect(drafts).toContain("報道記事や専門メディアも情報収集に使ってよい");
+    expect(drafts).not.toContain("台帳対象は次に限定する");
+  });
+
+  it("執筆入力は承認済み情報と確定事実に限定し、評価用プロパティを渡さない", () => {
+    expect(drafts).toContain("狙う読者");
+    expect(drafts).toContain("検索意図");
+    expect(drafts).toContain("想定CTA");
+    expect(drafts).toContain("一次情報メモ");
+    expect(drafts).toContain("`勝ち筋` と `成功指標` は本文生成へ渡さない");
   });
 
   it("再生成では既存下書きのslugを維持し、取得不能なら投入を止める", () => {
     expect(drafts).toContain("既存下書きのslugを読み直し");
     expect(drafts).toContain("記事URLを維持");
     expect(drafts).toContain("元slugを取得できない場合は安全側で投入を中断");
+  });
+});
+
+describe("承認画面プロトタイプのプロンプト表示", () => {
+  const view = readFileSync(
+    path.join(process.cwd(), "src/app/growth/approve-proto/PromptRegistryView.tsx"),
+    "utf-8"
+  );
+
+  it("本番と同じPromptsView/APIを使い、ハードコード本文を参照しない", () => {
+    expect(view).toContain("PromptsView");
+    expect(view).not.toContain("promptData");
+    expect(view).not.toContain("PROTO_PROMPTS");
+  });
+
+  it("プロンプト台帳でも文体例を自動下書き工程へ案内しない", () => {
+    const registry = readFileSync(
+      path.join(process.cwd(), "scripts/growth/promptRegistry.ts"),
+      "utf-8"
+    );
+    expect(registry).not.toContain("下書き生成時に文体を真似る");
+    expect(registry).not.toContain('stage: "編集者ゲート"');
   });
 });

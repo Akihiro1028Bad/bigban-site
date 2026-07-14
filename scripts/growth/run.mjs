@@ -38,6 +38,7 @@ const FAILURE_LOG_PATH = "data/growth-failures.log";
 
 // 共通の許可ツール。Claude headless では Notion が mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
+const DRAFTS_COMMON = COMMON.filter((tool) => tool !== "Task");
 
 // 旧環境変数は手動上書き用として維持する。無指定時は工程別の共有設定を使う。
 const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "";
@@ -78,11 +79,11 @@ const MODES = {
     ],
   },
   // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
-  drafts: { prompt: "drafts.md", allow: [...COMMON, "Write", "Bash"] },
+  drafts: { prompt: "drafts.md", allow: [...DRAFTS_COMMON, "Write", "Bash"] },
   // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけ drafts.md を起動する。
   "drafts-auto": {
     prompt: "drafts.md",
-    allow: [...COMMON, "Write", "Bash"],
+    allow: [...DRAFTS_COMMON, "Write", "Bash"],
     lock: true,
   },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
@@ -292,7 +293,7 @@ const imagePromptInput =
     ? `\n\n<input_json>\n${JSON.stringify({ specPath: imagePromptSpecPath, proposalPath: imagePromptProposalPath })}\n</input_json>`
     : "";
 const basePrompt = `${promptBody}${imagePromptInput}`;
-const prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${basePrompt}` : basePrompt;
+let prompt = AGENT === "codex" ? `${CODEX_RUNTIME_PREAMBLE}\n\n${basePrompt}` : basePrompt;
 
 function buildClaudeArgs() {
   // プロンプトは stdin で渡すので引数には含めない
@@ -528,6 +529,23 @@ function peekShouldRunLoop() {
   return shouldRunLoopFromPeek(res.stdout ?? "", res.status);
 }
 
+/** drafts-auto はロック内で1件を先に claim し、その pageId だけを AI 入力へ固定する。 */
+function claimDraftsAutoTarget() {
+  if (mode !== "drafts-auto") return "";
+  const npm = isWin ? "npm.cmd" : "npm";
+  const res = spawnSync(
+    npm,
+    ["run", "--silent", "growth:drafts-auto-peek", "--", "claim"],
+    {
+      encoding: "utf-8",
+      shell: isWin,
+      env: { ...process.env },
+    }
+  );
+  if ((res.status ?? 1) !== 0) return "";
+  return String(res.stdout ?? "").trim().split("\n").filter(Boolean).pop() ?? "";
+}
+
 /**
  * AI を起動する前に、決定的 CLI で stale 行を必ず回収する。
  * reap が失敗した状態で新しい依頼を claim すると滞留を増やすため、失敗時は安全側で停止する。
@@ -648,6 +666,19 @@ if (cfg.lock) {
     process.stdout.write(`${mode}: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
     process.exit(0);
   }
+}
+
+if (mode === "drafts-auto") {
+  const targetPageId = claimDraftsAutoTarget();
+  if (!targetPageId) {
+    releaseReviseLock();
+    notifyLoopFail("claim-failed", {
+      exitCode: 1,
+      detail: "下書き対象1件のclaimに失敗",
+    });
+    process.exit(1);
+  }
+  prompt += `\n\n<draft_target page_id="${targetPageId}">\nこのページIDの1件だけを処理する。ほかの記事は取得・更新しない。\n</draft_target>`;
 }
 
 /**

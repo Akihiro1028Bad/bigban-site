@@ -15,13 +15,23 @@ describe("scoreArticle", () => {
     expect(score.block + score.warn + score.ok).toBe(score.checks.length);
   });
 
-  it("AI免責文欠落・断定NG は block にカウントされる", () => {
+  it("AI免責文欠落・明確な禁止表現は block にカウントされる", () => {
     const score = scoreArticle({
-      title: "料金の話",
-      bodyHtml: `<p>1時間2,000円です。</p>`,
+      title: "営業時間の話",
+      bodyHtml: `<p>24時間営業です。</p>`,
     });
     expect(score.blocked).toBe(true);
     expect(score.block).toBeGreaterThanOrEqual(2);
+  });
+
+  it("確認済みのイベント事実はblockに数えない", () => {
+    const fact = "体験会は7月20日に開催します";
+    const score = scoreArticle({
+      title: "体験会",
+      bodyHtml: `<h2>体験会</h2><p>${fact}。${DISCLAIMER}</p>`,
+      confirmedFacts: [fact],
+    });
+    expect(score.blocked).toBe(false);
   });
 });
 
@@ -46,7 +56,7 @@ describe("compareArticles", () => {
 
   it("block が増えれば regressed", () => {
     const before = { title: "本八幡で雨でも打てる", bodyHtml: cleanBody };
-    const after = { title: "本八幡で雨でも打てる", bodyHtml: `<p>月額8,000円で営業時間は9時から。</p>` };
+    const after = { title: "本八幡で雨でも打てる", bodyHtml: `<p>24時間営業です。</p>` };
     const cmp = compareArticles(before, after);
     expect(cmp.blockDelta).toBeGreaterThan(0);
     expect(cmp.verdict).toBe("regressed");
