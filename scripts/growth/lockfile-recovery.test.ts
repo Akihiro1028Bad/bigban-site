@@ -117,13 +117,13 @@ describe("所有者を守る解放", () => {
     const lockPath = path.join(dir, "worker.lock");
     writeFileSync(lockPath, String(process.pid));
     utimesSync(lockPath, new Date(0), new Date(0));
-    let contender: ReturnType<typeof acquireLock> | null = null;
+    const contenders: ReturnType<typeof acquireLock>[] = [];
     try {
       releaseLock(lockPath, { rmSync(target: string, options: { force?: boolean }) {
-        if (target === lockPath && contender === null) contender = acquireLock(lockPath, { pid: 999_998 });
+        if (target === lockPath && contenders.length === 0) contenders.push(acquireLock(lockPath, { pid: 999_998 }));
         rmSync(target, options);
       } });
-      expect(contender?.acquired).toBe(false);
+      expect(contenders[0]?.acquired).toBe(false);
       expect(() => readFileSync(lockPath, "utf8")).toThrow();
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
