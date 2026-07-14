@@ -226,6 +226,9 @@ export const DRAFT_LINK_PROPS = {
   draftKey: "下書きプレビューキー",
 } as const;
 
+/** 構成からの再生成中だけ、旧contentIdを退避するrich_textプロパティ。 */
+export const REBUILD_SOURCE_ID_PROP = "再生成元下書きID";
+
 /**
  * 下書き本文HTMLのミラー保存先プロパティ名(#95)。
  * 公開キーで microCMS 下書きを読まない方針のため、本文HTMLを Notion 側にミラーし、

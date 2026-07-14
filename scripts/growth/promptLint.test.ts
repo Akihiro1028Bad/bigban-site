@@ -109,3 +109,32 @@ describe("記事ネタ案ルールの共通化", () => {
     expect(shared).toContain("最大1件");
   });
 });
+
+describe("下書き生成の構成案契約", () => {
+  const drafts = readFileSync(
+    path.join(process.cwd(), "scripts/growth/prompts/drafts.md"),
+    "utf-8"
+  );
+
+  it("現在の構成案を必須入力とし、見出しと順序を維持する", () => {
+    expect(drafts).toContain("現在の `構成案` を必ず読む");
+    expect(drafts).toContain("見出しレベル・見出し名・順序");
+    expect(drafts).toContain("構成を再設計しない");
+  });
+
+  it("前回本文と根拠台帳を参照しない", () => {
+    expect(drafts).toContain("`下書き本文HTML` と `根拠台帳` は読まない");
+  });
+
+  it("参考資料対象を発行年とは別の項目で明示する", () => {
+    expect(drafts).toContain("`reference_eligible`");
+    expect(drafts).toContain("`referenceEligible`");
+    expect(drafts).toContain("統計・数値・健康関連");
+  });
+
+  it("再生成では既存下書きのslugを維持し、取得不能なら投入を止める", () => {
+    expect(drafts).toContain("既存下書きのslugを読み直し");
+    expect(drafts).toContain("記事URLを維持");
+    expect(drafts).toContain("元slugを取得できない場合は安全側で投入を中断");
+  });
+});

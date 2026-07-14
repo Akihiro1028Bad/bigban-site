@@ -45,7 +45,7 @@ import {
   buildDraftFailureMessage,
   classifyDraftFailure,
 } from "./draft-notify";
-import { fetchDraftKey } from "./draft-meta";
+import { fetchContentSlug, fetchDraftKey } from "./draft-meta";
 import {
   growthEndpoint,
   growthMediaForRow,
@@ -61,6 +61,7 @@ import {
   buildBodyMirrorProps,
   buildDraftLinkProps,
   buildEyecatchMirrorProps,
+  getPage,
   updatePageProps,
 } from "./notion";
 import {
@@ -70,10 +71,18 @@ import {
 } from "./notify-throttle";
 import {
   buildSourceLedgerProps,
+  hasReferenceEligibleSource,
   parseSourceLedger,
   updatePagePropsWithLedgerFallback,
 } from "./sourceLedger";
 import { runStages, type Stage } from "./pipeline";
+import {
+  buildRebuildSourceClearProps,
+  preserveRebuildSourceSlug,
+  rebuildSourceIdOf,
+  validatedRebuildSourceId,
+} from "./rebuildDraft";
+import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
 import { evaluatePublishGate, resolveGateArticleType } from "./publishGate";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -191,6 +200,53 @@ async function main(): Promise<void> {
   }
 
   const stages: Stage[] = [];
+  const parsedLedger = parseSourceLedger(spec.sourceLedger);
+  let rebuildSourceId = "";
+
+  // 構成案ゲート: Notion連携のある通常フローでは、投入直前に現在の構成案を読み直す。
+  // 取得失敗・空・本文との不一致は安全側で停止する。notion無しの手動specは後方互換でスキップ。
+  if (spec.notion) {
+    stages.push({
+      name: "outline-gate",
+      run: async () => {
+        const page = await getPage(spec.notion!.pageId, {
+          token: requireEnv("NOTION_TOKEN"),
+          fetchFn: defaultFetch,
+        });
+        const gate = evaluateOutlineCompliance(
+          outlineFromPage(page),
+          String(spec.payload.bodyHtml ?? ""),
+          { allowGeneratedReferences: hasReferenceEligibleSource(parsedLedger.entries) }
+        );
+        if (!gate.ok) {
+          throw new Error(`構成案ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);
+        }
+        rebuildSourceId = validatedRebuildSourceId(rebuildSourceIdOf(page)) ?? "";
+        if (rebuildSourceId !== "") {
+          const metaOptions = {
+            serviceDomain,
+            apiKey: requireEnv("MICROCMS_API_KEY"),
+            fetchFn: defaultFetch,
+          };
+          const sourceDraftKey = await fetchDraftKey(
+            ENDPOINT,
+            rebuildSourceId,
+            metaOptions
+          );
+          if (sourceDraftKey === null) {
+            throw new Error("再生成元下書きのdraftKeyを取得できませんでした");
+          }
+          const sourceSlug = await fetchContentSlug(
+            ENDPOINT,
+            rebuildSourceId,
+            sourceDraftKey,
+            metaOptions
+          );
+          spec.payload = preserveRebuildSourceSlug(spec.payload, sourceSlug);
+        }
+      },
+    });
+  }
 
   // 品質ゲート(P1-B 案B): 投入前に draftQuality の block を判定し、1つでもあれば中断する。
   // 画像生成や microCMS 投入の前に止めることで、不合格の下書きを作らず API 課金も無駄にしない。
@@ -275,7 +331,12 @@ async function main(): Promise<void> {
       // Bug1: columns の articleType(kind=select)は配列を要求する。LLM が文字列で
       // 吐いても初回 create が HTTP 400 で落ちないよう、投入直前に配列へ矯正する。
       const createPayload = normalizeColumnsSelectFields(ENDPOINT, spec.payload);
-      contentId = await createDraft(ENDPOINT, createPayload, microOpts);
+      contentId = await createDraft(
+        ENDPOINT,
+        createPayload,
+        microOpts,
+        rebuildSourceId || undefined
+      );
     },
   });
 
@@ -340,8 +401,7 @@ async function main(): Promise<void> {
           process.stderr.write(`(draftKey 取得に失敗・プレビューキーなしで継続: ${m})\n`);
         }
         // #根拠台帳: 台帳を検証し、除外があれば沈黙させず LINE 通知する(投入は落とさない)。
-        const { entries: ledgerEntries, warnings: ledgerWarnings } =
-          parseSourceLedger(spec.sourceLedger);
+        const { entries: ledgerEntries, warnings: ledgerWarnings } = parsedLedger;
         for (const w of ledgerWarnings) {
           process.stderr.write(`${w}\n`);
           await notifyLineBestEffort(w);
@@ -356,6 +416,7 @@ async function main(): Promise<void> {
           ...buildBodyMirrorProps(String(spec.payload.bodyHtml ?? "")),
           // #141: アイキャッチURLも Notion へミラーし、承認画面のプレビューが表示できるようにする。
           ...buildEyecatchMirrorProps(eyecatchUrl),
+          ...(rebuildSourceId !== "" ? buildRebuildSourceClearProps() : {}),
         };
         // #根拠台帳: 同じ PATCH に台帳をマージして保存する(API 呼び出しを増やさない)。
         // 「根拠台帳」プロパティ未追加でも本体保存は成功させる(欠落耐性=台帳抜きでリトライ)。

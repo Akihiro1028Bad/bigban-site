@@ -120,6 +120,35 @@ describe("createDraft（冪等 upsert: PUT→既存ならPATCH）", () => {
     expect(fetchFn.mock.calls[1][1].method).toBe("PATCH");
   });
 
+  it("更新先contentIdを指定してもpayloadの元slugを維持する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okId("stable-content-id"));
+
+    const id = await createDraft(
+      "news",
+      { slug: "Pickleball Skill_Roadmap!", title: "T2" },
+      opts(fetchFn),
+      "stable-content-id"
+    );
+
+    expect(id).toBe("stable-content-id");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe(
+      "https://thepicklebang.microcms.io/api/v1/news/stable-content-id?status=draft"
+    );
+    expect(init.body).toBe(
+      JSON.stringify({ slug: "Pickleball Skill_Roadmap!", title: "T2" })
+    );
+  });
+
+  it("不正な更新先contentIdは送信前に拒否する", async () => {
+    const fetchFn = vi.fn<FetchFn>();
+
+    await expect(
+      createDraft("news", { slug: "original-slug" }, opts(fetchFn), "../other")
+    ).rejects.toThrow(/contentId/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it("slug が無い payload は例外", async () => {
     const fetchFn = vi.fn<FetchFn>();
     await expect(

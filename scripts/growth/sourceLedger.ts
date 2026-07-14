@@ -34,12 +34,26 @@ const entrySchema = z.object({
   source: z.string().min(1),
   /** 発行年。統計・数値主張は必須だがスキーマ上は任意(プロンプト規律で担保)。 */
   publishedYear: z.number().int().optional(),
+  /** §15の参考資料欄の対象となる統計・数値・健康関連の主張か。旧specでは安全側で未指定。 */
+  referenceEligible: z.boolean().optional(),
   confidence: z.enum(CONFIDENCES),
   usableInArticle: z.boolean(),
   reason: z.string().min(1),
 });
 
 export type SourceLedgerEntry = z.infer<typeof entrySchema>;
+
+/** §15の参考資料欄に使える、対象区分が明示された使用可能な外部根拠があるか。 */
+export function hasReferenceEligibleSource(
+  entries: readonly SourceLedgerEntry[]
+): boolean {
+  return entries.some(
+    (entry) =>
+      entry.usableInArticle &&
+      (entry.sourceType === "official-site" || entry.sourceType === "search-result") &&
+      entry.referenceEligible === true
+  );
+}
 
 export interface ParseSourceLedgerResult {
   /** 検証を通過したエントリ。 */
@@ -89,6 +103,7 @@ function renderEntry(entry: SourceLedgerEntry): string {
     entry.sourceType,
     entry.source,
     year,
+    String(entry.referenceEligible ?? false),
     entry.confidence,
     String(entry.usableInArticle),
     entry.reason,
