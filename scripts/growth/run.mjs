@@ -595,13 +595,33 @@ function logSkipped(detail) {
   });
 }
 
+function logLockRecovery(lockResult) {
+  if (!lockResult.recovery) return;
+  const previousPid = lockResult.previousPid ?? "不明";
+  const detail =
+    lockResult.recovery === "dead-pid"
+      ? `死亡 PID ${previousPid} の共有 lock を自動回収`
+      : `30分超過の共有 lock を自動回収 (旧 PID: ${previousPid})`;
+  runWorkerLog("reconcile", {
+    mode,
+    status: "reconcile",
+    kind: "info",
+    name: `${mode} lock recovered`,
+    "target-type": "system",
+    detail,
+    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+  });
+}
+
 // lock 系ループは高頻度起動。多重起動を lockfile で防ぎ、依頼ありの実作業だけ1日上限に数える。
 if (cfg.lock) {
-  if (!acquireReviseLock()) {
+  const lockResult = acquireReviseLock();
+  if (!lockResult.acquired) {
     logSkipped("既に実行中のためスキップ");
     process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
     process.exit(0);
   }
+  logLockRecovery(lockResult);
   if (PULL_LOOP_COMMANDS[mode] && !reapBeforePeek()) {
     releaseReviseLock();
     notifyLoopFail("reap-failed", { exitCode: 1, detail: "AI 起動前の stale 回収に失敗" });
