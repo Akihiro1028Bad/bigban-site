@@ -7,6 +7,7 @@ import {
   parseFacilityContextData,
   type FacilityContextData,
 } from "./facility-context";
+import facilityContextJson from "./facility-context.json";
 
 const SAMPLE: FacilityContextData = {
   name: "THE PICKLE BANG THEORY",
@@ -16,6 +17,31 @@ const SAMPLE: FacilityContextData = {
   doNotWrite: ["営業時間・定休日", "料金・キャンペーン", "コート面数"],
   notes: "開業日は確定。可変情報は doNotWrite を厳守。",
 };
+
+describe("facility-context.json", () => {
+  it("現在の営業情報・料金・アクセス・HYROX情報を正典として保持する", () => {
+    const context = parseFacilityContextData(facilityContextJson);
+
+    expect(context.openDate).toBe("2026-04-17");
+    expect(context.location).toEqual(expect.arrayContaining([
+      expect.stringContaining("八幡ハタビル6階"),
+      expect.stringContaining("都営新宿線"),
+      expect.stringContaining("京成本線"),
+    ]));
+    expect(context.confirmed).toEqual(expect.arrayContaining([
+      expect.stringContaining("4,980円"),
+      expect.stringContaining("HYROX公式8種目"),
+      expect.stringContaining("関吉大亮"),
+      expect.stringContaining("小さなディンクから、大きなムーブメントへ。"),
+    ]));
+    expect(context.confirmed.join("\n")).not.toContain("第三の居場所");
+    expect(context.doNotWrite).toEqual(expect.arrayContaining([
+      expect.stringContaining("期限付きキャンペーン"),
+      expect.stringContaining("24時間営業"),
+      expect.stringContaining("国内最大"),
+    ]));
+  });
+});
 
 describe("resolveFacilityPhase", () => {
   it("基準日が開業日より前なら pre-open と残り日数を返す", () => {
