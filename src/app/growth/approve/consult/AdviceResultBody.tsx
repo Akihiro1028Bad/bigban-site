@@ -4,8 +4,7 @@
  * AI相談ドロワーのアドバイス提示ボディ(proto へ再スキン)。
  *
  * proto(approve-proto/AdviceResultBody.tsx)の見た目を基に、backend の Advice 型へ adapt。
- * - 総評: RingScore(観点平均を overallFromScores で 0-100 導出) ＋ summary テキスト
- * - scores: axis/score(0-5)/note → 観点バー(幅 = score/5*100%・proto 閾値配色)
+ * - 総評: summary テキスト（主観スコアは表示しない）
  * - strengths: IconArrowUp 見出し
  * - fixes: quote? → area必須・severity・quote?・reason・suggestion(IconChart)。severity バッジ配色。
  *
@@ -17,9 +16,7 @@ import type { Advice, AdviceFix } from "@/lib/growth/advise";
 import { MAX_ADOPTED, selectableAdoptIndexes } from "@/lib/growth/adviseApply";
 import type { FixClassification } from "@/lib/growth/adviseApply";
 
-import { overallFromScores } from "../adviceScore";
 import { IconArrowDown, IconArrowUp, IconChart } from "../ui/icons";
-import { RingScore } from "../ui/primitives";
 
 interface AdviceResultBodyProps {
   advice: Advice;
@@ -42,14 +39,6 @@ const SEVERITY_STYLE: Record<string, { background: string; color: string }> = {
   中: { background: "var(--p-amber-weak)", color: "var(--p-amber)" },
   低: { background: "var(--p-bg-active)", color: "var(--p-text-2)" },
 };
-
-/** score(0-5) → バー配色(0-100 換算の proto 閾値: 80+ 緑 / 65+ accent / else amber)。 */
-function scoreBarColor(score: number): string {
-  const scaled = (score / 5) * 100;
-  if (scaled >= 80) return "var(--p-green)";
-  if (scaled >= 65) return "var(--p-accent)";
-  return "var(--p-amber)";
-}
 
 function renderFix(
   fix: AdviceFix,
@@ -139,58 +128,18 @@ export function AdviceResultBody({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 総評: RingScore(観点平均→0-100 導出) ＋ summary テキスト */}
+      {/* 総評: 主観採点をせず、判断理由が分かる短い文章だけを表示する。 */}
       <div
-        className="flex items-center gap-4 rounded-[12px] p-4"
+        className="rounded-[12px] p-4"
         style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
       >
-        <RingScore value={overallFromScores(advice.scores)} size={64} />
-        <div className="flex-1">
-          <div className="text-[11px] uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
-            総評
-          </div>
-          <p className="mt-1 text-[13px]" style={{ color: "var(--p-text-2)" }}>
-            {advice.summary}
-          </p>
+        <div className="text-[11px] uppercase tracking-wider" style={{ color: "var(--p-text-3)" }}>
+          総評
         </div>
+        <p className="mt-1 text-[13px]" style={{ color: "var(--p-text-2)" }}>
+          {advice.summary}
+        </p>
       </div>
-
-      {/* 観点別スコア(axis・score/5・note) */}
-      {advice.scores.length > 0 ? (
-        <ul className="m-0 grid list-none grid-cols-2 gap-2.5 p-0" aria-label="観点別スコア">
-          {advice.scores.map((s, i) => (
-            <li
-              key={i}
-              className="rounded-[10px] p-3"
-              style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px]" style={{ color: "var(--p-text-2)" }}>
-                  {s.axis}
-                </span>
-                <span className="text-[12px] font-semibold tabular-nums">{s.score}/5</span>
-              </div>
-              <div
-                className="mt-2 h-[5px] overflow-hidden rounded-full"
-                style={{ background: "var(--p-bg-active)" }}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${(s.score / 5) * 100}%`,
-                    background: scoreBarColor(s.score),
-                  }}
-                />
-              </div>
-              {s.note ? (
-                <div className="mt-1.5 text-[11px]" style={{ color: "var(--p-text-3)" }}>
-                  {s.note}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       {/* 強み */}
       {advice.strengths.length > 0 ? (

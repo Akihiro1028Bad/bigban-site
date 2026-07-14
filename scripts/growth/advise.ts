@@ -3,7 +3,7 @@
  *
  * 構成案修正ループ(#40)・画像再生成(#144/#156)と同方式の **pull 型**: 承認画面が Notion に
  * 「アドバイス依頼」を書き、自宅 PC の claude が下書き(本文＋タイトル)を style-guide に照らして
- * 分析し、**○×でなく具体的・実行可能な助言**(強み／直すべき点〔引用＋理由＋修正案〕／観点別スコア)を
+ * 分析し、**○×や主観採点でなく具体的・実行可能な助言**(強み／直すべき点〔引用＋理由＋修正案〕)を
  * Notion に書き戻す。承認画面が読んで表示する。**read-only**: 本文や下書きは書き換えない。
  *
  * 決定的な Notion 書き込み・通知・ロック・回収は CLI(`advise-cli.ts`)が行い、ここは I/O を持たない
@@ -51,9 +51,9 @@ export const ADVISE_BUSY_STATUSES: readonly AdviceStatus[] = ["依頼中", "処�
 export const ADVICE_SEVERITIES = ["高", "中", "低"] as const;
 
 const AdviceScoreSchema = z.object({
-  /** 観点名(§11 ルブリック: 検索意図/具体性/4段構成/独自視点/読みやすさ/正確性 など)。 */
+  /** 過去に保存済みのアドバイスとの後方互換用。新規生成では使用しない。 */
   axis: z.string().min(1),
-  /** 0〜5 点。 */
+  /** 過去データの点数。 */
   score: z.number().int().min(0).max(5),
   /** 一言メモ(任意)。 */
   note: z.string().optional(),
@@ -71,7 +71,8 @@ const AdviceFixSchema = z.object({
 
 export const AdviceSchema = z.object({
   summary: z.string().min(1),
-  scores: z.array(AdviceScoreSchema),
+  /** 旧形式との後方互換。新しい記事アドバイスは採点しない。 */
+  scores: z.array(AdviceScoreSchema).default([]),
   strengths: z.array(z.string().min(1)),
   fixes: z.array(AdviceFixSchema),
 });

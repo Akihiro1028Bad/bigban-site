@@ -65,8 +65,21 @@ describe("parseAdvice / serializeAdvice", () => {
     expect(parseAdvice("{壊れ")).toBeNull();
   });
 
+  it("主観採点を含まないアドバイスを受理する", () => {
+    const withoutScores = {
+      summary: "読者の判断に不要な制度説明が重複している。",
+      strengths: ["3つの選択肢が最初に分かる"],
+      fixes: [],
+    };
+
+    expect(parseAdvice(JSON.stringify(withoutScores))).toEqual({
+      ...withoutScores,
+      scores: [],
+    });
+  });
+
   it("スキーマ不一致(必須欠落・型違い)は null", () => {
-    expect(parseAdvice(JSON.stringify({ summary: "x" }))).toBeNull(); // scores等欠落
+    expect(parseAdvice(JSON.stringify({ summary: "x" }))).toBeNull(); // strengths/fixes 欠落
     expect(parseAdvice(JSON.stringify({ ...VALID_ADVICE, scores: [{ axis: "x", score: 9 }] }))).toBeNull(); // 0-5外
     expect(
       parseAdvice(JSON.stringify({ ...VALID_ADVICE, fixes: [{ area: "文体", severity: "致命", reason: "r", suggestion: "s" }] }))
