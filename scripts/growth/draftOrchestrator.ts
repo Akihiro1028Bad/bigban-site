@@ -295,6 +295,7 @@ export function parseValidatedWriterOutput(
     ...raw,
     bodyHtml: bindings.cleanBodyHtml,
     factReferences: bindings.references,
+    binding: bindings.binding,
   };
   validateWriterContract(writer, research, preparedOutline);
   return writer;
@@ -507,6 +508,7 @@ export function assemblePublishSpec(params: {
       writer.usedFactIds,
       writer.factReferences,
       (statement, excerpt) => recheckReasonForFactReference(statement, excerpt, doNotWrite),
+      writer.binding,
     ),
     notion: { pageId: input.pageId, property: "ステータス", value: "下書き作成済み" },
   };

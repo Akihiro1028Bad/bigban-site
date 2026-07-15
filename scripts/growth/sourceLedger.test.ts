@@ -5,11 +5,14 @@ import {
   confirmedFactsFromEntries,
   confirmedFactsFromPage,
   confirmedFactsFromRenderedText,
+  factBindingFromEntries,
+  factBindingFromPage,
   hasReferenceEligibleSource,
   parseSourceLedger,
   renderSourceLedgerText,
   SOURCE_LEDGER_PROP,
   updatePagePropsWithLedgerFallback,
+  withBindingBodyHash,
   type SourceLedgerEntry,
 } from "./sourceLedger";
 
@@ -28,6 +31,8 @@ const auditReference = {
   containerIndex: 2,
   recheckBeforePublish: true,
   recheckReason: "料金",
+  bindingVersion: 1,
+  bodyHash: "fnv1a64:abc",
 };
 
 const legacyEntry = {
@@ -189,8 +194,35 @@ describe("renderSourceLedgerText", () => {
 
   it("親行の下へfact監査行を表示し、品質ゲートのfact復元には混ぜない", () => {
     const text = renderSourceLedgerText([{ ...validEntry, factReferences: [auditReference] }]);
-    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] 料金 > p#2 「参加費は500円」");
+    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] [binding:v1;hash=fnv1a64:abc] 料金 > p#2");
+    expect(text).toContain("根拠「参加費は500円」");
+    expect(text).toContain("[binding:v1;hash=fnv1a64:abc]");
     expect(confirmedFactsFromRenderedText(text)).toEqual(validEntry.confirmedFacts);
+  });
+
+  it("bindingメタデータをentry・Notionテキストから復元し、不整合をinvalidにする", () => {
+    const entry = { ...validEntry, factReferences: [auditReference] };
+    expect(factBindingFromEntries([entry])).toEqual({
+      version: 1,
+      bodyHash: "fnv1a64:abc",
+      referenceCount: 1,
+      isValid: true,
+    });
+    expect(factBindingFromEntries([validEntry])).toBeUndefined();
+    expect(factBindingFromEntries([{ ...entry, factReferences: [auditReference, { ...auditReference, bodyHash: "fnv1a64:def" }] }])?.isValid).toBe(false);
+    const page = {
+      id: "page-binding",
+      url: "",
+      properties: { 根拠台帳: { rich_text: [{ plain_text: renderSourceLedgerText([entry]) }] } },
+    };
+    expect(factBindingFromPage(page)).toMatchObject({ bodyHash: "fnv1a64:abc", isValid: true });
+  });
+
+  it("最終本文に合わせて全referenceのhashを更新する", () => {
+    const entry = { ...validEntry, factReferences: [auditReference] };
+    const updated = withBindingBodyHash([entry], "<p>最終本文</p>");
+    expect(updated[0].factReferences?.[0].bodyHash).not.toBe(auditReference.bodyHash);
+    expect(entry.factReferences[0].bodyHash).toBe("fnv1a64:abc");
   });
 
   it("再確認不要・見出しなしの監査行も表示する", () => {
@@ -202,7 +234,7 @@ describe("renderSourceLedgerText", () => {
         recheckBeforePublish: false,
         recheckReason: undefined,
       }],
-    }])).toContain("↳ fact-price p#2");
+    }])).toContain("↳ fact-price [binding:v1;hash=fnv1a64:abc] p#2");
     expect(renderSourceLedgerText([{
       ...validEntry,
       factReferences: [{ ...auditReference, recheckReason: undefined }],

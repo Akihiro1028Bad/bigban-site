@@ -6,10 +6,20 @@ import {
   publishGateReason,
   resolveGateArticleType,
 } from "./publishGate";
+import { bindingBodyHash } from "./factBindingMetadata";
 
 const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 describe("evaluatePublishGate", () => {
+  it("検証後に本文が変わったbindingを公開blockする", () => {
+    const original = `<p>料金は500円です。${DISCLAIMER}</p>`;
+    const changed = `<p>料金は600円です。${DISCLAIMER}</p>`;
+    const factBinding = { version: 1, bodyHash: bindingBodyHash(original), referenceCount: 1, isValid: true };
+    expect(evaluatePublishGate({ title: "料金", bodyHtml: original, factBinding }).ok).toBe(true);
+    const result = evaluatePublishGate({ title: "料金", bodyHtml: changed, factBinding });
+    expect(result.ok).toBe(false);
+    expect(result.blockReasons.some((reason) => reason.includes("fact binding"))).toBe(true);
+  });
   it("fact markerが残った本文を公開不可にする", () => {
     const result = evaluatePublishGate({
       title: "料金",

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { SourceLedgerEntry } from "./sourceLedger";
 import type { FactReference } from "./factBinding";
+import type { FactBindingMetadata } from "./factBindingMetadata";
 
 export const RESERVE_URL = "https://www.thepicklebang.com/reserve";
 
@@ -116,6 +117,7 @@ export type WriterOutput = z.infer<typeof writerOutputSchema>;
 export interface ValidatedWriterOutput extends Omit<WriterOutput, "bodyHtml"> {
   bodyHtml: string;
   factReferences: FactReference[];
+  binding: FactBindingMetadata;
 }
 
 export interface ResearchTrustedSources {
@@ -192,6 +194,7 @@ export function buildSourceLedgerFromUsedFacts(
   usedFactIds: readonly string[],
   factReferences: readonly FactReference[] = [],
   recheckReasonForReference?: (statement: string, excerpt: string) => string | undefined,
+  binding?: FactBindingMetadata,
 ): SourceLedgerEntry[] {
   const used = new Set(usedFactIds);
   const grouped = new Map<string, SourceLedgerEntry>();
@@ -201,7 +204,7 @@ export function buildSourceLedgerFromUsedFacts(
     const current = grouped.get(key);
     if (current) {
       if (!current.confirmedFacts.includes(fact.statement)) current.confirmedFacts.push(fact.statement);
-      appendFactReferences(current, fact, factReferences, recheckReasonForReference);
+      appendFactReferences(current, fact, factReferences, recheckReasonForReference, binding);
       continue;
     }
     grouped.set(key, {
@@ -209,7 +212,7 @@ export function buildSourceLedgerFromUsedFacts(
       source: fact.source,
       confirmedFacts: [fact.statement],
     });
-    appendFactReferences(grouped.get(key)!, fact, factReferences, recheckReasonForReference);
+    appendFactReferences(grouped.get(key)!, fact, factReferences, recheckReasonForReference, binding);
   }
   return [...grouped.values()];
 }
@@ -219,6 +222,7 @@ function appendFactReferences(
   fact: ResearchFact,
   references: readonly FactReference[],
   recheckReasonForReference?: (statement: string, excerpt: string) => string | undefined,
+  binding?: FactBindingMetadata,
 ): void {
   const matching = references.filter((reference) => reference.factId === fact.id);
   if (matching.length === 0) return;
@@ -238,6 +242,7 @@ function appendFactReferences(
       containerIndex: reference.containerIndex,
       recheckBeforePublish: reason !== undefined,
       ...(reason ? { recheckReason: reason } : {}),
+      ...(binding ? { bindingVersion: binding.version, bodyHash: binding.bodyHash } : {}),
     });
   }
 }

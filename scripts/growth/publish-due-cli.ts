@@ -48,6 +48,7 @@ import {
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { confirmedFactsFromPage, factBindingFromPage } from "./sourceLedger";
 import { queryAllDataSource } from "./notionRepository";
 import {
   failureSignature,
@@ -55,7 +56,6 @@ import {
   type NotifyThrottleRecord,
 } from "./notify-throttle";
 import { publishGateReason, resolveGateArticleType } from "./publishGate";
-import { confirmedFactsFromPage } from "./sourceLedger";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -187,7 +187,8 @@ async function main(): Promise<void> {
       title,
       resolveGateArticleType({}),
       knownNewsPaths,
-      confirmedFactsFromPage(page)
+      confirmedFactsFromPage(page),
+      factBindingFromPage(page),
     );
     if (reason) {
       console.warn(`[publish-due] 公開直前ゲートでスキップ: ${title || page.id}: ${reason}`);

@@ -31,7 +31,7 @@ import { knownArticlePathsForMedia } from "@/lib/growth/knownArticlePaths";
 import { buildGrowthOperationResult } from "@/lib/growth/operationOutcome";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 import { publishGateReason, resolveGateArticleType } from "@/lib/growth/publishGate";
-import { confirmedFactsFromPage } from "@/lib/growth/sourceLedger";
+import { confirmedFactsFromPage, factBindingFromPage } from "@/lib/growth/sourceLedger";
 import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 
@@ -208,7 +208,8 @@ export async function POST(request: Request): Promise<Response> {
       ideaTitleOf(page).trim(),
       resolveGateArticleType({}),
       knownNewsPaths,
-      confirmedFactsFromPage(page)
+      confirmedFactsFromPage(page),
+      factBindingFromPage(page),
     );
     if (gateReason) {
       return NextResponse.json(

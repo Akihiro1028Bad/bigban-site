@@ -15,6 +15,8 @@ import {
   type ArticleType,
 } from "../../src/app/growth/approve/draftQuality";
 
+import type { StoredFactBindingMetadata } from "./sourceLedger";
+
 export interface PublishGateInput {
   /** 下書き本文 HTML(画像置換前で可。block 判定は本文テキストとリンクに依存)。 */
   bodyHtml: string;
@@ -25,6 +27,7 @@ export interface PublishGateInput {
   /** 既知の記事リンクパス。渡すと壊れた内部リンクを block にする。 */
   knownNewsPaths?: ReadonlySet<string>;
   confirmedFacts?: readonly string[];
+  factBinding?: StoredFactBindingMetadata;
 }
 
 export interface PublishGateResult {
@@ -77,6 +80,7 @@ export function evaluatePublishGate(input: PublishGateInput): PublishGateResult 
     articleType: input.articleType,
     knownNewsPaths: input.knownNewsPaths,
     confirmedFacts: input.confirmedFacts,
+    factBinding: input.factBinding,
   });
   const blockReasons = checks
     .filter((c) => c.level === "block")
@@ -90,9 +94,10 @@ export function publishGateReason(
   title: string,
   articleType?: ArticleType,
   knownNewsPaths?: ReadonlySet<string>,
-  confirmedFacts?: readonly string[]
+  confirmedFacts?: readonly string[],
+  factBinding?: StoredFactBindingMetadata,
 ): string | null {
-  const result = evaluatePublishGate({ bodyHtml, title, articleType, knownNewsPaths, confirmedFacts });
+  const result = evaluatePublishGate({ bodyHtml, title, articleType, knownNewsPaths, confirmedFacts, factBinding });
   if (result.ok) return null;
   return result.blockReasons.join(" / ");
 }

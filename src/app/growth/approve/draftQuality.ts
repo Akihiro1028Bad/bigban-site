@@ -9,6 +9,9 @@
  */
 
 import { styleLint, styleLintSummary } from "@/lib/growth/styleLint";
+import { bindingBodyHash, FACT_BINDING_VERSION } from "@/lib/growth/factBindingMetadata";
+import type { StoredFactBindingMetadata } from "@/lib/growth/sourceLedger";
+
 
 /** 各チェックの重大度。 */
 export type CheckLevel = "ok" | "warn" | "block";
@@ -35,6 +38,8 @@ export interface DraftQualityInput {
   knownNewsPaths?: ReadonlySet<string>;
   /** 公式ページ・施設正典で確認し、確認済み情報源リストに保存した本文用事実。 */
   confirmedFacts?: readonly string[];
+  /** 根拠台帳に保存した binding。未保存の旧記事は互換のため照合対象外。 */
+  factBinding?: StoredFactBindingMetadata;
 }
 
 export const QUALITY_THRESHOLDS = {
@@ -354,8 +359,21 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
   const prohibitedClaims = detectProhibitedClaims(plain, input.confirmedFacts);
   const unsafeHtml = detectUnsafeHtml(input.bodyHtml);
   const hasDisclaimer = plain.includes(DISCLAIMER_MARK);
+  const binding = input.factBinding;
+  const isBindingValid = binding === undefined || (
+    binding.isValid
+    && binding.referenceCount > 0
+    && binding.version === FACT_BINDING_VERSION
+    && binding.bodyHash === bindingBodyHash(input.bodyHtml)
+  );
 
   return [
+    {
+      label: "fact binding",
+      value: binding === undefined ? "対象外" : isBindingValid ? "OK" : "本文変更あり",
+      level: isBindingValid ? "ok" : "block",
+      hint: isBindingValid ? undefined : "本文をfactへ再結合してから公開してください",
+    },
     charsCheck(plain, type),
     warnIf("見出し", `${headings}`, headings < t.minHeadings, `${t.minHeadings}個以上を推奨`),
     warnIf("画像", `${images} / 3`, images < t.minImages, "1枚以上を推奨"),

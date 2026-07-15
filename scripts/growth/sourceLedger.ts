@@ -11,6 +11,7 @@
 import { z } from "zod";
 
 import { chunkRichText, type NotionPage } from "./notion";
+import { bindingBodyHash } from "./factBindingMetadata";
 
 /** 確認済み情報源の種別。旧specの search-result は再実行互換のため受理する。 */
 export const SOURCE_TYPES = [
@@ -33,6 +34,8 @@ const factReferenceSchema = z.object({
   containerIndex: z.number().int().positive(),
   recheckBeforePublish: z.boolean(),
   recheckReason: z.string().min(1).optional(),
+  bindingVersion: z.number().int().positive().optional(),
+  bodyHash: z.string().min(1).optional(),
 });
 
 const entrySchema = z.object({
@@ -48,6 +51,61 @@ export interface SourceLedgerEntry {
   source: string;
   confirmedFacts: string[];
   factReferences?: SourceLedgerFactReference[];
+}
+
+export interface StoredFactBindingMetadata {
+  version: number;
+  bodyHash: string;
+  referenceCount: number;
+  isValid: boolean;
+}
+
+function bindingMetadataFromReferences(
+  references: readonly SourceLedgerFactReference[],
+): StoredFactBindingMetadata | undefined {
+  const withMetadata = references.filter(
+    (reference) => reference.bindingVersion !== undefined || reference.bodyHash !== undefined,
+  );
+  if (withMetadata.length === 0) return undefined;
+  const first = withMetadata[0];
+  const isComplete = references.every(
+    (reference) => reference.bindingVersion !== undefined && reference.bodyHash !== undefined,
+  );
+  const isConsistent = withMetadata.every(
+    (reference) => reference.bindingVersion === first.bindingVersion && reference.bodyHash === first.bodyHash,
+  );
+  return {
+    version: first.bindingVersion ?? 0,
+    bodyHash: first.bodyHash ?? "",
+    referenceCount: references.length,
+    isValid: isComplete && isConsistent,
+  };
+}
+
+export function factBindingFromEntries(
+  entries: readonly SourceLedgerEntry[],
+): StoredFactBindingMetadata | undefined {
+  return bindingMetadataFromReferences(entries.flatMap((entry) => entry.factReferences ?? []));
+}
+
+export function withBindingBodyHash(
+  entries: readonly SourceLedgerEntry[],
+  bodyHtml: string,
+): SourceLedgerEntry[] {
+  const bodyHash = bindingBodyHash(bodyHtml);
+  return entries.map((entry) => ({
+    ...entry,
+    confirmedFacts: [...entry.confirmedFacts],
+    ...(entry.factReferences
+      ? {
+          factReferences: entry.factReferences.map((reference) =>
+            reference.bindingVersion === undefined && reference.bodyHash === undefined
+              ? { ...reference }
+              : { ...reference, bodyHash },
+          ),
+        }
+      : {}),
+  }));
 }
 
 const legacyEntrySchema = z.object({
@@ -100,6 +158,34 @@ export function confirmedFactsFromPage(page: NotionPage): string[] {
     | undefined;
   const text = (value?.rich_text ?? []).map((part) => part.plain_text ?? "").join("");
   return confirmedFactsFromRenderedText(text);
+}
+
+function sourceLedgerTextFromPage(page: NotionPage): string {
+  const value = page.properties[SOURCE_LEDGER_PROP] as
+    | { rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  return (value?.rich_text ?? []).map((part) => part.plain_text ?? "").join("");
+}
+
+export function factBindingFromRenderedText(value: string): StoredFactBindingMetadata | undefined {
+  const auditRows = value.split("\n").filter((line) => line.trimStart().startsWith("↳"));
+  const parsed = auditRows.flatMap((line) => {
+    const match = /\[binding:v(\d+);hash=([^\]]+)\]/.exec(line);
+    return match ? [{ version: Number(match[1]), bodyHash: match[2] }] : [];
+  });
+  if (parsed.length === 0) return undefined;
+  const first = parsed[0];
+  return {
+    version: first.version,
+    bodyHash: first.bodyHash,
+    referenceCount: auditRows.length,
+    isValid: parsed.length === auditRows.length
+      && parsed.every((metadata) => metadata.version === first.version && metadata.bodyHash === first.bodyHash),
+  };
+}
+
+export function factBindingFromPage(page: NotionPage): StoredFactBindingMetadata | undefined {
+  return factBindingFromRenderedText(sourceLedgerTextFromPage(page));
 }
 
 /**
@@ -190,7 +276,10 @@ function renderEntry(entry: SourceLedgerEntry): string {
       ? ` [公開前再確認:${reference.recheckReason ?? "要確認"}]`
       : "";
     const path = reference.sectionPath ? `${reference.sectionPath} > ` : "";
-    return `  ↳ ${reference.factId}${recheck} ${path}${reference.container}#${reference.containerIndex} 「${reference.excerpt}」`;
+    const binding = reference.bindingVersion !== undefined && reference.bodyHash !== undefined
+      ? ` [binding:v${reference.bindingVersion};hash=${reference.bodyHash}]`
+      : "";
+    return `  ↳ ${reference.factId}${recheck}${binding} ${path}${reference.container}#${reference.containerIndex} 根拠「${reference.statement}」 本文「${reference.excerpt}」`;
   });
   return [parent, ...auditRows].join("\n");
 }

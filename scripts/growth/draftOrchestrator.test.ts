@@ -469,6 +469,7 @@ describe("draftOrchestrator", () => {
         containerIndex: 1,
         claimKinds: ["proper-noun"],
       }],
+      binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const spec = assemblePublishSpec({
       input: {
@@ -517,6 +518,7 @@ describe("draftOrchestrator", () => {
       bodyHtml: "<p>本文</p>",
       usedFactIds: [],
       factReferences: [],
+      binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const baseInput = {
       pageId: "page-1",

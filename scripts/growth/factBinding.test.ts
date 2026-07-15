@@ -5,6 +5,7 @@ import {
   recheckReasonForFactReference,
   validateAndStripFactBindings,
 } from "./factBinding";
+import { FACT_BINDING_VERSION, bindingBodyHash } from "./factBindingMetadata";
 import type { ResearchFact } from "./draftPipeline";
 
 function fact(id: string, statement: string, sourceLabel?: string): ResearchFact {
@@ -31,6 +32,7 @@ describe("validateAndStripFactBindings", () => {
     expect(validate(bodyHtml, [fact("fact-price", "参加費は4980 円")])).toEqual({
       cleanBodyHtml: "<h2>料金 &amp; 利用</h2><p>説明です。参加費は4,980円。</p>{{IMG:1}}",
       usedFactIds: ["fact-price"],
+      binding: { version: FACT_BINDING_VERSION, bodyHash: bindingBodyHash("<h2>料金 &amp; 利用</h2><p>説明です。参加費は4,980円。</p>{{IMG:1}}") },
       references: [{
         factId: "fact-price",
         excerpt: "参加費は4,980円",
@@ -43,11 +45,17 @@ describe("validateAndStripFactBindings", () => {
   });
 
   it("H2/H3の編集上の数字・一般定性文・空本文はbinding不要", () => {
-    expect(validate("", [], [])).toEqual({ cleanBodyHtml: "", usedFactIds: [], references: [] });
+    expect(validate("", [], [])).toEqual({
+      cleanBodyHtml: "",
+      usedFactIds: [],
+      references: [],
+      binding: { version: FACT_BINDING_VERSION, bodyHash: bindingBodyHash("") },
+    });
     expect(validate("<h2>3つのポイント</h2><p>自分のペースで楽しめます。</p>", [], [])).toEqual({
       cleanBodyHtml: "<h2>3つのポイント</h2><p>自分のペースで楽しめます。</p>",
       usedFactIds: [],
       references: [],
+      binding: { version: FACT_BINDING_VERSION, bodyHash: bindingBodyHash("<h2>3つのポイント</h2><p>自分のペースで楽しめます。</p>") },
     });
   });
 
@@ -165,7 +173,7 @@ describe("validateAndStripFactBindings", () => {
   });
 
   it("AIという語やhref・画像URLは走査しない", () => {
-    const html = '<p>AIが作成した下書きです。</p><a href="https://example.com/2026/500yen">案内</a><img src="https://example.com/3.jpg">';
+    const html = '<p>AIが作成した下書きです。<a href="https://example.com/2026/500yen">案内</a><img src="https://example.com/3.jpg"></p>';
     expect(validate(html, [], []).cleanBodyHtml).toBe(html);
   });
 
@@ -208,6 +216,59 @@ describe("validateAndStripFactBindings", () => {
   it("No.1を統計主張として照合する", () => {
     expect(() => validate("<p>調査でNo.1<!--FACT:fact-rank-->。</p>", [fact("fact-rank", "調査でNo.1")])).not.toThrow();
   });
+
+  it("container外の可視テキストをrejectし、画像markerと空白は許可する", () => {
+    expect(() => validate("<h2>料金</h2><strong>参加費は500円です。</strong>", [], [])).toThrow(/container外/);
+    expect(() => validate("<h2>画像</h2>\n{{IMG:1}}\n<p>説明です。</p>", [], [])).not.toThrow();
+  });
+
+  it.each([
+    ["万円", "<p>参加費は1万円<!--FACT:fact-x-->。</p>", "参加費は10,000円"],
+    ["分", "<p>所要時間は30分<!--FACT:fact-x-->。</p>", "所要時間は30分"],
+    ["月", "<p>開始は4月<!--FACT:fact-x-->。</p>", "開始は4月"],
+    ["倍", "<p>広さは2倍<!--FACT:fact-x-->。</p>", "広さは2倍"],
+    ["順位", "<p>全国2位<!--FACT:fact-x-->。</p>", "全国2位"],
+    ["桁区切り", "<p>参加者は2,000人<!--FACT:fact-x-->。</p>", "参加者は2,000人"],
+  ])("%sを一体のatomとして照合する", (_label, html, statement) => {
+    expect(() => validate(html, [fact("fact-x", statement)])).not.toThrow();
+  });
+
+  it.each([
+    ["年月", "<p>開始は2026年4月<!--FACT:fact-x-->。</p>", "開始は2026年5月"],
+    ["桁区切り", "<p>参加者は2,000人<!--FACT:fact-x-->。</p>", "参加者は1,000人"],
+    ["午前午後", "<p>開始は午前9時<!--FACT:fact-x-->。</p>", "開始は午後9時"],
+  ])("%sの矛盾をrejectする", (_label, html, statement) => {
+    expect(() => validate(html, [fact("fact-x", statement)])).toThrow(/一致/);
+  });
+
+  it("定性的な比較表セルをヘッダーと組み合わせてbindingする", () => {
+    const facts = [
+      fact("fact-name", "施設A"),
+      fact("fact-indoor", "施設Aは屋内コートあり"),
+      fact("fact-reserve", "施設Aは予約可能"),
+    ];
+    expect(() => validate(
+      "<table><tr><th>施設</th><th>屋内コート</th><th>予約</th></tr><tr><td>施設A<!--FACT:fact-name--></td><td>あり<!--FACT:fact-indoor--></td><td>可能<!--FACT:fact-reserve--></td></tr></table>",
+      facts,
+    )).not.toThrow();
+    expect(() => validate(
+      "<table><tr><th>施設</th><th>予約</th></tr><tr><td>施設A<!--FACT:fact-name--></td><td>可能</td></tr></table>",
+      [facts[0]],
+    )).toThrow(/fact marker/);
+  });
+
+  it("publishedYearを統計factのsupport keyに含める", () => {
+    const statistic = { ...fact("fact-stat", "競技人口を公表", "SFIA"), isStatistic: true, publishedYear: 2024 };
+    expect(() => validate("<p>SFIA（2024年）<!--FACT:fact-stat-->。</p>", [statistic])).not.toThrow();
+    expect(() => validate("<h2>参考資料</h2><p>SFIA（2024年）<!--FACT:fact-stat-->。</p>", [statistic])).not.toThrow();
+  });
+
+  it("fact由来の既知名称だけを最長一致し、前置修飾語を取り込まない", () => {
+    expect(() => validate(
+      "<p>最寄りの本八幡駅から徒歩1分<!--FACT:fact-access-->。</p>",
+      [fact("fact-access", "本八幡駅から徒歩1分")],
+    )).not.toThrow();
+  });
 });
 
 describe("recheckReasonForFactReference", () => {
@@ -219,6 +280,29 @@ describe("recheckReasonForFactReference", () => {
     expect(recheckReasonForFactReference("代表は山田氏", "代表は山田氏", [])).toBe("現在の肩書き");
     expect(recheckReasonForFactReference("定員は20人", "定員は20人", [])).toBe("定員");
     expect(recheckReasonForFactReference("体験会を開催", "体験会を開催", [])).toBe("イベント日時");
+    const canonical = [
+      "期限付きキャンペーン、割引率、クーポンコード、キャンペーン価格は確認せずに書かない",
+      "予約先の外部サービス名やRESERVAからLaBOLAへの移行期間は可変情報",
+      "イベント、体験会の開催日時・参加料金・定員・出演者は書かない",
+      "ラウンジスペースは利用可能と断定しない",
+      "24時間営業は現在の営業時間として書かない",
+      "国内最大など比較根拠のない優位表現を使わない",
+      "未公表の会員制度、月額料金、貸切料金、法人利用料金を書かない",
+      "スタッフや選手の肩書き・実績は範囲を超えて書かない",
+    ];
+    const examples = [
+      ["キャンペーン価格を実施", "料金"],
+      ["現在はRESERVAを利用しています", "予約サービス名"],
+      ["出演者は山田氏", "イベント日時"],
+      ["ラウンジスペースを利用できます", "利用可否"],
+      ["24時間営業です", "営業時間"],
+      ["国内最大規模です", "比較優位"],
+      ["法人利用料金は1万円", "料金"],
+      ["現在の肩書きはコーチ", "現在の肩書き"],
+    ] as const;
+    examples.forEach(([excerpt, reason]) => {
+      expect(recheckReasonForFactReference(excerpt, excerpt, canonical)).toBe(reason);
+    });
   });
 
   it("歴史的日付は再確認対象にしない", () => {
