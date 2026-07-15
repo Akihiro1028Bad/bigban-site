@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   runDraftOrchestratorApplication,
+  runWithDraftWorkDirCleanup,
   type DraftOrchestratorApplicationPorts,
 } from "./draftOrchestratorApplication";
 
@@ -59,5 +60,23 @@ describe("runDraftOrchestratorApplication", () => {
 
     await expect(runDraftOrchestratorApplication(dependencies)).rejects.toThrow("notify failed");
     expect(events.at(-1)).toBe("cleanup");
+  });
+});
+
+describe("runWithDraftWorkDirCleanup", () => {
+  it("writer用ディレクトリ作成失敗時も先に作ったresearch用を解放する", async () => {
+    const directories: string[] = [];
+    const cleaned: string[][] = [];
+
+    await expect(runWithDraftWorkDirCleanup(
+      directories,
+      async () => {
+        directories.push("/tmp/research");
+        throw new Error("writer mkdtemp failed");
+      },
+      async (created) => { cleaned.push([...created]); },
+    )).rejects.toThrow("writer mkdtemp failed");
+
+    expect(cleaned).toEqual([["/tmp/research"]]);
   });
 });

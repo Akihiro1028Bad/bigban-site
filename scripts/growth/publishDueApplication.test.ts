@@ -11,9 +11,14 @@ const first: PublishDueCandidate = {
   patch: { title: "one" },
 };
 
-function ports(events: string[], candidates: PublishDueCandidate[] = [first]): PublishDueApplicationPorts {
+function ports(
+  events: string[],
+  candidates: PublishDueCandidate[] = [first],
+  dueCount = candidates.length,
+): PublishDueApplicationPorts<PublishDueCandidate> {
   return {
-    fetchCandidates: async () => { events.push("fetch"); return candidates; },
+    fetchDueItems: async () => { events.push("fetch"); return { items: candidates, total: dueCount }; },
+    prepareCandidate: async (item) => { events.push(`prepare:${item.pageId}`); return item; },
     patchDraft: async (item) => { events.push(`patch:${item.pageId}`); },
     publishContent: async (item) => { events.push(`publish:${item.pageId}`); },
     updatePublishedStatus: async (item) => { events.push(`status:${item.pageId}`); },
@@ -29,7 +34,7 @@ describe("runPublishDueApplication", () => {
     const result = await runPublishDueApplication(ports(events), { isDryRun: false, nowMs: 10 });
     expect(result).toEqual({ due: 1, published: 1, partial: [] });
     expect(events).toEqual([
-      "fetch", "patch:page-1", "publish:page-1", "status:page-1", "clear:page-1",
+      "fetch", "prepare:page-1", "patch:page-1", "publish:page-1", "status:page-1", "clear:page-1",
       "line:⏰ 予約公開: 1件 (対象 1件)",
     ]);
   });
@@ -73,7 +78,7 @@ describe("runPublishDueApplication", () => {
     const events: string[] = [];
     const result = await runPublishDueApplication(ports(events), { isDryRun: true, nowMs: 10 });
     expect(result).toEqual({ due: 1, published: 0, partial: [] });
-    expect(events).toEqual(["fetch"]);
+    expect(events).toEqual(["fetch", "prepare:page-1"]);
   });
 
   it("microCMS公開失敗時はその記事の後続処理をしない", async () => {
@@ -81,7 +86,7 @@ describe("runPublishDueApplication", () => {
     const dependencies = ports(events);
     dependencies.publishContent = async (item) => { events.push(`publish:${item.pageId}`); throw new Error("microcms"); };
     await expect(runPublishDueApplication(dependencies, { isDryRun: false, nowMs: 10 })).rejects.toThrow("microcms");
-    expect(events).toEqual(["fetch", "patch:page-1", "publish:page-1"]);
+    expect(events).toEqual(["fetch", "prepare:page-1", "patch:page-1", "publish:page-1"]);
   });
 
   it("候補がなければ通知しない", async () => {
@@ -89,5 +94,40 @@ describe("runPublishDueApplication", () => {
     const result = await runPublishDueApplication(ports(events, []), { isDryRun: false, nowMs: 10 });
     expect(result).toEqual({ due: 0, published: 0, partial: [] });
     expect(events).toEqual(["fetch"]);
+  });
+
+  it("各記事を準備から公開まで完了してから次の記事を評価する", async () => {
+    const events: string[] = [];
+    const second = { ...first, pageId: "page-2", contentId: "content-2" };
+
+    await runPublishDueApplication(ports(events, [first, second]), { isDryRun: false, nowMs: 10 });
+
+    expect(events.indexOf("clear:page-1")).toBeLessThan(events.indexOf("prepare:page-2"));
+  });
+
+  it("ゲート除外があってもLINEの対象件数は到来予約総数を使う", async () => {
+    const events: string[] = [];
+    const dependencies = ports(events, [first], 2);
+    dependencies.prepareCandidate = async (item) => {
+      events.push(`prepare:${item.pageId}`);
+      return item;
+    };
+
+    await runPublishDueApplication(dependencies, { isDryRun: false, nowMs: 10 });
+
+    expect(events).toContain("line:⏰ 予約公開: 1件 (対象 2件)");
+  });
+
+  it("準備で除外された記事は公開I/Oを行わない", async () => {
+    const events: string[] = [];
+    const dependencies = ports(events);
+    dependencies.prepareCandidate = async (item) => {
+      events.push(`prepare:${item.pageId}`);
+      return null;
+    };
+
+    expect(await runPublishDueApplication(dependencies, { isDryRun: false, nowMs: 10 }))
+      .toEqual({ due: 1, published: 0, partial: [] });
+    expect(events).toEqual(["fetch", "prepare:page-1"]);
   });
 });

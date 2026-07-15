@@ -3,6 +3,19 @@ export interface DraftPublishResult {
   recoveryCommand?: string;
 }
 
+/** work directory 作成中の失敗も含め、main 全体の終了時に作成済み資源を解放する。 */
+export async function runWithDraftWorkDirCleanup<T>(
+  directories: string[],
+  run: () => Promise<T>,
+  cleanup: (directories: readonly string[]) => Promise<void>,
+): Promise<T> {
+  try {
+    return await run();
+  } finally {
+    await cleanup(directories);
+  }
+}
+
 export interface DraftOrchestratorApplicationPorts<
   TTarget,
   TSettings,

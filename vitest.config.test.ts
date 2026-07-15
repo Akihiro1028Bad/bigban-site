@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync, statSync } from "node:fs";
 
 import config from "./vitest.config";
 import alternatives from "./docs/testing/growth-coverage-alternatives.json";
@@ -9,6 +9,16 @@ function staticConfig() {
     throw new TypeError("静的なVitest設定を想定しています");
   }
   return config;
+}
+
+interface CoverageAlternativeEntry {
+  guarantees: string[];
+  excludedFiles?: string[];
+}
+
+function expandedFiles(pattern: string): string[] {
+  if (!pattern.includes("*")) return [pattern];
+  return globSync(pattern).filter((file) => existsSync(file) && statSync(file).isFile()).sort();
 }
 
 describe("vitest config", () => {
@@ -39,9 +49,30 @@ describe("vitest config", () => {
     }
   });
 
+  it("保証先は実在する具体的なテストファイルである", () => {
+    for (const entry of Object.values(alternatives.exclusions) as CoverageAlternativeEntry[]) {
+      for (const guarantee of entry.guarantees) {
+        expect(guarantee).toMatch(/\.(?:test|spec)\.(?:ts|tsx|mjs)$/);
+        expect(existsSync(guarantee), guarantee).toBe(true);
+      }
+    }
+  });
+
+  it("glob除外を含む全pathを実ファイルへ展開して追跡する", () => {
+    for (const [pattern, entry] of Object.entries(alternatives.exclusions) as Array<[
+      string,
+      CoverageAlternativeEntry,
+    ]>) {
+      expect(entry.excludedFiles?.slice().sort(), pattern).toEqual(expandedFiles(pattern));
+    }
+  });
+
   it("Markdown対応表に全pathを掲載する", () => {
     const markdown = readFileSync("docs/testing/growth-coverage-alternatives.md", "utf8");
-    for (const path of Object.keys(alternatives.exclusions)) expect(markdown).toContain(`\`${path}\``);
+    for (const [path, entry] of Object.entries(alternatives.exclusions)) {
+      expect(markdown).toContain(`\`${path}\``);
+      for (const guarantee of entry.guarantees) expect(markdown).toContain(`\`${guarantee}\``);
+    }
   });
 
   it("application service と daemon smoke をcoverage除外にしない", () => {
@@ -49,5 +80,11 @@ describe("vitest config", () => {
     expect(excluded).not.toContain("scripts/growth/draftOrchestratorApplication.ts");
     expect(excluded).not.toContain("scripts/growth/publishDueApplication.ts");
     expect(excluded).not.toContain("scripts/growth/daemonSmoke.ts");
+  });
+
+  it("PR CIでChromium critical journeyを必須実行する", () => {
+    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    expect(workflow).toContain("npx playwright install --with-deps chromium");
+    expect(workflow).toContain("npx playwright test --project=chromium");
   });
 });

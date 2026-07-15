@@ -23,7 +23,7 @@ import type { ProcessResult } from "./processControl.mjs";
 import { buildGrowthOperationResult, mergeGrowthOperationResults, normalizeGrowthOperationResult } from "./operationOutcome";
 
 import type { GrowthOperationResult } from "./operationOutcome";
-import { runDraftOrchestratorApplication } from "./draftOrchestratorApplication";
+import { runDraftOrchestratorApplication, runWithDraftWorkDirCleanup } from "./draftOrchestratorApplication";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
@@ -331,6 +331,7 @@ async function publishAndNotify(params: {
 
 async function main(): Promise<void> {
   const workDirs: string[] = [];
+  await runWithDraftWorkDirCleanup(workDirs, async () => {
   const executionStartedAt = new Date();
   const page = await targetPage(process.argv[2]);
   const input = draftInputFromPage(page);
@@ -432,8 +433,10 @@ async function main(): Promise<void> {
     },
     notify: async () => undefined,
     recordPartial: async () => undefined,
-    cleanup: async () => cleanupDraftWorkDirs(workDirs, rm),
+    // main 全体の finally が work directory 作成途中の失敗も含めて解放する。
+    cleanup: async () => undefined,
   });
+  }, async (directories) => cleanupDraftWorkDirs(directories, rm));
 }
 
 main().catch(async (error: unknown) => {

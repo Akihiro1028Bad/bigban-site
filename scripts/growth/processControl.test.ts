@@ -167,9 +167,23 @@ describe("runProcess", () => {
     expect(await runProcess(process.execPath, ["-e", script], { timeoutMs: 2_000, killGraceMs: 30, stdio: "capture", maxBuffer: 4 })).toMatchObject({ kind: "max-buffer", forceKilled: true });
   });
 
-  it("SIGTERM猶予内終了ならSIGKILLしない", async () => {
+  it.skipIf(process.platform === "win32")("SIGTERM猶予内終了ならSIGKILLしない", async () => {
     const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], { timeoutMs: 100, killGraceMs: 1_000, stdio: "capture" });
     expect(result).toMatchObject({ kind: "timeout", exitCode: 124, termSent: true, forceKilled: false });
+  });
+
+  it.runIf(process.platform === "win32")("Windows timeoutはtaskkill /T /Fでprocess treeを強制終了する", async () => {
+    const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+      timeoutMs: 100,
+      killGraceMs: 100,
+      stdio: "capture",
+    });
+    expect(result).toMatchObject({
+      kind: "timeout",
+      exitCode: 124,
+      termSent: true,
+      forceKilled: true,
+    });
   });
 
   it("親 SIGINT/SIGTERM を子へ伝播する", async () => {

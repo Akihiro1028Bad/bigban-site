@@ -141,8 +141,7 @@ async function main(): Promise<void> {
   const windowMs =
     Number.isInteger(windowEnv) && windowEnv > 0 ? windowEnv : DEFAULT_NOTIFY_WINDOW_MS;
   let throttleRecords: NotifyThrottleRecord[] = [];
-  let dueCount = 0;
-  const fetchCandidates = async (nowMs: number): Promise<PublishDueCandidate[]> => {
+  const fetchDueItems = async (nowMs: number): Promise<{ items: NotionPage[]; total: number }> => {
     const pages = await queryAllDataSource(
       IDEA_DS,
       { filter: { property: PUBLISH_SCHEDULE_PROP, date: { is_not_empty: true } } },
@@ -150,27 +149,33 @@ async function main(): Promise<void> {
     );
     const byId = new Map(pages.map((page) => [page.id, page]));
     const due = selectDuePublications(pages.map(publishQueueItemFromPage), nowMs);
-    const candidates: PublishDueCandidate[] = [];
-    dueCount = due.length;
     throttleRecords = await readThrottleRecords();
-    for (const item of due) {
-    const page = byId.get(item.id);
-    if (!page) continue;
+    return {
+      items: due.flatMap((item) => {
+        const page = byId.get(item.id);
+        return page ? [page] : [];
+      }),
+      total: due.length,
+    };
+  };
+  const prepareCandidate = async (
+    page: NotionPage,
+    nowMs: number,
+  ): Promise<PublishDueCandidate | null> => {
     const contentId = richTextOf(page, "下書きID").trim();
     if (!CONTENT_ID_RE.test(contentId)) {
       console.warn(`[publish-due] 不正な contentId のためスキップ: ${titleOf(page)} (${contentId})`);
       skipped.push({ title: titleOf(page), contentId });
-      continue;
+      return null;
     }
     if (hasUnfinishedImageGeneration(page)) {
       console.warn(`[publish-due] ${IMAGE_GENERATION_PENDING_MESSAGE}: ${titleOf(page) || page.id}`);
-      continue;
+      return null;
     }
     const title = titleOf(page);
     if (DRYRUN) {
       console.log(`[publish-due][dryrun] ${title || page.id} (contentId=${contentId})`);
-      candidates.push({ pageId: page.id, contentId, title, endpoint: "", patch: null });
-      continue;
+      return { pageId: page.id, contentId, title, endpoint: "", patch: null };
     }
     // 公開直前に承認画面の正タイトルと、AI 免責注記を除去した本文を下書きへ同期(#176 と同じ)。
     const rawBody = richTextOf(page, "下書き本文HTML");
@@ -200,25 +205,24 @@ async function main(): Promise<void> {
       const decision = shouldSendFailureNotice(throttleRecords, signature, nowMs, windowMs);
       throttleRecords = decision.records;
       if (decision.send) gateBlocked.push({ title, contentId, reason });
-      continue;
+      return null;
     }
     const { body: cleanBody, removed } = removeAiDisclaimer(rawBody);
     const patch: Record<string, unknown> = {};
     if (title) patch.title = title;
     if (removed) patch.bodyHtml = cleanBody;
-    candidates.push({
+    return {
       pageId: page.id,
       contentId,
       title,
       endpoint,
       patch: Object.keys(patch).length > 0 ? patch : null,
-    });
-    }
-    return candidates;
+    };
   };
 
   const applicationResult = await runPublishDueApplication({
-    fetchCandidates,
+    fetchDueItems,
+    prepareCandidate,
     patchDraft: async (candidate) => {
       await patchDraft(candidate.endpoint, candidate.contentId, candidate.patch ?? {}, contentOpts);
     },
@@ -237,7 +241,7 @@ async function main(): Promise<void> {
   }, { isDryRun: DRYRUN, nowMs: Date.now() });
   const published = applicationResult.published;
   const partialStatusFailures: PartialStatusPublication[] = applicationResult.partial;
-  const summary = `⏰ 予約公開: ${published}件 (対象 ${dueCount}件)`;
+  const summary = `⏰ 予約公開: ${published}件 (対象 ${applicationResult.due}件)`;
   console.log(summary);
 
   // 不正 contentId のスキップを沈黙させない(#220): 取り残された記事を LINE 通知する。
