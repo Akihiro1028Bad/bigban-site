@@ -156,10 +156,21 @@ describe("runProcess", () => {
     expect(result).toMatchObject({ kind: "timeout", exitCode: 124, phase: "hung", timedOut: true, termSent: true, forceKilled: true });
   });
 
-  it("spawn error・signal・maxBufferを timeout と区別する", async () => {
+  it("spawn error・maxBufferを timeout と区別する", async () => {
     expect(await runProcess("__missing_growth_command__", [], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "spawn-error", timedOut: false });
-    expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "signal", timedOut: false, signal: "SIGTERM" });
-    expect(await runProcess(process.execPath, ["-e", "process.stdout.write('12345')"], { timeoutMs: 2_000, stdio: "capture", maxBuffer: 4 })).toMatchObject({ kind: "max-buffer", timedOut: false });
+    expect(await runProcess(process.execPath, ["-e", "process.stdout.write('12345')"], {
+      timeoutMs: 10_000,
+      killGraceMs: 100,
+      stdio: "capture",
+      maxBuffer: 4,
+    })).toMatchObject({ kind: "max-buffer", timedOut: false });
+  });
+
+  it.skipIf(process.platform === "win32")("signal終了をtimeoutと区別する", async () => {
+    expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], {
+      timeoutMs: 2_000,
+      stdio: "capture",
+    })).toMatchObject({ kind: "signal", timedOut: false, signal: "SIGTERM" });
   });
 
   it("maxBuffer超過でSIGTERMを無視する子は猶予後に強制終了する", async () => {
@@ -167,12 +178,26 @@ describe("runProcess", () => {
     expect(await runProcess(process.execPath, ["-e", script], { timeoutMs: 2_000, killGraceMs: 30, stdio: "capture", maxBuffer: 4 })).toMatchObject({ kind: "max-buffer", forceKilled: true });
   });
 
-  it("SIGTERM猶予内終了ならSIGKILLしない", async () => {
+  it.skipIf(process.platform === "win32")("SIGTERM猶予内終了ならSIGKILLしない", async () => {
     const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], { timeoutMs: 100, killGraceMs: 1_000, stdio: "capture" });
     expect(result).toMatchObject({ kind: "timeout", exitCode: 124, termSent: true, forceKilled: false });
   });
 
-  it("親 SIGINT/SIGTERM を子へ伝播する", async () => {
+  it.runIf(process.platform === "win32")("Windows timeoutはtaskkill /T /Fでprocess treeを強制終了する", async () => {
+    const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+      timeoutMs: 100,
+      killGraceMs: 100,
+      stdio: "capture",
+    });
+    expect(result).toMatchObject({
+      kind: "timeout",
+      exitCode: 124,
+      termSent: true,
+      forceKilled: true,
+    });
+  });
+
+  it.skipIf(process.platform === "win32")("親 SIGINT/SIGTERM を子へ伝播する", async () => {
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       const dir = mkdtempSync(path.join(tmpdir(), "growth-signal-ready-"));
       const ready = path.join(dir, "ready.txt");
