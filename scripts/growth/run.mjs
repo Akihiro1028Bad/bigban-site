@@ -38,21 +38,11 @@ const FAILURE_LOG_PATH = "data/growth-failures.log";
 
 // 共通の許可ツール。Claude headless では Notion が mcp__claude_ai_Notion になる。
 const COMMON = ["Read", "Glob", "Grep", "Task", "WebSearch", "WebFetch", "mcp__claude_ai_Notion"];
-const DRAFTS_COMMON = COMMON.filter((tool) => tool !== "Task");
-
-// 旧環境変数は手動上書き用として維持する。無指定時は工程別の共有設定を使う。
-const DRAFTS_MODEL = process.env.GROWTH_DRAFTS_MODEL || "";
-const WEEKLY_MODEL = process.env.GROWTH_WEEKLY_MODEL || "";
 
 const CODEX_APPROVAL = process.env.GROWTH_CODEX_APPROVAL || "never";
 // 自宅PCのheadless workerはNotion/MCP・ネットワーク・子プロセスを使うため、
 // Codex工程は非対話の完全アクセスを既定とする。必要なら環境変数で制限できる。
 const CODEX_SANDBOX = process.env.GROWTH_CODEX_SANDBOX || "danger-full-access";
-const COMMON_CODEX_MODEL = process.env.GROWTH_CODEX_MODEL || "";
-const COMMON_CODEX_REASONING_EFFORT = process.env.GROWTH_CODEX_REASONING_EFFORT || "";
-const WEEKLY_CODEX_MODEL = process.env.GROWTH_WEEKLY_CODEX_MODEL || "";
-const WEEKLY_CODEX_REASONING_EFFORT =
-  process.env.GROWTH_WEEKLY_CODEX_REASONING_EFFORT || "";
 const CODEX_REASONING_EFFORTS = new Set(["minimal", "low", "medium", "high", "xhigh"]);
 const CLAUDE_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
@@ -78,12 +68,12 @@ const MODES = {
       "Bash(npm run growth:learning-log:recent)",
     ],
   },
-  // 下書き/施策実行は複数スクリプト・画像生成・縮小を回すため Bash 全般を許可
-  drafts: { prompt: "drafts.md", allow: [...DRAFTS_COMMON, "Write", "Bash"] },
-  // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけ drafts.md を起動する。
+  // 下書きは決定的オーケストレーターが独立した調査・執筆セッションを起動する。
+  drafts: { prompt: "draft-write.md", allow: [] },
+  // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけオーケストレーターを起動する。
   "drafts-auto": {
-    prompt: "drafts.md",
-    allow: [...DRAFTS_COMMON, "Write", "Bash"],
+    prompt: "draft-write.md",
+    allow: [],
     lock: true,
   },
   initiatives: { prompt: "initiatives.md", allow: [...COMMON, "Bash"] },
@@ -196,6 +186,33 @@ if (!cfg) {
 }
 
 const isWin = process.platform === "win32";
+const isDraftOrchestratedMode = mode === "drafts" || mode === "drafts-auto";
+const LEGACY_MODEL_ENV_KEYS = [
+  "GROWTH_AGENT",
+  "GROWTH_DRAFTS_MODEL",
+  "GROWTH_WEEKLY_MODEL",
+  "GROWTH_CLAUDE_MODEL",
+  "GROWTH_CLAUDE_EFFORT",
+  "GROWTH_WEEKLY_CLAUDE_EFFORT",
+  "GROWTH_CODEX_MODEL",
+  "GROWTH_CODEX_REASONING_EFFORT",
+  "GROWTH_WEEKLY_CODEX_MODEL",
+  "GROWTH_WEEKLY_CODEX_REASONING_EFFORT",
+  "GROWTH_DRAFT_RESEARCH_PROVIDER",
+  "GROWTH_DRAFT_RESEARCH_MODEL",
+  "GROWTH_DRAFT_RESEARCH_EFFORT",
+  "GROWTH_DRAFT_WRITE_PROVIDER",
+  "GROWTH_DRAFT_WRITE_MODEL",
+  "GROWTH_DRAFT_WRITE_EFFORT",
+];
+
+function draftOrchestratorEnv() {
+  const env = { ...process.env };
+  // 廃止済みモデルenvとテスト用無効化フラグを子工程へ伝播させない。
+  for (const key of LEGACY_MODEL_ENV_KEYS) delete env[key];
+  delete env.GROWTH_MODEL_SETTINGS_DISABLE;
+  return { ...env, GROWTH_DRAFT_RUN_MODE: mode };
+}
 
 const FALLBACK_MODEL_SETTINGS = {
   weekly: { provider: "codex", model: "gpt-5.6-sol", effort: "xhigh" },
@@ -243,29 +260,16 @@ function resolveSharedModelSetting() {
 }
 
 const sharedModelSetting = resolveSharedModelSetting();
-// 既存の週次Claude上書きは、GROWTH_AGENT 未指定でもClaude選択として扱う。
-const AGENT = process.env.GROWTH_AGENT || (mode === "weekly" && WEEKLY_MODEL ? "claude" : sharedModelSetting.provider);
+const AGENT = sharedModelSetting.provider;
 if (AGENT !== "claude" && AGENT !== "codex") {
   process.stderr.write(`GROWTH_AGENT は claude または codex を指定してください: ${AGENT}\n`);
   process.exit(1);
 }
 
-const compatibleModel = sharedModelSetting.provider === AGENT ? sharedModelSetting.model : null;
-const compatibleEffort = sharedModelSetting.provider === AGENT ? sharedModelSetting.effort : null;
-const codexModel =
-  mode === "weekly"
-    ? WEEKLY_CODEX_MODEL || COMMON_CODEX_MODEL || compatibleModel || "gpt-5.5"
-    : COMMON_CODEX_MODEL || compatibleModel || "gpt-5.5";
-const codexReasoningEffort =
-  mode === "weekly"
-    ? WEEKLY_CODEX_REASONING_EFFORT || COMMON_CODEX_REASONING_EFFORT || compatibleEffort || "high"
-    : COMMON_CODEX_REASONING_EFFORT || compatibleEffort || "high";
-const claudeModel =
-  (mode === "weekly" ? WEEKLY_MODEL : DRAFTS_MODEL) || compatibleModel || "claude-opus-4-8";
-const claudeEffort =
-  (mode === "weekly"
-    ? process.env.GROWTH_WEEKLY_CLAUDE_EFFORT
-    : process.env.GROWTH_CLAUDE_EFFORT) || compatibleEffort || "high";
+const codexModel = sharedModelSetting.model;
+const codexReasoningEffort = sharedModelSetting.effort;
+const claudeModel = sharedModelSetting.model;
+const claudeEffort = sharedModelSetting.effort;
 
 if (
   AGENT === "codex" &&
@@ -285,7 +289,9 @@ if (AGENT === "claude" && !CLAUDE_EFFORTS.has(claudeEffort)) {
   process.exit(1);
 }
 
-const promptBody = readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
+const promptBody = isDraftOrchestratedMode
+  ? ""
+  : readFileSync(path.join(promptsDir, cfg.prompt), "utf-8");
 const imagePromptSpecPath = mode === "image-prompt" ? process.argv[3] || "" : "";
 const imagePromptProposalPath = imagePromptSpecPath ? `${imagePromptSpecPath}.image-prompt.json` : "";
 const imagePromptInput =
@@ -328,6 +334,10 @@ const activeModel = AGENT === "codex" ? codexModel : claudeModel;
 const activeEffort = AGENT === "codex" ? codexReasoningEffort : claudeEffort;
 
 if (process.env.GROWTH_DRYRUN) {
+  if (isDraftOrchestratedMode) {
+    process.stdout.write("[dry-run] npm run --silent growth:draft-orchestrator\n");
+    process.exit(0);
+  }
   const promptLabel = AGENT === "codex" ? `${cfg.prompt}+codex-runtime` : cfg.prompt;
   process.stdout.write(
     `[dry-run] (stdin=<prompt:${promptLabel}>) ${agentCommand} ${args.join(" ")}\n`
@@ -668,9 +678,10 @@ if (cfg.lock) {
   }
 }
 
+let draftsTargetPageId = "";
 if (mode === "drafts-auto") {
-  const targetPageId = claimDraftsAutoTarget();
-  if (!targetPageId) {
+  draftsTargetPageId = claimDraftsAutoTarget();
+  if (!draftsTargetPageId) {
     releaseReviseLock();
     notifyLoopFail("claim-failed", {
       exitCode: 1,
@@ -678,7 +689,6 @@ if (mode === "drafts-auto") {
     });
     process.exit(1);
   }
-  prompt += `\n\n<draft_target page_id="${targetPageId}">\nこのページIDの1件だけを処理する。ほかの記事は取得・更新しない。\n</draft_target>`;
 }
 
 /**
@@ -722,14 +732,30 @@ const workerRunPageId = runWorkerLog("start", {
   "target-type": "system",
   "started-at": runStartedAt,
   resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
-  detail: `${AGENT} ${activeModel} ${activeEffort}`,
+  detail: isDraftOrchestratedMode
+    ? "deterministic orchestrator: draft-research + draft-write"
+    : `${AGENT} ${activeModel} ${activeEffort}`,
 });
-const child = spawn(agentCommand, args, {
-  stdio: ["pipe", "inherit", "inherit"],
+const childCommand = isDraftOrchestratedMode ? (isWin ? "npm.cmd" : "npm") : agentCommand;
+const childArgs = isDraftOrchestratedMode
+  ? [
+      "run",
+      "--silent",
+      "growth:draft-orchestrator",
+      ...(draftsTargetPageId ? ["--", draftsTargetPageId] : []),
+    ]
+  : args;
+const child = spawn(childCommand, childArgs, {
+  stdio: [isDraftOrchestratedMode ? "ignore" : "pipe", "inherit", "inherit"],
   shell: isWin,
+  env: isDraftOrchestratedMode
+    ? draftOrchestratorEnv()
+    : { ...process.env },
 });
-child.stdin.write(prompt);
-child.stdin.end();
+if (!isDraftOrchestratedMode) {
+  child.stdin.write(prompt);
+  child.stdin.end();
+}
 child.on("exit", async (code) => {
   let exitCode = exitCodeOrFailure(code);
   if (mode === "image-prompt" && exitCode === 0) {
@@ -778,7 +804,7 @@ child.on("exit", async (code) => {
     process.exit(exitCode !== 0 ? exitCode : notifyCode);
   }
   // loop/実行モードの非0 exit も沈黙させない(#220): reap/next が回らない障害を LINE 通知。
-  if (exitCode !== 0) {
+  if (exitCode !== 0 && !(isDraftOrchestratedMode && exitCode === 70)) {
     notifyLoopFail("nonzero-exit", { exitCode });
   }
   process.exit(exitCode);
@@ -798,7 +824,7 @@ child.on("error", (err) => {
     resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
     detail: err.message,
   });
-  process.stderr.write(`${agentCommand} の起動に失敗しました: ${err.message}\n`);
+  process.stderr.write(`${childCommand} の起動に失敗しました: ${err.message}\n`);
   // agent 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
   if (mode === "weekly") {
     notifyLoopFail("spawn-error", { exitCode: 1, detail: err.message });

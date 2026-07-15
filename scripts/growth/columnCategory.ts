@@ -3,7 +3,7 @@
  * **既定マッピング(多対一)** を解決する純ロジック(#columns P3.5・§6.2)。
  *
  * **このファイルの `ARTICLE_TYPE_TO_CATEGORY` がマッピングの正典(単一の真実源)。**
- * `prompts/drafts.md` の出力スキーマ(payload.category の既定マッピング指示)は
+ * 下書きオーケストレーターのpayload.category解決は
  * この表を転記したもので、乖離は columnCategory.test.ts の乖離検知テストが
  * 検出する(プロンプト側だけ書き換える/削除するとテストが赤になる)。
  *
@@ -24,7 +24,7 @@ export type MappedColumnCategoryId = "start" | "rules" | "compare" | "event";
 
 /**
  * 記事タイプ → category content ID の正典マッピング表(多対一・§6.2)。
- * ここが単一の真実源。変更時は `prompts/drafts.md` の転記も併せて更新する
+ * ここが単一の真実源。下書きオーケストレーターはこの関数を直接呼び出す
  * (乖離検知テストが強制する)。
  */
 export const ARTICLE_TYPE_TO_CATEGORY: Readonly<

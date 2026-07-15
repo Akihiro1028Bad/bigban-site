@@ -15,6 +15,9 @@ export const MODEL_SETTINGS_DS = "d6b79283-f892-4d75-b998-332ccb6dc22e";
 
 export const MODEL_PHASE_IDS = [
   "weekly",
+  "draft-research",
+  "draft-write",
+  /** 旧Notion設定の読み取り専用alias。MODEL_PHASESには表示しない。 */
   "drafts",
   "initiatives",
   "revise",
@@ -128,10 +131,19 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     effort: "xhigh",
   },
   {
-    id: "drafts",
-    label: "記事下書き生成",
-    description: "承認済み構成案から本文・画像を含むmicroCMS下書きを作る。",
-    modes: ["drafts", "drafts-auto"],
+    id: "draft-research",
+    label: "記事リサーチ",
+    description: "承認済み構成案に必要な公式情報を確認し、事実JSONを作る。",
+    modes: ["draft-research"],
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    effort: "medium",
+  },
+  {
+    id: "draft-write",
+    label: "記事執筆",
+    description: "確認済み事実と承認済み構成案だけから本文を1回で書く。",
+    modes: ["drafts", "drafts-auto", "draft-write"],
     provider: "claude",
     model: "claude-opus-4-8",
     effort: "high",
@@ -262,7 +274,8 @@ export function modelSettingFromPage(page: NotionPage): ModelSettingInput | null
 export function mergeModelSettings(overrides: readonly ModelSettingInput[]): ModelPhaseSetting[] {
   const byId = new Map(overrides.map((setting) => [setting.phaseId, setting]));
   return MODEL_PHASES.map((phase) => {
-    const override = byId.get(phase.id);
+    const override =
+      byId.get(phase.id) ?? (phase.id === "draft-write" ? byId.get("drafts") : undefined);
     return {
       ...phase,
       phaseId: phase.id,
@@ -272,6 +285,21 @@ export function mergeModelSettings(overrides: readonly ModelSettingInput[]): Mod
       source: override ? "notion" : "default",
     };
   });
+}
+
+export function modelSettingsSnapshotForModes(
+  modes: readonly string[],
+  overrides: readonly ModelSettingInput[],
+): Record<string, ModelPhaseSetting> {
+  const settings = mergeModelSettings(overrides);
+  const snapshot: Record<string, ModelPhaseSetting> = {};
+  for (const mode of modes) {
+    const phaseId = modelPhaseIdForMode(mode);
+    if (!phaseId) throw new Error(`未知の実行モードです: ${mode}`);
+    const setting = settings.find((item) => item.id === phaseId)!;
+    snapshot[mode] = setting;
+  }
+  return snapshot;
 }
 
 export function buildModelSettingProps(input: ModelSettingInput): Record<string, unknown> {

@@ -1,7 +1,7 @@
 /**
  * 確認済み情報源リスト(sourceLedger)の永続化ロジック。
  *
- * 記事執筆時のリサーチ規律(drafts.md 手順2-2)で組んだ台帳を投入スペックに同梱し、
+ * 独立した記事リサーチで得たResearchPacketからコードで台帳を組み立て、投入スペックに同梱し、
  * publish-draft が Notion 記事ネタ行のプロパティへ保存する(読者非公開・監査用)。
  *
  * 設計: docs/superpowers/specs/2026-07-10-source-ledger-reference-design.md(D2/D3)。

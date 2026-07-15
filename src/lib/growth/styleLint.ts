@@ -14,7 +14,8 @@ export type StyleLintCategory =
   | "医療断定"
   | "AI定型"
   | "メタ言及"
-  | "括弧直訳";
+  | "括弧直訳"
+  | "確認反復";
 
 export interface StyleLintHit {
   category: StyleLintCategory;
@@ -44,6 +45,8 @@ const DICTIONARIES: ReadonlyArray<{ category: StyleLintCategory; terms: readonly
 
 /** 括弧書き直訳: 英単語(3文字以上)＋直後の括弧書き。例: belonging（帰属の感覚）。 */
 const PAREN_GLOSS = /[A-Za-z][A-Za-z-]{2,}\s*[（(][^）)]{1,40}[）)]/g;
+const CONFIRMATION_PHRASE = /確認してください|ご確認ください/g;
+const AI_DRAFT_DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 /** 本文プレーンテキストから NG 表現を検出して位置順に返す。 */
 export function styleLint(plain: string): StyleLintHit[] {
@@ -61,6 +64,11 @@ export function styleLint(plain: string): StyleLintHit[] {
   }
   for (const match of plain.matchAll(PAREN_GLOSS)) {
     hits.push({ category: "括弧直訳", term: match[0], index: match.index });
+  }
+  const confirmationInput = plain.replaceAll(AI_DRAFT_DISCLAIMER, " ".repeat(AI_DRAFT_DISCLAIMER.length));
+  const confirmationMatches = [...confirmationInput.matchAll(CONFIRMATION_PHRASE)];
+  for (const match of confirmationMatches.slice(1)) {
+    hits.push({ category: "確認反復", term: match[0], index: match.index });
   }
   return hits.sort((a, b) => a.index - b.index);
 }
@@ -103,7 +111,15 @@ export interface StyleLintCount {
 
 /** カテゴリ別の件数(0 件のカテゴリは含めない・件数降順→カテゴリ順)。 */
 export function styleLintSummary(hits: readonly StyleLintHit[]): StyleLintCount[] {
-  const order: StyleLintCategory[] = ["誇大", "煽り", "医療断定", "AI定型", "メタ言及", "括弧直訳"];
+  const order: StyleLintCategory[] = [
+    "誇大",
+    "煽り",
+    "医療断定",
+    "AI定型",
+    "メタ言及",
+    "括弧直訳",
+    "確認反復",
+  ];
   return order
     .map((category) => ({ category, count: hits.filter((h) => h.category === category).length }))
     .filter((c) => c.count > 0);

@@ -40,6 +40,22 @@ describe("styleLint", () => {
     expect(hits[0].term).toBe("絶対");
   });
 
+  it("確認表現は2回目以降だけを過剰反復として検出する", () => {
+    const hits = styleLint(
+      "料金は公式サイトで確認してください。日程もご確認ください。開催条件も確認してください。",
+    ).filter((hit) => hit.category === "確認反復");
+
+    expect(hits.map((hit) => hit.term)).toEqual(["ご確認ください", "確認してください"]);
+  });
+
+  it("必須のAI免責文は確認表現の回数に含めない", () => {
+    const hits = styleLint(
+      "料金は公式サイトで確認してください。※この記事はAIが作成した下書きです。公開前に内容をご確認ください。",
+    ).filter((hit) => hit.category === "確認反復");
+
+    expect(hits).toEqual([]);
+  });
+
   it("該当なしは空配列", () => {
     expect(styleLint("市川の屋内コートで、平日夜に1時間打てる。")).toEqual([]);
   });

@@ -110,107 +110,81 @@ describe("記事ネタ案ルールの共通化", () => {
   });
 });
 
-describe("下書き生成の構成案契約", () => {
-  const drafts = readFileSync(
-    path.join(process.cwd(), "scripts/growth/prompts/drafts.md"),
-    "utf-8"
+describe("下書き生成のフェーズ分離契約", () => {
+  const research = readFileSync(
+    path.join(process.cwd(), "scripts/growth/prompts/draft-research.md"),
+    "utf-8",
+  );
+  const writer = readFileSync(
+    path.join(process.cwd(), "scripts/growth/prompts/draft-write.md"),
+    "utf-8",
   );
   const publishDraftCli = readFileSync(
     path.join(process.cwd(), "scripts/growth/publish-draft-cli.ts"),
-    "utf-8"
+    "utf-8",
   );
 
-  it("現在の構成案を入力として使い、決定的ゲートでも見出し一致を守る", () => {
-    expect(drafts).toContain("現在の `構成案`");
-    expect(drafts).toContain("執筆入力として使う");
-    expect(drafts).toContain("H2/H3の見出し名・レベル・順序を変更しない");
+  it("リサーチは公式情報の確認だけを行い、記事本文を作らない", () => {
+    expect(research).toContain("公式情報の確認だけ");
+    expect(research).toContain("記事本文・導入文・見出し・まとめは書かない");
+    expect(research).toContain("`option | constraint | detail`");
+    expect(research).toContain("公式確認できない候補は出力しない");
+    expect(research).toContain("公式情報源の`sourceLabel`");
+    expect(research).toContain("統計・健康情報には`publishedYear`");
+    expect(research).toContain("`official-site`として出力");
+    expect(research).toContain("公式確認できなければ出力しない");
+    expect(research).toContain("原文のまま抜き出す");
+    expect(research).toContain("facility-context.json");
+    expect(research).toContain("一次情報メモ");
+    expect(research).toContain("任意項目も省略せず");
+    expect(research).toContain("該当しない値は`null`");
+  });
+
+  it("執筆はResearchPacketだけを素材に1回で書き、運用手順を含まない", () => {
+    expect(writer).toContain("最初から最後まで1回で書く");
+    expect(writer).toContain("調査過程や裏取り方法を書かない");
+    expect(writer).toContain("`constraint`を利用可能な選択肢として数えない");
+    for (const forbidden of ["npm run", "microCMS", "LINE", "Notion", "WebSearch", "WebFetch", "Task"]) {
+      expect(writer).not.toContain(forbidden);
+    }
+  });
+
+  it("見出し契約は執筆プロンプトと決定的ゲートの両方で守る", () => {
+    expect(writer).toContain("H2/H3の見出し名・レベル・順序を変更しない");
     expect(publishDraftCli).toContain("evaluateOutlineCompliance");
     expect(publishDraftCli).toContain("outlineFromPage(page)");
   });
 
-  it("1回のClaudeセッションでは対象記事を1件だけ処理する", () => {
-    expect(drafts).toContain("1回の実行で1件だけ");
-    expect(drafts).toContain("複数件を同じClaudeセッションで処理しない");
+  it("重複、確認表現、自施設の説明量を制限する", () => {
+    expect(writer).toContain("同じ事実を本文・表・まとめで繰り返さない");
+    expect(writer).toContain("記事末に最大1回");
+    expect(writer).toContain("自施設だけ説明量を増やさず");
   });
 
-  it("禁止する表現と創作の範囲を具体的に示す", () => {
-    expect(drafts).toContain(
-      "根拠のない最大級表現、過度に不安や焦りを促す表現、確認できない事実・体験談の創作はしない。"
-    );
-    expect(drafts).not.toContain("煽り・誇張・創作なし");
+  it("入力にない読者の行動や心理を導入へ創作しない", () => {
+    expect(writer).toContain("入力にない行動や心理を作らない");
+    expect(writer).toContain("公式サイトを開いた");
+    expect(writer).toContain("戸惑っている");
   });
 
-  it("前回本文と根拠台帳を参照しない", () => {
-    expect(drafts).toContain("`下書き本文HTML` と `根拠台帳` は読まない");
+  it("CTAは自然な1文と固定予約URLの1件だけにする", () => {
+    expect(writer).toContain("記事内容に合う自然な誘導文を1文だけ");
+    expect(writer).toContain("固定予約URLのCTAを1つだけ");
+    expect(writer).toContain("行動を迫らない");
   });
 
-  it("確認済み情報源はURLと重要事実だけの最小形式にする", () => {
-    expect(drafts).toContain("`confirmedFacts`");
-    expect(drafts).not.toContain("`confidence`");
-    expect(drafts).not.toContain("`reason`");
-    expect(drafts).not.toContain("`usableInArticle`");
+  it("統計・健康情報を使う場合だけ参考資料見出しを例外として追加する", () => {
+    expect(writer).toContain("統計・健康情報を使う場合");
+    expect(writer).toContain("AI免責文の直前に`参考資料`見出し");
+    expect(writer).toContain("見出し追加禁止の唯一の例外");
+    expect(writer).toContain("factの`sourceLabel`と`publishedYear`");
+    expect(writer).toContain("入力にない出典名や発行年を作らない");
   });
 
-  it("単一Claudeの1パス執筆で、別AI校閲・採点・自動リライトを行わない", () => {
-    expect(drafts).toContain("同じ Claude プロセス");
-    expect(drafts).toContain("1パス");
-    expect(drafts).not.toContain("記事ブリーフを確定");
-    expect(drafts).not.toContain("校閲(別エージェント");
-    expect(drafts).not.toContain("編集者ゲート");
-    expect(drafts).not.toContain("最大2周");
-  });
-
-  it("確認済み情報源リストは重要事実だけを本文と同じ1回の出力で保存する", () => {
-    expect(drafts).toContain("重要事実だけ");
-    expect(drafts).toContain("実際に本文で使用した重要事実だけ");
-    expect(drafts).toContain("検索結果の要約だけでは使用可能にしない");
-    expect(drafts).toContain("確認できなかった候補は本文にもリストにも入れない");
-  });
-
-  it("調査対象を列挙項目に限定せず、重要事実だけ公式情報で確認する", () => {
-    expect(drafts).toContain("承認済み構成案と記事テーマに必要な情報を調査する");
-    expect(drafts).toContain("これらに限らず、読者の判断に役立つ具体的な情報があれば調査してよい");
-    expect(drafts).toContain("報道記事や専門メディアも情報収集に使ってよい");
-    expect(drafts).not.toContain("台帳対象は次に限定する");
-  });
-
-  it("執筆入力は承認済み情報と確定事実に限定し、評価用プロパティを渡さない", () => {
-    expect(drafts).toContain("狙う読者");
-    expect(drafts).toContain("検索意図");
-    expect(drafts).toContain("想定CTA");
-    expect(drafts).toContain("一次情報メモ");
-    expect(drafts).toContain("`勝ち筋` と `成功指標` は本文生成へ渡さない");
-  });
-
-  it("冒頭で検索意図へ直接答え、入力にない読者の行動や心理を作らない", () => {
-    expect(drafts).toContain("冒頭の1〜2文で、検索意図への答えを直接書く");
-    expect(drafts).toContain(
-      "読者が公式サイトを開いた、迷っている、身構えているなど、入力にない行動や心理を作らない"
-    );
-  });
-
-  it("確認済み事実を使い切らず、読者の判断に不要な情報を省く", () => {
-    expect(drafts).toContain("確認済み事実は素材であり、本文で使い切るチェックリストではない");
-    expect(drafts).toContain("場所選びや次の行動に影響しない事実は、正しくても省く");
-    expect(drafts).toContain("facility-context の `confirmed` はそのまま全文を渡さない");
-  });
-
-  it("重複説明と自施設のパンフレット化を避ける", () => {
-    expect(drafts).toContain("同じ事実を本文・表・まとめで繰り返さない");
-    expect(drafts).toContain(
-      "自施設の理念・スローガン・ショーコート等は、記事テーマと直接関係しなければ書かない"
-    );
-  });
-
-  it("CTAは強く勧めず、確認を促す穏やかな1文にする", () => {
-    expect(drafts).toContain("空き状況や詳細の確認を促す穏やかな1文");
-    expect(drafts).toContain("今すぐ・まずは・体験してみてください等で行動を迫らない");
-  });
-
-  it("再生成では既存下書きのslugを維持し、取得不能なら投入を止める", () => {
-    expect(drafts).toContain("既存下書きのslugを読み直し");
-    expect(drafts).toContain("記事URLを維持");
-    expect(drafts).toContain("元slugを取得できない場合は安全側で投入を中断");
+  it("可変情報はResearchFactと公開ゲートで照合できる表現を保つ", () => {
+    expect(writer).toContain("キャンペーン、クーポン、イベント");
+    expect(writer).toContain("factのstatementの語順と数値を本文に保持する");
+    expect(writer).toContain("意味が同じでも言い換えない");
   });
 });
 
