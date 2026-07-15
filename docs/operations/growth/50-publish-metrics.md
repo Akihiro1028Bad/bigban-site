@@ -21,3 +21,10 @@
 - **承認画面は Notion を読むだけ**(GA4/microCMS は触らない)。
 - 純ロジック `scripts/growth/metrics.ts`(`articlePagePath`/`normalizePagePath`/`metricsForPagePath`/`serializeMetrics`/`parseMetrics`/`buildMetricsMirrorProps`/`summarizeMetrics`・`src/lib/growth/metrics.ts` 再エクスポート)＋表示整形 `articleMetricsView.ts`(`formatCount`/`formatDelta`)、CLI はカバレッジ除外。
 - `growth:metrics` は cron 等で定期実行(claude 不使用の純データ結線・`GROWTH_DRYRUN=1` で空実行)。
+
+### CTAイベント別・実予約CSV（#280）
+
+- GA4は `topPages(pagePath)` と `topPageCtaEvents(pagePath,eventName)` を別取得する。CTAレポートは正典 `ctaEvents.ts` のイベント名だけをfilterする。
+- `growth:metrics` は `GROWTH_RESERVATION_CSV_PATH` の正規化CSVを1回読み、mtimeを `syncedAt` として全記事の同一snapshotへ保存する。
+- CSVが未設定/読取失敗/不正でもGA4/GSC更新は継続し、実予約だけ `missing` にする。7日超・未来・不正mtimeは古い表示となる。
+- PerformanceBoardは予約意図、SNS、その他CTA、施設全体実予約、記事帰属実予約を混同せず表示する。

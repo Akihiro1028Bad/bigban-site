@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 
+import { aggregateCtaEvents, type CtaEventMetrics } from "./ctaEvents";
 import { growthArticleSegment, type GrowthMedia } from "./endpoint";
 import type { MergedRow } from "./transform";
 
@@ -37,11 +38,28 @@ export interface SearchMetrics {
   topQueries: SearchQueryStat[];
 }
 
+export type ActualReservationMetrics =
+  | {
+      state: "missing";
+      reason: "not_configured" | "read_error" | "invalid";
+      checkedAt: string;
+    }
+  | {
+      state: "available";
+      source: "csv";
+      syncedAt: string;
+      facility: MetricDelta;
+      article: MetricDelta | null;
+    };
+
 /** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
 export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
   users: MetricDelta;
+  ctaEvents?: CtaEventMetrics;
+  ctaEventsMeasured?: boolean;
+  actualReservations?: ActualReservationMetrics;
   // #計測強化 S2: GA4 keyEvents(CTAキーイベント。後方互換のため任意。旧データには無い)。
   keyEvents?: MetricDelta;
   // R6: GA4 keyEvents が実測できる期間の記事か。未指定は未計測扱い(後方互換・安全側)。
@@ -142,7 +160,8 @@ export function buildSearchMetrics(
 export function metricsForPagePath(
   pagePath: string,
   rows: readonly MergedRow[],
-  period: { start: string; end: string }
+  period: { start: string; end: string },
+  ctaRows?: readonly MergedRow[]
 ): ArticleMetrics | null {
   const target = normalizePagePath(pagePath);
   const matching = rows.filter((r) => normalizePagePath(r.keys[0] ?? "") === target);
@@ -152,21 +171,29 @@ export function metricsForPagePath(
   let viewsP = 0;
   let usersC = 0;
   let usersP = 0;
-  let keyC = 0;
-  let keyP = 0;
   for (const r of matching) {
     viewsC += r.metrics[VIEWS_METRIC]?.current ?? 0;
     viewsP += r.metrics[VIEWS_METRIC]?.prior ?? 0;
     usersC += r.metrics[USERS_METRIC]?.current ?? 0;
     usersP += r.metrics[USERS_METRIC]?.prior ?? 0;
-    keyC += r.metrics[KEY_EVENTS_METRIC]?.current ?? 0;
-    keyP += r.metrics[KEY_EVENTS_METRIC]?.prior ?? 0;
   }
+  const matchingCta = ctaRows?.filter(
+    (row) => normalizePagePath(row.keys[0] ?? "") === target
+  );
+  const ctaEvents = matchingCta
+    ? aggregateCtaEvents(
+        matchingCta.map((row) => ({
+          eventName: row.keys[1] ?? "",
+          current: row.metrics[KEY_EVENTS_METRIC]?.current ?? 0,
+          prior: row.metrics[KEY_EVENTS_METRIC]?.prior ?? 0,
+        }))
+      )
+    : undefined;
   return {
     pagePath: target,
     views: { current: viewsC, prior: viewsP, deltaPct: deltaPct(viewsC, viewsP) },
     users: { current: usersC, prior: usersP, deltaPct: deltaPct(usersC, usersP) },
-    keyEvents: { current: keyC, prior: keyP, deltaPct: deltaPct(keyC, keyP) },
+    ...(ctaEvents ? { ctaEvents } : {}),
     period,
   };
 }
@@ -205,10 +232,36 @@ const searchSchema = z.object({
   topQueries: z.array(searchQuerySchema),
 });
 
+const ctaEventsSchema = z.object({
+  reservationClick: deltaSchema,
+  reserveEntryClick: deltaSchema,
+  lineClick: deltaSchema,
+  instagramClick: deltaSchema,
+  other: deltaSchema,
+});
+
+const actualReservationsSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("missing"),
+    reason: z.enum(["not_configured", "read_error", "invalid"]),
+    checkedAt: z.string(),
+  }),
+  z.object({
+    state: z.literal("available"),
+    source: z.literal("csv"),
+    syncedAt: z.string(),
+    facility: deltaSchema,
+    article: deltaSchema.nullable(),
+  }),
+]);
+
 const metricsSchema = z.object({
   pagePath: z.string(),
   views: deltaSchema,
   users: deltaSchema,
+  ctaEvents: ctaEventsSchema.optional(),
+  ctaEventsMeasured: z.boolean().optional(),
+  actualReservations: actualReservationsSchema.optional(),
   // #計測強化 S2/S3: 後方互換。旧データ(keyEvents/search/publishedAt 無し)も valid のまま。
   keyEvents: deltaSchema.optional(),
   keyEventsMeasured: z.boolean().optional(),

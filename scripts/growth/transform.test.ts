@@ -227,4 +227,25 @@ describe("mergeRows", () => {
       deltaPct: 25,
     });
   });
+
+  it("priorにだけ存在する複合キーをcurrent=0・-100%で末尾へ残す", () => {
+    const current = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 2 } },
+    ];
+    const prior = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 1 } },
+      { keys: ["/news/a", "reservation_click"], metrics: { keyEvents: 5 } },
+    ];
+
+    expect(mergeRows(current, prior)).toEqual([
+      {
+        keys: ["/news/a", "line_click"],
+        metrics: { keyEvents: { current: 2, prior: 1, deltaPct: 100 } },
+      },
+      {
+        keys: ["/news/a", "reservation_click"],
+        metrics: { keyEvents: { current: 0, prior: 5, deltaPct: -100 } },
+      },
+    ]);
+  });
 });

@@ -13,6 +13,8 @@
 
 import "dotenv/config";
 
+import { readFile, stat } from "node:fs/promises";
+
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
@@ -27,6 +29,7 @@ import {
   buildSearchMetrics,
   isKeyEventsMeasured,
   metricsForPagePath,
+  type ActualReservationMetrics,
   type SearchMetrics,
 } from "./metrics";
 import { computeWeeklyPeriods, type DateRange } from "./period";
@@ -36,6 +39,8 @@ import {
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { CTA_EVENT_NAMES } from "./ctaEvents";
+import { aggregateReservations, parseReservationCsv, type ParsedReservationCsv } from "./reservations";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -46,13 +51,19 @@ const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const KEY_EVENTS_SINCE = process.env.GROWTH_GA4_KEYEVENTS_SINCE;
 
-// topPages のみ取得すれば足りる(pagePath→表示数/ユーザー数/keyEvents)。
+// 表示指標とCTAイベント別指標は別レポートで取得し、keyEvents合計を予約と混同しない。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
   key: "topPages",
   dimensions: ["pagePath"],
-  // #計測強化 S2: keyEvents(CTAキーイベント)も取得し、CTA 計測に使う。
-  metrics: ["screenPageViews", "activeUsers", "keyEvents"],
+  metrics: ["screenPageViews", "activeUsers"],
   limit: 200,
+};
+const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
+  key: "topPageCtaEvents",
+  dimensions: ["pagePath", "eventName"],
+  metrics: ["keyEvents"],
+  dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
+  limit: 10_000,
 };
 
 // #計測強化 S2: 記事ごとの上位クエリ取得件数。
@@ -135,6 +146,36 @@ async function notifyLine(text: string): Promise<void> {
   await pushTextMessage(to, text, { channelAccessToken: token, fetchFn: defaultFetch });
 }
 
+interface ReservationCsvSnapshot {
+  parsed: ParsedReservationCsv;
+  syncedAt: string;
+}
+
+async function loadReservationCsv(
+  path: string | undefined,
+  checkedAt: string
+): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
+  if (!path) return { state: "missing", reason: "not_configured", checkedAt };
+  try {
+    const [content, file] = await Promise.all([readFile(path, "utf8"), stat(path)]);
+    try {
+      return { parsed: parseReservationCsv(content), syncedAt: file.mtime.toISOString() };
+    } catch (error) {
+      console.warn("[metrics] 予約CSVが不正です:", error);
+      return { state: "missing", reason: "invalid", checkedAt };
+    }
+  } catch (error) {
+    console.warn("[metrics] 予約CSVを読み込めません:", error);
+    return { state: "missing", reason: "read_error", checkedAt };
+  }
+}
+
+function isCsvSnapshot(
+  value: ReservationCsvSnapshot | ActualReservationMetrics
+): value is ReservationCsvSnapshot {
+  return "parsed" in value;
+}
+
 /**
  * 記事1件の GSC 検索成績(page フィルタの summary＋query を2期間)を取得する。
  * 失敗しても GA4 分の成績は維持したいので、エラーは握って null を返す(沈黙はログで明示)。
@@ -174,9 +215,10 @@ async function main(): Promise<void> {
     accessToken,
     current,
     prior,
-    reports: [TOP_PAGES_REPORT],
+    reports: [TOP_PAGES_REPORT, TOP_PAGE_CTA_EVENTS_REPORT],
   });
   const rows = ga4.topPages ?? [];
+  const ctaRows = ga4.topPageCtaEvents ?? [];
 
   const options = notionOptions();
   const pages = await publishedPages(options);
@@ -188,6 +230,7 @@ async function main(): Promise<void> {
   }
 
   const nowIso = new Date().toISOString();
+  const reservations = await loadReservationCsv(process.env.GROWTH_RESERVATION_CSV_PATH, nowIso);
   let updated = 0;
   let unmatched = 0;
   let gscFailed = 0; // #計測強化 S2: GSC 取得失敗(クォータ枯渇等)の沈黙を防ぐため件数を可視化。
@@ -204,7 +247,7 @@ async function main(): Promise<void> {
       continue;
     }
     const pagePath = articlePagePath(sl.slug, sl.locale, media);
-    const base = metricsForPagePath(pagePath, rows, current);
+    const base = metricsForPagePath(pagePath, rows, current, ctaRows);
     if (!base) {
       unmatched += 1;
       console.warn(`[metrics] GA4 一致なし: ${titleOf(page)} (${pagePath})`);
@@ -215,16 +258,25 @@ async function main(): Promise<void> {
     const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
     if (search === null) gscFailed += 1; // 失敗は GA4 分を維持しつつ件数だけ数える(沈黙させない)。
     // #計測強化 S3: 公開日(要改稿判定)も載せる。
+    const actualReservations: ActualReservationMetrics = isCsvSnapshot(reservations)
+      ? {
+          state: "available",
+          source: "csv",
+          syncedAt: reservations.syncedAt,
+          ...aggregateReservations(reservations.parsed, current, prior, pagePath),
+        }
+      : reservations;
     const metrics = {
       ...base,
-      keyEventsMeasured: isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
+      ctaEventsMeasured: isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
+      actualReservations,
       ...(search ? { search } : {}),
       ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
     };
     if (DRYRUN) {
       const s = metrics.search;
       console.log(
-        `[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current} keyEvents=${metrics.keyEvents?.current ?? 0}` +
+        `[metrics][dryrun] ${titleOf(page)} ${pagePath} views=${metrics.views.current} users=${metrics.users.current} reservationClicks=${(metrics.ctaEvents?.reservationClick.current ?? 0) + (metrics.ctaEvents?.reserveEntryClick.current ?? 0)}` +
           (s ? ` clicks=${s.clicks.current} ctr=${s.ctr.current} pos=${s.position.current} q=${s.topQueries.length}` : " (GSCなし)")
       );
     } else {

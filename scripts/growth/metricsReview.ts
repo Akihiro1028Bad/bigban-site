@@ -5,13 +5,14 @@
  */
 
 import type { ArticleMetrics } from "./metrics";
+import { reservationIntent } from "./ctaEvents";
 
 export type ReviewLabel =
   | "伸びている"
   | "CTR弱い"
   | "順位あと少し"
-  | "読まれるがCTA弱い"
-  | "CV未計測"
+  | "読まれるが予約意図弱い"
+  | "予約意図未計測"
   | "要改稿"
   | "未計測";
 
@@ -49,8 +50,8 @@ export function reviewLabels(
   const views = metrics.views.current;
   const search = metrics.search;
   const clicks = search?.clicks.current ?? 0;
-  const keyEvents = metrics.keyEvents?.current ?? 0;
-  const keyEventsMeasured = metrics.keyEventsMeasured === true;
+  const reservationClicks = metrics.ctaEvents ? reservationIntent(metrics.ctaEvents).current : 0;
+  const ctaEventsMeasured = metrics.ctaEventsMeasured === true;
 
   if (views === 0 && clicks === 0) return ["未計測"];
 
@@ -71,10 +72,10 @@ export function reviewLabels(
     labels.push("順位あと少し");
   }
   if (views >= CTA_WEAK_VIEWS) {
-    if (!keyEventsMeasured) {
-      labels.push("CV未計測");
-    } else if (keyEvents === 0) {
-      labels.push("読まれるがCTA弱い");
+    if (!ctaEventsMeasured) {
+      labels.push("予約意図未計測");
+    } else if (reservationClicks === 0) {
+      labels.push("読まれるが予約意図弱い");
     }
   }
 

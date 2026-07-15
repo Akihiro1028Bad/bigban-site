@@ -7,20 +7,8 @@
  * 実送信は trackEvent.ts(gtag/dataLayer の薄い I/O)が担い、ここは純ロジック(テスト対象)。
  */
 
-/** CTA クリックの key イベント名(GA4 でキーイベント化する対象)。 */
-export const CTA_EVENTS = {
-  instagram: "instagram_click",
-  line: "line_click",
-  reservation: "reservation_click",
-  reserveEntry: "reserve_entry_click",
-  contactSubmit: "contact_submit",
-  newsletterSignup: "newsletter_signup",
-  externalLink: "external_link_click",
-  contentClick: "content_click",
-  access: "access_click",
-  price: "price_click",
-  newsCta: "news_cta_click",
-} as const;
+export { CTA_EVENTS } from "@/lib/growth/ctaEvents";
+import { CTA_EVENTS } from "@/lib/growth/ctaEvents";
 
 export type CtaKey = keyof typeof CTA_EVENTS;
 

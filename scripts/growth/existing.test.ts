@@ -747,6 +747,96 @@ describe("coverageCrossTabLines", () => {
 });
 
 describe("articleReviewLabelLines", () => {
+  it("イベント別成果とfreshな実予約を週次入力へ出す", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-outcomes",
+        title: "成果あり記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          ctaEventsMeasured: true,
+          ctaEvents: {
+            reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+            reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
+            lineClick: { current: 4, prior: 2, deltaPct: 100 },
+            instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+            other: { current: 5, prior: 0, deltaPct: null },
+          },
+          actualReservations: {
+            state: "available",
+            source: "csv",
+            syncedAt: "2026-07-05T00:00:00.000Z",
+            facility: { current: 8, prior: 5, deltaPct: 60 },
+            article: { current: 2, prior: 1, deltaPct: 100 },
+          },
+        }),
+      }),
+    ], fixedNowMs);
+    const output = lines.join("\n");
+    expect(output).toContain("予約意図=3");
+    expect(output).toContain("LINE=4");
+    expect(output).toContain("Instagram=3");
+    expect(output).toContain("その他CTA=5");
+    expect(output).toContain("施設全体実予約=8");
+    expect(output).toContain("記事帰属実予約=2");
+  });
+
+  it.each([
+    {
+      label: "欠損",
+      actualReservations: {
+        state: "missing" as const,
+        reason: "not_configured" as const,
+        checkedAt: "2026-07-06T00:00:00.000Z",
+      },
+      expected: "実予約=欠損（予約意図は代理指標）",
+    },
+    {
+      label: "古い",
+      actualReservations: {
+        state: "available" as const,
+        source: "csv" as const,
+        syncedAt: "2026-06-20T00:00:00.000Z",
+        facility: { current: 8, prior: 5, deltaPct: 60 },
+        article: null,
+      },
+      expected: "実予約=古い（最終取込 2026-06-20T00:00:00.000Z、予約意図は代理指標）",
+    },
+  ])("実予約が$labelなら代理指標注記を週次入力へ出す", ({ actualReservations, expected }) => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: `i-${actualReservations.state}`,
+        title: `${actualReservations.state}記事`,
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({ actualReservations }),
+      }),
+    ], fixedNowMs);
+    expect(lines.join("\n")).toContain(expected);
+  });
+
+  it("freshな施設実予約のみなら記事帰属なしを週次入力へ出す", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-facility-only",
+        title: "施設予約のみ記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          actualReservations: {
+            state: "available",
+            source: "csv",
+            syncedAt: "2026-07-05T00:00:00.000Z",
+            facility: { current: 8, prior: 5, deltaPct: 60 },
+            article: null,
+          },
+        }),
+      }),
+    ], fixedNowMs);
+    expect(lines.join("\n")).toContain("記事帰属実予約=なし");
+  });
+
   it("公開済み記事に判定ラベルを記事単位で併記する", () => {
     const lines = articleReviewLabelLines([
       ideaPage({

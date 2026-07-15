@@ -31,6 +31,35 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGa4", () => {
+  it("CTAレポートへeventNameとinListFilterを設定する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
+    expect(ctaReport).toBeDefined();
+
+    await fetchGa4({
+      config,
+      accessToken: "t",
+      current,
+      prior,
+      fetchFn,
+      reports: [ctaReport!],
+    });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<Record<string, unknown>>;
+    };
+    expect(body.requests[0]).toMatchObject({
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "keyEvents" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          inListFilter: { values: expect.arrayContaining(["reservation_click", "line_click"]) },
+        },
+      },
+    });
+  });
+
   it("batchRunReports を正しい URL と Bearer トークンで叩く", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
 
@@ -114,8 +143,8 @@ describe("fetchGa4", () => {
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior });
 
-    // 既定5レポート × 2期間 = 10リクエスト → 5件ずつ2バッチ
-    expect(globalFetch).toHaveBeenCalledTimes(2);
+    // 既定6レポート × 2期間 = 12リクエスト → 5件ずつ3バッチ
+    expect(globalFetch).toHaveBeenCalledTimes(3);
     // 既定レポートの各 key が結果に存在する
     for (const def of GA4_REPORTS) {
       expect(result[def.key]).toBeDefined();

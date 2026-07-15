@@ -329,3 +329,7 @@ pull 型なので、依頼は自宅PCが拾って初めて処理される。次�
 | 学習ログ(セルフチューニング) | [70-self-tuning.md](70-self-tuning.md) |
 | AI 実行時の内部手順(全体像) | [growth-weekly-runbook.md](../growth-weekly-runbook.md) |
 | 初期構築(自宅PCのタスク・環境変数・LINE 承認) | [01-setup-guide.md](01-setup-guide.md) |
+
+## 予約CSVの運用（#280）
+
+予約サービスから正規化したCSVを `GROWTH_RESERVATION_CSV_PATH` に配置し、週次計測前に更新する。必須列は `reservation_id,booked_at,status`、記事帰属が提供される場合だけ `source_page_path` を付ける。7日超のCSVは古いと表示されるため件数は参考値に留め、予約意図を代理指標として扱う。CSVを用意できない週は既存の「予約件数」手入力をfallbackにし、推測帰属はしない。

@@ -23,6 +23,9 @@
  */
 
 import { parseMetrics, METRICS_PROPS } from "./metrics";
+import { combineMetricDeltas, metricDelta, reservationIntent } from "./ctaEvents";
+import { isReservationDataFresh } from "./reservations";
+import type { MetricDelta } from "./metrics";
 import type { NotionPage } from "./notion";
 
 /** 集計対象にする記事ステータス(公開済みのみ成績がある)。 */
@@ -54,6 +57,14 @@ export interface ArticleTypePerformance {
   unjudged: number;
   /** このタイプで勝ったクエリ(クリック降順・重複排除・上位数件)。 */
   winningQueries: string[];
+  outcomes?: {
+    reservationIntent: MetricDelta;
+    lineClick: MetricDelta;
+    instagramClick: MetricDelta;
+    other: MetricDelta;
+    actualReservations: MetricDelta;
+  };
+  notes?: string[];
 }
 
 function selectName(page: NotionPage, prop: string): string {
@@ -76,6 +87,15 @@ interface Bucket {
   unjudged: number;
   /** query → 累計クリック数(重複クエリはクリックを合算し、最も効いた順に並べる)。 */
   queryClicks: Map<string, number>;
+  outcomeValues: {
+    reservationIntent: MetricDelta[];
+    lineClick: MetricDelta[];
+    instagramClick: MetricDelta[];
+    other: MetricDelta[];
+    actualReservations: MetricDelta[];
+  };
+  notes: Set<string>;
+  hasOutcomes: boolean;
 }
 
 function newBucket(): Bucket {
@@ -86,6 +106,15 @@ function newBucket(): Bucket {
     rewrite: 0,
     unjudged: 0,
     queryClicks: new Map<string, number>(),
+    outcomeValues: {
+      reservationIntent: [],
+      lineClick: [],
+      instagramClick: [],
+      other: [],
+      actualReservations: [],
+    },
+    notes: new Set<string>(),
+    hasOutcomes: false,
   };
 }
 
@@ -98,6 +127,42 @@ function accumulateWinningQueries(bucket: Bucket, page: NotionPage): void {
     if (!query || q.clicks < WINNING_QUERY_MIN_CLICKS) continue;
     bucket.queryClicks.set(query, (bucket.queryClicks.get(query) ?? 0) + q.clicks);
   }
+}
+
+function accumulateOutcomes(bucket: Bucket, page: NotionPage, nowMs: number): void {
+  const metrics = parseMetrics(richTextValue(page, METRICS_PROPS.data));
+  if (!metrics) return;
+  if (metrics.ctaEvents && metrics.ctaEventsMeasured === true) {
+    bucket.hasOutcomes = true;
+    bucket.outcomeValues.reservationIntent.push(reservationIntent(metrics.ctaEvents));
+    bucket.outcomeValues.lineClick.push(metrics.ctaEvents.lineClick);
+    bucket.outcomeValues.instagramClick.push(metrics.ctaEvents.instagramClick);
+    bucket.outcomeValues.other.push(metrics.ctaEvents.other);
+  }
+  const actual = metrics.actualReservations;
+  if (!actual) return;
+  bucket.hasOutcomes = true;
+  if (actual.state === "missing") {
+    bucket.notes.add("実予約欠損（予約意図を代理指標として使用）");
+  } else if (!isReservationDataFresh(actual.syncedAt, new Date(nowMs).toISOString())) {
+    bucket.notes.add(`実予約データが古い（最終取込 ${actual.syncedAt}、予約意図を代理指標として使用）`);
+  } else if (actual.article === null) {
+    bucket.notes.add("施設全体の実予約のみ（記事別帰属なし）");
+  } else {
+    bucket.outcomeValues.actualReservations.push(actual.article);
+  }
+}
+
+function outcomesOf(bucket: Bucket): NonNullable<ArticleTypePerformance["outcomes"]> {
+  const combined = (values: MetricDelta[]) =>
+    values.length > 0 ? combineMetricDeltas(values) : metricDelta(0, 0);
+  return {
+    reservationIntent: combined(bucket.outcomeValues.reservationIntent),
+    lineClick: combined(bucket.outcomeValues.lineClick),
+    instagramClick: combined(bucket.outcomeValues.instagramClick),
+    other: combined(bucket.outcomeValues.other),
+    actualReservations: combined(bucket.outcomeValues.actualReservations),
+  };
 }
 
 /** bucket の判定カウンタに、人が付けた `公開後判定` を反映する。 */
@@ -121,7 +186,8 @@ function topWinningQueries(queryClicks: Map<string, number>): string[] {
  * 公開前(ステータス≠公開済み)の行は成績が無いので除外する。公開0本なら空配列を返す。
  */
 export function summarizeArticlePerformance(
-  ideas: readonly NotionPage[]
+  ideas: readonly NotionPage[],
+  nowMs = Date.now()
 ): ArticleTypePerformance[] {
   const buckets = new Map<string, Bucket>();
 
@@ -132,6 +198,7 @@ export function summarizeArticlePerformance(
     bucket.published += 1;
     tallyVerdict(bucket, selectName(page, "公開後判定"));
     accumulateWinningQueries(bucket, page);
+    accumulateOutcomes(bucket, page, nowMs);
     buckets.set(articleType, bucket);
   }
 
@@ -143,6 +210,7 @@ export function summarizeArticlePerformance(
     rewrite: bucket.rewrite,
     unjudged: bucket.unjudged,
     winningQueries: topWinningQueries(bucket.queryClicks),
+    ...(bucket.hasOutcomes ? { outcomes: outcomesOf(bucket), notes: [...bucket.notes] } : {}),
   }));
 }
 
@@ -175,6 +243,16 @@ export function renderPerformanceSummary(
     lines.push(head);
     if (s.winningQueries.length > 0) {
       lines.push(`  - 勝ったクエリ: ${s.winningQueries.join(" / ")}`);
+    }
+    if (s.outcomes) {
+      lines.push(
+        `  - 予約意図 ${s.outcomes.reservationIntent.current}/${s.outcomes.reservationIntent.prior}、` +
+          `LINE ${s.outcomes.lineClick.current}/${s.outcomes.lineClick.prior}、` +
+          `Instagram ${s.outcomes.instagramClick.current}/${s.outcomes.instagramClick.prior}、` +
+          `その他CTA ${s.outcomes.other.current}/${s.outcomes.other.prior}、` +
+          `記事帰属実予約 ${s.outcomes.actualReservations.current}/${s.outcomes.actualReservations.prior}`
+      );
+      for (const note of s.notes ?? []) lines.push(`  - 注記: ${note}`);
     }
   }
   lines.push(
