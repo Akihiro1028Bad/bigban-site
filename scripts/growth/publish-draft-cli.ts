@@ -73,9 +73,11 @@ import {
 import {
   buildSourceLedgerProps,
   confirmedFactsFromEntries,
+  factBindingFromEntries,
   hasReferenceEligibleSource,
   parseSourceLedger,
   updatePagePropsWithLedgerFallback,
+  withBindingBodyHash,
 } from "./sourceLedger";
 import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
 import { canRestoreGeneratedFile, createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
@@ -328,6 +330,7 @@ async function main(): Promise<void> {
         articleType: resolveGateArticleType(spec.payload),
         knownNewsPaths,
         confirmedFacts: confirmedFactsFromEntries(parsedLedger.entries),
+        factBinding: factBindingFromEntries(parsedLedger.entries),
       });
       if (!gate.ok) {
         throw new Error(`品質ゲート不合格(投入中断): ${gate.blockReasons.join(" / ")}`);
@@ -475,7 +478,8 @@ async function main(): Promise<void> {
           process.stderr.write(`(draftKey 取得に失敗・プレビューキーなしで継続: ${m})\n`);
         }
         // #根拠台帳: 台帳を検証し、除外があれば沈黙させず LINE 通知する(投入は落とさない)。
-        const { entries: ledgerEntries, warnings: ledgerWarnings } = parsedLedger;
+        const { entries, warnings: ledgerWarnings } = parsedLedger;
+        const ledgerEntries = withBindingBodyHash(entries, String(spec.payload.bodyHtml ?? ""));
         for (const w of ledgerWarnings) {
           process.stderr.write(`${w}\n`);
           await notifyLineBestEffort(w);

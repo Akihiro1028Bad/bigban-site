@@ -11,6 +11,7 @@
 import { z } from "zod";
 
 import { chunkRichText, type NotionPage } from "./notion";
+import { bindingBodyHash } from "./factBindingMetadata";
 
 /** 確認済み情報源の種別。旧specの search-result は再実行互換のため受理する。 */
 export const SOURCE_TYPES = [
@@ -24,13 +25,88 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 /** Notion に保存する台帳プロパティ名(rich_text・任意・publish-draft が自動書き込み)。 */
 export const SOURCE_LEDGER_PROP = "根拠台帳";
 
+const factReferenceSchema = z.object({
+  factId: z.string().regex(/^fact-[a-z0-9-]+$/i),
+  statement: z.string().min(1),
+  excerpt: z.string().min(1),
+  sectionPath: z.string(),
+  container: z.enum(["p", "li", "th", "td"]),
+  containerIndex: z.number().int().positive(),
+  recheckBeforePublish: z.boolean(),
+  recheckReason: z.string().min(1).optional(),
+  bindingVersion: z.number().int().positive().optional(),
+  bodyHash: z.string().min(1).optional(),
+});
+
 const entrySchema = z.object({
   sourceType: z.enum(SOURCE_TYPES),
   source: z.string().min(1),
   confirmedFacts: z.array(z.string().min(1)).min(1),
+  factReferences: z.array(z.unknown()).optional(),
 });
 
-export type SourceLedgerEntry = z.infer<typeof entrySchema>;
+export type SourceLedgerFactReference = z.infer<typeof factReferenceSchema>;
+export interface SourceLedgerEntry {
+  sourceType: SourceType;
+  source: string;
+  confirmedFacts: string[];
+  factReferences?: SourceLedgerFactReference[];
+}
+
+export interface StoredFactBindingMetadata {
+  version: number;
+  bodyHash: string;
+  referenceCount: number;
+  isValid: boolean;
+}
+
+function bindingMetadataFromReferences(
+  references: readonly SourceLedgerFactReference[],
+): StoredFactBindingMetadata | undefined {
+  const withMetadata = references.filter(
+    (reference) => reference.bindingVersion !== undefined || reference.bodyHash !== undefined,
+  );
+  if (withMetadata.length === 0) return undefined;
+  const first = withMetadata[0];
+  const isComplete = references.every(
+    (reference) => reference.bindingVersion !== undefined && reference.bodyHash !== undefined,
+  );
+  const isConsistent = withMetadata.every(
+    (reference) => reference.bindingVersion === first.bindingVersion && reference.bodyHash === first.bodyHash,
+  );
+  return {
+    version: first.bindingVersion ?? 0,
+    bodyHash: first.bodyHash ?? "",
+    referenceCount: references.length,
+    isValid: isComplete && isConsistent,
+  };
+}
+
+export function factBindingFromEntries(
+  entries: readonly SourceLedgerEntry[],
+): StoredFactBindingMetadata | undefined {
+  return bindingMetadataFromReferences(entries.flatMap((entry) => entry.factReferences ?? []));
+}
+
+export function withBindingBodyHash(
+  entries: readonly SourceLedgerEntry[],
+  bodyHtml: string,
+): SourceLedgerEntry[] {
+  const bodyHash = bindingBodyHash(bodyHtml);
+  return entries.map((entry) => ({
+    ...entry,
+    confirmedFacts: [...entry.confirmedFacts],
+    ...(entry.factReferences
+      ? {
+          factReferences: entry.factReferences.map((reference) =>
+            reference.bindingVersion === undefined && reference.bodyHash === undefined
+              ? { ...reference }
+              : { ...reference, bodyHash },
+          ),
+        }
+      : {}),
+  }));
+}
 
 const legacyEntrySchema = z.object({
   claim: z.string().min(1),
@@ -67,6 +143,7 @@ export function confirmedFactsFromEntries(
 /** Notionへ保存した1行1情報源の表示テキストから確認済み事実を復元する。 */
 export function confirmedFactsFromRenderedText(value: string): string[] {
   const facts = value.split("\n").flatMap((line) => {
+    if (line.trimStart().startsWith("↳")) return [];
     const parts = line.split(" | ");
     if (parts.length < 3) return [];
     return parts.slice(2).join(" | ").split("／").map((fact) => fact.trim()).filter(Boolean);
@@ -81,6 +158,34 @@ export function confirmedFactsFromPage(page: NotionPage): string[] {
     | undefined;
   const text = (value?.rich_text ?? []).map((part) => part.plain_text ?? "").join("");
   return confirmedFactsFromRenderedText(text);
+}
+
+function sourceLedgerTextFromPage(page: NotionPage): string {
+  const value = page.properties[SOURCE_LEDGER_PROP] as
+    | { rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  return (value?.rich_text ?? []).map((part) => part.plain_text ?? "").join("");
+}
+
+export function factBindingFromRenderedText(value: string): StoredFactBindingMetadata | undefined {
+  const auditRows = value.split("\n").filter((line) => line.trimStart().startsWith("↳"));
+  const parsed = auditRows.flatMap((line) => {
+    const match = /\[binding:v(\d+);hash=([^\]]+)\]/.exec(line);
+    return match ? [{ version: Number(match[1]), bodyHash: match[2] }] : [];
+  });
+  if (parsed.length === 0) return undefined;
+  const first = parsed[0];
+  return {
+    version: first.version,
+    bodyHash: first.bodyHash,
+    referenceCount: auditRows.length,
+    isValid: parsed.length === auditRows.length
+      && parsed.every((metadata) => metadata.version === first.version && metadata.bodyHash === first.bodyHash),
+  };
+}
+
+export function factBindingFromPage(page: NotionPage): StoredFactBindingMetadata | undefined {
+  return factBindingFromRenderedText(sourceLedgerTextFromPage(page));
 }
 
 /**
@@ -106,7 +211,18 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
   value.forEach((item, index) => {
     const result = entrySchema.safeParse(item);
     if (result.success) {
-      parsedEntries.push(result.data);
+      const references: SourceLedgerFactReference[] = [];
+      result.data.factReferences?.forEach((reference, referenceIndex) => {
+        const parsedReference = factReferenceSchema.safeParse(reference);
+        if (parsedReference.success) references.push(parsedReference.data);
+        else warnings.push(`${SOURCE_LEDGER_PROP}[${index}].factReferences[${referenceIndex}]: 不正な監査参照のため除外しました。`);
+      });
+      parsedEntries.push({
+        sourceType: result.data.sourceType,
+        source: result.data.source,
+        confirmedFacts: result.data.confirmedFacts,
+        ...(references.length > 0 ? { factReferences: references } : {}),
+      });
       return;
     }
     const legacy = legacyEntrySchema.safeParse(item);
@@ -142,12 +258,30 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
     for (const fact of entry.confirmedFacts) {
       if (!existing.confirmedFacts.includes(fact)) existing.confirmedFacts.push(fact);
     }
+    for (const reference of entry.factReferences ?? []) {
+      const references = existing.factReferences ?? (existing.factReferences = []);
+      const key = `${reference.factId}\u0000${reference.container}\u0000${reference.containerIndex}\u0000${reference.excerpt}`;
+      if (!references.some((current) => `${current.factId}\u0000${current.container}\u0000${current.containerIndex}\u0000${current.excerpt}` === key)) {
+        references.push(reference);
+      }
+    }
   }
   return { entries: [...grouped.values()], warnings };
 }
 
 function renderEntry(entry: SourceLedgerEntry): string {
-  return [entry.sourceType, entry.source, entry.confirmedFacts.join("／")].join(" | ");
+  const parent = [entry.sourceType, entry.source, entry.confirmedFacts.join("／")].join(" | ");
+  const auditRows = (entry.factReferences ?? []).map((reference) => {
+    const recheck = reference.recheckBeforePublish
+      ? ` [公開前再確認:${reference.recheckReason ?? "要確認"}]`
+      : "";
+    const path = reference.sectionPath ? `${reference.sectionPath} > ` : "";
+    const binding = reference.bindingVersion !== undefined && reference.bodyHash !== undefined
+      ? ` [binding:v${reference.bindingVersion};hash=${reference.bodyHash}]`
+      : "";
+    return `  ↳ ${reference.factId}${recheck}${binding} ${path}${reference.container}#${reference.containerIndex} 根拠「${reference.statement}」 本文「${reference.excerpt}」`;
+  });
+  return [parent, ...auditRows].join("\n");
 }
 
 /**

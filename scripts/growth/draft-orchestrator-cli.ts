@@ -12,7 +12,7 @@ import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
 import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, invalidatePublishResumeFiles, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
-import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
+import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type ValidatedWriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
 import { defaultFetch } from "./http";
 import { getPage, updatePageSelect, type NotionApiOptions } from "./notion";
@@ -388,6 +388,7 @@ async function main(): Promise<void> {
   const researchKey = stageCacheKey({ input: researchInput, prompt: promptResearch, model: researchSetting, cacheScope: generation.cacheScope });
   const researchPath = path.join(stateDir, "research.json");
   const trustedResearchSources = {
+    facilityName: relevantFacilityContext.name,
     facilityConfirmed: relevantFacilityContext.confirmed,
     facilityLocation: relevantFacilityContext.location,
     primaryNotes: input.primaryNotes,
@@ -432,7 +433,7 @@ async function main(): Promise<void> {
   );
   const writerKey = stageCacheKey({ input: writerInput, prompt: promptWrite, model: writerSetting, cacheScope: generation.cacheScope });
   let writerValue = cached(writerPath, writerKey);
-  let cachedWriter: WriterOutput | null = null;
+  let cachedWriter: ValidatedWriterOutput | null = null;
   if (writerValue !== null) {
     try {
       cachedWriter = parseValidatedWriterOutput(writerValue, research, prepared.outline);
@@ -443,7 +444,7 @@ async function main(): Promise<void> {
   }
   const writerWasCached = cachedWriter !== null;
   const writerLogId = await startPhaseLog(input.pageId, "draft-write", writerSetting);
-  let writer: WriterOutput;
+  let writer: ValidatedWriterOutput;
   try {
     if (writerValue === null) {
       writerValue = await runAgent({ phase: "draft-write", setting: writerSetting, prompt: `${promptWrite}\n\n<input_json>\n${JSON.stringify(writerInput)}\n</input_json>`, schema: writerSchema, workDir: writerWorkDir });
@@ -457,7 +458,7 @@ async function main(): Promise<void> {
     if (error instanceof ProcessExecutionError) throw error;
     throw new Error(`${draftPhaseExecutionLabel("draft-write", writerSetting)}; ${message}`);
   }
-  const spec = assemblePublishSpec({ input, writer, research, images: prepared.images });
+  const spec = assemblePublishSpec({ input, writer, research, images: prepared.images, doNotWrite: relevantFacilityContext.doNotWrite });
   spec.imagePath = path.join(stateDir, "growth-eyecatch.png");
   writeFileSync(specPath, JSON.stringify(spec, null, 2));
   await runNpm("growth:image-prompt", [specPath], false, timeoutPolicy.imagePromptMs);

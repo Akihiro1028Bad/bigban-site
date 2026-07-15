@@ -3,10 +3,11 @@ import { createHash } from "node:crypto";
 import { resolveColumnCategoryId } from "./columnCategory";
 import { placeholderIndices } from "./body-image";
 import { buildSourceLedgerFromUsedFacts, duplicateExternalLinks, externalLinksOutsideFacts, parseWriterOutput, RESERVE_URL } from "./draftPipeline";
+import { recheckReasonForFactReference, validateAndStripFactBindings } from "./factBinding";
 import { resolveFacilityPhase } from "./facility-context";
 import { rebuildSourceIdOf } from "./rebuildDraft";
 import { buildGrowthOperationResult } from "./operationOutcome";
-import type { ResearchPacket, WriterOutput } from "./draftPipeline";
+import type { ResearchPacket, ValidatedWriterOutput, WriterOutput } from "./draftPipeline";
 import type { FacilityContextData, FacilityPhase } from "./facility-context";
 import type { NotionPage } from "./notion";
 import type { GrowthOperationResult } from "./operationOutcome";
@@ -283,8 +284,19 @@ export function parseValidatedWriterOutput(
   value: unknown,
   research: ResearchPacket,
   preparedOutline: string,
-): WriterOutput {
-  const writer = parseWriterOutput(value, research);
+): ValidatedWriterOutput {
+  const raw = parseWriterOutput(value, research);
+  const bindings = validateAndStripFactBindings({
+    bodyHtml: raw.bodyHtml,
+    usedFactIds: raw.usedFactIds,
+    facts: research.facts,
+  });
+  const writer: ValidatedWriterOutput = {
+    ...raw,
+    bodyHtml: bindings.cleanBodyHtml,
+    factReferences: bindings.references,
+    binding: bindings.binding,
+  };
   validateWriterContract(writer, research, preparedOutline);
   return writer;
 }
@@ -463,11 +475,12 @@ async function runDraftNotification(params: {
 
 export function assemblePublishSpec(params: {
   input: DraftInput;
-  writer: WriterOutput;
+  writer: ValidatedWriterOutput;
   research: ResearchPacket;
   images: DraftImageInput[];
+  doNotWrite?: readonly string[];
 }): Record<string, unknown> {
-  const { input, writer, research, images } = params;
+  const { input, writer, research, images, doNotWrite = [] } = params;
   const category = resolveColumnCategoryId(input.articleType, input.columnCategory);
   const payload: Record<string, unknown> = {
     title: input.title,
@@ -490,7 +503,13 @@ export function assemblePublishSpec(params: {
     eyecatchAction: "pending",
     imagePath: `/tmp/growth-eyecatch-${writer.slug}.png`,
     images,
-    sourceLedger: buildSourceLedgerFromUsedFacts(research, writer.usedFactIds),
+    sourceLedger: buildSourceLedgerFromUsedFacts(
+      research,
+      writer.usedFactIds,
+      writer.factReferences,
+      (statement, excerpt) => recheckReasonForFactReference(statement, excerpt, doNotWrite),
+      writer.binding,
+    ),
     notion: { pageId: input.pageId, property: "ステータス", value: "下書き作成済み" },
   };
 }
