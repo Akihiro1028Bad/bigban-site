@@ -112,6 +112,38 @@ export function classifyProcessClose(state) {
   return state.code === 0 ? "success" : "nonzero-exit";
 }
 
+export function createTaskkillRunner(spawnTaskkill) {
+  return (args) => new Promise((resolve) => {
+      let settled = false;
+      const finish = (didStart) => {
+        /* istanbul ignore if -- error/close may race on spawn failure */
+        if (settled) return;
+        settled = true;
+        resolve(didStart);
+      };
+      const killer = spawnTaskkill("taskkill", args, { stdio: "ignore", windowsHide: true });
+      killer.once("error", () => finish(false));
+      killer.once("close", () => finish(true));
+    });
+}
+
+export function waitForDelay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const WINDOWS_TERMINATION_DEPENDENCIES = Object.freeze({
+  runTaskkill: createTaskkillRunner(spawn),
+  wait: waitForDelay,
+});
+
+export async function terminateWindowsProcessTree(pid, killGraceMs, leaderClose, dependencies) {
+  const graceful = dependencies.runTaskkill(["/pid", String(pid), "/T"]);
+  await dependencies.wait(killGraceMs);
+  const forced = dependencies.runTaskkill(["/pid", String(pid), "/T", "/F"]);
+  const [termSent, forceKilled] = await Promise.all([graceful, forced, leaderClose]);
+  return { termSent, forceKilled };
+}
+
 function assertPositiveFinite(name, value) {
   if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a positive finite number`);
 }
@@ -165,14 +197,6 @@ function subtreeGroupIds(registryPath, rootGroupId) {
 function signalProcessGroups(child, groupIds, signal) {
   /* istanbul ignore if -- spawned processes have a PID before termination paths run */
   if (!child.pid) return false;
-  /* istanbul ignore if -- Windows process tree is exercised on Windows CI/operation */
-  if (process.platform === "win32") {
-    const args = ["/pid", String(child.pid), "/T"];
-    if (signal === "SIGKILL") args.push("/F");
-    const killer = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
-    killer.unref();
-    return true;
-  }
   let sent = false;
   for (const groupId of groupIds) {
     try {
@@ -187,8 +211,6 @@ function signalProcessGroups(child, groupIds, signal) {
 }
 
 function isProcessGroupAlive(groupId) {
-  /* istanbul ignore if -- Windows uses taskkill completion rather than POSIX group probing */
-  if (process.platform === "win32") return false;
   try {
     process.kill(-groupId, 0);
     return true;
@@ -292,6 +314,12 @@ export function runProcess(command, args, options) {
     let groupPollTimer;
     let closeResult = null;
     let timeoutTimer;
+    let resolveLeaderClose;
+    const leaderClose = new Promise((resolveClose) => { resolveLeaderClose = resolveClose; });
+    let terminationStarted = false;
+    let windowsTerminationComplete = false;
+    let windowsTerminationPromise = null;
+    let forwardedSignal = null;
     const terminationGroupIds = new Set();
 
     const refreshTerminationGroups = () => {
@@ -333,13 +361,32 @@ export function runProcess(command, args, options) {
       else finish(kind, code, null, undefined);
     };
     const finishTerminatedTree = () => {
-      if (closeResult && haveTerminationGroupsExited()) finishFromClose();
+      if (!closeResult) return;
+      /* istanbul ignore next -- Windows runProcess wiring is exercised through the injected controller */
+      if (process.platform === "win32") {
+        if (windowsTerminationComplete) finishFromClose();
+        return;
+      }
+      if (haveTerminationGroupsExited()) finishFromClose();
     };
     const beginTermination = (kind, error) => {
+      terminationStarted = true;
       if (kind === "timeout") timedOut = true;
       if (kind === "lease-lost") {
         leaseLost = true;
         terminationError = error;
+      }
+      /* istanbul ignore next -- Windows runProcess wiring is exercised through the injected controller */
+      if (process.platform === "win32") {
+        if (!windowsTerminationPromise) {
+          windowsTerminationPromise = terminateWindowsProcessTree(rootGroupId, killGraceMs, leaderClose, WINDOWS_TERMINATION_DEPENDENCIES).then((result) => {
+            termSent = result.termSent || termSent;
+            forceKilled = result.forceKilled || forceKilled;
+            windowsTerminationComplete = true;
+            finishTerminatedTree();
+          });
+        }
+        return;
       }
       /* istanbul ignore next -- false only after the target tree has already exited */
       termSent = signalProcessGroups(child, refreshTerminationGroups(), "SIGTERM") || termSent;
@@ -364,7 +411,13 @@ export function runProcess(command, args, options) {
       ? startPeriodicTask(controlledHeartbeat, options.heartbeatMs)
       : () => {};
     const parentSignals = ["SIGINT", "SIGTERM"];
-    const forwardSignal = (signal) => { signalProcessGroups(child, refreshTerminationGroups(), signal); };
+    const forwardSignal = (signal) => {
+      /* istanbul ignore next -- Windows runProcess wiring is exercised through the injected controller */
+      if (process.platform === "win32") {
+        forwardedSignal = signal;
+        beginTermination("parent-signal");
+      } else signalProcessGroups(child, refreshTerminationGroups(), signal);
+    };
     for (const parentSignal of parentSignals) process.on(parentSignal, forwardSignal);
 
     const append = (stream, chunk) => {
@@ -379,8 +432,9 @@ export function runProcess(command, args, options) {
     /* istanbul ignore next -- POSIX root wrapper reports spawn errors via exit 126 */
     child.on("error", (error) => finish("spawn-error", 1, null, error));
     child.on("close", (code, signal) => {
-      closeResult = { code, signal };
-      if (timedOut || leaseLost || bufferExceeded) finishTerminatedTree();
+      closeResult = { code, signal: signal ?? forwardedSignal };
+      resolveLeaderClose();
+      if (terminationStarted) finishTerminatedTree();
       else finishFromClose();
     });
     if (options.stdin !== undefined) child.stdin.end(options.stdin);

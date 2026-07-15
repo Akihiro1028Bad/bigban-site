@@ -2,10 +2,11 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { buildProcessFailureDetail, classifyProcessClose, parseProcessGroupRegistry, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+import { buildProcessFailureDetail, classifyProcessClose, createTaskkillRunner, parseProcessGroupRegistry, resolveTimeoutPolicy, runProcess, startPeriodicTask, terminateWindowsProcessTree, waitForDelay } from "./processControl.mjs";
 
 it("process group registryは追加・削除を順に適用し、壊れた行を無視する", () => {
   const groups = parseProcessGroupRegistry([
@@ -45,6 +46,65 @@ describe("timeout policy", () => {
 });
 
 describe("runProcess", () => {
+  it("taskkill runnerはtaskkill自体のcloseを待ち、spawn errorを区別する", async () => {
+    const closedChild = new EventEmitter();
+    const failedChild = new EventEmitter();
+    const spawnTaskkill = vi.fn()
+      .mockReturnValueOnce(closedChild)
+      .mockReturnValueOnce(failedChild);
+    const runTaskkill = createTaskkillRunner(spawnTaskkill);
+    let didResolve = false;
+    const completed = runTaskkill(["/pid", "42", "/T"]).then((result) => {
+      didResolve = true;
+      return result;
+    });
+
+    expect(spawnTaskkill).toHaveBeenCalledWith("taskkill", ["/pid", "42", "/T"], { stdio: "ignore", windowsHide: true });
+    await Promise.resolve();
+    expect(didResolve).toBe(false);
+    closedChild.emit("close", 0);
+    await expect(completed).resolves.toBe(true);
+
+    const failed = runTaskkill(["/pid", "42", "/T", "/F"]);
+    failedChild.emit("error", new Error("taskkill missing"));
+    await expect(failed).resolves.toBe(false);
+  });
+
+  it("Windowsはleader close後も猶予を維持しtaskkill /T /Fの完了までresolveしない", async () => {
+    vi.useFakeTimers();
+    let resolveGraceful: ((value: boolean) => void) | undefined;
+    let resolveForced: ((value: boolean) => void) | undefined;
+    let resolveLeaderClose: (() => void) | undefined;
+    const graceful = new Promise<boolean>((resolve) => { resolveGraceful = resolve; });
+    const forced = new Promise<boolean>((resolve) => { resolveForced = resolve; });
+    const leaderClose = new Promise<void>((resolve) => { resolveLeaderClose = resolve; });
+    const runTaskkill = vi.fn()
+      .mockImplementationOnce(() => graceful)
+      .mockImplementationOnce(() => forced);
+    let didResolve = false;
+
+    const termination = terminateWindowsProcessTree(42, 100, leaderClose, {
+      runTaskkill,
+      wait: waitForDelay,
+    }).then((result) => {
+      didResolve = true;
+      return result;
+    });
+
+    expect(runTaskkill).toHaveBeenNthCalledWith(1, ["/pid", "42", "/T"]);
+    resolveLeaderClose?.();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(runTaskkill).toHaveBeenNthCalledWith(2, ["/pid", "42", "/T", "/F"]);
+    expect(didResolve).toBe(false);
+
+    resolveForced?.(true);
+    await Promise.resolve();
+    expect(didResolve).toBe(false);
+    resolveGraceful?.(true);
+    await expect(termination).resolves.toEqual({ termSent: true, forceKilled: true });
+    vi.useRealTimers();
+  });
+
   it("wrapperのspawn error診断を受信済みならtimeoutフラグよりspawn-errorを優先する", () => {
     expect(classifyProcessClose({
       leaseLost: false,

@@ -63,9 +63,38 @@ export interface ProcessCloseState {
   stderr: string;
 }
 
+export interface WindowsTerminationDependencies {
+  runTaskkill(args: readonly string[]): Promise<boolean>;
+  wait(ms: number): Promise<void>;
+}
+
+export interface TaskkillChild {
+  once(event: "error", listener: (error: Error) => void): TaskkillChild;
+  once(event: "close", listener: () => void): TaskkillChild;
+}
+
+export type TaskkillSpawner = (
+  command: string,
+  args: readonly string[],
+  options: { stdio: "ignore"; windowsHide: true },
+) => TaskkillChild;
+
+export interface WindowsTerminationResult {
+  termSent: boolean;
+  forceKilled: boolean;
+}
+
 export function resolveTimeoutPolicy(env?: Record<string, string | undefined>): TimeoutPolicy;
 export function buildProcessFailureDetail(result: ProcessResult, context: ProcessFailureContext): string;
 export function classifyProcessClose(state: ProcessCloseState): ProcessResultKind;
+export function createTaskkillRunner(spawnTaskkill: TaskkillSpawner): (args: readonly string[]) => Promise<boolean>;
 export function parseProcessGroupRegistry(records: string): ReadonlyMap<number, number | null>;
 export function runProcess(command: string, args: readonly string[], options: RunProcessOptions): Promise<ProcessResult>;
 export function startPeriodicTask(task: () => void | Promise<void>, intervalMs: number, options?: { runImmediately?: boolean }): () => void;
+export function terminateWindowsProcessTree(
+  pid: number,
+  killGraceMs: number,
+  leaderClose: Promise<void>,
+  dependencies: WindowsTerminationDependencies,
+): Promise<WindowsTerminationResult>;
+export function waitForDelay(ms: number): Promise<void>;
