@@ -1,154 +1,233 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { ArticleMetrics } from "./metrics";
-import type { NotionPage } from "./notion";
 import {
+  MIN_JUDGED_ARTICLES_PER_TYPE,
+  QUERY_MIN_CLICKS,
+  QUERY_MIN_IMPRESSIONS,
   renderPerformanceSummary,
   summarizeArticlePerformance,
-  type ArticleTypePerformance,
 } from "./performanceSummary";
+
+import type { ArticleMetrics, SearchQueryStat } from "./metrics";
+import type { NotionPage } from "./notion";
 
 function select(name: string) {
   return { type: "select", select: { name } };
 }
 
-function metricsJson(topQueries: { query: string; clicks: number }[]): string {
-  const metrics: ArticleMetrics = {
+function metricsJson(overrides: Partial<ArticleMetrics> = {}): string {
+  return JSON.stringify({
     pagePath: "/news/x",
     views: { current: 100, prior: 0, deltaPct: null },
     users: { current: 80, prior: 0, deltaPct: null },
-    search: {
-      clicks: { current: 10, prior: 0, deltaPct: null },
-      impressions: { current: 500, prior: 0, deltaPct: null },
-      ctr: { current: 0.02, prior: 0, deltaPct: null },
-      position: { current: 8, prior: 0, deltaPct: null },
-      topQueries: topQueries.map((q) => ({
-        query: q.query,
-        clicks: q.clicks,
-        impressions: 100,
-        ctr: 0.05,
-        position: 6,
-      })),
-    },
-    period: { start: "2026-06-01", end: "2026-06-07" },
-  };
-  return JSON.stringify(metrics);
-}
-
-function outcomeMetricsJson(): string {
-  const metrics: ArticleMetrics = {
-    pagePath: "/news/x",
-    views: { current: 100, prior: 80, deltaPct: 25 },
-    users: { current: 50, prior: 40, deltaPct: 25 },
-    ctaEventsMeasured: true,
-    ctaEvents: {
-      reservationClick: { current: 2, prior: 1, deltaPct: 100 },
-      reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
-      lineClick: { current: 4, prior: 2, deltaPct: 100 },
-      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
-      other: { current: 7, prior: 3, deltaPct: 133.3 },
-    },
-    actualReservations: {
-      state: "available",
-      source: "csv",
-      syncedAt: "2026-07-14T00:00:00.000Z",
-      facility: { current: 20, prior: 10, deltaPct: 100 },
-      article: { current: 2, prior: 1, deltaPct: 100 },
-    },
-    period: { start: "2026-07-07", end: "2026-07-13" },
-  };
-  return JSON.stringify(metrics);
-}
-
-function actualReservationMetricsJson(
-  actualReservations: NonNullable<ArticleMetrics["actualReservations"]>
-): string {
-  return JSON.stringify({
-    pagePath: "/news/x",
-    views: { current: 10, prior: 5, deltaPct: 100 },
-    users: { current: 8, prior: 4, deltaPct: 100 },
-    actualReservations,
-    period: { start: "2026-07-07", end: "2026-07-13" },
+    period: { start: "2026-07-06", end: "2026-07-12" },
+    ...overrides,
   } satisfies ArticleMetrics);
+}
+
+function searchMetrics(topQueries: SearchQueryStat[], impressions = 500): NonNullable<ArticleMetrics["search"]> {
+  return {
+    clicks: { current: 10, prior: 0, deltaPct: null },
+    impressions: { current: impressions, prior: 0, deltaPct: null },
+    ctr: { current: 0.02, prior: 0, deltaPct: null },
+    position: { current: 8, prior: 0, deltaPct: null },
+    topQueries,
+  };
+}
+
+function query(query: string, clicks: number, impressions: number): SearchQueryStat {
+  return { query, clicks, impressions, ctr: impressions === 0 ? 0 : clicks / impressions, position: 6 };
 }
 
 function ideaPage(opts: {
   id: string;
-  status: string;
+  status?: string;
   articleType?: string;
   verdict?: string;
   metrics?: string;
 }): NotionPage {
-  const props: Record<string, unknown> = {
-    "ステータス": select(opts.status),
-  };
-  if (opts.articleType) props["記事タイプ"] = select(opts.articleType);
-  if (opts.verdict) props["公開後判定"] = select(opts.verdict);
-  if (opts.metrics) {
-    props["成績データ"] = { type: "rich_text", rich_text: [{ plain_text: opts.metrics }] };
+  const properties: Record<string, unknown> = { "ステータス": select(opts.status ?? "公開済み") };
+  if (opts.articleType) properties["記事タイプ"] = select(opts.articleType);
+  if (opts.verdict) properties["公開後判定"] = select(opts.verdict);
+  if (opts.metrics !== undefined) {
+    properties["成績データ"] = { type: "rich_text", rich_text: [{ plain_text: opts.metrics }] };
   }
-  return { id: opts.id, url: `https://notion.so/${opts.id}`, properties: props };
+  return { id: opts.id, url: `https://notion.so/${opts.id}`, properties };
 }
 
 describe("summarizeArticlePerformance", () => {
-  it("記事タイプ別にイベント別成果とfreshな記事帰属実予約を集計する", () => {
-    const [summary] = summarizeArticlePerformance(
-      [ideaPage({ id: "a", status: "公開済み", articleType: "獲得", metrics: outcomeMetricsJson() })],
-      Date.parse("2026-07-15T00:00:00.000Z")
-    );
-    expect(summary.outcomes).toEqual({
-      reservationIntent: { current: 3, prior: 2, deltaPct: 50 },
-      lineClick: { current: 4, prior: 2, deltaPct: 100 },
-      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
-      other: { current: 7, prior: 3, deltaPct: 133.3 },
-      actualReservations: { current: 2, prior: 1, deltaPct: 100 },
-    });
-    expect(summary.notes).toEqual([]);
+  it("公開済みだけを固定記事タイプ順で集計し、欠落と未知値を末尾へ置く", () => {
+    const summaries = summarizeArticlePerformance([
+      ideaPage({ id: "unknown-z", articleType: "未知Z", verdict: "成功" }),
+      ideaPage({ id: "asset", articleType: "資産", verdict: "様子見" }),
+      ideaPage({ id: "acquisition", articleType: "獲得", verdict: "要改稿" }),
+      ideaPage({ id: "unset", verdict: "未判定" }),
+      ideaPage({ id: "unknown-a", articleType: "未知A", verdict: "成功" }),
+      ideaPage({ id: "draft", status: "承認", articleType: "不安解消", verdict: "成功" }),
+    ]);
+    expect(summaries.map((summary) => summary.articleType)).toEqual([
+      "獲得", "資産", "タイプ未設定", "未知A", "未知Z",
+    ]);
+    expect(summaries[0]).toMatchObject({ success: 0, watch: 0, rewrite: 1, judged: 1, unjudged: 0 });
+    expect(summaries[1]).toMatchObject({ success: 0, watch: 1, rewrite: 0, judged: 1 });
+    expect(summaries[2].unjudged).toBe(1);
   });
 
-  it("実予約の欠損・古い・記事帰属なしを注記し、代理指標の0値を保持する", () => {
-    const pages = [
-      ideaPage({
-        id: "missing",
-        status: "公開済み",
-        articleType: "獲得",
-        metrics: actualReservationMetricsJson({
-          state: "missing",
-          reason: "read_error",
-          checkedAt: "2026-07-15T00:00:00.000Z",
-        }),
-      }),
-      ideaPage({
-        id: "stale",
-        status: "公開済み",
-        articleType: "獲得",
-        metrics: actualReservationMetricsJson({
-          state: "available",
-          source: "csv",
-          syncedAt: "2026-06-01T00:00:00.000Z",
-          facility: { current: 9, prior: 8, deltaPct: 12.5 },
-          article: { current: 3, prior: 2, deltaPct: 50 },
-        }),
-      }),
-      ideaPage({
-        id: "facility-only",
-        status: "公開済み",
-        articleType: "獲得",
-        metrics: actualReservationMetricsJson({
-          state: "available",
-          source: "csv",
-          syncedAt: "2026-07-14T00:00:00.000Z",
-          facility: { current: 4, prior: 3, deltaPct: 33.3 },
-          article: null,
-        }),
-      }),
-    ];
-    const [summary] = summarizeArticlePerformance(
-      pages,
-      Date.parse("2026-07-15T00:00:00.000Z")
+  it("成功率は判定済みだけを分母に小数第1位で丸め、3本を母数境界にする", () => {
+    const pages = Array.from({ length: 20 }, (_, index) => ideaPage({
+      id: `rate-${index}`,
+      articleType: "不安解消",
+      verdict: index < 2 ? "成功" : "未判定",
+    }));
+    const [exploring] = summarizeArticlePerformance(pages);
+    expect(MIN_JUDGED_ARTICLES_PER_TYPE).toBe(3);
+    expect(exploring).toMatchObject({
+      published: 20,
+      judged: 2,
+      success: 2,
+      successRatePct: 100,
+      unjudged: 18,
+      unjudgedRatePct: 90,
+      sampleStatus: "exploring",
+    });
+    const [sufficient] = summarizeArticlePerformance([
+      ...pages,
+      ideaPage({ id: "boundary", articleType: "不安解消", verdict: "様子見" }),
+    ]);
+    expect(sufficient).toMatchObject({ judged: 3, successRatePct: 66.7, sampleStatus: "sufficient" });
+  });
+
+  it("5/20と2/2を成功本数順にせず固定タイプ順で返す", () => {
+    const acquisition = Array.from({ length: 2 }, (_, index) =>
+      ideaPage({ id: `acquisition-${index}`, articleType: "獲得", verdict: "成功" })
     );
-    expect(summary.outcomes?.actualReservations).toEqual({ current: 0, prior: 0, deltaPct: null });
+    const reassurance = Array.from({ length: 20 }, (_, index) =>
+      ideaPage({
+        id: `reassurance-${index}`,
+        articleType: "不安解消",
+        verdict: index < 5 ? "成功" : "様子見",
+      })
+    );
+    const summaries = summarizeArticlePerformance([...reassurance, ...acquisition]);
+    expect(summaries.map(({ articleType, success, judged }) => ({ articleType, success, judged }))).toEqual([
+      { articleType: "獲得", success: 2, judged: 2 },
+      { articleType: "不安解消", success: 5, judged: 20 },
+    ]);
+  });
+
+  it("判定済み0本では成功率をnullにする", () => {
+    const [summary] = summarizeArticlePerformance([ideaPage({ id: "none", articleType: "比較" })]);
+    expect(summary).toMatchObject({ judged: 0, successRatePct: null, unjudgedRatePct: 100 });
+  });
+
+  it("公開日・期間・GA4/GSCを独立した観測条件として集計する", () => {
+    const nowMs = Date.parse("2026-07-16T00:00:00.000Z");
+    const search = searchMetrics([], 100);
+    const [summary] = summarizeArticlePerformance([
+      ideaPage({ id: "seven", articleType: "獲得", metrics: metricsJson({ publishedAt: "2026-07-09T00:00:00.000Z", views: { current: 0, prior: 0, deltaPct: null }, measurementStatus: "path-unmatched", search }) }),
+      ideaPage({ id: "ninety", articleType: "獲得", metrics: metricsJson({ publishedAt: "2026-04-17T00:00:00.000Z", views: { current: 800, prior: 0, deltaPct: null }, measurementStatus: "measured", search: searchMetrics([], 1100) }) }),
+      ideaPage({ id: "error", articleType: "獲得", metrics: metricsJson({ publishedAt: "invalid", views: { current: 999, prior: 0, deltaPct: null }, measurementStatus: "source-error" }) }),
+      ideaPage({ id: "future", articleType: "獲得", metrics: metricsJson({ publishedAt: "2026-07-17T00:00:00.000Z", period: { start: "bad", end: "2026-07-12" } }) }),
+      ideaPage({ id: "reverse", articleType: "獲得", metrics: metricsJson({ period: { start: "2026-07-12", end: "2026-07-06" } }) }),
+      ideaPage({ id: "duplicate", articleType: "獲得", metrics: metricsJson() }),
+      ideaPage({ id: "broken", articleType: "獲得", metrics: "not-json" }),
+    ], nowMs);
+    expect(summary.observation).toEqual({
+      periods: ["2026-07-06〜2026-07-12"],
+      publishedDays: { min: 7, max: 90, knownArticles: 2 },
+      views: { total: 1100, measuredArticles: 5 },
+      impressions: { total: 1200, measuredArticles: 2 },
+    });
+  });
+
+  it("公開日・期間・計測JSONがすべて欠落した観測条件を保持する", () => {
+    const page = ideaPage({ id: "missing", articleType: "イベント" });
+    page.properties["成績データ"] = { type: "rich_text", rich_text: [{}] };
+    const [summary] = summarizeArticlePerformance([page]);
+    expect(summary.observation).toEqual({
+      periods: [],
+      publishedDays: null,
+      views: { total: 0, measuredArticles: 0 },
+      impressions: { total: 0, measuredArticles: 0 },
+    });
+  });
+
+  it("同一クエリを合算してCTRを再計算し、qualified優先・上位3件で並べる", () => {
+    const [summary] = summarizeArticlePerformance([
+      ideaPage({ id: "q1", articleType: "獲得", metrics: metricsJson({ search: searchMetrics([
+        query("合算", 1, 50), query("99表示", 2, 99), query("100表示1クリック", 1, 100), query("ゼロ", 0, 1000), query(" ", 10, 100),
+      ]) }) }),
+      ideaPage({ id: "q2", articleType: "獲得", metrics: metricsJson({ search: searchMetrics([
+        query("合算", 1, 50), query("qualified大", 20, 100), query("qualified同率b", 2, 100), query("qualified同率a", 2, 100),
+      ]) }) }),
+    ]);
+    expect(QUERY_MIN_IMPRESSIONS).toBe(100);
+    expect(QUERY_MIN_CLICKS).toBe(2);
+    expect(summary.querySignals).toEqual([
+      { query: "qualified大", clicks: 20, impressions: 100, ctr: 0.2, status: "qualified" },
+      { query: "qualified同率a", clicks: 2, impressions: 100, ctr: 0.02, status: "qualified" },
+      { query: "qualified同率b", clicks: 2, impressions: 100, ctr: 0.02, status: "qualified" },
+    ]);
+  });
+
+  it("探索中クエリの境界、0表示CTR、クリック・表示・名称の決定順を保つ", () => {
+    const [summary] = summarizeArticlePerformance([
+      ideaPage({ id: "q", articleType: "比較", metrics: metricsJson({ search: searchMetrics([
+        query("100表示2クリック", 2, 100),
+        query("99表示2クリック", 2, 99),
+        query("100表示1クリック", 1, 100),
+        query("表示なし", 1, 0),
+      ]) }) }),
+    ]);
+    expect(summary.querySignals).toEqual([
+      { query: "100表示2クリック", clicks: 2, impressions: 100, ctr: 0.02, status: "qualified" },
+      { query: "99表示2クリック", clicks: 2, impressions: 99, ctr: 2 / 99, status: "exploring" },
+      { query: "100表示1クリック", clicks: 1, impressions: 100, ctr: 0.01, status: "exploring" },
+    ]);
+  });
+
+  it("分離計測済みCTAとfreshな記事帰属実予約だけを合算する", () => {
+    const outcome = (current: number): Partial<ArticleMetrics> => ({
+      ctaEventsMeasured: true,
+      ctaEvents: {
+        reservationClick: { current, prior: 1, deltaPct: 0 },
+        reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
+        lineClick: { current: 2, prior: 1, deltaPct: 100 },
+        instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+        other: { current: 4, prior: 1, deltaPct: 300 },
+      },
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: "2026-07-15T00:00:00.000Z",
+        facility: { current: 10, prior: 5, deltaPct: 100 },
+        article: { current, prior: 1, deltaPct: 0 },
+      },
+    });
+    const [summary] = summarizeArticlePerformance([
+      ideaPage({ id: "a", articleType: "獲得", metrics: metricsJson(outcome(2)) }),
+      ideaPage({ id: "b", articleType: "獲得", metrics: metricsJson(outcome(3)) }),
+    ], Date.parse("2026-07-16T00:00:00.000Z"));
+    expect(summary.outcomes).toEqual({
+      reservationIntent: { current: 7, prior: 4, deltaPct: 75 },
+      lineClick: { current: 4, prior: 2, deltaPct: 100 },
+      instagramClick: { current: 6, prior: 2, deltaPct: 200 },
+      other: { current: 8, prior: 2, deltaPct: 300 },
+      actualReservations: { current: 5, prior: 2, deltaPct: 150 },
+    });
+  });
+
+  it("CTA未計測とfreshでない実予約をnullにし、理由を注記する", () => {
+    const actual = (actualReservations: NonNullable<ArticleMetrics["actualReservations"]>) =>
+      metricsJson({ actualReservations });
+    const [summary] = summarizeArticlePerformance([
+      ideaPage({ id: "none", articleType: "資産", metrics: metricsJson({ ctaEventsMeasured: false }) }),
+      ideaPage({ id: "missing", articleType: "資産", metrics: actual({ state: "missing", reason: "read_error", checkedAt: "2026-07-15T00:00:00.000Z" }) }),
+      ideaPage({ id: "stale", articleType: "資産", metrics: actual({ state: "available", source: "csv", syncedAt: "2026-06-01T00:00:00.000Z", facility: { current: 1, prior: 0, deltaPct: null }, article: { current: 1, prior: 0, deltaPct: null } }) }),
+      ideaPage({ id: "facility", articleType: "資産", metrics: actual({ state: "available", source: "csv", syncedAt: "2026-07-15T00:00:00.000Z", facility: { current: 1, prior: 0, deltaPct: null }, article: null }) }),
+    ], Date.parse("2026-07-16T00:00:00.000Z"));
+    expect(summary.outcomes).toEqual({ reservationIntent: null, lineClick: null, instagramClick: null, other: null, actualReservations: null });
     expect(summary.notes).toEqual([
       "実予約欠損（予約意図を代理指標として使用）",
       "実予約データが古い（最終取込 2026-06-01T00:00:00.000Z、予約意図を代理指標として使用）",
@@ -156,224 +235,52 @@ describe("summarizeArticlePerformance", () => {
     ]);
   });
 
-  it("公開済み記事だけを記事タイプ別に集計する(公開前は成績が無いので除外)", () => {
-    const summaries = summarizeArticlePerformance([
-      ideaPage({ id: "a", status: "公開済み", articleType: "獲得", verdict: "成功" }),
-      ideaPage({ id: "b", status: "承認", articleType: "獲得", verdict: "成功" }), // 除外
-      ideaPage({ id: "c", status: "下書き作成済み", articleType: "資産" }), // 除外
-    ]);
-    expect(summaries).toEqual<ArticleTypePerformance[]>([
-      {
-        articleType: "獲得",
-        published: 1,
-        success: 1,
-        watch: 0,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-      },
-    ]);
-  });
-
-  it("公開後判定を 成功/様子見/要改稿/未判定 に振り分ける", () => {
-    const [summary] = summarizeArticlePerformance([
-      ideaPage({ id: "a", status: "公開済み", articleType: "不安解消", verdict: "成功" }),
-      ideaPage({ id: "b", status: "公開済み", articleType: "不安解消", verdict: "様子見" }),
-      ideaPage({ id: "c", status: "公開済み", articleType: "不安解消", verdict: "要改稿" }),
-      ideaPage({ id: "d", status: "公開済み", articleType: "不安解消", verdict: "未判定" }),
-      ideaPage({ id: "e", status: "公開済み", articleType: "不安解消" }), // 判定プロパティ欠落
-    ]);
-    expect(summary).toMatchObject({
-      articleType: "不安解消",
-      published: 5,
-      success: 1,
-      watch: 1,
-      rewrite: 1,
-      unjudged: 2, // 未判定 + 欠落
-    });
-  });
-
-  it("記事タイプ欠落は『タイプ未設定』バケットに寄せる(黙って落とさない)", () => {
-    const [summary] = summarizeArticlePerformance([
-      ideaPage({ id: "a", status: "公開済み", verdict: "成功" }),
-    ]);
-    expect(summary.articleType).toBe("タイプ未設定");
-    expect(summary.published).toBe(1);
-  });
-
-  it("成績データの勝ちクエリをクリック降順・上位3件・重複合算で返す", () => {
-    const [summary] = summarizeArticlePerformance([
-      ideaPage({
-        id: "a",
-        status: "公開済み",
-        articleType: "獲得",
-        verdict: "成功",
-        metrics: metricsJson([
-          { query: "本八幡 ピックルボール", clicks: 5 },
-          { query: "市川 屋内", clicks: 3 },
-          { query: "0クリック語", clicks: 0 }, // 下限未満は勝ちに含めない
-          { query: "低クリック語", clicks: 1 },
-        ]),
-      }),
-      ideaPage({
-        id: "b",
-        status: "公開済み",
-        articleType: "獲得",
-        verdict: "様子見",
-        metrics: metricsJson([{ query: "本八幡 ピックルボール", clicks: 4 }]), // 合算で最上位
-      }),
-    ]);
-    expect(summary.winningQueries).toEqual([
-      "本八幡 ピックルボール", // 5+4=9 で最上位
-      "市川 屋内", // 3
-      "低クリック語", // 1(上位3件に入る)
-    ]);
-  });
-
-  it("成績データ rich_text の要素に plain_text が無くても空文字で扱う(欠落耐性)", () => {
-    const page: NotionPage = {
-      id: "a",
-      url: "https://notion.so/a",
-      properties: {
-        "ステータス": select("公開済み"),
-        "記事タイプ": select("獲得"),
-        "成績データ": { type: "rich_text", rich_text: [{}] },
-      },
-    };
-    const [summary] = summarizeArticlePerformance([page]);
-    expect(summary.winningQueries).toEqual([]);
-  });
-
-  it("成績データが空/不正でも壊れず勝ちクエリ無しで扱う(欠落耐性)", () => {
-    const [summary] = summarizeArticlePerformance([
-      ideaPage({
-        id: "a",
-        status: "公開済み",
-        articleType: "資産",
-        verdict: "成功",
-        metrics: "これはJSONではない",
-      }),
-    ]);
-    expect(summary.winningQueries).toEqual([]);
-  });
-
-  it("公開0本なら空配列(欠落耐性)", () => {
+  it("公開0本では空配列を返す", () => {
     expect(summarizeArticlePerformance([])).toEqual([]);
-    expect(
-      summarizeArticlePerformance([ideaPage({ id: "a", status: "承認", articleType: "獲得" })])
-    ).toEqual([]);
+    expect(summarizeArticlePerformance([ideaPage({ id: "draft", status: "承認" })])).toEqual([]);
   });
 });
 
 describe("renderPerformanceSummary", () => {
-  it("イベント別成果と実予約注記を週次入力向けに描画する", () => {
-    const text = renderPerformanceSummary([
-      {
-        articleType: "獲得",
-        published: 1,
-        success: 1,
-        watch: 0,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-        outcomes: {
-          reservationIntent: { current: 3, prior: 2, deltaPct: 50 },
-          lineClick: { current: 4, prior: 2, deltaPct: 100 },
-          instagramClick: { current: 3, prior: 1, deltaPct: 200 },
-          other: { current: 5, prior: 0, deltaPct: null },
-          actualReservations: { current: 2, prior: 1, deltaPct: 100 },
-        },
-        notes: ["施設全体の実予約のみ（記事別帰属なし）"],
-      },
-    ]).join("\n");
-    expect(text).toContain("予約意図 3/2");
-    expect(text).toContain("記事帰属実予約 2/1");
-    expect(text).toContain("注記: 施設全体の実予約のみ（記事別帰属なし）");
-  });
-
-  it("outcomesにnotesが無くても成果を描画する", () => {
-    const text = renderPerformanceSummary([
-      {
-        articleType: "獲得",
-        published: 1,
-        success: 1,
-        watch: 0,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-        outcomes: {
-          reservationIntent: { current: 0, prior: 0, deltaPct: null },
+  it("率・母数・未判定率・観測条件・検索反応・nullable成果を描画する", () => {
+    const summaries = summarizeArticlePerformance([
+      ideaPage({ id: "success", articleType: "獲得", verdict: "成功", metrics: metricsJson({
+        publishedAt: "2026-07-09T00:00:00.000Z",
+        search: searchMetrics([query("母数あり", 2, 100), query("本八幡", 1, 1)], 1200),
+        ctaEventsMeasured: true,
+        ctaEvents: {
+          reservationClick: { current: 0, prior: 0, deltaPct: null },
+          reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
           lineClick: { current: 0, prior: 0, deltaPct: null },
           instagramClick: { current: 0, prior: 0, deltaPct: null },
           other: { current: 0, prior: 0, deltaPct: null },
-          actualReservations: { current: 0, prior: 0, deltaPct: null },
         },
-      },
-    ]).join("\n");
-    expect(text).toContain("予約意図 0/0");
-  });
-
-  it("公開0本のとき『空』と学習開始の意図を明示する", () => {
-    const lines = renderPerformanceSummary([]);
-    const text = lines.join("\n");
-    expect(text).toContain("成績サマリ");
-    expect(text).toContain("公開済み記事がまだ無い");
-  });
-
-  it("成功本数の多い型を上に並べ、勝ちクエリと伸ばす学習の指示を出す", () => {
-    const summaries: ArticleTypePerformance[] = [
-      {
-        articleType: "資産",
-        published: 1,
-        success: 0,
-        watch: 1,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-      },
-      {
-        articleType: "獲得",
-        published: 3,
-        success: 2,
-        watch: 1,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: ["本八幡 ピックルボール", "市川 屋内"],
-      },
-    ];
-    const lines = renderPerformanceSummary(summaries);
-    const text = lines.join("\n");
-    // 獲得(成功2)が資産(成功0)より上に来る
-    expect(text.indexOf("獲得")).toBeLessThan(text.indexOf("資産"));
-    expect(text).toContain("公開3本");
-    expect(text).toContain("成功2");
-    expect(text).toContain("勝ったクエリ: 本八幡 ピックルボール / 市川 屋内");
-    expect(text).toContain("効いた型を優先");
-  });
-
-  it("成功本数が同数のとき公開本数の多い型を上に並べる(第2ソート軸)", () => {
-    const summaries: ArticleTypePerformance[] = [
-      {
-        articleType: "比較",
-        published: 1,
-        success: 1,
-        watch: 0,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-      },
-      {
-        articleType: "獲得",
-        published: 4,
-        success: 1,
-        watch: 3,
-        rewrite: 0,
-        unjudged: 0,
-        winningQueries: [],
-      },
-    ];
+        actualReservations: {
+          state: "missing",
+          reason: "read_error",
+          checkedAt: "2026-07-16T00:00:00.000Z",
+        },
+      }) }),
+      ideaPage({ id: "watch", articleType: "獲得", verdict: "様子見" }),
+      ideaPage({ id: "rewrite", articleType: "獲得", verdict: "要改稿" }),
+      ideaPage({ id: "unjudged", articleType: "不安解消" }),
+    ], Date.parse("2026-07-16T00:00:00.000Z"));
     const text = renderPerformanceSummary(summaries).join("\n");
-    // 成功は同数(1)。公開が多い獲得(4本)を比較(1本)より上に。
-    expect(text.indexOf("獲得")).toBeLessThan(text.indexOf("比較"));
+    expect(text).toContain("獲得 [母数条件クリア]: 公開3本 / 判定済み3本 / 成功1本 / 成功率33.3% / 未判定0本 (0%)");
+    expect(text).toContain("不安解消 [探索中: 判定済み0本 < 3本]");
+    expect(text).toContain("公開後7〜7日 (1/3本) / 期間2026-07-06〜2026-07-12 / views 100 (1/3本) / impressions 1200 (1/3本)");
+    expect(text).toContain("本八幡 (1click/1imp・CTR 100%・探索中)");
+    expect(text).toContain("母数あり (2click/100imp・CTR 2%・母数条件クリア)");
+    expect(text).toContain("予約意図 0/0");
+    expect(text).toContain("記事帰属実予約 未計測");
+    expect(text).toContain("注記: 実予約欠損（予約意図を代理指標として使用）");
+    expect(text).toContain("公開後日数 未計測 (0/1本) / 期間未計測");
+    expect(text).toContain("成功本数だけで優先しない");
+    expect(text).toContain("観測条件が揃わない型は直接比較しない");
+    expect(text).not.toContain("勝ったクエリ:");
+  });
+
+  it("公開0本の空表示を維持する", () => {
+    expect(renderPerformanceSummary([]).join("\n")).toContain("公開済み記事がまだ無い");
   });
 });

@@ -50,6 +50,28 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(goals).toContain("実予約");
   });
 
+  it("記事タイプを成功率・母数・未判定率・観測条件のセットで読む", () => {
+    expect(weekly).toContain("成功率・判定済み母数・未判定率");
+    expect(weekly).toContain("判定済み3本未満");
+    expect(weekly).toContain("探索中");
+    expect(weekly).toContain("成功本数だけで優先しない");
+    expect(weekly).toContain("5/20 と 2/2");
+    expect(weekly).toContain("観測条件");
+    expect(weekly).toContain("直接比較しない");
+    expect(weekly).toContain("1表示1クリック");
+    expect(weekly).not.toContain("成功が多い型=効いた型");
+    expect(weekly).not.toContain("効いた型を優先");
+  });
+
+  it("通常記事を本命1件・補欠1件・探索1件にし、探索の積み増しを防ぐ", () => {
+    expect(weekly).toContain("本命1件＋補欠1件＋探索1件");
+    expect(weekly).toContain("同型の生きている記事案・観測中記事がない");
+    expect(weekly).toContain("未判定率が高い型");
+    expect(weekly).toContain("判定待ち");
+    expect(weekly).toContain("適切な探索仮説がなければ");
+    expect(weekly).toContain("全型が探索中");
+  });
+
   it("承認画面のプロンプトタブで分析基準を参考資料として表示する", () => {
     expect(PROMPT_REGISTRY).toContainEqual(
       expect.objectContaining({

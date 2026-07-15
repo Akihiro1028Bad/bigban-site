@@ -525,7 +525,7 @@ describe("summarizeExisting", () => {
     expect(md).toContain("公開後判定: 成功");
   });
 
-  it("公開済み記事があるとき記事タイプ別の成績サマリを含む(#221 伸ばす学習)", () => {
+  it("weekly入力に記事タイプ別の率・母数・未判定率・探索状態を含む", () => {
     const publishedIdea: NotionPage = {
       id: "pub1",
       url: "https://notion.so/pub1",
@@ -535,6 +535,7 @@ describe("summarizeExisting", () => {
         "対象週開始": date("2026-05-01"),
         "記事タイプ": select("獲得"),
         "公開後判定": select("成功"),
+        "成績データ": text(metricsJson()),
       },
     };
     const md = summarizeExisting({
@@ -546,8 +547,17 @@ describe("summarizeExisting", () => {
     });
     expect(md).toContain("成績サマリ");
     expect(md).toContain("獲得");
-    expect(md).toContain("成功1");
-    expect(md).toContain("効いた型を優先");
+    expect(md).toContain("判定済み1本");
+    expect(md).toContain("成功1本");
+    expect(md).toContain("成功率100%");
+    expect(md).toContain("未判定0本 (0%)");
+    expect(md).toContain("探索中: 判定済み1本 < 3本");
+    expect(md).toContain("観測条件");
+    expect(md).toContain("公開後35〜35日 (1/1本)");
+    expect(md).toContain("期間2026-06-01〜2026-06-07");
+    expect(md).toContain("views 80 (1/1本)");
+    expect(md).toContain("impressions 500 (1/1本)");
+    expect(md).not.toContain("効いた型を優先");
   });
 
   it("公開済み記事が無いとき成績サマリは空表示で壊れない(#221 欠落耐性)", () => {
