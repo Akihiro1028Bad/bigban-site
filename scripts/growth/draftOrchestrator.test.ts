@@ -24,7 +24,7 @@ import {
   invalidatePublishResumeFiles,
   shouldResumePublishSpec,
 } from "./draftOrchestrator";
-import type { ResearchPacket, WriterOutput } from "./draftPipeline";
+import type { ResearchPacket, ValidatedWriterOutput, WriterOutput } from "./draftPipeline";
 
 function page(properties: Record<string, unknown>): NotionPage {
   return { id: "page-1", url: "", properties };
@@ -384,7 +384,7 @@ describe("draftOrchestrator", () => {
       version: 1,
       facts: [{
         id: "fact-1",
-        statement: "公式事実",
+        statement: "公式ページの案内",
         role: "detail",
         sourceType: "official-site",
         source: "https://example.jp/official",
@@ -397,7 +397,7 @@ describe("draftOrchestrator", () => {
     const base: WriterOutput = {
       slug: "ichikawa-guide",
       excerpt: "概要",
-      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式</a></p>{{IMG:1}}',
+      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式ページ</a><!--FACT:fact-1-->。</p>{{IMG:1}}',
       usedFactIds: ["fact-1"],
     };
 
@@ -406,8 +406,15 @@ describe("draftOrchestrator", () => {
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2><a href="https://invalid.example">未確認</a>{{IMG:1}}' }, research, outline)).toThrow(/確認済みでない/);
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2><a href="https://example.jp/official">1</a><a href="https://example.jp/official">2</a>{{IMG:1}}' }, research, outline)).toThrow(/重複/);
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2>{{IMG:2}}' }, research, outline)).toThrow(/プレースホルダー/);
-    expect(parseValidatedWriterOutput(base, research, outline)).toEqual(base);
-    expect(() => parseValidatedWriterOutput({ ...base, bodyHtml: '<h2>場所</h2>{{IMG:2}}' }, research, outline)).toThrow(/プレースホルダー/);
+    expect(parseValidatedWriterOutput(base, research, outline)).toMatchObject({
+      ...base,
+      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式ページ</a>。</p>{{IMG:1}}',
+      factReferences: [{ factId: "fact-1", excerpt: "公式ページ", sectionPath: "場所" }],
+    });
+    expect(() => parseValidatedWriterOutput({
+      ...base,
+      bodyHtml: '<h2>場所</h2><p>公式ページ<!--FACT:fact-1-->。</p>{{IMG:2}}',
+    }, research, outline)).toThrow(/プレースホルダー/);
   });
 
   it("本文画像markerを構成案と同じ見出し配下にだけ配置できる", () => {
@@ -449,11 +456,19 @@ describe("draftOrchestrator", () => {
         publishedYear: undefined,
       }],
     };
-    const writer: WriterOutput = {
+    const writer: ValidatedWriterOutput = {
       slug: "ichikawa-guide",
       excerpt: "概要",
       bodyHtml: "<h2>場所</h2><p>本文</p>",
       usedFactIds: ["fact-1"],
+      factReferences: [{
+        factId: "fact-1",
+        excerpt: "公式事実",
+        sectionPath: "場所",
+        container: "p",
+        containerIndex: 1,
+        claimKinds: ["proper-noun"],
+      }],
     };
     const spec = assemblePublishSpec({
       input: {
@@ -486,17 +501,22 @@ describe("draftOrchestrator", () => {
       eyecatchAction: "pending",
       rebuildSourceId: "",
       notion: { pageId: "page-1", property: "ステータス", value: "下書き作成済み" },
-      sourceLedger: [{ source: "https://example.jp/official", confirmedFacts: ["公式事実"] }],
+      sourceLedger: [{
+        source: "https://example.jp/official",
+        confirmedFacts: ["公式事実"],
+        factReferences: [{ factId: "fact-1", excerpt: "公式事実", sectionPath: "場所", recheckBeforePublish: false }],
+      }],
     });
   });
 
   it("ニュース用specと分類なしのコラムspecを組み立てる", () => {
     const research: ResearchPacket = { version: 1, facts: [] };
-    const writer: WriterOutput = {
+    const writer: ValidatedWriterOutput = {
       slug: "news",
       excerpt: "概要",
       bodyHtml: "<p>本文</p>",
       usedFactIds: [],
+      factReferences: [],
     };
     const baseInput = {
       pageId: "page-1",

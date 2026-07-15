@@ -58,6 +58,7 @@ describe("draftPipeline structured contracts", () => {
 
   it("facility-contextと一次情報メモ由来のfactを元入力と照合する", () => {
     const trusted = {
+      facilityName: "THE PICKLE BANG THEORY",
       facilityConfirmed: ["屋内にDecoTurfコートが3面ある"],
       facilityLocation: ["JR総武線「本八幡駅」北口から徒歩1分"],
       primaryNotes: "利用者への貸出パドルは受付で案内する。シューズの貸出はない。",
@@ -89,6 +90,16 @@ describe("draftPipeline structured contracts", () => {
       ],
     });
     expect(validateResearchPacketSources(packet, trusted)).toEqual(packet);
+    expect(validateResearchPacketSources(parseResearchPacket({
+      version: 1,
+      facts: [{
+        ...research.facts[0],
+        id: "fact-name",
+        statement: "THE PICKLE BANG THEORY",
+        sourceType: "facility-context",
+        source: "facility-context.json",
+      }],
+    }), trusted).facts[0].statement).toBe("THE PICKLE BANG THEORY");
     expect(() => validateResearchPacketSources(parseResearchPacket({
       version: 1,
       facts: [{
@@ -131,6 +142,7 @@ describe("draftPipeline structured contracts", () => {
     });
 
     expect(() => validateResearchPacketSources(packet, {
+      facilityName: "THE PICKLE BANG THEORY",
       facilityConfirmed: [],
       facilityLocation: [],
       primaryNotes: "キャンペーンは実施しない。",
@@ -139,6 +151,7 @@ describe("draftPipeline structured contracts", () => {
 
   it("一次情報メモの句点と箇条書き記号だけの差は許容する", () => {
     const trusted = {
+      facilityName: "THE PICKLE BANG THEORY",
       facilityConfirmed: [],
       facilityLocation: [],
       primaryNotes: "- シューズの貸出はない。\n・パドルは受付で案内する！",
@@ -177,6 +190,7 @@ describe("draftPipeline structured contracts", () => {
       }],
     });
     expect(() => validateResearchPacketSources(packet, {
+      facilityName: "THE PICKLE BANG THEORY",
       facilityConfirmed: ["屋内3面"],
       facilityLocation: [],
       primaryNotes: "",
@@ -264,6 +278,7 @@ describe("draftPipeline structured contracts", () => {
     };
     expect(parseWriterOutput(writer, parseResearchPacket(research))).toEqual(writer);
     expect(() => parseWriterOutput({ ...writer, usedFactIds: ["missing"] }, parseResearchPacket(research))).toThrow(/missing/);
+    expect(() => parseWriterOutput({ ...writer, usedFactIds: ["fact-option", "fact-option"] }, parseResearchPacket(research))).toThrow(/重複/);
   });
 
   it("使用したfact idだけから既存sourceLedger形式を生成する", () => {
@@ -291,6 +306,28 @@ describe("draftPipeline structured contracts", () => {
       source: "https://pickleball-chiba.com/lp/ichikawa/",
       confirmedFacts: ["市川ピックルボールクラブは市内で活動している", "週末に活動している"],
     }]);
+  });
+
+  it("binding参照を台帳へ結び付け、同一位置の重複を除く", () => {
+    const reference = {
+      factId: "fact-option",
+      excerpt: "市川ピックルボールクラブ",
+      sectionPath: "場所",
+      container: "p" as const,
+      containerIndex: 1,
+      claimKinds: ["proper-noun" as const],
+    };
+    const entries = buildSourceLedgerFromUsedFacts(
+      parseResearchPacket(research),
+      ["fact-option"],
+      [reference, reference],
+      () => "予約サービス名",
+    );
+    expect(entries[0].factReferences).toEqual([expect.objectContaining({
+      factId: "fact-option",
+      recheckBeforePublish: true,
+      recheckReason: "予約サービス名",
+    })]);
   });
 
   it("確認済み公式URLと固定CTA以外の外部リンクを検出する", () => {

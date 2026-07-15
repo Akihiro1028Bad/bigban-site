@@ -33,6 +33,14 @@ function okHtml(): string {
 }
 
 describe("draftQuality", () => {
+  it("fact markerが残ったHTMLを安全性blockにする", () => {
+    const checks = draftQuality({
+      bodyHtml: `<p>料金は500円<!--FACT:fact-price-->。${DISCLAIMER}</p>`,
+      body: "",
+      title: "料金",
+    });
+    expect(pick(checks, "HTML安全性")).toMatchObject({ level: "block", value: "FACT marker" });
+  });
   it("十分な下書き(免責あり・断定なし)は全項目 ok・公開ブロックなし", () => {
     const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + DISCLAIMER;
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "短いタイトル" });

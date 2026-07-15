@@ -10,6 +10,14 @@ import {
 const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 describe("evaluatePublishGate", () => {
+  it("fact markerが残った本文を公開不可にする", () => {
+    const result = evaluatePublishGate({
+      title: "料金",
+      bodyHtml: `<p>料金は500円<!--FACT:fact-price-->。${DISCLAIMER}</p>`,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.blockReasons.some((reason) => reason.includes("FACT marker"))).toBe(true);
+  });
   it("AI免責文があり断定NGが無ければ ok=true・理由なし", () => {
     const result = evaluatePublishGate({
       title: "本八幡で、雨の日もピックルボール",

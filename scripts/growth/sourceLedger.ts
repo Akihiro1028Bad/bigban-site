@@ -24,13 +24,31 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 /** Notion に保存する台帳プロパティ名(rich_text・任意・publish-draft が自動書き込み)。 */
 export const SOURCE_LEDGER_PROP = "根拠台帳";
 
+const factReferenceSchema = z.object({
+  factId: z.string().regex(/^fact-[a-z0-9-]+$/i),
+  statement: z.string().min(1),
+  excerpt: z.string().min(1),
+  sectionPath: z.string(),
+  container: z.enum(["p", "li", "th", "td"]),
+  containerIndex: z.number().int().positive(),
+  recheckBeforePublish: z.boolean(),
+  recheckReason: z.string().min(1).optional(),
+});
+
 const entrySchema = z.object({
   sourceType: z.enum(SOURCE_TYPES),
   source: z.string().min(1),
   confirmedFacts: z.array(z.string().min(1)).min(1),
+  factReferences: z.array(z.unknown()).optional(),
 });
 
-export type SourceLedgerEntry = z.infer<typeof entrySchema>;
+export type SourceLedgerFactReference = z.infer<typeof factReferenceSchema>;
+export interface SourceLedgerEntry {
+  sourceType: SourceType;
+  source: string;
+  confirmedFacts: string[];
+  factReferences?: SourceLedgerFactReference[];
+}
 
 const legacyEntrySchema = z.object({
   claim: z.string().min(1),
@@ -67,6 +85,7 @@ export function confirmedFactsFromEntries(
 /** Notionへ保存した1行1情報源の表示テキストから確認済み事実を復元する。 */
 export function confirmedFactsFromRenderedText(value: string): string[] {
   const facts = value.split("\n").flatMap((line) => {
+    if (line.trimStart().startsWith("↳")) return [];
     const parts = line.split(" | ");
     if (parts.length < 3) return [];
     return parts.slice(2).join(" | ").split("／").map((fact) => fact.trim()).filter(Boolean);
@@ -106,7 +125,18 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
   value.forEach((item, index) => {
     const result = entrySchema.safeParse(item);
     if (result.success) {
-      parsedEntries.push(result.data);
+      const references: SourceLedgerFactReference[] = [];
+      result.data.factReferences?.forEach((reference, referenceIndex) => {
+        const parsedReference = factReferenceSchema.safeParse(reference);
+        if (parsedReference.success) references.push(parsedReference.data);
+        else warnings.push(`${SOURCE_LEDGER_PROP}[${index}].factReferences[${referenceIndex}]: 不正な監査参照のため除外しました。`);
+      });
+      parsedEntries.push({
+        sourceType: result.data.sourceType,
+        source: result.data.source,
+        confirmedFacts: result.data.confirmedFacts,
+        ...(references.length > 0 ? { factReferences: references } : {}),
+      });
       return;
     }
     const legacy = legacyEntrySchema.safeParse(item);
@@ -142,12 +172,27 @@ export function parseSourceLedger(value: unknown): ParseSourceLedgerResult {
     for (const fact of entry.confirmedFacts) {
       if (!existing.confirmedFacts.includes(fact)) existing.confirmedFacts.push(fact);
     }
+    for (const reference of entry.factReferences ?? []) {
+      const references = existing.factReferences ?? (existing.factReferences = []);
+      const key = `${reference.factId}\u0000${reference.container}\u0000${reference.containerIndex}\u0000${reference.excerpt}`;
+      if (!references.some((current) => `${current.factId}\u0000${current.container}\u0000${current.containerIndex}\u0000${current.excerpt}` === key)) {
+        references.push(reference);
+      }
+    }
   }
   return { entries: [...grouped.values()], warnings };
 }
 
 function renderEntry(entry: SourceLedgerEntry): string {
-  return [entry.sourceType, entry.source, entry.confirmedFacts.join("／")].join(" | ");
+  const parent = [entry.sourceType, entry.source, entry.confirmedFacts.join("／")].join(" | ");
+  const auditRows = (entry.factReferences ?? []).map((reference) => {
+    const recheck = reference.recheckBeforePublish
+      ? ` [公開前再確認:${reference.recheckReason ?? "要確認"}]`
+      : "";
+    const path = reference.sectionPath ? `${reference.sectionPath} > ` : "";
+    return `  ↳ ${reference.factId}${recheck} ${path}${reference.container}#${reference.containerIndex} 「${reference.excerpt}」`;
+  });
+  return [parent, ...auditRows].join("\n");
 }
 
 /**

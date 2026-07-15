@@ -2,6 +2,7 @@ import { Parser } from "htmlparser2";
 import { z } from "zod";
 
 import type { SourceLedgerEntry } from "./sourceLedger";
+import type { FactReference } from "./factBinding";
 
 export const RESERVE_URL = "https://www.thepicklebang.com/reserve";
 
@@ -112,8 +113,13 @@ const writerOutputSchema = z.object({
 export type ResearchFact = z.infer<typeof researchFactSchema>;
 export type ResearchPacket = z.infer<typeof researchPacketSchema>;
 export type WriterOutput = z.infer<typeof writerOutputSchema>;
+export interface ValidatedWriterOutput extends Omit<WriterOutput, "bodyHtml"> {
+  bodyHtml: string;
+  factReferences: FactReference[];
+}
 
 export interface ResearchTrustedSources {
+  facilityName: string;
   facilityConfirmed: readonly string[];
   facilityLocation: readonly string[];
   primaryNotes: string;
@@ -147,7 +153,7 @@ export function validateResearchPacketSources(
   packet: ResearchPacket,
   trusted: ResearchTrustedSources,
 ): ResearchPacket {
-  const facilityFacts = [...trusted.facilityConfirmed, ...trusted.facilityLocation].map(normalizeTrustedText);
+  const facilityFacts = [trusted.facilityName, ...trusted.facilityConfirmed, ...trusted.facilityLocation].map(normalizeTrustedText);
   const primaryNoteStatements = normalizedPrimaryNoteStatements(trusted.primaryNotes);
   for (const fact of packet.facts) {
     const statement = normalizeTrustedText(fact.statement);
@@ -177,12 +183,15 @@ export function parseWriterOutput(value: unknown, research: ResearchPacket): Wri
   const available = new Set(research.facts.map((fact) => fact.id));
   const missing = output.usedFactIds.filter((id) => !available.has(id));
   if (missing.length > 0) throw new Error(`未確認のfact idです: ${missing.join(", ")}`);
+  if (new Set(output.usedFactIds).size !== output.usedFactIds.length) throw new Error("usedFactIdsに重複があります");
   return output;
 }
 
 export function buildSourceLedgerFromUsedFacts(
   research: ResearchPacket,
   usedFactIds: readonly string[],
+  factReferences: readonly FactReference[] = [],
+  recheckReasonForReference?: (statement: string, excerpt: string) => string | undefined,
 ): SourceLedgerEntry[] {
   const used = new Set(usedFactIds);
   const grouped = new Map<string, SourceLedgerEntry>();
@@ -192,6 +201,7 @@ export function buildSourceLedgerFromUsedFacts(
     const current = grouped.get(key);
     if (current) {
       if (!current.confirmedFacts.includes(fact.statement)) current.confirmedFacts.push(fact.statement);
+      appendFactReferences(current, fact, factReferences, recheckReasonForReference);
       continue;
     }
     grouped.set(key, {
@@ -199,8 +209,37 @@ export function buildSourceLedgerFromUsedFacts(
       source: fact.source,
       confirmedFacts: [fact.statement],
     });
+    appendFactReferences(grouped.get(key)!, fact, factReferences, recheckReasonForReference);
   }
   return [...grouped.values()];
+}
+
+function appendFactReferences(
+  entry: SourceLedgerEntry,
+  fact: ResearchFact,
+  references: readonly FactReference[],
+  recheckReasonForReference?: (statement: string, excerpt: string) => string | undefined,
+): void {
+  const matching = references.filter((reference) => reference.factId === fact.id);
+  if (matching.length === 0) return;
+  const target = entry.factReferences ?? (entry.factReferences = []);
+  for (const reference of matching) {
+    if (target.some((current) => current.factId === reference.factId
+      && current.container === reference.container
+      && current.containerIndex === reference.containerIndex
+      && current.excerpt === reference.excerpt)) continue;
+    const reason = recheckReasonForReference?.(fact.statement, reference.excerpt);
+    target.push({
+      factId: fact.id,
+      statement: fact.statement,
+      excerpt: reference.excerpt,
+      sectionPath: reference.sectionPath,
+      container: reference.container,
+      containerIndex: reference.containerIndex,
+      recheckBeforePublish: reason !== undefined,
+      ...(reason ? { recheckReason: reason } : {}),
+    });
+  }
 }
 
 function externalLinks(html: string): string[] {

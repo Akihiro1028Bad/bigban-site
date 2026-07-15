@@ -241,6 +241,7 @@ export function detectProhibitedClaims(
 /** AI HTML 契約で禁止されているタグ・属性を重複なしで返す。 */
 export function detectUnsafeHtml(html: string): string[] {
   const hits: string[] = [];
+  if (/<!--\s*FACT:/i.test(html)) hits.push("FACT marker");
   for (const tag of FORBIDDEN_HTML_TAGS) {
     if (new RegExp(`<\\/?${tag}(?:\\s|>)`, "i").test(html)) hits.push(tag);
   }

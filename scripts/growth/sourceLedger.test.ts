@@ -19,6 +19,17 @@ const validEntry: SourceLedgerEntry = {
   confirmedFacts: ["2024年の公式レポートで競技人口を公表"],
 };
 
+const auditReference = {
+  factId: "fact-price",
+  statement: "参加費は500円",
+  excerpt: "参加費は500円",
+  sectionPath: "料金",
+  container: "p" as const,
+  containerIndex: 2,
+  recheckBeforePublish: true,
+  recheckReason: "料金",
+};
+
 const legacyEntry = {
   claim: "ピックルボールは全世界で急成長している",
   sourceType: "search-result",
@@ -52,6 +63,13 @@ describe("parseSourceLedger", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("監査参照を任意で受理し、不正な参照だけ警告付きで除外する", () => {
+    expect(parseSourceLedger([{ ...validEntry, factReferences: [auditReference] }]).entries[0].factReferences).toEqual([auditReference]);
+    const result = parseSourceLedger([{ ...validEntry, factReferences: [auditReference, { ...auditReference, container: "h2" }] }]);
+    expect(result.entries[0].factReferences).toEqual([auditReference]);
+    expect(result.warnings).toHaveLength(1);
+  });
+
   it("同じ情報源の確認済み事実を1件へ集約する", () => {
     const result = parseSourceLedger([
       validEntry,
@@ -65,6 +83,19 @@ describe("parseSourceLedger", () => {
       },
     ]);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("同じ情報源の監査参照も重複なく集約する", () => {
+    const first = { ...validEntry, factReferences: [auditReference] };
+    const second = {
+      ...validEntry,
+      factReferences: [auditReference, { ...auditReference, factId: "fact-capacity", excerpt: "定員は20人" }],
+    };
+    expect(parseSourceLedger([first, second]).entries[0].factReferences).toEqual([
+      auditReference,
+      { ...auditReference, factId: "fact-capacity", excerpt: "定員は20人" },
+    ]);
+    expect(parseSourceLedger([validEntry, second]).entries[0].factReferences).toEqual(second.factReferences);
   });
 
   it("旧claim形式は確認済み情報源形式へ変換して再実行互換を保つ", () => {
@@ -154,6 +185,28 @@ describe("renderSourceLedgerText", () => {
     expect(text).toBe(
       "official-site | https://example.com/report | 2024年の公式レポートで競技人口を公表"
     );
+  });
+
+  it("親行の下へfact監査行を表示し、品質ゲートのfact復元には混ぜない", () => {
+    const text = renderSourceLedgerText([{ ...validEntry, factReferences: [auditReference] }]);
+    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] 料金 > p#2 「参加費は500円」");
+    expect(confirmedFactsFromRenderedText(text)).toEqual(validEntry.confirmedFacts);
+  });
+
+  it("再確認不要・見出しなしの監査行も表示する", () => {
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{
+        ...auditReference,
+        sectionPath: "",
+        recheckBeforePublish: false,
+        recheckReason: undefined,
+      }],
+    }])).toContain("↳ fact-price p#2");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{ ...auditReference, recheckReason: undefined }],
+    }])).toContain("[公開前再確認:要確認]");
   });
 
   it("同じ情報源の複数事実は読点で連結する", () => {
