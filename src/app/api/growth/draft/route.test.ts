@@ -121,6 +121,27 @@ describe("GET /api/growth/draft", () => {
     expect(json.draft.confirmedFacts).toEqual(["体験会は7月20日に開催します"]);
   });
 
+  it("保存済みfact bindingメタデータを下書きへ含める", async () => {
+    const page = pageWithMirror("<p>参加費は600円。AIが作成した下書きです。</p>");
+    page.properties["根拠台帳"] = {
+      rich_text: [{
+        plain_text: [
+          "official-site | https://example.com | 参加費は500円",
+          "  ↳ fact-price [binding:v1;hash=fnv1a64:original] p#1 根拠「参加費は500円」 本文「参加費は500円」",
+        ].join("\n"),
+      }],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+
+    const json = await (await GET(getRequest(null, PAGE_ID))).json();
+    expect(json.draft.factBinding).toEqual({
+      version: 1,
+      bodyHash: "fnv1a64:original",
+      referenceCount: 1,
+      isValid: true,
+    });
+  });
+
   it("#H19: 公開記事 slug を /ja/news/<slug> パスにして knownNewsPaths に入れる(ja のみ)", async () => {
     vi.mocked(getPage).mockResolvedValue(pageWithMirror("<p>本文</p>"));
     vi.mocked(getNewsSlugs).mockResolvedValue([

@@ -8,6 +8,7 @@ import type { BodyCommentView } from "@/lib/growth/bodyComment";
 import type { BodyRegenStatus } from "@/lib/growth/bodyImageRegen";
 import type { DecorateView } from "@/lib/growth/decorate";
 import type { RegenStatus } from "@/lib/growth/eyecatchRegen";
+import type { StoredFactBindingMetadata } from "@/lib/growth/sourceLedger";
 
 // #75: 下書きプレビューの内容。
 export interface DraftPreview {
@@ -32,6 +33,8 @@ export interface DraftPreview {
   knownNewsPaths?: readonly string[];
   // 確認済み情報源リストから復元した、可変情報のblock解除に使う事実。
   confirmedFacts?: readonly string[];
+  // 本文がfact結合時から変わっていないかを公開前チェックで照合する。
+  factBinding?: StoredFactBindingMetadata;
 }
 
 // #75: 下書きプレビューの取得状態。
