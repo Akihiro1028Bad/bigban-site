@@ -5,9 +5,11 @@ import { placeholderIndices } from "./body-image";
 import { buildSourceLedgerFromUsedFacts, duplicateExternalLinks, externalLinksOutsideFacts, parseWriterOutput, RESERVE_URL } from "./draftPipeline";
 import { resolveFacilityPhase } from "./facility-context";
 import { rebuildSourceIdOf } from "./rebuildDraft";
+import { buildGrowthOperationResult } from "./operationOutcome";
 import type { ResearchPacket, WriterOutput } from "./draftPipeline";
 import type { FacilityContextData, FacilityPhase } from "./facility-context";
 import type { NotionPage } from "./notion";
+import type { GrowthOperationResult } from "./operationOutcome";
 
 export interface DraftInput {
   pageId: string;
@@ -346,6 +348,18 @@ export function shouldInvalidateWriterCacheForPublishFailure(output: string): bo
     || /(?:^|\n)✗ notion-context:.*構成案ゲート不合格/m.test(output);
 }
 
+export function invalidatePublishResumeFiles(
+  output: string,
+  files: readonly string[],
+  deps: { exists: (filePath: string) => boolean; remove: (filePath: string) => void },
+): boolean {
+  if (!shouldInvalidateWriterCacheForPublishFailure(output)) return false;
+  for (const file of files) {
+    if (deps.exists(file)) deps.remove(file);
+  }
+  return true;
+}
+
 export function workerLogTargetFields(pageId: string): Record<string, string> {
   return {
     "target-type": "article",
@@ -367,19 +381,83 @@ export async function cleanupDraftWorkDirs(
 
 export function runDraftNotificationBestEffort(params: {
   notifyPath: string;
-  notify: () => void;
+  notify: () => Promise<void>;
   warn: (message: string) => void;
-}): boolean {
+  now?: () => string;
+}): Promise<GrowthOperationResult> {
+  return runDraftNotification(params);
+}
+
+export function shouldResumePublishSpec(hasCheckpoint: boolean, hasSpec: boolean): boolean {
+  return hasCheckpoint && hasSpec;
+}
+
+export function draftRunMode(env: Record<string, string | undefined>): string {
+  return env.GROWTH_DRAFT_RUN_MODE || "drafts";
+}
+
+export function publishDraftRecoveryCommand(specPath: string): string {
+  return `npm run growth:publish-draft -- ${specPath}`;
+}
+
+export function matchesPublishCheckpointContext(
+  output: unknown,
+  current: {
+    rebuildSourceId: string;
+    endpoint: string;
+    notionPageId: string;
+    notionContentId?: string;
+    checkpointContentId?: string;
+  },
+): boolean {
+  if (!output || typeof output !== "object") return false;
+  const saved = output as Record<string, unknown>;
+  if (saved.endpoint !== current.endpoint || saved.notionPageId !== current.notionPageId) return false;
+  if (saved.rebuildSourceId === current.rebuildSourceId) return true;
+  return current.rebuildSourceId === ""
+    && typeof saved.rebuildSourceId === "string"
+    && saved.rebuildSourceId !== ""
+    && current.notionContentId !== undefined
+    && current.notionContentId !== ""
+    && current.notionContentId === current.checkpointContentId;
+}
+
+async function runDraftNotification(params: {
+  notifyPath: string;
+  notify: () => Promise<void>;
+  warn: (message: string) => void;
+  now?: () => string;
+}): Promise<GrowthOperationResult> {
+  const at = (params.now ?? (() => new Date().toISOString()))();
   try {
-    params.notify();
-    return true;
+    await params.notify();
+    return buildGrowthOperationResult({
+      outcome: "success",
+      message: "下書き通知を送信しました。",
+      completedStages: ["line-notify"],
+      events: [
+        { stage: "line-notify", event: "started", at },
+        { stage: "line-notify", event: "succeeded", at },
+      ],
+    });
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
     params.warn(
       `下書き投入は完了しましたがLINE通知に失敗しました: ${detail}\n`
       + `通知だけ再送: npm run growth:notify-drafts -- ${params.notifyPath}`,
     );
-    return false;
+    return buildGrowthOperationResult({
+      outcome: "partial",
+      message: `下書き投入は完了しましたがLINE通知に失敗しました: ${detail}`,
+      failedStage: "line-notify",
+      events: [{ stage: "line-notify", event: "started", at }],
+      error,
+      recovery: {
+        retryable: true,
+        resumeFrom: "line-notify",
+        command: `npm run growth:notify-drafts -- ${params.notifyPath}`,
+      },
+    });
   }
 }
 
@@ -407,6 +485,7 @@ export function assemblePublishSpec(params: {
   }
   return {
     media: input.media === "ニュース" ? "ニュース" : "コラム",
+    rebuildSourceId: input.rebuildSourceId,
     payload,
     eyecatchAction: "pending",
     imagePath: `/tmp/growth-eyecatch-${writer.slug}.png`,

@@ -174,3 +174,7 @@
 ## `成績データ` JSON拡張（#280 / #281）
 
 新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `measurementStatus`、`ctaEventsMeasurementStatus`、互換用 `ga4Measured` / `ctaEventsMeasured`、`ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`actualReservations` を保存する。実予約CSVのcurrent/prior収録範囲が不足する場合、`actualReservations.state=missing`、`reason=coverage_incomplete`、`coverage.current/prior` で各期間の収録可否を保持する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。
+
+# 学習ログの部分成功種別
+
+Notion「学習ログ」DB の `種別` select に **`工程部分成功`** を手動で追加する。既存の `工程失敗` とは別集計され、`結果` は `リトライ`、`対象` は実行 mode として保存される。

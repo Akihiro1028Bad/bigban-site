@@ -17,13 +17,16 @@ import { useState } from "react";
 
 import { EYECATCH_MISSING_REASON } from "@/lib/growth/publishQueue";
 import { splitPublishQueue, formatSchedule } from "@/lib/growth/publishQueueView";
+import { buildGrowthOperationResult, normalizeGrowthOperationResult } from "@/lib/growth/operationOutcome";
 
 import { sessionHeaders } from "./sessionHeaders";
 import { useStepUp } from "./StepUpProvider";
 import { MediaLibraryModal } from "./MediaLibraryModal";
+import { PublishOperationResults } from "./PublishOperationResults";
 import { SchedulePicker } from "./SchedulePicker";
 import { cardHue } from "./boardCardView";
 import type { PendingItem } from "./types";
+import type { PublishOperationResultItem } from "./PublishOperationResults";
 import { EyecatchThumb } from "./ui/eyecatchThumb";
 import {
   IconArrowRight,
@@ -54,6 +57,7 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
   const [mediaFor, setMediaFor] = useState<{ id: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [publishResults, setPublishResults] = useState<PublishOperationResultItem[]>([]);
 
   // 公開待ち(ready/scheduled/blocked)が空でも、見出しは残して空状態を明示する。
   // 記事公開直後にキューが空になり画面が真っ白になる問題(UX)への対処。
@@ -73,6 +77,7 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
             記事を承認して下書きができると、ここに公開待ちとして並びます。
           </p>
         </div>
+        <PublishOperationResults results={publishResults} onRetry={handleRetryPublish} />
       </section>
     );
   }
@@ -91,6 +96,26 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
     if (!res.ok || json.success === false) throw new Error(String(res.status));
   }
 
+  async function postPublish(pageId: string, resumeFrom?: string) {
+    try {
+      const res = await runPrivileged("publish", () =>
+        fetch("/api/growth/publish", {
+          method: "POST",
+          headers: sessionHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ pageId, ...(resumeFrom ? { resumeFrom } : {}) }),
+        })
+      );
+      const json: unknown = await res.json().catch(() => null);
+      const fallback = res.ok ? "公開APIの応答を確認できませんでした。" : `公開APIに失敗しました (HTTP ${res.status})。`;
+      const result = normalizeGrowthOperationResult(json, fallback);
+      return !res.ok && result.outcome === "success"
+        ? buildGrowthOperationResult({ outcome: "retryable-failure", message: fallback })
+        : result;
+    } catch {
+      return buildGrowthOperationResult({ outcome: "retryable-failure", message: "通信に失敗しました。", recovery: { retryable: true } });
+    }
+  }
+
   async function run(task: () => Promise<void>): Promise<void> {
     setBusy(true);
     setError(null);
@@ -107,9 +132,19 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
 
   function handlePublishNow(ids: readonly string[]): void {
     void run(async () => {
+      const next: PublishOperationResultItem[] = [];
       for (const id of ids) {
-        await post("/api/growth/publish", { pageId: id });
+        const item = items.find((candidate) => candidate.id === id);
+        next.push({ pageId: id, title: item!.title, result: await postPublish(id) });
       }
+      setPublishResults(next);
+    });
+  }
+
+  function handleRetryPublish(pageId: string, resumeFrom?: string): void {
+    void run(async () => {
+      const result = await postPublish(pageId, resumeFrom);
+      setPublishResults((current) => current.map((item) => item.pageId === pageId ? { ...item, result } : item));
     });
   }
 
@@ -157,6 +192,8 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
         />
         <SummaryCard color="var(--p-amber)" label="要対応" value={blocked.length} />
       </div>
+
+      <PublishOperationResults results={publishResults} onRetry={handleRetryPublish} />
 
       {scheduleDays.length > 0 ? (
         <section aria-label="公開予定" className="mb-6 rounded-[12px] p-4" style={{ background: "linear-gradient(135deg, var(--p-teal-weak), var(--p-bg-elevated))", border: "1px solid var(--p-border)" }}>

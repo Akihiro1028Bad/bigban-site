@@ -574,3 +574,11 @@ AI は使わない（純粋なデータ結線）。
 - サイトのコードを変更する・PR を作る(本 MVP では提案文に留める)
 - 取得できなかった数字を推測で埋める
 - 確度の根拠を示さずに施策を断定する
+
+# 部分成功からの復旧
+
+下書き投入と即時公開は `success` / `partial` / `retryable-failure` / `manual-action-required` を区別する。`partial` は外部サービスの一部更新が完了しているため、通常の全工程再実行をしない。
+
+- 下書き投入: spec と同じディレクトリの `publish-checkpoint.json` と `publish-outcome.json` を確認し、画面・標準出力に表示された `npm run growth:draft-orchestrator -- <pageId>` で再開する。
+- LINE 通知だけ失敗: `npm run growth:notify-drafts -- <notify.json>` で通知だけ再送する。本体は成功扱いで終了する。
+- 即時公開で Notion 同期だけ失敗: 公開キューの「Notion同期のみ再試行」を使う。microCMS が `PUBLISH` であることを確認してから Notion だけを更新する。

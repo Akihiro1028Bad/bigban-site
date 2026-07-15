@@ -79,6 +79,11 @@ function eventSummary(event: LearningEvent): { diffSummary: string; titleHeadlin
       return { diffSummary: "", isNoChangeEdit: false };
     case "工程失敗":
       return { diffSummary: failureSummary(event), isNoChangeEdit: false };
+    case "工程部分成功":
+      return {
+        diffSummary: `${event.failedStage} / ${event.resumeCommand} / ${event.detail}`.slice(0, 2000),
+        isNoChangeEdit: false,
+      };
   }
 }
 
@@ -182,6 +187,10 @@ async function appendFail(mode: string, exitCodeStr: string, detail: string): Pr
   await appendEvent(appendFailEvent(mode, exitCodeStr, detail));
 }
 
+async function appendPartial(mode: string, failedStage: string, resumeCommand: string, detail: string): Promise<void> {
+  await appendEvent({ kind: "工程部分成功", mode, failedStage, resumeCommand, detail });
+}
+
 function weeksOf(value: string | undefined): number {
   const weeks = value ? Number(value) : 4;
   return Number.isFinite(weeks) && weeks > 0 ? weeks : 4;
@@ -218,11 +227,16 @@ async function main(): Promise<void> {
     case "append-fail":
       if (!a || b === undefined) throw new Error("使い方: append-fail <mode> <exitCode> <detail>");
       return appendFail(a, b, rest.join(" "));
+    case "append-partial": {
+      const [resumeCommand, ...detail] = rest;
+      if (!a || !b || !resumeCommand) throw new Error("使い方: append-partial <mode> <failedStage> <resumeCommand> <detail>");
+      return appendPartial(a, b, resumeCommand, detail.join(" "));
+    }
     case "recent":
       return recent(a);
     default:
       throw new Error(
-        `使い方: learning-log-cli <append|append-fail|recent> ... (種別: ${LEARNING_EVENT_KINDS.join(", ")})`
+        `使い方: learning-log-cli <append|append-fail|append-partial|recent> ... (種別: ${LEARNING_EVENT_KINDS.join(", ")})`
       );
   }
 }
