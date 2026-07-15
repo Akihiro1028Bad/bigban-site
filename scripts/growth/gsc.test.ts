@@ -17,7 +17,7 @@ const current = { start: "2026-06-08", end: "2026-06-14" };
 const prior = { start: "2026-06-01", end: "2026-06-07" };
 
 const reports: GscReportDef[] = [
-  { key: "summary", dimensions: [] },
+  { key: "summary", dimensions: [], includePriorOnly: true },
   { key: "topQueries", dimensions: ["query"], rowLimit: 25 },
 ];
 
@@ -31,6 +31,11 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGsc", () => {
+  it("既定定義は集計だけprior-onlyを保持し、上位クエリでは保持しない", () => {
+    expect(GSC_REPORTS.find((report) => report.key === "summary")?.includePriorOnly).toBe(true);
+    expect(GSC_REPORTS.find((report) => report.key === "topQueries")?.includePriorOnly).not.toBe(true);
+  });
+
   it("searchAnalytics.query を URL エンコードした siteUrl 付きで叩く", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ rows: [] }));
 
@@ -112,6 +117,26 @@ describe("fetchGsc", () => {
     });
     expect(result.topQueries[0].keys).toEqual(["pickleball 福岡"]);
     expect(result.topQueries[0].metrics.clicks.current).toBe(12);
+  });
+
+  it("前週のみの集計行は0件・-100%で残し、前週のみの上位クエリは除外する", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockReturnValueOnce(okResponse({ rows: [] }))
+      .mockReturnValueOnce(
+        okResponse({ rows: [{ clicks: 8, impressions: 80, ctr: 0.1, position: 4 }] })
+      )
+      .mockReturnValueOnce(
+        okResponse({ rows: [{ keys: ["今週クエリ"], clicks: 2, impressions: 20, ctr: 0.1, position: 5 }] })
+      )
+      .mockReturnValueOnce(
+        okResponse({ rows: [{ keys: ["前週だけクエリ"], clicks: 7, impressions: 70, ctr: 0.1, position: 3 }] })
+      );
+
+    const result = await fetchGsc({ config, accessToken: "t", current, prior, fetchFn, reports });
+
+    expect(result.summary[0]?.metrics.clicks).toEqual({ current: 0, prior: 8, deltaPct: -100 });
+    expect(result.topQueries.map((row) => row.keys[0])).toEqual(["今週クエリ"]);
   });
 
   it("reports/fetchFn 未指定時は既定値(GSC_REPORTS・グローバル fetch)を用いる", async () => {

@@ -559,6 +559,14 @@ AI は使わない（純粋なデータ結線）。
 - **リッチエディタ本体(TipTap)はカバレッジ除外**のため、導入後はブラウザでの実挙動、特に**画像/表/埋め込み等の往復保持**（読み込み→保存で壊れないか）を実機確認する。保持が不十分なら別issueで強化する。
 - **プレビュー iframe の `postMessage` は同一オリジン限定**（`isAllowedPreviewOrigin`）・受信HTMLは型/サイズ検証(`parsePreviewMessage`)＋ `NewsBodyRenderer` 内で STRICT サニタイズ。iframe.contentWindow への薄い結線(`DraftPreviewFrame.tsx`)はカバレッジ除外のため、**iframe が本番スタイルで描画されるか**を実機確認する（純ロジックは `draftPreview.ts`、受信描画は `DraftFrameClient` でテスト済み）。
 
+### 予約CSV更新とイベント別計測（#280）
+
+1. GA4で正典のCTAイベントをkey event化する。集計はeventName別に行い、全keyEvents合計を予約数として使わない。
+2. `reservation_id,booked_at,status`（任意 `source_page_path`）の正規化CSVを自宅PCへ置き、絶対パスを `GROWTH_RESERVATION_CSV_PATH` に設定する。
+3. CSVと同じ場所へ `<CSVパス>.coverage.json` を置き、`{"coverageStart":"YYYY-MM-DD","coverageEnd":"YYYY-MM-DD"}` でCSVが完全収録している期間を記録する。別パスなら `GROWTH_RESERVATION_COVERAGE_PATH` を設定する。
+4. `growth:metrics` 実行前にCSVとsidecarを更新する。current/priorのどちらかが収録範囲外なら0件とは扱わず、予約意図が代理指標になる。両期間を収録した空CSVだけが実測0件になる。
+5. mtimeが7日を超えると古い参考値になり、予約意図が代理指標になる。`source_page_path` が無いCSVでは施設全体実予約のみ表示し、記事帰属を推測しない。
+
 ## やってはいけないこと
 
 - microCMS の記事を公開する / 既存記事を編集する

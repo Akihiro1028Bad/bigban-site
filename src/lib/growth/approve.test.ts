@@ -289,6 +289,37 @@ describe("toPendingItems", () => {
     expect(item.metrics).toEqual(metrics);
   });
 
+  it("成績データのイベント別成果と実予約をPendingItemへ保持する", () => {
+    const page = idea("i8m-outcomes", "T", "S");
+    const metrics = {
+      pagePath: "/news/a",
+      views: { current: 120, prior: 100, deltaPct: 20 },
+      users: { current: 80, prior: 70, deltaPct: 14.3 },
+      ctaEventsMeasured: true,
+      ctaEvents: {
+        reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+        reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
+        lineClick: { current: 4, prior: 2, deltaPct: 100 },
+        instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+        other: { current: 5, prior: 0, deltaPct: null },
+      },
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: "2026-07-14T00:00:00.000Z",
+        facility: { current: 8, prior: 5, deltaPct: 60 },
+        article: { current: 2, prior: 1, deltaPct: 100 },
+      },
+      period: { start: "2026-07-07", end: "2026-07-13" },
+    };
+    page.properties["成績データ"] = {
+      type: "rich_text",
+      rich_text: [{ plain_text: JSON.stringify(metrics) }],
+    };
+    const [item] = toPendingItems([], [page]);
+    expect(item.metrics).toEqual(metrics);
+  });
+
   it("成績データが無ければ metrics は undefined", () => {
     const [item] = toPendingItems([], [idea("i8n", "T", "S")]);
     expect(item.metrics).toBeUndefined();

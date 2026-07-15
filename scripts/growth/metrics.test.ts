@@ -9,6 +9,7 @@ import {
   isKeyEventsMeasured,
   type ArticleMetrics,
   metricsForPagePath,
+  metricsForKnownPagePath,
   METRICS_PROPS,
   normalizePagePath,
   parseMetrics,
@@ -31,6 +32,19 @@ function row(
       screenPageViews: { current: views[0], prior: views[1], deltaPct: null },
       activeUsers: { current: users[0], prior: users[1], deltaPct: null },
       keyEvents: { current: keyEvents[0], prior: keyEvents[1], deltaPct: null },
+    },
+  };
+}
+
+function eventRow(
+  pagePath: string,
+  eventName: string,
+  values: [number, number]
+): MergedRow {
+  return {
+    keys: [pagePath, eventName],
+    metrics: {
+      keyEvents: { current: values[0], prior: values[1], deltaPct: null },
     },
   };
 }
@@ -117,10 +131,52 @@ describe("metricsForPagePath", () => {
     expect(m?.views.deltaPct).toBe(100);
   });
 
-  it("keyEvents(CTA)も合算する(#S2)", () => {
-    const rows = [row("/news/a", [100, 50], [60, 30], [4, 2]), row("/news/a?ref=line", [20, 10], [10, 5], [1, 0])];
-    const m = metricsForPagePath("/news/a", rows, PERIOD);
-    expect(m?.keyEvents).toEqual({ current: 5, prior: 2, deltaPct: 150 });
+  it("pagePath×eventNameを5分類へ集約しクエリ違いも合算する", () => {
+    const events = [
+      eventRow("/news/a", "reservation_click", [2, 1]),
+      eventRow("/news/a?ref=line", "reserve_entry_click", [1, 2]),
+      eventRow("/news/a", "line_click", [4, 1]),
+      eventRow("/news/a", "instagram_click", [3, 1]),
+      eventRow("/news/a", "contact_submit", [7, 0]),
+      eventRow("/news/a", "purchase", [99, 99]),
+    ];
+    const m = metricsForPagePath("/news/a", [row("/news/a", [100, 50], [60, 30])], PERIOD, events);
+    expect(m?.ctaEvents).toEqual({
+      reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+      reserveEntryClick: { current: 1, prior: 2, deltaPct: -50 },
+      lineClick: { current: 4, prior: 1, deltaPct: 300 },
+      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+      other: { current: 7, prior: 0, deltaPct: null },
+    });
+    expect(m?.keyEvents).toBeUndefined();
+  });
+
+  it("予約0・非予約7でも予約意図は0のままにする", () => {
+    const m = metricsForPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD,
+      [eventRow("/news/a", "line_click", [7, 2])]
+    );
+    expect(m?.ctaEvents?.reservationClick.current).toBe(0);
+    expect(m?.ctaEvents?.reserveEntryClick.current).toBe(0);
+    expect(m?.ctaEvents?.lineClick.current).toBe(7);
+  });
+
+  it("イベント行のkeys・keyEvents欠落を空イベント名・0件として安全に扱う", () => {
+    const malformedEvents: MergedRow[] = [
+      { keys: [], metrics: {} },
+      { keys: ["/news/a"], metrics: {} },
+      eventRow("/news/a", "reservation_click", [2, 1]),
+    ];
+    const m = metricsForPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD,
+      malformedEvents
+    );
+    expect(m?.ctaEvents?.reservationClick).toEqual({ current: 2, prior: 1, deltaPct: 100 });
+    expect(m?.ctaEvents?.other).toEqual({ current: 0, prior: 0, deltaPct: null });
   });
 
   it("prior が 0 なら deltaPct は null", () => {
@@ -143,6 +199,45 @@ describe("metricsForPagePath", () => {
     expect(m?.views.current).toBe(0);
     expect(m?.users.prior).toBe(0);
     expect(m?.views.deltaPct).toBeNull();
+  });
+});
+
+describe("metricsForKnownPagePath", () => {
+  it("GA4 topPages一致なしでも既知の記事を未計測状態で返す", () => {
+    const metrics = metricsForKnownPagePath("/news/a", [], PERIOD, [
+      eventRow("/news/a", "reservation_click", [2, 1]),
+    ]);
+    expect(metrics).toMatchObject({
+      pagePath: "/news/a",
+      ga4Measured: false,
+      views: { current: 0, prior: 0, deltaPct: null },
+      users: { current: 0, prior: 0, deltaPct: null },
+      ctaEvents: {
+        reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+      },
+    });
+    expect(metricsForKnownPagePath("/news/no-cta", [], PERIOD).ctaEvents).toBeUndefined();
+  });
+
+  it("GA4 topPages一致時は実測状態を保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.views.current).toBe(10);
+  });
+
+  it("topPagesの前週のみ記事を0/80・-100%の実測急落として保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [0, 80], [0, 40])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.views).toEqual({ current: 0, prior: 80, deltaPct: -100 });
+    expect(metrics.users).toEqual({ current: 0, prior: 40, deltaPct: -100 });
   });
 });
 
@@ -199,6 +294,64 @@ describe("serializeMetrics / parseMetrics", () => {
       keyEventsMeasured: true,
     };
     expect(parseMetrics(serializeMetrics(withMeasured))).toEqual(withMeasured);
+  });
+
+  it("ctaEventsとactualReservations付きも往復できる", () => {
+    const extended: ArticleMetrics = {
+      ...metrics,
+      ctaEventsMeasured: true,
+      ctaEvents: {
+        reservationClick: { current: 1, prior: 0, deltaPct: null },
+        reserveEntryClick: { current: 2, prior: 1, deltaPct: 100 },
+        lineClick: { current: 3, prior: 2, deltaPct: 50 },
+        instagramClick: { current: 4, prior: 4, deltaPct: 0 },
+        other: { current: 5, prior: 10, deltaPct: -50 },
+      },
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: "2026-07-14T00:00:00.000Z",
+        facility: { current: 8, prior: 4, deltaPct: 100 },
+        article: { current: 2, prior: 1, deltaPct: 100 },
+      },
+    };
+    expect(parseMetrics(serializeMetrics(extended))).toEqual(extended);
+  });
+
+  it("GA4未取得状態と実測0を区別して往復できる", () => {
+    const value: ArticleMetrics = { ...metrics, ga4Measured: false };
+    expect(parseMetrics(serializeMetrics(value))).toEqual(value);
+  });
+
+  it("実予約missingを往復し不正stateは拒否する", () => {
+    const missing: ArticleMetrics = {
+      ...metrics,
+      actualReservations: {
+        state: "missing",
+        reason: "not_configured",
+        checkedAt: "2026-07-15T00:00:00.000Z",
+      },
+    };
+    expect(parseMetrics(serializeMetrics(missing))).toEqual(missing);
+    expect(parseMetrics(JSON.stringify({ ...metrics, actualReservations: { state: "stale" } }))).toBeNull();
+  });
+
+  it("実予約のcurrent/prior収録状態を往復する", () => {
+    const incomplete: ArticleMetrics = {
+      ...metrics,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: "2026-07-15T00:00:00.000Z",
+        coverage: {
+          start: "2026-07-07",
+          end: "2026-07-13",
+          current: true,
+          prior: false,
+        },
+      },
+    };
+    expect(parseMetrics(serializeMetrics(incomplete))).toEqual(incomplete);
   });
 });
 

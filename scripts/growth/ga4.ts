@@ -14,6 +14,7 @@ import {
   type Ga4Report,
   type MergedRow,
 } from "./transform";
+import { CTA_EVENT_NAMES } from "./ctaEvents";
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -37,6 +38,10 @@ export interface Ga4ReportDef {
   metrics: string[];
   /** 取得行数の上限(ブレイクダウン用)。 */
   limit?: number;
+  /** 単一ディメンションの値を許可リストで絞る。 */
+  dimensionFilter?: { fieldName: string; values: readonly string[] };
+  /** currentに無くpriorにだけある行をcurrent=0として保持する。 */
+  includePriorOnly?: boolean;
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
@@ -60,15 +65,23 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
   {
     key: "topPages",
     dimensions: ["pagePath"],
-    // #計測強化 S2: keyEvents(CTAキーイベント)も取得し、記事ごとの CTA 計測に使う。
-    metrics: ["screenPageViews", "activeUsers", "keyEvents"],
+    metrics: ["screenPageViews", "activeUsers"],
     limit: 20,
+    includePriorOnly: true,
   },
   {
     key: "landingPages",
     dimensions: ["landingPage"],
     metrics: ["sessions", "activeUsers", "keyEvents"],
     limit: 20,
+  },
+  {
+    key: "ctaEvents",
+    dimensions: ["eventName"],
+    metrics: ["keyEvents"],
+    dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
+    limit: 10_000,
+    includePriorOnly: true,
   },
 ];
 
@@ -89,6 +102,14 @@ function buildRequest(def: Ga4ReportDef, range: DateRange) {
   };
   if (def.limit !== undefined) {
     request.limit = String(def.limit);
+  }
+  if (def.dimensionFilter) {
+    request.dimensionFilter = {
+      filter: {
+        fieldName: def.dimensionFilter.fieldName,
+        inListFilter: { values: [...def.dimensionFilter.values] },
+      },
+    };
   }
   return request;
 }
@@ -126,7 +147,8 @@ export async function fetchGa4(
     const priorReport = allReports[index * 2 + 1] ?? {};
     result[def.key] = mergeRows(
       parseGa4Report(currentReport),
-      parseGa4Report(priorReport)
+      parseGa4Report(priorReport),
+      { includePriorOnly: def.includePriorOnly === true }
     );
   });
 

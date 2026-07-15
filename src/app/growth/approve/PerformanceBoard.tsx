@@ -14,6 +14,8 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { type ArticleMetrics, summarizeMetrics } from "@/lib/growth/metrics";
 import { daysSincePublished, isLowSample, reviewLabels, type ReviewLabel } from "@/lib/growth/metricsReview";
+import { reservationIntent, socialCta, type MetricDeltaValue } from "@/lib/growth/ctaEvents";
+import { isReservationDataFresh, selectLatestReservationSnapshot } from "@/lib/growth/reservations";
 
 import {
   type DeltaTone,
@@ -47,8 +49,8 @@ const LABEL_TONE: Record<ReviewLabel, { color: string; bg: string }> = {
   伸びている: { color: "var(--p-green)", bg: "var(--p-green-weak)" },
   CTR弱い: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
   順位あと少し: { color: "var(--p-accent)", bg: "var(--p-accent-weak)" },
-  読まれるがCTA弱い: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
-  CV未計測: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
+  読まれるが予約意図弱い: { color: "var(--p-amber)", bg: "var(--p-amber-weak)" },
+  予約意図未計測: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
   要改稿: { color: "var(--p-red)", bg: "var(--p-red-weak)" },
   未計測: { color: "var(--p-text-3)", bg: "var(--p-bg-active)" },
 };
@@ -85,6 +87,12 @@ export function PerformanceBoard({ items, onAddIdea }: PerformanceBoardProps) {
     .sort((a, b) => b.metrics.views.current - a.metrics.views.current);
 
   const summary = summarizeMetrics(items.map((item) => ({ title: item.title, metrics: item.metrics })));
+  const latestReservations = selectLatestReservationSnapshot(
+    measured.flatMap(({ metrics }) => metrics.actualReservations ? [metrics.actualReservations] : [])
+  );
+  const hasFreshReservations = latestReservations
+    ? isReservationDataFresh(latestReservations.syncedAt, new Date(nowMs).toISOString())
+    : false;
 
   // proto「いちばん伸びた記事」= 表示前週比が最大(かつプラス)の記事。
   const risers: { row: MeasuredRow; delta: number }[] = [];
@@ -115,10 +123,16 @@ export function PerformanceBoard({ items, onAddIdea }: PerformanceBoardProps) {
     <section aria-label="成績ボード" className="mx-auto max-w-[880px] px-6 py-7">
       <BoardHeading />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard label="合計表示数" value={formatCount(summary.totalViews)} />
         <SummaryCard label="合計ユーザー数" value={formatCount(summary.totalUsers)} />
         <SummaryCard label="計測記事数" value={String(summary.count)} />
+        {latestReservations ? (
+          <SummaryCard
+            label={hasFreshReservations ? "施設全体の実予約" : "施設全体の実予約（古い）"}
+            value={formatCount(latestReservations.facility.current)}
+          />
+        ) : null}
       </div>
 
       {best && (
@@ -272,6 +286,7 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 /** GSC(検索)行展開: クリック/表示/CTR/順位＋CTA＋上位クエリ(本番 search 実データ)。 */
 function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?: () => void }) {
   const search = metrics.search;
+  const cta = metrics.ctaEvents;
   return (
     <div className="border-t px-3.5 py-4" style={{ borderColor: "var(--p-border)" }}>
       <div
@@ -312,6 +327,30 @@ function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?
       ) : (
         <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>検索成績は未計測です。</div>
       )}
+      {cta ? (
+        <div className="mt-4 space-y-3">
+          {metrics.ctaEventsMeasured === true ? (
+            <>
+              <CtaGroup label="予約意図" total={reservationIntent(cta)}>
+                <CtaMetric label="reservation_click" value={cta.reservationClick} />
+                <CtaMetric label="reserve_entry_click" value={cta.reserveEntryClick} />
+              </CtaGroup>
+              <CtaGroup label="SNS" total={socialCta(cta)}>
+                <CtaMetric label="LINE" value={cta.lineClick} />
+                <CtaMetric label="Instagram" value={cta.instagramClick} />
+              </CtaGroup>
+              <CtaGroup label="その他CTA" total={cta.other}>
+                <CtaMetric label="その他CTA 合計" value={cta.other} />
+              </CtaGroup>
+            </>
+          ) : (
+            <div className="text-[12.5px]" style={{ color: "var(--p-text-3)" }}>
+              予約意図・SNS・その他CTAはイベント別未計測です。数値0とは区別されます。
+            </div>
+          )}
+        </div>
+      ) : null}
+      <ActualReservations metrics={metrics} />
       {/* #218: CTA(予約クリック等)キーイベントは search の有無に依らず、存在すれば常に表示する。 */}
       {metrics.keyEvents ? (
         <div className="mt-2.5 text-[12px]" style={{ color: "var(--p-text-2)" }}>
@@ -340,6 +379,59 @@ function RowDetail({ metrics, onAddIdea }: { metrics: ArticleMetrics; onAddIdea?
           </button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CtaGroup({
+  label,
+  total,
+  children,
+}: {
+  label: string;
+  total: MetricDeltaValue;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-label={label} className="rounded-[10px] p-3" style={{ background: "var(--p-bg-raised)", border: "1px solid var(--p-border)" }}>
+      <div className="mb-2 flex items-center justify-between text-[12px] font-semibold">
+        <span>{label}</span>
+        <span className="tabular-nums">今週 {formatCount(total.current)} / 前週 {formatCount(total.prior)} / {formatDelta(total.deltaPct).text}</span>
+      </div>
+      <div className="space-y-1">{children}</div>
+    </section>
+  );
+}
+
+function CtaMetric({ label, value }: { label: string; value: MetricDeltaValue }) {
+  return (
+    <div className="flex items-center justify-between text-[11.5px]" style={{ color: "var(--p-text-2)" }}>
+      <span>{label}</span>
+      <span className="tabular-nums">今週 {formatCount(value.current)} / 前週 {formatCount(value.prior)} / {formatDelta(value.deltaPct).text}</span>
+    </div>
+  );
+}
+
+function ActualReservations({ metrics }: { metrics: ArticleMetrics }) {
+  const actual = metrics.actualReservations;
+  if (!actual) return null;
+  if (actual.state === "missing") {
+    const coverageText = actual.reason === "coverage_incomplete" && actual.coverage
+      ? `予約CSVの収録期間が不足しています（当週=${actual.coverage.current ? "収録" : "未収録"} / 前週=${actual.coverage.prior ? "収録" : "未収録"}）。予約意図を代理指標として扱います。`
+      : "実予約は未取得です。予約意図を代理指標として扱います。";
+    return (
+      <div className="mt-3 rounded-[10px] p-3 text-[12.5px]" style={{ background: "var(--p-bg-raised)", color: "var(--p-text-2)" }}>
+        {coverageText}
+      </div>
+    );
+  }
+  const isFresh = isReservationDataFresh(actual.syncedAt, new Date().toISOString());
+  return (
+    <div className="mt-3 rounded-[10px] p-3 text-[12.5px]" style={{ background: "var(--p-bg-raised)", color: "var(--p-text-2)" }}>
+      <div className="font-semibold">{isFresh ? "実予約" : "実予約（データが古い・予約意図を代理指標）"}</div>
+      <div>施設全体: 今週 {actual.facility.current} / 前週 {actual.facility.prior} / {formatDelta(actual.facility.deltaPct).text}</div>
+      <div>{actual.article ? `記事帰属の実予約: 今週 ${actual.article.current} / 前週 ${actual.article.prior} / ${formatDelta(actual.article.deltaPct).text}` : "施設全体の実予約のみ（記事別帰属なし）"}</div>
+      <div style={{ color: "var(--p-text-3)" }}>最終取込 {actual.syncedAt}</div>
     </div>
   );
 }

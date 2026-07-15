@@ -36,6 +36,150 @@ function published(
 }
 
 describe("PerformanceBoard", () => {
+  it("検索成績なしでも予約意図・SNS・その他CTAをイベント別に表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      ctaEventsMeasured: true,
+      ctaEvents: {
+        reservationClick: { current: 0, prior: 2, deltaPct: -100 },
+        reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
+        lineClick: { current: 4, prior: 2, deltaPct: 100 },
+        instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+        other: { current: 0, prior: 0, deltaPct: null },
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "イベント別記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /イベント別記事/ }));
+
+    expect(screen.getByText("予約意図")).toBeInTheDocument();
+    expect(screen.getByText("reservation_click")).toBeInTheDocument();
+    expect(screen.getByText("reserve_entry_click")).toBeInTheDocument();
+    expect(screen.getByText("SNS")).toBeInTheDocument();
+    expect(screen.getByText("LINE")).toBeInTheDocument();
+    expect(screen.getByText("Instagram")).toBeInTheDocument();
+    expect(screen.getByText("その他CTA")).toBeInTheDocument();
+    expect(screen.getAllByText(/今週 0.*前週 2.*-100%/)).toHaveLength(2);
+    expect(screen.getByText(/今週 4.*前週 2.*\+100%/)).toBeInTheDocument();
+  });
+
+  it("freshな施設全体実予約と記事帰属実予約、最終取込時刻を区別する", async () => {
+    const user = userEvent.setup();
+    const syncedAt = new Date(Date.now() - 86_400_000).toISOString();
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt,
+        facility: { current: 8, prior: 5, deltaPct: 60 },
+        article: { current: 2, prior: 1, deltaPct: 100 },
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "実予約記事", m)]} />);
+    expect(screen.getByText("施設全体の実予約")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /実予約記事/ }));
+    expect(screen.getByText(/記事帰属の実予約/)).toBeInTheDocument();
+    expect(screen.getByText(/最終取込/)).toBeInTheDocument();
+  });
+
+  it("実予約欠損時は予約意図を代理指標と明示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      actualReservations: {
+        state: "missing",
+        reason: "not_configured",
+        checkedAt: new Date().toISOString(),
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "欠損記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /欠損記事/ }));
+    expect(screen.getByText(/実予約は未取得/)).toBeInTheDocument();
+    expect(screen.getByText(/予約意図を代理指標/)).toBeInTheDocument();
+  });
+
+  it("予約CSVの当週・前週収録状態を区別して表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(0, null, 0),
+      ga4Measured: false,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: new Date().toISOString(),
+        coverage: {
+          start: "2026-07-07",
+          end: "2026-07-13",
+          current: true,
+          prior: false,
+        },
+      },
+    };
+    const currentMissing: ArticleMetrics = {
+      ...m,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: new Date().toISOString(),
+        coverage: {
+          start: "2026-06-30",
+          end: "2026-07-06",
+          current: false,
+          prior: true,
+        },
+      },
+    };
+    render(<PerformanceBoard items={[
+      published("a", "前週収録不足記事", m),
+      published("b", "当週収録不足記事", currentMissing),
+    ]} />);
+    await user.click(screen.getByRole("button", { name: /前週収録不足記事/ }));
+    expect(screen.getByText(/当週=収録.*前週=未収録/)).toBeInTheDocument();
+    expect(screen.getByText(/予約意図を代理指標/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /当週収録不足記事/ }));
+    expect(screen.getByText(/当週=未収録.*前週=収録/)).toBeInTheDocument();
+  });
+
+  it("古い実予約と記事帰属なしを明示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: "2020-01-01T00:00:00.000Z",
+        facility: { current: 8, prior: 5, deltaPct: 60 },
+        article: null,
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "古い実予約記事", m)]} />);
+    expect(screen.getByText("施設全体の実予約（古い）")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /古い実予約記事/ }));
+    expect(screen.getByText("実予約（データが古い・予約意図を代理指標）")).toBeInTheDocument();
+    expect(screen.getByText("施設全体の実予約のみ（記事別帰属なし）")).toBeInTheDocument();
+  });
+
+  it("イベント内訳が存在しても未計測なら0件表示せず未計測を明示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(100, 20, 50),
+      ctaEventsMeasured: false,
+      ctaEvents: {
+        reservationClick: { current: 0, prior: 0, deltaPct: null },
+        reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
+        lineClick: { current: 0, prior: 0, deltaPct: null },
+        instagramClick: { current: 0, prior: 0, deltaPct: null },
+        other: { current: 0, prior: 0, deltaPct: null },
+      },
+    };
+    render(<PerformanceBoard items={[published("a", "イベント未計測記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /イベント未計測記事/ }));
+    expect(screen.getByText(/イベント別未計測です/)).toBeInTheDocument();
+    expect(screen.queryByText("reservation_click")).not.toBeInTheDocument();
+  });
+
   it("計測データが無ければ空メッセージを出す", () => {
     render(<PerformanceBoard items={[published("a", "未計測")]} />);
     expect(screen.getByText(/まだ計測データがありません/)).toBeInTheDocument();

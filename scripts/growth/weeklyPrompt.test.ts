@@ -39,6 +39,17 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(goals).toContain("日本一");
   });
 
+  it("実予約を優先しイベント別CTAを予約数から分離する", () => {
+    expect(weekly).toContain("ga4.ctaEvents");
+    expect(weekly).toContain("keyEvents合計を予約数とみなさない");
+    expect(weekly).toContain("freshな記事帰属実予約");
+    expect(weekly).toContain("欠損または古い場合だけ");
+    expect(weekly).toContain("LINE・Instagram・その他CTA");
+    expect(goals).toContain("reservation_click");
+    expect(goals).toContain("reserve_entry_click");
+    expect(goals).toContain("実予約");
+  });
+
   it("承認画面のプロンプトタブで分析基準を参考資料として表示する", () => {
     expect(PROMPT_REGISTRY).toContainEqual(
       expect.objectContaining({

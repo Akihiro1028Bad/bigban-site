@@ -168,3 +168,7 @@
 
 - **すべて任意・欠落耐性**: 未入力なら週次は「手入力データなし」で従来動作(推測しない)。`growth:existing` が「オーナー手入力」節で読み、週次が成功指標の分母(実予約・SNS・口コミ)に接地させる。
 - **作成済み判定への影響なし**: これらの数字だけ入れた行(`レポート` title 空)は「レポート作成済み」に数えないので、週次モードは通常どおりレポートを新規作成する。入力手順は [60-kpi-tree.md](60-kpi-tree.md) §7。
+
+## `成績データ` JSON拡張（#280）
+
+新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `ga4Measured`（`false` はGA4実測0ではなくtopPages未取得）、`ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`ctaEventsMeasured`、`actualReservations` を保存する。実予約CSVのcurrent/prior収録範囲が不足する場合、`actualReservations.state=missing`、`reason=coverage_incomplete`、`coverage.current/prior` で各期間の収録可否を保持する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。

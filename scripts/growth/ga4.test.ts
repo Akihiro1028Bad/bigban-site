@@ -31,6 +31,37 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGa4", () => {
+  it("CTAレポートへeventNameとinListFilterを設定する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
+    expect(ctaReport).toBeDefined();
+    expect(ctaReport?.includePriorOnly).toBe(true);
+    expect(GA4_REPORTS.find((report) => report.key === "topPages")?.includePriorOnly).toBe(true);
+
+    await fetchGa4({
+      config,
+      accessToken: "t",
+      current,
+      prior,
+      fetchFn,
+      reports: [ctaReport!],
+    });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<Record<string, unknown>>;
+    };
+    expect(body.requests[0]).toMatchObject({
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "keyEvents" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          inListFilter: { values: expect.arrayContaining(["reservation_click", "line_click"]) },
+        },
+      },
+    });
+  });
+
   it("batchRunReports を正しい URL と Bearer トークンで叩く", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
 
@@ -103,6 +134,69 @@ describe("fetchGa4", () => {
     ]);
   });
 
+  it("定義で有効化したtopPagesとCTAレポートのprior-only行を残す", async () => {
+    const reportDefs: Ga4ReportDef[] = [
+      {
+        key: "topPages",
+        dimensions: ["pagePath"],
+        metrics: ["screenPageViews"],
+        includePriorOnly: true,
+      },
+      {
+        key: "cta",
+        dimensions: ["pagePath", "eventName"],
+        metrics: ["keyEvents"],
+        includePriorOnly: true,
+      },
+    ];
+    const ga4Report = (
+      dimensions: string[],
+      metrics: string[],
+      rows: Array<{ keys: string[]; values: string[] }>
+    ) => ({
+      dimensionHeaders: dimensions.map((name) => ({ name })),
+      metricHeaders: metrics.map((name) => ({ name })),
+      rows: rows.map((row) => ({
+        dimensionValues: row.keys.map((value) => ({ value })),
+        metricValues: row.values.map((value) => ({ value })),
+      })),
+    });
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({
+      reports: [
+        ga4Report(["pagePath"], ["screenPageViews"], [{ keys: ["/news/current"], values: ["3"] }]),
+        ga4Report(["pagePath"], ["screenPageViews"], [{ keys: ["/news/prior-only"], values: ["8"] }]),
+        ga4Report(["pagePath", "eventName"], ["keyEvents"], []),
+        ga4Report(["pagePath", "eventName"], ["keyEvents"], [
+          { keys: ["/news/a", "reservation_click"], values: ["2"] },
+        ]),
+      ],
+    }));
+
+    const result = await fetchGa4({
+      config,
+      accessToken: "t",
+      current,
+      prior,
+      fetchFn,
+      reports: reportDefs,
+    });
+
+    expect(result.topPages).toEqual([
+      {
+        keys: ["/news/current"],
+        metrics: { screenPageViews: { current: 3, prior: 0, deltaPct: null } },
+      },
+      {
+        keys: ["/news/prior-only"],
+        metrics: { screenPageViews: { current: 0, prior: 8, deltaPct: -100 } },
+      },
+    ]);
+    expect(result.cta).toEqual([{
+      keys: ["/news/a", "reservation_click"],
+      metrics: { keyEvents: { current: 0, prior: 2, deltaPct: -100 } },
+    }]);
+  });
+
   it("reports/fetchFn 未指定時は既定値(GA4_REPORTS・グローバル fetch)を用いる", async () => {
     const globalFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -114,8 +208,8 @@ describe("fetchGa4", () => {
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior });
 
-    // 既定5レポート × 2期間 = 10リクエスト → 5件ずつ2バッチ
-    expect(globalFetch).toHaveBeenCalledTimes(2);
+    // 既定6レポート × 2期間 = 12リクエスト → 5件ずつ3バッチ
+    expect(globalFetch).toHaveBeenCalledTimes(3);
     // 既定レポートの各 key が結果に存在する
     for (const def of GA4_REPORTS) {
       expect(result[def.key]).toBeDefined();
