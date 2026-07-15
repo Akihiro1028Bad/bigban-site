@@ -44,7 +44,7 @@ export default defineConfig({
     globals: true,
     css: false,
     passWithNoTests: true,
-    exclude: [...configDefaults.exclude, ".claude/worktrees/**"],
+    exclude: [...configDefaults.exclude, ".claude/worktrees/**", "e2e/**"],
     coverage: {
       provider: "istanbul",
       reporter: ["text", "lcov"],

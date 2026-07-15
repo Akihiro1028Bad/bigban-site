@@ -23,6 +23,7 @@ import type { ProcessResult } from "./processControl.mjs";
 import { buildGrowthOperationResult, mergeGrowthOperationResults, normalizeGrowthOperationResult } from "./operationOutcome";
 
 import type { GrowthOperationResult } from "./operationOutcome";
+import { runDraftOrchestratorApplication } from "./draftOrchestratorApplication";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
@@ -330,7 +331,6 @@ async function publishAndNotify(params: {
 
 async function main(): Promise<void> {
   const workDirs: string[] = [];
-  try {
   const executionStartedAt = new Date();
   const page = await targetPage(process.argv[2]);
   const input = draftInputFromPage(page);
@@ -338,142 +338,102 @@ async function main(): Promise<void> {
   const stateDir = path.join(root, ".growth-tmp", "drafts", input.pageId.replace(/[^a-zA-Z0-9-]/g, "-"));
   mkdirSync(stateDir, { recursive: true });
   const generationMarkerPath = path.join(stateDir, "generation-attempt.json");
-  const generation = resolveDraftGenerationScope(
-    input.rebuildSourceId,
-    readGenerationMarker(generationMarkerPath),
-    randomUUID,
-  );
+  const generation = resolveDraftGenerationScope(input.rebuildSourceId, readGenerationMarker(generationMarkerPath), randomUUID);
   const specPath = path.join(stateDir, "publish-spec.json");
   const checkpointPath = path.join(stateDir, "publish-checkpoint.json");
   const writerPath = path.join(stateDir, "writer-output.json");
   if (shouldResumePublishSpec(existsSync(checkpointPath), existsSync(specPath))) {
-    await publishAndNotify({
-      specPath,
-      input,
-      stateDir,
-      generationMarkerPath,
-      checkpointPath,
-      hasGenerationMarker: generation.marker !== null,
-      writerPath,
-    });
+    await publishAndNotify({ specPath, input, stateDir, generationMarkerPath, checkpointPath, hasGenerationMarker: generation.marker !== null, writerPath });
     return;
   }
   const prepared = prepareOutlineImages(input.outline);
-  const facilityRaw = JSON.parse(readFileSync(path.join(here, "facility-context.json"), "utf-8")) as unknown;
-  const facility = parseFacilityContextData(facilityRaw);
+  const facility = parseFacilityContextData(JSON.parse(readFileSync(path.join(here, "facility-context.json"), "utf-8")) as unknown);
   const facilityContext = buildFacilityResearchContext(facility, executionStartedAt);
   const articleContext = [input.title, input.outline, input.audience, input.searchIntent, input.cta].join("\n");
   const relevantFacilityContext = selectRelevantFacilityContext(facilityContext, articleContext);
-  const settings = await resolveSettings();
-  const researchSetting = settings["draft-research"];
-  const writerSetting = settings["draft-write"];
-  executionSettingsSummary = [
-    draftPhaseExecutionLabel("draft-research", researchSetting),
-    draftPhaseExecutionLabel("draft-write", writerSetting),
-  ].join("; ");
   const promptResearch = readFileSync(path.join(here, "prompts", "draft-research.md"), "utf-8");
   const promptWrite = readFileSync(path.join(here, "prompts", "draft-write.md"), "utf-8");
-  if (generation.marker) {
-    writeFileSync(generationMarkerPath, JSON.stringify(generation.marker, null, 2));
-  } else if (existsSync(generationMarkerPath)) {
-    unlinkSync(generationMarkerPath);
-  }
+  if (generation.marker) writeFileSync(generationMarkerPath, JSON.stringify(generation.marker, null, 2));
+  else if (existsSync(generationMarkerPath)) unlinkSync(generationMarkerPath);
   writeFileSync(path.join(stateDir, "input.json"), JSON.stringify({ input, facility: relevantFacilityContext }, null, 2));
   const researchWorkDir = await mkdtemp(path.join(os.tmpdir(), "growth-draft-research-"));
   workDirs.push(researchWorkDir);
   const writerWorkDir = await mkdtemp(path.join(os.tmpdir(), "growth-draft-write-"));
   workDirs.push(writerWorkDir);
 
-  const researchInput = { title: input.title, outline: prepared.outline, audience: input.audience, searchIntent: input.searchIntent, primaryNotes: input.primaryNotes, facility: relevantFacilityContext };
-  const researchKey = stageCacheKey({ input: researchInput, prompt: promptResearch, model: researchSetting, cacheScope: generation.cacheScope });
-  const researchPath = path.join(stateDir, "research.json");
-  const trustedResearchSources = {
-    facilityName: relevantFacilityContext.name,
-    facilityConfirmed: relevantFacilityContext.confirmed,
-    facilityLocation: relevantFacilityContext.location,
-    primaryNotes: input.primaryNotes,
-  };
-  let researchValue = cached(researchPath, researchKey, researchTtlMs);
-  let cachedResearch: ResearchPacket | null = null;
-  if (researchValue !== null) {
-    try {
-      cachedResearch = validateResearchPacketSources(
-        parseResearchPacket(researchValue),
-        trustedResearchSources,
-      );
-    } catch {
-      unlinkSync(researchPath);
-      researchValue = null;
-    }
-  }
-  const researchWasCached = cachedResearch !== null;
-  const researchLogId = await startPhaseLog(input.pageId, "draft-research", researchSetting);
-  let research: ResearchPacket;
-  try {
-    if (researchValue === null) {
-      researchValue = await runAgent({ phase: "draft-research", setting: researchSetting, prompt: `${promptResearch}\n\n<input_json>\n${JSON.stringify(researchInput)}\n</input_json>`, schema: RESEARCH_OUTPUT_JSON_SCHEMA, workDir: researchWorkDir });
-    }
-    research = cachedResearch ?? validateResearchPacketSources(
-      parseResearchPacket(researchValue),
-      trustedResearchSources,
-    );
-    if (!researchWasCached) saveCache(researchPath, researchKey, researchValue);
-    await finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "success", researchWasCached ? "cache hit" : "AI completed");
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "failed", message);
-    if (error instanceof ProcessExecutionError) throw error;
-    throw new Error(`${draftPhaseExecutionLabel("draft-research", researchSetting)}; ${message}`);
-  }
-  const writerInput = buildWriterInput(
-    input,
-    prepared.outline,
-    research,
-    relevantFacilityContext.doNotWrite,
-  );
-  const writerKey = stageCacheKey({ input: writerInput, prompt: promptWrite, model: writerSetting, cacheScope: generation.cacheScope });
-  let writerValue = cached(writerPath, writerKey);
-  let cachedWriter: ValidatedWriterOutput | null = null;
-  if (writerValue !== null) {
-    try {
-      cachedWriter = parseValidatedWriterOutput(writerValue, research, prepared.outline);
-    } catch {
-      unlinkSync(writerPath);
-      writerValue = null;
-    }
-  }
-  const writerWasCached = cachedWriter !== null;
-  const writerLogId = await startPhaseLog(input.pageId, "draft-write", writerSetting);
-  let writer: ValidatedWriterOutput;
-  try {
-    if (writerValue === null) {
-      writerValue = await runAgent({ phase: "draft-write", setting: writerSetting, prompt: `${promptWrite}\n\n<input_json>\n${JSON.stringify(writerInput)}\n</input_json>`, schema: writerSchema, workDir: writerWorkDir });
-    }
-    writer = cachedWriter ?? parseValidatedWriterOutput(writerValue, research, prepared.outline);
-    if (!writerWasCached) saveCache(writerPath, writerKey, writerValue);
-    await finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "success", writerWasCached ? "cache hit" : "AI completed");
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "failed", message);
-    if (error instanceof ProcessExecutionError) throw error;
-    throw new Error(`${draftPhaseExecutionLabel("draft-write", writerSetting)}; ${message}`);
-  }
-  const spec = assemblePublishSpec({ input, writer, research, images: prepared.images, doNotWrite: relevantFacilityContext.doNotWrite });
-  spec.imagePath = path.join(stateDir, "growth-eyecatch.png");
-  writeFileSync(specPath, JSON.stringify(spec, null, 2));
-  await runNpm("growth:image-prompt", [specPath], false, timeoutPolicy.imagePromptMs);
-  await publishAndNotify({
-    specPath,
-    input,
-    stateDir,
-    generationMarkerPath,
-    checkpointPath,
-    hasGenerationMarker: generation.marker !== null,
-    writerPath,
+  await runDraftOrchestratorApplication({
+    acquireTarget: async () => input,
+    resolveSettings: async () => {
+      const settings = await resolveSettings();
+      executionSettingsSummary = [draftPhaseExecutionLabel("draft-research", settings["draft-research"]), draftPhaseExecutionLabel("draft-write", settings["draft-write"])].join("; ");
+      return settings;
+    },
+    runResearch: async (target, settings) => {
+      const setting = settings["draft-research"];
+      const researchInput = { title: target.title, outline: prepared.outline, audience: target.audience, searchIntent: target.searchIntent, primaryNotes: target.primaryNotes, facility: relevantFacilityContext };
+      const researchKey = stageCacheKey({ input: researchInput, prompt: promptResearch, model: setting, cacheScope: generation.cacheScope });
+      const researchPath = path.join(stateDir, "research.json");
+      const trusted = { facilityName: relevantFacilityContext.name, facilityConfirmed: relevantFacilityContext.confirmed, facilityLocation: relevantFacilityContext.location, primaryNotes: target.primaryNotes };
+      let value = cached(researchPath, researchKey, researchTtlMs);
+      let parsed: ResearchPacket | null = null;
+      if (value !== null) {
+        try { parsed = validateResearchPacketSources(parseResearchPacket(value), trusted); }
+        catch { unlinkSync(researchPath); value = null; }
+      }
+      const wasCached = parsed !== null;
+      const logId = await startPhaseLog(target.pageId, "draft-research", setting);
+      try {
+        if (value === null) value = await runAgent({ phase: "draft-research", setting, prompt: `${promptResearch}\n\n<input_json>\n${JSON.stringify(researchInput)}\n</input_json>`, schema: RESEARCH_OUTPUT_JSON_SCHEMA, workDir: researchWorkDir });
+        const research = parsed ?? validateResearchPacketSources(parseResearchPacket(value), trusted);
+        if (!wasCached) saveCache(researchPath, researchKey, value);
+        await finishPhaseLog(logId, target.pageId, "draft-research", setting, "success", wasCached ? "cache hit" : "AI completed");
+        return research;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        await finishPhaseLog(logId, target.pageId, "draft-research", setting, "failed", message);
+        if (error instanceof ProcessExecutionError) throw error;
+        throw new Error(`${draftPhaseExecutionLabel("draft-research", setting)}; ${message}`);
+      }
+    },
+    runWriter: async (target, settings, research) => {
+      const setting = settings["draft-write"];
+      const writerInput = buildWriterInput(target, prepared.outline, research, relevantFacilityContext.doNotWrite);
+      const writerKey = stageCacheKey({ input: writerInput, prompt: promptWrite, model: setting, cacheScope: generation.cacheScope });
+      let value = cached(writerPath, writerKey);
+      let parsed: ValidatedWriterOutput | null = null;
+      if (value !== null) {
+        try { parsed = parseValidatedWriterOutput(value, research, prepared.outline); }
+        catch { unlinkSync(writerPath); value = null; }
+      }
+      const wasCached = parsed !== null;
+      const logId = await startPhaseLog(target.pageId, "draft-write", setting);
+      try {
+        if (value === null) value = await runAgent({ phase: "draft-write", setting, prompt: `${promptWrite}\n\n<input_json>\n${JSON.stringify(writerInput)}\n</input_json>`, schema: writerSchema, workDir: writerWorkDir });
+        const writer = parsed ?? parseValidatedWriterOutput(value, research, prepared.outline);
+        if (!wasCached) saveCache(writerPath, writerKey, value);
+        await finishPhaseLog(logId, target.pageId, "draft-write", setting, "success", wasCached ? "cache hit" : "AI completed");
+        return { writer, research };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        await finishPhaseLog(logId, target.pageId, "draft-write", setting, "failed", message);
+        if (error instanceof ProcessExecutionError) throw error;
+        throw new Error(`${draftPhaseExecutionLabel("draft-write", setting)}; ${message}`);
+      }
+    },
+    runImagePrompt: async ({ writer, research }) => {
+      const spec = assemblePublishSpec({ input, writer, research, images: prepared.images, doNotWrite: relevantFacilityContext.doNotWrite });
+      spec.imagePath = path.join(stateDir, "growth-eyecatch.png");
+      writeFileSync(specPath, JSON.stringify(spec, null, 2));
+      await runNpm("growth:image-prompt", [specPath], false, timeoutPolicy.imagePromptMs);
+    },
+    publishDraft: async () => {
+      await publishAndNotify({ specPath, input, stateDir, generationMarkerPath, checkpointPath, hasGenerationMarker: generation.marker !== null, writerPath });
+      return { isPartial: false };
+    },
+    notify: async () => undefined,
+    recordPartial: async () => undefined,
+    cleanup: async () => cleanupDraftWorkDirs(workDirs, rm),
   });
-  } finally {
-    await cleanupDraftWorkDirs(workDirs, rm);
-  }
 }
 
 main().catch(async (error: unknown) => {

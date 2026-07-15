@@ -56,6 +56,10 @@ import {
   type NotifyThrottleRecord,
 } from "./notify-throttle";
 import { publishGateReason, resolveGateArticleType } from "./publishGate";
+import {
+  runPublishDueApplication,
+  type PublishDueCandidate,
+} from "./publishDueApplication";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -131,26 +135,25 @@ async function main(): Promise<void> {
   const managementOpts = { serviceDomain, apiKey: microcmsApiKey, fetchFn: defaultFetch, retry };
   const contentOpts = { serviceDomain, apiKey: microcmsApiKey, fetchFn: defaultFetch, retry };
 
-  // 予約が入っているページを取得(到来判定・公開可否は純ロジックで)。
-  const pages = await queryAllDataSource(
-    IDEA_DS,
-    { filter: { property: PUBLISH_SCHEDULE_PROP, date: { is_not_empty: true } } },
-    notionOpts
-  );
-
-  const byId = new Map(pages.map((p) => [p.id, p]));
-  const items = pages.map(publishQueueItemFromPage);
-  const due = selectDuePublications(items, Date.now());
-
-  let published = 0;
   const skipped: SkippedPublication[] = [];
   const gateBlocked: GateBlockedPublication[] = [];
-  const partialStatusFailures: PartialStatusPublication[] = [];
   const windowEnv = Number(process.env.GROWTH_NOTIFY_WINDOW_MS);
   const windowMs =
     Number.isInteger(windowEnv) && windowEnv > 0 ? windowEnv : DEFAULT_NOTIFY_WINDOW_MS;
-  let throttleRecords = await readThrottleRecords();
-  for (const item of due) {
+  let throttleRecords: NotifyThrottleRecord[] = [];
+  let dueCount = 0;
+  const fetchCandidates = async (nowMs: number): Promise<PublishDueCandidate[]> => {
+    const pages = await queryAllDataSource(
+      IDEA_DS,
+      { filter: { property: PUBLISH_SCHEDULE_PROP, date: { is_not_empty: true } } },
+      notionOpts,
+    );
+    const byId = new Map(pages.map((page) => [page.id, page]));
+    const due = selectDuePublications(pages.map(publishQueueItemFromPage), nowMs);
+    const candidates: PublishDueCandidate[] = [];
+    dueCount = due.length;
+    throttleRecords = await readThrottleRecords();
+    for (const item of due) {
     const page = byId.get(item.id);
     if (!page) continue;
     const contentId = richTextOf(page, "下書きID").trim();
@@ -166,6 +169,7 @@ async function main(): Promise<void> {
     const title = titleOf(page);
     if (DRYRUN) {
       console.log(`[publish-due][dryrun] ${title || page.id} (contentId=${contentId})`);
+      candidates.push({ pageId: page.id, contentId, title, endpoint: "", patch: null });
       continue;
     }
     // 公開直前に承認画面の正タイトルと、AI 免責注記を除去した本文を下書きへ同期(#176 と同じ)。
@@ -193,7 +197,7 @@ async function main(): Promise<void> {
     if (reason) {
       console.warn(`[publish-due] 公開直前ゲートでスキップ: ${title || page.id}: ${reason}`);
       const signature = failureSignature("publish-due-gate", `${contentId}:${reason}`);
-      const decision = shouldSendFailureNotice(throttleRecords, signature, Date.now(), windowMs);
+      const decision = shouldSendFailureNotice(throttleRecords, signature, nowMs, windowMs);
       throttleRecords = decision.records;
       if (decision.send) gateBlocked.push({ title, contentId, reason });
       continue;
@@ -202,32 +206,39 @@ async function main(): Promise<void> {
     const patch: Record<string, unknown> = {};
     if (title) patch.title = title;
     if (removed) patch.bodyHtml = cleanBody;
-    if (Object.keys(patch).length > 0) await patchDraft(endpoint, contentId, patch, contentOpts);
-    // PATCH status PUBLISH は冪等(既に公開済みでも PUBLISH のまま)。
-    await publishContent(endpoint, contentId, managementOpts);
-    // microCMS 公開後の Notion 同期失敗は「外部公開済み」として明示し、総失敗にしない。
-    try {
-      await updatePageSelect(page.id, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
-    } catch (error: unknown) {
-      console.warn(`[publish-due] Notion ステータス更新に失敗(公開は完了): ${title || page.id}`, error);
-      partialStatusFailures.push({ title, contentId });
-      published += 1;
-      continue;
+    candidates.push({
+      pageId: page.id,
+      contentId,
+      title,
+      endpoint,
+      patch: Object.keys(patch).length > 0 ? patch : null,
+    });
     }
-    // 予約の消去は付随処理。失敗しても公開自体は完了しているのでループは止めず警告だけ出す
-    // (ステータスは既に公開済みなので次回ループで再公開されることはない)。
-    try {
-      await updatePageProps(page.id, buildScheduleProps(null), notionOpts);
-    } catch (error: unknown) {
-      console.warn(`[publish-due] 予約消去に失敗(公開は完了): ${title || page.id}`, error);
-    }
-    published += 1;
-    console.log(`[publish-due] 公開: ${title || page.id}`);
-  }
+    return candidates;
+  };
 
-  const summary = `⏰ 予約公開: ${published}件 (対象 ${due.length}件)`;
+  const applicationResult = await runPublishDueApplication({
+    fetchCandidates,
+    patchDraft: async (candidate) => {
+      await patchDraft(candidate.endpoint, candidate.contentId, candidate.patch ?? {}, contentOpts);
+    },
+    publishContent: async (candidate) => {
+      await publishContent(candidate.endpoint, candidate.contentId, managementOpts);
+    },
+    updatePublishedStatus: async (candidate) => {
+      await updatePageSelect(candidate.pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+    },
+    clearSchedule: async (candidate) => {
+      await updatePageProps(candidate.pageId, buildScheduleProps(null), notionOpts);
+      console.log(`[publish-due] 公開: ${candidate.title || candidate.pageId}`);
+    },
+    notifyLine,
+    warn: (message) => console.warn(`[publish-due] ${message}`),
+  }, { isDryRun: DRYRUN, nowMs: Date.now() });
+  const published = applicationResult.published;
+  const partialStatusFailures: PartialStatusPublication[] = applicationResult.partial;
+  const summary = `⏰ 予約公開: ${published}件 (対象 ${dueCount}件)`;
   console.log(summary);
-  if (!DRYRUN && published > 0) await notifyLine(summary);
 
   // 不正 contentId のスキップを沈黙させない(#220): 取り残された記事を LINE 通知する。
   const skipMessage = buildPublishDueSkipMessage(skipped);

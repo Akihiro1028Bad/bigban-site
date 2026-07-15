@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import {
@@ -12,6 +13,7 @@ import {
 } from "./daemonSchedule";
 import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
 import type { ProcessResult } from "./processControl.mjs";
+import { runDaemonSmoke } from "./daemonSmoke";
 
 const MIN_SLEEP_MS = 1_000;
 const MAX_SLEEP_MS = 60_000;
@@ -158,6 +160,26 @@ async function recordTimeoutEvidence(job: DaemonJob, jobId: string, result: Proc
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes("--smoke")) {
+    const statePath = process.env.GROWTH_DAEMON_SMOKE_STATE_PATH
+      ?? join(process.cwd(), ".growth-tmp", "daemon-smoke.json");
+    const result = await runDaemonSmoke(statePath, process.platform, {
+      runProcess: async (command, args) => runProcess(command, args, {
+        timeoutMs: timeoutPolicy.controlMs,
+        phase: "daemon-smoke",
+        stdio: "capture",
+        shell: process.platform === "win32",
+      }),
+      readText: (filePath) => readFile(filePath, "utf8"),
+      makeDirectory: async (directoryPath) => { await mkdir(directoryPath, { recursive: true }); },
+      writeText: (filePath, value) => writeFile(filePath, value, "utf8"),
+      rename,
+      now: () => new Date(),
+    });
+    log(`[daemon-smoke] ${result.isSuccess ? "成功" : "失敗"}; 前回状態${result.hadPreviousState ? "あり" : "なし"}; npm=${result.npmVersion}`);
+    process.exit(result.isSuccess ? 0 : 1);
+  }
+
   installSignalHandlers();
 
   const jobs = buildJobs(process.env);

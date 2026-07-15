@@ -1,0 +1,541 @@
+{
+  "version": 1,
+  "exclusions": {
+    "__mocks__/**": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/test/**": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/lib/analytics/trackEvent.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/providers.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/trend-io.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/existing-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/setup-token.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/upload-media.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/draft-content.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/facility-context-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/notify-drafts.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/gen-eyecatch.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/gen-body-image.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/self-heal-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/publish-draft-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/draft-orchestrator-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/knownArticlePaths.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/notify-line.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/revise-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/eyecatch-regen-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/body-image-regen-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/advise-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/decorate-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/advise-apply-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/comment-revise-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/daemon-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/metrics-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/learning-log-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/publish-due-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/review-due-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/proposal-review-due-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/notify-pull-fail-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/notify-loop-fail-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/stall-check-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/loop-state-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/prompt-lint-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/article-eval-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/column-category-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/worker-log-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "scripts/growth/reconcile-cli.ts": {
+      "reason": "外部I/Oを結線する薄い実行入口",
+      "guarantees": [
+        "対応する純ロジック単体テストとapplication/adapterテスト"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DraftEditor.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DraftPreviewFrame.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DraftEditWorkspace.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/CommandPalette.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/AdviceResultBody.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/SentenceFixBody.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/ReviseProposalBody.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/CommentableBody.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/ConsultComposer.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/ConsultCard.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/consult/ConsultDrawer.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/hooks/useBodyCommentConsult.ts": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DetailPanel.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DetailViews.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/OutlineView.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/QualityChecklist.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/DevicePreview.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/ProposalView.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/ProposalDetailBody.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/ProposalFormModal.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/SchedulePicker.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/MediaLibraryModal.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/BodyImageRegenModal.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/BodyImageInsertModal.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/ArtboardView.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    },
+    "src/app/growth/approve/OpsView.tsx": {
+      "reason": "テスト基盤または薄いpresentation結線",
+      "guarantees": [
+        "対応する純ロジック・統合・操作テスト"
+      ],
+      "kind": "integration-test",
+      "residualRisk": "実環境固有の結線はCI外"
+    }
+  }
+}
