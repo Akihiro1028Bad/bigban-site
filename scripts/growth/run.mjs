@@ -15,7 +15,7 @@
 
 import "dotenv/config";
 
-import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   appendFileSync,
   readFileSync,
@@ -26,8 +26,8 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { acquireLock, releaseLock } from "./lockfile.mjs";
-import { exitCodeOrFailure } from "./processExit.mjs";
+import { acquireLock, heartbeatLock, releaseLock } from "./lockfile.mjs";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
@@ -69,7 +69,7 @@ const MODES = {
     ],
   },
   // 下書きは決定的オーケストレーターが独立した調査・執筆セッションを起動する。
-  drafts: { prompt: "draft-write.md", allow: [] },
+  drafts: { prompt: "draft-write.md", allow: [], lock: true },
   // 下書き自動生成。承認済み/生成中かつ下書きID未作成の行がある時だけオーケストレーターを起動する。
   "drafts-auto": {
     prompt: "draft-write.md",
@@ -143,17 +143,34 @@ const MODES = {
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
 const REVISE_COUNT = path.join(tmpDir, "revise-count.json");
 const REVISE_DAILY_CAP = Number(process.env.GROWTH_REVISE_DAILY_CAP || "50");
-// lockfile は claude 実行1回ぶん(数分)を覆う。revise.ts の REVISE_TIMEOUT_MS(行の処理中=15分)
-// より長くして、claude 実行中に reaper が起きても次の起動が割り込まないようにしている。
-const LOCK_STALE_MS = 30 * 60 * 1000; // 30分超のロックは死んだプロセスとみなす
+// lockfile は実行1回を JSON lease で覆う。PID死亡は即時、heartbeat停止は
+// 同一hostの生存PIDを含めlease expiry後に回収する。旧所有者はfenceで停止する。
+const timeoutPolicy = resolveTimeoutPolicy(process.env);
+const jobId = process.env.GROWTH_JOB_ID || randomUUID();
+let lockToken = null;
+let stopLockHeartbeat = () => {};
+let isLeaseLost = false;
 
-/** 多重起動防止のロック取得。取れなければ false。stale(>30分)なロックは奪って再取得。 */
+/** 多重起動防止の共有 lease 取得。取れなければ false。 */
 function acquireReviseLock() {
-  return acquireLock(REVISE_LOCK, { staleMs: LOCK_STALE_MS });
+  const acquired = acquireLock(REVISE_LOCK, {
+    jobId,
+    mode,
+    leaseMs: timeoutPolicy.lockLeaseMs,
+  });
+  lockToken = acquired.token;
+  if (acquired.acquired && lockToken) {
+    stopLockHeartbeat = startPeriodicTask(() => {
+      if (!heartbeatLock(REVISE_LOCK, lockToken)) isLeaseLost = true;
+    }, timeoutPolicy.lockHeartbeatMs);
+  }
+  return acquired;
 }
 
 function releaseReviseLock() {
-  releaseLock(REVISE_LOCK);
+  stopLockHeartbeat();
+  if (lockToken) releaseLock(REVISE_LOCK, lockToken);
+  lockToken = null;
 }
 
 /** 1日あたりの実行上限。超えていれば false。 */
@@ -208,9 +225,9 @@ const LEGACY_MODEL_ENV_KEYS = [
 
 function draftOrchestratorEnv() {
   const env = { ...process.env };
-  // 廃止済みモデルenvとテスト用無効化フラグを子工程へ伝播させない。
-  for (const key of LEGACY_MODEL_ENV_KEYS) delete env[key];
-  delete env.GROWTH_MODEL_SETTINGS_DISABLE;
+  // runProcess は親環境を補完するため、明示的な undefined で廃止済み設定を遮断する。
+  for (const key of LEGACY_MODEL_ENV_KEYS) env[key] = undefined;
+  env.GROWTH_MODEL_SETTINGS_DISABLE = undefined;
   return { ...env, GROWTH_DRAFT_RUN_MODE: mode };
 }
 
@@ -230,16 +247,16 @@ const FALLBACK_MODEL_SETTINGS = {
   "comment-revise": { provider: "claude", model: "claude-opus-4-8", effort: "high" },
 };
 
-function resolveSharedModelSetting() {
+async function resolveSharedModelSetting() {
   const fallback = FALLBACK_MODEL_SETTINGS[mode];
   if (process.env.GROWTH_MODEL_SETTINGS_DISABLE === "1") return fallback;
   const npm = isWin ? "npm.cmd" : "npm";
-  const result = spawnSync(
+  const result = await runProcess(
     npm,
     ["run", "--silent", "growth:model-settings", "--", "resolve", mode],
-    { encoding: "utf-8", shell: isWin, env: { ...process.env } },
+    { timeoutMs: timeoutPolicy.controlMs, phase: "model-settings", stdio: "capture", shell: isWin, env: { ...process.env } },
   );
-  if (result.status !== 0) {
+  if (result.exitCode !== 0) {
     process.stderr.write("[model-settings] 設定解決に失敗したためランナー既定値を使用します。\n");
     return fallback;
   }
@@ -259,7 +276,7 @@ function resolveSharedModelSetting() {
   return fallback;
 }
 
-const sharedModelSetting = resolveSharedModelSetting();
+const sharedModelSetting = await resolveSharedModelSetting();
 const AGENT = sharedModelSetting.provider;
 if (AGENT !== "claude" && AGENT !== "codex") {
   process.stderr.write(`GROWTH_AGENT は claude または codex を指定してください: ${AGENT}\n`);
@@ -357,31 +374,26 @@ if (mode === "image-prompt" && !imagePromptSpecPath) {
 
 /** npm スクリプトを実行し、終了コードを resolve する。env で追加の環境変数を渡せる。 */
 function runNpm(scriptName, env = {}) {
-  return new Promise((resolve) => {
-    const npm = isWin ? "npm.cmd" : "npm";
-    const proc = spawn(npm, ["run", scriptName], {
-      stdio: ["ignore", "inherit", "inherit"],
-      shell: isWin,
-      env: { ...process.env, ...env },
-    });
-    proc.on("exit", (code) => resolve(exitCodeOrFailure(code)));
-    proc.on("error", (err) => {
-      process.stderr.write(`${scriptName} の起動に失敗しました: ${err.message}\n`);
-      resolve(1);
-    });
-  });
+  const npm = isWin ? "npm.cmd" : "npm";
+  return runProcess(npm, ["run", scriptName], {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: scriptName,
+    stdio: "inherit",
+    shell: isWin,
+    env: { ...process.env, ...env },
+  }).then((result) => result.exitCode);
 }
 
 /** 現在の HEAD 短縮 SHA。取得失敗時は空文字(通知側で「取得できませんでした」を出す)。 */
-function currentShortSha() {
-  const res = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" });
-  return res.status === 0 ? (res.stdout || "").trim() : "";
+async function currentShortSha() {
+  const res = await runProcess("git", ["rev-parse", "--short", "HEAD"], { timeoutMs: timeoutPolicy.controlMs, phase: "git-sha", stdio: "capture" });
+  return res.exitCode === 0 ? res.stdout.trim() : "";
 }
 
 /** 現在のブランチ名。detached など取得できない場合は "HEAD"。 */
-function currentBranch() {
-  const res = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
-  const name = res.status === 0 ? (res.stdout || "").trim() : "";
+async function currentBranch() {
+  const res = await runProcess("git", ["rev-parse", "--abbrev-ref", "HEAD"], { timeoutMs: timeoutPolicy.controlMs, phase: "git-branch", stdio: "capture" });
+  const name = res.exitCode === 0 ? res.stdout.trim() : "";
   return name || "HEAD";
 }
 
@@ -464,31 +476,31 @@ function appendGrowthFailureLog({ source, exitCode, resume, detail }) {
  * weekly 以外、または GROWTH_DRYRUN / GROWTH_SKIP_PULL 指定時は no-op(動作確認を壊さない)。
  * push/commit の DISALLOW は不変。
  */
-function pullLatestOrAbort() {
+async function pullLatestOrAbort() {
   // ⚠️ この mode 判定、skip 判定、exit-code 成否判定は gitPull.ts(shouldPullForMode /
   // PULL_SKIP_ENV_VARS / shouldSkipPull / classifyPullResult)のミラー実装(run.mjs は .ts を import 不可)。
   // env 名や判定を変更する時は gitPull.ts と両方を必ず同時に更新すること。
   if (mode !== "weekly") return;
   if (process.env.GROWTH_DRYRUN || process.env.GROWTH_SKIP_PULL) return;
-  const branch = currentBranch();
+  const branch = await currentBranch();
   // fetch は best-effort(オフラインでも pull --ff-only 側で確実に失敗を拾う)。
-  spawnSync("git", ["fetch", "--quiet"], { stdio: ["ignore", "inherit", "inherit"] });
-  const pull = spawnSync("git", ["pull", "--ff-only"], { encoding: "utf-8" });
+  await runProcess("git", ["fetch", "--quiet"], { timeoutMs: timeoutPolicy.controlMs, phase: "git-fetch", stdio: "inherit" });
+  const pull = await runProcess("git", ["pull", "--ff-only"], { timeoutMs: timeoutPolicy.controlMs, phase: "git-pull", stdio: "capture" });
   const detail = `${pull.stdout ?? ""}${pull.stderr ?? ""}`.trim().split("\n").slice(-3).join(" ");
-  if ((pull.status ?? 1) !== 0) {
+  if (pull.exitCode !== 0) {
     const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
     process.stderr.write(
       `git pull --ff-only に失敗しました(${mode})。工程を中断します。再開: ${resumeCommand}\n`
     );
     appendGrowthFailureLog({
       source: "pull",
-      exitCode: pull.status ?? 1,
+      exitCode: pull.exitCode,
       resume: resumeCommand,
       detail,
     });
     // 失敗を沈黙させない: LINE へ通知する(本文は gitPull.ts、送信は notify-pull-fail CLI)。
-    spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-pull-fail"], {
-      stdio: ["ignore", "inherit", "inherit"],
+    await runProcess(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-pull-fail"], {
+      timeoutMs: timeoutPolicy.controlMs, phase: "notify-pull-fail", stdio: "inherit",
       shell: isWin,
       env: {
         ...process.env,
@@ -498,18 +510,18 @@ function pullLatestOrAbort() {
         GROWTH_PULL_DETAIL: detail,
       },
     });
-    spawnSync(isWin ? "npm.cmd" : "npm",
-      ["run", "growth:learning-log", "--", "append-fail", "pull", String(pull.status ?? 1), detail],
-      { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
+    await runProcess(isWin ? "npm.cmd" : "npm",
+      ["run", "growth:learning-log", "--", "append-fail", "pull", String(pull.exitCode), detail],
+      { timeoutMs: timeoutPolicy.controlMs, phase: "learning-log", stdio: "inherit", shell: isWin, env: { ...process.env } });
     process.exit(1);
   }
 }
 
 // weekly は最新を取り込んでから起動する(dry-run/skip/weekly 以外は no-op・失敗時はここで中断)。
-pullLatestOrAbort();
+await pullLatestOrAbort();
 
 // pull 後の実行 SHA(週次通知に載せてデプロイ側とのスキュー確認を可能にする=#219)。
-const runSha = currentShortSha();
+const runSha = await currentShortSha();
 
 // scripts/growth/peekGate.ts (shouldRunLoop) とミラー。run.mjs は .ts を import しない。
 // きれいに数値0を返した時だけ「依頼なし」とみなし、それ以外は実依頼取りこぼし防止で走らせる。
@@ -526,66 +538,66 @@ function shouldRunLoopFromPeek(peekStdout, peekExitCode) {
   return Number(last) > 0;
 }
 
-function peekShouldRunLoop() {
+async function peekShouldRunLoop() {
   const scriptName = PEEK_COMMANDS[mode];
   if (!scriptName) return true;
   const npm = isWin ? "npm.cmd" : "npm";
   // --silent で npm バナーを抑制(残っても shouldRunLoopFromPeek が最後の行で吸収)。
-  const res = spawnSync(npm, ["run", "--silent", scriptName, "--", "peek"], {
-    encoding: "utf-8",
+  const res = await runProcess(npm, ["run", "--silent", scriptName, "--", "peek"], {
+    timeoutMs: timeoutPolicy.controlMs, phase: "peek", stdio: "capture",
     shell: isWin,
     env: { ...process.env },
   });
-  return shouldRunLoopFromPeek(res.stdout ?? "", res.status);
+  return shouldRunLoopFromPeek(res.stdout, res.exitCode);
 }
 
 /** drafts-auto はロック内で1件を先に claim し、その pageId だけを AI 入力へ固定する。 */
-function claimDraftsAutoTarget() {
+async function claimDraftsAutoTarget() {
   if (mode !== "drafts-auto") return "";
   const npm = isWin ? "npm.cmd" : "npm";
-  const res = spawnSync(
+  const res = await runProcess(
     npm,
     ["run", "--silent", "growth:drafts-auto-peek", "--", "claim"],
     {
-      encoding: "utf-8",
+      timeoutMs: timeoutPolicy.controlMs, phase: "drafts-claim", stdio: "capture",
       shell: isWin,
       env: { ...process.env },
     }
   );
-  if ((res.status ?? 1) !== 0) return "";
-  return String(res.stdout ?? "").trim().split("\n").filter(Boolean).pop() ?? "";
+  if (res.exitCode !== 0) return "";
+  return res.stdout.trim().split("\n").filter(Boolean).pop() ?? "";
 }
 
 /**
  * AI を起動する前に、決定的 CLI で stale 行を必ず回収する。
  * reap が失敗した状態で新しい依頼を claim すると滞留を増やすため、失敗時は安全側で停止する。
  */
-function reapBeforePeek() {
+async function reapBeforePeek() {
   const scriptName = PULL_LOOP_COMMANDS[mode];
   if (!scriptName) return true;
   const npm = isWin ? "npm.cmd" : "npm";
-  const res = spawnSync(npm, ["run", "--silent", scriptName, "--", "reap"], {
-    stdio: ["ignore", "inherit", "inherit"],
+  const res = await runProcess(npm, ["run", "--silent", scriptName, "--", "reap"], {
+    timeoutMs: timeoutPolicy.controlMs, phase: "reap", stdio: "inherit",
     shell: isWin,
     env: { ...process.env },
   });
-  return res.status === 0;
+  return res.exitCode === 0;
 }
 
 /** AI が正常終了しても、対象ループに「処理中」が残っていれば成功とはみなさない。 */
-function assertLoopSettled() {
+async function assertLoopSettled() {
   if (!PULL_LOOP_COMMANDS[mode]) return 0;
   const npm = isWin ? "npm.cmd" : "npm";
-  const res = spawnSync(
+  const res = await runProcess(
     npm,
     ["run", "--silent", "growth:loop-state", "--", "assert-settled", mode],
     {
-      stdio: ["ignore", "inherit", "inherit"],
+      timeoutMs: timeoutPolicy.controlMs, phase: "postcondition", stdio: "inherit",
       shell: isWin,
       env: { ...process.env },
     }
   );
-  return res.status ?? 1;
+  return res.exitCode;
 }
 
 function workerLogArgs(command, fields) {
@@ -597,22 +609,22 @@ function workerLogArgs(command, fields) {
   return args;
 }
 
-function runWorkerLog(command, fields) {
+async function runWorkerLog(command, fields) {
   const npm = isWin ? "npm.cmd" : "npm";
-  const res = spawnSync(npm, workerLogArgs(command, fields), {
-    encoding: "utf-8",
+  const res = await runProcess(npm, workerLogArgs(command, fields), {
+    timeoutMs: timeoutPolicy.controlMs, phase: `worker-log-${command}`, stdio: "capture",
     shell: isWin,
     env: { ...process.env },
   });
-  if ((res.status ?? 0) !== 0) {
-    process.stderr.write(`[worker-log] ${command} に失敗しました: ${(res.stderr ?? "").trim()}\n`);
+  if (res.exitCode !== 0) {
+    process.stderr.write(`[worker-log] ${command} に失敗しました: ${res.stderr.trim()}\n`);
     return "disabled";
   }
-  return (res.stdout ?? "").trim().split("\n").filter(Boolean).pop() ?? "disabled";
+  return res.stdout.trim().split("\n").filter(Boolean).pop() ?? "disabled";
 }
 
-function logSkipped(detail) {
-  runWorkerLog("start", {
+async function logSkipped(detail) {
+  await runWorkerLog("start", {
     mode,
     status: "skipped",
     kind: "job",
@@ -623,14 +635,14 @@ function logSkipped(detail) {
   });
 }
 
-function logLockRecovery(lockResult) {
+async function logLockRecovery(lockResult) {
   if (!lockResult.recovery) return;
   const previousPid = lockResult.previousPid ?? "不明";
   const detail =
     lockResult.recovery === "dead-pid"
       ? `死亡 PID ${previousPid} の共有 lock を自動回収`
       : `30分超過の共有 lock を自動回収 (旧 PID: ${previousPid})`;
-  runWorkerLog("reconcile", {
+  await runWorkerLog("reconcile", {
     mode,
     status: "reconcile",
     kind: "info",
@@ -645,34 +657,34 @@ function logLockRecovery(lockResult) {
 if (cfg.lock) {
   const lockResult = acquireReviseLock();
   if (!lockResult.acquired) {
-    logSkipped("既に実行中のためスキップ");
+    await logSkipped("既に実行中のためスキップ");
     process.stdout.write(`${mode}: 既に実行中のためスキップします。\n`);
     process.exit(0);
   }
-  logLockRecovery(lockResult);
-  if (PULL_LOOP_COMMANDS[mode] && !reapBeforePeek()) {
+  await logLockRecovery(lockResult);
+  if (PULL_LOOP_COMMANDS[mode] && !await reapBeforePeek()) {
     releaseReviseLock();
-    notifyLoopFail("reap-failed", { exitCode: 1, detail: "AI 起動前の stale 回収に失敗" });
+    await notifyLoopFail("reap-failed", { exitCode: 1, detail: "AI 起動前の stale 回収に失敗" });
     process.exit(1);
   }
   // stale 回収後も既存の処理中行が残る場合、新しい依頼を claim すると今回分の
   // postcondition と区別できない。安全側で AI 起動前に停止する。
-  if (PULL_LOOP_COMMANDS[mode] && assertLoopSettled() !== 0) {
+  if (PULL_LOOP_COMMANDS[mode] && await assertLoopSettled() !== 0) {
     releaseReviseLock();
-    notifyLoopFail("processing-remains", {
+    await notifyLoopFail("processing-remains", {
       exitCode: 1,
       detail: "stale 回収後も既存の処理中行が残っているため AI 起動を中断",
     });
     process.exit(1);
   }
-  if (!peekShouldRunLoop()) {
+  if (!await peekShouldRunLoop()) {
     releaseReviseLock();
     process.stdout.write(`${mode}: 依頼なし(スキップ)\n`);
     process.exit(0);
   }
   if (!underDailyCap()) {
     releaseReviseLock();
-    logSkipped(`本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップ`);
+    await logSkipped(`本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップ`);
     process.stdout.write(`${mode}: 本日の実行上限(${REVISE_DAILY_CAP})に達したためスキップします。\n`);
     process.exit(0);
   }
@@ -680,10 +692,10 @@ if (cfg.lock) {
 
 let draftsTargetPageId = "";
 if (mode === "drafts-auto") {
-  draftsTargetPageId = claimDraftsAutoTarget();
+  draftsTargetPageId = await claimDraftsAutoTarget();
   if (!draftsTargetPageId) {
     releaseReviseLock();
-    notifyLoopFail("claim-failed", {
+    await notifyLoopFail("claim-failed", {
       exitCode: 1,
       detail: "下書き対象1件のclaimに失敗",
     });
@@ -693,9 +705,9 @@ if (mode === "drafts-auto") {
 
 /**
  * loop/実行モードの失敗を LINE 通知する(#220 / P1⑥)。weekly は独自の notify-line 経路を持つため対象外。
- * 送信は notify-loop-fail CLI(本文は loopFailure.ts)。spawnSync で確実に完了させてから exit する。
+ * 送信は notify-loop-fail CLI(本文は loopFailure.ts)。有限ランナーで完了させてから exit する。
  */
-function notifyLoopFail(kind, { exitCode, detail } = {}) {
+async function notifyLoopFail(kind, { exitCode, detail } = {}) {
   const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
   appendGrowthFailureLog({
     source: mode,
@@ -704,8 +716,8 @@ function notifyLoopFail(kind, { exitCode, detail } = {}) {
     detail: detail || kind,
   });
   if (mode === "weekly") return; // weekly は notify-line 側で kind=weekly の通知を送る
-  spawnSync(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-loop-fail"], {
-    stdio: ["ignore", "inherit", "inherit"],
+  await runProcess(isWin ? "npm.cmd" : "npm", ["run", "growth:notify-loop-fail"], {
+    timeoutMs: timeoutPolicy.controlMs, phase: "notify-loop-fail", stdio: "inherit",
     shell: isWin,
     env: {
       ...process.env,
@@ -717,20 +729,21 @@ function notifyLoopFail(kind, { exitCode, detail } = {}) {
     },
   });
   // #SI1(d): 工程失敗を学習ログ台帳へ best-effort 追記(LINE 通知の後・exit は変えない)。
-  spawnSync(isWin ? "npm.cmd" : "npm",
+  await runProcess(isWin ? "npm.cmd" : "npm",
     ["run", "growth:learning-log", "--", "append-fail", mode, String(exitCode ?? ""), detail ?? ""],
-    { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
+    { timeoutMs: timeoutPolicy.controlMs, phase: "learning-log", stdio: "inherit", shell: isWin, env: { ...process.env, GROWTH_JOB_ID: jobId } });
 }
 
 // Windows では .cmd 解決のため shell:true が必要(Node の spawn 仕様)。
 const runStartedAt = new Date().toISOString();
-const workerRunPageId = runWorkerLog("start", {
+const workerRunPageId = await runWorkerLog("start", {
   mode,
   status: "running",
   kind: "job",
   name: `${mode} running`,
   "target-type": "system",
   "started-at": runStartedAt,
+  "job-id": jobId,
   resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
   detail: isDraftOrchestratedMode
     ? "deterministic orchestrator: draft-research + draft-write"
@@ -745,33 +758,43 @@ const childArgs = isDraftOrchestratedMode
       ...(draftsTargetPageId ? ["--", draftsTargetPageId] : []),
     ]
   : args;
-const child = spawn(childCommand, childArgs, {
-  stdio: [isDraftOrchestratedMode ? "ignore" : "pipe", "inherit", "inherit"],
+const childTimeoutMs = timeoutPolicy.runModeTimeouts[mode] ?? timeoutPolicy.controlMs;
+const childResult = await runProcess(childCommand, childArgs, {
+  timeoutMs: childTimeoutMs,
+  killGraceMs: timeoutPolicy.killGraceMs,
+  phase: mode,
+  stdio: "inherit",
+  stdin: isDraftOrchestratedMode ? undefined : prompt,
   shell: isWin,
   env: isDraftOrchestratedMode
-    ? draftOrchestratorEnv()
-    : { ...process.env },
+    ? { ...draftOrchestratorEnv(), GROWTH_JOB_ID: jobId }
+    : { ...process.env, GROWTH_JOB_ID: jobId },
+  heartbeat: cfg.lock ? () => {
+    const owned = Boolean(lockToken && heartbeatLock(REVISE_LOCK, lockToken));
+    if (!owned) isLeaseLost = true;
+    return owned;
+  } : undefined,
+  heartbeatMs: cfg.lock ? timeoutPolicy.lockHeartbeatMs : undefined,
 });
-if (!isDraftOrchestratedMode) {
-  child.stdin.write(prompt);
-  child.stdin.end();
+let exitCode = childResult.exitCode;
+if (childResult.kind === "lease-lost") isLeaseLost = true;
+if (isLeaseLost && exitCode === 0) exitCode = 1;
+if (mode === "image-prompt" && exitCode === 0) {
+  const applied = await runProcess(
+    isWin ? "npm.cmd" : "npm",
+    ["run", "--silent", "growth:image-prompt-spec", "--", "apply", imagePromptSpecPath, imagePromptProposalPath],
+    { timeoutMs: timeoutPolicy.controlMs, phase: "image-prompt-apply", stdio: "inherit", shell: isWin, env: { ...process.env, GROWTH_JOB_ID: jobId } },
+  );
+  exitCode = applied.exitCode;
 }
-child.on("exit", async (code) => {
-  let exitCode = exitCodeOrFailure(code);
-  if (mode === "image-prompt" && exitCode === 0) {
-    const applied = spawnSync(
-      isWin ? "npm.cmd" : "npm",
-      ["run", "--silent", "growth:image-prompt-spec", "--", "apply", imagePromptSpecPath, imagePromptProposalPath],
-      { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } },
-    );
-    exitCode = applied.status ?? 1;
-  }
-  if (cfg.lock && exitCode === 0) {
-    exitCode = assertLoopSettled();
-  }
-  // postcondition 確認までは共有ロックを保持し、別ループの claim との競合を防ぐ。
-  if (cfg.lock) releaseReviseLock();
-  runWorkerLog("finish", {
+if (cfg.lock && exitCode === 0) exitCode = await assertLoopSettled();
+// postcondition 確認までは共有ロックを保持し、別ループの claim との競合を防ぐ。
+if (cfg.lock) releaseReviseLock();
+const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
+const timeoutDetail = childResult.kind === "timeout"
+  ? `mode=${mode} ${buildProcessFailureDetail(childResult, { jobId, timeoutMs: childTimeoutMs, resumeCommand })}`
+  : isLeaseLost ? `lease lost; child fenced; phase=${childResult.phase} jobId=${jobId} SIGTERM=${childResult.termSent} SIGKILL=${childResult.forceKilled} exit=${exitCode} resume=${resumeCommand}` : undefined;
+await runWorkerLog("finish", {
     "page-id": workerRunPageId,
     mode,
     status: exitCode === 0 ? "success" : "failed",
@@ -781,14 +804,16 @@ child.on("exit", async (code) => {
     "started-at": runStartedAt,
     "finished-at": new Date().toISOString(),
     "exit-code": exitCode,
-    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
+    "job-id": jobId,
+    resume: resumeCommand,
+    detail: timeoutDetail,
   });
   // 週次モードは分析(Notion書き込み)完了後に LINE 通知を実行する。
   // agent の出力には依存せず、スナップショット + Notion から通知を組み立てる。
   // 異常終了(exit≠0)でも、失敗を**沈黙させない**ためにエラー通知を送る。
   if (mode === "weekly") {
     if (exitCode !== 0) {
-      notifyLoopFail("nonzero-exit", { exitCode });
+      await notifyLoopFail(childResult.kind === "timeout" ? "timeout" : "nonzero-exit", { exitCode, detail: timeoutDetail });
     }
     const env =
       exitCode === 0
@@ -796,44 +821,15 @@ child.on("exit", async (code) => {
         : { GROWTH_NOTIFY_ERROR: "1", GROWTH_WEEKLY_EXIT_CODE: String(exitCode) };
     const notifyCode = await runNpm("growth:notify-line", env);
     if (exitCode !== 0) {
-      spawnSync(isWin ? "npm.cmd" : "npm",
+      await runProcess(isWin ? "npm.cmd" : "npm",
         ["run", "growth:learning-log", "--", "append-fail", "weekly", String(exitCode), ""],
-        { stdio: ["ignore", "inherit", "inherit"], shell: isWin, env: { ...process.env } });
+        { timeoutMs: timeoutPolicy.controlMs, phase: "learning-log", stdio: "inherit", shell: isWin, env: { ...process.env, GROWTH_JOB_ID: jobId } });
     }
     // 異常終了時は元の失敗を握り潰さないよう、weekly の終了コードを優先する。
     process.exit(exitCode !== 0 ? exitCode : notifyCode);
   }
   // loop/実行モードの非0 exit も沈黙させない(#220): reap/next が回らない障害を LINE 通知。
   if (exitCode !== 0 && !(isDraftOrchestratedMode && exitCode === 70)) {
-    notifyLoopFail("nonzero-exit", { exitCode });
+    await notifyLoopFail(childResult.kind === "timeout" ? "timeout" : childResult.kind === "spawn-error" ? "spawn-error" : "nonzero-exit", { exitCode, detail: timeoutDetail ?? childResult.error?.message });
   }
   process.exit(exitCode);
-});
-child.on("error", (err) => {
-  if (cfg.lock) releaseReviseLock();
-  runWorkerLog("finish", {
-    "page-id": workerRunPageId,
-    mode,
-    status: "failed",
-    kind: "job",
-    name: `${mode} spawn-error`,
-    "target-type": "system",
-    "started-at": runStartedAt,
-    "finished-at": new Date().toISOString(),
-    "exit-code": 1,
-    resume: RESUME_COMMANDS[mode] || `npm run growth:${mode}`,
-    detail: err.message,
-  });
-  process.stderr.write(`${childCommand} の起動に失敗しました: ${err.message}\n`);
-  // agent 未起動(PATH 崩れ・サブスク切れ)を沈黙させない(#220)。weekly は notify-line 側で通知。
-  if (mode === "weekly") {
-    notifyLoopFail("spawn-error", { exitCode: 1, detail: err.message });
-    runNpm("growth:notify-line", {
-      GROWTH_NOTIFY_ERROR: "1",
-      GROWTH_WEEKLY_EXIT_CODE: "1",
-    }).finally(() => process.exit(1));
-    return;
-  }
-  notifyLoopFail("spawn-error", { detail: err.message });
-  process.exit(1);
-});

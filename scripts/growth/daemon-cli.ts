@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
@@ -10,10 +10,14 @@ import {
   selectDueJobs,
   type DaemonJob,
 } from "./daemonSchedule";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+import type { ProcessResult } from "./processControl.mjs";
 
 const MIN_SLEEP_MS = 1_000;
 const MAX_SLEEP_MS = 60_000;
 const LAST_RUN_PATH = join(process.cwd(), ".growth-tmp", "daemon-last-run.json");
+const timeoutPolicy = resolveTimeoutPolicy(process.env);
+const FAILURE_LOG_PATH = join(process.cwd(), "data", "growth-failures.log");
 
 let isStopping = false;
 let wakeSleep: (() => void) | null = null;
@@ -41,7 +45,7 @@ function saveLastRun(lastRun: Readonly<Record<string, number>>): void {
   renameSync(temporaryPath, LAST_RUN_PATH);
 }
 
-function writeHeartbeat(detail: string, currentJob = ""): void {
+async function writeHeartbeat(detail: string, currentJob = "", jobId = ""): Promise<void> {
   const args = [
     "run",
     "--silent",
@@ -56,13 +60,16 @@ function writeHeartbeat(detail: string, currentJob = ""): void {
     detail,
     "--target-type",
     "system",
+    "--job-id",
+    jobId,
   ];
-  const child = spawn("npm", args, {
-    env: process.env,
+  await runProcess(process.platform === "win32" ? "npm.cmd" : "npm", args, {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: "daemon-worker-heartbeat",
+    env: { ...process.env, ...(jobId ? { GROWTH_JOB_ID: jobId } : {}) },
     shell: true,
-    stdio: "ignore",
+    stdio: "capture",
   });
-  child.on("error", () => undefined);
 }
 
 function clampSleep(ms: number): number {
@@ -95,22 +102,58 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-function runScript(job: DaemonJob): Promise<number> {
-  return new Promise((resolve) => {
-    const child = spawn("npm", ["run", job.script], {
-      env: process.env,
-      shell: true,
-      stdio: "inherit",
-    });
+function jobTimeoutMs(job: DaemonJob): number {
+  if (job.name === "drafts-auto") return timeoutPolicy.draftsMs;
+  if (job.name === "initiatives-auto") return timeoutPolicy.initiativesMs;
+  if (["revise", "regen", "regen-body", "advise", "decorate", "advise-apply", "comment-revise"].includes(job.name)) return timeoutPolicy.pullLoopMs;
+  return timeoutPolicy.daemonDataMs;
+}
 
-    child.on("error", (error) => {
-      process.stderr.write(`[${timestamp()}] ${job.name} 起動失敗: ${String(error)}\n`);
-      resolve(1);
-    });
+async function runScript(job: DaemonJob, jobId: string): Promise<ProcessResult> {
+  const result = await runProcess(process.platform === "win32" ? "npm.cmd" : "npm", ["run", job.script], {
+    timeoutMs: jobTimeoutMs(job),
+    killGraceMs: timeoutPolicy.killGraceMs,
+    phase: `daemon:${job.name}`,
+    env: { ...process.env, GROWTH_JOB_ID: jobId },
+    shell: true,
+    stdio: "inherit",
+  });
+  if (result.kind === "spawn-error") process.stderr.write(`[${timestamp()}] ${job.name} 起動失敗: ${result.error?.message ?? "unknown"}\n`);
+  return result;
+}
 
-    child.on("close", (code) => {
-      resolve(code ?? 1);
-    });
+async function recordTimeoutEvidence(job: DaemonJob, jobId: string, result: ProcessResult): Promise<void> {
+  if (result.kind !== "timeout") return;
+  const timeoutMs = jobTimeoutMs(job);
+  const resumeCommand = `npm run ${job.script}`;
+  const detail = buildProcessFailureDetail(result, { jobId, timeoutMs, resumeCommand });
+  mkdirSync(dirname(FAILURE_LOG_PATH), { recursive: true });
+  appendFileSync(FAILURE_LOG_PATH, `${new Date().toISOString()}\tsource=daemon:${job.name}\texit=124\tresume=${resumeCommand}\tdetail=${detail}\n`, "utf8");
+
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  await runProcess(npm, ["run", "--silent", "growth:worker-log", "--", "start", "--mode", job.name, "--status", "failed", "--kind", "job", "--name", `${job.name} timeout`, "--target-type", "system", "--job-id", jobId, "--exit-code", "124", "--detail", detail, "--resume", resumeCommand], {
+    timeoutMs: timeoutPolicy.controlMs, phase: "daemon-timeout-worker-log", stdio: "capture", shell: process.platform === "win32", env: { ...process.env, GROWTH_JOB_ID: jobId },
+  });
+  await runProcess(npm, ["run", "growth:learning-log", "--", "append-fail", `daemon:${job.name}`, "124", detail], {
+    timeoutMs: timeoutPolicy.controlMs, phase: "daemon-timeout-learning-log", stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, GROWTH_JOB_ID: jobId },
+  });
+  await runProcess(npm, ["run", "growth:notify-loop-fail"], {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: "daemon-timeout-notify",
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    env: {
+      ...process.env,
+      GROWTH_JOB_ID: jobId,
+      GROWTH_LOOP_MODE: `daemon:${job.name}`,
+      GROWTH_LOOP_RESUME: resumeCommand,
+      GROWTH_LOOP_KIND: "timeout",
+      GROWTH_LOOP_EXIT: "124",
+      GROWTH_LOOP_DETAIL: detail,
+      GROWTH_LOOP_TIMEOUT_MS: String(timeoutMs),
+      GROWTH_LOOP_TERM_SENT: String(result.termSent),
+      GROWTH_LOOP_FORCE_KILLED: String(result.forceKilled),
+    },
   });
 }
 
@@ -126,7 +169,7 @@ async function main(): Promise<void> {
     log(`- ${job.name}: npm run ${job.script} every ${job.everyMs}ms`);
   }
   log("Ctrl+C で停止");
-  writeHeartbeat("started");
+  await writeHeartbeat("started");
 
   while (!isStopping) {
     const due = selectDueJobs(jobs, lastRun, Date.now());
@@ -135,11 +178,19 @@ async function main(): Promise<void> {
       if (isStopping) break;
 
       log(`[${timestamp()}] ▶ ${job.name}`);
-      writeHeartbeat("running", job.name);
-      const exitCode = await runScript(job);
+      const jobId = randomUUID();
+      await writeHeartbeat("running", job.name, jobId);
+      const stopHeartbeat = startPeriodicTask(
+        () => writeHeartbeat("running", job.name, jobId),
+        timeoutPolicy.daemonHeartbeatMs,
+      );
+      const result = await runScript(job, jobId);
+      stopHeartbeat();
+      await recordTimeoutEvidence(job, jobId, result);
+      const exitCode = result.exitCode;
       const mark = exitCode === 0 ? "✓" : "✗";
       log(`[${timestamp()}] ${mark} ${job.name} (exit ${exitCode})`);
-      writeHeartbeat(`idle exit=${exitCode}`, job.name);
+      await writeHeartbeat(`idle exit=${exitCode}`, job.name, jobId);
       lastRun[job.name] = lastRunAfterAttempt(job, Date.now(), exitCode === 0);
       saveLastRun(lastRun);
     }
@@ -150,7 +201,7 @@ async function main(): Promise<void> {
     await sleep(sleepMs);
   }
 
-  writeHeartbeat("stopping");
+  await writeHeartbeat("stopping");
   process.exit(0);
 }
 

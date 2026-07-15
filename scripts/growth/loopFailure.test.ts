@@ -49,4 +49,32 @@ describe("buildLoopFailureMessage", () => {
     expect(msg).not.toContain("詳細:");
     expect(msg).toContain("decorate");
   });
+
+  it("timeout は工程・制限時間・終了シグナル・再開コマンドを伝える", () => {
+    const msg = buildLoopFailureMessage({
+      mode: "draft-write",
+      resumeCommand: "npm run growth:drafts",
+      kind: "timeout",
+      exitCode: 124,
+      timeoutMs: 5_400_000,
+      termSent: true,
+      forceKilled: false,
+    });
+    expect(msg).toContain("draft-write");
+    expect(msg).toContain("5400000ms");
+    expect(msg).toContain("SIGTERM");
+    expect(msg).toContain("npm run growth:drafts");
+    expect(msg).not.toContain("SIGKILL を使用");
+  });
+
+  it("timeout の強制 kill を明記する", () => {
+    const msg = buildLoopFailureMessage({ mode: "revise", resumeCommand: "npm run growth:revise-loop", kind: "timeout", timeoutMs: 1, termSent: true, forceKilled: true });
+    expect(msg).toContain("SIGKILL を使用");
+  });
+
+  it("timeout情報欠落時も安全な文面にする", () => {
+    const msg = buildLoopFailureMessage({ mode: "weekly", resumeCommand: "npm run growth:weekly", kind: "timeout" });
+    expect(msg).toContain("制限 ?ms");
+    expect(msg).toContain("SIGTERM 未送信");
+  });
 });

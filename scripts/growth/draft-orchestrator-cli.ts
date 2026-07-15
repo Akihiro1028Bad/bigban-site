@@ -1,8 +1,7 @@
 import "dotenv/config";
 
-import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
-import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
+import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
@@ -19,11 +18,16 @@ import { defaultFetch } from "./http";
 import { getPage, updatePageSelect, type NotionApiOptions } from "./notion";
 import { queryAllDataSource } from "./notionRepository";
 import { selectDraftsAutoTarget, draftsAutoQueryFilter, DRAFTS_AUTO_STATUS_PROP } from "./draftsAuto";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess } from "./processControl.mjs";
+import type { ProcessResult } from "./processControl.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
 const ideaDataSource = "5adab8b1-f182-4123-b963-9463a2580d4a";
 const researchTtlMs = 24 * 60 * 60 * 1000;
+const timeoutPolicy = resolveTimeoutPolicy(process.env);
+const jobId = process.env.GROWTH_JOB_ID || randomUUID();
+const failureLogPath = path.join(root, "data", "growth-failures.log");
 
 const writerSchema = {
   type: "object",
@@ -44,6 +48,26 @@ interface CacheEnvelope {
 }
 
 let executionSettingsSummary = "モデル設定確定前";
+
+class ProcessExecutionError extends Error {
+  constructor(
+    readonly result: ProcessResult,
+    readonly timeoutMs: number,
+    readonly resumeCommand: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProcessExecutionError";
+  }
+}
+
+function processFailureDetail(error: ProcessExecutionError): string {
+  return buildProcessFailureDetail(error.result, {
+    jobId,
+    timeoutMs: error.timeoutMs,
+    resumeCommand: error.resumeCommand,
+  });
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -67,16 +91,20 @@ async function targetPage(pageId: string | undefined) {
   return target;
 }
 
-function resolveSettings(): Record<DraftAiPhase, DraftPhaseSetting> {
+async function resolveSettings(): Promise<Record<DraftAiPhase, DraftPhaseSetting>> {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const phases: DraftAiPhase[] = ["draft-research", "draft-write"];
-  const result = spawnSync(npm, ["run", "--silent", "growth:model-settings", "--", "resolve-many", ...phases], {
+  const result = await runProcess(npm, ["run", "--silent", "growth:model-settings", "--", "resolve-many", ...phases], {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: "model-settings",
     cwd: root,
-    encoding: "utf-8",
+    stdio: "capture",
     shell: process.platform === "win32",
-    env: { ...process.env },
+    env: { ...process.env, GROWTH_JOB_ID: jobId },
   });
-  if ((result.status ?? 1) !== 0) throw new Error("下書き工程のモデル設定を取得できませんでした。");
+  if (result.exitCode !== 0) {
+    throw new ProcessExecutionError(result, timeoutPolicy.controlMs, `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`, "下書き工程のモデル設定を取得できませんでした。");
+  }
   const parsed = JSON.parse(result.stdout.trim()) as Record<string, ModelPhaseSetting>;
   return {
     "draft-research": resolveDraftPhaseSetting(parsed["draft-research"]),
@@ -114,16 +142,23 @@ async function runAgent(params: {
     schemaJson,
     outputPath,
   });
-  const result = spawnSync(invocation.command, invocation.args, {
+  const timeoutMs = params.phase === "draft-research" ? timeoutPolicy.draftResearchMs : timeoutPolicy.draftWriteMs;
+  const result = await runProcess(invocation.command, invocation.args, {
+    timeoutMs,
+    killGraceMs: timeoutPolicy.killGraceMs,
+    phase: params.phase,
     cwd: invocation.isolatedCwd,
-    input: params.prompt,
-    encoding: "utf-8",
+    stdin: params.prompt,
+    stdio: "capture",
     shell: process.platform === "win32",
-    env: { ...process.env },
+    env: { ...process.env, GROWTH_JOB_ID: jobId },
     maxBuffer: 10 * 1024 * 1024,
   });
-  if ((result.status ?? 1) !== 0) {
-    throw new Error(`${params.phase}に失敗しました: ${(result.stderr || result.stdout || "終了コード不明").trim()}`);
+  if (result.exitCode !== 0) {
+    const resumeCommand = `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`;
+    const processError = new ProcessExecutionError(result, timeoutMs, resumeCommand, `${params.phase}に失敗しました: ${(result.stderr || result.stdout || "終了コード不明").trim()}`);
+    if (result.kind === "timeout") processError.message = `${params.phase}に失敗しました: ${processFailureDetail(processError)}`;
+    throw processError;
   }
   const raw = invocation.outputFromStdout ? result.stdout : await readFile(invocation.outputPath, "utf-8");
   return parseAgentJson(raw);
@@ -157,21 +192,23 @@ function readGenerationMarker(file: string): DraftGenerationMarker | null {
   }
 }
 
-function workerLog(command: "start" | "finish", fields: Record<string, string | number>): string {
+async function workerLog(command: "start" | "finish", fields: Record<string, string | number>): Promise<string> {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const args = ["run", "--silent", "growth:worker-log", "--", command];
   for (const [key, value] of Object.entries(fields)) args.push(`--${key}`, String(value));
-  const result = spawnSync(npm, args, {
+  const result = await runProcess(npm, args, {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: `worker-log-${command}`,
     cwd: root,
-    encoding: "utf-8",
+    stdio: "capture",
     shell: process.platform === "win32",
-    env: { ...process.env },
+    env: { ...process.env, GROWTH_JOB_ID: jobId },
   });
-  if ((result.status ?? 1) !== 0) return "";
+  if (result.exitCode !== 0) return "";
   return result.stdout.trim().split("\n").filter(Boolean).pop() ?? "";
 }
 
-function startPhaseLog(pageId: string, phase: DraftAiPhase, setting: DraftPhaseSetting): string {
+function startPhaseLog(pageId: string, phase: DraftAiPhase, setting: DraftPhaseSetting): Promise<string> {
   return workerLog("start", {
     mode: phase,
     status: "running",
@@ -179,19 +216,20 @@ function startPhaseLog(pageId: string, phase: DraftAiPhase, setting: DraftPhaseS
     name: `${phase} running`,
     ...workerLogTargetFields(pageId),
     detail: draftPhaseExecutionLabel(phase, setting),
+    "job-id": jobId,
   });
 }
 
-function finishPhaseLog(
+async function finishPhaseLog(
   logPageId: string,
   pageId: string,
   phase: DraftAiPhase,
   setting: DraftPhaseSetting,
   status: "success" | "failed",
   detail: string,
-): void {
+): Promise<void> {
   if (!logPageId) return;
-  workerLog("finish", {
+  await workerLog("finish", {
     "page-id": logPageId,
     mode: phase,
     status,
@@ -199,21 +237,27 @@ function finishPhaseLog(
     name: `${phase} ${status}`,
     ...workerLogTargetFields(pageId),
     detail: `${draftPhaseExecutionLabel(phase, setting)}; ${detail}`,
+    "job-id": jobId,
   });
 }
 
-function runNpm(script: string, args: string[] = [], capture = false): string {
+async function runNpm(script: string, args: string[] = [], capture = false, timeoutMs = timeoutPolicy.controlMs): Promise<string> {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(npm, ["run", "--silent", script, ...(args.length ? ["--", ...args] : [])], {
+  const result = await runProcess(npm, ["run", "--silent", script, ...(args.length ? ["--", ...args] : [])], {
+    timeoutMs,
+    killGraceMs: timeoutPolicy.killGraceMs,
+    phase: script,
     cwd: root,
-    encoding: "utf-8",
     shell: process.platform === "win32",
-    env: { ...process.env },
-    stdio: capture ? "pipe" : "inherit",
+    env: { ...process.env, GROWTH_JOB_ID: jobId },
+    stdio: capture ? "capture" : "inherit",
   });
-  if ((result.status ?? 1) !== 0) {
+  if (result.exitCode !== 0) {
     const detail = capture ? [result.stdout, result.stderr].filter(Boolean).join("\n").trim() : "";
-    throw new Error(`${script}に失敗しました。${detail ? ` ${detail}` : ""}`);
+    const resumeCommand = `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`;
+    const processError = new ProcessExecutionError(result, timeoutMs, resumeCommand, `${script}に失敗しました。${detail ? ` ${detail}` : ""}`);
+    if (result.kind === "timeout") processError.message = `${script}に失敗しました。 ${processFailureDetail(processError)}`;
+    throw processError;
   }
   return capture ? result.stdout : "";
 }
@@ -231,7 +275,7 @@ async function main(): Promise<void> {
   const facilityContext = buildFacilityResearchContext(facility, executionStartedAt);
   const articleContext = [input.title, input.outline, input.audience, input.searchIntent, input.cta].join("\n");
   const relevantFacilityContext = selectRelevantFacilityContext(facilityContext, articleContext);
-  const settings = resolveSettings();
+  const settings = await resolveSettings();
   const researchSetting = settings["draft-research"];
   const writerSetting = settings["draft-write"];
   executionSettingsSummary = [
@@ -281,7 +325,7 @@ async function main(): Promise<void> {
     }
   }
   const researchWasCached = cachedResearch !== null;
-  const researchLogId = startPhaseLog(input.pageId, "draft-research", researchSetting);
+  const researchLogId = await startPhaseLog(input.pageId, "draft-research", researchSetting);
   let research: ResearchPacket;
   try {
     if (researchValue === null) {
@@ -292,10 +336,11 @@ async function main(): Promise<void> {
       trustedResearchSources,
     );
     if (!researchWasCached) saveCache(researchPath, researchKey, researchValue);
-    finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "success", researchWasCached ? "cache hit" : "AI completed");
+    await finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "success", researchWasCached ? "cache hit" : "AI completed");
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "failed", message);
+    await finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "failed", message);
+    if (error instanceof ProcessExecutionError) throw error;
     throw new Error(`${draftPhaseExecutionLabel("draft-research", researchSetting)}; ${message}`);
   }
   const writerInput = buildWriterInput(
@@ -317,7 +362,7 @@ async function main(): Promise<void> {
     }
   }
   const writerWasCached = cachedWriter !== null;
-  const writerLogId = startPhaseLog(input.pageId, "draft-write", writerSetting);
+  const writerLogId = await startPhaseLog(input.pageId, "draft-write", writerSetting);
   let writer: WriterOutput;
   try {
     if (writerValue === null) {
@@ -325,19 +370,20 @@ async function main(): Promise<void> {
     }
     writer = cachedWriter ?? parseValidatedWriterOutput(writerValue, research, prepared.outline);
     if (!writerWasCached) saveCache(writerPath, writerKey, writerValue);
-    finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "success", writerWasCached ? "cache hit" : "AI completed");
+    await finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "success", writerWasCached ? "cache hit" : "AI completed");
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "failed", message);
+    await finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "failed", message);
+    if (error instanceof ProcessExecutionError) throw error;
     throw new Error(`${draftPhaseExecutionLabel("draft-write", writerSetting)}; ${message}`);
   }
   const spec = assemblePublishSpec({ input, writer, research, images: prepared.images });
   const specPath = path.join(stateDir, "publish-spec.json");
   writeFileSync(specPath, JSON.stringify(spec, null, 2));
-  runNpm("growth:image-prompt", [specPath]);
+  await runNpm("growth:image-prompt", [specPath], false, timeoutPolicy.imagePromptMs);
   let publishOut: string;
   try {
-    publishOut = runNpm("growth:publish-draft", [specPath], true);
+    publishOut = await runNpm("growth:publish-draft", [specPath], true, timeoutPolicy.publishDraftMs);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     if (shouldInvalidateWriterCacheForPublishFailure(message) && existsSync(writerPath)) {
@@ -351,37 +397,70 @@ async function main(): Promise<void> {
   if (generation.marker && existsSync(generationMarkerPath)) unlinkSync(generationMarkerPath);
   const notifyPath = path.join(stateDir, "notify.json");
   writeFileSync(notifyPath, JSON.stringify([{ title: input.title, contentId, media: input.media }]));
-  runDraftNotificationBestEffort({
-    notifyPath,
-    notify: () => runNpm("growth:notify-drafts", [notifyPath]),
-    warn: (message) => process.stderr.write(`${message}\n`),
-  });
+  try {
+    await runNpm("growth:notify-drafts", [notifyPath]);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`下書き投入は完了しましたがLINE通知に失敗しました: ${detail}\n通知だけ再送: npm run growth:notify-drafts -- ${notifyPath}\n`);
+  }
   } finally {
     await cleanupDraftWorkDirs(workDirs, rm);
   }
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  const detail = `${executionSettingsSummary}; ${message}`;
+  const processDetail = error instanceof ProcessExecutionError ? processFailureDetail(error) : "";
+  const isTimeout = error instanceof ProcessExecutionError && error.result.kind === "timeout";
+  const evidenceExitCode = isTimeout ? "124" : "70";
+  const detail = `${executionSettingsSummary}; ${message}${processDetail && !message.includes(processDetail) ? `; ${processDetail}` : ""}; orchestratorExit=70`;
   process.stderr.write(`下書きオーケストレーターに失敗しました: ${detail}\n`);
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  spawnSync(npm, ["run", "growth:notify-loop-fail"], {
+  if (isTimeout) {
+    const resumeCommand = error.resumeCommand;
+    mkdirSync(path.dirname(failureLogPath), { recursive: true });
+    appendFileSync(
+      failureLogPath,
+      `${new Date().toISOString()}\tsource=draft-orchestrator:${error.result.phase}\tjobId=${jobId}\texit=124\tresume=${resumeCommand}\tdetail=${detail.replace(/[\r\n\t]+/g, " ")}\n`,
+      "utf8",
+    );
+    await workerLog("start", {
+      mode: error.result.phase,
+      status: "failed",
+      kind: "job",
+      name: `${error.result.phase} timeout`,
+      "target-type": "system",
+      "job-id": jobId,
+      "exit-code": 124,
+      detail,
+      resume: resumeCommand,
+    });
+  }
+  await runProcess(npm, ["run", "growth:notify-loop-fail"], {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: "notify-loop-fail",
     cwd: root,
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: "inherit",
     shell: process.platform === "win32",
     env: {
       ...process.env,
       GROWTH_LOOP_MODE: process.env.GROWTH_DRAFT_RUN_MODE || "drafts",
       GROWTH_LOOP_RESUME: `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`,
-      GROWTH_LOOP_KIND: "draft-orchestrator-failed",
-      GROWTH_LOOP_EXIT: "70",
+      GROWTH_LOOP_KIND: isTimeout ? "timeout" : "nonzero-exit",
+      GROWTH_LOOP_EXIT: evidenceExitCode,
       GROWTH_LOOP_DETAIL: detail,
+      ...(error instanceof ProcessExecutionError ? {
+        GROWTH_LOOP_TIMEOUT_MS: String(error.timeoutMs),
+        GROWTH_LOOP_TERM_SENT: String(error.result.termSent),
+        GROWTH_LOOP_FORCE_KILLED: String(error.result.forceKilled),
+      } : {}),
     },
   });
-  spawnSync(npm, ["run", "growth:learning-log", "--", "append-fail", process.env.GROWTH_DRAFT_RUN_MODE || "drafts", "70", detail], {
+  await runProcess(npm, ["run", "growth:learning-log", "--", "append-fail", process.env.GROWTH_DRAFT_RUN_MODE || "drafts", evidenceExitCode, detail], {
+    timeoutMs: timeoutPolicy.controlMs,
+    phase: "learning-log",
     cwd: root,
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: "inherit",
     shell: process.platform === "win32",
     env: { ...process.env },
   });
