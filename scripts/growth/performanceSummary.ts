@@ -1,82 +1,63 @@
-/**
- * 公開済み記事の「記事タイプ別 成績サマリ」を組み立てる純ロジック(#221 / P2⑨)。
- *
- * 「計測 → 次回提案」の学習弧を code 上で閉じるための供給側。週次エージェントは
- * `growth:existing` の出力しか確実に読めない(headless では MCP で行を列挙できない)ため、
- * ここで「記事ネタ案」DB の既存プロパティ(`記事タイプ`/`公開後判定`/`成績データ`)を
- * **記事タイプ軸で集計**し、weekly が「避ける学習」に加えて**「伸ばす学習(効いた型を厚くする)」**の
- * 入力として読めるようにする。
- *
- * データ源(すべて既存プロパティ・新規追加なし):
- * - `ステータス` = `公開済み` の行だけを集計対象にする(公開前の仮説は成績が無い)。
- * - `記事タイプ`(select・獲得/不安解消/資産/比較/イベント) = 集計の軸(内部計測軸・AD8)。
- * - `公開後判定`(select・未判定/成功/様子見/要改稿) = 人が最終決定した公開後判定(review-due.ts)。
- * - `成績データ`(rich_text JSON) = GA4/GSC ミラー。`search.topQueries` から「勝ったクエリ」を抽出。
- *
- * **欠落耐性(#221 受け入れ基準・欠落耐性)**: プロパティ未設定・公開0本でも空サマリで壊れない。
- *   - `記事タイプ` 欠落 → 「タイプ未設定」バケットに寄せる(黙って落とさない)。
- *   - `公開後判定` 未設定/未判定 → 「未判定」として数える(成功/様子見/要改稿には入れない)。
- *   - `成績データ` 空/不正 → 勝ちクエリ無しとして扱う(parseMetrics が null を返す)。
- *
- * I/O は持たない。呼び出し側(existing.ts)が Notion 行を渡す。承認画面(src)からは
- * src/lib/growth/performanceSummary.ts 経由で参照できる(純ロジック分離規約)。
- */
+/** 公開済み記事を記事タイプ別に集計し、週次判断へ渡す純ロジック (#286)。 */
 
-import { parseMetrics, METRICS_PROPS } from "./metrics";
-import { combineMetricDeltas, metricDelta, reservationIntent } from "./ctaEvents";
+import { combineMetricDeltas, reservationIntent } from "./ctaEvents";
+import { METRICS_PROPS, measurementStatusOf, parseMetrics } from "./metrics";
 import { isReservationDataFresh } from "./reservations";
-import type { MetricDelta } from "./metrics";
+
+import type { MetricDelta, SearchQueryStat } from "./metrics";
 import type { NotionPage } from "./notion";
 
-/** 集計対象にする記事ステータス(公開済みのみ成績がある)。 */
 const PUBLISHED_STATUS = "公開済み";
-/** 記事タイプ欠落時のバケット名(黙って落とさず可視化する)。 */
 const UNTYPED_BUCKET = "タイプ未設定";
-/** 人が付ける公開後判定 select の値(未判定は「まだ判定していない」)。 */
 const VERDICT_SUCCESS = "成功";
 const VERDICT_WATCH = "様子見";
 const VERDICT_REWRITE = "要改稿";
-/** 勝ちクエリとして拾う上限(タイプごと)。ノイズを避け要点だけ供給する。 */
-const WINNING_QUERIES_PER_TYPE = 3;
-/** 勝ちクエリの最小クリック数(0クリックは「勝った」と言えない)。 */
-const WINNING_QUERY_MIN_CLICKS = 1;
+const KNOWN_ARTICLE_TYPE_ORDER = ["獲得", "不安解消", "資産", "比較", "イベント"] as const;
+const QUERY_SIGNALS_PER_TYPE = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** 記事タイプ1件ぶんの公開後成績集計。 */
+export const MIN_JUDGED_ARTICLES_PER_TYPE = 3;
+export const QUERY_MIN_IMPRESSIONS = 100;
+export const QUERY_MIN_CLICKS = 2;
+
+export interface ArticleTypeObservation {
+  periods: string[];
+  publishedDays: { min: number; max: number; knownArticles: number } | null;
+  views: { total: number; measuredArticles: number };
+  impressions: { total: number; measuredArticles: number };
+}
+
+export interface ArticleTypeQuerySignal {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  status: "qualified" | "exploring";
+}
+
+interface ArticleTypeOutcomes {
+  reservationIntent: MetricDelta | null;
+  lineClick: MetricDelta | null;
+  instagramClick: MetricDelta | null;
+  other: MetricDelta | null;
+  actualReservations: MetricDelta | null;
+}
+
 export interface ArticleTypePerformance {
-  /** 記事タイプ(獲得/不安解消/資産/比較/イベント、または「タイプ未設定」)。 */
   articleType: string;
-  /** このタイプの公開済み記事数。 */
   published: number;
-  /** `公開後判定`=成功 の本数。 */
   success: number;
-  /** `公開後判定`=様子見 の本数。 */
   watch: number;
-  /** `公開後判定`=要改稿 の本数。 */
   rewrite: number;
-  /** まだ人が判定していない本数(未判定/未設定)。 */
+  judged: number;
   unjudged: number;
-  /** このタイプで勝ったクエリ(クリック降順・重複排除・上位数件)。 */
-  winningQueries: string[];
-  outcomes?: {
-    reservationIntent: MetricDelta;
-    lineClick: MetricDelta;
-    instagramClick: MetricDelta;
-    other: MetricDelta;
-    actualReservations: MetricDelta;
-  };
-  notes?: string[];
-}
-
-function selectName(page: NotionPage, prop: string): string {
-  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
-  return (value?.select?.name ?? "").trim();
-}
-
-function richTextValue(page: NotionPage, prop: string): string {
-  const value = page.properties[prop] as
-    | { rich_text?: Array<{ plain_text?: string }> }
-    | undefined;
-  return (value?.rich_text ?? []).map((t) => t.plain_text ?? "").join("").trim();
+  successRatePct: number | null;
+  unjudgedRatePct: number;
+  sampleStatus: "sufficient" | "exploring";
+  observation: ArticleTypeObservation;
+  querySignals: ArticleTypeQuerySignal[];
+  outcomes: ArticleTypeOutcomes;
+  notes: string[];
 }
 
 interface Bucket {
@@ -85,8 +66,13 @@ interface Bucket {
   watch: number;
   rewrite: number;
   unjudged: number;
-  /** query → 累計クリック数(重複クエリはクリックを合算し、最も効いた順に並べる)。 */
-  queryClicks: Map<string, number>;
+  periods: Set<string>;
+  publishedDays: number[];
+  viewsTotal: number;
+  viewsMeasuredArticles: number;
+  impressionsTotal: number;
+  impressionsMeasuredArticles: number;
+  queries: Map<string, { clicks: number; impressions: number }>;
   outcomeValues: {
     reservationIntent: MetricDelta[];
     lineClick: MetricDelta[];
@@ -94,8 +80,19 @@ interface Bucket {
     other: MetricDelta[];
     actualReservations: MetricDelta[];
   };
+  hasCtaMeasurement: boolean;
+  hasActualReservationMeasurement: boolean;
   notes: Set<string>;
-  hasOutcomes: boolean;
+}
+
+function selectName(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
+  return (value?.select?.name ?? "").trim();
+}
+
+function richTextValue(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { rich_text?: Array<{ plain_text?: string }> } | undefined;
+  return (value?.rich_text ?? []).map((text) => text.plain_text ?? "").join("").trim();
 }
 
 function newBucket(): Bucket {
@@ -105,7 +102,13 @@ function newBucket(): Bucket {
     watch: 0,
     rewrite: 0,
     unjudged: 0,
-    queryClicks: new Map<string, number>(),
+    periods: new Set<string>(),
+    publishedDays: [],
+    viewsTotal: 0,
+    viewsMeasuredArticles: 0,
+    impressionsTotal: 0,
+    impressionsMeasuredArticles: 0,
+    queries: new Map<string, { clicks: number; impressions: number }>(),
     outcomeValues: {
       reservationIntent: [],
       lineClick: [],
@@ -113,19 +116,66 @@ function newBucket(): Bucket {
       other: [],
       actualReservations: [],
     },
+    hasCtaMeasurement: false,
+    hasActualReservationMeasurement: false,
     notes: new Set<string>(),
-    hasOutcomes: false,
   };
 }
 
-/** `成績データ` JSON から勝ちクエリ(クリック>=下限)を bucket に加算する。空/不正は無視。 */
-function accumulateWinningQueries(bucket: Bucket, page: NotionPage): void {
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function isValidDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00.000Z`));
+}
+
+function periodLabel(period: { start: string; end: string }): string | null {
+  if (!isValidDate(period.start) || !isValidDate(period.end)) return null;
+  if (Date.parse(period.start) > Date.parse(period.end)) return null;
+  return `${period.start}〜${period.end}`;
+}
+
+function publishedDays(publishedAt: string | undefined, nowMs: number): number | null {
+  if (!publishedAt) return null;
+  const publishedMs = Date.parse(publishedAt);
+  if (!Number.isFinite(publishedMs) || publishedMs > nowMs) return null;
+  return Math.floor((nowMs - publishedMs) / DAY_MS);
+}
+
+function tallyVerdict(bucket: Bucket, verdict: string): void {
+  if (verdict === VERDICT_SUCCESS) bucket.success += 1;
+  else if (verdict === VERDICT_WATCH) bucket.watch += 1;
+  else if (verdict === VERDICT_REWRITE) bucket.rewrite += 1;
+  else bucket.unjudged += 1;
+}
+
+function accumulateQueries(bucket: Bucket, queries: readonly SearchQueryStat[]): void {
+  for (const queryStat of queries) {
+    const query = queryStat.query.trim();
+    if (!query) continue;
+    const current = bucket.queries.get(query) ?? { clicks: 0, impressions: 0 };
+    current.clicks += queryStat.clicks;
+    current.impressions += queryStat.impressions;
+    bucket.queries.set(query, current);
+  }
+}
+
+function accumulateObservations(bucket: Bucket, page: NotionPage, nowMs: number): void {
   const metrics = parseMetrics(richTextValue(page, METRICS_PROPS.data));
-  const topQueries = metrics?.search?.topQueries ?? [];
-  for (const q of topQueries) {
-    const query = q.query.trim();
-    if (!query || q.clicks < WINNING_QUERY_MIN_CLICKS) continue;
-    bucket.queryClicks.set(query, (bucket.queryClicks.get(query) ?? 0) + q.clicks);
+  if (!metrics) return;
+  const period = periodLabel(metrics.period);
+  if (period) bucket.periods.add(period);
+  const age = publishedDays(metrics.publishedAt, nowMs);
+  if (age !== null) bucket.publishedDays.push(age);
+  if (measurementStatusOf(metrics) !== "source-error") {
+    bucket.viewsTotal += metrics.views.current;
+    bucket.viewsMeasuredArticles += 1;
+  }
+  if (metrics.search) {
+    bucket.impressionsTotal += metrics.search.impressions.current;
+    bucket.impressionsMeasuredArticles += 1;
+    accumulateQueries(bucket, metrics.search.topQueries);
   }
 }
 
@@ -133,7 +183,7 @@ function accumulateOutcomes(bucket: Bucket, page: NotionPage, nowMs: number): vo
   const metrics = parseMetrics(richTextValue(page, METRICS_PROPS.data));
   if (!metrics) return;
   if (metrics.ctaEvents && metrics.ctaEventsMeasured === true) {
-    bucket.hasOutcomes = true;
+    bucket.hasCtaMeasurement = true;
     bucket.outcomeValues.reservationIntent.push(reservationIntent(metrics.ctaEvents));
     bucket.outcomeValues.lineClick.push(metrics.ctaEvents.lineClick);
     bucket.outcomeValues.instagramClick.push(metrics.ctaEvents.instagramClick);
@@ -141,7 +191,6 @@ function accumulateOutcomes(bucket: Bucket, page: NotionPage, nowMs: number): vo
   }
   const actual = metrics.actualReservations;
   if (!actual) return;
-  bucket.hasOutcomes = true;
   if (actual.state === "missing") {
     bucket.notes.add("実予約欠損（予約意図を代理指標として使用）");
   } else if (!isReservationDataFresh(actual.syncedAt, new Date(nowMs).toISOString())) {
@@ -149,114 +198,146 @@ function accumulateOutcomes(bucket: Bucket, page: NotionPage, nowMs: number): vo
   } else if (actual.article === null) {
     bucket.notes.add("施設全体の実予約のみ（記事別帰属なし）");
   } else {
+    bucket.hasActualReservationMeasurement = true;
     bucket.outcomeValues.actualReservations.push(actual.article);
   }
 }
 
-function outcomesOf(bucket: Bucket): NonNullable<ArticleTypePerformance["outcomes"]> {
-  const combined = (values: MetricDelta[]) =>
-    values.length > 0 ? combineMetricDeltas(values) : metricDelta(0, 0);
+function combine(values: readonly MetricDelta[]): MetricDelta {
+  return combineMetricDeltas(values);
+}
+
+function outcomesOf(bucket: Bucket): ArticleTypeOutcomes {
   return {
-    reservationIntent: combined(bucket.outcomeValues.reservationIntent),
-    lineClick: combined(bucket.outcomeValues.lineClick),
-    instagramClick: combined(bucket.outcomeValues.instagramClick),
-    other: combined(bucket.outcomeValues.other),
-    actualReservations: combined(bucket.outcomeValues.actualReservations),
+    reservationIntent: bucket.hasCtaMeasurement ? combine(bucket.outcomeValues.reservationIntent) : null,
+    lineClick: bucket.hasCtaMeasurement ? combine(bucket.outcomeValues.lineClick) : null,
+    instagramClick: bucket.hasCtaMeasurement ? combine(bucket.outcomeValues.instagramClick) : null,
+    other: bucket.hasCtaMeasurement ? combine(bucket.outcomeValues.other) : null,
+    actualReservations: bucket.hasActualReservationMeasurement
+      ? combine(bucket.outcomeValues.actualReservations)
+      : null,
   };
 }
 
-/** bucket の判定カウンタに、人が付けた `公開後判定` を反映する。 */
-function tallyVerdict(bucket: Bucket, verdict: string): void {
-  if (verdict === VERDICT_SUCCESS) bucket.success += 1;
-  else if (verdict === VERDICT_WATCH) bucket.watch += 1;
-  else if (verdict === VERDICT_REWRITE) bucket.rewrite += 1;
-  else bucket.unjudged += 1; // 未判定/未設定/未知の値はすべて「未判定」に寄せる。
+function querySignalsOf(queries: ReadonlyMap<string, { clicks: number; impressions: number }>): ArticleTypeQuerySignal[] {
+  return [...queries.entries()]
+    .filter(([, value]) => value.clicks > 0)
+    .map(([query, value]): ArticleTypeQuerySignal => ({
+      query,
+      clicks: value.clicks,
+      impressions: value.impressions,
+      ctr: value.impressions === 0 ? 0 : value.clicks / value.impressions,
+      status:
+        value.impressions >= QUERY_MIN_IMPRESSIONS && value.clicks >= QUERY_MIN_CLICKS
+          ? "qualified"
+          : "exploring",
+    }))
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "qualified" ? -1 : 1;
+      return b.clicks - a.clicks || b.impressions - a.impressions || a.query.localeCompare(b.query, "ja");
+    })
+    .slice(0, QUERY_SIGNALS_PER_TYPE);
 }
 
-/** クリック降順で上位のクエリ名だけを返す(件数上限つき)。 */
-function topWinningQueries(queryClicks: Map<string, number>): string[] {
-  return [...queryClicks.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, WINNING_QUERIES_PER_TYPE)
-    .map(([query]) => query);
+function observationOf(bucket: Bucket): ArticleTypeObservation {
+  return {
+    periods: [...bucket.periods].sort(),
+    publishedDays:
+      bucket.publishedDays.length === 0
+        ? null
+        : {
+            min: Math.min(...bucket.publishedDays),
+            max: Math.max(...bucket.publishedDays),
+            knownArticles: bucket.publishedDays.length,
+          },
+    views: { total: bucket.viewsTotal, measuredArticles: bucket.viewsMeasuredArticles },
+    impressions: {
+      total: bucket.impressionsTotal,
+      measuredArticles: bucket.impressionsMeasuredArticles,
+    },
+  };
 }
 
-/**
- * 記事ネタ案の行から、**公開済み記事の記事タイプ別 成績サマリ**を作る(純関数)。
- * 公開前(ステータス≠公開済み)の行は成績が無いので除外する。公開0本なら空配列を返す。
- */
+function articleTypeRank(articleType: string): number {
+  const knownIndex = KNOWN_ARTICLE_TYPE_ORDER.indexOf(articleType as typeof KNOWN_ARTICLE_TYPE_ORDER[number]);
+  if (knownIndex >= 0) return knownIndex;
+  return articleType === UNTYPED_BUCKET ? KNOWN_ARTICLE_TYPE_ORDER.length : KNOWN_ARTICLE_TYPE_ORDER.length + 1;
+}
+
 export function summarizeArticlePerformance(
   ideas: readonly NotionPage[],
   nowMs = Date.now()
 ): ArticleTypePerformance[] {
-  const buckets = new Map<string, Bucket>();
-
+  const buckets = new Map<string, Bucket>(
+    KNOWN_ARTICLE_TYPE_ORDER.map((articleType) => [articleType, newBucket()])
+  );
   for (const page of ideas) {
     if (selectName(page, "ステータス") !== PUBLISHED_STATUS) continue;
     const articleType = selectName(page, "記事タイプ") || UNTYPED_BUCKET;
     const bucket = buckets.get(articleType) ?? newBucket();
     bucket.published += 1;
     tallyVerdict(bucket, selectName(page, "公開後判定"));
-    accumulateWinningQueries(bucket, page);
+    accumulateObservations(bucket, page, nowMs);
     accumulateOutcomes(bucket, page, nowMs);
     buckets.set(articleType, bucket);
   }
 
-  return [...buckets.entries()].map(([articleType, bucket]) => ({
-    articleType,
-    published: bucket.published,
-    success: bucket.success,
-    watch: bucket.watch,
-    rewrite: bucket.rewrite,
-    unjudged: bucket.unjudged,
-    winningQueries: topWinningQueries(bucket.queryClicks),
-    ...(bucket.hasOutcomes ? { outcomes: outcomesOf(bucket), notes: [...bucket.notes] } : {}),
-  }));
+  return [...buckets.entries()]
+    .sort(([typeA], [typeB]) => articleTypeRank(typeA) - articleTypeRank(typeB) || typeA.localeCompare(typeB, "ja"))
+    .map(([articleType, bucket]) => {
+      const judged = bucket.success + bucket.watch + bucket.rewrite;
+      return {
+        articleType,
+        published: bucket.published,
+        success: bucket.success,
+        watch: bucket.watch,
+        rewrite: bucket.rewrite,
+        judged,
+        unjudged: bucket.unjudged,
+        successRatePct: judged === 0 ? null : roundOne((bucket.success / judged) * 100),
+        unjudgedRatePct:
+          bucket.published === 0 ? 0 : roundOne((bucket.unjudged / bucket.published) * 100),
+        sampleStatus: judged < MIN_JUDGED_ARTICLES_PER_TYPE ? "exploring" : "sufficient",
+        observation: observationOf(bucket),
+        querySignals: querySignalsOf(bucket.queries),
+        outcomes: outcomesOf(bucket),
+        notes: [...bucket.notes],
+      };
+    });
 }
 
-/**
- * 記事タイプ別成績サマリを、週次エージェントが読める Markdown 行に整形する(純関数)。
- * 公開0本のときは学習の入力が無い旨を明示する(沈黙させない・#24 の思想)。
- */
-export function renderPerformanceSummary(
-  summaries: readonly ArticleTypePerformance[]
-): string[] {
-  const lines: string[] = [];
-  lines.push(`## 公開済み記事の成績サマリ(記事タイプ別・伸ばす学習の入力)`);
+function metricText(metric: MetricDelta | null): string {
+  return metric ? `${metric.current}/${metric.prior}` : "未計測";
+}
 
-  const totalPublished = summaries.reduce((sum, s) => sum + s.published, 0);
-  if (totalPublished === 0) {
-    lines.push(
-      `(公開済み記事がまだ無いため成績サマリは空。公開後に「効いた型」を厚くする学習を開始する)`
-    );
-    return lines;
+function observationText(summary: ArticleTypePerformance): string {
+  const { observation } = summary;
+  const days = observation.publishedDays
+    ? `公開後${observation.publishedDays.min}〜${observation.publishedDays.max}日 (${observation.publishedDays.knownArticles}/${summary.published}本)`
+    : `公開後日数 未計測 (0/${summary.published}本)`;
+  const periods = observation.periods.length > 0 ? observation.periods.join(" / ") : "未計測";
+  return `${days} / 期間${periods} / views ${observation.views.total} (${observation.views.measuredArticles}/${summary.published}本) / impressions ${observation.impressions.total} (${observation.impressions.measuredArticles}/${summary.published}本)`;
+}
+
+export function renderPerformanceSummary(summaries: readonly ArticleTypePerformance[]): string[] {
+  const lines = ["## 公開済み記事の成績サマリ(記事タイプ別・率/母数/観測条件)"];
+  if (summaries.reduce((sum, summary) => sum + summary.published, 0) === 0) {
+    lines.push("(公開済み記事がまだ無いため成績サマリは空。公開後に率・母数・観測条件を蓄積する)");
   }
 
-  // 成功本数の多いタイプを上に(効いた型が一目で分かるように)。
-  const ordered = [...summaries].sort(
-    (a, b) => b.success - a.success || b.published - a.published
-  );
-  for (const s of ordered) {
-    const head =
-      `- ${s.articleType}: 公開${s.published}本 ` +
-      `(成功${s.success}・様子見${s.watch}・要改稿${s.rewrite}・未判定${s.unjudged})`;
-    lines.push(head);
-    if (s.winningQueries.length > 0) {
-      lines.push(`  - 勝ったクエリ: ${s.winningQueries.join(" / ")}`);
+  for (const summary of summaries) {
+    const status = summary.sampleStatus === "sufficient"
+      ? "母数条件クリア"
+      : `探索中: 判定済み${summary.judged}本 < ${MIN_JUDGED_ARTICLES_PER_TYPE}本`;
+    const successRate = summary.successRatePct === null ? "未算出" : `${summary.successRatePct}%`;
+    lines.push(`- ${summary.articleType} [${status}]: 公開${summary.published}本 / 判定済み${summary.judged}本 / 成功${summary.success}本 / 様子見${summary.watch}本 / 要改稿${summary.rewrite}本 / 成功率${successRate} / 未判定${summary.unjudged}本 (${summary.unjudgedRatePct}%)`);
+    lines.push(`  - 観測条件: ${observationText(summary)}`);
+    if (summary.querySignals.length > 0) {
+      lines.push(`  - 検索反応: ${summary.querySignals.map((signal) => `${signal.query} (${signal.clicks}click/${signal.impressions}imp・CTR ${roundOne(signal.ctr * 100)}%・${signal.status === "qualified" ? "母数条件クリア" : "探索中"})`).join(" / ")}`);
     }
-    if (s.outcomes) {
-      lines.push(
-        `  - 予約意図 ${s.outcomes.reservationIntent.current}/${s.outcomes.reservationIntent.prior}、` +
-          `LINE ${s.outcomes.lineClick.current}/${s.outcomes.lineClick.prior}、` +
-          `Instagram ${s.outcomes.instagramClick.current}/${s.outcomes.instagramClick.prior}、` +
-          `その他CTA ${s.outcomes.other.current}/${s.outcomes.other.prior}、` +
-          `記事帰属実予約 ${s.outcomes.actualReservations.current}/${s.outcomes.actualReservations.prior}`
-      );
-      for (const note of s.notes ?? []) lines.push(`  - 注記: ${note}`);
-    }
+    lines.push(`  - 成果: 予約意図 ${metricText(summary.outcomes.reservationIntent)}、LINE ${metricText(summary.outcomes.lineClick)}、Instagram ${metricText(summary.outcomes.instagramClick)}、その他CTA ${metricText(summary.outcomes.other)}、記事帰属実予約 ${metricText(summary.outcomes.actualReservations)}`);
+    for (const note of summary.notes) lines.push(`  - 注記: ${note}`);
   }
-  lines.push(
-    `(成功が多い型＝効いた型。次回提案では効いた型を優先して厚くする=伸ばす学習。要改稿が多い型は角度を変える)`
-  );
+  lines.push("(成功本数だけで優先しない。率・母数・未判定率をセットで読み、観測条件が揃わない型は直接比較しない。判定済み3本未満は探索中で本命確定しない。freshな実予約を優先し、予約意図は代理指標。低サンプル検索反応を成果や「勝ちクエリ」と呼ばない)");
   return lines;
 }

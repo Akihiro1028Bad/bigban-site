@@ -222,7 +222,7 @@ export function coverageCrossTabLines(ideas: readonly NotionPage[]): string[] {
       const counts = rows.get(articleType)!;
       return `| ${articleType} | ${counts.column} | ${counts.news} |`;
     }),
-    "(薄い型・媒体を埋める視点も本命/補欠の選定材料にする。ただし成功型を厚くする学習(#221)と両立させ、根拠なく薄い枠を量産しない)",
+    "(薄い型・媒体は探索候補の材料にする。ただし記事タイプ別の成功率・判定済み母数・未判定率・観測条件を確認し、根拠なく薄い枠を量産しない)",
   ];
 }
 
@@ -357,8 +357,8 @@ export function summarizeExisting(input: ExistingInput): string {
   );
   lines.push("");
 
-  // #221: 公開済み記事の記事タイプ別 成績サマリ(伸ばす学習の入力)。
-  // 「避ける学習」(却下/見送りの併記)に加え、「効いた型を厚くする」判断材料を供給する。
+  // #221/#286: 公開済み記事の記事タイプ別 成績サマリ。
+  // 率・母数・未判定率・観測条件をセットで供給し、低母数の自動順位付けを避ける。
   lines.push(...renderPerformanceSummary(summarizeArticlePerformance(ideas, nowMs)));
 
   return lines.join("\n");
