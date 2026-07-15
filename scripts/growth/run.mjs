@@ -225,9 +225,9 @@ const LEGACY_MODEL_ENV_KEYS = [
 
 function draftOrchestratorEnv() {
   const env = { ...process.env };
-  // 廃止済みモデルenvとテスト用無効化フラグを子工程へ伝播させない。
-  for (const key of LEGACY_MODEL_ENV_KEYS) delete env[key];
-  delete env.GROWTH_MODEL_SETTINGS_DISABLE;
+  // runProcess は親環境を補完するため、明示的な undefined で廃止済み設定を遮断する。
+  for (const key of LEGACY_MODEL_ENV_KEYS) env[key] = undefined;
+  env.GROWTH_MODEL_SETTINGS_DISABLE = undefined;
   return { ...env, GROWTH_DRAFT_RUN_MODE: mode };
 }
 

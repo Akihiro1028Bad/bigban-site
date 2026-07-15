@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -27,6 +27,7 @@ const ideaDataSource = "5adab8b1-f182-4123-b963-9463a2580d4a";
 const researchTtlMs = 24 * 60 * 60 * 1000;
 const timeoutPolicy = resolveTimeoutPolicy(process.env);
 const jobId = process.env.GROWTH_JOB_ID || randomUUID();
+const failureLogPath = path.join(root, "data", "growth-failures.log");
 
 const writerSchema = {
   type: "object",
@@ -410,9 +411,31 @@ async function main(): Promise<void> {
 main().catch(async (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   const processDetail = error instanceof ProcessExecutionError ? processFailureDetail(error) : "";
-  const detail = `${executionSettingsSummary}; ${message}${processDetail && !message.includes(processDetail) ? `; ${processDetail}` : ""}`;
+  const isTimeout = error instanceof ProcessExecutionError && error.result.kind === "timeout";
+  const evidenceExitCode = isTimeout ? "124" : "70";
+  const detail = `${executionSettingsSummary}; ${message}${processDetail && !message.includes(processDetail) ? `; ${processDetail}` : ""}; orchestratorExit=70`;
   process.stderr.write(`下書きオーケストレーターに失敗しました: ${detail}\n`);
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  if (isTimeout) {
+    const resumeCommand = error.resumeCommand;
+    mkdirSync(path.dirname(failureLogPath), { recursive: true });
+    appendFileSync(
+      failureLogPath,
+      `${new Date().toISOString()}\tsource=draft-orchestrator:${error.result.phase}\tjobId=${jobId}\texit=124\tresume=${resumeCommand}\tdetail=${detail.replace(/[\r\n\t]+/g, " ")}\n`,
+      "utf8",
+    );
+    await workerLog("start", {
+      mode: error.result.phase,
+      status: "failed",
+      kind: "job",
+      name: `${error.result.phase} timeout`,
+      "target-type": "system",
+      "job-id": jobId,
+      "exit-code": 124,
+      detail,
+      resume: resumeCommand,
+    });
+  }
   await runProcess(npm, ["run", "growth:notify-loop-fail"], {
     timeoutMs: timeoutPolicy.controlMs,
     phase: "notify-loop-fail",
@@ -423,8 +446,8 @@ main().catch(async (error: unknown) => {
       ...process.env,
       GROWTH_LOOP_MODE: process.env.GROWTH_DRAFT_RUN_MODE || "drafts",
       GROWTH_LOOP_RESUME: `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`,
-      GROWTH_LOOP_KIND: error instanceof ProcessExecutionError && error.result.kind === "timeout" ? "timeout" : "nonzero-exit",
-      GROWTH_LOOP_EXIT: "70",
+      GROWTH_LOOP_KIND: isTimeout ? "timeout" : "nonzero-exit",
+      GROWTH_LOOP_EXIT: evidenceExitCode,
       GROWTH_LOOP_DETAIL: detail,
       ...(error instanceof ProcessExecutionError ? {
         GROWTH_LOOP_TIMEOUT_MS: String(error.timeoutMs),
@@ -433,7 +456,7 @@ main().catch(async (error: unknown) => {
       } : {}),
     },
   });
-  await runProcess(npm, ["run", "growth:learning-log", "--", "append-fail", process.env.GROWTH_DRAFT_RUN_MODE || "drafts", "70", detail], {
+  await runProcess(npm, ["run", "growth:learning-log", "--", "append-fail", process.env.GROWTH_DRAFT_RUN_MODE || "drafts", evidenceExitCode, detail], {
     timeoutMs: timeoutPolicy.controlMs,
     phase: "learning-log",
     cwd: root,

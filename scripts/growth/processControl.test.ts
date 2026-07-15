@@ -5,7 +5,19 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+import { buildProcessFailureDetail, classifyProcessClose, parseProcessGroupRegistry, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+
+it("process group registryは追加・削除を順に適用し、壊れた行を無視する", () => {
+  const groups = parseProcessGroupRegistry([
+    JSON.stringify({ operation: "add", groupId: 10, parentGroupId: null }),
+    JSON.stringify({ operation: "add", groupId: 20, parentGroupId: 10 }),
+    JSON.stringify({ operation: "remove", groupId: 20 }),
+    JSON.stringify({ operation: "unknown", groupId: 30 }),
+    "broken-json",
+    "",
+  ].join("\n"));
+  expect([...groups]).toEqual([[10, null]]);
+});
 
 describe("timeout policy", () => {
   it("全 mode・draft phase・daemon job に正の有限値を定義する", () => {
@@ -33,6 +45,18 @@ describe("timeout policy", () => {
 });
 
 describe("runProcess", () => {
+  it("wrapperのspawn error診断を受信済みならtimeoutフラグよりspawn-errorを優先する", () => {
+    expect(classifyProcessClose({
+      leaseLost: false,
+      timedOut: true,
+      bufferExceeded: false,
+      isWrapper: true,
+      code: 126,
+      signal: null,
+      stderr: "GROWTH_SPAWN_ERROR:spawn missing",
+    })).toBe("spawn-error");
+  });
+
   it("正常終了と capture を返す", async () => {
     const result = await runProcess(process.execPath, ["-e", "process.stdout.write('ok'); process.stderr.write('warn')"], { timeoutMs: 2_000, phase: "test", stdio: "capture" });
     expect(result).toMatchObject({ kind: "success", exitCode: 0, phase: "test", stdout: "ok", stderr: "warn", timedOut: false, termSent: false, forceKilled: false });
@@ -59,7 +83,7 @@ describe("runProcess", () => {
   });
 
   it("spawn error・signal・maxBufferを timeout と区別する", async () => {
-    expect(await runProcess("__missing_growth_command__", [], { timeoutMs: 100, stdio: "capture" })).toMatchObject({ kind: "spawn-error", timedOut: false });
+    expect(await runProcess("__missing_growth_command__", [], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "spawn-error", timedOut: false });
     expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "signal", timedOut: false, signal: "SIGTERM" });
     expect(await runProcess(process.execPath, ["-e", "process.stdout.write('12345')"], { timeoutMs: 2_000, stdio: "capture", maxBuffer: 4 })).toMatchObject({ kind: "max-buffer", timedOut: false });
   });
@@ -133,14 +157,43 @@ describe("runProcess", () => {
     if (process.platform === "win32") return;
     const dir = mkdtempSync(path.join(tmpdir(), "growth-process-tree-"));
     const marker = path.join(dir, "orphan.txt");
+    const ready = path.join(dir, "ready.txt");
     const moduleUrl = new URL("./processControl.mjs", import.meta.url).href;
-    const nested = `import { runProcess } from ${JSON.stringify(moduleUrl)}; await runProcess(process.execPath,['-e',${JSON.stringify(`const fs=require('node:fs');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'orphan'),500)`) }],{timeoutMs:5000,killGraceMs:30,stdio:'capture'});`;
+    const nestedAgent = `const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'orphan'),1500);setInterval(()=>{},1000)`;
+    const nested = `import { existsSync } from 'node:fs'; import { runProcess } from ${JSON.stringify(moduleUrl)}; const running=runProcess(process.execPath,['-e',${JSON.stringify(nestedAgent)}],{timeoutMs:5000,killGraceMs:30,stdio:'capture'}); while(!existsSync(${JSON.stringify(ready)})) await new Promise(resolve=>setTimeout(resolve,10)); await running;`;
     try {
-      const result = await runProcess(process.execPath, ["--input-type=module", "-e", nested], { timeoutMs: 200, killGraceMs: 50, stdio: "capture" });
+      const result = await runProcess(process.execPath, ["--input-type=module", "-e", nested], { timeoutMs: 1_000, killGraceMs: 50, stdio: "capture" });
       expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
       await new Promise((resolve) => setTimeout(resolve, 600));
       expect(existsSync(marker)).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("nested timeoutは呼び出し元を巻き込まず証跡処理へ復帰する", async () => {
+    if (process.platform === "win32") return;
+    const moduleUrl = new URL("./processControl.mjs", import.meta.url).href;
+    const nested = `import { runProcess } from ${JSON.stringify(moduleUrl)}; const result=await runProcess(process.execPath,['-e',\"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)\"],{timeoutMs:200,killGraceMs:30,stdio:'capture'}); process.stdout.write('after:'+result.kind+':'+result.forceKilled);`;
+    const outer = await runProcess(process.execPath, ["--input-type=module", "-e", nested], { timeoutMs: 2_000, killGraceMs: 50, stdio: "capture" });
+    expect(outer).toMatchObject({ kind: "success", stdout: "after:timeout:true" });
+  });
+
+  it("capture close後もstdio ignoreの孫groupが生存中ならSIGKILL完了まで待つ", async () => {
+    if (process.platform === "win32") return;
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-ignore-grandchild-"));
+    const marker = path.join(dir, "survived.txt");
+    const grandchild = `const fs=require('node:fs');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'alive'),500);setInterval(()=>{},1000)`;
+    const parent = `const {spawn}=require('node:child_process');spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:'ignore'});process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000)`;
+    try {
+      const result = await runProcess(process.execPath, ["-e", parent], { timeoutMs: 200, killGraceMs: 50, stdio: "capture" });
+      expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(marker)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("options.env未指定時もHOME・PATH等の親環境をwrapperへ継承する", async () => {
+    const result = await runProcess(process.execPath, ["-e", "process.stdout.write(JSON.stringify({HOME:process.env.HOME,PATH:process.env.PATH}))"], { timeoutMs: 2_000, stdio: "capture" });
+    expect(JSON.parse(result.stdout)).toEqual({ HOME: process.env.HOME, PATH: process.env.PATH });
   });
 
   it("captureはexitではなくstdio closeまで待ち末尾を保持する", async () => {
@@ -221,4 +274,6 @@ it("daemonとdraft orchestratorは完全なProcessResultからtimeout証跡を�
   const orchestrator = readFileSync(path.join(process.cwd(), "scripts/growth/draft-orchestrator-cli.ts"), "utf8");
   expect(orchestrator).toContain("ProcessExecutionError");
   expect(orchestrator).toContain("buildProcessFailureDetail");
+  expect(orchestrator).toContain("growth-failures.log");
+  expect(orchestrator).toContain('"124"');
 });

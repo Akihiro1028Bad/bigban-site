@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
-const PROCESS_GROUP_ENV = "GROWTH_PROCESS_GROUP_ID";
+const PROCESS_GROUP_ENV = "GROWTH_PROCESS_CURRENT_GROUP";
+const PROCESS_REGISTRY_ENV = "GROWTH_PROCESS_GROUP_REGISTRY";
 const ROOT_LAUNCHER = `
 const { spawn } = require("node:child_process");
 const command = process.argv[1];
@@ -99,34 +103,98 @@ export function buildProcessFailureDetail(result, context) {
   ].join(" ");
 }
 
+export function classifyProcessClose(state) {
+  if (state.isWrapper && state.code === 126 && state.stderr.includes("GROWTH_SPAWN_ERROR:")) return "spawn-error";
+  if (state.leaseLost) return "lease-lost";
+  if (state.timedOut) return "timeout";
+  if (state.bufferExceeded) return "max-buffer";
+  if (state.signal) return "signal";
+  return state.code === 0 ? "success" : "nonzero-exit";
+}
+
 function assertPositiveFinite(name, value) {
   if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a positive finite number`);
 }
 
-function groupIdFor(child) {
-  const inherited = Number(process.env[PROCESS_GROUP_ENV]);
-  /* istanbul ignore next -- inherited branch executes in the integration-test subprocess */
-  return Number.isSafeInteger(inherited) && inherited > 0 ? inherited : child.pid;
+function registryRecord(registryPath, record) {
+  appendFileSync(registryPath, `${JSON.stringify(record)}\n`, "utf8");
 }
 
-function killTree(child, signal) {
+function activeGroups(registryPath) {
+  let records = "";
+  try {
+    records = readFileSync(registryPath, "utf8");
+  } catch {
+    /* istanbul ignore next -- registry is created before the first child is spawned */
+    return new Map();
+  }
+  return parseProcessGroupRegistry(records);
+}
+
+export function parseProcessGroupRegistry(records) {
+  const groups = new Map();
+  for (const line of records.split("\n")) {
+    if (!line) continue;
+    try {
+      const record = JSON.parse(line);
+      if (record.operation === "add") groups.set(record.groupId, record.parentGroupId);
+      else if (record.operation === "remove") groups.delete(record.groupId);
+    } catch {
+      continue;
+    }
+  }
+  return groups;
+}
+
+function subtreeGroupIds(registryPath, rootGroupId) {
+  const groups = activeGroups(registryPath);
+  const selected = new Set([rootGroupId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [groupId, parentGroupId] of groups) {
+      if (selected.has(parentGroupId) && !selected.has(groupId)) {
+        selected.add(groupId);
+        changed = true;
+      }
+    }
+  }
+  return [...selected].reverse();
+}
+
+function signalProcessGroups(child, groupIds, signal) {
   /* istanbul ignore if -- spawned processes have a PID before termination paths run */
   if (!child.pid) return false;
-  try {
-    /* istanbul ignore if -- Windows process tree is exercised on Windows CI/operation */
-    if (process.platform === "win32") {
-      const args = ["/pid", String(child.pid), "/T"];
-      if (signal === "SIGKILL") args.push("/F");
-      const killer = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
-      killer.unref();
-    } else {
-      process.kill(-groupIdFor(child), signal);
-    }
+  /* istanbul ignore if -- Windows process tree is exercised on Windows CI/operation */
+  if (process.platform === "win32") {
+    const args = ["/pid", String(child.pid), "/T"];
+    if (signal === "SIGKILL") args.push("/F");
+    const killer = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
+    killer.unref();
     return true;
-  /* istanbul ignore next -- process-group fallback is platform/runtime defensive */
-  } catch {
-    /* istanbul ignore next -- child.kill throwing is a last-resort runtime failure */
-    try { return child.kill(signal); } catch { return false; }
+  }
+  let sent = false;
+  for (const groupId of groupIds) {
+    try {
+      process.kill(-groupId, signal);
+      sent = true;
+    } catch (error) {
+      /* istanbul ignore next -- only unexpected OS errors are rethrown; ESRCH is the expected race */
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
+    }
+  }
+  return sent;
+}
+
+function isProcessGroupAlive(groupId) {
+  /* istanbul ignore if -- Windows uses taskkill completion rather than POSIX group probing */
+  if (process.platform === "win32") return false;
+  try {
+    process.kill(-groupId, 0);
+    return true;
+  } catch (error) {
+    /* istanbul ignore else -- non-ESRCH errors fail closed */
+    return !(error instanceof Error && "code" in error && error.code === "ESRCH");
   }
 }
 
@@ -147,15 +215,15 @@ export function startPeriodicTask(task, intervalMs, options = {}) {
   return () => { isStopped = true; clearInterval(timer); };
 }
 
-function spawnSpec(command, args, options) {
-  const hasInheritedGroup = process.platform !== "win32" && Boolean(process.env[PROCESS_GROUP_ENV]);
-  /* istanbul ignore if -- Windows/inherited branches execute outside the instrumented test process */
-  if (process.platform === "win32" || hasInheritedGroup) {
+function spawnSpec(command, args, options, registryPath) {
+  const inheritedEnv = { ...process.env, ...options.env };
+  /* istanbul ignore if -- Windows branch executes on Windows CI/operation */
+  if (process.platform === "win32") {
     return {
       command,
       args: [...args],
       detached: false,
-      env: options.env,
+      env: inheritedEnv,
       shell: options.shell ?? false,
       isWrapper: false,
     };
@@ -164,7 +232,11 @@ function spawnSpec(command, args, options) {
     command: process.execPath,
     args: ["-e", ROOT_LAUNCHER, command, ...args],
     detached: true,
-    env: { ...options.env, GROWTH_PROCESS_GROUP_SHELL: options.shell ? "1" : "0" },
+    env: {
+      ...inheritedEnv,
+      [PROCESS_REGISTRY_ENV]: registryPath,
+      GROWTH_PROCESS_GROUP_SHELL: options.shell ? "1" : "0",
+    },
     shell: false,
     isWrapper: true,
   };
@@ -182,7 +254,17 @@ export function runProcess(command, args, options) {
 
   return new Promise((resolve) => {
     const capture = options.stdio === "capture";
-    const spec = spawnSpec(command, args, options);
+    const inheritedRegistryPath = process.env[PROCESS_REGISTRY_ENV];
+    /* istanbul ignore next -- inherited registry is exercised inside integration subprocesses */
+    const registryDirectory = process.platform !== "win32" && !inheritedRegistryPath
+      ? mkdtempSync(path.join(tmpdir(), "growth-process-groups-"))
+      : null;
+    /* istanbul ignore next -- non-root alternative is exercised inside integration subprocesses */
+    const registryPath = inheritedRegistryPath ?? (registryDirectory ? path.join(registryDirectory, "groups.log") : "");
+    const parentGroup = Number(process.env[PROCESS_GROUP_ENV]);
+    /* istanbul ignore next -- parent group is supplied only to nested integration subprocesses */
+    const parentGroupId = Number.isSafeInteger(parentGroup) && parentGroup > 0 ? parentGroup : null;
+    const spec = spawnSpec(command, args, options, registryPath);
     const child = spawn(spec.command, spec.args, {
       cwd: options.cwd,
       env: spec.env,
@@ -191,6 +273,12 @@ export function runProcess(command, args, options) {
       stdio: [options.stdin === undefined ? "ignore" : "pipe", capture ? "pipe" : "inherit", capture ? "pipe" : "inherit"],
       windowsHide: true,
     });
+    /* istanbul ignore next -- spawn returns a PID before this synchronous line */
+    const rootGroupId = child.pid ?? 0;
+    /* istanbul ignore else -- Windows/no-PID branch is platform/runtime defensive */
+    if (process.platform !== "win32" && rootGroupId > 0) {
+      registryRecord(registryPath, { operation: "add", groupId: rootGroupId, parentGroupId });
+    }
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -201,8 +289,18 @@ export function runProcess(command, args, options) {
     let bufferExceeded = false;
     let terminationError;
     let graceTimer;
-    let isGraceElapsed = false;
+    let groupPollTimer;
     let closeResult = null;
+    let timeoutTimer;
+    const terminationGroupIds = new Set();
+
+    const refreshTerminationGroups = () => {
+      /* istanbul ignore if -- Windows uses taskkill /T */
+      if (process.platform === "win32") return [rootGroupId];
+      for (const groupId of subtreeGroupIds(registryPath, rootGroupId)) terminationGroupIds.add(groupId);
+      return [...terminationGroupIds];
+    };
+    const haveTerminationGroupsExited = () => refreshTerminationGroups().every((groupId) => !isProcessGroupAlive(groupId));
 
     const finish = (kind, code, signal, error) => {
       /* istanbul ignore if -- spawn error/close races are guarded */
@@ -210,19 +308,32 @@ export function runProcess(command, args, options) {
       settled = true;
       clearTimeout(timeoutTimer);
       if (graceTimer) clearTimeout(graceTimer);
+      if (groupPollTimer) clearInterval(groupPollTimer);
       stopHeartbeat();
       for (const parentSignal of parentSignals) process.off(parentSignal, forwardSignal);
+      /* istanbul ignore else -- Windows/no-PID branch is platform/runtime defensive */
+      if (process.platform !== "win32" && rootGroupId > 0) {
+        registryRecord(registryPath, { operation: "remove", groupId: rootGroupId });
+      }
+      /* istanbul ignore else -- nested cleanup is exercised inside integration subprocesses */
+      if (registryDirectory) rmSync(registryDirectory, { recursive: true, force: true });
       resolve({ kind, exitCode: timedOut ? 124 : leaseLost ? 125 : code, phase, elapsedMs: Date.now() - startedAt, signal, stdout, stderr, timedOut, termSent, forceKilled, ...(error ? { error } : {}) });
     };
     const finishFromClose = () => {
+      /* istanbul ignore if -- callers invoke this only after closeResult is assigned */
       if (!closeResult) return;
       const { code, signal } = closeResult;
-      if (leaseLost) finish("lease-lost", 125, signal, terminationError);
-      else if (timedOut) finish("timeout", 124, signal, undefined);
-      else if (bufferExceeded) finish("max-buffer", 1, signal, undefined);
-      else if (signal) finish("signal", 1, signal, undefined);
-      else if (spec.isWrapper && code === 126 && stderr.includes("GROWTH_SPAWN_ERROR:")) finish("spawn-error", 1, null, new Error(stderr.trim()));
-      else finish(code === 0 ? "success" : "nonzero-exit", code, null, undefined);
+      const kind = classifyProcessClose({ leaseLost, timedOut, bufferExceeded, isWrapper: spec.isWrapper, code, signal, stderr });
+      if (kind === "spawn-error") {
+        timedOut = false;
+        finish(kind, 1, null, new Error(stderr.trim()));
+      } else if (kind === "lease-lost") finish(kind, 125, signal, terminationError);
+      else if (kind === "timeout") finish(kind, 124, signal, undefined);
+      else if (kind === "max-buffer" || kind === "signal") finish(kind, 1, signal, undefined);
+      else finish(kind, code, null, undefined);
+    };
+    const finishTerminatedTree = () => {
+      if (closeResult && haveTerminationGroupsExited()) finishFromClose();
     };
     const beginTermination = (kind, error) => {
       if (kind === "timeout") timedOut = true;
@@ -230,14 +341,14 @@ export function runProcess(command, args, options) {
         leaseLost = true;
         terminationError = error;
       }
-      /* istanbul ignore next -- false only after the target group has already exited */
-      termSent = killTree(child, "SIGTERM") || termSent;
+      /* istanbul ignore next -- false only after the target tree has already exited */
+      termSent = signalProcessGroups(child, refreshTerminationGroups(), "SIGTERM") || termSent;
       if (graceTimer) return;
+      groupPollTimer = setInterval(finishTerminatedTree, 10);
       graceTimer = setTimeout(() => {
-        /* istanbul ignore next -- false only after the target group has already exited */
-        forceKilled = killTree(child, "SIGKILL") || forceKilled;
-        isGraceElapsed = true;
-        setTimeout(finishFromClose, 0);
+        /* istanbul ignore next -- false only after the target tree has already exited */
+        forceKilled = signalProcessGroups(child, refreshTerminationGroups(), "SIGKILL") || forceKilled;
+        finishTerminatedTree();
       }, killGraceMs);
     };
     const controlledHeartbeat = options.heartbeat
@@ -253,7 +364,7 @@ export function runProcess(command, args, options) {
       ? startPeriodicTask(controlledHeartbeat, options.heartbeatMs)
       : () => {};
     const parentSignals = ["SIGINT", "SIGTERM"];
-    const forwardSignal = (signal) => { killTree(child, signal); };
+    const forwardSignal = (signal) => { signalProcessGroups(child, refreshTerminationGroups(), signal); };
     for (const parentSignal of parentSignals) process.on(parentSignal, forwardSignal);
 
     const append = (stream, chunk) => {
@@ -269,13 +380,10 @@ export function runProcess(command, args, options) {
     child.on("error", (error) => finish("spawn-error", 1, null, error));
     child.on("close", (code, signal) => {
       closeResult = { code, signal };
-      // capture の close は共有 pipe を持つ全子孫の終了後にだけ発火する。
-      // inherit は leader close だけでは子孫終了を証明できないため grace 完了まで待つ。
-      /* istanbul ignore next -- short-circuit variants are platform/stdio timing dependent */
-      if (!capture && (timedOut || leaseLost || bufferExceeded) && graceTimer && !isGraceElapsed) return;
-      finishFromClose();
+      if (timedOut || leaseLost || bufferExceeded) finishTerminatedTree();
+      else finishFromClose();
     });
     if (options.stdin !== undefined) child.stdin.end(options.stdin);
-    const timeoutTimer = setTimeout(() => beginTermination("timeout"), options.timeoutMs);
+    timeoutTimer = setTimeout(() => beginTermination("timeout"), options.timeoutMs);
   });
 }

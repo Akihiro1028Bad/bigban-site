@@ -53,7 +53,19 @@ export interface ProcessFailureContext {
   resumeCommand: string;
 }
 
+export interface ProcessCloseState {
+  leaseLost: boolean;
+  timedOut: boolean;
+  bufferExceeded: boolean;
+  isWrapper: boolean;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  stderr: string;
+}
+
 export function resolveTimeoutPolicy(env?: Record<string, string | undefined>): TimeoutPolicy;
 export function buildProcessFailureDetail(result: ProcessResult, context: ProcessFailureContext): string;
+export function classifyProcessClose(state: ProcessCloseState): ProcessResultKind;
+export function parseProcessGroupRegistry(records: string): ReadonlyMap<number, number | null>;
 export function runProcess(command: string, args: readonly string[], options: RunProcessOptions): Promise<ProcessResult>;
 export function startPeriodicTask(task: () => void | Promise<void>, intervalMs: number, options?: { runImmediately?: boolean }): () => void;
