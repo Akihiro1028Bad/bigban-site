@@ -59,8 +59,6 @@ import { confirmedFactsFromPage } from "./sourceLedger";
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
-const DRAFTED_STATUS = "下書き作成済み";
-const APPROVED_STATUS = "承認";
 // microCMS contentId の許可文字＋長さ上限(draft/eyecatch route と同じ)。不正値・過大値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
@@ -86,14 +84,6 @@ function richTextOf(page: NotionPage, prop: string): string {
 function selectOf(page: NotionPage, prop: string): string {
   const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
   return value?.select?.name ?? "";
-}
-
-function dateMsOf(page: NotionPage, prop: string): number | null {
-  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
-  const start = value?.date?.start;
-  if (!start) return null;
-  const ms = Date.parse(start);
-  return Number.isNaN(ms) ? null : ms;
 }
 
 function titleOf(page: NotionPage): string {
