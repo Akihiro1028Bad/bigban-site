@@ -395,6 +395,8 @@ npm run growth:weekly     # 分析→Notion 3DB 書き込み→自動で notify-
 
 ```powershell
 npm run growth:daemon
+
+任意の `GROWTH_TIMEOUT_*_MS` / `GROWTH_KILL_GRACE_MS` / `GROWTH_LOCK_HEARTBEAT_MS` / `GROWTH_LOCK_LEASE_MS` / `GROWTH_DAEMON_HEARTBEAT_MS` は `.env.example` を参照。0・負数・Infinity・文字列は無視され既定値になる。lock heartbeat は lease expiry より短くする。
 ```
 
 - 起動しておくだけで、各ループを**間隔ごとに自動巡回**（pull系=既定1分・publish-due=5分・stall-check=15分・metrics=24時間・review-due/proposal-review-due=7日）。依頼が無いループは軽い `peek` だけで空振りし、headless agent 起動も日次上限カウントも発生しないので、依頼は**押してから最大1〜2分**で拾われます。

@@ -3,6 +3,8 @@
 > 承認済み記事を microCMS の**下書き**として作る経路。正典の前提・絶対禁止は [00-canon.md](00-canon.md)。
 
 1回の実行で処理する記事は1件だけ。`drafts-auto` はH2/H3を含む構成案がある行だけを対象に、中断中の `生成中`、次に `承認` の順で1件をclaimし、そのpageIdだけを決定的オーケストレーターへ渡す。構成不備の行は後続記事を止めない。
+
+手動 `drafts` と `drafts-auto` は共有 lease の取得後にだけ対象を選ぶ。同時起動時は片方が exit 0 でスキップする。timeout 時も「生成中」と research/writer キャッシュを残すため、同じコマンドを再実行すると完了済み工程を再利用できる。
 > AIプロンプトは `scripts/growth/prompts/draft-research.md` と `draft-write.md`、運用手順は runbook「下書きモード」。
 
 ## 下書き生成(`growth:drafts`)
