@@ -7,6 +7,7 @@ import {
   confirmedFactsFromRenderedText,
   factBindingFromEntries,
   factBindingFromPage,
+  factBindingFromRenderedText,
   hasReferenceEligibleSource,
   parseSourceLedger,
   renderSourceLedgerText,
@@ -218,11 +219,39 @@ describe("renderSourceLedgerText", () => {
     expect(factBindingFromPage(page)).toMatchObject({ bodyHash: "fnv1a64:abc", isValid: true });
   });
 
+  it("部分的・混在したbindingメタデータと旧監査行を安全側に扱う", () => {
+    const withoutMetadata = { ...auditReference, bindingVersion: undefined, bodyHash: undefined };
+    const versionOnly = { ...withoutMetadata, bindingVersion: 1 };
+    const hashOnly = { ...withoutMetadata, bodyHash: "fnv1a64:partial" };
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [withoutMetadata] }])).toBeUndefined();
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [versionOnly] }])).toEqual({
+      version: 1,
+      bodyHash: "",
+      referenceCount: 1,
+      isValid: false,
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [hashOnly] }])).toEqual({
+      version: 0,
+      bodyHash: "fnv1a64:partial",
+      referenceCount: 1,
+      isValid: false,
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [auditReference, withoutMetadata] }])?.isValid).toBe(false);
+    expect(factBindingFromRenderedText("  ↳ fact-old p#1 根拠「旧形式」 本文「旧本文」")).toBeUndefined();
+    expect(factBindingFromRenderedText(
+      "  ↳ fact-new [binding:v1;hash=fnv1a64:abc] p#1\n  ↳ fact-old p#2",
+    )?.isValid).toBe(false);
+  });
+
   it("最終本文に合わせて全referenceのhashを更新する", () => {
     const entry = { ...validEntry, factReferences: [auditReference] };
     const updated = withBindingBodyHash([entry], "<p>最終本文</p>");
     expect(updated[0].factReferences?.[0].bodyHash).not.toBe(auditReference.bodyHash);
     expect(entry.factReferences[0].bodyHash).toBe("fnv1a64:abc");
+    expect(withBindingBodyHash([validEntry], "<p>最終本文</p>")).toEqual([validEntry]);
+    expect(withBindingBodyHash([
+      { ...validEntry, factReferences: [{ ...auditReference, bindingVersion: undefined, bodyHash: undefined }] },
+    ], "<p>最終本文</p>")[0].factReferences?.[0].bodyHash).toBeUndefined();
   });
 
   it("再確認不要・見出しなしの監査行も表示する", () => {
@@ -239,6 +268,19 @@ describe("renderSourceLedgerText", () => {
       ...validEntry,
       factReferences: [{ ...auditReference, recheckReason: undefined }],
     }])).toContain("[公開前再確認:要確認]");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{ ...auditReference, bindingVersion: undefined, bodyHash: undefined }],
+    }])).not.toContain("[binding:");
+  });
+
+  it("binding台帳プロパティの欠落・空rich_text・plain_text欠落は旧記事として扱う", () => {
+    expect(factBindingFromPage({ id: "missing", url: "", properties: {} })).toBeUndefined();
+    expect(factBindingFromPage({
+      id: "empty",
+      url: "",
+      properties: { 根拠台帳: { rich_text: [{}] } },
+    })).toBeUndefined();
   });
 
   it("同じ情報源の複数事実は読点で連結する", () => {

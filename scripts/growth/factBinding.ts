@@ -113,8 +113,8 @@ function knownProperNouns(facts: readonly ResearchFact[]): string[] {
     }
     for (const match of statement.matchAll(/[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}(?:駅|体育館|クラブ|協会|連盟)/g)) {
       const segments = match[0].split(/[のはをがにでとへ]|より|から/).filter(Boolean);
-      const noun = segments.at(-1);
-      if (noun) nouns.add(noun);
+      const noun = segments.at(-1)!;
+      nouns.add(noun);
     }
   }
   return [...nouns].filter((noun) => noun.length > 0).sort((a, b) => b.length - a.length);
@@ -126,14 +126,14 @@ function numeric(match: string): number {
 
 function canonicalYen(match: string): string {
   const normalizedMatch = match.normalize("NFKC").replace(/\s+/g, "");
-  const amount = numeric(normalizedMatch.match(new RegExp(NUMBER_SOURCE))?.[0] ?? "0");
+  const amount = numeric(normalizedMatch.match(new RegExp(NUMBER_SOURCE))![0]);
   const multiplier = normalizedMatch.includes("万") ? 10_000 : normalizedMatch.includes("千") ? 1_000 : 1;
   return `yen:${amount * multiplier}`;
 }
 
 function canonicalClock(match: string): string {
   const value = match.normalize("NFKC");
-  const numbers = value.match(/\d+/g) ?? ["0"];
+  const numbers = value.match(/\d+/g)!;
   let hour = Number(numbers[0]);
   if (value.includes("午後") && hour < 12) hour += 12;
   if (value.includes("午前") && hour === 12) hour = 0;
@@ -143,8 +143,7 @@ function canonicalClock(match: string): string {
 function pushJapaneseProperNouns(atoms: Atom[], value: string): void {
   for (const match of value.matchAll(/[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}(?:駅|体育館|クラブ|協会|連盟)/g)) {
     const segments = match[0].split(/[のはをがにでとへ]|より|から/).filter(Boolean);
-    const noun = segments.at(-1);
-    if (!noun) continue;
+    const noun = segments.at(-1)!;
     const relativeStart = match[0].lastIndexOf(noun);
     const start = match.index + relativeStart;
     atoms.push({ kind: "proper-noun", canonical: normalized(noun), start, end: start + noun.length });
@@ -170,7 +169,7 @@ function extractAtoms(text: string, facts: readonly ResearchFact[], isTableCell 
   pushMatches(atoms, value, /入会金|参加費|月額|無料|有料/g, "price");
   pushMatches(atoms, value, /\d{1,2}:\d{2}(?:\s*[-〜～]\s*\d{1,2}:\d{2})?/g, "time", (match) => `time:${normalized(match[0])}`);
   pushMatches(atoms, value, /(?:午前|午後)?\d{1,2}時(?:\d{1,2}分)?/g, "time", (match) => canonicalClock(match[0]));
-  pushMatches(atoms, value, new RegExp(`徒歩\\s*${NUMBER_SOURCE}\\s*分`, "g"), "time", (match) => `walk-minutes:${numeric(match[0].match(new RegExp(NUMBER_SOURCE))?.[0] ?? "0")}`);
+  pushMatches(atoms, value, new RegExp(`徒歩\\s*${NUMBER_SOURCE}\\s*分`, "g"), "time", (match) => `walk-minutes:${numeric(match[0].match(new RegExp(NUMBER_SOURCE))![0])}`);
   pushMatches(atoms, value, new RegExp(`${NUMBER_SOURCE}\\s*(?:時間|分|秒)`, "g"), "time", (match) => `duration:${normalized(match[0])}`);
   pushMatches(atoms, value, new RegExp(`(?<![\\d,])${NUMBER_SOURCE}\\s*(?:%|％|割|人|名|件|面|本|台|回|km|m|kg|g|日|週|か月|年|月|分|秒|倍|位)`, "gi"), "quantity", (match) => normalized(match[0]));
   pushMatches(atoms, value, STATISTIC_WORDS, "statistic");
@@ -238,7 +237,7 @@ function sectionPath(headings: readonly string[]): string {
 
 function tableClaimAtom(value: string, header: string | undefined): Atom | undefined {
   const trimmed = value.trim();
-  if (!trimmed || (/^[A-Za-z]$/.test(trimmed) && !header)) return undefined;
+  if (!trimmed) return undefined;
   if (/^[A-Za-z]$/.test(trimmed)) return undefined;
   return {
     kind: "statistic",

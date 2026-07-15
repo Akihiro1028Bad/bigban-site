@@ -224,6 +224,7 @@ describe("validateAndStripFactBindings", () => {
 
   it.each([
     ["万円", "<p>参加費は1万円<!--FACT:fact-x-->。</p>", "参加費は10,000円"],
+    ["千円", "<p>参加費は2千円<!--FACT:fact-x-->。</p>", "参加費は2,000円"],
     ["分", "<p>所要時間は30分<!--FACT:fact-x-->。</p>", "所要時間は30分"],
     ["月", "<p>開始は4月<!--FACT:fact-x-->。</p>", "開始は4月"],
     ["倍", "<p>広さは2倍<!--FACT:fact-x-->。</p>", "広さは2倍"],
@@ -231,6 +232,13 @@ describe("validateAndStripFactBindings", () => {
     ["桁区切り", "<p>参加者は2,000人<!--FACT:fact-x-->。</p>", "参加者は2,000人"],
   ])("%sを一体のatomとして照合する", (_label, html, statement) => {
     expect(() => validate(html, [fact("fact-x", statement)])).not.toThrow();
+  });
+
+  it("午前12時を0時として照合し、空表セルは主張として扱わない", () => {
+    expect(() => validate(
+      "<p>開始は午前12時<!--FACT:fact-midnight-->。</p><table><tr><th>備考</th></tr><tr><td></td></tr></table>",
+      [fact("fact-midnight", "開始は0時")],
+    )).not.toThrow();
   });
 
   it.each([
