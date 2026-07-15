@@ -19,7 +19,7 @@
 
 import "dotenv/config";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,7 +77,9 @@ import {
   updatePagePropsWithLedgerFallback,
 } from "./sourceLedger";
 import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
-import { runStages, type Stage } from "./pipeline";
+import { createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
+import { buildGrowthOperationResult } from "./operationOutcome";
+import { diagnosticDetail } from "./externalApiError";
 import {
   buildRebuildSourceClearProps,
   preserveRebuildSourceSlug,
@@ -155,7 +157,24 @@ function errorMessage(error: unknown): string {
 async function main(): Promise<void> {
   const specPath = process.argv[2];
   if (!specPath) throw new Error("使い方: publish-draft -- <spec.json>");
-  const spec = JSON.parse(await readFile(specPath, "utf-8")) as DraftSpec;
+  const specRaw = await readFile(specPath, "utf-8");
+  const spec = JSON.parse(specRaw) as DraftSpec;
+  const stateDirectory = path.dirname(specPath);
+  const checkpointPath = path.join(stateDirectory, "publish-checkpoint.json");
+  const outcomePath = path.join(stateDirectory, "publish-outcome.json");
+  const specHash = createSpecHash(specRaw);
+  const atomicJson = async (filePath: string, value: unknown): Promise<void> => {
+    const temporary = `${filePath}.tmp`;
+    await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
+    await rename(temporary, filePath);
+  };
+  let checkpoint: PipelineCheckpoint | null = null;
+  try {
+    const parsed: unknown = JSON.parse(await readFile(checkpointPath, "utf-8"));
+    if (parsed && typeof parsed === "object") checkpoint = parsed as PipelineCheckpoint;
+  } catch {
+    checkpoint = null;
+  }
 
   // 媒体軸(#media): 行の `媒体` で公開先を出し分ける。欠落=column=従来の env 従属。
   const media: GrowthMedia = growthMediaForRow(spec.media);
@@ -209,6 +228,12 @@ async function main(): Promise<void> {
   if (spec.notion) {
     stages.push({
       name: "notion-context",
+      restore: (output) => {
+        if (!output || typeof output !== "object") return;
+        const saved = output as { rebuildSourceId?: unknown; payload?: unknown };
+        if (typeof saved.rebuildSourceId === "string") rebuildSourceId = saved.rebuildSourceId;
+        if (saved.payload && typeof saved.payload === "object") spec.payload = saved.payload as Record<string, unknown>;
+      },
       run: async () => {
         const page = await getPage(spec.notion!.pageId, {
           token: requireEnv("NOTION_TOKEN"),
@@ -245,6 +270,7 @@ async function main(): Promise<void> {
           );
           spec.payload = preserveRebuildSourceSlug(spec.payload, sourceSlug);
         }
+        return { rebuildSourceId, payload: spec.payload };
       },
     });
   }
@@ -298,6 +324,11 @@ async function main(): Promise<void> {
     const inputs = spec.images;
     stages.push({
       name: "body-images",
+      restore: (output) => {
+        if (output && typeof output === "object" && typeof (output as { bodyHtml?: unknown }).bodyHtml === "string") {
+          spec.payload.bodyHtml = (output as { bodyHtml: string }).bodyHtml;
+        }
+      },
       run: async () => {
         // spec.json は未検証 JSON。旧値(minimal/diagram 等)や未知値が来ても
         // 落とさず新6語彙へ正規化してから spec を組む(#P2 レビュー Important)。
@@ -323,12 +354,18 @@ async function main(): Promise<void> {
           process.stderr.write(`${msg}\n`);
           await notifyLineBestEffort(msg);
         }
+        return { bodyHtml: String(spec.payload.bodyHtml ?? "") };
       },
     });
   }
 
   stages.push({
     name: "create",
+    restore: (output) => {
+      if (output && typeof output === "object" && typeof (output as { contentId?: unknown }).contentId === "string") {
+        contentId = (output as { contentId: string }).contentId;
+      }
+    },
     run: async () => {
       // Bug1: columns の articleType(kind=select)は配列を要求する。LLM が文字列で
       // 吐いても初回 create が HTTP 400 で落ちないよう、投入直前に配列へ矯正する。
@@ -339,6 +376,7 @@ async function main(): Promise<void> {
         microOpts,
         rebuildSourceId || undefined
       );
+      return { contentId };
     },
   });
 
@@ -362,10 +400,16 @@ async function main(): Promise<void> {
             { fetchFn: defaultFetch, readFile }
           );
           await writeFile(imagePath, buf);
+          return { imagePath };
         },
       },
       {
         name: "eyecatch:upload",
+        restore: (output) => {
+          if (output && typeof output === "object" && typeof (output as { eyecatchUrl?: unknown }).eyecatchUrl === "string") {
+            eyecatchUrl = (output as { eyecatchUrl: string }).eyecatchUrl;
+          }
+        },
         run: async () => {
           eyecatchUrl = await uploadMedia(imagePath, {
             serviceDomain,
@@ -373,6 +417,7 @@ async function main(): Promise<void> {
             fetchFn: defaultFetch,
             readFile,
           });
+          return { eyecatchUrl };
         },
       },
       {
@@ -435,9 +480,39 @@ async function main(): Promise<void> {
     });
   }
 
-  const result = await runStages(stages, (m) => process.stdout.write(`${m}\n`));
+  const result = await runStages(stages, (m) => process.stdout.write(`${m}\n`), {
+    specHash,
+    checkpoint,
+    onCheckpoint: (next) => atomicJson(checkpointPath, next),
+  });
 
   if (result.failedAt) {
+    const resumeCommand = spec.notion
+      ? `npm run growth:draft-orchestrator -- ${spec.notion.pageId}`
+      : `npm run growth:publish-draft -- ${specPath}`;
+    const isPartial = result.completed.includes("create") && result.failedAt.name === "notion:update";
+    const safeDetail = diagnosticDetail(result.failedAt.error, {
+      secrets: [process.env.MICROCMS_API_KEY ?? "", process.env.NOTION_TOKEN ?? "", process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ""],
+    });
+    const outcome = buildGrowthOperationResult({
+      outcome: isPartial ? "partial" : "retryable-failure",
+      message: isPartial
+        ? `microCMS投入は完了しましたが ${result.failedAt.name} に失敗しました。`
+        : `投入工程 ${result.failedAt.name} に失敗しました。`,
+      completedStages: result.completed,
+      failedStage: result.failedAt.name,
+      events: result.events,
+      externalIds: { ...(contentId ? { contentId } : {}), ...(spec.notion ? { notionPageId: spec.notion.pageId } : {}) },
+      recovery: { retryable: true, resumeFrom: result.failedAt.name, command: resumeCommand },
+    });
+    await atomicJson(outcomePath, outcome);
+    process.stdout.write(`growthOutcome=${JSON.stringify(outcome)}\n`);
+    if (isPartial) {
+      process.stderr.write(`部分成功: ${result.failedAt.name}: ${safeDetail}\n再開: ${resumeCommand}\n`);
+      if (contentId) process.stdout.write(`contentId=${contentId}\n`);
+      process.exitCode = 0;
+      return;
+    }
     const category = classifyDraftFailure(result.failedAt.error);
     const failureMessage = buildDraftFailureMessage({
       failedStage: result.failedAt.name,
@@ -489,6 +564,16 @@ async function main(): Promise<void> {
     return;
   }
 
+  const outcome = buildGrowthOperationResult({
+    outcome: "success",
+    message: "下書き投入が完了しました。",
+    completedStages: result.completed,
+    events: result.events,
+    externalIds: { ...(contentId ? { contentId } : {}), ...(eyecatchUrl ? { assetUrl: eyecatchUrl } : {}), ...(spec.notion ? { notionPageId: spec.notion.pageId } : {}) },
+  });
+  await atomicJson(outcomePath, outcome);
+  await unlink(checkpointPath).catch(() => {});
+  process.stdout.write(`growthOutcome=${JSON.stringify(outcome)}\n`);
   process.stdout.write(`contentId=${contentId}\n`);
   if (eyecatchUrl) process.stdout.write(`eyecatch=${eyecatchUrl}\n`);
 }

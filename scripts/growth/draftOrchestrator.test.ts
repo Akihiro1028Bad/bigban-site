@@ -42,46 +42,49 @@ describe("draftOrchestrator", () => {
     ]);
   });
 
-  it("下書き投入後の通知失敗は処理を失敗にせず再送コマンドを警告する", () => {
+  it("下書き投入後の通知失敗はpartialでthrowせず再送コマンドを警告する", async () => {
     const warnings: string[] = [];
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
-      notify: () => {
+      notify: async () => {
         throw new Error("LINE API error");
       },
       warn: (message) => warnings.push(message),
-    })).toBe(false);
+    });
+    expect(result).toMatchObject({ outcome: "partial", failedStage: "line-notify", success: false });
     expect(warnings).toEqual([
       expect.stringContaining("npm run growth:notify-drafts -- /tmp/notify.json"),
     ]);
   });
 
-  it("下書き投入後の通知成功をそのまま成功として返す", () => {
+  it("下書き投入後の通知成功をsuccessとして返す", async () => {
     let notified = false;
     const warnings: string[] = [];
 
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
-      notify: () => {
+      notify: async () => {
         notified = true;
       },
       warn: (message) => warnings.push(message),
-    })).toBe(true);
+    });
+    expect(result).toMatchObject({ outcome: "success", success: true, completedStages: ["line-notify"] });
     expect(notified).toBe(true);
     expect(warnings).toEqual([]);
   });
 
-  it("通知処理がError以外をthrowしても警告へ変換する", () => {
+  it("通知処理がError以外をrejectしても警告へ変換する", async () => {
     const warnings: string[] = [];
     const thrownValue: unknown = "LINE unavailable";
 
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
       notify: () => {
-        throw thrownValue;
+        return Promise.reject(thrownValue);
       },
       warn: (message) => warnings.push(message),
-    })).toBe(false);
+    });
+    expect(result.outcome).toBe("partial");
     expect(warnings[0]).toContain("LINE unavailable");
   });
 

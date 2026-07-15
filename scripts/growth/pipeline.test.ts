@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
 
-import { runStages, type Stage } from "./pipeline";
+import { createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
 
 describe("runStages", () => {
   it("全ステージ成功で completed を全件・failedAt は null", async () => {
@@ -56,5 +56,59 @@ describe("runStages", () => {
     ];
     const r = await runStages(stages, log);
     expect(r.failedAt).toEqual({ name: "create", error: "boom" });
+    expect(r.events.at(-1)).toMatchObject({ stage: "create", event: "failed" });
+  });
+
+  it("成功出力をcheckpointへ保存し、再開時はrestoreして成功prefixをskipする", async () => {
+    const create = vi.fn(async () => ({ contentId: "content-1" }));
+    const patch = vi.fn(async () => ({ done: true }));
+    const restored: unknown[] = [];
+    const checkpoints: PipelineCheckpoint[] = [];
+    const stages: Stage[] = [
+      { name: "create", run: create, restore: (output) => restored.push(output) },
+      { name: "patch", run: patch },
+    ];
+    const first = await runStages(stages, vi.fn(), {
+      specHash: createSpecHash("spec"),
+      onCheckpoint: (checkpoint) => { checkpoints.push(checkpoint); },
+    });
+    const resumed = await runStages(stages, vi.fn(), {
+      specHash: createSpecHash("spec"),
+      checkpoint: checkpoints.at(-1),
+    });
+
+    expect(first.outputs.create).toEqual({ contentId: "content-1" });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(restored).toEqual([{ contentId: "content-1" }]);
+    expect(resumed.events.map((event) => event.event)).toEqual(["skipped", "skipped"]);
+  });
+
+  it("失敗stage以降だけ実行し、hash不一致・壊れた非prefix checkpointは不使用", async () => {
+    const ran: string[] = [];
+    const stages: Stage[] = [
+      { name: "a", run: async () => void ran.push("a") },
+      { name: "b", run: async () => void ran.push("b") },
+    ];
+    await runStages(stages, vi.fn(), {
+      specHash: "new",
+      checkpoint: { version: 1, specHash: "old", completed: [{ stage: "a", output: 1 }] },
+    });
+    expect(ran).toEqual(["a", "b"]);
+    ran.length = 0;
+    await runStages(stages, vi.fn(), {
+      specHash: "same",
+      checkpoint: { version: 1, specHash: "same", completed: [{ stage: "b", output: 1 }] },
+    });
+    expect(ran).toEqual(["a", "b"]);
+  });
+
+  it("started/succeeded/skippedイベントを順序通り通知する", async () => {
+    const events: string[] = [];
+    await runStages([{ name: "a", run: async () => "out" }], vi.fn(), {
+      now: () => "now",
+      onEvent: (event) => events.push(`${event.event}:${event.at}`),
+    });
+    expect(events).toEqual(["started:now", "succeeded:now"]);
   });
 });

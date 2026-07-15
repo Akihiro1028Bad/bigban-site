@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
-import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
+import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
@@ -20,6 +20,9 @@ import { queryAllDataSource } from "./notionRepository";
 import { selectDraftsAutoTarget, draftsAutoQueryFilter, DRAFTS_AUTO_STATUS_PROP } from "./draftsAuto";
 import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess } from "./processControl.mjs";
 import type { ProcessResult } from "./processControl.mjs";
+import { buildGrowthOperationResult, mergeGrowthOperationResults, normalizeGrowthOperationResult } from "./operationOutcome";
+
+import type { GrowthOperationResult } from "./operationOutcome";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
@@ -121,6 +124,16 @@ function parseAgentJson(raw: string): unknown {
     if (typeof record.result === "string") return JSON.parse(record.result);
   }
   return parsed;
+}
+
+function operationResultFromOutput(output: string): GrowthOperationResult {
+  const line = output.split("\n").find((item) => item.startsWith("growthOutcome="));
+  if (!line) return buildGrowthOperationResult({ outcome: "success", message: "下書き投入が完了しました。" });
+  try {
+    return normalizeGrowthOperationResult(JSON.parse(line.slice("growthOutcome=".length)) as unknown);
+  } catch {
+    return buildGrowthOperationResult({ outcome: "retryable-failure", message: "下書き投入結果を確認できませんでした。" });
+  }
 }
 
 async function runAgent(params: {
@@ -392,17 +405,28 @@ async function main(): Promise<void> {
     throw error;
   }
   process.stdout.write(publishOut);
+  const publishResult = operationResultFromOutput(publishOut);
   const contentId = publishedContentId(publishOut);
   // CMS投入まで完了したattemptだけを閉じる。途中失敗ではmarkerを残し、再試行で本文を再利用する。
-  if (generation.marker && existsSync(generationMarkerPath)) unlinkSync(generationMarkerPath);
+  if (publishResult.outcome === "success" && generation.marker && existsSync(generationMarkerPath)) unlinkSync(generationMarkerPath);
   const notifyPath = path.join(stateDir, "notify.json");
   writeFileSync(notifyPath, JSON.stringify([{ title: input.title, contentId, media: input.media }]));
-  try {
-    await runNpm("growth:notify-drafts", [notifyPath]);
-  } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`下書き投入は完了しましたがLINE通知に失敗しました: ${detail}\n通知だけ再送: npm run growth:notify-drafts -- ${notifyPath}\n`);
+  const notificationResult = await runDraftNotificationBestEffort({
+    notifyPath,
+    notify: async () => void await runNpm("growth:notify-drafts", [notifyPath]),
+    warn: (message) => process.stderr.write(`${message}\n`),
+  });
+  const finalResult = mergeGrowthOperationResults(publishResult, notificationResult);
+  if (finalResult.outcome === "partial") {
+    const resumeCommand = finalResult.recovery?.command ?? `npm run growth:draft-orchestrator -- ${input.pageId}`;
+    try {
+      await runNpm("growth:learning-log", ["append-partial", "drafts", finalResult.failedStage ?? "unknown", resumeCommand, finalResult.message]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`学習ログへの部分成功記録に失敗しました: ${message}\n`);
+    }
   }
+  process.stdout.write(`draftOutcome=${JSON.stringify(finalResult)}\n`);
   } finally {
     await cleanupDraftWorkDirs(workDirs, rm);
   }

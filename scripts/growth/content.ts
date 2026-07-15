@@ -305,6 +305,31 @@ export interface PublishApiOptions {
   fetchFn: FetchFn;
 }
 
+export type ContentStatus = "PUBLISH" | "DRAFT" | "UNKNOWN";
+
+function managementStatusUrl(serviceDomain: string, endpoint: string, contentId: string): string {
+  return `https://${serviceDomain}.microcms-management.io/api/v1/contents/${endpoint}/${encodeURIComponent(contentId)}/status`;
+}
+
+export async function readContentStatus(
+  endpoint: string,
+  contentId: string,
+  options: PublishApiOptions,
+): Promise<ContentStatus> {
+  const res = await options.fetchFn(managementStatusUrl(options.serviceDomain, endpoint, contentId), {
+    method: "GET",
+    headers: { "X-MICROCMS-API-KEY": options.apiKey },
+  });
+  if (!res.ok) throw externalApiErrorFromResponse("microcms.status.read", res);
+  const body = await res.json() as unknown;
+  if (!body || typeof body !== "object") return "UNKNOWN";
+  const status = (body as { status?: unknown }).status;
+  if (!Array.isArray(status)) return "UNKNOWN";
+  if (status.includes("PUBLISH")) return "PUBLISH";
+  if (status.includes("DRAFT")) return "DRAFT";
+  return "UNKNOWN";
+}
+
 /**
  * 既存コンテンツを**公開**する(#167)。
  *
@@ -319,9 +344,7 @@ export async function publishContent(
   contentId: string,
   options: PublishApiOptions
 ): Promise<void> {
-  const url = `https://${options.serviceDomain}.microcms-management.io/api/v1/contents/${endpoint}/${encodeURIComponent(
-    contentId
-  )}/status`;
+  const url = managementStatusUrl(options.serviceDomain, endpoint, contentId);
   const res = await options.fetchFn(url, {
     method: "PATCH",
     headers: {

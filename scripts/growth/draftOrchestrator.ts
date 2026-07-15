@@ -5,9 +5,11 @@ import { placeholderIndices } from "./body-image";
 import { buildSourceLedgerFromUsedFacts, duplicateExternalLinks, externalLinksOutsideFacts, parseWriterOutput, RESERVE_URL } from "./draftPipeline";
 import { resolveFacilityPhase } from "./facility-context";
 import { rebuildSourceIdOf } from "./rebuildDraft";
+import { buildGrowthOperationResult } from "./operationOutcome";
 import type { ResearchPacket, WriterOutput } from "./draftPipeline";
 import type { FacilityContextData, FacilityPhase } from "./facility-context";
 import type { NotionPage } from "./notion";
+import type { GrowthOperationResult } from "./operationOutcome";
 
 export interface DraftInput {
   pageId: string;
@@ -367,19 +369,49 @@ export async function cleanupDraftWorkDirs(
 
 export function runDraftNotificationBestEffort(params: {
   notifyPath: string;
-  notify: () => void;
+  notify: () => Promise<void>;
   warn: (message: string) => void;
-}): boolean {
+  now?: () => string;
+}): Promise<GrowthOperationResult> {
+  return runDraftNotification(params);
+}
+
+async function runDraftNotification(params: {
+  notifyPath: string;
+  notify: () => Promise<void>;
+  warn: (message: string) => void;
+  now?: () => string;
+}): Promise<GrowthOperationResult> {
+  const at = (params.now ?? (() => new Date().toISOString()))();
   try {
-    params.notify();
-    return true;
+    await params.notify();
+    return buildGrowthOperationResult({
+      outcome: "success",
+      message: "下書き通知を送信しました。",
+      completedStages: ["line-notify"],
+      events: [
+        { stage: "line-notify", event: "started", at },
+        { stage: "line-notify", event: "succeeded", at },
+      ],
+    });
   } catch (error: unknown) {
     const detail = error instanceof Error ? error.message : String(error);
     params.warn(
       `下書き投入は完了しましたがLINE通知に失敗しました: ${detail}\n`
       + `通知だけ再送: npm run growth:notify-drafts -- ${params.notifyPath}`,
     );
-    return false;
+    return buildGrowthOperationResult({
+      outcome: "partial",
+      message: `下書き投入は完了しましたがLINE通知に失敗しました: ${detail}`,
+      failedStage: "line-notify",
+      events: [{ stage: "line-notify", event: "started", at }],
+      error,
+      recovery: {
+        retryable: true,
+        resumeFrom: "line-notify",
+        command: `npm run growth:notify-drafts -- ${params.notifyPath}`,
+      },
+    });
   }
 }
 

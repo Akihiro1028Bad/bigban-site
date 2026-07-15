@@ -145,6 +145,21 @@ describe("parseLearningEvent", () => {
     });
   });
 
+  it("工程部分成功をparseし、復旧情報をNotion propsへ保存する", () => {
+    const event: LearningEvent = {
+      kind: "工程部分成功",
+      mode: "drafts",
+      failedStage: "line-notify",
+      detail: "safe detail",
+      resumeCommand: "npm run growth:notify-drafts -- notify.json",
+    };
+    expect(parseLearningEvent(JSON.stringify(event))).toEqual(event);
+    expect(buildLearningLogTitle(event)).toBe("部分成功: drafts (line-notify)");
+    const props = buildLearningLogProps(event, NOW_ISO, "line-notify / npm run growth:notify-drafts -- notify.json / safe detail");
+    expect(selectName(props[LEARNING_LOG_PROPS.result])).toBe("リトライ");
+    expect(richTextContent(props[LEARNING_LOG_PROPS.target])).toBe("drafts");
+  });
+
   it("不正 JSON とスキーマ不一致は null を返す", () => {
     expect(parseLearningEvent("{")).toBeNull();
     expect(parseLearningEvent(JSON.stringify({ pageId: "idea-1" }))).toBeNull();
@@ -772,11 +787,12 @@ describe("summarizeLearningLog", () => {
       不採用: 0,
       画像試行: 0,
       工程失敗: 0,
+      工程部分成功: 0,
       その他: 0,
     });
   });
 
-  it("種別別件数は 5 種別とその他を初期化してカウントする", () => {
+  it("種別別件数は 6 種別とその他を初期化してカウントする", () => {
     const summary = summarizeLearningLog(
       [
         row({ kind: "編集" }),
@@ -784,6 +800,7 @@ describe("summarizeLearningLog", () => {
         row({ kind: "不採用" }),
         row({ kind: "画像試行" }),
         row({ kind: "工程失敗" }),
+        row({ kind: "工程部分成功" }),
         row({ kind: "その他" }),
       ],
       nowMs,
@@ -796,6 +813,7 @@ describe("summarizeLearningLog", () => {
       不採用: 1,
       画像試行: 1,
       工程失敗: 1,
+      工程部分成功: 1,
       その他: 1,
     });
   });
@@ -894,6 +912,16 @@ describe("summarizeLearningLog", () => {
     expect(summary.failModeFrequency).toEqual({ revise: 3, weekly: 1, 不明: 1 });
   });
 
+  it("工程部分成功は独立集計し工程失敗には加算しない", () => {
+    const summary = summarizeLearningLog([
+      row({ kind: "工程部分成功", target: "drafts" }),
+      row({ kind: "工程部分成功", target: "drafts" }),
+      row({ kind: "工程失敗", target: "weekly" }),
+    ], nowMs, 4);
+    expect(summary.partialModeFrequency).toEqual({ drafts: 2 });
+    expect(summary.failModeFrequency).toEqual({ weekly: 1 });
+  });
+
   it("0 件でも空サマリを返す", () => {
     expect(summarizeLearningLog([], nowMs, 4)).toEqual({
       windowWeeks: 4,
@@ -904,6 +932,7 @@ describe("summarizeLearningLog", () => {
         不採用: 0,
         画像試行: 0,
         工程失敗: 0,
+        工程部分成功: 0,
         その他: 0,
       },
       editRegionHeatmap: {},
@@ -911,6 +940,7 @@ describe("summarizeLearningLog", () => {
       rejectAspectHeatmap: {},
       imageRetryTop: [],
       failModeFrequency: {},
+      partialModeFrequency: {},
     });
   });
 });
