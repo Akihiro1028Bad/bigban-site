@@ -81,7 +81,7 @@ const PROHIBITED_CLAIMS: ReadonlyArray<{
   {
     label: "未確定イベント",
     pattern:
-      /(?:イベント|体験会|クリニック|レッスン|大会)[^。]{0,50}(?:[0-9０-９]{1,2}月[0-9０-９]{1,2}日|開催(?:します|予定)|参加料金|参加費|定員|出演者)/,
+      /(?:イベント|体験会|クリニック|レッスン|大会)[^。]{0,50}(?:[0-9０-９]{1,2}月[0-9０-９]{1,2}日|開催(?:します|予定(?:です|となっています|があります|と(?:案内|発表)されています|[。！!]))|参加料金|参加費|定員|出演者)/,
     requiresConfirmation: true,
   },
   {
@@ -116,7 +116,7 @@ const FORBIDDEN_HTML_TAGS = [
   "h1",
 ] as const;
 
-const FORBIDDEN_HTML_ATTRIBUTES = ["style", "target", "rel", "formaction"] as const;
+const FORBIDDEN_HTML_ATTRIBUTES = ["style", "formaction"] as const;
 
 function stripTags(html: string): string {
   return html
@@ -252,7 +252,58 @@ export function detectUnsafeHtml(html: string): string[] {
     const attribute = raw.trim().split(/\s*=/)[0].toLowerCase();
     if (!hits.includes(attribute)) hits.push(attribute);
   }
+  detectUnsafeLinkAttributes(html, hits);
   return hits;
+}
+
+function addUnique(hits: string[], attribute: string): void {
+  if (!hits.includes(attribute)) hits.push(attribute);
+}
+
+function hasHtmlAttribute(tag: string, attribute: string): boolean {
+  return new RegExp(`\\s${attribute}\\s*=`, "i").test(tag);
+}
+
+function htmlAttributeValue(tag: string, attribute: string): string | null {
+  const source =
+    "\\s" + attribute + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+))";
+  const match = new RegExp(source, "i").exec(tag);
+  if (!match) return null;
+  return match[1] ?? match[2] ?? match[3]!;
+}
+
+/**
+ * 外部リンクのサニタイザーが付与する安全な組み合わせだけを許可する。
+ * target/rel を全タグで一律許可せず、a@target=_blank には tabnabbing 防止の
+ * noopener+noreferrer を必須にする。
+ */
+function detectUnsafeLinkAttributes(html: string, hits: string[]): void {
+  const tags = html.match(/<[a-z][^>]*>/gi) ?? [];
+  for (const tag of tags) {
+    const hasTarget = hasHtmlAttribute(tag, "target");
+    const hasRel = hasHtmlAttribute(tag, "rel");
+    if (!hasTarget && !hasRel) continue;
+
+    const tagName = /^<([a-z][a-z0-9-]*)/i.exec(tag)?.[1]?.toLowerCase();
+    if (tagName !== "a") {
+      if (hasTarget) addUnique(hits, "target");
+      if (hasRel) addUnique(hits, "rel");
+      continue;
+    }
+
+    const target = htmlAttributeValue(tag, "target")?.toLowerCase();
+    const relTokens = (htmlAttributeValue(tag, "rel") ?? "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    const hasSafeRel =
+      relTokens.includes("noopener") &&
+      relTokens.includes("noreferrer") &&
+      !relTokens.includes("opener");
+
+    if (hasTarget && target !== "_blank") addUnique(hits, "target");
+    if (hasTarget && !hasSafeRel) addUnique(hits, "rel");
+  }
 }
 
 function articleType(input: DraftQualityInput): ArticleType {

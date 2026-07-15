@@ -430,6 +430,37 @@ describe("POST /api/growth/draft/edit", () => {
     expect(patchDraft).not.toHaveBeenCalled();
   });
 
+  it("comment-revise は最新情報の確認案内とサニタイザーが付けた安全な外部リンク属性を保存できる", async () => {
+    const disclaimer =
+      "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
+    vi.mocked(getPage).mockResolvedValue(
+      pageWithBodyMirror("g-abc", "承認したタイトル", `<p>旧本文です。${disclaimer}</p>`)
+    );
+
+    const res = await POST(
+      postRequest(null, {
+        pageId: PAGE_ID,
+        bodyHtml:
+          '<p><a href="https://example.com">公式サイト</a>を案内します。</p>' +
+          `<p>一人でも参加しやすいレッスンやイベントも用意されているので、開催予定や募集内容は最新の公式情報で確認してみてください。${disclaimer}</p>`,
+        source: "comment-revise",
+        adoptedAspects: ["正確性"],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(patchDraft).toHaveBeenCalledWith(
+      expect.any(String),
+      "g-abc",
+      expect.objectContaining({
+        bodyHtml: expect.stringMatching(
+          /target="_blank" rel="noopener noreferrer"/
+        ),
+      }),
+      expect.any(Object)
+    );
+  });
+
   it("adoptedFixes があれば fix ごとに指摘・変更前後を要約に残して採否を追記する", async () => {
     process.env.GROWTH_LEARNING_LOG_DS = "ds-log";
     vi.mocked(getPage).mockResolvedValue(
