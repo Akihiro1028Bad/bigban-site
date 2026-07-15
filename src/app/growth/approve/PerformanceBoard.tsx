@@ -99,7 +99,7 @@ export function PerformanceBoard({ items, onAddIdea }: PerformanceBoardProps) {
 
   const summary = summarizeMetrics(items.map((item) => ({ title: item.title, metrics: item.metrics })));
   const latestReservations = selectLatestReservationSnapshot(
-    measured.flatMap(({ metrics }) => metrics.actualReservations ? [metrics.actualReservations] : [])
+    rows.flatMap(({ metrics }) => metrics.actualReservations ? [metrics.actualReservations] : [])
   );
   const hasFreshReservations = latestReservations
     ? isReservationDataFresh(latestReservations.syncedAt, new Date(nowMs).toISOString())

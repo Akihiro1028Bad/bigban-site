@@ -219,6 +219,23 @@ describe("PerformanceBoard", () => {
     expect(screen.getByRole("button", { name: /失敗のみ/ })).toBeInTheDocument();
   });
 
+  it("GA4取得失敗でも独立して取得できた施設全体の実予約をサマリー表示する", () => {
+    const m: ArticleMetrics = {
+      ...metrics(0, null, 0),
+      measurementStatus: "source-error",
+      ga4Measured: false,
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: new Date().toISOString(),
+        facility: { current: 12, prior: 8, deltaPct: 50 },
+        article: null,
+      },
+    };
+    render(<PerformanceBoard items={[published("error-reservations", "GA4失敗・予約取得済み", m)]} />);
+    expect(screen.getByText("施設全体の実予約").parentElement).toHaveTextContent("12");
+  });
+
   it("CTA部分計測は完全計測・未計測と異なる注記を表示する", async () => {
     const user = userEvent.setup();
     const m: ArticleMetrics = {

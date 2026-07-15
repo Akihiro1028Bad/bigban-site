@@ -272,7 +272,8 @@ export function measurementStatusOf(
 function ymdTime(value: string | undefined): number | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const time = Date.parse(`${value}T00:00:00.000Z`);
-  return Number.isNaN(time) ? null : time;
+  if (Number.isNaN(time)) return null;
+  return new Date(time).toISOString().slice(0, 10) === value ? time : null;
 }
 
 /** CTAイベント設定日とレポート期間の重なりから計測状態を決める。 */

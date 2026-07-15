@@ -406,6 +406,20 @@ describe("measurement status", () => {
     expect(ctaEventsMeasurementStatusForPeriod({ start: "2026-07-01", end: "2026-07-07" }, "2026-99-99", true)).toBe("unmeasured");
   });
 
+  it("存在しない月末日を繰り上げ解釈せずunmeasuredにする", () => {
+    const period = { start: "2026-03-01", end: "2026-03-07" };
+    expect(ctaEventsMeasurementStatusForPeriod(period, "2026-02-30", true)).toBe("unmeasured");
+    expect(ctaEventsMeasurementStatusForPeriod(period, "2025-02-29", true)).toBe("unmeasured");
+  });
+
+  it("実在する閏日は有効な設定日として扱う", () => {
+    expect(ctaEventsMeasurementStatusForPeriod(
+      { start: "2024-03-01", end: "2024-03-07" },
+      "2024-02-29",
+      true
+    )).toBe("measured");
+  });
+
   it("パス不一致・一致済み0流入・ソース失敗を分離する", () => {
     expect(measurementBucketOf({ measurementStatus: "path-unmatched", views: { current: 0 } })).toBe("path-unmatched");
     expect(measurementBucketOf({ measurementStatus: "measured", views: { current: 0 } })).toBe("zero-inflow");
