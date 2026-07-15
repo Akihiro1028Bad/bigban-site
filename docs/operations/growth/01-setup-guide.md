@@ -80,7 +80,7 @@
 | **GA4** | プロパティ ID | 自宅 PC |
 | **Search Console** | 登録済みプロパティの URL（完全一致） | 自宅 PC |
 | **Notion** | 内部インテグレーションのトークン（`secret_...` / `ntn_...`） | 自宅 PC + Vercel |
-| **microCMS** | サービスドメイン / 管理 API キー | 自宅 PC |
+| **microCMS** | サービスドメイン / 管理 API キー | 自宅 PC + Vercel |
 | **LINE Messaging API** | チャネルアクセストークン（長期）/ グループ ID | 自宅 PC |
 | **OpenAI** | API キー | 自宅 PC |
 

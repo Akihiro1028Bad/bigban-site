@@ -175,12 +175,16 @@ describe("公開権限の境界", () => {
     expect(setupGuide).toContain("AI処理依頼は Notion");
     expect(setupGuide).toContain("Vercel から microCMS へ直接");
     expect(setupGuide).toContain("/api/growth/publish");
+    expect(setupGuide).toMatch(
+      /\| \*\*microCMS\*\* \| サービスドメイン \/ 管理 API キー \| 自宅 PC \+ Vercel \|/
+    );
   });
 
-  it("canonとsetup guideにLINE通知の例外を明記する", () => {
+  it("canon・setup guide・operator guideにLINE通知の例外を明記する", () => {
     for (const file of [
       "docs/operations/growth/00-canon.md",
       "docs/operations/growth/01-setup-guide.md",
+      "docs/operations/growth/10-operator-guide.md",
     ]) {
       const document = read(file);
       expect(document, file).toContain("publish-due");
