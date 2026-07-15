@@ -23,7 +23,7 @@ import { validateProposalForm } from "@/lib/growth/proposalForm";
 import { KIND_META } from "@/lib/growth/proposalKind";
 
 import type { AddedProposal } from "./AddProposalForm";
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
 import { toMessage } from "./errorMessage";
 import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
@@ -55,7 +55,7 @@ function segmentStyle(active: boolean): React.CSSProperties {
   };
 }
 
-export function ProposalFormModal({ token, initialName = "", initialNote = "", onClose, onAdded }: ProposalFormModalProps) {
+export function ProposalFormModal({ token: _token, initialName = "", initialNote = "", onClose, onAdded }: ProposalFormModalProps) {
   const [kind, setKind] = useState<ProposalKind>("article");
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState<string>(PROPOSAL_CATEGORIES[0]);
@@ -76,7 +76,7 @@ export function ProposalFormModal({ token, initialName = "", initialNote = "", o
     try {
       const res = await fetch("/api/growth/proposals", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(validation.payload),
       });
       const json = await res.json();

@@ -32,7 +32,9 @@ export function LoginScreen({
   return (
     <main className="mx-auto max-w-md p-6">
       <h1 className="text-xl font-bold text-gray-900">承認ページ</h1>
-      <p className="mt-2 text-sm text-gray-700">LINE で届いた合言葉を入力してください。</p>
+      <p className="mt-2 text-sm text-gray-700">
+        管理者から安全な経路で共有された合言葉を入力してください。
+      </p>
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
         <div className="space-y-1">
           <label htmlFor="passphrase" className="block text-sm font-medium text-gray-800">

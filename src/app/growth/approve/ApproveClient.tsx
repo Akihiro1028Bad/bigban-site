@@ -34,7 +34,7 @@ import {
 } from "./boardPrefs";
 
 import { fetchBoard, fetchOps, postRevert } from "./api";
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import { BoardCard } from "./BoardCard";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
@@ -155,8 +155,8 @@ export function ApproveClient() {
   // 既定は表示(text)。type=password は日本語IMEを無効化するため、合言葉が日本語でも
   // 打てるよう text を既定にし、必要なときだけトグルで隠せるようにする。
   const [showPassphrase, setShowPassphrase] = useState(true);
-  const [token, setToken] = useState("");
-  const [authed, setAuthed] = useState(authDisabled);
+  const token = "";
+  const [authed, setAuthed] = useState(false);
   // 認証無効時はマウント時の自動取得が走るため、その間は読み込み中表示にする。
   const [loadError, setLoadError] = useState("");
   // #H7: 盤(サーバ状態)は React Query を単一ソースにする。初期ロードは命令的に取得して
@@ -214,7 +214,7 @@ export function ApproveClient() {
   const [proposalSeed, setProposalSeed] = useState<{ name: string; note: string } | null>(null);
   const [message, setMessage] = useState("");
   // 認証無効時は初回マウントで自動取得するため、初期から読み込み中にしておく。
-  const [busy, setBusy] = useState(authDisabled);
+  const [busy, setBusy] = useState(true);
   // #240: 操作後に次の操作対象へフォーカスを移すための一時ターゲット(要素 id)。
   const [focusId, setFocusId] = useState<string | null>(null);
   // #275/#proto P3a: master-detail。右詳細ペインでアクティブにしている項目 id。
@@ -550,6 +550,16 @@ export function ApproveClient() {
     revise,
   });
 
+  // 認証リクエスト中は LoadingGate が入力欄を一時的に外すため、失敗後に
+  // LoginScreen が戻った時点でも確実にフォーカスを復元する。
+  useEffect(() => {
+    if (!authed && !busy && message) {
+      const input = passphraseRef.current;
+      /* istanbul ignore else -- message 表示時は LoginScreen の入力欄が常に存在する */
+      if (input) input.focus();
+    }
+  }, [authed, busy, message]);
+
   // #244: 合言葉エラーは入力欄へフォーカスを戻し、再入力しやすくする。
   function failAuth(text: string): void {
     setMessage(text);
@@ -568,9 +578,18 @@ export function ApproveClient() {
     setBusy(true);
     setMessage("");
     try {
-      setBoardData(await fetchBoard(pass));
+      const response = await fetch("/api/growth/auth/session", {
+        method: "POST",
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ passphrase: pass }),
+      });
+      const json = await readJsonObject(response);
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.error ?? (response.status === 429 ? "しばらく待ってから再試行してください。" : "認証に失敗しました。"));
+      }
+      setPassphrase("");
+      setBoardData(await fetchBoard(""));
       setBoardSeeded(true);
-      setToken(pass);
       setAuthed(true);
     } catch (error) {
       failAuth(toMessage(error, "取得に失敗しました。"));
@@ -586,6 +605,7 @@ export function ApproveClient() {
     try {
       setBoardData(await fetchBoard(""));
       setBoardSeeded(true);
+      setAuthed(true);
     } catch (error) {
       setLoadError(toMessage(error, "取得に失敗しました。"));
     } finally {
@@ -594,9 +614,8 @@ export function ApproveClient() {
   }, [setBoardData]);
 
   useEffect(() => {
-    if (!authDisabled) return;
     void loadPending();
-  }, [authDisabled, loadPending]);
+  }, [loadPending]);
 
   // #proto P3b: 構成やり直し(revert)の確認ダイアログ状態。公開/クローズ(#167)は proto 厳密優先で
   // 詳細パネルから撤去したため、確認ダイアログは "revert" 専用に縮約した(公開キューは PublishQueue へ)。
@@ -647,7 +666,7 @@ export function ApproveClient() {
     try {
       const res = await fetch("/api/growth/draft/excerpt", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, excerpt: text }),
       });
       const json = await readJsonObject(res);
@@ -662,7 +681,10 @@ export function ApproveClient() {
 
 
   // 認証無効(一時措置): 自動取得の読み込み中・失敗をそれぞれ明示する(沈黙させない)。
-  if (authDisabled && busy) {
+  // Cookie 復元中と、認証成功後に盤を初期取得している間だけ全画面ローディングにする。
+  // 合言葉の検証中は LoginScreen を維持し、busy 表示・エラー関連付け・入力欄への
+  // フォーカス復帰を同じ DOM 要素上で成立させる。
+  if (!authed && busy && !passphrase) {
     return <LoadingGate />;
   }
 
@@ -905,7 +927,7 @@ export function ApproveClient() {
     try {
       const res = await fetch("/api/growth/eyecatch/regen", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, instruction: "" }),
       });
       const json = await readJsonObject(res);
@@ -928,7 +950,7 @@ export function ApproveClient() {
     try {
       const res = await fetch("/api/growth/body-image/regen", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(buildBodyRegenBody(pageId, target, input)),
       });
       const json = await readJsonObject(res);

@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 
-import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
+import { privilegedAuthFailure, verifyPrivileged } from "@/lib/growth/apiAuth";
 import {
   draftBodyOf,
   draftLinkOf,
@@ -82,7 +82,14 @@ function hasUnfinishedImageGeneration(page: NotionPage): boolean {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!verifyToken(request, true)) return unauthorized("公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。");
+  const auth = verifyPrivileged(request, "publish");
+  if (auth !== "authorized") {
+    return privilegedAuthFailure(
+      auth,
+      "publish",
+      "公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。"
+    );
+  }
 
   let body: unknown;
   try {

@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", () => ({
   defaultFetch: vi.fn(),
 }));
@@ -20,7 +22,7 @@ const SECRET = "approve-secret-token";
 
 function request(token: string | null): Request {
   return new Request("http://localhost/api/growth/ops", {
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: growthAuthHeaders(token),
   });
 }
 

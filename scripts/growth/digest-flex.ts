@@ -238,23 +238,8 @@ function reportSummaryTexts(input: DigestInput): FlexComponent[] {
   return contents;
 }
 
-function passphraseText(input: DigestInput): FlexText | undefined {
-  const passphrase = input.passphrase?.trim();
-  if (!passphrase) return undefined;
-  return {
-    type: "text",
-    text: `🔑 合言葉: ${passphrase}`,
-    weight: "bold",
-    size: "sm",
-    color: COLOR_HEADING,
-    wrap: true,
-  };
-}
-
 function footerButtons(input: DigestInput): FlexBox | undefined {
   const contents: FlexComponent[] = [];
-  const passphrase = passphraseText(input);
-  if (passphrase) contents.push(passphrase);
   if (input.approveUrl) {
     contents.push({
       type: "button",

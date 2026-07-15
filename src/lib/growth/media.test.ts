@@ -201,7 +201,9 @@ describe("fetchMediaList", () => {
 
   it("HTTP エラーは throw(理由を含む)", async () => {
     const fetchFn = vi.fn<FetchFn>(async () => res(false, "forbidden", 403));
-    await expect(fetchMediaList({ limit: 30, offset: 0 }, OPTS(fetchFn))).rejects.toThrow(/403/);
+    const error = await fetchMediaList({ limit: 30, offset: 0 }, OPTS(fetchFn)).catch((reason: unknown) => reason);
+    expect((error as Error).message).toMatch(/403/);
+    expect((error as Error).message).not.toContain("forbidden");
   });
 });
 
@@ -226,6 +228,8 @@ describe("uploadMediaBlob", () => {
   it("HTTP エラーは throw", async () => {
     const fetchFn = vi.fn<FetchFn>(async () => res(false, "too large", 413));
     const blob = new Blob([new Uint8Array([1])], { type: "image/png" });
-    await expect(uploadMediaBlob({ blob, fileName: "a.png" }, OPTS(fetchFn))).rejects.toThrow(/413/);
+    const error = await uploadMediaBlob({ blob, fileName: "a.png" }, OPTS(fetchFn)).catch((reason: unknown) => reason);
+    expect((error as Error).message).toMatch(/413/);
+    expect((error as Error).message).not.toContain("too large");
   });
 });

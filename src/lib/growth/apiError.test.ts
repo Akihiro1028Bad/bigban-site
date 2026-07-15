@@ -33,12 +33,15 @@ describe("missingNotionProperty", () => {
 describe("growthApiError", () => {
   it("真因を必ず console.error に出す(沈黙させない)", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const err = new Error("boom");
+    process.env.APPROVE_SECRET = "very-secret";
+    const err = new Error("boom Bearer abc very-secret <p>html</p>");
     growthApiError("advise/apply", err, "反映依頼の登録に失敗しました");
-    expect(spy).toHaveBeenCalledWith(
-      "[growth/advise/apply] 反映依頼の登録に失敗しました",
-      err
-    );
+    const logged = String(spy.mock.calls[0]?.[0]);
+    expect(logged).toContain("[growth/advise/apply]");
+    expect(logged).not.toContain("very-secret");
+    expect(logged).not.toContain("Bearer abc");
+    expect(logged).not.toContain("<p>");
+    delete process.env.APPROVE_SECRET;
   });
 
   it("Notion プロパティ欠落は 500 ＋ どのプロパティかを返す", () => {
@@ -58,5 +61,12 @@ describe("growthApiError", () => {
     const res = growthApiError("revise", new Error("timeout"), "修正依頼の登録に失敗しました");
     expect(res.status).toBe(502);
     expect(res.body).toEqual({ success: false, error: "修正依頼の登録に失敗しました" });
+  });
+
+  it("Error 以外の例外値も安全な診断文字列として扱う", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = growthApiError("revise", "plain failure", "修正依頼の登録に失敗しました");
+    expect(res.status).toBe(502);
+    expect(String(spy.mock.calls[0]?.[0])).toContain("plain failure");
   });
 });

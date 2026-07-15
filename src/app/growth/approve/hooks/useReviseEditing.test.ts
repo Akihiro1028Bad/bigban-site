@@ -186,7 +186,7 @@ describe("applyRevise", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer %E8%AA%8D%E8%A8%BC%E3%83%88%E3%83%BC%E3%82%AF%E3%83%B3",
+        "X-Growth-Request": "1",
       },
       body: JSON.stringify({
         pageId: BASE_ITEM.id,

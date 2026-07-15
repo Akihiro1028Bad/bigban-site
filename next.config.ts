@@ -51,8 +51,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // 承認ページは URL にトークンを持つため、Referrer 経由の流出と
-        // キャッシュ保持を防ぐ。
+        // 承認ページはHttpOnly Cookie sessionを使う。認証画面・盤の
+        // キャッシュ保持と外部へのReferrer送信を防ぐ。
         source: "/growth/approve",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

@@ -41,6 +41,7 @@ import {
   type PartialStatusPublication,
   type SkippedPublication,
 } from "./publishDueNotify";
+import { safeExternalError } from "./externalApiError";
 import {
   updatePageProps,
   updatePageSelect,
@@ -242,9 +243,8 @@ main().catch(async (error: unknown) => {
   console.error("[publish-due] 失敗:", error);
   // 予約公開の総失敗を沈黙させない(#220): publish-draft と対称に LINE 通知する(best-effort)。
   if (!DRYRUN) {
-    const reason = error instanceof Error ? error.message : String(error);
     try {
-      await notifyLine(buildPublishDueFailureMessage(reason));
+      await notifyLine(buildPublishDueFailureMessage(safeExternalError(error)));
     } catch (notifyError: unknown) {
       const m = notifyError instanceof Error ? notifyError.message : String(notifyError);
       console.error(`[publish-due] 失敗の LINE 通知も送れませんでした: ${m}`);

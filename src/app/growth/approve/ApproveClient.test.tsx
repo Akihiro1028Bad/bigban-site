@@ -242,12 +242,22 @@ function mockFetchSequence(
   }
   const fn = vi.fn();
   const queue = [...responses];
+  let restoreAttempted = false;
   fn.mockImplementation((input: RequestInfo | URL) => {
     if (isOpsRequest(input)) {
       fn.mock.calls.pop();
       return opsFetchResult();
     }
     const url = requestUrl(input);
+    if (url.includes("/api/growth/auth/session")) {
+      fn.mock.calls.pop();
+      return Promise.resolve(jsonResponse({ success: true, expiresAt: Date.now() + 1_800_000 }));
+    }
+    if (flags.authEnabled && !restoreAttempted && url === TOKEN_URL) {
+      restoreAttempted = true;
+      fn.mock.calls.pop();
+      return Promise.resolve(jsonResponse({ success: false, error: "認証に失敗しました" }, { ok: false, status: 401 }));
+    }
     const r = queue.shift();
     if (!r) return Promise.reject(new Error(`unexpected fetch: ${url}`));
     if (r instanceof Error || typeof r === "string") {
@@ -277,6 +287,26 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
   };
 }
 
+function mockFailedSessionExchange(error: string | undefined, status = 401): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.includes("/api/growth/auth/session")) {
+        return Promise.resolve(
+          jsonResponse({ success: false, error }, { ok: false, status })
+        );
+      }
+      return Promise.resolve(
+        jsonResponse(
+          { success: false, error: "認証に失敗しました" },
+          { ok: false, status: 401 }
+        )
+      );
+    })
+  );
+}
+
 const PASS = "ビックマン";
 const TOKEN_URL = "/api/growth/approve";
 
@@ -295,7 +325,17 @@ afterEach(() => {
 });
 
 async function login(pass: string = PASS): Promise<void> {
-  await userEvent.type(screen.getByLabelText("合言葉"), pass);
+  await waitFor(() => {
+    if (
+      !screen.queryByLabelText("合言葉") &&
+      !screen.queryByRole("navigation", { name: "情報源" })
+    ) {
+      throw new Error("セッション復元またはログイン画面を待機中");
+    }
+  });
+  const input = screen.queryByLabelText("合言葉");
+  if (!input) return;
+  await userEvent.type(input, pass);
   await userEvent.click(screen.getByRole("button", { name: "確認する" }));
 }
 
@@ -410,25 +450,25 @@ function ideaItem(over: Partial<Record<string, unknown>> = {}) {
 }
 
 describe("ApproveClient 合言葉画面", () => {
-  it("入力意図の説明文を表示する(#229)", () => {
+  it("入力意図の説明文を表示する(#229)", async () => {
     mockFetchSequence();
     render(<ApproveClient />);
     expect(
-      screen.getByText("LINE で届いた合言葉を入力してください。")
+      await screen.findByText("管理者から安全な経路で共有された合言葉を入力してください。")
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "確認する" })).toBeInTheDocument();
   });
 
-  it("合言葉入力欄は初期状態でtext型(日本語IMEが効く)", () => {
+  it("合言葉入力欄は初期状態でtext型(日本語IMEが効く)", async () => {
     mockFetchSequence();
     render(<ApproveClient />);
-    expect(screen.getByLabelText("合言葉")).toHaveAttribute("type", "text");
+    expect(await screen.findByLabelText("合言葉")).toHaveAttribute("type", "text");
   });
 
   it("表示/非表示トグルで合言葉の表示を切り替えられる", async () => {
     mockFetchSequence();
     render(<ApproveClient />);
-    const input = screen.getByLabelText("合言葉");
+    const input = await screen.findByLabelText("合言葉");
     expect(input).toHaveAttribute("type", "text");
 
     await userEvent.click(screen.getByRole("button", { name: "合言葉を隠す" }));
@@ -441,9 +481,19 @@ describe("ApproveClient 合言葉画面", () => {
   it("合言葉未入力なら促してfetchしない", async () => {
     const fn = mockFetchSequence();
     render(<ApproveClient />);
-    await userEvent.click(screen.getByRole("button", { name: "確認する" }));
+    await userEvent.click(await screen.findByRole("button", { name: "確認する" }));
     expect(screen.getByRole("alert")).toHaveTextContent("合言葉を入力してください。");
     expect(fn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [429, "しばらく待ってから再試行してください。"],
+    [503, "認証に失敗しました。"],
+  ])("認証交換がerror本文なしの%dなら安全な既定文言を出す", async (status, expected) => {
+    mockFailedSessionExchange(undefined, status);
+    render(<ApproveClient />);
+    await login();
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
   });
 
   it("正しい合言葉で承認待ちを一覧表示し、合言葉をtokenとして送る", async () => {
@@ -519,8 +569,8 @@ describe("ApproveClient 合言葉画面", () => {
     render(<ApproveClient />);
     await login("ちがう");
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("合言葉が違います。");
-    expect(alert).toHaveTextContent("LINE");
+    expect(alert).toHaveTextContent("セッションの有効期限");
+    expect(alert).not.toHaveTextContent("LINE");
   });
 
   it("401以外の失敗はAPIのエラーメッセージを表示する", async () => {
@@ -979,22 +1029,23 @@ describe("ApproveClient フォーカス管理(#240/#213)", () => {
 
 describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
   it("エラーは入力欄に aria-describedby/aria-invalid で関連付く", async () => {
-    mockFetchSequence({ ok: false, status: 401, json: { success: false, error: "認証に失敗しました" } });
+    mockFailedSessionExchange("認証に失敗しました");
     render(<ApproveClient />);
-    const input = screen.getByLabelText("合言葉");
+    const input = await screen.findByLabelText("合言葉");
     expect(input).not.toHaveAttribute("aria-invalid");
 
     await login("ちがう");
     await screen.findByRole("alert");
-    expect(input).toHaveAttribute("aria-invalid", "true");
-    expect(input).toHaveAttribute("aria-describedby", "passphrase-error");
+    const failedInput = screen.getByLabelText("合言葉");
+    expect(failedInput).toHaveAttribute("aria-invalid", "true");
+    expect(failedInput).toHaveAttribute("aria-describedby", "passphrase-error");
     expect(screen.getByRole("alert")).toHaveAttribute("id", "passphrase-error");
   });
 
   it("エラー時に入力欄へフォーカスが戻る", async () => {
-    mockFetchSequence({ ok: false, status: 401, json: { success: false, error: "x" } });
+    mockFailedSessionExchange("x");
     render(<ApproveClient />);
-    const input = screen.getByLabelText("合言葉");
+    const input = await screen.findByLabelText("合言葉");
     await login("ちがう");
     await screen.findByRole("alert");
     expect(input).toHaveFocus();
@@ -1003,7 +1054,7 @@ describe("ApproveClient 合言葉エラーのA11y(#244)", () => {
   it("未入力エラーでも入力欄へフォーカスが戻る", async () => {
     mockFetchSequence();
     render(<ApproveClient />);
-    await userEvent.click(screen.getByRole("button", { name: "確認する" }));
+    await userEvent.click(await screen.findByRole("button", { name: "確認する" }));
     expect(screen.getByLabelText("合言葉")).toHaveFocus();
   });
 });

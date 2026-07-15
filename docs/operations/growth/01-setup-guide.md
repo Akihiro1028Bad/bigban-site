@@ -125,7 +125,9 @@
 | `NOTION_PUBLIC_DOMAIN` | 公開レポートの notion.site ドメイン | △ | ✅ | ✗ |
 | `NOTION_TOKEN` | 承認画面/通知が DB を読み書き | △ | ✅ | ✅ |
 | `APPROVE_AUTH_ENABLED` | 承認画面の合言葉認証 | ✗ | ✗ | ⚠️本番ON必須 |
-| `APPROVE_SECRET` | 承認画面の合言葉・週次LINE通知 | △ | ✅ | ✅ |
+| `APPROVE_SECRET` | 承認画面の合言葉 | ✗ | ✗ | ✅ |
+| `APPROVE_SESSION_SECRET` | 承認session署名専用キー | ✗ | ✗ | ✅ |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 認証誤入力rate limit | ✗ | ✗ | ✅ |
 
 凡例: ✅=必須 / △=任意・環境に応じて / ✗=不要 / ⚠️=特記あり（下記）。
 ※ Mac は「開発・動作確認をしたい場合に一式そろえる」位置づけ。本番の週次自動実行は自宅 PC が担うため、Mac 側は必須ではありません。
@@ -140,7 +142,7 @@
 - **プロバイダー・モデル・推論強度は承認画面 `AIモデル` で設定**します。環境変数では上書きせず、Notionを読めない場合だけコード内推奨値へフォールバックします。
 - **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
 - **`APPROVE_AUTH_ENABLED` は Vercel 本番で ON 必須**。未設定＝ON（フェイルセーフ）ですが、`false` にすると本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。詳細は「手順 8」。
-- **`APPROVE_SECRET` はVercelと自宅PCに同じ値を設定**します。Vercelは承認APIの認証、PCは週次LINEダイジェストへの合言葉表示に使います。
+- **`APPROVE_SECRET` はVercelだけに設定**します。自宅PC・LINE通知には置きません。`APPROVE_SESSION_SECRET`は別のランダム値にしてください。
 - **クォート**: 値に空白や記号（`< > | ( ) &` 等）を含む場合は必ずダブルクォートで囲むこと。未クォートだとシェルスクリプトが壊れます（例: `RESEND_FROM`）。
 
 ### 2-3. Notion DB の開発/本番分離について（未決・将来課題）
@@ -283,7 +285,7 @@ OAuth 同意画面のステータスが**「テスト」のままだと、付与
 
 ## 手順 6: LINE 通知 + 承認ページを設定する
 
-> ここは LINE 通知と承認ページの初期構築手順です。通知は自宅 PC、承認ページは Vercel で動きます。**`NOTION_TOKEN` と `APPROVE_SECRET` は両環境に同じ値**を設定します。
+> ここは LINE 通知と承認ページの初期構築手順です。通知は自宅 PC、承認ページは Vercel で動きます。合言葉とsession署名キーはVercelだけに設定します。
 
 ### 手順 6-1: LINE Messaging API を用意する
 
@@ -301,9 +303,9 @@ OAuth 同意画面のステータスが**「テスト」のままだと、付与
 
 承認ページ（`/growth/approve`）は URL にトークンを載せず、**画面で「合言葉」を入力して入る**方式です。この合言葉を `APPROVE_SECRET` に設定します。
 
-- 覚えやすい語でよいが**社外秘**として扱い、LINE グループ（信頼できるメンバー）内でのみ共有する。
-- ⚠️ セキュリティ: 承認 API にレート制限は無いため、短い/推測しやすい語は総当たりのリスクがあります。承認操作は「Notion のステータス変更（可逆）」のみで金銭・個人情報は扱いませんが、心配なら推測されにくい長めの語句にする（例 `openssl rand -hex 16` の出力）。
-- 合言葉を変更したら、Vercel と自宅PCの `APPROVE_SECRET` を同時に更新し、Vercelを再デプロイする。
+- **社外秘**として扱い、LINEでは共有せず、管理者から安全な経路で共有する。
+- 誤入力は同一IPごとに15分5回までです。本番はUpstash未設定・障害時に認証交換を503で閉じます。rate limit中でも正しい合言葉は受け付けます。合言葉には推測されにくい長い値を使います（例 `openssl rand -hex 16` の出力）。
+- 合言葉を変更したらVercelの`APPROVE_SECRET`を更新して再デプロイする。詳細は[security.md](security.md)を参照。
 
 ### 手順 6-3: Vercel に環境変数を設定する
 
@@ -311,6 +313,8 @@ Vercel の **Production 環境変数**に次を設定し、再デプロイする
 
 - `NOTION_TOKEN`（手順 4-1・自宅 PC と同じ値）
 - `APPROVE_SECRET`（手順 6-2）
+- `APPROVE_SESSION_SECRET`（`APPROVE_SECRET`とは別に生成した署名専用キー）
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`（認証誤入力rate limit）
 - `APPROVE_AUTH_ENABLED=true`（本番では ON。未設定＝ONだが、意図を明確にするため明示を推奨）
 - `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_MAINTENANCE`
 - `MICROCMS_SERVICE_DOMAIN` / `MICROCMS_API_KEY` / `MICROCMS_WEBHOOK_SECRET` / `MICROCMS_DRAFT_SECRET`
@@ -484,7 +488,7 @@ Vercel の承認画面を本番公開する前に、必ず次を確認してく�
 
 - [ ] **`APPROVE_AUTH_ENABLED` を必ず ON**（未設定＝ON でも可・`false` にしない）。承認画面は強権限 API を叩くため、合言葉ゲートが必須です。`false` のままだと本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。
 - [ ] **`APPROVE_SECRET`（合言葉）を Vercel に設定**し、推測されにくい語にしてある。
-- [ ] **自宅PCにもVercelと同じ `APPROVE_SECRET`** を設定し、週次LINE通知から承認画面へ入れる。
+- [ ] **`APPROVE_SESSION_SECRET`とUpstash接続情報をVercelに設定**し、自宅PC・LINEに`APPROVE_SECRET`が無い。
 - [ ] **`MICROCMS_API_KEY` に `NEXT_PUBLIC_` を付けていない**（server-only・クライアントへ渡さない）。
 - [ ] **`NOTION_TOKEN` が Vercel（承認画面用）と自宅 PC（通知用）で同じ値**になっている。
 - [ ] コラム分離後は **`USE_CMS_COLUMNS=true` と `GROWTH_MICROCMS_ENDPOINT=columns`** をVercelへ、後者を自宅PCへ設定している。

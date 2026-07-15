@@ -1,124 +1,94 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bearerToken, safeEqual, unauthorized } from "./apiAuth";
+import { issueSession, issueStepUp } from "./authSession";
+import { privilegedAuthFailure, safeEqual, stepUpRequired, unauthorized } from "./apiAuth";
 
-function req(authHeader?: string): Request {
-  const headers: Record<string, string> = {};
-  if (authHeader !== undefined) headers.authorization = authHeader;
-  return new Request("http://localhost/api/growth/x", { method: "POST", headers });
+const KEY = "session-signing-secret";
+
+function headers(cookie = "", isUnsafe = true): HeadersInit {
+  return { cookie, ...(isUnsafe ? { "x-growth-request": "1" } : {}) };
 }
 
 describe("safeEqual", () => {
-  it("同じ文字列は true", () => {
-    expect(safeEqual("secret-token", "secret-token")).toBe(true);
-  });
-  it("異なる文字列は false", () => {
-    expect(safeEqual("secret-token", "wrong-token")).toBe(false);
-  });
-  it("長さが違っても false(早期 return せず定数時間)", () => {
-    expect(safeEqual("abc", "abcdef")).toBe(false);
-  });
-  it("空文字同士は true", () => {
-    expect(safeEqual("", "")).toBe(true);
+  it.each([["same", "same", true], ["a", "b", false], ["", "", true], ["a", "long", false]])(
+    "値を定数時間比較する",
+    (left, right, expected) => expect(safeEqual(left, right)).toBe(expected)
+  );
+});
+
+describe("認証response", () => {
+  it("401とstep-up 403をJSONで返す", async () => {
+    expect(await unauthorized().json()).toEqual({ success: false, error: "認証に失敗しました" });
+    const response = stepUpRequired("publish");
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "STEP_UP_REQUIRED", scope: "publish" });
+    expect(privilegedAuthFailure("unauthorized", "media", "no").status).toBe(401);
+    expect(privilegedAuthFailure("step-up-required", "media", "no").status).toBe(403);
+    expect((await unauthorized("custom").json()).error).toBe("custom");
   });
 });
 
-describe("bearerToken", () => {
-  it("Bearer ヘッダからトークンを取り出す", () => {
-    expect(bearerToken(req("Bearer my-token"))).toBe("my-token");
-  });
-  it("ヘッダ無しは空文字", () => {
-    expect(bearerToken(req())).toBe("");
-  });
-  it("Bearer 以外のスキームは空文字", () => {
-    expect(bearerToken(req("Basic abc"))).toBe("");
-  });
-  it("Bearer のみ(トークン空)は空文字", () => {
-    expect(bearerToken(req("Bearer "))).toBe("");
-  });
-  it("percent-encode された非ASCIIトークンを復元する(クライアントの encode と対)", () => {
-    const token = "ひみつの合言葉";
-    expect(bearerToken(req(`Bearer ${encodeURIComponent(token)}`))).toBe(token);
-  });
-  it("絵文字を含む合言葉もラウンドトリップする", () => {
-    const token = "合言葉🔑テスト";
-    expect(bearerToken(req(`Bearer ${encodeURIComponent(token)}`))).toBe(token);
-  });
-  it("不正な % シーケンスは復号せずそのまま返す(フォールバック)", () => {
-    expect(bearerToken(req("Bearer %E0%A4%A"))).toBe("%E0%A4%A");
-  });
-});
+describe("Cookie認証", () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllEnvs());
 
-describe("unauthorized", () => {
-  it("既定メッセージで 401 JSON", async () => {
-    const res = unauthorized();
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ success: false, error: "認証に失敗しました" });
-  });
-  it("カスタムメッセージを反映", async () => {
-    const res = unauthorized("公開には認証が必要です。");
-    expect((await res.json()).error).toBe("公開には認証が必要です。");
-  });
-});
-
-describe("verifyToken (APPROVE_AUTH_ENABLED 依存)", () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  async function load() {
-    return (await import("./apiAuth")).verifyToken;
+  async function load(enabled = "true") {
+    vi.stubEnv("APPROVE_AUTH_ENABLED", enabled);
+    vi.stubEnv("APPROVE_SESSION_SECRET", KEY);
+    return import("./apiAuth");
   }
 
-  it("認証無効・denyWhenDisabled 既定(false) は許可(true)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "false");
-    const verify = await load();
-    expect(verify(req("Bearer anything"))).toBe(true);
+  it("有効なCookieとunsafe headerを許可する", async () => {
+    const auth = await load();
+    const session = issueSession(KEY);
+    const request = new Request("https://x.test/api/growth/x", {
+      method: "POST",
+      headers: headers(`growth_session=${session.token}`),
+    });
+    expect(auth.verifyToken(request)).toBe(true);
   });
 
-  it("認証無効・denyWhenDisabled=true は常に拒否(false・公開など最強権限)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "false");
-    const verify = await load();
-    expect(verify(req("Bearer anything"), true)).toBe(false);
+  it("Cookie欠落・署名不正・CSRF欠落・Bearer・query tokenを拒否する", async () => {
+    const auth = await load();
+    const session = issueSession(KEY);
+    const base = `growth_session=${session.token}`;
+    expect(auth.verifyToken(new Request("https://x.test", { method: "POST", headers: headers() }))).toBe(false);
+    expect(auth.verifyToken(new Request("https://x.test", { method: "POST", headers: headers(`${base}x`) }))).toBe(false);
+    expect(auth.verifyToken(new Request("https://x.test", { method: "POST", headers: { cookie: base } }))).toBe(false);
+    expect(auth.verifyToken(new Request("https://x.test", { method: "POST", headers: { ...headers(base), authorization: "Bearer old" } }))).toBe(false);
+    expect(auth.verifyToken(new Request("https://x.test?token=old", { method: "GET", headers: headers(base, false) }))).toBe(false);
+    expect(auth.authenticatedSession(new Request("https://x.test", { headers: { cookie: "growth_session=%broken" } }))).toBeNull();
+    delete process.env.APPROVE_SESSION_SECRET;
+    expect(auth.authenticatedSession(new Request("https://x.test", { headers: { cookie: base } }))).toBeNull();
   });
 
-  it("認証有効・正しいトークンは true", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    vi.stubEnv("APPROVE_SECRET", "right-secret");
-    const verify = await load();
-    expect(verify(req("Bearer right-secret"))).toBe(true);
+  it("認証無効時は通常APIだけ許可し強権は拒否する", async () => {
+    const auth = await load("false");
+    const request = new Request("https://x.test", { method: "POST" });
+    expect(auth.verifyToken(request)).toBe(true);
+    expect(auth.verifyToken(request, true)).toBe(false);
+    expect(auth.verifyPrivileged(request, "publish")).toBe("unauthorized");
   });
 
-  it("認証有効・誤ったトークンは false", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    vi.stubEnv("APPROVE_SECRET", "right-secret");
-    const verify = await load();
-    expect(verify(req("Bearer wrong"))).toBe(false);
+  it("scopeと親sidを分離する", async () => {
+    const auth = await load();
+    const session = issueSession(KEY, { sid: "parent" });
+    const publish = issueStepUp(KEY, "parent", "publish");
+    const cookie = `growth_session=${session.token}; growth_step_up_publish=${publish.token}`;
+    const request = new Request("https://x.test", { method: "POST", headers: headers(cookie) });
+    expect(auth.verifyPrivileged(request, "publish")).toBe("authorized");
+    expect(auth.verifyPrivileged(request, "media")).toBe("step-up-required");
+    const legacy = new Request("https://x.test", { method: "POST", headers: { ...headers(cookie), authorization: "Bearer old" } });
+    expect(auth.verifyPrivileged(legacy, "publish")).toBe("unauthorized");
+    expect(auth.verifyPrivileged(new Request("https://x.test", { method: "POST", headers: headers() }), "publish")).toBe("unauthorized");
   });
 
-  it("認証有効・ヘッダ無し＋?token= クエリは後方互換で許可(非推奨フォールバック)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    vi.stubEnv("APPROVE_SECRET", "right-secret");
-    const verify = await load();
-    const r = new Request("http://localhost/api/growth/x?token=right-secret", { method: "POST" });
-    expect(verify(r)).toBe(true);
-  });
-
-  it("認証有効・ヘッダ無しは false", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    vi.stubEnv("APPROVE_SECRET", "right-secret");
-    const verify = await load();
-    expect(verify(req())).toBe(false);
-  });
-
-  it("認証有効・APPROVE_SECRET 未設定は false", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    vi.stubEnv("APPROVE_SECRET", "");
-    const verify = await load();
-    expect(verify(req("Bearer anything"))).toBe(false);
+  it("GET/HEAD/OPTIONSはCSRFヘッダ不要", async () => {
+    const auth = await load();
+    const session = issueSession(KEY);
+    for (const method of ["GET", "HEAD", "OPTIONS"]) {
+      expect(auth.verifyToken(new Request("https://x.test", { method, headers: { cookie: `growth_session=${session.token}` } }))).toBe(true);
+    }
   });
 });

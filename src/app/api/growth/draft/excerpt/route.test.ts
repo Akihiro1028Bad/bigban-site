@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
   getPage: vi.fn(),
@@ -24,8 +26,7 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 function postRequest(token: string | null, body: unknown, raw?: string): Request {
   const url = new URL("http://localhost/api/growth/draft/excerpt");
-  const headers: Record<string, string> = {};
-  if (token !== null) headers.authorization = `Bearer ${token}`;
+  const headers = growthAuthHeaders(token);
   return new Request(url, { method: "POST", headers, body: raw ?? JSON.stringify(body) });
 }
 

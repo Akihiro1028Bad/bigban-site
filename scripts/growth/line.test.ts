@@ -37,12 +37,15 @@ describe("pushTextMessage", () => {
     });
   });
 
-  it("失敗時は HTTP ステータス付きで throw する", async () => {
+  it("失敗時は HTTP ステータスだけを含みresponse本文を捨てる", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(false, 401, "invalid token"));
 
     await expect(
       pushTextMessage("Gabc", "x", { channelAccessToken: TOKEN, fetchFn, kind: "weekly" })
-    ).rejects.toThrow(/401.*invalid token/);
+    ).rejects.toThrow(/401/);
+    await expect(
+      pushTextMessage("Gabc", "x", { channelAccessToken: TOKEN, fetchFn, kind: "weekly" })
+    ).rejects.not.toThrow(/invalid token/);
   });
 
   it("weekly-only 既定では routine メッセージを送信しない", async () => {
@@ -103,11 +106,11 @@ describe("pushFlexMessage", () => {
     });
   });
 
-  it("失敗時は HTTP ステータス付きで throw する", async () => {
+  it("失敗時は HTTP ステータスだけを含みresponse本文を捨てる", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(false, 400, "bad flex"));
 
     await expect(
       pushFlexMessage("Gabc", "x", bubble, { channelAccessToken: TOKEN, fetchFn, kind: "weekly" })
-    ).rejects.toThrow(/400.*bad flex/);
+    ).rejects.toThrow(/400/);
   });
 });

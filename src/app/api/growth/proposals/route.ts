@@ -4,7 +4,7 @@
  * POST : 施策入力を検証し、Notion「施策提案」DB に ステータス=未処理(承認待ち)で
  *        ページを作成する。作成した表示用アイテムを返し、承認一覧に差し込む。
  *
- * 認証は承認 API と同じ APPROVE_SECRET とクエリ token の定数時間比較。
+ * 認証は承認 API と同じ署名付きHttpOnly Cookie sessionを共通検証する。
  */
 
 import { NextResponse } from "next/server";

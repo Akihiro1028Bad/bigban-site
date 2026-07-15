@@ -11,6 +11,7 @@ import {
   type DraftMeta,
   type SelfHealDeps,
 } from "./self-heal";
+import { ExternalApiError } from "./externalApiError";
 import type { FetchFn } from "./http";
 
 describe("selectDuplicateIds", () => {
@@ -90,14 +91,19 @@ describe("listDraftMetas", () => {
     expect(r.totalCount).toBe(1);
   });
 
-  it("HTTPエラーは例外", async () => {
+  it("HTTPエラーは本文を含めず構造化例外にする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 500,
       json: async () => ({}),
       text: async () => "err",
     });
-    await expect(listDraftMetas("news", opts(fetchFn))).rejects.toThrow();
+    const error = await listDraftMetas("news", opts(fetchFn)).catch(
+      (reason: unknown) => reason
+    );
+    expect(error).toBeInstanceOf(ExternalApiError);
+    expect(error).toMatchObject({ operation: "microcms.drafts.list", status: 500 });
+    expect((error as Error).message).not.toContain("err");
   });
 
   it("contents 欠落でも空配列を返す", async () => {
@@ -144,14 +150,18 @@ describe("fetchContentSlug", () => {
     expect(await fetchContentSlug("news", "a", null, opts(fetchFn))).toBeNull();
   });
 
-  it("HTTPエラーは例外", async () => {
+  it("HTTPエラーは本文を含めず構造化例外にする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 404,
       json: async () => ({}),
       text: async () => "nf",
     });
-    await expect(fetchContentSlug("news", "a", null, opts(fetchFn))).rejects.toThrow();
+    const error = await fetchContentSlug("news", "a", null, opts(fetchFn)).catch(
+      (reason: unknown) => reason
+    );
+    expect(error).toMatchObject({ operation: "microcms.content.slug.get", status: 404 });
+    expect((error as Error).message).not.toContain("nf");
   });
 });
 
@@ -175,14 +185,18 @@ describe("deleteContent", () => {
     expect(init.method).toBe("DELETE");
   });
 
-  it("HTTPエラーは例外", async () => {
+  it("HTTPエラーは本文を含めず構造化例外にする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 403,
       json: async () => ({}),
       text: async () => "forbidden",
     });
-    await expect(deleteContent("news", "rnd1", opts(fetchFn))).rejects.toThrow();
+    const error = await deleteContent("news", "rnd1", opts(fetchFn)).catch(
+      (reason: unknown) => reason
+    );
+    expect(error).toMatchObject({ operation: "microcms.content.delete", status: 403 });
+    expect((error as Error).message).not.toContain("forbidden");
   });
 });
 

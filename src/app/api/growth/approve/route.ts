@@ -4,7 +4,7 @@
  * GET  : 承認待ち(施策提案=未処理 / 記事ネタ案=提案中)を一覧で返す。
  * POST : decisions[] を受け取り、各ページの「ステータス」を承認/却下に更新する。
  *
- * 認証は APPROVE_SECRET とクエリ token の定数時間比較(draft/enable と同方式)。
+ * 認証は署名付きHttpOnly Cookie sessionを共通検証する。
  * Notion 更新には内部インテグレーションの NOTION_TOKEN が必要。
  */
 

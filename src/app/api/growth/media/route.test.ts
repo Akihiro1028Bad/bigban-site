@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/media", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/media")>();
   return { ...actual, fetchMediaList: vi.fn(), uploadMediaBlob: vi.fn() };
@@ -20,14 +22,16 @@ const BASE = "http://localhost/api/growth/media";
 
 function getReq(token: string | null, qs = ""): Request {
   const url = new URL(BASE + (qs ? `?${qs}` : ""));
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "GET" });
+  return new Request(url, { method: "GET", headers: growthAuthHeaders(token, "media") });
 }
 
 function postReq(body: BodyInit, token: string | null = null, headers?: HeadersInit): Request {
   const url = new URL(BASE);
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body, headers });
+  return new Request(url, {
+    method: "POST",
+    body,
+    headers: { ...Object.fromEntries(new Headers(headers)), ...growthAuthHeaders(token, "media") },
+  });
 }
 
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -93,6 +97,15 @@ describe("GET /api/growth/media", () => {
   it("token 未指定は 401", async () => {
     const res = await GET(getReq(null));
     expect(res.status).toBe(401);
+  });
+
+  it("通常sessionだけならmedia scope不足の403で外部APIを呼ばない", async () => {
+    const response = await GET(
+      new Request(BASE, { method: "GET", headers: growthAuthHeaders("secret-token") })
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "STEP_UP_REQUIRED", scope: "media" });
+    expect(fetchMediaList).not.toHaveBeenCalled();
   });
 
   it("APPROVE_SECRET 未設定は 401", async () => {

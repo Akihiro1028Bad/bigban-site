@@ -6,6 +6,7 @@
  */
 
 import type { FetchFn } from "./http";
+import { externalApiErrorFromResponse } from "./externalApiError";
 
 const MIME_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg",
@@ -62,10 +63,7 @@ export async function uploadMedia(
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(
-      `メディアアップロードに失敗しました (HTTP ${res.status}): ${text}`
-    );
+    throw externalApiErrorFromResponse("microcms.media.upload", res);
   }
 
   const body = (await res.json()) as { url?: string };

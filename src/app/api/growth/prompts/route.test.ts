@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
   readFile: vi.fn(),
@@ -23,8 +25,7 @@ const BASE = "http://localhost/api/growth/prompts";
 
 function getReq(token: string | null = null): Request {
   const url = new URL(BASE);
-  const headers: Record<string, string> = {};
-  if (token !== null) headers.Authorization = `Bearer ${encodeURIComponent(token)}`;
+  const headers = growthAuthHeaders(token);
   return new Request(url, { method: "GET", headers });
 }
 

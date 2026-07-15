@@ -8,6 +8,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildProcessFailureDetail, classifyProcessClose, createTaskkillRunner, parseProcessGroupRegistry, resolveTimeoutPolicy, runProcess, startPeriodicTask, terminateWindowsProcessTree, waitForDelay } from "./processControl.mjs";
 
+const SUBPROCESS_TEST_TIMEOUT_MS = 30_000;
+
+vi.setConfig({ testTimeout: SUBPROCESS_TEST_TIMEOUT_MS });
+
+async function waitForPath(filePath: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(filePath)) {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for child readiness: ${filePath}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
 it("process group registryは追加・削除を順に適用し、壊れた行を無視する", () => {
   const groups = parseProcessGroupRegistry([
     JSON.stringify({ operation: "add", groupId: 10, parentGroupId: null }),
@@ -160,12 +174,23 @@ describe("runProcess", () => {
 
   it("親 SIGINT/SIGTERM を子へ伝播する", async () => {
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
-      const running = runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], { timeoutMs: 2_000, stdio: "capture" });
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      process.emit(signal, signal);
-      expect(await running).toMatchObject({ kind: "signal", signal });
+      const dir = mkdtempSync(path.join(tmpdir(), "growth-signal-ready-"));
+      const ready = path.join(dir, "ready.txt");
+      const script = `require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready');setInterval(()=>{},1000)`;
+      const running = runProcess(process.execPath, ["-e", script], { timeoutMs: 15_000, stdio: "capture" });
+      let hasSignaled = false;
+      try {
+        await waitForPath(ready, 10_000);
+        process.emit(signal, signal);
+        hasSignaled = true;
+        expect(await running).toMatchObject({ kind: "signal", signal });
+      } finally {
+        if (!hasSignaled) process.emit(signal, signal);
+        await running;
+        rmSync(dir, { recursive: true, force: true });
+      }
     }
-  });
+  }, SUBPROCESS_TEST_TIMEOUT_MS);
 
   it("heartbeatを継続し、falseならlease喪失として子を止める", async () => {
     const heartbeat = vi.fn(() => false);
@@ -241,12 +266,12 @@ describe("runProcess", () => {
     if (process.platform === "win32") return;
     const dir = mkdtempSync(path.join(tmpdir(), "growth-ignore-grandchild-"));
     const marker = path.join(dir, "survived.txt");
-    const grandchild = `const fs=require('node:fs');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'alive'),500);setInterval(()=>{},1000)`;
+    const grandchild = `const fs=require('node:fs');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'alive'),3000);setInterval(()=>{},1000)`;
     const parent = `const {spawn}=require('node:child_process');spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:'ignore'});process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000)`;
     try {
-      const result = await runProcess(process.execPath, ["-e", parent], { timeoutMs: 200, killGraceMs: 50, stdio: "capture" });
+      const result = await runProcess(process.execPath, ["-e", parent], { timeoutMs: 2_000, killGraceMs: 100, stdio: "capture" });
       expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 3_100));
       expect(existsSync(marker)).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
