@@ -50,4 +50,12 @@ describe("sanitizeLinePayload", () => {
     expect(sanitized).not.toContain("third-key");
     expect(sanitized).toContain("[redacted]");
   });
+
+  it("括弧付きHTTP status以降の複数行本文をすべて除去する", () => {
+    const sanitized = sanitizeLinePayload(
+      "下書き取得に失敗しました (HTTP 500): first private line\nsecond private line\nthird private line"
+    );
+
+    expect(sanitized).toBe("下書き取得に失敗しました (HTTP 500): [redacted]");
+  });
 });

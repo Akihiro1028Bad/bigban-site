@@ -27,6 +27,14 @@ describe("authExchange", () => {
     const store = new UpstashFailureStore("https://redis.test", "token", okFetch);
     await expect(store.incrementFailure("hash", 1000, 900_000)).resolves.toEqual({ count: 2, resetAt: 6000 });
     expect(okFetch.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
+    const requestBody: unknown = JSON.parse(String(okFetch.mock.calls[0][1].body));
+    expect(requestBody).toEqual([
+      "EVAL",
+      expect.stringMatching(/INCR.*PEXPIRE/),
+      "1",
+      "hash",
+      "900000",
+    ]);
 
     const badStatus = new UpstashFailureStore("x", "t", vi.fn().mockResolvedValue(new Response("", { status: 500 })));
     await expect(badStatus.incrementFailure("k", 0, 1)).rejects.toThrow("unavailable");

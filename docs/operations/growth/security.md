@@ -2,7 +2,7 @@
 
 承認画面は、長期合言葉を通常APIへ送らないCookie session方式です。ログイン成功後は30分の署名付きHttpOnly Cookieを使います。公開・予約公開は`publish`、メディア一覧・アップロードは`media` scopeで再認証し、scope別Cookieは5分で失効します。
 
-本番では`APPROVE_AUTH_ENABLED=true`、`APPROVE_SECRET`、別値の`APPROVE_SESSION_SECRET`、`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`をVercelに設定します。Upstash未設定・通信失敗時の認証交換は503でfail-closedです。自宅PCやLINEへ`APPROVE_SECRET`を置かないでください。
+本番では`APPROVE_AUTH_ENABLED=true`、`APPROVE_SECRET`、別値の`APPROVE_SESSION_SECRET`、`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`をVercelに設定します。認証交換は合言葉を比較する前に、同一IPの固定窓（15分・5回）の試行枠をUpstashの原子的処理で消費します。上限超過中は正しい合言葉でも比較せず429を返します。Upstash未設定・通信失敗時も合言葉を比較せず503でfail-closedです。自宅PCやLINEへ`APPROVE_SECRET`を置かないでください。
 
 ## secretローテーション
 

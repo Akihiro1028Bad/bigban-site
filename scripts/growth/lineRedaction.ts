@@ -23,7 +23,7 @@ function sanitizeString(value: string, options: LineRedactionOptions): string {
       /(\b[a-z0-9_-]*api[-_ ]?key\s*[:=]\s*)[^\s,"'}]+/gi,
       "$1[redacted]"
     )
-    .replace(/HTTP\s+\d{3}\s*:[^\n]*/gi, (match) => `${match.match(/HTTP\s+\d{3}/i)![0]}: [redacted]`);
+    .replace(/(\(?HTTP\s+\d{3}\)?\s*:)[\s\S]*/gi, "$1 [redacted]");
 
   if (/<\/?[a-z][^>]*>/i.test(sanitized)) sanitized = "[redacted html]";
 

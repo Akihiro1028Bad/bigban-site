@@ -57,7 +57,6 @@ interface CheckAuthAttemptInput {
 }
 
 export async function checkAuthAttempt(input: CheckAuthAttemptInput): Promise<AuthAttemptResult> {
-  if (input.expected && safeEqual(input.supplied, input.expected)) return { status: "valid" };
   const nowMs = input.nowMs ?? Date.now();
   try {
     const result = await input.store.incrementFailure(
@@ -65,14 +64,18 @@ export async function checkAuthAttempt(input: CheckAuthAttemptInput): Promise<Au
       nowMs,
       WINDOW_MS
     );
-    if (result.count <= MAX_FAILURES) return { status: "invalid" };
-    return {
-      status: "limited",
-      retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - nowMs) / 1_000)),
-    };
+    if (result.count > MAX_FAILURES) {
+      return {
+        status: "limited",
+        retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - nowMs) / 1_000)),
+      };
+    }
   } catch {
     return { status: "unavailable" };
   }
+  return input.expected && safeEqual(input.supplied, input.expected)
+    ? { status: "valid" }
+    : { status: "invalid" };
 }
 
 declare global {

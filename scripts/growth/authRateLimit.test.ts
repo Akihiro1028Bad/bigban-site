@@ -22,7 +22,9 @@ describe("authRateLimit", () => {
       status: "limited",
       retryAfterSeconds: 900,
     });
-    await expect(checkAuthAttempt({ ...base, supplied: "right" })).resolves.toEqual({ status: "valid" });
+    await expect(checkAuthAttempt({ ...base, supplied: "right" })).resolves.toMatchObject({
+      status: "limited",
+    });
   });
 
   it("IPを分離し、15分後にwindowをリセットする", async () => {
@@ -48,8 +50,27 @@ describe("authRateLimit", () => {
   it("store通信失敗はservice unavailableへ倒す", async () => {
     const store = { incrementFailure: async () => { throw new Error("redis secret"); } };
     await expect(
-      checkAuthAttempt({ expected: "right", supplied: "wrong", ip: "a", hmacKey: "key", store })
+      checkAuthAttempt({ expected: "right", supplied: "right", ip: "a", hmacKey: "key", store })
     ).resolves.toEqual({ status: "unavailable" });
+  });
+
+  it("上限超過時は合言葉を読み取らず比較しない", async () => {
+    const store = { incrementFailure: async () => ({ count: 6, resetAt: 901_000 }) };
+    const input = {
+      expected: "right",
+      get supplied(): string {
+        throw new Error("passphrase comparison must not run");
+      },
+      ip: "a",
+      hmacKey: "key",
+      store,
+      nowMs: 1_000,
+    };
+
+    await expect(checkAuthAttempt(input)).resolves.toEqual({
+      status: "limited",
+      retryAfterSeconds: 900,
+    });
   });
 
   it("現在時刻の既定・空expected・retry最小値とglobal store再利用を扱う", async () => {
