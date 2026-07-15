@@ -6,8 +6,14 @@
  *   常時稼働 PC の publish-due ループが時刻到来分を公開する(プル型)。`selectDuePublications` がその選別。
  */
 
+import type { NotionPage } from "./notion";
+
 /** Notion 記事ネタ案DB に事前追加が必要な予約公開時刻プロパティ名。 */
 export const PUBLISH_SCHEDULE_PROP = "公開予約時刻";
+const STATUS_PROP = "ステータス";
+const PUBLISHED_STATUS = "公開済み";
+const DRAFTED_STATUS = "下書き作成済み";
+const APPROVED_STATUS = "承認";
 
 /** 予約時刻を Notion に書く/消すプロパティを作る(null で予約解除)。 */
 export function buildScheduleProps(scheduledAtIso: string | null): Record<string, unknown> {
@@ -40,6 +46,33 @@ export interface PublishQueueItem extends PublishReadiness {
   id: string;
   stage: string;
   scheduledAtMs?: number | null;
+}
+
+function richTextOf(page: NotionPage, prop: string): string {
+  const value = page.properties[prop] as { rich_text?: { plain_text?: string }[] } | undefined;
+  return (value?.rich_text ?? []).map((item) => item.plain_text ?? "").join("");
+}
+
+/** Notionページを予約公開判定用の最小形状へ変換する。 */
+export function publishQueueItemFromPage(page: NotionPage): PublishQueueItem {
+  const statusValue = page.properties[STATUS_PROP] as
+    | { select?: { name?: string } | null }
+    | undefined;
+  const status = statusValue?.select?.name ?? "";
+  const contentId = richTextOf(page, "下書きID").trim();
+  const scheduledValue = page.properties[PUBLISH_SCHEDULE_PROP] as
+    | { date?: { start?: string } | null }
+    | undefined;
+  const scheduledAt = scheduledValue?.date?.start;
+  const scheduledAtMs = scheduledAt ? Date.parse(scheduledAt) : Number.NaN;
+  const isDrafted = status === DRAFTED_STATUS || (status === APPROVED_STATUS && contentId !== "");
+  return {
+    id: page.id,
+    stage: isDrafted ? "drafted" : status === PUBLISHED_STATUS ? "published" : "other",
+    eyecatchUrl: richTextOf(page, "アイキャッチURL").trim() || undefined,
+    hasDraftBody: richTextOf(page, "下書き本文HTML").trim() !== "",
+    scheduledAtMs: Number.isNaN(scheduledAtMs) ? null : scheduledAtMs,
+  };
 }
 
 /**

@@ -1,7 +1,8 @@
 import { toPendingItems, DRAFT_READY_STATUS } from "../../src/lib/growth/approve";
 import { reconcileGrowthState } from "../../src/lib/growth/reconcile";
 import { buildWorkerLogProps, workerRunFromPage } from "../../src/lib/growth/workerLog";
-import { createPage, queryDataSource, type NotionApiOptions } from "./notion";
+import { createPage, type NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { defaultFetch } from "./http";
 
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460";
@@ -20,12 +21,12 @@ function statusFilter(value: string): unknown {
 
 async function main(): Promise<void> {
   const options = notionOptions();
-  const proposals = await queryDataSource(
+  const proposals = await queryAllDataSource(
     PROPOSAL_DS,
-    { filter: { or: [statusFilter("未処理"), statusFilter("承認"), statusFilter("成果物化済")] }, pageSize: 100 },
+    { filter: { or: [statusFilter("未処理"), statusFilter("承認"), statusFilter("成果物化済")] } },
     options
   );
-  const ideas = await queryDataSource(
+  const ideas = await queryAllDataSource(
     IDEA_DS,
     {
       filter: {
@@ -37,17 +38,16 @@ async function main(): Promise<void> {
           statusFilter("公開済み"),
         ],
       },
-      pageSize: 100,
     },
     options
   );
 
   const workerDs = process.env.GROWTH_WORKER_LOG_DS;
   const workerPages = workerDs
-    ? (await queryDataSource(workerDs, { sorts: [{ property: "記録時刻", direction: "descending" }], pageSize: 50 }, options)).pages
+    ? await queryAllDataSource(workerDs, { sorts: [{ property: "記録時刻", direction: "descending" }] }, options)
     : [];
   const runs = workerPages.map((page) => workerRunFromPage(page));
-  const findings = reconcileGrowthState(toPendingItems(proposals.pages, ideas.pages), runs);
+  const findings = reconcileGrowthState(toPendingItems(proposals, ideas), runs);
 
   process.stdout.write(`${JSON.stringify({ findings }, null, 2)}\n`);
 

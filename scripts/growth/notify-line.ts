@@ -17,7 +17,8 @@ import { buildDigestMessage, buildFailureMessage, clampAltText, extractReportSum
 import { buildDigestFlex } from "./digest-flex";
 import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
-import { getLatestReport, listBlockChildren, queryDataSource } from "./notion";
+import { listBlockChildren } from "./notion";
+import { getLatestReport, queryAllDataSource } from "./notionRepository";
 import {
   FAILURE_LOG_PATH,
   FAILURE_WINDOW_MS,
@@ -107,18 +108,18 @@ async function main(): Promise<void> {
   const notionToken = process.env.NOTION_TOKEN;
   if (notionToken) {
     const opts = { token: notionToken, fetchFn: defaultFetch };
-    const proposals = await queryDataSource(
+    const proposals = await queryAllDataSource(
       PROPOSAL_DS,
-      { filter: statusFilter("未処理"), pageSize: 100 },
+      { filter: statusFilter("未処理") },
       opts
     );
-    const ideas = await queryDataSource(
+    const ideas = await queryAllDataSource(
       IDEA_DS,
-      { filter: statusFilter("提案中"), pageSize: 100 },
+      { filter: statusFilter("提案中") },
       opts
     );
-    pendingCount = proposals.pages.length + ideas.pages.length;
-    topActions = extractActionTitles(proposals.pages, "施策名", 3);
+    pendingCount = proposals.length + ideas.length;
+    topActions = extractActionTitles(proposals, "施策名", 3);
 
     const report = await getLatestReport(REPORT_DS, opts);
     reportUrl = report

@@ -3,7 +3,8 @@ import "dotenv/config";
 
 import { defaultFetch } from "./http";
 import { assertNoProcessingPages, processingStatusFilter, requireLoopState } from "./loopState";
-import { queryAllDataSource, type NotionApiOptions } from "./notion";
+import type { NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a";
 
@@ -17,7 +18,7 @@ async function assertSettled(mode: string, options: NotionApiOptions): Promise<v
   const loop = requireLoopState(mode);
   const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: processingStatusFilter(loop), pageSize: 100 },
+    { filter: processingStatusFilter(loop) },
     options
   );
   assertNoProcessingPages(loop, pages);

@@ -36,11 +36,11 @@ import {
 } from "./metrics";
 import { computeWeeklyPeriods, type DateRange } from "./period";
 import {
-  queryDataSource,
   updatePageProps,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
 import {
   actualReservationsForPage,
@@ -112,15 +112,13 @@ function mediaOf(page: NotionPage): ReturnType<typeof growthMediaForRow> {
 
 /** 公開記事(ステータス=公開済み)のページを取得する。 */
 async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> {
-  const { pages } = await queryDataSource(
+  return queryAllDataSource(
     IDEA_DS,
     {
       filter: { property: STATUS_PROP, select: { equals: PUBLISHED_STATUS } },
-      pageSize: 100,
     },
     options
   );
-  return pages;
 }
 
 /**

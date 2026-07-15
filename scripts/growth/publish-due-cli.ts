@@ -29,8 +29,8 @@ import { pushTextMessage } from "./line";
 import {
   buildScheduleProps,
   PUBLISH_SCHEDULE_PROP,
+  publishQueueItemFromPage,
   selectDuePublications,
-  type PublishQueueItem,
 } from "./publishQueue";
 import {
   buildPublishDueFailureMessage,
@@ -42,12 +42,12 @@ import {
   type SkippedPublication,
 } from "./publishDueNotify";
 import {
-  queryDataSource,
   updatePageProps,
   updatePageSelect,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import {
   failureSignature,
   shouldSendFailureNotice,
@@ -59,8 +59,6 @@ import { confirmedFactsFromPage } from "./sourceLedger";
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
 const PUBLISHED_STATUS = "公開済み";
-const DRAFTED_STATUS = "下書き作成済み";
-const APPROVED_STATUS = "承認";
 // microCMS contentId の許可文字＋長さ上限(draft/eyecatch route と同じ)。不正値・過大値を URL パスに載せない。
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
@@ -86,14 +84,6 @@ function richTextOf(page: NotionPage, prop: string): string {
 function selectOf(page: NotionPage, prop: string): string {
   const value = page.properties[prop] as { select?: { name?: string } | null } | undefined;
   return value?.select?.name ?? "";
-}
-
-function dateMsOf(page: NotionPage, prop: string): number | null {
-  const value = page.properties[prop] as { date?: { start?: string } | null } | undefined;
-  const start = value?.date?.start;
-  if (!start) return null;
-  const ms = Date.parse(start);
-  return Number.isNaN(ms) ? null : ms;
 }
 
 function titleOf(page: NotionPage): string {
@@ -125,20 +115,6 @@ function hasUnfinishedImageGeneration(page: NotionPage): boolean {
   );
 }
 
-/** Notion ページ → 公開キュー判定用の項目。drafted 判定は status＋下書きID から。 */
-function toQueueItem(page: NotionPage): PublishQueueItem {
-  const status = selectOf(page, STATUS_PROP);
-  const contentId = richTextOf(page, "下書きID").trim();
-  const isDrafted = status === DRAFTED_STATUS || (status === APPROVED_STATUS && contentId !== "");
-  return {
-    id: page.id,
-    stage: isDrafted ? "drafted" : status === PUBLISHED_STATUS ? "published" : "other",
-    eyecatchUrl: richTextOf(page, "アイキャッチURL").trim() || undefined,
-    hasDraftBody: richTextOf(page, "下書き本文HTML").trim() !== "",
-    scheduledAtMs: dateMsOf(page, PUBLISH_SCHEDULE_PROP),
-  };
-}
-
 async function notifyLine(text: string): Promise<void> {
   const to = process.env.LINE_GROUP_ID;
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -155,14 +131,14 @@ async function main(): Promise<void> {
   const contentOpts = { serviceDomain, apiKey: microcmsApiKey, fetchFn: defaultFetch, retry };
 
   // 予約が入っているページを取得(到来判定・公開可否は純ロジックで)。
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: { property: PUBLISH_SCHEDULE_PROP, date: { is_not_empty: true } }, pageSize: 100 },
+    { filter: { property: PUBLISH_SCHEDULE_PROP, date: { is_not_empty: true } } },
     notionOpts
   );
 
   const byId = new Map(pages.map((p) => [p.id, p]));
-  const items = pages.map(toQueueItem);
+  const items = pages.map(publishQueueItemFromPage);
   const due = selectDuePublications(items, Date.now());
 
   let published = 0;

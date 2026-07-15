@@ -44,12 +44,11 @@ import {
   buildBodyMirrorProps,
   createPage,
   getPage,
-  queryAllDataSource,
-  queryDataSource,
   updatePageProps,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import {
   failureSignature,
   shouldSendFailureNotice,
@@ -113,7 +112,7 @@ function endpointForPage(page: NotionPage): string {
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<BodyRegenRow[]> {
   const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: statusFilter(value), pageSize: 100 },
+    { filter: statusFilter(value) },
     options
   );
   return pages.map(bodyRegenRowFromPage);
@@ -212,7 +211,7 @@ async function countRecentImageAttempts(
   if (!dataSourceId) return 0;
   const cutoff = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString();
   try {
-    const { pages } = await queryDataSource(
+    const pages = await queryAllDataSource(
       dataSourceId,
       {
         filter: {
@@ -223,7 +222,6 @@ async function countRecentImageAttempts(
             { property: "記録時刻", date: { on_or_after: cutoff } },
           ],
         },
-        pageSize: 100,
       },
       options
     );

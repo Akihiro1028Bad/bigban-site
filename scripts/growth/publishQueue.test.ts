@@ -4,6 +4,7 @@ import {
   buildScheduleProps,
   partitionPublishQueue,
   PUBLISH_SCHEDULE_PROP,
+  publishQueueItemFromPage,
   type PublishQueueItem,
   publishBlockReason,
   selectDuePublications,
@@ -71,5 +72,37 @@ describe("selectDuePublications", () => {
       item({ id: "due-but-published", stage: "published", scheduledAtMs: now - 1 }),
     ];
     expect(selectDuePublications(items, now).map((i) => i.id)).toEqual(["due", "exact"]);
+  });
+});
+
+describe("publishQueueItemFromPage", () => {
+  it("101件目を含むNotionページを予約公開判定用項目へ変換できる", () => {
+    const pages = Array.from({ length: 101 }, (_, index) => ({
+      id: `p-${index + 1}`,
+      url: "",
+      properties: {
+        "ステータス": { select: { name: "下書き作成済み" } },
+        "下書きID": { rich_text: [{ plain_text: `article-${index + 1}` }] },
+        "アイキャッチURL": { rich_text: [{ plain_text: "https://images.microcms-assets.io/x.png" }] },
+        "下書き本文HTML": { rich_text: [{ plain_text: "<p>body</p>" }] },
+        [PUBLISH_SCHEDULE_PROP]: { date: { start: index === 100 ? "2026-07-01T00:00:00.000Z" : "invalid" } },
+      },
+    }));
+    const items = pages.map(publishQueueItemFromPage);
+    expect(selectDuePublications(items, Date.parse("2026-07-02T00:00:00.000Z")).map(({ id }) => id)).toEqual(["p-101"]);
+  });
+
+  it("承認＋下書きIDをdrafted、公開済みをpublished、欠落値をotherへ変換する", () => {
+    expect(publishQueueItemFromPage({ id: "approved", url: "", properties: {
+      "ステータス": { select: { name: "承認" } }, "下書きID": { rich_text: [{ plain_text: "id" }] },
+    } }).stage).toBe("drafted");
+    expect(publishQueueItemFromPage({ id: "published", url: "", properties: {
+      "ステータス": { select: { name: "公開済み" } },
+    } }).stage).toBe("published");
+    expect(publishQueueItemFromPage({ id: "other", url: "", properties: {
+      "アイキャッチURL": { rich_text: [{}] },
+    } })).toEqual({
+      id: "other", stage: "other", eyecatchUrl: undefined, hasDraftBody: false, scheduledAtMs: null,
+    });
   });
 });

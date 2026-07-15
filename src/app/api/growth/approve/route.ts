@@ -12,7 +12,8 @@ import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { DRAFT_READY_STATUS, parseDecisions, toPendingItems } from "@/lib/growth/approve";
-import { defaultFetch, getPage, queryDataSource, updatePageProps } from "@/lib/growth/notion";
+import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
+import { queryAllDataSource } from "@/lib/growth/notionRepository";
 import type { NotionPage } from "@/lib/growth/notion";
 
 export const runtime = "nodejs";
@@ -108,20 +109,20 @@ export async function GET(request: Request): Promise<Response> {
   if (!options) return serverError();
 
   try {
-    const proposals = await queryDataSource(
+    const proposals = await queryAllDataSource(
       PROPOSAL_DS,
-      { filter: proposalStatusFilter(), pageSize: 100 },
+      { filter: proposalStatusFilter() },
       options
     );
-    const ideas = await queryDataSource(
+    const ideas = await queryAllDataSource(
       IDEA_DS,
-      { filter: ideaStatusFilter(), pageSize: 100 },
+      { filter: ideaStatusFilter() },
       options
     );
 
     return NextResponse.json({
       success: true,
-      items: toPendingItems(proposals.pages, ideas.pages),
+      items: toPendingItems(proposals, ideas),
     });
   } catch {
     // Notion 側のエラー詳細はクライアントに返さない(情報漏えい防止)。

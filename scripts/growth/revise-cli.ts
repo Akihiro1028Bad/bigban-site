@@ -26,10 +26,10 @@ import { pushFlexMessage } from "./line";
 import { reapStaleRows } from "./loopReaper";
 import {
   getPage,
-  queryAllDataSource,
   updatePageProps,
   type NotionApiOptions,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import {
   buildReviseFailMessage,
   buildReviseFailProps,
@@ -104,7 +104,7 @@ function statusFilter(value: string): unknown {
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<ReviseRow[]> {
   const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: statusFilter(value), pageSize: 100 },
+    { filter: statusFilter(value) },
     options
   );
   return pages.map(reviseRowFromPage);
