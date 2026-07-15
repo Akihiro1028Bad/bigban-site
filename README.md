@@ -21,12 +21,12 @@
 
 - GA4 / Search Consoleの分析とNotionへのレポート・記事案・施策保存
 - 人間の承認を起点とするClaude Code / Codexの記事制作
-- OpenAIによる画像生成とmicroCMSの下書き・予約公開
+- OpenAIによる画像生成、microCMSの下書き、非AI workerによる予約公開
 - LINE通知と常時稼働PCによるpull型Worker
 
 ## システム全体像
 
-公開サイトと承認画面はVercel上のNext.jsで動作します。AI推論、画像生成、分析、microCMSへの書き込みなどの重い処理は、常時稼働PCのWorkerがNotionの依頼をpullして実行します。
+公開サイトと承認画面はVercel上のNext.jsで動作します。AI推論、画像生成、分析、microCMSの下書き作成などの重い処理は、常時稼働PCのWorkerがNotionの依頼をpullして実行します。即時公開だけは、再認証した人間の操作を受けたVercelの公開APIがmicroCMSへ直接書き込みます。
 
 ```mermaid
 flowchart LR
@@ -374,8 +374,8 @@ npm run build
 - `MICROCMS_API_KEY`に`NEXT_PUBLIC_`を付けず、server-onlyを維持する
 - 本番の `/growth/approve` は合言葉認証を必須にする
 - `APPROVE_AUTH_ENABLED=false`のVercel Production buildは禁止される
-- AIは人間の承認なしで記事を本番公開しない
-- 予約公開は、人間が予約した記事だけをWorkerが処理する
+- AIは自律判断で記事を本番公開しない。記事案の承認は下書き生成の許可であり、公開権限ではない
+- 即時公開は再認証した人間の明示操作で行い、予約公開は人間が予約した記事だけを非AIのWorkerが決定的に処理する
 - headless agentからの`git commit`と`git push`を許可しない
 - 失敗を沈黙させず、再開コマンドとログを残す
 - Worker処理は冪等性を維持し、安全に再実行できるようにする

@@ -1,5 +1,7 @@
 # グロースループ レビュー指摘 修正4件 設計書
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 - 対象リポジトリ: `bigban-growth-loop-mvp`
 - 起票日: 2026-07-06
 - 前提レビュー: `docs/superpowers/specs/2026-07-06-growth-article-quality-uplift-design.md` および 2026-07-06 実装レビューの改善バックログ

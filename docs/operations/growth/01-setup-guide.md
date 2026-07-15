@@ -15,17 +15,17 @@
 | 場所 / サービス | 役割 |
 |---|---|
 | **Mac（開発機）** | コードの開発・修正。ここでは本番の週次自動実行は**しない**（後述、二重実行防止）。 |
-| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（headless agent 実行。承認画面 `AIモデル` の工程別設定に応じて Claude Code CLI / Codex CLI を選択）を回す本番実行機。 |
-| **Vercel（承認画面 + サイト）** | 公開サイトと承認画面 `/growth/approve` をホスト。承認画面は **Notion に「依頼」を書くだけ**（重い処理はしない）。 |
+| **自宅 Windows PC（本番実行機）** | 常時稼働。週次分析・下書き生成・各種修正ループ（headless agent）と、人間が許可した予約公開の執行（非AI worker）を回す本番実行機。 |
+| **Vercel（承認画面 + サイト）** | 公開サイトと承認画面 `/growth/approve` をホスト。AI処理依頼は Notion に書く。例外として、再認証後の即時公開は `/api/growth/publish` から Vercel から microCMS へ直接書き込む。 |
 | **Notion（4つの DB）** | データの中核。①記事ネタ案 ②施策提案 ③週次グロースレポート ④学習ログ。 |
-| **microCMS** | 記事本文の CMS。AI は**下書きまで**を作る（本番公開は人間が手動）。 |
-| **LINE（グループ）** | 週次完了通知・週次モード自身の失敗通知の届け先。通常ループの完了/失敗は `data/growth-failures.log` と各タスクログに残す。 |
+| **microCMS** | 記事本文の CMS。AI は**下書きまで**を作る。公開は再認証した人間の即時公開、または人間が許可した予約公開だけ。 |
+| **LINE（グループ）** | 週次完了・週次失敗の通知先。例外として `publish-due` の成功通知・失敗通知と、#283 の timeout critical通知も届く。通常ループの記録は `data/growth-failures.log` と各タスクログに残す。 |
 | **GA4 / Search Console（GSC）** | サイトのアクセス・検索データの取得元。 |
 | **OpenAI** | アイキャッチ・本文画像の AI 生成。 |
 
 ### 0-2. データフロー（pull 型）
 
-このシステムの背骨は **pull 型**です。承認画面（Vercel）は軽い操作（Notion への「依頼」書き込み）しかせず、重い処理（AI 推論・画像生成・microCMS 書き込み）は**常時稼働の自宅 PC 側ループが Notion をポーリングして拾う**構造になっています。
+このシステムの背骨は **pull 型**です。承認画面（Vercel）からのAI処理依頼は Notion に書き、AI 推論・画像生成・下書き作成は**常時稼働の自宅 PC 側ループが Notion をポーリングして拾う**構造です。ただし即時公開は例外で、再認証した人間の操作により Vercel の `/api/growth/publish` が microCMS へ直接書き込みます。予約公開はPC側の非AI workerが執行します。
 
 ```
  ┌──────────────┐      毎週木曜 朝(自動)       ┌──────────────────────┐
@@ -46,25 +46,27 @@
         │                                                       │
  ┌──────┴───────┐   合言葉で入る    ┌──────────────────┐        │
  │ あなた(オーナー) │ ─────────────▶ │ 承認画面 (Vercel)  │ ───────┘
- │ LINE→承認URL   │  承認/却下/修正   │ /growth/approve   │  Notion に依頼だけ書く
+ │ LINE→承認URL   │  承認/却下/修正   │ /growth/approve   │  AI処理依頼をNotionへ
  └──────────────┘                  └──────────────────┘
+                                           │ 再認証後の即時公開
+                                           └── /api/growth/publish ──▶ microCMS [公開]
 ```
 
 **流れのまとめ**:
 1. 木曜朝、自宅 PC が自動で GA4/GSC を分析 → Notion にレポート・ネタ案・施策を書く → LINE に通知。
 2. あなたは LINE の承認 URL から承認画面を開き、Notion 上でネタ案・施策を承認/却下（または修正依頼）する。
-3. 承認画面は Notion に「承認」「修正依頼」などのフラグを立てるだけ。
+3. 承認画面はAI処理について Notion に「承認」「修正依頼」などのフラグを立てる。即時公開だけは再認証後に `/api/growth/publish` から microCMS へ直接書き込む。
 4. 自宅 PC の各種ループ（数分間隔）がそのフラグを拾い、下書き作成・画像生成・修正を実行する。
-5. 最終的な**本番公開（microCMS の公開ボタン）とコードのマージは人間が手動**で行う（AI は下書きまで）。
+5. AI は下書きまでを作る。最終的な本番公開は、再認証した人間が承認画面の公開キューで即時公開するか、予約公開を許可して到来時に非AI workerが決定的に実行する。コードのマージは人間が行う。
 
 ### 0-3. 絶対に守るルール
 
 運用に入る前に [`00-canon.md`](00-canon.md) の「絶対禁止（全モード共通）」を必ず読んでください。要点だけ:
 
-- **本番公開しない**（AI は下書きまで）。
+- **AIの自律判断だけで本番公開しない**（AI は下書きまで。公開権限は再認証した人間だけが付与する）。
 - **git push / commit しない**（`run.mjs` の `DISALLOW` で機械的に拒否済み）。
 - **未確定情報を断定しない**（料金・所要分・未確定の日時。正典は `scripts/growth/facility-context.json`）。
-- **失敗を沈黙させない**（失敗時は工程名・再開コマンドを出力し、ハード失敗を `data/growth-failures.log` に追記する。LINE は週次完了と週次失敗のみ）。
+- **失敗を沈黙させない**（失敗時は工程名・再開コマンドを出力し、ハード失敗を `data/growth-failures.log` に追記する。LINE の通常通知は週次完了と週次失敗に絞るが、`publish-due` の成功通知・失敗通知と #283 の timeout critical通知は例外）。
 
 ---
 
@@ -78,7 +80,7 @@
 | **GA4** | プロパティ ID | 自宅 PC |
 | **Search Console** | 登録済みプロパティの URL（完全一致） | 自宅 PC |
 | **Notion** | 内部インテグレーションのトークン（`secret_...` / `ntn_...`） | 自宅 PC + Vercel |
-| **microCMS** | サービスドメイン / 管理 API キー | 自宅 PC |
+| **microCMS** | サービスドメイン / 管理 API キー | 自宅 PC + Vercel |
 | **LINE Messaging API** | チャネルアクセストークン（長期）/ グループ ID | 自宅 PC |
 | **OpenAI** | API キー | 自宅 PC |
 
@@ -140,7 +142,7 @@
 - **`GROWTH_WORKER_LOG_DS` はPC側のheartbeat記録に必要**です。承認画面の運用タブに同じログを表示する場合はVercelにも同じ値を設定します。`GROWTH_WORKER_ID`はPC側だけで構いません。
 - **AIモデル設定はNotionで共有**します。承認画面 `AIモデル` で保存した設定を自宅PC workerも読むため、「AIモデル設定」DBを`NOTION_TOKEN`の内部インテグレーションへ共有してください。`GROWTH_MODEL_SETTINGS_DS`はDBを差し替える場合だけ設定し、通常は未設定でコード内の既定IDを使います。
 - **プロバイダー・モデル・推論強度は承認画面 `AIモデル` で設定**します。環境変数では上書きせず、Notionを読めない場合だけコード内推奨値へフォールバックします。
-- **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
+- **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では通常の LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。例外として `publish-due` の成功通知・失敗通知はCLIから直接送られ、#283 の timeout critical通知は通知レベルにかかわらず送られます。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
 - **`APPROVE_AUTH_ENABLED` は Vercel 本番で ON 必須**。未設定＝ON（フェイルセーフ）ですが、`false` にすると本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。詳細は「手順 8」。
 - **`APPROVE_SECRET` はVercelだけに設定**します。自宅PC・LINE通知には置きません。`APPROVE_SESSION_SECRET`は別のランダム値にしてください。
 - **クォート**: 値に空白や記号（`< > | ( ) &` 等）を含む場合は必ずダブルクォートで囲むこと。未クォートだとシェルスクリプトが壊れます（例: `RESEND_FROM`）。
@@ -381,7 +383,7 @@ npm run growth:weekly     # 分析→Notion 3DB 書き込み→自動で notify-
 - `claude` が見つからない: PowerShell を開き直す / `npm i -g @anthropic-ai/claude-code` を再確認。
 - `codex` が見つからない: Codex CLI のインストールと `codex --version` を確認。Notion 併用時は `codex mcp login notion` も確認。
 - Notion に書けない: Claude なら Mac と同一アカウントでログイン済みか、Codex なら Notion MCP/connector がログイン済みか、DB がインテグレーションに接続済みか（手順 4）。
-- LINE に届かない: 週次通知であること、`LINE_CHANNEL_ACCESS_TOKEN` / `LINE_GROUP_ID`、Bot がグループに入っているかを確認。通常ループ通知は `GROWTH_NOTIFY_LEVEL` 未設定では送られません。
+- LINE に届かない: 週次通知、`publish-due` の成功/失敗、timeout critical通知のいずれかであることと、`LINE_CHANNEL_ACCESS_TOKEN` / `LINE_GROUP_ID`、Bot がグループに入っているかを確認。その他の通常ループ通知は `GROWTH_NOTIFY_LEVEL` 未設定では送られません。
 - 承認待ちが空 / レポート URL が出ない: `NOTION_TOKEN` 未設定か、対象 DB がインテグレーション未接続（手順 4-2）。
 - microCMS: 下書き/画像は MCP ではなくスクリプト（管理 API 直叩き）で動くため、Windows で MCP 未接続でも問題なし。
 

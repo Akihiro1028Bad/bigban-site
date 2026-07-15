@@ -1,5 +1,7 @@
 # HYROX トレーニングエリア 設計書
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 **作成日**: 2026-05-24
 **ブランチ**: `feature/hyrox-training-area`
 **対象**: `THE PICKLE BANG THEORY` ブランドサイト（Next.js 16 + next-intl + Vercel）

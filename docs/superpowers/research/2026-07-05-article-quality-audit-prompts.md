@@ -1,5 +1,7 @@
 # 記事品質監査①: 生成プロンプト・文体ガイド(2026-07-05・Opus調査)
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 > 監査対象: `scripts/growth/prompts/drafts.md`・`examples/*`・`docs/operations/growth-article-style.md`・`facility-context.json` ほか。
 > 総評: ガードレール(やってはいけないこと)は一級品だが、「プロが良い記事を能動的に作る」正のドライバーが弱い。「事故らない凡庸な記事」を安定生産する設計になっている。
 
