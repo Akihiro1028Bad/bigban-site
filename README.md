@@ -21,12 +21,12 @@
 
 - GA4 / Search Consoleの分析とNotionへのレポート・記事案・施策保存
 - 人間の承認を起点とするClaude Code / Codexの記事制作
-- OpenAIによる画像生成とmicroCMSの下書き・予約公開
+- OpenAIによる画像生成、microCMSの下書き、非AI workerによる予約公開
 - LINE通知と常時稼働PCによるpull型Worker
 
 ## システム全体像
 
-公開サイトと承認画面はVercel上のNext.jsで動作します。AI推論、画像生成、分析、microCMSへの書き込みなどの重い処理は、常時稼働PCのWorkerがNotionの依頼をpullして実行します。
+公開サイトと承認画面はVercel上のNext.jsで動作します。AI推論、画像生成、分析、microCMSの下書き作成などの重い処理は、常時稼働PCのWorkerがNotionの依頼をpullして実行します。即時公開だけは、再認証した人間の操作を受けたVercelの公開APIがmicroCMSへ直接書き込みます。
 
 ```mermaid
 flowchart LR

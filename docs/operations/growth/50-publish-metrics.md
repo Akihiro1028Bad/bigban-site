@@ -5,12 +5,12 @@
 ## 公開キュー(#H23 例外管理型 ＋ #H24 予約公開)
 
 - 公開権限は人間だけが付与する。AIの自律判断は公開権限にならず、記事案の承認も下書き生成の許可に限られる。
-- **即時公開**は人間が再認証後に「今すぐ公開」を選び、公開APIが決定的に処理する。**予約公開**は人間が再認証後に日時を指定して将来の公開権限を付与し、予約解除はその権限の撤回となる。
+- **即時公開**は人間が再認証後に「今すぐ公開」を選び、公開APIが決定的に処理する。**予約公開**は人間が再認証後に日時を指定して将来の公開権限を付与する。予約解除が確実に有効なのはworkerの対象取得前までで、実行中は間に合わない場合がある。
 - 記事タブ上部の折りたたみ「公開キュー」(`PublishQueue.tsx`)で、下書き済み記事を **公開OK(green)** と **要対応(例外・理由付き)** に振り分け、green を**一括公開**／**一括予約**できる。
 - 公開可否＝アイキャッチ有り＋本文非空(`partitionPublishQueue`／`publishBlockReason`)。
 - 公開は既存 `/api/growth/publish`(冪等)を ready 件数ぶん順次呼ぶ。
 - **予約公開はプル型**: microCMS は書き込み API で予約公開を持たない(`reservationTime` は管理画面専用・read-only／status PATCH は `["PUBLISH"|"DRAFT"]` のみ)ため、`/api/growth/publish/schedule` は Notion `公開予約時刻` に時刻を書くだけ(強権キー不要)。
-- 実際の予約公開は非AIの決定的worker `npm run growth:publish-due`(`publish-due-cli.ts`)が、人間から公開権限を付与された到来分だけを `selectDuePublications` で再検証し、`publishContent`(管理キー)で公開＋予約解除＋LINE通知する。
+- 実際の予約公開は非AIの決定的worker `npm run growth:publish-due`(`publish-due-cli.ts`)が、実行開始時のスナップショットから `selectDuePublications` で到来分を選び、各対象を公開直前ゲートで検証して `publishContent`(管理キー)で公開＋予約解除＋LINE通知する。公開直前に予約状態そのものは再取得しない。
 - 承認画面のキュー表示は Notion のミラーを読む(`toPendingItems` が `eyecatchUrl`/`hasDraftBody`/`scheduledAtMs` を載せる)。強権操作は再認証後の人間の明示操作に限定する。
 - 純ロジック `scripts/growth/publishQueue.ts`(`publishBlockReason`/`partitionPublishQueue`/`selectDuePublications`/`buildScheduleProps`/`PUBLISH_SCHEDULE_PROP`・`src/lib/growth/publishQueue.ts` 再エクスポート)＋表示整形 `articleMetricsView.ts`(`formatScheduledAt`)、CLI はカバレッジ除外。
 - 生成中/公開済みは段階ガード(#H9)で予約も弾く。

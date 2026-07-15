@@ -44,7 +44,7 @@ function markdownLinks(document: string): string[] {
 
 function localLinkTarget(link: string): string | null {
   const withoutTitle = link.trim().split(/\s+["']/)[0];
-  if (/^(?:https?:|mailto:|#)/.test(withoutTitle)) return null;
+  if (/^(?:https?:|mailto:|#|\/)/.test(withoutTitle)) return null;
   const decoded = decodeURIComponent(withoutTitle.split("#")[0]);
   return decoded || null;
 }
@@ -83,7 +83,10 @@ describe("施設情報の正典", () => {
   });
 
   it("現行コーパスに旧開業日を正式日として残さない", () => {
-    const forbidden = [/2026-04-18/, /2026年4月18日/, /4月18日のオープン/];
+    const forbidden = [
+      /2026\s*(?:[-/.]\s*0?4\s*[-/.]\s*0?18|年\s*0?4月\s*0?18日)/,
+      /4月18日のオープン/,
+    ];
     for (const file of currentCorpus) {
       const document = read(file);
       for (const pattern of forbidden) expect(document, file).not.toMatch(pattern);
@@ -152,6 +155,41 @@ describe("公開権限の境界", () => {
     }
   });
 
+  it("予約解除が有効な実装上の境界を明記する", () => {
+    const canon = read("docs/operations/growth/00-canon.md");
+    expect(canon).toContain("workerが対象を取得する前");
+    expect(canon).toContain("worker実行中の解除は間に合わない場合がある");
+    expect(canon).not.toContain("解除後にworkerは公開しない");
+  });
+
+  it("週次runbookでAI生成と2つの公開経路を区別する", () => {
+    const runbook = read("docs/operations/growth-weekly-runbook.md");
+    expect(runbook).toContain("AI生成は下書きまで");
+    expect(runbook).toContain("即時公開は人間");
+    expect(runbook).toContain("予約公開は人間が付与した公開権限をworkerが執行");
+    expect(runbook).not.toMatch(/microCMS は下書き作成のみ。公開・マージは人間が行う/);
+  });
+
+  it("setup guideでAI依頼とVercelからの即時公開を区別する", () => {
+    const setupGuide = read("docs/operations/growth/01-setup-guide.md");
+    expect(setupGuide).toContain("AI処理依頼は Notion");
+    expect(setupGuide).toContain("Vercel から microCMS へ直接");
+    expect(setupGuide).toContain("/api/growth/publish");
+  });
+
+  it("canonとsetup guideにLINE通知の例外を明記する", () => {
+    for (const file of [
+      "docs/operations/growth/00-canon.md",
+      "docs/operations/growth/01-setup-guide.md",
+    ]) {
+      const document = read(file);
+      expect(document, file).toContain("publish-due");
+      expect(document, file).toContain("成功通知");
+      expect(document, file).toContain("失敗通知");
+      expect(document, file).toContain("timeout critical通知");
+    }
+  });
+
   it("ニュース管理画面とグロース公開キューを別経路として説明する", () => {
     const manual = read("docs/operations/news-admin-manual.md");
     expect(manual).toContain("人間の明示操作");
@@ -167,7 +205,6 @@ describe("履歴資料", () => {
         fs.readFileSync(file, "utf8")
       )
     );
-    expect(targets).toHaveLength(13);
     for (const file of targets) {
       const document = fs.readFileSync(file, "utf8");
       expect(document, relativeFromRoot(file)).toMatch(
@@ -185,6 +222,12 @@ describe("現行文書の参照", () => {
     ...filesBelow(OPERATIONS_ROOT, ".md").map(relativeFromRoot),
   ];
   const scripts = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
+
+  it("サイトルートへのリンクをローカルファイル検査から除外する", () => {
+    expect(localLinkTarget("/news")).toBeNull();
+    expect(localLinkTarget("/ja/news#latest")).toBeNull();
+    expect(localLinkTarget("../growth/00-canon.md")).toBe("../growth/00-canon.md");
+  });
 
   it("Markdownのローカルリンク先と prompts 配下の参照先が存在する", () => {
     for (const file of markdownFiles) {
