@@ -156,10 +156,16 @@ describe("runProcess", () => {
     expect(result).toMatchObject({ kind: "timeout", exitCode: 124, phase: "hung", timedOut: true, termSent: true, forceKilled: true });
   });
 
-  it("spawn error・signal・maxBufferを timeout と区別する", async () => {
+  it("spawn error・maxBufferを timeout と区別する", async () => {
     expect(await runProcess("__missing_growth_command__", [], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "spawn-error", timedOut: false });
-    expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], { timeoutMs: 2_000, stdio: "capture" })).toMatchObject({ kind: "signal", timedOut: false, signal: "SIGTERM" });
     expect(await runProcess(process.execPath, ["-e", "process.stdout.write('12345')"], { timeoutMs: 2_000, stdio: "capture", maxBuffer: 4 })).toMatchObject({ kind: "max-buffer", timedOut: false });
+  });
+
+  it.skipIf(process.platform === "win32")("signal終了をtimeoutと区別する", async () => {
+    expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], {
+      timeoutMs: 2_000,
+      stdio: "capture",
+    })).toMatchObject({ kind: "signal", timedOut: false, signal: "SIGTERM" });
   });
 
   it("maxBuffer超過でSIGTERMを無視する子は猶予後に強制終了する", async () => {
