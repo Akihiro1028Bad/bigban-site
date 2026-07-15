@@ -7,10 +7,13 @@ import { describe, expect, it } from "vitest";
 import { PROMPT_REGISTRY } from "./promptRegistry";
 
 const PROMPTS_DIR = path.resolve("scripts/growth/prompts");
+const RUNBOOK_PATH = path.resolve("docs/operations/growth-weekly-runbook.md");
 
 describe("週次分析の予約率中心プロンプト", () => {
   const weekly = readFileSync(path.join(PROMPTS_DIR, "weekly.md"), "utf-8");
   const goals = readFileSync(path.join(PROMPTS_DIR, "shared/growth-goals.md"), "utf-8");
+  const articleIdea = readFileSync(path.join(PROMPTS_DIR, "shared/article-idea.md"), "utf-8");
+  const runbook = readFileSync(RUNBOOK_PATH, "utf-8");
 
   it("週次プロンプトが共通の目標・分析基準を参照する", () => {
     expect(weekly).toContain("scripts/growth/prompts/shared/growth-goals.md");
@@ -64,7 +67,16 @@ describe("週次分析の予約率中心プロンプト", () => {
   });
 
   it("通常記事を本命1件・補欠1件・探索1件にし、探索の積み増しを防ぐ", () => {
-    expect(weekly).toContain("本命1件＋補欠1件＋探索1件");
+    const canonicalContracts = [weekly, articleIdea, goals, runbook];
+    for (const contract of canonicalContracts) {
+      expect(contract).toContain("本命1件＋補欠1件＋探索1件");
+      expect(contract).toContain("成功率");
+      expect(contract).toContain("判定済み母数");
+      expect(contract).toContain("未判定率");
+      expect(contract).not.toContain("本命1件＋補欠2件");
+      expect(contract).not.toContain("本命1件と補欠2件");
+      expect(contract).not.toContain("効いている型を厚くする");
+    }
     expect(weekly).toContain("同型の生きている記事案・観測中記事がない");
     expect(weekly).toContain("未判定率が高い型");
     expect(weekly).toContain("判定待ち");

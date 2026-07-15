@@ -268,7 +268,9 @@ export function summarizeArticlePerformance(
   ideas: readonly NotionPage[],
   nowMs = Date.now()
 ): ArticleTypePerformance[] {
-  const buckets = new Map<string, Bucket>();
+  const buckets = new Map<string, Bucket>(
+    KNOWN_ARTICLE_TYPE_ORDER.map((articleType) => [articleType, newBucket()])
+  );
   for (const page of ideas) {
     if (selectName(page, "ステータス") !== PUBLISHED_STATUS) continue;
     const articleType = selectName(page, "記事タイプ") || UNTYPED_BUCKET;
@@ -293,7 +295,8 @@ export function summarizeArticlePerformance(
         judged,
         unjudged: bucket.unjudged,
         successRatePct: judged === 0 ? null : roundOne((bucket.success / judged) * 100),
-        unjudgedRatePct: roundOne((bucket.unjudged / bucket.published) * 100),
+        unjudgedRatePct:
+          bucket.published === 0 ? 0 : roundOne((bucket.unjudged / bucket.published) * 100),
         sampleStatus: judged < MIN_JUDGED_ARTICLES_PER_TYPE ? "exploring" : "sufficient",
         observation: observationOf(bucket),
         querySignals: querySignalsOf(bucket.queries),
@@ -320,7 +323,6 @@ export function renderPerformanceSummary(summaries: readonly ArticleTypePerforma
   const lines = ["## 公開済み記事の成績サマリ(記事タイプ別・率/母数/観測条件)"];
   if (summaries.reduce((sum, summary) => sum + summary.published, 0) === 0) {
     lines.push("(公開済み記事がまだ無いため成績サマリは空。公開後に率・母数・観測条件を蓄積する)");
-    return lines;
   }
 
   for (const summary of summaries) {
@@ -328,7 +330,7 @@ export function renderPerformanceSummary(summaries: readonly ArticleTypePerforma
       ? "母数条件クリア"
       : `探索中: 判定済み${summary.judged}本 < ${MIN_JUDGED_ARTICLES_PER_TYPE}本`;
     const successRate = summary.successRatePct === null ? "未算出" : `${summary.successRatePct}%`;
-    lines.push(`- ${summary.articleType} [${status}]: 公開${summary.published}本 / 判定済み${summary.judged}本 / 成功${summary.success}本 / 成功率${successRate} / 未判定${summary.unjudged}本 (${summary.unjudgedRatePct}%)`);
+    lines.push(`- ${summary.articleType} [${status}]: 公開${summary.published}本 / 判定済み${summary.judged}本 / 成功${summary.success}本 / 様子見${summary.watch}本 / 要改稿${summary.rewrite}本 / 成功率${successRate} / 未判定${summary.unjudged}本 (${summary.unjudgedRatePct}%)`);
     lines.push(`  - 観測条件: ${observationText(summary)}`);
     if (summary.querySignals.length > 0) {
       lines.push(`  - 検索反応: ${summary.querySignals.map((signal) => `${signal.query} (${signal.clicks}click/${signal.impressions}imp・CTR ${roundOne(signal.ctr * 100)}%・${signal.status === "qualified" ? "母数条件クリア" : "探索中"})`).join(" / ")}`);
