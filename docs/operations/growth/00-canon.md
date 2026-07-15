@@ -21,9 +21,8 @@
 - ランチャー: `scripts/growth/run.mjs`(Windows/macOS 両対応)。プロンプトは stdin で渡す。
 - 既定は承認画面 `AIモデル` の工程別設定。Notion「AIモデル設定」DBを自宅PC workerが起動前に読み、Claude Code CLI / Codex CLIを工程ごとに選ぶ。Notionが読めない場合はコード内推奨値へフォールバックする。
 - 動作確認(agent 非起動): `GROWTH_DRYRUN=1`。
-- Claude 側: `GROWTH_DRAFTS_MODEL` / `GROWTH_WEEKLY_MODEL` / `GROWTH_CLAUDE_EFFORT` / `GROWTH_WEEKLY_CLAUDE_EFFORT` で一時上書きできる。
-- Codex 側: `GROWTH_CODEX_APPROVAL`(既定 `never`) / `GROWTH_CODEX_SANDBOX`(既定 `danger-full-access`) / 共通・週次専用のモデル/推論強度envで調整する。Claude専用のallowedToolsや`mcp__claude_ai_Notion`は渡さない。制限したい環境だけ `GROWTH_CODEX_SANDBOX=workspace-write` などを明示する。
-- 優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。`GROWTH_AGENT` は全工程のプロバイダーを強制する緊急・検証用で、通常は未設定にする。
+- プロバイダー・モデル・推論強度は承認画面の工程別設定だけで選ぶ。Notionを読めない場合はコード内推奨値へフォールバックする。
+- Codex 側の実行制御は `GROWTH_CODEX_APPROVAL`(既定 `never`) / `GROWTH_CODEX_SANDBOX`(既定 `danger-full-access`) で調整する。Claude専用のallowedToolsや`mcp__claude_ai_Notion`は渡さない。
 
 ## 実行モード一覧と参照先
 

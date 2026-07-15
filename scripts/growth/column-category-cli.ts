@@ -5,7 +5,7 @@
  *   npm run growth:column-category -- 資産 improve    # コラムカテゴリ上書き優先 → improve
  *   npm run growth:column-category                     # 正典マッピング表を一覧表示
  *
- * 下書きモード(drafts.md)が `payload.category` を決める際にこれを使う。マッピングは
+ * 下書きオーケストレーターが `payload.category` を決める際にこれを使う。マッピングは
  * `columnCategory.ts` の `ARTICLE_TYPE_TO_CATEGORY` を単一ソースとし、プロンプト側に
  * 手書きの表を持たない(二重管理・転記ズレの排除 = #222)。
  *
@@ -22,7 +22,7 @@ import {
 const [articleType, override] = process.argv.slice(2);
 
 if (!articleType) {
-  // 引数なしは正典表を一覧表示(drafts.md から「表はこれ」と参照できる)。
+  // 引数なしは正典表を一覧表示する。
   process.stdout.write("記事タイプ→コラムカテゴリ 既定マッピング(正典・単一ソース):\n");
   for (const [ja, id] of Object.entries(ARTICLE_TYPE_TO_CATEGORY)) {
     process.stdout.write(`  ${ja}→${id}\n`);

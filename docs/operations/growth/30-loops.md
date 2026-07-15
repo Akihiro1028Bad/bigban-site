@@ -3,13 +3,13 @@
 > いずれも pull 型: 承認画面が Notion に「依頼」を書き、常時稼働PC のループ(5分間隔・`run.mjs` の lock/1日上限を共有)が headless agent で拾う。既定は承認画面 `AIモデル` の工程別設定で、Claude Code CLI / Codex CLI を工程ごとに選ぶ。
 > 共通原則・段階ガードは [00-canon.md](00-canon.md)。必要 Notion プロパティは [40-notion-props.md](40-notion-props.md)。
 
-Codex 強制の初期検証は、本文や microCMS を直接変更しない `growth:advise-loop` と、採用前のメタ提案までに留まる `growth:decorate-loop` から始める。通常運用では `GROWTH_AGENT` を未設定にして工程別設定を使う。
+Codex の初期検証は、承認画面 `AIモデル` で対象工程をCodexに設定し、本文や microCMS を直接変更しない `growth:advise-loop` と、採用前のメタ提案までに留まる `growth:decorate-loop` から始める。
 
 Codex 実行例:
 
 ```bash
-GROWTH_AGENT=codex GROWTH_CODEX_SANDBOX=danger-full-access npm run growth:advise-loop
-GROWTH_AGENT=codex GROWTH_CODEX_SANDBOX=danger-full-access npm run growth:decorate-loop
+GROWTH_CODEX_SANDBOX=danger-full-access npm run growth:advise-loop
+GROWTH_CODEX_SANDBOX=danger-full-access npm run growth:decorate-loop
 ```
 
 Codex 工程は既定で `danger-full-access`。制限したい環境だけ `GROWTH_CODEX_SANDBOX=workspace-write` などを明示し、常用する前に対象ループを `advise` → `decorate` → その他の順に広げる。

@@ -31,7 +31,7 @@
 | `コラムカテゴリ` | select(`start`/`rules`/`improve`/`health`/`compare`/`event`) | 下書き生成時の `payload.category` を**既定マッピングより優先**して人が上書きする(読者向けの最終分類)。 |
 
 - **任意プロパティ**。**未追加でも従来どおり動く**(欠落耐性)。空/未設定なら `記事タイプ` からの既定マッピング(正典 `columnCategory.ts`)で解決する。
-- 解決は `npm run growth:column-category -- "<記事タイプ>" "<コラムカテゴリ>"` に一本化(drafts.md は手書き表を持たない=単一ソース #222)。
+- 解決は `resolveColumnCategoryId` に一本化し、CLI確認は `npm run growth:column-category -- "<記事タイプ>" "<コラムカテゴリ>"` を使う(単一ソース #222)。
 - category(読者向け・回遊/SEO)と `記事タイプ`(内部計測 #C4)は**別軸で共存**(AD8)。上書きは読者向け分類だけを動かし `記事タイプ` は変えない。
 
 ## 修正ループ(#40 / #139B)

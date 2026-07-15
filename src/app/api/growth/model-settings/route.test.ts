@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe("/api/growth/model-settings", () => {
-  it("GETはNotion上書きを既定値へマージして9工程を返す", async () => {
+  it("GETはNotion上書きを既定値へマージして10工程を返す", async () => {
     vi.mocked(queryDataSource).mockResolvedValue({
       hasMore: false,
       nextCursor: null,
@@ -68,7 +68,7 @@ describe("/api/growth/model-settings", () => {
     const res = await GET(request("GET"));
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.settings).toHaveLength(9);
+    expect(json.settings).toHaveLength(10);
     expect(json.settings.find((item: { id: string }) => item.id === "image-prompt")).toMatchObject({
       provider: "codex",
       model: "gpt-5.6-sol",

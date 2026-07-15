@@ -29,15 +29,24 @@ function dryRun(mode: string, env: Record<string, string> = {}): string {
   });
 }
 
-function failedDryRun(mode: string, env: Record<string, string>) {
-  return spawnSync("node", [RUN, mode], {
+function dryRunWithSetting(
+  mode: string,
+  setting: { provider: "claude" | "codex"; model: string; effort: string },
+  env: Record<string, string> = {},
+): string {
+  const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-setting-bin-"));
+  const npmPath = path.join(binDir, "npm");
+  writeFileSync(
+    npmPath,
+    `#!/bin/sh\nprintf '%s\\n' '${JSON.stringify(setting)}'\n`,
+    { mode: 0o755 },
+  );
+  return execFileSync("node", [RUN, mode], {
     env: {
       ...process.env,
+      PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
       GROWTH_DRYRUN: "1",
-      GROWTH_AGENT: "",
-      GROWTH_MODEL_SETTINGS_DISABLE: "1",
-      GROWTH_CODEX_REASONING_EFFORT: "",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "",
+      GROWTH_MODEL_SETTINGS_DISABLE: "",
       ...env,
     },
     encoding: "utf-8",
@@ -83,6 +92,7 @@ function runLockedModeWithStubs(options: {
   peekCount?: number;
   lockPid?: number;
   claimPageId?: string;
+  orchestratorExitCode?: number;
 }) {
   const mode = options.mode ?? "revise";
   const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-loop-bin-"));
@@ -91,12 +101,16 @@ function runLockedModeWithStubs(options: {
   const settledCount = path.join(binDir, "settled-count");
   const promptLog = path.join(binDir, "prompt.log");
   const codexPath = path.join(binDir, "codex");
+  const claudePath = path.join(binDir, "claude");
   const npmPath = path.join(binDir, "npm");
   if (options.lockPid !== undefined) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(path.join(stateDir, "revise.lock"), String(options.lockPid));
   }
   writeFileSync(codexPath, `#!/bin/sh\necho codex >> "${callLog}"\ncat > "${promptLog}"\nexit 0\n`, {
+    mode: 0o755,
+  });
+  writeFileSync(claudePath, `#!/bin/sh\necho codex >> "${callLog}"\ncat > "${promptLog}"\nexit 0\n`, {
     mode: 0o755,
   });
   writeFileSync(
@@ -117,6 +131,11 @@ case "$*" in
     esac
     ;;
   *"growth:worker-log"*) echo disabled; exit 0 ;;
+  *"growth:draft-orchestrator"*)
+    echo "orchestrator-agent=\${GROWTH_AGENT:-}" >> "${callLog}"
+    echo "orchestrator-model=\${GROWTH_CODEX_MODEL:-}" >> "${callLog}"
+    exit ${options.orchestratorExitCode ?? 0}
+    ;;
   *) exit 0 ;;
 esac
 `,
@@ -132,7 +151,7 @@ esac
       GROWTH_SKIP_PULL: "1",
       GROWTH_STATE_DIR: stateDir,
       GROWTH_REVISE_DAILY_CAP: "9999",
-      GROWTH_CODEX_MODEL: "",
+      GROWTH_CODEX_MODEL: mode === "drafts-auto" ? "gpt-leak" : "",
       GROWTH_CODEX_REASONING_EFFORT: "",
     },
     encoding: "utf-8",
@@ -146,6 +165,21 @@ esac
 }
 
 describe("run.mjs dry-run の --model(#247)", () => {
+  it("全AI工程で旧モデル環境変数より工程別設定を優先する", () => {
+    expect(
+      dryRun("advise", {
+        GROWTH_AGENT: "codex",
+        GROWTH_CODEX_MODEL: "gpt-5.5",
+      }),
+    ).toContain("claude -p");
+    expect(
+      dryRun("weekly", {
+        GROWTH_AGENT: "claude",
+        GROWTH_WEEKLY_MODEL: "claude-opus-4-8",
+      }),
+    ).toContain("codex -a never exec");
+  });
+
   it("記事アドバイスは既定で Claude Opus 4.8 / high を使う", () => {
     const out = dryRun("advise");
     expect(out).toContain("claude -p");
@@ -155,16 +189,10 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain("mcp__claude_ai_Notion");
   });
 
-  it("drafts は既定で --model claude-opus-4-8 を付ける", () => {
-    const out = dryRun("drafts");
-    expect(out).toContain("--model claude-opus-4-8");
-    expect(out).toContain("--effort high");
-  });
-
-  it("GROWTH_DRAFTS_MODEL で執筆モデルを上書きできる", () => {
-    expect(dryRun("drafts", { GROWTH_DRAFTS_MODEL: "claude-sonnet-4-6" })).toContain(
-      "--model claude-sonnet-4-6"
-    );
+  it.each(["drafts", "drafts-auto"])("%s は決定的オーケストレーターを起動する", (mode) => {
+    const out = dryRun(mode);
+    expect(out).toContain("npm run --silent growth:draft-orchestrator");
+    expect(out).not.toContain("prompt:drafts.md");
   });
 
   it("weekly は既定で Codex GPT-5.6 Sol / xhigh を使う", () => {
@@ -174,24 +202,26 @@ describe("run.mjs dry-run の --model(#247)", () => {
     expect(out).toContain('model_reasoning_effort="xhigh"');
   });
 
-  it("GROWTH_WEEKLY_MODEL で従来どおり週次をClaudeへ上書きできる", () => {
-    expect(dryRun("weekly", { GROWTH_WEEKLY_MODEL: "claude-sonnet-4-6" })).toContain(
-      "--model claude-sonnet-4-6"
+  it("旧週次モデル環境変数では工程別設定を上書きできない", () => {
+    expect(dryRun("weekly", { GROWTH_WEEKLY_MODEL: "claude-opus-4-8" })).toContain(
+      "--model gpt-5.6-sol"
     );
   });
 
-  it("weekly は learning-log:recent を allowedTools に含む", () => {
-    expect(dryRun("weekly", { GROWTH_AGENT: "claude" })).toContain("growth:learning-log:recent");
+  it("weekly を設定画面でClaudeにした場合も learning-log:recent を許可する", () => {
+    expect(dryRunWithSetting("weekly", {
+      provider: "claude",
+      model: "claude-opus-4-8",
+      effort: "high",
+    })).toContain("growth:learning-log:recent");
   });
 
-  it.each(["drafts", "drafts-auto"])("%s は単一Claude執筆のため Task を許可しない", (mode) => {
-    const out = dryRun(mode, { GROWTH_AGENT: "claude" });
-    expect(out).toContain("--allowedTools");
-    expect(out).not.toMatch(/--allowedTools .*\bTask\b/);
-  });
-
-  it("weekly は並列分析のため Task を引き続き許可する", () => {
-    expect(dryRun("weekly", { GROWTH_AGENT: "claude" })).toMatch(/--allowedTools .*\bTask\b/);
+  it("weekly を設定画面でClaudeにした場合も Task を許可する", () => {
+    expect(dryRunWithSetting("weekly", {
+      provider: "claude",
+      model: "claude-opus-4-8",
+      effort: "high",
+    })).toMatch(/--allowedTools .*\bTask\b/);
   });
 
   it("画像プロンプト設計は既定で Codex GPT-5.6 Sol / high を使う", () => {
@@ -238,13 +268,22 @@ describe("run.mjs dry-run の --model(#247)", () => {
 });
 
 describe("run.mjs Claude のファイル生成権限", () => {
-  it.each(["drafts", "drafts-auto", "revise", "advise", "decorate", "apply", "comment-revise"])(
+  it.each(["revise", "advise", "apply", "comment-revise"])(
     "mode=%s は Write を allowedTools に含む",
     (mode) => {
-      const out = dryRun(mode, { GROWTH_AGENT: "claude" });
+      const out = dryRun(mode);
       expect(out).toMatch(/--allowedTools .*\bWrite\b/);
     }
   );
+
+  it("設定画面でdecorateをClaudeにした場合もWriteを許可する", () => {
+    const out = dryRunWithSetting("decorate", {
+      provider: "claude",
+      model: "claude-opus-4-8",
+      effort: "high",
+    });
+    expect(out).toMatch(/--allowedTools .*\bWrite\b/);
+  });
 });
 
 describe("run.mjs pull 型ループの回収と完了確認", () => {
@@ -329,16 +368,29 @@ describe("run.mjs pull 型ループの回収と完了確認", () => {
     expect(calls).not.toContain("codex");
   });
 
-  it("drafts-auto は1件をclaimし、そのpageIdだけをClaudeへ渡す", () => {
-    const { result, calls, prompt } = runLockedModeWithStubs({
+  it("drafts-auto は1件をclaimし、そのpageIdだけをオーケストレーターへ渡す", () => {
+    const { result, calls } = runLockedModeWithStubs({
       mode: "drafts-auto",
       claimPageId: "page-claimed",
     });
 
     expect(result.status).toBe(0);
     expect(calls).toContain("growth:drafts-auto-peek -- claim");
-    expect(calls.indexOf("-- claim")).toBeLessThan(calls.indexOf("codex"));
-    expect(prompt).toContain('<draft_target page_id="page-claimed"');
+    expect(calls.indexOf("-- claim")).toBeLessThan(calls.indexOf("growth:draft-orchestrator"));
+    expect(calls).toContain("growth:draft-orchestrator -- page-claimed");
+    expect(calls).toMatch(/^orchestrator-agent=$/m);
+    expect(calls).toMatch(/^orchestrator-model=$/m);
+  });
+
+  it("オーケストレーターが詳細通知済みの終了コード70なら汎用失敗通知を重複送信しない", () => {
+    const { result, calls } = runLockedModeWithStubs({
+      mode: "drafts-auto",
+      claimPageId: "page-failed",
+      orchestratorExitCode: 70,
+    });
+
+    expect(result.status).toBe(70);
+    expect(calls).not.toContain("growth:notify-loop-fail");
   });
 });
 
@@ -357,124 +409,64 @@ describe("pull 型CLIの全ページ回収", () => {
   });
 });
 
-describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
-  const codexModes = [
+describe("run.mjs の工程別モデル設定", () => {
+  const defaultCodexModes = [
     "weekly",
-    "drafts",
-    "drafts-auto",
     "initiatives",
     "initiatives-auto",
-    "revise",
     "image-prompt",
     "regen",
     "regen-body",
-    "advise",
     "decorate",
-    "apply",
-    "comment-revise",
   ];
 
-  it("Codex CLI の exec 形式で起動する", () => {
-    const out = dryRun("advise", { GROWTH_AGENT: "codex" });
+  it("設定画面で選ばれたCodexをexec形式で起動する", () => {
+    const out = dryRunWithSetting("advise", {
+      provider: "codex",
+      model: "gpt-5.5",
+      effort: "high",
+    });
 
     expect(out).toContain("codex -a never exec");
     expect(out).toContain("--sandbox danger-full-access");
     expect(out).toContain(" -C ");
-  });
-
-  it("Claude 専用の tool 引数を Codex へ渡さない", () => {
-    const out = dryRun("decorate", { GROWTH_AGENT: "codex" });
-
     expect(out).not.toContain("--allowedTools");
     expect(out).not.toContain("mcp__claude_ai_Notion");
   });
 
-  it("GROWTH_CODEX_MODEL で Codex モデルを指定できる", () => {
-    expect(dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_MODEL: "gpt-5.5" })).toContain(
-      "--model gpt-5.5"
+  it("旧環境変数のプロバイダー・モデル・推論強度を無視する", () => {
+    const out = dryRun("advise", {
+      GROWTH_AGENT: "codex",
+      GROWTH_CODEX_MODEL: "gpt-5.5",
+      GROWTH_CODEX_REASONING_EFFORT: "xhigh",
+    });
+
+    expect(out).toContain("claude -p");
+    expect(out).toContain("--model claude-opus-4-8");
+    expect(out).toContain("--effort high");
+  });
+
+  it("Codexの実行制御用sandbox環境変数は維持する", () => {
+    expect(dryRun("decorate", { GROWTH_CODEX_SANDBOX: "read-only" })).toContain(
+      "--sandbox read-only",
     );
   });
 
-  it("GROWTH_CODEX_REASONING_EFFORT で Codex の推論強度を指定できる", () => {
-    expect(
-      dryRun("advise", {
-        GROWTH_AGENT: "codex",
-        GROWTH_CODEX_REASONING_EFFORT: "xhigh",
-      })
-    ).toContain(' -c model_reasoning_effort="xhigh"');
+  it("Codexの実行制御用approval環境変数は維持する", () => {
+    expect(dryRun("decorate", { GROWTH_CODEX_APPROVAL: "on-request" })).toContain(
+      "codex -a on-request exec",
+    );
   });
 
-  it("weekly は週次専用のモデルと推論強度を共通設定より優先する", () => {
-    const out = dryRun("weekly", {
-      GROWTH_AGENT: "codex",
-      GROWTH_CODEX_MODEL: "gpt-common",
-      GROWTH_CODEX_REASONING_EFFORT: "medium",
-      GROWTH_WEEKLY_CODEX_MODEL: "gpt-5.6-sol",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "xhigh",
-    });
-
-    expect(out).toContain("--model gpt-5.6-sol");
-    expect(out).toContain(' -c model_reasoning_effort="xhigh"');
-    expect(out).not.toContain("--model gpt-common");
-  });
-
-  it("週次専用設定は週次以外の Codex モードへ漏れない", () => {
-    const out = dryRun("advise", {
-      GROWTH_AGENT: "codex",
-      GROWTH_WEEKLY_CODEX_MODEL: "gpt-5.6-sol",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "xhigh",
-    });
-
-    expect(out).not.toContain("--model gpt-5.6-sol");
-    expect(out).toContain('model_reasoning_effort="high"');
-    expect(out).not.toContain('model_reasoning_effort="xhigh"');
-  });
-
-  it("不正な Codex 推論強度は agent 起動前に拒否する", () => {
-    const result = failedDryRun("weekly", {
-      GROWTH_AGENT: "codex",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "maximum",
-    });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("Codex 推論強度が不正です: maximum");
-  });
-
-  it("GROWTH_CODEX_SANDBOX で Codex sandbox を指定できる", () => {
-    expect(
-      dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_SANDBOX: "read-only" })
-    ).toContain("--sandbox read-only");
-  });
-
-  it("GROWTH_CODEX_APPROVAL で Codex approval を指定できる", () => {
-    expect(
-      dryRun("advise", { GROWTH_AGENT: "codex", GROWTH_CODEX_APPROVAL: "on-request" })
-    ).toContain("codex -a on-request exec");
-  });
-
-  it("不正な GROWTH_AGENT は非0終了する", () => {
-    const result = failedDryRun("advise", { GROWTH_AGENT: "openai" });
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("GROWTH_AGENT は claude または codex を指定してください");
-  });
-
-  it("drafts-auto は drafts.md を使い Codex でも起動できる", () => {
-    const out = dryRun("drafts-auto", { GROWTH_AGENT: "codex" });
-
-    expect(out).toContain("drafts.md+codex-runtime");
-    expect(out).toContain("codex -a never exec");
-  });
-
-  it("initiatives-auto は initiatives.md を使い Codex でも起動できる", () => {
-    const out = dryRun("initiatives-auto", { GROWTH_AGENT: "codex" });
+  it("initiatives-auto は initiatives.md を使い既定のCodexで起動する", () => {
+    const out = dryRun("initiatives-auto");
 
     expect(out).toContain("initiatives.md+codex-runtime");
     expect(out).toContain("codex -a never exec");
   });
 
-  it.each(codexModes)("mode=%s でも Codex dry-run を選べる", (mode) => {
-    const out = dryRun(mode, { GROWTH_AGENT: "codex" });
+  it.each(defaultCodexModes)("mode=%s は既定のCodex設定を使う", (mode) => {
+    const out = dryRun(mode);
 
     expect(out).toContain("codex -a never exec");
     expect(out).not.toContain("--allowedTools");
@@ -482,12 +474,15 @@ describe("run.mjs dry-run の GROWTH_AGENT=codex", () => {
   });
 
   it("weekly の通常実行でも解決済み Codex モデルで worker-log を記録できる", () => {
-    const result = runWithStubbedCodex("weekly", {
-      GROWTH_WEEKLY_CODEX_MODEL: "gpt-5.6-sol",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "xhigh",
-    });
+    const result = runWithStubbedCodex("weekly");
 
     expect(result.stderr).not.toContain("ReferenceError");
     expect(result.stderr).not.toContain("CODEX_MODEL");
+  });
+});
+
+describe("run.mjs 下書きオーケストレーター", () => {
+  it.each(["drafts", "drafts-auto"])("mode=%s は環境変数のagent指定を評価しない", (mode) => {
+    expect(dryRun(mode, { GROWTH_AGENT: "openai" })).toContain("growth:draft-orchestrator");
   });
 });
