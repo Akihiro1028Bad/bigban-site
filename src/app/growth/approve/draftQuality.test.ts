@@ -302,6 +302,16 @@ describe("品質ゲートの事実・HTML検出", () => {
       )
     ).toEqual(["24時間営業", "国内最大", "未確定イベント", "ラウンジ利用"]);
   });
+  it("イベントの開催予定を公式情報で確認する案内は未確定イベント扱いしない", () => {
+    expect(
+      detectProhibitedClaims(
+        "一人でも参加しやすいレッスンやイベントも用意されているので、開催予定や募集内容は最新の公式情報で確認してみてください。"
+      )
+    ).toEqual([]);
+    expect(detectProhibitedClaims("体験会を開催予定です。内容は後日案内します。")).toEqual([
+      "未確定イベント",
+    ]);
+  });
   it("安全なHTMLは空、禁止タグとイベント属性を返す", () => {
     expect(detectUnsafeHtml("<h2>見出し</h2><p>本文</p>")).toEqual([]);
     expect(detectUnsafeHtml('<iframe src="x"></iframe><p onload="x">本文</p>')).toEqual(["iframe", "onload"]);
@@ -311,6 +321,29 @@ describe("品質ゲートの事実・HTML検出", () => {
     expect(
       detectUnsafeHtml('<p style="color:red" onclick="a"><span onclick="b">本文</span></p>')
     ).toEqual(["style", "onclick"]);
+  });
+
+  it("外部リンクへ付与された安全な target・rel は許可し、不正な組み合わせは拒否する", () => {
+    expect(
+      detectUnsafeHtml(
+        '<a href="https://example.com" target="_blank" rel="noopener noreferrer">公式サイト</a>'
+      )
+    ).toEqual([]);
+    expect(detectUnsafeHtml('<a href="https://example.com" target="_blank">外部</a>')).toContain(
+      "rel"
+    );
+    expect(
+      detectUnsafeHtml('<a href="https://example.com" target="popup" rel="noopener">外部</a>')
+    ).toEqual(expect.arrayContaining(["target", "rel"]));
+    expect(
+      detectUnsafeHtml(
+        '<a href="https://example.com" target="_blank" rel="opener noopener noreferrer">外部</a>'
+      )
+    ).toContain("rel");
+    expect(detectUnsafeHtml('<img src="x" target="_blank" rel="noopener noreferrer">')).toEqual([
+      "target",
+      "rel",
+    ]);
   });
 });
 
