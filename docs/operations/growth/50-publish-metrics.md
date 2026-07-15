@@ -16,7 +16,7 @@
 ## 計測ループ(#C4・成績ボード・pull型)
 
 - 公開記事の GA4 成績(表示数/ユーザー数＋前週比)を承認画面の「成績ボード」(`PerformanceBoard.tsx`)に表示。
-- プル型＝PC の `npm run growth:metrics`(`metrics-cli.ts`)が GA4 `topPages`(pagePath→screenPageViews/activeUsers・current/prior 2期間)を取得 → Notion 公開記事(ステータス=公開済み)ごとに microCMS を contentId で引いて `slug`/`locale`→`articlePagePath` を組み立て → `metricsForKnownPagePath` で突き合わせ → `成績データ`(JSON)＋`成績更新時刻`(date)を Notion へ書く。GA4不一致・認証/取得失敗でも `ga4Measured=false` として既知記事を更新し、独立した実予約を失わない。
+- プル型＝PC の `npm run growth:metrics`(`metrics-cli.ts`)が GA4 `topPages` を取得し、公開記事の `articlePagePath` と突き合わせて `成績データ`＋`成績更新時刻`を Notion へ書く。`measurementStatus` は行あり=`measured`、取得成功・行なし=`path-unmatched`、認証/取得失敗=`source-error`。前2者は実測値（行なしは明示的0）、`source-error` の0はプレースホルダーで、集計・改稿判定から除外する。いずれも独立した実予約状態は更新する。
 - 承認画面は `toPendingItems` が `成績データ` を `parseMetrics`(zod・安全側 null)して `PendingItem.metrics` に載せ、`PerformanceBoard` が合計＋表示数降順リストを描画。
 - **承認画面は Notion を読むだけ**(GA4/microCMS は触らない)。
 - 純ロジック `scripts/growth/metrics.ts`(`articlePagePath`/`normalizePagePath`/`metricsForPagePath`/`serializeMetrics`/`parseMetrics`/`buildMetricsMirrorProps`/`summarizeMetrics`・`src/lib/growth/metrics.ts` 再エクスポート)＋表示整形 `articleMetricsView.ts`(`formatCount`/`formatDelta`)、CLI はカバレッジ除外。
@@ -29,3 +29,4 @@
 - current/priorを別々に収録判定し、片方でも範囲外なら `coverage_incomplete` として実予約を未取得にする。両期間が完全収録された空CSVだけを実測0件として扱う。
 - CSV/sidecarが未設定・読取失敗・不正でもGA4/GSC更新は継続し、実予約だけ `missing` にする。逆にGoogle認証・GA4取得・topPages一致が失敗しても、既知記事へ実予約状態を書き込む。7日超・未来・不正mtimeは古い表示となる。
 - PerformanceBoardは予約意図、SNS、その他CTA、施設全体実予約、記事帰属実予約を混同せず表示する。
+- CTA計測状態は `GROWTH_GA4_KEYEVENTS_SINCE` とレポート期間で判定する。期間全体が設定日以降なら `measured`、期間内に設定日があれば `partial`、期間前・不正・GA4失敗は `unmeasured`。記事公開日は使わない。

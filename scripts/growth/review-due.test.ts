@@ -9,6 +9,8 @@ import {
   reviewEndpointForPage,
   selectReviewMilestone,
 } from "./review-due";
+import { metricsForKnownPagePath, parseMetrics, serializeMetrics } from "./metrics";
+import { reviewLabels } from "./metricsReview";
 import type { NotionPage } from "./notion";
 
 function pageWithMedia(media?: string): NotionPage {
@@ -72,6 +74,25 @@ describe("selectReviewMilestone", () => {
 });
 
 describe("buildReviewMemo", () => {
+  it("GA4行なし成功の記事を28日レビューで要改稿にする", () => {
+    const metrics = parseMetrics(serializeMetrics(metricsForKnownPagePath(
+      "/news/a", [], { start: "2026-07-01", end: "2026-07-07" }, [],
+      { isGa4SourceAvailable: true }
+    )));
+    expect(metrics).not.toBeNull();
+    expect(buildReviewMemo(28, reviewLabels(metrics!, 28), "")).toContain("[28日レビュー] 要改稿");
+  });
+
+  it("GA4 source-errorの記事は28日でも未計測メモにする", () => {
+    const metrics = parseMetrics(serializeMetrics(metricsForKnownPagePath(
+      "/news/a", [], { start: "2026-07-01", end: "2026-07-07" }, [],
+      { isGa4SourceAvailable: false }
+    )));
+    expect(metrics).not.toBeNull();
+    const memo = buildReviewMemo(28, reviewLabels(metrics!, 28), "");
+    expect(memo).toContain("未計測");
+    expect(memo).not.toContain("要改稿");
+  });
   it("マイルストーン＋ラベル＋成功指標を1行にまとめる", () => {
     expect(buildReviewMemo(28, ["CTR弱い", "順位あと少し"], "予約クリック5件/月")).toBe(
       "[28日レビュー] CTR弱い・順位あと少し ／成功指標: 予約クリック5件/月"

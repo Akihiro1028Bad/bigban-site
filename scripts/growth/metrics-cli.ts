@@ -26,8 +26,10 @@ import {
   articlePagePath,
   articleSearchUrl,
   buildMetricsMirrorProps,
+  buildMetricsNotificationSummary,
   buildSearchMetrics,
-  isKeyEventsMeasured,
+  ctaEventsMeasurementStatusForPeriod,
+  measurementBucketOf,
   metricsForKnownPagePath,
   type ActualReservationMetrics,
   type SearchMetrics,
@@ -273,7 +275,10 @@ async function main(): Promise<void> {
     process.env.GROWTH_RESERVATION_COVERAGE_PATH
   );
   let updated = 0;
-  let unmatched = 0;
+  let slugFailed = 0;
+  let sourceError = 0;
+  let pathUnmatched = 0;
+  let zeroInflow = 0;
   let gscFailed = 0; // #計測強化 S2: GSC 取得失敗(クォータ枯渇等)の沈黙を防ぐため件数を可視化。
 
   for (const page of pages) {
@@ -283,16 +288,21 @@ async function main(): Promise<void> {
     const media = mediaOf(page);
     const sl = await fetchSlugLocale(domain, microKey, growthEndpoint(media), contentId);
     if (!sl) {
-      unmatched += 1;
+      slugFailed += 1;
       console.warn(`[metrics] slug 解決失敗: ${titleOf(page)} (contentId=${contentId})`);
       continue;
     }
     const pagePath = articlePagePath(sl.slug, sl.locale, media);
-    const base = metricsForKnownPagePath(pagePath, rows, current, ctaRows);
-    if (!base.ga4Measured) {
-      unmatched += 1;
-      console.warn(`[metrics] GA4 一致なし: ${titleOf(page)} (${pagePath})`);
+    const base = metricsForKnownPagePath(pagePath, rows, current, ctaRows, {
+      isGa4SourceAvailable: isGa4Available,
+    });
+    const bucket = measurementBucketOf(base);
+    if (bucket === "source-error") sourceError += 1;
+    if (bucket === "path-unmatched") {
+      pathUnmatched += 1;
+      console.warn(`[metrics] GA4 パス不一致: ${titleOf(page)} (${pagePath})`);
     }
+    if (bucket === "zero-inflow") zeroInflow += 1;
     // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
     const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
     const search = accessToken
@@ -309,10 +319,15 @@ async function main(): Promise<void> {
           checkedAt: nowIso,
         })
       : reservations;
+    const ctaEventsMeasurementStatus = ctaEventsMeasurementStatusForPeriod(
+      current,
+      KEY_EVENTS_SINCE,
+      isGa4Available
+    );
     const metrics = {
       ...base,
-      ctaEventsMeasured:
-        isGa4Available && isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
+      ctaEventsMeasurementStatus,
+      ctaEventsMeasured: ctaEventsMeasurementStatus === "measured",
       actualReservations,
       ...(search ? { search } : {}),
       ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
@@ -329,8 +344,10 @@ async function main(): Promise<void> {
     updated += 1;
   }
 
-  const gscNote = gscFailed > 0 ? ` / GSC失敗 ${gscFailed}件` : "";
-  const summary = `📊 成績更新: ${updated}件 / 未一致 ${unmatched}件${gscNote} (期間 ${current.start}〜${current.end})`;
+  const summary = buildMetricsNotificationSummary(
+    { updated, slugFailed, sourceError, pathUnmatched, zeroInflow, gscFailed },
+    current
+  );
   console.log(summary);
   if (!DRYRUN && updated > 0) {
     await notifyLine(summary);

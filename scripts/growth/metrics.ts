@@ -58,15 +58,21 @@ export type ActualReservationMetrics =
       article: MetricDelta | null;
     };
 
+export type MeasurementStatus = "measured" | "path-unmatched" | "source-error";
+export type CtaEventsMeasurementStatus = "measured" | "partial" | "unmeasured";
+
 /** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
 export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
   users: MetricDelta;
-  /** GA4 topPagesに記事行が存在したか。falseは実測0ではなく未取得。 */
+  /** 後方互換値。新規判断は measurementStatus を正本にする。 */
   ga4Measured?: boolean;
+  /** GA4値の正本。未指定の旧JSONは measurementStatusOf で正規化する。 */
+  measurementStatus?: MeasurementStatus;
   ctaEvents?: CtaEventMetrics;
   ctaEventsMeasured?: boolean;
+  ctaEventsMeasurementStatus?: CtaEventsMeasurementStatus;
   actualReservations?: ActualReservationMetrics;
   // #計測強化 S2: GA4 keyEvents(CTAキーイベント。後方互換のため任意。旧データには無い)。
   keyEvents?: MetricDelta;
@@ -190,6 +196,7 @@ export function metricsForPagePath(
     pagePath: target,
     views: { current: viewsC, prior: viewsP, deltaPct: deltaPct(viewsC, viewsP) },
     users: { current: usersC, prior: usersP, deltaPct: deltaPct(usersC, usersP) },
+    measurementStatus: "measured",
     ...(ctaEvents ? { ctaEvents } : {}),
     period,
   };
@@ -214,16 +221,30 @@ function ctaEventsForPagePath(
 
 /**
  * microCMSで解決済みの既知記事を、GA4 topPages一致の有無にかかわらず成績モデルへ載せる。
- * ga4Measured=false時の0はplaceholderであり、実測0として判断してはならない。
+ * path-unmatched の0は改稿対象、source-error の0は集計・判断対象外のplaceholder。
  */
 export function metricsForKnownPagePath(
   pagePath: string,
   rows: readonly MergedRow[],
   period: { start: string; end: string },
-  ctaRows?: readonly MergedRow[]
+  ctaRows?: readonly MergedRow[],
+  options: { isGa4SourceAvailable?: boolean } = {}
 ): ArticleMetrics {
+  const isGa4SourceAvailable = options.isGa4SourceAvailable ?? true;
+  if (!isGa4SourceAvailable) {
+    return zeroMetrics(pagePath, period, "source-error", ctaRows);
+  }
   const measured = metricsForPagePath(pagePath, rows, period, ctaRows);
-  if (measured) return { ...measured, ga4Measured: true };
+  if (measured) return { ...measured, ga4Measured: true, measurementStatus: "measured" };
+  return zeroMetrics(pagePath, period, "path-unmatched", ctaRows);
+}
+
+function zeroMetrics(
+  pagePath: string,
+  period: { start: string; end: string },
+  measurementStatus: Exclude<MeasurementStatus, "measured">,
+  ctaRows: readonly MergedRow[] | undefined
+): ArticleMetrics {
   const target = normalizePagePath(pagePath);
   const ctaEvents = ctaEventsForPagePath(target, ctaRows);
   return {
@@ -231,21 +252,77 @@ export function metricsForKnownPagePath(
     views: { current: 0, prior: 0, deltaPct: null },
     users: { current: 0, prior: 0, deltaPct: null },
     ga4Measured: false,
+    measurementStatus,
     ...(ctaEvents ? { ctaEvents } : {}),
     period,
   };
 }
 
-/** keyEvents の設定完了日以降に公開された記事だけを「計測済み」とみなす。 */
-export function isKeyEventsMeasured(
-  publishedAt: string | undefined,
-  sinceYmd: string | undefined
-): boolean {
-  if (!publishedAt || !sinceYmd) return false;
-  const since = Date.parse(`${sinceYmd}T00:00:00.000Z`);
-  const published = Date.parse(publishedAt);
-  if (Number.isNaN(since) || Number.isNaN(published)) return false;
-  return published >= since;
+/** 新状態を正本とし、旧JSONは安全側に正規化する。 */
+export function measurementStatusOf(
+  metrics: Pick<ArticleMetrics, "measurementStatus" | "ga4Measured"> | {
+    measurementStatus?: MeasurementStatus;
+    ga4Measured?: boolean;
+  }
+): MeasurementStatus {
+  if (metrics.measurementStatus) return metrics.measurementStatus;
+  return metrics.ga4Measured === false ? "source-error" : "measured";
+}
+
+function ymdTime(value: string | undefined): number | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isNaN(time) ? null : time;
+}
+
+/** CTAイベント設定日とレポート期間の重なりから計測状態を決める。 */
+export function ctaEventsMeasurementStatusForPeriod(
+  period: { start: string; end: string } | undefined,
+  sinceYmd: string | undefined,
+  isGa4SourceAvailable: boolean
+): CtaEventsMeasurementStatus {
+  if (!isGa4SourceAvailable || !period) return "unmeasured";
+  const start = ymdTime(period.start);
+  const end = ymdTime(period.end);
+  const since = ymdTime(sinceYmd);
+  if (start === null || end === null || since === null || start > end) return "unmeasured";
+  if (end < since) return "unmeasured";
+  return start >= since ? "measured" : "partial";
+}
+
+export function ctaEventsMeasurementStatusOf(
+  metrics: Pick<ArticleMetrics, "ctaEventsMeasurementStatus" | "ctaEventsMeasured">
+): CtaEventsMeasurementStatus {
+  if (metrics.ctaEventsMeasurementStatus) return metrics.ctaEventsMeasurementStatus;
+  return metrics.ctaEventsMeasured === true ? "measured" : "unmeasured";
+}
+
+export type MeasurementBucket = MeasurementStatus | "zero-inflow";
+
+export function measurementBucketOf(metrics: {
+  measurementStatus?: MeasurementStatus;
+  ga4Measured?: boolean;
+  views: { current: number };
+}): MeasurementBucket {
+  const status = measurementStatusOf(metrics);
+  if (status !== "measured") return status;
+  return metrics.views.current === 0 ? "zero-inflow" : "measured";
+}
+
+export interface MetricsNotificationCounts {
+  updated: number;
+  slugFailed: number;
+  sourceError: number;
+  pathUnmatched: number;
+  zeroInflow: number;
+  gscFailed: number;
+}
+
+export function buildMetricsNotificationSummary(
+  counts: MetricsNotificationCounts,
+  period: { start: string; end: string }
+): string {
+  return `📊 成績更新: ${counts.updated}件 / slug失敗 ${counts.slugFailed}件 / GA4失敗 ${counts.sourceError}件 / パス不一致 ${counts.pathUnmatched}件 / 0流入 ${counts.zeroInflow}件 / GSC失敗 ${counts.gscFailed}件 (期間 ${period.start}〜${period.end})`;
 }
 
 const deltaSchema = z.object({
@@ -304,8 +381,10 @@ const metricsSchema = z.object({
   views: deltaSchema,
   users: deltaSchema,
   ga4Measured: z.boolean().optional(),
+  measurementStatus: z.enum(["measured", "path-unmatched", "source-error"]).optional(),
   ctaEvents: ctaEventsSchema.optional(),
   ctaEventsMeasured: z.boolean().optional(),
+  ctaEventsMeasurementStatus: z.enum(["measured", "partial", "unmeasured"]).optional(),
   actualReservations: actualReservationsSchema.optional(),
   // #計測強化 S2/S3: 後方互換。旧データ(keyEvents/search/publishedAt 無し)も valid のまま。
   keyEvents: deltaSchema.optional(),
@@ -348,7 +427,12 @@ export function buildMetricsMirrorProps(
 export function summarizeMetrics(
   items: readonly {
     title: string;
-    metrics?: { views?: { current?: number }; users?: { current?: number } };
+    metrics?: {
+      views?: { current?: number };
+      users?: { current?: number };
+      measurementStatus?: MeasurementStatus;
+      ga4Measured?: boolean;
+    };
   }[]
 ): { totalViews: number; totalUsers: number; count: number; top: { title: string; views: number } | null } {
   let totalViews = 0;
@@ -356,11 +440,14 @@ export function summarizeMetrics(
   let count = 0;
   let top: { title: string; views: number } | null = null;
   for (const item of items) {
-    const views = item.metrics?.views?.current;
+    const metrics = item.metrics;
+    if (!metrics) continue;
+    const views = metrics.views?.current;
     if (typeof views !== "number") continue;
+    if (measurementStatusOf(metrics) === "source-error") continue;
     count += 1;
     totalViews += views;
-    totalUsers += item.metrics?.users?.current ?? 0;
+    totalUsers += metrics.users?.current ?? 0;
     if (!top || views > top.views) top = { title: item.title, views };
   }
   return { totalViews, totalUsers, count, top };

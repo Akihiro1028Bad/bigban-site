@@ -295,7 +295,10 @@ describe("toPendingItems", () => {
       pagePath: "/news/a",
       views: { current: 120, prior: 100, deltaPct: 20 },
       users: { current: 80, prior: 70, deltaPct: 14.3 },
-      ctaEventsMeasured: true,
+      measurementStatus: "path-unmatched",
+      ga4Measured: false,
+      ctaEventsMeasurementStatus: "partial",
+      ctaEventsMeasured: false,
       ctaEvents: {
         reservationClick: { current: 2, prior: 1, deltaPct: 100 },
         reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
