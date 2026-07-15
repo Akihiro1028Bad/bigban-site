@@ -53,21 +53,6 @@ function dryRunWithSetting(
   });
 }
 
-function failedDryRun(mode: string, env: Record<string, string>) {
-  return spawnSync("node", [RUN, mode], {
-    env: {
-      ...process.env,
-      GROWTH_DRYRUN: "1",
-      GROWTH_AGENT: "",
-      GROWTH_MODEL_SETTINGS_DISABLE: "1",
-      GROWTH_CODEX_REASONING_EFFORT: "",
-      GROWTH_WEEKLY_CODEX_REASONING_EFFORT: "",
-      ...env,
-    },
-    encoding: "utf-8",
-  });
-}
-
 function runWithStubbedCodex(mode: string, env: Record<string, string> = {}) {
   const binDir = mkdtempSync(path.join(tmpdir(), "growth-run-bin-"));
   const stubPath = path.join(binDir, "codex");
