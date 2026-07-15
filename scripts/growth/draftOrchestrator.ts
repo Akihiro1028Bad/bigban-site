@@ -348,6 +348,18 @@ export function shouldInvalidateWriterCacheForPublishFailure(output: string): bo
     || /(?:^|\n)✗ notion-context:.*構成案ゲート不合格/m.test(output);
 }
 
+export function invalidatePublishResumeFiles(
+  output: string,
+  files: readonly string[],
+  deps: { exists: (filePath: string) => boolean; remove: (filePath: string) => void },
+): boolean {
+  if (!shouldInvalidateWriterCacheForPublishFailure(output)) return false;
+  for (const file of files) {
+    if (deps.exists(file)) deps.remove(file);
+  }
+  return true;
+}
+
 export function workerLogTargetFields(pageId: string): Record<string, string> {
   return {
     "target-type": "article",
@@ -390,13 +402,24 @@ export function publishDraftRecoveryCommand(specPath: string): string {
 
 export function matchesPublishCheckpointContext(
   output: unknown,
-  current: { rebuildSourceId: string; endpoint: string; notionPageId: string },
+  current: {
+    rebuildSourceId: string;
+    endpoint: string;
+    notionPageId: string;
+    notionContentId?: string;
+    checkpointContentId?: string;
+  },
 ): boolean {
   if (!output || typeof output !== "object") return false;
   const saved = output as Record<string, unknown>;
-  return saved.rebuildSourceId === current.rebuildSourceId
-    && saved.endpoint === current.endpoint
-    && saved.notionPageId === current.notionPageId;
+  if (saved.endpoint !== current.endpoint || saved.notionPageId !== current.notionPageId) return false;
+  if (saved.rebuildSourceId === current.rebuildSourceId) return true;
+  return current.rebuildSourceId === ""
+    && typeof saved.rebuildSourceId === "string"
+    && saved.rebuildSourceId !== ""
+    && current.notionContentId !== undefined
+    && current.notionContentId !== ""
+    && current.notionContentId === current.checkpointContentId;
 }
 
 async function runDraftNotification(params: {

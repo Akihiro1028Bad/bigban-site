@@ -21,6 +21,7 @@ import {
   workerLogTargetFields,
   publishDraftRecoveryCommand,
   matchesPublishCheckpointContext,
+  invalidatePublishResumeFiles,
   shouldResumePublishSpec,
 } from "./draftOrchestrator";
 import type { ResearchPacket, WriterOutput } from "./draftPipeline";
@@ -50,6 +51,44 @@ describe("draftOrchestrator", () => {
     expect(matchesPublishCheckpointContext(saved, { ...saved, endpoint: "news" })).toBe(false);
     expect(matchesPublishCheckpointContext(saved, { ...saved, notionPageId: "page-2" })).toBe(false);
     expect(matchesPublishCheckpointContext(null, saved)).toBe(false);
+  });
+
+  it("再生成元がクリア済みでも同じcontentIdがNotionに反映済みならcheckpointを維持する", () => {
+    const saved = { rebuildSourceId: "source-a", endpoint: "columns", notionPageId: "page-1" };
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+      notionContentId: "content-1",
+      checkpointContentId: "content-1",
+    })).toBe(true);
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+      notionContentId: "other-content",
+      checkpointContentId: "content-1",
+    })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+    })).toBe(false);
+  });
+
+  it("quality/notion-contextゲート失敗時だけwriter・spec・checkpointをまとめて破棄する", () => {
+    const removed: string[] = [];
+    const files = ["writer.json", "publish-spec.json", "publish-checkpoint.json"];
+    expect(invalidatePublishResumeFiles("✗ quality-gate: invalid", files, {
+      exists: (file) => file !== "writer.json",
+      remove: (file) => removed.push(file),
+    })).toBe(true);
+    expect(removed).toEqual(["publish-spec.json", "publish-checkpoint.json"]);
+    expect(invalidatePublishResumeFiles("✗ create: timeout", files, {
+      exists: () => true,
+      remove: (file) => removed.push(file),
+    })).toBe(false);
+    expect(removed).toEqual(["publish-spec.json", "publish-checkpoint.json"]);
   });
   it("一時作業ディレクトリを失敗の有無にかかわらず全て削除する", async () => {
     const calls: Array<{ directory: string; options: { recursive: true; force: true } }> = [];

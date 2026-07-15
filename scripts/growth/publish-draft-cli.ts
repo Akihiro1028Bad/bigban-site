@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { getColumnSlugs } from "../../src/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "../../src/lib/microcms/queries";
 import { summarizeStyleWarnings } from "../../src/app/growth/approve/draftQuality";
+import { draftLinkOf } from "../../src/lib/growth/approve";
 
 import {
   bodyImageFileStem,
@@ -241,10 +242,16 @@ async function main(): Promise<void> {
           token: requireEnv("NOTION_TOKEN"),
           fetchFn: defaultFetch,
         });
+        const checkpointContentId = checkpoint?.completed.find((entry) => entry.stage === "create")?.output;
+        const savedContentId = checkpointContentId && typeof checkpointContentId === "object"
+          ? (checkpointContentId as { contentId?: unknown }).contentId
+          : undefined;
         return matchesPublishCheckpointContext(output, {
           rebuildSourceId: validatedRebuildSourceId(rebuildSourceIdOf(current)) ?? "",
           endpoint: ENDPOINT,
           notionPageId: spec.notion!.pageId,
+          notionContentId: draftLinkOf(current).contentId,
+          checkpointContentId: typeof savedContentId === "string" ? savedContentId : undefined,
         });
       },
       restore: (output) => {

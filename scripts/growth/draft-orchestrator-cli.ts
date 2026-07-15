@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
-import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
+import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, invalidatePublishResumeFiles, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
@@ -280,6 +280,7 @@ async function publishAndNotify(params: {
   input: ReturnType<typeof draftInputFromPage>;
   stateDir: string;
   generationMarkerPath: string;
+  checkpointPath: string;
   hasGenerationMarker: boolean;
   writerPath?: string;
 }): Promise<void> {
@@ -288,9 +289,11 @@ async function publishAndNotify(params: {
     publishOut = await runNpm("growth:publish-draft", [params.specPath], true, timeoutPolicy.publishDraftMs);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    if (params.writerPath && shouldInvalidateWriterCacheForPublishFailure(message) && existsSync(params.writerPath)) {
-      unlinkSync(params.writerPath);
-    }
+    invalidatePublishResumeFiles(
+      message,
+      [params.writerPath, params.specPath, params.checkpointPath].filter((file): file is string => file !== undefined),
+      { exists: existsSync, remove: unlinkSync },
+    );
     throw error;
   }
   process.stdout.write(publishOut);
@@ -342,13 +345,16 @@ async function main(): Promise<void> {
   );
   const specPath = path.join(stateDir, "publish-spec.json");
   const checkpointPath = path.join(stateDir, "publish-checkpoint.json");
+  const writerPath = path.join(stateDir, "writer-output.json");
   if (shouldResumePublishSpec(existsSync(checkpointPath), existsSync(specPath))) {
     await publishAndNotify({
       specPath,
       input,
       stateDir,
       generationMarkerPath,
+      checkpointPath,
       hasGenerationMarker: generation.marker !== null,
+      writerPath,
     });
     return;
   }
@@ -425,7 +431,6 @@ async function main(): Promise<void> {
     relevantFacilityContext.doNotWrite,
   );
   const writerKey = stageCacheKey({ input: writerInput, prompt: promptWrite, model: writerSetting, cacheScope: generation.cacheScope });
-  const writerPath = path.join(stateDir, "writer-output.json");
   let writerValue = cached(writerPath, writerKey);
   let cachedWriter: WriterOutput | null = null;
   if (writerValue !== null) {
@@ -461,6 +466,7 @@ async function main(): Promise<void> {
     input,
     stateDir,
     generationMarkerPath,
+    checkpointPath,
     hasGenerationMarker: generation.marker !== null,
     writerPath,
   });
