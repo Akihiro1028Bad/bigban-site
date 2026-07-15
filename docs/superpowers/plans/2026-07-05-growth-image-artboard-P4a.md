@@ -1,5 +1,7 @@
 # グロース画像アートボード P4a(誌面俯瞰・記法拡張・旧UI全撤去)実装計画
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development(推奨)または superpowers:executing-plans でタスク単位に実装する。各ステップは checkbox(`- [ ]`)で進捗管理する。
 > **本計画の実装者は Codex CLI**(`codex exec`)。各タスクは自己完結ブリーフとして渡す。コードは完全転記せず、正確なインターフェース・受け入れ挙動・テストケース一覧・参照イディオム(実在ファイル指名)を指定する。実装者は必ず参照ファイルの現物イディオムに合わせること。曖昧さが致命的な箇所(記法の正規表現・表示名マップ・シリアライズ出力例)だけ具体値/コードを書く。
 

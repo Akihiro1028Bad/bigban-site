@@ -1,7 +1,7 @@
 /**
  * 承認画面プロトタイプのモックデータ(#proto)。
  *
- * 「THE PICKLE BANG THEORY」(屋内ピックルボール施設・2026-04-18 開業)の
+ * 「THE PICKLE BANG THEORY」(営業中の屋内ピックルボール施設)の
  * グロース記事を模した、見た目検証用のダミー。外部 I/O は一切しない。
  */
 import { migrateImageHint } from "./imageIntent";
@@ -222,7 +222,7 @@ const indoorBody = `
 
 const publishedBody = `
 <h2>グランドオープン記念、最大3つの特典</h2>
-<p>2026年4月18日のオープンを記念して、先着・期間限定の特典をご用意しました。</p>
+<p>グランドオープンを記念して、先着・期間限定の特典をご用意しました。</p>
 <ul>
 <li>初回コート利用料が無料</li>
 <li>パドルレンタルが1ヶ月間半額</li>

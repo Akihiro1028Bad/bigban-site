@@ -2,7 +2,7 @@
 
 Premium Indoor Pickleball Facility Website
 Next.js 16 + TypeScript + Tailwind CSS v4 + Framer Motion
-Open: 2026-04-18
+Open: 2026-04-17
 
 ## Project Structure
 
@@ -48,11 +48,11 @@ public/
 
 **正典の優先順位**: `scripts/growth/facility-context.json`(施設の前提・書いてはいけない未確定項目の単一ソース) > `docs/operations/growth-article-style.md`(文体・構成・NG) > `docs/operations/growth-weekly-runbook.md`(運用手順)。
 
-**絶対禁止(全モード)**: 本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(料金・正確な所要分 等。列挙の正典は `scripts/growth/facility-context.json` の `doNotWrite`)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。
+**絶対禁止(全モード)**: AIの自律判断だけで本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(料金・正確な所要分 等。列挙の正典は `scripts/growth/facility-context.json` の `doNotWrite`)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。即時公開と予約公開は、再認証した人間が公開権限を付与した場合だけ行う。
 
 **実行**: 自宅 PC の headless agent(`scripts/growth/run.mjs`)。承認画面 `AIモデル` の工程別設定に応じて Claude Code CLI / Codex CLI を選ぶ。動作確認は `GROWTH_DRYRUN=1`。
 
-**設計の共通原則**: pull型(承認画面=Vercel は Notion に依頼を書くだけ／重い処理は常時稼働PCのループが拾う) / 承認画面は基本 Notion を読むだけ / 純ロジック分離(`scripts/growth/*.ts`＋`src/lib/growth/*` 再エクスポート・CLI/run.mjs/gen-* はカバレッジ除外) / 欠落耐性 / 段階ガード(#H9)。
+**設計の共通原則**: pull型(承認画面=Vercel は通常のAI依頼を Notion に書き、重い処理は常時稼働PCのループが拾う) / 公開は再認証した人間の明示操作に限定 / 純ロジック分離(`scripts/growth/*.ts`＋`src/lib/growth/*` 再エクスポート・CLI/run.mjs/gen-* はカバレッジ除外) / 欠落耐性 / 段階ガード(#H9)。
 
 **セキュリティ**: `MICROCMS_API_KEY` は **server-only**(`NEXT_PUBLIC_` 禁止)。⚠️ 本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON。横断ハードニングは #7。
 

@@ -1,5 +1,7 @@
 # ティザーページ シネマティックイントロ 実装計画
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** ティザーページに「宇宙→爆発→ロゴ惑星登場」のシネマティックイントロを追加する。Canvas 2D / WebGL の2エンジン、爆発3パターン、尺3パターンを切り替えて比較可能にする。
