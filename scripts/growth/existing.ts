@@ -14,6 +14,8 @@ import type { NotionPage } from "./notion";
 import { growthMediaForRow } from "./endpoint";
 import { parseMetrics } from "./metrics";
 import { daysSincePublished, reviewLabels, type ReviewLabel } from "./metricsReview";
+import { reservationIntent } from "./ctaEvents";
+import { isReservationDataFresh } from "./reservations";
 import {
   renderPerformanceSummary,
   summarizeArticlePerformance,
@@ -245,7 +247,39 @@ export function articleReviewLabelLines(
             metrics.publishedAt ? daysSincePublished(metrics.publishedAt, nowMs) : null
           );
     const suffix = labels.length > 0 ? `: ${labels.join("・")}` : "";
-    return `- ${articleTitle(page)}${suffix}`;
+    if (!metrics) return `- ${articleTitle(page)}${suffix}`;
+    const outcomes: string[] = [];
+    if (metrics.ctaEvents && metrics.ctaEventsMeasured === true) {
+      outcomes.push(
+        `予約意図=${reservationIntent(metrics.ctaEvents).current}`,
+        `LINE=${metrics.ctaEvents.lineClick.current}`,
+        `Instagram=${metrics.ctaEvents.instagramClick.current}`,
+        `その他CTA=${metrics.ctaEvents.other.current}`
+      );
+    }
+    const actual = metrics.actualReservations;
+    if (actual?.state === "missing") {
+      if (actual.reason === "coverage_incomplete" && actual.coverage) {
+        outcomes.push(
+          `実予約=収録不足（当週=${actual.coverage.current ? "収録" : "未収録"} / ` +
+            `前週=${actual.coverage.prior ? "収録" : "未収録"}、予約意図は代理指標）`
+        );
+      } else {
+        outcomes.push("実予約=欠損（予約意図は代理指標）");
+      }
+    } else if (actual?.state === "available") {
+      if (!isReservationDataFresh(actual.syncedAt, new Date(nowMs).toISOString())) {
+        outcomes.push(`実予約=古い（最終取込 ${actual.syncedAt}、予約意図は代理指標）`);
+      } else {
+        outcomes.push(
+          `施設全体実予約=${actual.facility.current}`,
+          actual.article ? `記事帰属実予約=${actual.article.current}` : "記事帰属実予約=なし"
+        );
+      }
+    }
+    return outcomes.length > 0
+      ? `- ${articleTitle(page)}${suffix}\n  - イベント別成果: ${outcomes.join(" / ")}`
+      : `- ${articleTitle(page)}${suffix}`;
   });
 }
 
@@ -319,13 +353,13 @@ export function summarizeExisting(input: ExistingInput): string {
   lines.push(`## 公開済み記事の判定ラベル(記事単位・次の打ち手の材料)`);
   lines.push(...articleReviewLabelLines(ideas, nowMs));
   lines.push(
-    `(ラベルは機械判定の参考値。CTR弱い→タイトル/description、順位あと少し→リライト/内部リンク、読まれるがCTA弱い→CTA/導線、要改稿→改稿。最終判断は分析で行う)`
+    `(ラベルは機械判定の参考値。CTR弱い→タイトル/description、順位あと少し→リライト/内部リンク、読まれるが予約意図弱い→予約導線、要改稿→改稿。最終判断は分析で行う)`
   );
   lines.push("");
 
   // #221: 公開済み記事の記事タイプ別 成績サマリ(伸ばす学習の入力)。
   // 「避ける学習」(却下/見送りの併記)に加え、「効いた型を厚くする」判断材料を供給する。
-  lines.push(...renderPerformanceSummary(summarizeArticlePerformance(ideas)));
+  lines.push(...renderPerformanceSummary(summarizeArticlePerformance(ideas, nowMs)));
 
   return lines.join("\n");
 }

@@ -16,6 +16,14 @@ function base(over: Partial<ArticleMetrics> = {}): ArticleMetrics {
   };
 }
 
+const measuredCta: ArticleMetrics["ctaEvents"] = {
+  reservationClick: { current: 0, prior: 0, deltaPct: null },
+  reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
+  lineClick: { current: 4, prior: 2, deltaPct: 100 },
+  instagramClick: { current: 2, prior: 1, deltaPct: 100 },
+  other: { current: 1, prior: 0, deltaPct: null },
+};
+
 function search(over: Partial<ArticleMetrics["search"] & object> = {}): ArticleMetrics["search"] {
   return {
     clicks: { current: 10, prior: 8, deltaPct: 25 },
@@ -39,12 +47,23 @@ describe("daysSincePublished", () => {
 });
 
 describe("reviewLabels", () => {
-  it("表示もクリックも 0 は 未計測 のみ", () => {
+  it("source-errorの0は未計測のみで要改稿にしない", () => {
     const m = base({
+      measurementStatus: "source-error",
       views: { current: 0, prior: 0, deltaPct: null },
       keyEvents: { current: 0, prior: 0, deltaPct: null },
     });
-    expect(reviewLabels(m, 3)).toEqual(["未計測"]);
+    expect(reviewLabels(m, 28)).toEqual(["未計測"]);
+  });
+
+  it.each(["measured", "path-unmatched"] as const)("%sの実測0は28日境界で要改稿になる", (measurementStatus) => {
+    const m = base({
+      measurementStatus,
+      views: { current: 0, prior: 0, deltaPct: null },
+      keyEvents: { current: 0, prior: 0, deltaPct: null },
+    });
+    expect(reviewLabels(m, 27)).not.toContain("要改稿");
+    expect(reviewLabels(m, 28)).toContain("要改稿");
   });
 
   it("CTR弱い: impressions>=100 かつ ctr<0.03", () => {
@@ -62,37 +81,49 @@ describe("reviewLabels", () => {
     expect(reviewLabels(base({ search: search({ position: { current: 16, prior: 0, deltaPct: null } }) }), 3)).not.toContain("順位あと少し");
   });
 
-  it("読まれるがCTA弱い: views>=50 かつ keyEvents=0", () => {
-    const m = base({ views: { current: 50, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null }, keyEventsMeasured: true });
-    expect(reviewLabels(m, 3)).toContain("読まれるがCTA弱い");
-    const m2 = base({ views: { current: 49, prior: 0, deltaPct: null }, keyEvents: { current: 0, prior: 0, deltaPct: null }, keyEventsMeasured: true });
-    expect(reviewLabels(m2, 3)).not.toContain("読まれるがCTA弱い");
+  it("予約意図0・SNSその他7なら読まれるが予約意図弱い", () => {
+    const m = base({ views: { current: 50, prior: 0, deltaPct: null }, ctaEvents: measuredCta, ctaEventsMeasured: true });
+    expect(reviewLabels(m, 3)).toContain("読まれるが予約意図弱い");
+    const m2 = base({ views: { current: 49, prior: 0, deltaPct: null }, ctaEvents: measuredCta, ctaEventsMeasured: true });
+    expect(reviewLabels(m2, 3)).not.toContain("読まれるが予約意図弱い");
   });
 
-  it("未計測期間: views>=50 keyEvents=0 は CV未計測(CTA弱いにしない)", () => {
+  it("イベント別未計測なら予約意図未計測", () => {
     const labels = reviewLabels(
       base({
         views: { current: 60, prior: 0, deltaPct: null },
         keyEvents: { current: 0, prior: 0, deltaPct: null },
-        keyEventsMeasured: false,
+        ctaEvents: measuredCta,
+        ctaEventsMeasured: false,
       }),
       3
     );
-    expect(labels).toContain("CV未計測");
-    expect(labels).not.toContain("読まれるがCTA弱い");
+    expect(labels).toContain("予約意図未計測");
+    expect(labels).not.toContain("読まれるが予約意図弱い");
   });
 
-  it("計測済み: keyEvents>0 は CV 系ラベルを付けない", () => {
+  it("CTA部分計測は予約意図0の完全計測とみなさない", () => {
+    const labels = reviewLabels(base({
+      views: { current: 60, prior: 0, deltaPct: null },
+      ctaEvents: measuredCta,
+      ctaEventsMeasured: false,
+      ctaEventsMeasurementStatus: "partial",
+    }), 3);
+    expect(labels).toContain("予約意図未計測");
+    expect(labels).not.toContain("読まれるが予約意図弱い");
+  });
+
+  it("計測済み: 予約意図が1以上なら弱いを付けない", () => {
     const labels = reviewLabels(
       base({
         views: { current: 60, prior: 0, deltaPct: null },
-        keyEvents: { current: 1, prior: 0, deltaPct: null },
-        keyEventsMeasured: true,
+        ctaEvents: { ...measuredCta!, reservationClick: { current: 1, prior: 0, deltaPct: null } },
+        ctaEventsMeasured: true,
       }),
       3
     );
-    expect(labels).not.toContain("CV未計測");
-    expect(labels).not.toContain("読まれるがCTA弱い");
+    expect(labels).not.toContain("予約意図未計測");
+    expect(labels).not.toContain("読まれるが予約意図弱い");
   });
 
   it("views<50: CV未計測も付かない", () => {
@@ -104,8 +135,8 @@ describe("reviewLabels", () => {
       }),
       3
     );
-    expect(labels).not.toContain("CV未計測");
-    expect(labels).not.toContain("読まれるがCTA弱い");
+    expect(labels).not.toContain("予約意図未計測");
+    expect(labels).not.toContain("読まれるが予約意図弱い");
   });
 
   it("要改稿: 公開28日後かつ低調(views<50 & clicks<10)。伸びているは出さない", () => {
@@ -132,13 +163,16 @@ describe("reviewLabels", () => {
     expect(reviewLabels(flat, 3)).not.toContain("伸びている");
   });
 
-  it("search 無し(旧データ)でも落ちない", () => {
-    const m = base({ search: undefined, keyEvents: { current: 0, prior: 0, deltaPct: null } });
-    expect(reviewLabels(m, 3)).toContain("CV未計測");
+  it("旧keyEventsが多くても予約成功とはみなさない", () => {
+    const m = base({ search: undefined, keyEvents: { current: 99, prior: 50, deltaPct: 98 } });
+    expect(reviewLabels(m, 3)).toContain("予約意図未計測");
   });
 });
 
 describe("isLowSample", () => {
+  it("source-errorを母数小の実測サンプルとして扱わない", () => {
+    expect(isLowSample(base({ measurementStatus: "source-error", views: { current: 0, prior: 0, deltaPct: null } }))).toBe(false);
+  });
   it("impressions<100 かつ views<50 で true", () => {
     expect(
       isLowSample(

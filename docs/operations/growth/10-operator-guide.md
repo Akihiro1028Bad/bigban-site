@@ -253,6 +253,7 @@ GA4/GSC では見えない**実 KPI** を、オーナーが週次で数分入力
 - 自宅PCの `growth:metrics`(1日1回)が GA4 から表示数・ユーザー数・前週比を取り、Notion にミラーする。承認画面は Notion を読むだけ。
 - 計測データが無いうちは「まだ計測データがありません」と出る(実行後に反映)。
 - 記事別ランキング(表示数降順+前週比)が見えるので、どの記事が伸びているかが分かる。
+- `0` は実測0流入、`GA4パス不一致` は行なしを明示的0で保存した状態（28日後は改稿判定対象）、`GA4取得失敗` と `—` は取得不能で集計・改稿判定の対象外。後者は0流入と読み違えず、OAuth/GA4を確認する。
 
 > 実装の詳細・KPI との対応は [50-publish-metrics.md](50-publish-metrics.md) と [60-kpi-tree.md](60-kpi-tree.md)。
 
@@ -329,3 +330,7 @@ pull 型なので、依頼は自宅PCが拾って初めて処理される。次�
 | 学習ログ(セルフチューニング) | [70-self-tuning.md](70-self-tuning.md) |
 | AI 実行時の内部手順(全体像) | [growth-weekly-runbook.md](../growth-weekly-runbook.md) |
 | 初期構築(自宅PCのタスク・環境変数・LINE 承認) | [01-setup-guide.md](01-setup-guide.md) |
+
+## 予約CSVの運用（#280）
+
+予約サービスから正規化したCSVを `GROWTH_RESERVATION_CSV_PATH` に配置し、週次計測前に更新する。必須列は `reservation_id,booked_at,status`、記事帰属が提供される場合だけ `source_page_path` を付ける。同時に `<CSVパス>.coverage.json`（別パスなら `GROWTH_RESERVATION_COVERAGE_PATH`）へ `{"coverageStart":"YYYY-MM-DD","coverageEnd":"YYYY-MM-DD"}` を書き、CSVが完全収録する期間を明示する。current/priorの片方でも範囲外なら0件ではなく未取得になる。両期間を収録した空CSVだけが実測0件。7日超のCSVは古いと表示されるため件数は参考値に留め、予約意図を代理指標として扱う。CSVを用意できない週は既存の「予約件数」手入力をfallbackにし、推測帰属はしない。

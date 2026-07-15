@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CTA_EVENTS, ctaEventParams, formEntryLabel } from "./events";
+import { CTA_EVENTS as GROWTH_CTA_EVENTS } from "@/lib/growth/ctaEvents";
 
 describe("CTA_EVENTS", () => {
   it("公開導線の key イベント名を持つ(GA4 キーイベント化対象)", () => {
@@ -17,6 +18,10 @@ describe("CTA_EVENTS", () => {
       price: "price_click",
       newsCta: "news_cta_click",
     });
+  });
+
+  it("グロース集計の正典と同じ定義を参照する", () => {
+    expect(CTA_EVENTS).toBe(GROWTH_CTA_EVENTS);
   });
 });
 

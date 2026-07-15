@@ -227,4 +227,42 @@ describe("mergeRows", () => {
       deltaPct: 25,
     });
   });
+
+  it("既定ではpriorにだけ存在する行を今週行へ混入させない", () => {
+    const current = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 2 } },
+    ];
+    const prior = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 1 } },
+      { keys: ["/news/a", "reservation_click"], metrics: { keyEvents: 5 } },
+    ];
+
+    expect(mergeRows(current, prior)).toEqual([
+      {
+        keys: ["/news/a", "line_click"],
+        metrics: { keyEvents: { current: 2, prior: 1, deltaPct: 100 } },
+      },
+    ]);
+  });
+
+  it("CTA用optionではprior-onlyイベントをcurrent=0・-100%で残す", () => {
+    const current = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 2 } },
+    ];
+    const prior = [
+      { keys: ["/news/a", "line_click"], metrics: { keyEvents: 1 } },
+      { keys: ["/news/a", "reservation_click"], metrics: { keyEvents: 5 } },
+    ];
+
+    expect(mergeRows(current, prior, { includePriorOnly: true })).toEqual([
+      {
+        keys: ["/news/a", "line_click"],
+        metrics: { keyEvents: { current: 2, prior: 1, deltaPct: 100 } },
+      },
+      {
+        keys: ["/news/a", "reservation_click"],
+        metrics: { keyEvents: { current: 0, prior: 5, deltaPct: -100 } },
+      },
+    ]);
+  });
 });

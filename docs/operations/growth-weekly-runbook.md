@@ -464,7 +464,8 @@ AI は使わない（純粋なデータ結線）。
 3. 動作確認だけしたいときは `GROWTH_DRYRUN=1 npm run growth:metrics`（Notion へ書かず内容だけ表示）。
 
 ### 失敗・沈黙させない
-- microCMS で slug を引けない／GA4 に pagePath 一致が無い記事は **未一致としてログ＋件数表示**し、上書きはしない（誤データで成績を汚さない）。
+- microCMS の slug 解決失敗は更新できないため別件数で通知する。GA4取得成功・pagePath行なしは `path-unmatched` と明示的0を上書き保存し、成績ボードで「GA4パス不一致」と表示する。GA4取得失敗は `source-error` として更新し、数値を集計・改稿判定に使わない。
+- LINE/ログは `slug失敗` / `GA4失敗` / `パス不一致` / 一致済みの`0流入` / `GSC失敗` を別件数で出す。
 - GA4 はクエリ違いで pagePath が分割されることがあるため、同一記事の行は **合算**してから前週比を出す。
 
 ## 公開後レビュー抽出（review-due・常時稼働PC・#計測強化 S7）
@@ -558,6 +559,14 @@ AI は使わない（純粋なデータ結線）。
 - `下書きプレビューキー`(draftKey)は下書き読取トークンに相当。**Notion DB の共有範囲を「特定メンバー/プライベート」に限定**しておく（公開共有しない）。
 - **リッチエディタ本体(TipTap)はカバレッジ除外**のため、導入後はブラウザでの実挙動、特に**画像/表/埋め込み等の往復保持**（読み込み→保存で壊れないか）を実機確認する。保持が不十分なら別issueで強化する。
 - **プレビュー iframe の `postMessage` は同一オリジン限定**（`isAllowedPreviewOrigin`）・受信HTMLは型/サイズ検証(`parsePreviewMessage`)＋ `NewsBodyRenderer` 内で STRICT サニタイズ。iframe.contentWindow への薄い結線(`DraftPreviewFrame.tsx`)はカバレッジ除外のため、**iframe が本番スタイルで描画されるか**を実機確認する（純ロジックは `draftPreview.ts`、受信描画は `DraftFrameClient` でテスト済み）。
+
+### 予約CSV更新とイベント別計測（#280）
+
+1. GA4で正典のCTAイベントをkey event化する。集計はeventName別に行い、全keyEvents合計を予約数として使わない。
+2. `reservation_id,booked_at,status`（任意 `source_page_path`）の正規化CSVを自宅PCへ置き、絶対パスを `GROWTH_RESERVATION_CSV_PATH` に設定する。
+3. CSVと同じ場所へ `<CSVパス>.coverage.json` を置き、`{"coverageStart":"YYYY-MM-DD","coverageEnd":"YYYY-MM-DD"}` でCSVが完全収録している期間を記録する。別パスなら `GROWTH_RESERVATION_COVERAGE_PATH` を設定する。
+4. `growth:metrics` 実行前にCSVとsidecarを更新する。current/priorのどちらかが収録範囲外なら0件とは扱わず、予約意図が代理指標になる。両期間を収録した空CSVだけが実測0件になる。
+5. mtimeが7日を超えると古い参考値になり、予約意図が代理指標になる。`source_page_path` が無いCSVでは施設全体実予約のみ表示し、記事帰属を推測しない。
 
 ## やってはいけないこと
 

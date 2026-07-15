@@ -74,6 +74,8 @@
 
 `成績データ`(テキスト) / `成績更新時刻`(日付)
 
+`成績データ` JSON は `measurementStatus` (`measured` / `path-unmatched` / `source-error`) と `ctaEventsMeasurementStatus` (`measured` / `partial` / `unmeasured`) を持つ。`ga4Measured` / `ctaEventsMeasured` は旧データ互換で併記する。旧 JSON は `ga4Measured=false` のみを `source-error`、それ以外を `measured` として安全側に読む。
+
 ## 学習ループ(#221・週次「伸ばす学習」の入力)
 
 週次モードは `growth:existing` 出力末尾の「公開済み記事の成績サマリ(記事タイプ別)」を読み、成功が多い型を優先する。集計は**既存プロパティのみ**で行い新規追加は不要:
@@ -168,3 +170,7 @@
 
 - **すべて任意・欠落耐性**: 未入力なら週次は「手入力データなし」で従来動作(推測しない)。`growth:existing` が「オーナー手入力」節で読み、週次が成功指標の分母(実予約・SNS・口コミ)に接地させる。
 - **作成済み判定への影響なし**: これらの数字だけ入れた行(`レポート` title 空)は「レポート作成済み」に数えないので、週次モードは通常どおりレポートを新規作成する。入力手順は [60-kpi-tree.md](60-kpi-tree.md) §7。
+
+## `成績データ` JSON拡張（#280 / #281）
+
+新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `measurementStatus`、`ctaEventsMeasurementStatus`、互換用 `ga4Measured` / `ctaEventsMeasured`、`ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`actualReservations` を保存する。実予約CSVのcurrent/prior収録範囲が不足する場合、`actualReservations.state=missing`、`reason=coverage_incomplete`、`coverage.current/prior` で各期間の収録可否を保持する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。

@@ -5,13 +5,15 @@
  */
 
 import type { ArticleMetrics } from "./metrics";
+import { ctaEventsMeasurementStatusOf, measurementStatusOf } from "./metrics";
+import { reservationIntent } from "./ctaEvents";
 
 export type ReviewLabel =
   | "伸びている"
   | "CTR弱い"
   | "順位あと少し"
-  | "読まれるがCTA弱い"
-  | "CV未計測"
+  | "読まれるが予約意図弱い"
+  | "予約意図未計測"
   | "要改稿"
   | "未計測";
 
@@ -40,7 +42,7 @@ export function daysSincePublished(publishedAt: string, nowMs: number): number |
 /**
  * 成績から「次の打ち手」が分かる判定ラベルを作る(複数可)。
  * daysPublished は公開後経過日数(不明は null。要改稿の判定にのみ使う)。
- * 表示もクリックも無い記事は ["未計測"] のみを返す。
+ * GA4取得失敗だけを ["未計測"] とし、実測0・パス不一致0はレビュー対象にする。
  */
 export function reviewLabels(
   metrics: ArticleMetrics,
@@ -49,10 +51,10 @@ export function reviewLabels(
   const views = metrics.views.current;
   const search = metrics.search;
   const clicks = search?.clicks.current ?? 0;
-  const keyEvents = metrics.keyEvents?.current ?? 0;
-  const keyEventsMeasured = metrics.keyEventsMeasured === true;
+  const reservationClicks = metrics.ctaEvents ? reservationIntent(metrics.ctaEvents).current : 0;
+  const ctaEventsMeasured = ctaEventsMeasurementStatusOf(metrics) === "measured";
 
-  if (views === 0 && clicks === 0) return ["未計測"];
+  if (measurementStatusOf(metrics) === "source-error") return ["未計測"];
 
   const labels: ReviewLabel[] = [];
 
@@ -71,10 +73,10 @@ export function reviewLabels(
     labels.push("順位あと少し");
   }
   if (views >= CTA_WEAK_VIEWS) {
-    if (!keyEventsMeasured) {
-      labels.push("CV未計測");
-    } else if (keyEvents === 0) {
-      labels.push("読まれるがCTA弱い");
+    if (!ctaEventsMeasured) {
+      labels.push("予約意図未計測");
+    } else if (reservationClicks === 0) {
+      labels.push("読まれるが予約意図弱い");
     }
   }
 
@@ -94,6 +96,7 @@ export function reviewLabels(
 
 /** 判定ラベルの母数が小さく参考値かどうか。true なら表示側で注記する。 */
 export function isLowSample(metrics: ArticleMetrics): boolean {
+  if (measurementStatusOf(metrics) === "source-error") return false;
   const impressions = metrics.search?.impressions.current ?? 0;
   return impressions < CTR_WEAK_IMPRESSIONS && metrics.views.current < CTA_WEAK_VIEWS;
 }

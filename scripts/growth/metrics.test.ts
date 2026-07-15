@@ -6,9 +6,13 @@ import {
   articleSearchUrl,
   buildMetricsMirrorProps,
   buildSearchMetrics,
-  isKeyEventsMeasured,
+  buildMetricsNotificationSummary,
+  ctaEventsMeasurementStatusForPeriod,
+  measurementBucketOf,
+  measurementStatusOf,
   type ArticleMetrics,
   metricsForPagePath,
+  metricsForKnownPagePath,
   METRICS_PROPS,
   normalizePagePath,
   parseMetrics,
@@ -31,6 +35,19 @@ function row(
       screenPageViews: { current: views[0], prior: views[1], deltaPct: null },
       activeUsers: { current: users[0], prior: users[1], deltaPct: null },
       keyEvents: { current: keyEvents[0], prior: keyEvents[1], deltaPct: null },
+    },
+  };
+}
+
+function eventRow(
+  pagePath: string,
+  eventName: string,
+  values: [number, number]
+): MergedRow {
+  return {
+    keys: [pagePath, eventName],
+    metrics: {
+      keyEvents: { current: values[0], prior: values[1], deltaPct: null },
     },
   };
 }
@@ -117,10 +134,52 @@ describe("metricsForPagePath", () => {
     expect(m?.views.deltaPct).toBe(100);
   });
 
-  it("keyEvents(CTA)も合算する(#S2)", () => {
-    const rows = [row("/news/a", [100, 50], [60, 30], [4, 2]), row("/news/a?ref=line", [20, 10], [10, 5], [1, 0])];
-    const m = metricsForPagePath("/news/a", rows, PERIOD);
-    expect(m?.keyEvents).toEqual({ current: 5, prior: 2, deltaPct: 150 });
+  it("pagePath×eventNameを5分類へ集約しクエリ違いも合算する", () => {
+    const events = [
+      eventRow("/news/a", "reservation_click", [2, 1]),
+      eventRow("/news/a?ref=line", "reserve_entry_click", [1, 2]),
+      eventRow("/news/a", "line_click", [4, 1]),
+      eventRow("/news/a", "instagram_click", [3, 1]),
+      eventRow("/news/a", "contact_submit", [7, 0]),
+      eventRow("/news/a", "purchase", [99, 99]),
+    ];
+    const m = metricsForPagePath("/news/a", [row("/news/a", [100, 50], [60, 30])], PERIOD, events);
+    expect(m?.ctaEvents).toEqual({
+      reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+      reserveEntryClick: { current: 1, prior: 2, deltaPct: -50 },
+      lineClick: { current: 4, prior: 1, deltaPct: 300 },
+      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+      other: { current: 7, prior: 0, deltaPct: null },
+    });
+    expect(m?.keyEvents).toBeUndefined();
+  });
+
+  it("予約0・非予約7でも予約意図は0のままにする", () => {
+    const m = metricsForPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD,
+      [eventRow("/news/a", "line_click", [7, 2])]
+    );
+    expect(m?.ctaEvents?.reservationClick.current).toBe(0);
+    expect(m?.ctaEvents?.reserveEntryClick.current).toBe(0);
+    expect(m?.ctaEvents?.lineClick.current).toBe(7);
+  });
+
+  it("イベント行のkeys・keyEvents欠落を空イベント名・0件として安全に扱う", () => {
+    const malformedEvents: MergedRow[] = [
+      { keys: [], metrics: {} },
+      { keys: ["/news/a"], metrics: {} },
+      eventRow("/news/a", "reservation_click", [2, 1]),
+    ];
+    const m = metricsForPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD,
+      malformedEvents
+    );
+    expect(m?.ctaEvents?.reservationClick).toEqual({ current: 2, prior: 1, deltaPct: 100 });
+    expect(m?.ctaEvents?.other).toEqual({ current: 0, prior: 0, deltaPct: null });
   });
 
   it("prior が 0 なら deltaPct は null", () => {
@@ -143,6 +202,59 @@ describe("metricsForPagePath", () => {
     expect(m?.views.current).toBe(0);
     expect(m?.users.prior).toBe(0);
     expect(m?.views.deltaPct).toBeNull();
+  });
+});
+
+describe("metricsForKnownPagePath", () => {
+  it("GA4取得成功・topPages一致なしをpath-unmatchedの明示的ゼロとして返す", () => {
+    const metrics = metricsForKnownPagePath("/news/a", [], PERIOD, [
+    ], { isGa4SourceAvailable: true });
+    expect(metrics).toMatchObject({
+      pagePath: "/news/a",
+      ga4Measured: false,
+      measurementStatus: "path-unmatched",
+      views: { current: 0, prior: 0, deltaPct: null },
+      users: { current: 0, prior: 0, deltaPct: null },
+      ctaEvents: {
+        reservationClick: { current: 0, prior: 0, deltaPct: null },
+        reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
+        lineClick: { current: 0, prior: 0, deltaPct: null },
+        instagramClick: { current: 0, prior: 0, deltaPct: null },
+        other: { current: 0, prior: 0, deltaPct: null },
+      },
+    });
+  });
+
+  it("GA4ソース失敗をsource-errorとして実測0と区別する", () => {
+    const metrics = metricsForKnownPagePath("/news/a", [], PERIOD, undefined, {
+      isGa4SourceAvailable: false,
+    });
+    expect(metrics.measurementStatus).toBe("source-error");
+    expect(metrics.ga4Measured).toBe(false);
+    expect(metrics.ctaEvents).toBeUndefined();
+  });
+
+  it("GA4 topPages一致時は実測状態を保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.measurementStatus).toBe("measured");
+    expect(metrics.views.current).toBe(10);
+  });
+
+  it("topPagesの前週のみ記事を0/80・-100%の実測急落として保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [0, 80], [0, 40])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.measurementStatus).toBe("measured");
+    expect(metrics.views).toEqual({ current: 0, prior: 80, deltaPct: -100 });
+    expect(metrics.users).toEqual({ current: 0, prior: 40, deltaPct: -100 });
   });
 });
 
@@ -200,27 +312,125 @@ describe("serializeMetrics / parseMetrics", () => {
     };
     expect(parseMetrics(serializeMetrics(withMeasured))).toEqual(withMeasured);
   });
+
+  it("ctaEventsとactualReservations付きも往復できる", () => {
+    const extended: ArticleMetrics = {
+      ...metrics,
+      ctaEventsMeasured: true,
+      ctaEvents: {
+        reservationClick: { current: 1, prior: 0, deltaPct: null },
+        reserveEntryClick: { current: 2, prior: 1, deltaPct: 100 },
+        lineClick: { current: 3, prior: 2, deltaPct: 50 },
+        instagramClick: { current: 4, prior: 4, deltaPct: 0 },
+        other: { current: 5, prior: 10, deltaPct: -50 },
+      },
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: "2026-07-14T00:00:00.000Z",
+        facility: { current: 8, prior: 4, deltaPct: 100 },
+        article: { current: 2, prior: 1, deltaPct: 100 },
+      },
+    };
+    expect(parseMetrics(serializeMetrics(extended))).toEqual(extended);
+  });
+
+  it("GA4未取得状態と実測0を区別して往復できる", () => {
+    const value: ArticleMetrics = {
+      ...metrics,
+      ga4Measured: false,
+      measurementStatus: "source-error",
+      ctaEventsMeasurementStatus: "partial",
+    };
+    expect(parseMetrics(serializeMetrics(value))).toEqual(value);
+    expect(parseMetrics(JSON.stringify({ ...metrics, measurementStatus: "invalid" }))).toBeNull();
+    expect(parseMetrics(JSON.stringify({ ...metrics, ctaEventsMeasurementStatus: "invalid" }))).toBeNull();
+  });
+
+  it("実予約missingを往復し不正stateは拒否する", () => {
+    const missing: ArticleMetrics = {
+      ...metrics,
+      actualReservations: {
+        state: "missing",
+        reason: "not_configured",
+        checkedAt: "2026-07-15T00:00:00.000Z",
+      },
+    };
+    expect(parseMetrics(serializeMetrics(missing))).toEqual(missing);
+    expect(parseMetrics(JSON.stringify({ ...metrics, actualReservations: { state: "stale" } }))).toBeNull();
+  });
+
+  it("実予約のcurrent/prior収録状態を往復する", () => {
+    const incomplete: ArticleMetrics = {
+      ...metrics,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: "2026-07-15T00:00:00.000Z",
+        coverage: {
+          start: "2026-07-07",
+          end: "2026-07-13",
+          current: true,
+          prior: false,
+        },
+      },
+    };
+    expect(parseMetrics(serializeMetrics(incomplete))).toEqual(incomplete);
+  });
 });
 
-describe("isKeyEventsMeasured", () => {
-  it("publishedAt が since 以降なら true", () => {
-    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "2026-07-01")).toBe(true);
-    expect(isKeyEventsMeasured("2026-07-01T00:00:00.000Z", "2026-07-01")).toBe(true);
+describe("measurement status", () => {
+  it("新状態を優先し旧ga4Measuredを安全側に正規化する", () => {
+    expect(measurementStatusOf({ measurementStatus: "path-unmatched", ga4Measured: true })).toBe("path-unmatched");
+    expect(measurementStatusOf({ ga4Measured: true })).toBe("measured");
+    expect(measurementStatusOf({ ga4Measured: false })).toBe("source-error");
+    expect(measurementStatusOf({})).toBe("measured");
   });
 
-  it("publishedAt が since より前なら false", () => {
-    expect(isKeyEventsMeasured("2026-06-20T00:00:00.000Z", "2026-07-01")).toBe(false);
+  it.each([
+    ["2026-07-01", { start: "2026-07-01", end: "2026-07-07" }, "measured"],
+    ["2026-07-07", { start: "2026-07-01", end: "2026-07-07" }, "partial"],
+    ["2026-07-04", { start: "2026-07-01", end: "2026-07-07" }, "partial"],
+    ["2026-07-08", { start: "2026-07-01", end: "2026-07-07" }, "unmeasured"],
+    ["2026-06-30", { start: "2026-07-01", end: "2026-07-07" }, "measured"],
+    [undefined, { start: "2026-07-01", end: "2026-07-07" }, "unmeasured"],
+    ["invalid", { start: "2026-07-01", end: "2026-07-07" }, "unmeasured"],
+  ] as const)("since=%s を期間から分類する", (since, period, expected) => {
+    expect(ctaEventsMeasurementStatusForPeriod(period, since, true)).toBe(expected);
   });
 
-  it("since 未指定または publishedAt 不明なら false", () => {
-    expect(isKeyEventsMeasured(undefined, "2026-07-01")).toBe(false);
-    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", undefined)).toBe(false);
-    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "")).toBe(false);
+  it("GA4失敗・不正期間はunmeasuredで、記事公開日に依存しない", () => {
+    expect(ctaEventsMeasurementStatusForPeriod(PERIOD, "2026-06-01", false)).toBe("unmeasured");
+    expect(ctaEventsMeasurementStatusForPeriod({ start: "bad", end: "2026-07-01" }, "2026-06-01", true)).toBe("unmeasured");
+    expect(ctaEventsMeasurementStatusForPeriod({ start: "2026-07-01", end: "bad" }, "2026-06-01", true)).toBe("unmeasured");
+    expect(ctaEventsMeasurementStatusForPeriod({ start: "2026-07-01", end: "2026-07-07" }, "2026-99-99", true)).toBe("unmeasured");
   });
 
-  it("不正な日付文字列なら false", () => {
-    expect(isKeyEventsMeasured("not-a-date", "2026-07-01")).toBe(false);
-    expect(isKeyEventsMeasured("2026-07-10T00:00:00.000Z", "not-a-date")).toBe(false);
+  it("存在しない月末日を繰り上げ解釈せずunmeasuredにする", () => {
+    const period = { start: "2026-03-01", end: "2026-03-07" };
+    expect(ctaEventsMeasurementStatusForPeriod(period, "2026-02-30", true)).toBe("unmeasured");
+    expect(ctaEventsMeasurementStatusForPeriod(period, "2025-02-29", true)).toBe("unmeasured");
+  });
+
+  it("実在する閏日は有効な設定日として扱う", () => {
+    expect(ctaEventsMeasurementStatusForPeriod(
+      { start: "2024-03-01", end: "2024-03-07" },
+      "2024-02-29",
+      true
+    )).toBe("measured");
+  });
+
+  it("パス不一致・一致済み0流入・ソース失敗を分離する", () => {
+    expect(measurementBucketOf({ measurementStatus: "path-unmatched", views: { current: 0 } })).toBe("path-unmatched");
+    expect(measurementBucketOf({ measurementStatus: "measured", views: { current: 0 } })).toBe("zero-inflow");
+    expect(measurementBucketOf({ measurementStatus: "measured", views: { current: 1 } })).toBe("measured");
+    expect(measurementBucketOf({ measurementStatus: "source-error", views: { current: 0 } })).toBe("source-error");
+  });
+
+  it("通知要約で各失敗と0流入を別件数にする", () => {
+    expect(buildMetricsNotificationSummary({ updated: 4, slugFailed: 1, sourceError: 2, pathUnmatched: 3, zeroInflow: 4, gscFailed: 5 }, PERIOD)).toBe(
+      "📊 成績更新: 4件 / slug失敗 1件 / GA4失敗 2件 / パス不一致 3件 / 0流入 4件 / GSC失敗 5件 (期間 2026-06-15〜2026-06-21)"
+    );
   });
 });
 
@@ -321,5 +531,18 @@ describe("summarizeMetrics", () => {
       count: 0,
       top: null,
     });
+  });
+
+  it("metricsはあってもviewsが無ければ集計しない", () => {
+    expect(summarizeMetrics([{ title: "A", metrics: {} }])).toEqual({
+      totalViews: 0, totalUsers: 0, count: 0, top: null,
+    });
+  });
+
+  it("source-errorを集計から除外しpath-unmatchedは計測記事として数える", () => {
+    expect(summarizeMetrics([
+      { title: "失敗", metrics: { views: { current: 99 }, users: { current: 50 }, measurementStatus: "source-error" } },
+      { title: "不一致", metrics: { views: { current: 0 }, users: { current: 0 }, measurementStatus: "path-unmatched" } },
+    ])).toEqual({ totalViews: 0, totalUsers: 0, count: 1, top: { title: "不一致", views: 0 } });
   });
 });

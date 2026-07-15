@@ -36,6 +36,43 @@ function metricsJson(topQueries: { query: string; clicks: number }[]): string {
   return JSON.stringify(metrics);
 }
 
+function outcomeMetricsJson(): string {
+  const metrics: ArticleMetrics = {
+    pagePath: "/news/x",
+    views: { current: 100, prior: 80, deltaPct: 25 },
+    users: { current: 50, prior: 40, deltaPct: 25 },
+    ctaEventsMeasured: true,
+    ctaEvents: {
+      reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+      reserveEntryClick: { current: 1, prior: 1, deltaPct: 0 },
+      lineClick: { current: 4, prior: 2, deltaPct: 100 },
+      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+      other: { current: 7, prior: 3, deltaPct: 133.3 },
+    },
+    actualReservations: {
+      state: "available",
+      source: "csv",
+      syncedAt: "2026-07-14T00:00:00.000Z",
+      facility: { current: 20, prior: 10, deltaPct: 100 },
+      article: { current: 2, prior: 1, deltaPct: 100 },
+    },
+    period: { start: "2026-07-07", end: "2026-07-13" },
+  };
+  return JSON.stringify(metrics);
+}
+
+function actualReservationMetricsJson(
+  actualReservations: NonNullable<ArticleMetrics["actualReservations"]>
+): string {
+  return JSON.stringify({
+    pagePath: "/news/x",
+    views: { current: 10, prior: 5, deltaPct: 100 },
+    users: { current: 8, prior: 4, deltaPct: 100 },
+    actualReservations,
+    period: { start: "2026-07-07", end: "2026-07-13" },
+  } satisfies ArticleMetrics);
+}
+
 function ideaPage(opts: {
   id: string;
   status: string;
@@ -55,6 +92,70 @@ function ideaPage(opts: {
 }
 
 describe("summarizeArticlePerformance", () => {
+  it("記事タイプ別にイベント別成果とfreshな記事帰属実予約を集計する", () => {
+    const [summary] = summarizeArticlePerformance(
+      [ideaPage({ id: "a", status: "公開済み", articleType: "獲得", metrics: outcomeMetricsJson() })],
+      Date.parse("2026-07-15T00:00:00.000Z")
+    );
+    expect(summary.outcomes).toEqual({
+      reservationIntent: { current: 3, prior: 2, deltaPct: 50 },
+      lineClick: { current: 4, prior: 2, deltaPct: 100 },
+      instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+      other: { current: 7, prior: 3, deltaPct: 133.3 },
+      actualReservations: { current: 2, prior: 1, deltaPct: 100 },
+    });
+    expect(summary.notes).toEqual([]);
+  });
+
+  it("実予約の欠損・古い・記事帰属なしを注記し、代理指標の0値を保持する", () => {
+    const pages = [
+      ideaPage({
+        id: "missing",
+        status: "公開済み",
+        articleType: "獲得",
+        metrics: actualReservationMetricsJson({
+          state: "missing",
+          reason: "read_error",
+          checkedAt: "2026-07-15T00:00:00.000Z",
+        }),
+      }),
+      ideaPage({
+        id: "stale",
+        status: "公開済み",
+        articleType: "獲得",
+        metrics: actualReservationMetricsJson({
+          state: "available",
+          source: "csv",
+          syncedAt: "2026-06-01T00:00:00.000Z",
+          facility: { current: 9, prior: 8, deltaPct: 12.5 },
+          article: { current: 3, prior: 2, deltaPct: 50 },
+        }),
+      }),
+      ideaPage({
+        id: "facility-only",
+        status: "公開済み",
+        articleType: "獲得",
+        metrics: actualReservationMetricsJson({
+          state: "available",
+          source: "csv",
+          syncedAt: "2026-07-14T00:00:00.000Z",
+          facility: { current: 4, prior: 3, deltaPct: 33.3 },
+          article: null,
+        }),
+      }),
+    ];
+    const [summary] = summarizeArticlePerformance(
+      pages,
+      Date.parse("2026-07-15T00:00:00.000Z")
+    );
+    expect(summary.outcomes?.actualReservations).toEqual({ current: 0, prior: 0, deltaPct: null });
+    expect(summary.notes).toEqual([
+      "実予約欠損（予約意図を代理指標として使用）",
+      "実予約データが古い（最終取込 2026-06-01T00:00:00.000Z、予約意図を代理指標として使用）",
+      "施設全体の実予約のみ（記事別帰属なし）",
+    ]);
+  });
+
   it("公開済み記事だけを記事タイプ別に集計する(公開前は成績が無いので除外)", () => {
     const summaries = summarizeArticlePerformance([
       ideaPage({ id: "a", status: "公開済み", articleType: "獲得", verdict: "成功" }),
@@ -165,6 +266,53 @@ describe("summarizeArticlePerformance", () => {
 });
 
 describe("renderPerformanceSummary", () => {
+  it("イベント別成果と実予約注記を週次入力向けに描画する", () => {
+    const text = renderPerformanceSummary([
+      {
+        articleType: "獲得",
+        published: 1,
+        success: 1,
+        watch: 0,
+        rewrite: 0,
+        unjudged: 0,
+        winningQueries: [],
+        outcomes: {
+          reservationIntent: { current: 3, prior: 2, deltaPct: 50 },
+          lineClick: { current: 4, prior: 2, deltaPct: 100 },
+          instagramClick: { current: 3, prior: 1, deltaPct: 200 },
+          other: { current: 5, prior: 0, deltaPct: null },
+          actualReservations: { current: 2, prior: 1, deltaPct: 100 },
+        },
+        notes: ["施設全体の実予約のみ（記事別帰属なし）"],
+      },
+    ]).join("\n");
+    expect(text).toContain("予約意図 3/2");
+    expect(text).toContain("記事帰属実予約 2/1");
+    expect(text).toContain("注記: 施設全体の実予約のみ（記事別帰属なし）");
+  });
+
+  it("outcomesにnotesが無くても成果を描画する", () => {
+    const text = renderPerformanceSummary([
+      {
+        articleType: "獲得",
+        published: 1,
+        success: 1,
+        watch: 0,
+        rewrite: 0,
+        unjudged: 0,
+        winningQueries: [],
+        outcomes: {
+          reservationIntent: { current: 0, prior: 0, deltaPct: null },
+          lineClick: { current: 0, prior: 0, deltaPct: null },
+          instagramClick: { current: 0, prior: 0, deltaPct: null },
+          other: { current: 0, prior: 0, deltaPct: null },
+          actualReservations: { current: 0, prior: 0, deltaPct: null },
+        },
+      },
+    ]).join("\n");
+    expect(text).toContain("予約意図 0/0");
+  });
+
   it("公開0本のとき『空』と学習開始の意図を明示する", () => {
     const lines = renderPerformanceSummary([]);
     const text = lines.join("\n");
