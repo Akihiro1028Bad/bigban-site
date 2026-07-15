@@ -40,6 +40,8 @@ export interface Ga4ReportDef {
   limit?: number;
   /** 単一ディメンションの値を許可リストで絞る。 */
   dimensionFilter?: { fieldName: string; values: readonly string[] };
+  /** currentに無くpriorにだけある行をcurrent=0として保持する。 */
+  includePriorOnly?: boolean;
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
@@ -65,6 +67,7 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
     dimensions: ["pagePath"],
     metrics: ["screenPageViews", "activeUsers"],
     limit: 20,
+    includePriorOnly: true,
   },
   {
     key: "landingPages",
@@ -78,6 +81,7 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
     metrics: ["keyEvents"],
     dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
     limit: 10_000,
+    includePriorOnly: true,
   },
 ];
 
@@ -144,7 +148,7 @@ export async function fetchGa4(
     result[def.key] = mergeRows(
       parseGa4Report(currentReport),
       parseGa4Report(priorReport),
-      { includePriorOnly: def.dimensions.includes("eventName") }
+      { includePriorOnly: def.includePriorOnly === true }
     );
   });
 

@@ -35,6 +35,8 @@ describe("fetchGa4", () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
     expect(ctaReport).toBeDefined();
+    expect(ctaReport?.includePriorOnly).toBe(true);
+    expect(GA4_REPORTS.find((report) => report.key === "topPages")?.includePriorOnly).toBe(true);
 
     await fetchGa4({
       config,
@@ -132,10 +134,20 @@ describe("fetchGa4", () => {
     ]);
   });
 
-  it("eventNameレポートだけprior-only行を残し、通常レポートには混入させない", async () => {
+  it("定義で有効化したtopPagesとCTAレポートのprior-only行を残す", async () => {
     const reportDefs: Ga4ReportDef[] = [
-      { key: "topPages", dimensions: ["pagePath"], metrics: ["screenPageViews"] },
-      { key: "cta", dimensions: ["pagePath", "eventName"], metrics: ["keyEvents"] },
+      {
+        key: "topPages",
+        dimensions: ["pagePath"],
+        metrics: ["screenPageViews"],
+        includePriorOnly: true,
+      },
+      {
+        key: "cta",
+        dimensions: ["pagePath", "eventName"],
+        metrics: ["keyEvents"],
+        includePriorOnly: true,
+      },
     ];
     const ga4Report = (
       dimensions: string[],
@@ -169,7 +181,16 @@ describe("fetchGa4", () => {
       reports: reportDefs,
     });
 
-    expect(result.topPages.map((row) => row.keys[0])).toEqual(["/news/current"]);
+    expect(result.topPages).toEqual([
+      {
+        keys: ["/news/current"],
+        metrics: { screenPageViews: { current: 3, prior: 0, deltaPct: null } },
+      },
+      {
+        keys: ["/news/prior-only"],
+        metrics: { screenPageViews: { current: 0, prior: 8, deltaPct: -100 } },
+      },
+    ]);
     expect(result.cta).toEqual([{
       keys: ["/news/a", "reservation_click"],
       metrics: { keyEvents: { current: 0, prior: 2, deltaPct: -100 } },

@@ -228,6 +228,17 @@ describe("metricsForKnownPagePath", () => {
     expect(metrics.ga4Measured).toBe(true);
     expect(metrics.views.current).toBe(10);
   });
+
+  it("topPagesの前週のみ記事を0/80・-100%の実測急落として保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [0, 80], [0, 40])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.views).toEqual({ current: 0, prior: 80, deltaPct: -100 });
+    expect(metrics.users).toEqual({ current: 0, prior: 40, deltaPct: -100 });
+  });
 });
 
 describe("serializeMetrics / parseMetrics", () => {

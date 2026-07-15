@@ -29,11 +29,13 @@ export interface GscReportDef {
   rowLimit?: number;
   /** dimensionFilterGroups(AND グループ1つ)。記事ごとの page=URL 絞り込みに使う。 */
   filters?: GscDimensionFilter[];
+  /** currentに無くpriorにだけある集計行をcurrent=0として保持する。 */
+  includePriorOnly?: boolean;
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
 export const GSC_REPORTS: GscReportDef[] = [
-  { key: "summary", dimensions: [] },
+  { key: "summary", dimensions: [], includePriorOnly: true },
   { key: "topQueries", dimensions: ["query"], rowLimit: 25 },
   { key: "topPages", dimensions: ["page"], rowLimit: 25 },
   { key: "queryPage", dimensions: ["query", "page"], rowLimit: 25 },
@@ -99,7 +101,8 @@ export async function fetchGsc(
     const priorReport = await query(def, prior);
     result[def.key] = mergeRows(
       parseGscReport(currentReport),
-      parseGscReport(priorReport)
+      parseGscReport(priorReport),
+      { includePriorOnly: def.includePriorOnly === true }
     );
   }
 

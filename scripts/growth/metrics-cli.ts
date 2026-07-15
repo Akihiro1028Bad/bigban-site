@@ -63,6 +63,7 @@ const TOP_PAGES_REPORT: Ga4ReportDef = {
   dimensions: ["pagePath"],
   metrics: ["screenPageViews", "activeUsers"],
   limit: 200,
+  includePriorOnly: true,
 };
 const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
   key: "topPageCtaEvents",
@@ -70,6 +71,7 @@ const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
   metrics: ["keyEvents"],
   dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
   limit: 10_000,
+  includePriorOnly: true,
 };
 
 // #計測強化 S2: 記事ごとの上位クエリ取得件数。
@@ -204,7 +206,12 @@ async function fetchArticleSearch(
   pageUrl: string
 ): Promise<SearchMetrics | null> {
   const reports: GscReportDef[] = [
-    { key: "articleSummary", dimensions: [], filters: [{ dimension: "page", expression: pageUrl }] },
+    {
+      key: "articleSummary",
+      dimensions: [],
+      filters: [{ dimension: "page", expression: pageUrl }],
+      includePriorOnly: true,
+    },
     {
       key: "articleQueries",
       dimensions: ["query"],
