@@ -56,6 +56,35 @@ describe("draftOrchestrator", () => {
     ]);
   });
 
+  it("下書き投入後の通知成功をそのまま成功として返す", () => {
+    let notified = false;
+    const warnings: string[] = [];
+
+    expect(runDraftNotificationBestEffort({
+      notifyPath: "/tmp/notify.json",
+      notify: () => {
+        notified = true;
+      },
+      warn: (message) => warnings.push(message),
+    })).toBe(true);
+    expect(notified).toBe(true);
+    expect(warnings).toEqual([]);
+  });
+
+  it("通知処理がError以外をthrowしても警告へ変換する", () => {
+    const warnings: string[] = [];
+    const thrownValue: unknown = "LINE unavailable";
+
+    expect(runDraftNotificationBestEffort({
+      notifyPath: "/tmp/notify.json",
+      notify: () => {
+        throw thrownValue;
+      },
+      warn: (message) => warnings.push(message),
+    })).toBe(false);
+    expect(warnings[0]).toContain("LINE unavailable");
+  });
+
   it("facility-contextのopenDateから実行時点の開業状態を決定する", () => {
     const facility = {
       name: "THE PICKLE BANG THEORY",
@@ -79,6 +108,13 @@ describe("draftOrchestrator", () => {
       phase: "open",
       phaseDays: 1,
     });
+    expect(buildFacilityResearchContext({
+      name: facility.name,
+      openDate: facility.openDate,
+      location: facility.location,
+      confirmed: facility.confirmed,
+      doNotWrite: facility.doNotWrite,
+    }, new Date("2026-04-18T12:00:00+09:00"))).not.toHaveProperty("notes");
   });
 
   it("記事テーマに関係する施設情報だけをリサーチと執筆へ渡す", () => {
@@ -109,6 +145,7 @@ describe("draftOrchestrator", () => {
       doNotWrite: ["予約サービス名は断定しない"],
     });
     expect(selected).not.toHaveProperty("notes");
+    expect(selectRelevantFacilityContext(facility, "料金を比較する").location).toEqual([]);
   });
 
   it("執筆入力は生の一次情報メモを含めずResearchPacketだけを事実入力にする", () => {

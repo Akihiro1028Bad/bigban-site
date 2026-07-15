@@ -116,6 +116,21 @@ describe("draftsAuto", () => {
     expect(selectDraftsAutoTarget([invalidGenerating])).toBeNull();
   });
 
+  it("タイトル案プロパティやplain_textが欠落した行を安全に除外する", () => {
+    const missingTitleProperty = page("生成中");
+    delete missingTitleProperty.properties["タイトル案"];
+    const missingTitleArray = page("生成中");
+    missingTitleArray.properties["タイトル案"] = {};
+    const missingPlainText = page("生成中");
+    missingPlainText.properties["タイトル案"] = { title: [{}] };
+
+    expect(countDraftsAutoTargets([
+      missingTitleProperty,
+      missingTitleArray,
+      missingPlainText,
+    ])).toBe(0);
+  });
+
   it("Notion query 用の軽量 filter を返す", () => {
     expect(draftsAutoQueryFilter()).toEqual({
       and: [
