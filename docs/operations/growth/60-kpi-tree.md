@@ -37,7 +37,7 @@
 | **記事KPI** | 記事タイプ別の成功指標(記事ごとの仮説) | Notion `成功指標`(週次で記入=S4/S5)＋ 上記の実測 | 承認画面「記事の仮説」カード / `growth:review-due` の判定メモ |
 
 - 実装の突き合わせは [50-publish-metrics.md](50-publish-metrics.md)「計測ループ #C4」を正典とする(`metrics.ts` が GA4/GSC を記事の `articlePagePath` に紐付けて Notion `成績データ` へ書き、PerformanceBoard が描画)。
-- `GROWTH_GA4_KEYEVENTS_SINCE=YYYY-MM-DD` が未設定、設定日前公開、またはGA4取得失敗なら「予約意図未計測」とし、0件と断定しない。
+- `GROWTH_GA4_KEYEVENTS_SINCE=YYYY-MM-DD` とレポート期間を比較する。期間全体が設定日以降なら完全計測、期間が設定日をまたげば部分計測、期間前・未設定・GA4取得失敗は未計測とし、0件と断定しない。記事公開日はこの判定に使わない。
 - 旧 `keyEvents` / `keyEventsMeasured` は既存Notion JSONを読むためだけの後方互換。分類不能なので予約意図・SNS・その他CTAのいずれにも変換しない。
 
 ### 記事タイプ→中間KPIの対応(どの型が何を狙うか)

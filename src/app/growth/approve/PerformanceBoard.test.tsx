@@ -187,6 +187,75 @@ describe("PerformanceBoard", () => {
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
+  it("GA4取得失敗と実測0を別表示し、失敗記事をサマリー集計から除外する", () => {
+    render(<PerformanceBoard items={[
+      published("zero", "実測0記事", { ...metrics(0, null, 0), measurementStatus: "measured", ga4Measured: true }),
+      published("error", "取得失敗記事", { ...metrics(0, null, 0), measurementStatus: "source-error", ga4Measured: false }),
+    ]} />);
+    expect(screen.getByText("GA4取得失敗")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /取得失敗記事/ })).toHaveTextContent("—");
+    expect(screen.getByRole("button", { name: /実測0記事/ })).toHaveTextContent("0");
+    expect(screen.getByText("計測記事数").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("合計表示数").parentElement).toHaveTextContent("0");
+  });
+
+  it("path-unmatchedは明示的0とパス不一致・28日後の要改稿を表示する", () => {
+    render(<PerformanceBoard items={[published("path", "不一致記事", {
+      ...metrics(0, null, 0),
+      measurementStatus: "path-unmatched",
+      ga4Measured: false,
+      publishedAt: "2020-01-01T00:00:00.000Z",
+    })]} />);
+    expect(screen.getByText("GA4パス不一致")).toBeInTheDocument();
+    expect(screen.getByText("要改稿")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /不一致記事/ })).toHaveTextContent("0");
+  });
+
+  it("source-errorだけでも空状態にせず失敗行を表示する", () => {
+    render(<PerformanceBoard items={[published("error", "失敗のみ", {
+      ...metrics(0, null, 0), measurementStatus: "source-error", ga4Measured: false,
+    })]} />);
+    expect(screen.queryByText(/まだ計測データがありません/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /失敗のみ/ })).toBeInTheDocument();
+  });
+
+  it("GA4取得失敗でも独立して取得できた施設全体の実予約をサマリー表示する", () => {
+    const m: ArticleMetrics = {
+      ...metrics(0, null, 0),
+      measurementStatus: "source-error",
+      ga4Measured: false,
+      actualReservations: {
+        state: "available",
+        source: "csv",
+        syncedAt: new Date().toISOString(),
+        facility: { current: 12, prior: 8, deltaPct: 50 },
+        article: null,
+      },
+    };
+    render(<PerformanceBoard items={[published("error-reservations", "GA4失敗・予約取得済み", m)]} />);
+    expect(screen.getByText("施設全体の実予約").parentElement).toHaveTextContent("12");
+  });
+
+  it("CTA部分計測は完全計測・未計測と異なる注記を表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(100, 0, 50),
+      ctaEventsMeasurementStatus: "partial",
+      ctaEventsMeasured: false,
+      ctaEvents: {
+        reservationClick: { current: 1, prior: 0, deltaPct: null },
+        reserveEntryClick: { current: 0, prior: 0, deltaPct: null },
+        lineClick: { current: 0, prior: 0, deltaPct: null },
+        instagramClick: { current: 0, prior: 0, deltaPct: null },
+        other: { current: 0, prior: 0, deltaPct: null },
+      },
+    };
+    render(<PerformanceBoard items={[published("partial", "部分計測記事", m)]} />);
+    await user.click(screen.getByRole("button", { name: /部分計測記事/ }));
+    expect(screen.getByText(/設定日以降の一部期間のみ計測/)).toBeInTheDocument();
+    expect(screen.getByText("reservation_click")).toBeInTheDocument();
+  });
+
   it("計測済み記事を表示数の多い順に並べ、合計と前週比を出す", () => {
     const items = [
       published("a", "記事A", metrics(100, 20, 50)),
