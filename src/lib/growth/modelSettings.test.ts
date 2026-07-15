@@ -6,6 +6,7 @@ import {
   buildModelSettingProps,
   mergeModelSettings,
   modelPhaseIdForMode,
+  modelSettingsSnapshotForModes,
   modelSettingFromPage,
   parseModelSettingInput,
 } from "./modelSettings";
@@ -16,14 +17,21 @@ function page(properties: NotionPage["properties"]): NotionPage {
 }
 
 describe("工程別AIモデル設定", () => {
-  it("画像プロンプト設計を独立させた9工程に品質優先の推奨デフォルトを持つ", () => {
-    expect(MODEL_PHASES).toHaveLength(9);
+  it("記事リサーチと記事執筆を独立させた10工程に品質優先の推奨デフォルトを持つ", () => {
+    expect(MODEL_PHASES).toHaveLength(10);
     expect(MODEL_PHASES.find((phase) => phase.id === "weekly")).toMatchObject({
       provider: "codex",
       model: "gpt-5.6-sol",
       effort: "xhigh",
     });
-    expect(MODEL_PHASES.find((phase) => phase.id === "drafts")).toMatchObject({
+    expect(MODEL_PHASES.find((phase) => phase.id === "draft-research")).toMatchObject({
+      label: "記事リサーチ",
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "medium",
+    });
+    expect(MODEL_PHASES.find((phase) => phase.id === "draft-write")).toMatchObject({
+      label: "記事執筆",
       provider: "claude",
       model: "claude-opus-4-8",
       effort: "high",
@@ -42,7 +50,10 @@ describe("工程別AIモデル設定", () => {
   });
 
   it("autoモードは手動工程と設定を共有する", () => {
-    expect(modelPhaseIdForMode("drafts-auto")).toBe("drafts");
+    expect(modelPhaseIdForMode("drafts")).toBe("draft-write");
+    expect(modelPhaseIdForMode("drafts-auto")).toBe("draft-write");
+    expect(modelPhaseIdForMode("draft-research")).toBe("draft-research");
+    expect(modelPhaseIdForMode("draft-write")).toBe("draft-write");
     expect(modelPhaseIdForMode("initiatives-auto")).toBe("initiatives");
     expect(modelPhaseIdForMode("image-prompt")).toBe("image-prompt");
     expect(modelPhaseIdForMode("regen")).toBe("image-prompt");
@@ -75,7 +86,7 @@ describe("工程別AIモデル設定", () => {
     ).toThrow(/モデル/);
     expect(() =>
       parseModelSettingInput({
-        phaseId: "drafts",
+        phaseId: "draft-write",
         provider: "claude",
         model: "claude-opus-4-8",
         effort: "minimal",
@@ -104,6 +115,65 @@ describe("工程別AIモデル設定", () => {
       provider: "codex",
       model: "gpt-5.5",
       effort: "high",
+      source: "notion",
+    });
+  });
+
+  it("旧drafts設定をdraft-writeへ引き継ぎ、明示的な新設定を優先する", () => {
+    const legacy = {
+      phaseId: "drafts" as const,
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "medium" as const,
+    };
+    const inherited = mergeModelSettings([legacy]).find((phase) => phase.id === "draft-write");
+    expect(inherited).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "medium",
+      source: "notion",
+    });
+
+    const exact = {
+      phaseId: "draft-write" as const,
+      provider: "claude" as const,
+      model: "claude-opus-4-8",
+      effort: "high" as const,
+    };
+    expect(mergeModelSettings([legacy, exact]).find((phase) => phase.id === "draft-write")).toMatchObject({
+      provider: "claude",
+      model: "claude-opus-4-8",
+      effort: "high",
+    });
+  });
+
+  it("複数工程の設定を同じ上書き一覧から一度に確定する", () => {
+    const snapshot = modelSettingsSnapshotForModes(
+      ["draft-research", "draft-write"],
+      [
+        {
+          phaseId: "draft-research",
+          provider: "claude",
+          model: "claude-sonnet-5",
+          effort: "medium",
+        },
+        {
+          phaseId: "draft-write",
+          provider: "codex",
+          model: "gpt-5.5",
+          effort: "high",
+        },
+      ],
+    );
+
+    expect(snapshot["draft-research"]).toMatchObject({
+      provider: "claude",
+      model: "claude-sonnet-5",
+      source: "notion",
+    });
+    expect(snapshot["draft-write"]).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.5",
       source: "notion",
     });
   });

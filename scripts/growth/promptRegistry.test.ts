@@ -64,7 +64,7 @@ describe("assemblePromptGroups", () => {
     // 実行プロンプト→正典 を逆順で渡しても順序表どおりに並ぶ
     const groups = assemblePromptGroups([
       file("docs/operations/growth-article-style.md"),
-      file("scripts/growth/prompts/drafts.md"),
+      file("scripts/growth/prompts/draft-write.md"),
     ]);
     const order = groups.map((g) => g.group);
     expect(order.indexOf("実行プロンプト")).toBeLessThan(order.indexOf("正典・共通ルール"));

@@ -10,4 +10,12 @@ describe("vitest config", () => {
 
     expect(config.test?.exclude).toContain(".claude/worktrees/**");
   });
+
+  it("下書きオーケストレーターCLIは薄いI/O入口としてcoverage対象外にする", () => {
+    if (typeof config === "function" || config instanceof Promise) {
+      throw new TypeError("静的なVitest設定を想定しています");
+    }
+
+    expect(config.test?.coverage?.exclude).toContain("scripts/growth/draft-orchestrator-cli.ts");
+  });
 });

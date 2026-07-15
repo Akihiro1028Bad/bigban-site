@@ -1,25 +1,16 @@
 import "dotenv/config";
 
 import {
-  MODEL_PHASES,
   MODEL_SETTINGS_DS,
-  mergeModelSettings,
-  modelPhaseIdForMode,
+  modelSettingsSnapshotForModes,
   modelSettingFromPage,
 } from "../../src/lib/growth/modelSettings";
-import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
+import type { ModelPhaseSetting, ModelSettingInput } from "../../src/lib/growth/modelSettings";
 import { defaultFetch } from "./http";
 import { queryDataSource } from "./notion";
 
-function defaultForMode(mode: string): ModelPhaseSetting {
-  const phaseId = modelPhaseIdForMode(mode);
-  const phase = MODEL_PHASES.find((item) => item.id === phaseId);
-  if (!phase) throw new Error(`未知の実行モードです: ${mode}`);
-  return { ...phase, phaseId: phase.id, source: "default" };
-}
-
-async function resolveForMode(mode: string): Promise<ModelPhaseSetting> {
-  const fallback = defaultForMode(mode);
+async function resolveForModes(modes: readonly string[]): Promise<Record<string, ModelPhaseSetting>> {
+  const fallback = modelSettingsSnapshotForModes(modes, []);
   if (process.env.GROWTH_MODEL_SETTINGS_DISABLE === "1") return fallback;
 
   const token = process.env.NOTION_TOKEN;
@@ -31,10 +22,10 @@ async function resolveForMode(mode: string): Promise<ModelPhaseSetting> {
       { pageSize: 50 },
       { token, fetchFn: defaultFetch },
     );
-    const overrides = result.pages
+    const overrides: ModelSettingInput[] = result.pages
       .map(modelSettingFromPage)
-      .filter((setting) => setting !== null);
-    return mergeModelSettings(overrides).find((item) => item.id === fallback.id) ?? fallback;
+      .filter((setting): setting is ModelSettingInput => setting !== null);
+    return modelSettingsSnapshotForModes(modes, overrides);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`[model-settings] Notion設定を取得できないため既定値を使用: ${message}\n`);
@@ -44,11 +35,12 @@ async function resolveForMode(mode: string): Promise<ModelPhaseSetting> {
 
 async function main(): Promise<void> {
   const command = process.argv[2];
-  const mode = process.argv[3];
-  if (command !== "resolve" || !mode) {
-    throw new Error("使い方: model-settings-cli resolve <mode>");
+  const modes = process.argv.slice(3);
+  if (!modes.length || (command !== "resolve" && command !== "resolve-many")) {
+    throw new Error("使い方: model-settings-cli <resolve|resolve-many> <mode...>");
   }
-  process.stdout.write(`${JSON.stringify(await resolveForMode(mode))}\n`);
+  const snapshot = await resolveForModes(modes);
+  process.stdout.write(`${JSON.stringify(command === "resolve" ? snapshot[modes[0]] : snapshot)}\n`);
 }
 
 main().catch((error: unknown) => {

@@ -112,11 +112,6 @@
 | `GROWTH_LEARNING_LOG_DS` | 学習ログ DB の data source ID | △ | △ | △ |
 | `GROWTH_WORKER_LOG_DS` | Worker運用ログ DB の data source ID | △ | △ | △ |
 | `GROWTH_MODEL_SETTINGS_DS` | （任意）AIモデル設定DBの data source ID | △ | △ | △ |
-| `GROWTH_AGENT` | （任意）全工程のagent強制 | △ | △ | ✗ |
-| `GROWTH_WEEKLY_MODEL` | （任意）週次Claudeモデル上書き | △ | △ | ✗ |
-| `GROWTH_CLAUDE_EFFORT` / `GROWTH_WEEKLY_CLAUDE_EFFORT` | （任意）Claude推論強度上書き | △ | △ | ✗ |
-| `GROWTH_CODEX_MODEL` / `GROWTH_CODEX_REASONING_EFFORT` | （任意）Codex共通設定上書き | △ | △ | ✗ |
-| `GROWTH_WEEKLY_CODEX_MODEL` / `_REASONING_EFFORT` | （任意）週次Codex設定上書き | △ | △ | ✗ |
 | `GROWTH_GA4_KEYEVENTS_SINCE` | （任意）CV 計測開始日 | △ | △ | ✗ |
 | `OPENAI_API_KEY` | 画像生成 | △ | ✅ | ✗ |
 | `MICROCMS_SERVICE_DOMAIN` | microCMS サービス名 | △ | ✅ | ✅ |
@@ -142,7 +137,7 @@
 - **`GROWTH_LEARNING_LOG_DS` は本番の学習ログを記録したい環境へ設定**します。PC側のAI処理に加え、Vercelの下書き編集APIからも記録するため、完全運用では両方へ同じ値を設定します。未設定時は静かにスキップされ、本処理は止まりません。
 - **`GROWTH_WORKER_LOG_DS` はPC側のheartbeat記録に必要**です。承認画面の運用タブに同じログを表示する場合はVercelにも同じ値を設定します。`GROWTH_WORKER_ID`はPC側だけで構いません。
 - **AIモデル設定はNotionで共有**します。承認画面 `AIモデル` で保存した設定を自宅PC workerも読むため、「AIモデル設定」DBを`NOTION_TOKEN`の内部インテグレーションへ共有してください。`GROWTH_MODEL_SETTINGS_DS`はDBを差し替える場合だけ設定し、通常は未設定でコード内の既定IDを使います。
-- **モデル設定のenvは一時上書き用**です。優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。通常運用では`GROWTH_AGENT`を未設定にし、工程別のプロバイダー選択を有効にします。
+- **プロバイダー・モデル・推論強度は承認画面 `AIモデル` で設定**します。環境変数では上書きせず、Notionを読めない場合だけコード内推奨値へフォールバックします。
 - **`GROWTH_NOTIFY_LEVEL` は未設定のままが推奨**です。未設定/`weekly-only` では LINE push は週次完了と週次失敗だけに絞られ、通常ループの完了・提示・失敗は送信しません。検証目的で全通知を戻したいときだけ `all`（または `normal` / `verbose`）を設定します。
 - **`APPROVE_AUTH_ENABLED` は Vercel 本番で ON 必須**。未設定＝ON（フェイルセーフ）ですが、`false` にすると本番ビルドがガード（`scripts/check-prod-auth.mjs`）で失敗します。詳細は「手順 8」。
 - **`APPROVE_SECRET` はVercelと自宅PCに同じ値を設定**します。Vercelは承認APIの認証、PCは週次LINEダイジェストへの合言葉表示に使います。
@@ -186,7 +181,7 @@
    codex --version
    codex mcp login notion
    ```
-   > **確認**: `GROWTH_AGENT` 未設定なら承認画面の工程別設定を使います。指定した場合は全工程のプロバイダーを強制します。
+   > **確認**: 実行時は承認画面の工程別設定に従い、各工程でClaudeまたはCodexを起動します。
 
 ### 手順 3-2: リポジトリを取得する
 
@@ -350,10 +345,10 @@ $env:GROWTH_DRYRUN=1; npm run growth:weekly; Remove-Item Env:\GROWTH_DRYRUN
 > **確認**: `[dry-run] ... claude -p --permission-mode default --allowedTools ...` と、続けて `[dry-run] then: npm run growth:notify-line ...` の 2 行が表示されれば **週次の DRYRUN 疎通 OK（初期構築の完了条件クリア）**。
 > ※ 最新取り込み（`git pull --ff-only`）は weekly モードだけが対象です。weekly でも `GROWTH_DRYRUN=1` や `GROWTH_SKIP_PULL=1` のときは、動作確認を壊さないため pull をスキップします。
 
-Codex 併用の dry-run:
+Codex 工程の dry-run（事前に承認画面 `AIモデル` で対象工程をCodexに設定）:
 
 ```powershell
-$env:GROWTH_DRYRUN=1; $env:GROWTH_AGENT="codex"; npm run growth:advise-loop; Remove-Item Env:\GROWTH_DRYRUN; Remove-Item Env:\GROWTH_AGENT
+$env:GROWTH_DRYRUN=1; npm run growth:advise-loop; Remove-Item Env:\GROWTH_DRYRUN
 ```
 
 > **確認**: `[dry-run] ... codex -a never exec --sandbox danger-full-access ...` が表示されれば Codex 起動形の組み立ては OK。制限したい環境だけ `GROWTH_CODEX_SANDBOX=workspace-write` などを明示します。
@@ -472,7 +467,7 @@ GROWTH_INITIATIVES_AUTO=0
 Codex で動かす場合:
 
 ```powershell
-$env:GROWTH_AGENT="codex"; $env:GROWTH_CODEX_SANDBOX="danger-full-access"; npm run growth:daemon
+$env:GROWTH_CODEX_SANDBOX="danger-full-access"; npm run growth:daemon
 ```
 
 この場合も `weekly` は自動巡回に含めません。`drafts-auto` は `growth:drafts-auto-peek`、`initiatives-auto` は `growth:initiatives-auto-peek` で対象件数を確認し、0件なら何も起動しません。

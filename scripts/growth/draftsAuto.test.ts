@@ -8,7 +8,12 @@ import {
 } from "./draftsAuto";
 import type { NotionPage } from "./notion";
 
-function page(status: string, draftId = "", outline = "## 見出し\n### 詳細"): NotionPage {
+function page(
+  status: string,
+  draftId = "",
+  outline = "## 見出し\n### 詳細",
+  title = "承認済みタイトル",
+): NotionPage {
   return {
     id: `${status}-${draftId || "empty"}`,
     url: "",
@@ -16,6 +21,7 @@ function page(status: string, draftId = "", outline = "## 見出し\n### 詳細"
       "ステータス": { select: { name: status } },
       "下書きID": { rich_text: draftId ? [{ plain_text: draftId }] : [] },
       "構成案": { rich_text: outline ? [{ plain_text: outline }] : [] },
+      "タイトル案": { title: title ? [{ plain_text: title }] : [] },
     },
   };
 }
@@ -94,6 +100,15 @@ describe("draftsAuto", () => {
 
   it("構成案にH2/H3がない生成中は除外し、後続の承認済み記事を返す", () => {
     const invalidGenerating = page("生成中", "", "説明だけ");
+    const approved = page("承認");
+
+    expect(selectDraftsAutoTarget([invalidGenerating, approved])).toBe(approved);
+    expect(countDraftsAutoTargets([invalidGenerating, approved])).toBe(1);
+    expect(selectDraftsAutoTarget([invalidGenerating])).toBeNull();
+  });
+
+  it("タイトルがない生成中は除外し、後続の承認済み記事を返す", () => {
+    const invalidGenerating = page("生成中", "", "## 見出し", "");
     const approved = page("承認");
 
     expect(selectDraftsAutoTarget([invalidGenerating, approved])).toBe(approved);

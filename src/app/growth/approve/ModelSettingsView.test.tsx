@@ -27,11 +27,22 @@ const DATA = {
       source: "notion" as const,
     },
     {
-      id: "drafts" as const,
-      phaseId: "drafts" as const,
-      label: "記事下書き生成",
-      description: "記事本文を作る",
-      modes: ["drafts", "drafts-auto"],
+      id: "draft-research" as const,
+      phaseId: "draft-research" as const,
+      label: "記事リサーチ",
+      description: "公式情報を確認する",
+      modes: ["draft-research"],
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "medium" as const,
+      source: "default" as const,
+    },
+    {
+      id: "draft-write" as const,
+      phaseId: "draft-write" as const,
+      label: "記事執筆",
+      description: "確認済み情報から記事本文を作る",
+      modes: ["drafts", "drafts-auto", "draft-write"],
       provider: "claude" as const,
       model: "claude-opus-4-8",
       effort: "high" as const,
@@ -90,10 +101,11 @@ describe("ModelSettingsView", () => {
 
     expect(await screen.findByRole("heading", { name: "AIモデル設定" })).toBeInTheDocument();
     expect(screen.getByText("週次分析・提案")).toBeInTheDocument();
-    expect(screen.getByText("記事下書き生成")).toBeInTheDocument();
+    expect(screen.getByText("記事リサーチ")).toBeInTheDocument();
+    expect(screen.getByText("記事執筆")).toBeInTheDocument();
     expect(screen.getByText("画像プロンプト設計")).toBeInTheDocument();
     expect(screen.getByText("保存済み")).toBeInTheDocument();
-    expect(screen.getAllByText("推奨値")).toHaveLength(2);
+    expect(screen.getAllByText("推奨値")).toHaveLength(3);
     expect(screen.getByLabelText("週次分析・提案のモデル")).toHaveValue("gpt-5.6-sol");
     expect(screen.getByLabelText("画像プロンプト設計のモデル")).toHaveValue("gpt-5.6-sol");
     expect(screen.getByText("growth:image-prompt / growth:regen / growth:regen-body")).toBeInTheDocument();
@@ -144,10 +156,10 @@ describe("ModelSettingsView", () => {
     vi.mocked(putModelSetting).mockRejectedValue(new Error("保存できません"));
     renderWithClient(<ModelSettingsView token="t" />);
 
-    fireEvent.change(await screen.findByLabelText("記事下書き生成のモデル"), {
+    fireEvent.change(await screen.findByLabelText("記事執筆のモデル"), {
       target: { value: "claude-sonnet-5" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "記事下書き生成を保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "記事執筆を保存" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("保存できません");
   });
 

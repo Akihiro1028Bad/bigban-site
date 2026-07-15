@@ -35,14 +35,7 @@ headless agent(承認画面「AIモデル」の工程別設定に応じて Claud
 | 装飾提案 | Codex / `gpt-5.5` | `medium` |
 | アドバイス反映・本文コメント修正 | Claude / `claude-opus-4-8` | `high` |
 
-設定の優先順位は `工程専用env → 共通env → Notion工程別設定 → コード内推奨値`。`GROWTH_AGENT` を指定すると全工程のプロバイダーを強制するが、通常運用では未設定にする。Notionが一時的に読めない場合もコード内推奨値へフォールバックして処理を継続する。
-
-週次分析だけを一時的に上書きする場合は、`.env` または実行時に次を設定する。下書き・修正・装飾など他モードには漏れない。
-
-```env
-GROWTH_WEEKLY_CODEX_MODEL=gpt-5.6-sol
-GROWTH_WEEKLY_CODEX_REASONING_EFFORT=xhigh
-```
+全AI工程で承認画面の工程別設定をそのまま使い、プロバイダー・モデル・推論強度は環境変数で上書きしない。Notionが一時的に読めない場合はコード内推奨値へフォールバックする。
 
 ```bash
 npm run growth:weekly
@@ -178,16 +171,17 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 承認済みの記事ネタ案を、コンテンツ+画像チームで microCMS 下書きにする。週次モードとは独立に、**人間が承認した直後に実行できる**(承認の即時反映)。
 
 ### 手順
-0. **前提コンテキストを注入**(最優先): `npm run growth:facility-context` を実行し、出力(施設の現況=開業前/開業済み・基準日・確定事実・立地・書いてはいけない未確定項目)を**正典の前提**として同じClaudeプロセスに渡す。記事はこの前提と矛盾させない(開業済みなら「開業を待つ」と書かない/未確定情報は断定せず「最新情報をご確認ください」)。単一ソースは [scripts/growth/facility-context.json](../../scripts/growth/facility-context.json)、方針は [growth-article-style.md](./growth-article-style.md) §13
-1. 1回の実行では対象を1件だけclaimする。H2/H3を含む有効な構成案がある中断中の `生成中` を優先し、無ければ `ステータス = 承認` を1件取得する(無ければ「承認済みなし」と報告して終了)。構成不備の行は自動対象から除外するため、後続記事を止めない。`drafts-auto` は決定的CLIが先にpageIdを固定し、複数記事を同じClaudeセッションへ渡さない
-2. 各案を、同じClaudeプロセスが情報収集から本文まで1パスで執筆
-3. **投入スペックをステージ**: 記事ごとに `{ payload(title/slug/locale/category/excerpt/displayMode/bodyHtml), eyecatchAction:"pending", imagePath, images[], notion{pageId,property,value} }` を `.growth-tmp/<slug>.json` に書く。**この時点では create も画像生成もしない**(重い処理を背景タスク化して待ちでストールするのを防ぐ=#23)。**構成案に画像指示 `[画像:<スタイル>: <説明>]` または `[画像:<スタイル>: <説明> | 文字: <textSpec>]` があれば**、本文HTMLの該当箇所に `{{IMG:1}}`(以降連番)を置き、`images:[{index,style,description,textSpec?}]` を入れる。`[画像:なし]` は画像なし指定として扱う(上限3枚・超過はスキップ報告)
-4. **画像プロンプト設計→投入を同期実行**: 記事ごとに `npm run growth:image-prompt -- .growth-tmp/<slug>.json` を実行し、承認画面の「画像プロンプト設計」で選択したモデル(GPT-5.6 Sol既定)が画像関連フィールドだけを具体化する。検証済みsidecarだけが元specへ反映され、本文・Notion情報・根拠台帳は変更できない。成功後に `npm run growth:publish-draft -- .growth-tmp/<slug>.json` を実行する。投入直前にNotionの現在の構成案を再読込し、本文H2/H3の名前・レベル・順序が一致しなければ停止する。その後、スクリプトが **本文画像生成→upload→`{{IMG:n}}`置換(#63)→ create(冪等PUT #21)→ アイキャッチ生成(参照画像方式 §9)→ upload → eyecatch添付 → 記事ネタ案DBステータス更新** を**直列・同期**で実行する([pipeline.ts](../../scripts/growth/pipeline.ts) のオーケストレータ)。本文画像は **create より前**に解決して bodyHtml を確定させる。画像プロンプト設計が失敗した場合は投入しない。**背景タスク化しない・完了待ちでストールしない**。途中失敗時はどの工程で落ちたか＋再開コマンドを出力し、**失敗を LINE にも通知**(沈黙させない=#24)して終了コード1で終わる。**本文画像は1枚失敗しても全体を止めず**、その画像を除いて続行し失敗を通知する。同じ spec で再実行すれば冪等に再開(生成画像はキャッシュし再課金しない)。`却下` は無視。**microCMS MCP は使わない**(headless 非接続)
-5. **LINE 通知(下書き完了)**: 投入に成功した1件を `[{"title":"...","contentId":"..."}]` にして `npm run growth:notify-drafts -- <json>` を実行。contentId の draftKey を管理APIで引き、**プレビューURL**(`/api/draft/enable`)を組み立てて LINE グループへ通知(draftKey が取れない記事はURLなしでフォールバック)。成功時のみ実行し、`LINE_*` 等が無く送れない場合はその旨を報告。<br>※将来、管理画面で下書きを閲覧できるようになったら通知URLを差し替える予定(URL組み立ては `scripts/growth/draft-notify.ts` に集約済み)
+0. `run.mjs` が対象を1件だけclaimし、決定的オーケストレーターへpageIdを渡す。手動`drafts`も1件だけ選ぶ。
+1. オーケストレーターはNotionの承認済み情報と `facility-context.json` を取得し、実行開始時点の「記事リサーチ」「記事執筆」モデル設定を固定する。
+2. **記事リサーチ**: [draft-research.md](../../scripts/growth/prompts/draft-research.md)を、Webだけを許可した独立セッションで実行する。公式確認できた重要事実だけを`ResearchPacket`へ保存する。失敗時は執筆しない。
+3. **記事執筆**: [draft-write.md](../../scripts/growth/prompts/draft-write.md)を、リポジトリやNotionへアクセスできない新しい一時ディレクトリの独立セッションで実行する。承認済み構成案、ResearchPacket、関連する禁止事項だけから本文を1回で生成する。校閲・採点・自動全文リライトは行わない。
+4. コードが`usedFactIds`から根拠台帳、カテゴリ、画像配置、Notion更新先を含む投入specを組み立てる。キャッシュは`.growth-tmp/drafts/<pageId>/`に保存し、リサーチは24時間、執筆は入力・プロンプト・モデル設定が同じ限り再利用する。「構成からやり直す」は新しい生成attemptとしてキャッシュを分け、同じattempt内の障害再試行だけを再利用する。
+5. **画像プロンプト設計→投入を同期実行**: `growth:image-prompt`の検証済みsidecarで画像関連フィールドだけを反映し、`growth:publish-draft`が構成一致・品質ゲート→本文画像→microCMS下書き→アイキャッチ→Notion更新を直列実行する。失敗時の再実行では有効なリサーチ・本文キャッシュを使い、本文を作り直さない。
+6. **LINE通知**: 下書き投入成功後だけ`growth:notify-drafts`を実行する。既存の失敗通知、worker log、ロック、日次上限も維持する。
 
 **本文生成の工程**
 
-執筆工程の正典は [scripts/growth/prompts/drafts.md](../../scripts/growth/prompts/drafts.md) とする。必要な重要事実を公式ページで確認し、同じClaudeプロセスが承認済み構成に沿って本文とspecを1パス生成する。別AI校閲・主観採点・自動全文リライトは行わない。安全性は [growth-article-style.md](./growth-article-style.md) §11 の決定的ゲートと承認画面での人手確認で担保する。
+リサーチ工程の正典は [draft-research.md](../../scripts/growth/prompts/draft-research.md)、執筆工程の正典は [draft-write.md](../../scripts/growth/prompts/draft-write.md) とする。各工程のプロバイダー・モデル・推論強度は承認画面の「AIモデル」で個別設定する。安全性は [growth-article-style.md](./growth-article-style.md) §11 の決定的ゲートと承認画面での人手確認で担保する。
 
 **画像チームの工程**(プロのデザイナー・写真家・イラストレーターのチーム)
 
@@ -544,7 +538,7 @@ AI は使わない（純粋なデータ結線）。
 - **編集導線（#110）**: 「下書き」列のカードの**「編集」ボタンから直接、全画面2ペインのワークスペース**（#104）が開く（下書き取得後に自動オープン・route 遷移なし・passphrase 維持）。保存するとワークスペースが閉じ、ドロワーのプレビューが最新化。詳細ボタンは従来どおり閲覧プレビューを開く。
 - **操作性（#109）**: キーボード（`j/k` 移動・`a` 承認・`r` 却下・`e` 詳細・`/` 検索・`Esc` 解除）、**⌘K/「検索・ジャンプ」**でコマンドパレット（タイトル検索→ジャンプ）、**チェックで一括選択→一括承認/却下**、**表示密度トグル（標準/コンパクト・localStorage 保持）**。すべて可視UIと二重化（キーボード必須にしない）。
 - **事前セットアップ（1回だけ）**: Notion「記事ネタ案」DB の `ステータス` select に **「生成中」値を追加**する（#108）。これが無いと自宅PCの着手マークが書けず、盤に「生成中」が出ない。
-- 自宅PCの `drafts` モードは、各記事の執筆**着手時に `ステータス=生成中`**、完了時に `下書き作成済み` へ更新する（`scripts/growth/prompts/drafts.md`）。中断で「生成中」のまま残った記事は次回再実行で拾い直す（冪等）。
+- 自宅PCの `drafts` モードは、各記事の処理**着手時に `ステータス=生成中`**、完了時に `下書き作成済み` へ更新する。中断で「生成中」のまま残った記事は次回再実行で拾い直す（フェーズキャッシュを使って冪等に再開）。
 
 ### プレビューの仕組み（iframe 方式 / Epic #100）
 

@@ -61,6 +61,7 @@
     "growth:drafts": "node scripts/growth/run.mjs drafts",
     "growth:drafts-auto": "node scripts/growth/run.mjs drafts-auto",
     "growth:drafts-auto-peek": "tsx scripts/growth/drafts-auto-cli.ts",
+    "growth:draft-orchestrator": "tsx scripts/growth/draft-orchestrator-cli.ts",
     "growth:initiatives": "node scripts/growth/run.mjs initiatives",
     "growth:initiatives-auto": "node scripts/growth/run.mjs initiatives-auto",
     "growth:initiatives-auto-peek": "tsx scripts/growth/initiatives-auto-cli.ts"
@@ -86,6 +87,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
     "google-auth-library": "^10.7.0",
+    "htmlparser2": "^12.0.0",
     "isomorphic-dompurify": "^3.18.0",
     "marked": "^18.0.5",
     "next": "^16.2.9",

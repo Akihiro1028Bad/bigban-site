@@ -69,6 +69,7 @@ export default defineConfig({
         "scripts/growth/gen-body-image.ts",
         "scripts/growth/self-heal-cli.ts",
         "scripts/growth/publish-draft-cli.ts",
+        "scripts/growth/draft-orchestrator-cli.ts",
         // 既知記事パス取得の I/O ラッパ。純ロジックは knownPaths.ts でテスト済み。
         "scripts/growth/knownArticlePaths.ts",
         "scripts/growth/notify-line.ts",

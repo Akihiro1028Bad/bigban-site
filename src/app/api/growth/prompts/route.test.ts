@@ -112,7 +112,7 @@ describe("GET /api/growth/prompts", () => {
 
   it("sourceKind=prompt の登録ファイルが1件でも欠落したら500", async () => {
     mockReaddir(["weekly.md"], [], []);
-    mockReadFile(["scripts/growth/prompts/drafts.md"]);
+    mockReadFile(["scripts/growth/prompts/draft-write.md"]);
 
     const res = await GET(getReq());
     expect(res.status).toBe(500);
