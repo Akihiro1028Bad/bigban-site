@@ -268,7 +268,8 @@ function htmlAttributeValue(tag: string, attribute: string): string | null {
   const source =
     "\\s" + attribute + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+))";
   const match = new RegExp(source, "i").exec(tag);
-  return match ? (match[1] ?? match[2] ?? match[3] ?? "") : null;
+  if (!match) return null;
+  return match[1] ?? match[2] ?? match[3]!;
 }
 
 /**

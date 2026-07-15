@@ -344,6 +344,26 @@ describe("品質ゲートの事実・HTML検出", () => {
       "target",
       "rel",
     ]);
+    expect(
+      detectUnsafeHtml(
+        "<a href='https://example.com' target='_blank' rel='noopener noreferrer'>外部</a>"
+      )
+    ).toEqual([]);
+    expect(
+      detectUnsafeHtml(
+        '<a href=https://example.com target=_blank rel="noopener noreferrer">外部</a>'
+      )
+    ).toEqual([]);
+    expect(detectUnsafeHtml('<a href="/about" rel="nofollow">施設案内</a>')).toEqual([]);
+    expect(detectUnsafeHtml("<a target=<>")).toContain("target");
+  });
+
+  it("アンカー以外の target・rel を片側だけでも検出し、重複を返さない", () => {
+    expect(detectUnsafeHtml('<img src="x" target="_blank">')).toEqual(["target"]);
+    expect(detectUnsafeHtml('<img src="x" rel="noopener noreferrer">')).toEqual(["rel"]);
+    expect(
+      detectUnsafeHtml('<img src="x" target="_blank"><span target="_blank">本文</span>')
+    ).toEqual(["target"]);
   });
 });
 
