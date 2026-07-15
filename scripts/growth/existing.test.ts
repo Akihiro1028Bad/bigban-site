@@ -816,6 +816,56 @@ describe("articleReviewLabelLines", () => {
     expect(lines.join("\n")).toContain(expected);
   });
 
+  it("予約CSVの前週未収録を週次入力へ明示する", () => {
+    const lines = articleReviewLabelLines([
+      ideaPage({
+        id: "i-coverage",
+        title: "収録不足記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          actualReservations: {
+            state: "missing",
+            reason: "coverage_incomplete",
+            checkedAt: "2026-07-15T00:00:00.000Z",
+            coverage: {
+              start: "2026-07-07",
+              end: "2026-07-13",
+              current: true,
+              prior: false,
+            },
+          },
+        }),
+      }),
+      ideaPage({
+        id: "i-current-missing",
+        title: "当週未収録記事",
+        status: "公開済み",
+        weekStart: "2026-06-08",
+        metrics: metricsJson({
+          actualReservations: {
+            state: "missing",
+            reason: "coverage_incomplete",
+            checkedAt: "2026-07-15T00:00:00.000Z",
+            coverage: {
+              start: "2026-06-30",
+              end: "2026-07-06",
+              current: false,
+              prior: true,
+            },
+          },
+        }),
+      }),
+    ], fixedNowMs);
+    const output = lines.join("\n");
+    expect(output).toContain(
+      "実予約=収録不足（当週=収録 / 前週=未収録、予約意図は代理指標）"
+    );
+    expect(output).toContain(
+      "実予約=収録不足（当週=未収録 / 前週=収録、予約意図は代理指標）"
+    );
+  });
+
   it("freshな施設実予約のみなら記事帰属なしを週次入力へ出す", () => {
     const lines = articleReviewLabelLines([
       ideaPage({

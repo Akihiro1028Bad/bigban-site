@@ -143,7 +143,8 @@ export async function fetchGa4(
     const priorReport = allReports[index * 2 + 1] ?? {};
     result[def.key] = mergeRows(
       parseGa4Report(currentReport),
-      parseGa4Report(priorReport)
+      parseGa4Report(priorReport),
+      { includePriorOnly: def.dimensions.includes("eventName") }
     );
   });
 

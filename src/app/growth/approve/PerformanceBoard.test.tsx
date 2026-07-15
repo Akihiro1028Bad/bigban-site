@@ -100,6 +100,48 @@ describe("PerformanceBoard", () => {
     expect(screen.getByText(/予約意図を代理指標/)).toBeInTheDocument();
   });
 
+  it("予約CSVの当週・前週収録状態を区別して表示する", async () => {
+    const user = userEvent.setup();
+    const m: ArticleMetrics = {
+      ...metrics(0, null, 0),
+      ga4Measured: false,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: new Date().toISOString(),
+        coverage: {
+          start: "2026-07-07",
+          end: "2026-07-13",
+          current: true,
+          prior: false,
+        },
+      },
+    };
+    const currentMissing: ArticleMetrics = {
+      ...m,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: new Date().toISOString(),
+        coverage: {
+          start: "2026-06-30",
+          end: "2026-07-06",
+          current: false,
+          prior: true,
+        },
+      },
+    };
+    render(<PerformanceBoard items={[
+      published("a", "前週収録不足記事", m),
+      published("b", "当週収録不足記事", currentMissing),
+    ]} />);
+    await user.click(screen.getByRole("button", { name: /前週収録不足記事/ }));
+    expect(screen.getByText(/当週=収録.*前週=未収録/)).toBeInTheDocument();
+    expect(screen.getByText(/予約意図を代理指標/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /当週収録不足記事/ }));
+    expect(screen.getByText(/当週=未収録.*前週=収録/)).toBeInTheDocument();
+  });
+
   it("古い実予約と記事帰属なしを明示する", async () => {
     const user = userEvent.setup();
     const m: ArticleMetrics = {

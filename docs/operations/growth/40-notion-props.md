@@ -171,4 +171,4 @@
 
 ## `成績データ` JSON拡張（#280）
 
-新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`ctaEventsMeasured`、`actualReservations` を保存する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。
+新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `ga4Measured`（`false` はGA4実測0ではなくtopPages未取得）、`ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`ctaEventsMeasured`、`actualReservations` を保存する。実予約CSVのcurrent/prior収録範囲が不足する場合、`actualReservations.state=missing`、`reason=coverage_incomplete`、`coverage.current/prior` で各期間の収録可否を保持する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。

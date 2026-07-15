@@ -18,6 +18,54 @@ export interface ParsedReservationCsv {
   hasSourcePagePath: boolean;
 }
 
+export interface ReservationCoverage {
+  start: string;
+  end: string;
+}
+
+function isValidYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** 予約CSV sidecar JSONを解析する。 */
+export function parseReservationCoverageJson(input: string): ReservationCoverage {
+  let value: unknown;
+  try {
+    value = JSON.parse(input);
+  } catch {
+    throw new Error("予約CSV収録範囲sidecarがJSONではありません");
+  }
+  if (!value || typeof value !== "object") {
+    throw new Error("予約CSV収録範囲sidecarにcoverageStartがありません");
+  }
+  const record = value as Record<string, unknown>;
+  const start = record.coverageStart;
+  const end = record.coverageEnd;
+  if (typeof start !== "string") {
+    throw new Error("予約CSV収録範囲sidecarにcoverageStartがありません");
+  }
+  if (typeof end !== "string") {
+    throw new Error("予約CSV収録範囲sidecarにcoverageEndがありません");
+  }
+  if (!isValidYmd(start) || !isValidYmd(end)) {
+    throw new Error("予約CSV収録範囲sidecarの日付が不正です");
+  }
+  if (start > end) throw new Error("予約CSV収録範囲sidecarの日付前後が逆です");
+  return { start, end };
+}
+
+export function reservationCoverageForPeriods(
+  coverage: ReservationCoverage,
+  current: DateRange,
+  prior: DateRange
+): { current: boolean; prior: boolean } {
+  const covers = (range: DateRange) =>
+    coverage.start <= range.start && coverage.end >= range.end;
+  return { current: covers(current), prior: covers(prior) };
+}
+
 function csvRows(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -136,6 +184,37 @@ export function aggregateReservations(
   return {
     facility: metricDelta(facilityCurrent, facilityPrior),
     article: parsed.hasSourcePagePath ? metricDelta(articleCurrent, articlePrior) : null,
+  };
+}
+
+interface ActualReservationsForPageInput {
+  parsed: ParsedReservationCsv;
+  coverage: ReservationCoverage;
+  current: DateRange;
+  prior: DateRange;
+  pagePath: string;
+  syncedAt: string;
+  checkedAt: string;
+}
+
+/** 収録期間を検証してから記事の実予約deltaを作る。 */
+export function actualReservationsForPage(
+  input: ActualReservationsForPageInput
+): ActualReservationMetrics {
+  const covered = reservationCoverageForPeriods(input.coverage, input.current, input.prior);
+  if (!covered.current || !covered.prior) {
+    return {
+      state: "missing",
+      reason: "coverage_incomplete",
+      checkedAt: input.checkedAt,
+      coverage: { ...input.coverage, ...covered },
+    };
+  }
+  return {
+    state: "available",
+    source: "csv",
+    syncedAt: input.syncedAt,
+    ...aggregateReservations(input.parsed, input.current, input.prior, input.pagePath),
   };
 }
 

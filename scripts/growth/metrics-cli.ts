@@ -28,7 +28,7 @@ import {
   buildMetricsMirrorProps,
   buildSearchMetrics,
   isKeyEventsMeasured,
-  metricsForPagePath,
+  metricsForKnownPagePath,
   type ActualReservationMetrics,
   type SearchMetrics,
 } from "./metrics";
@@ -40,7 +40,13 @@ import {
   type NotionPage,
 } from "./notion";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
-import { aggregateReservations, parseReservationCsv, type ParsedReservationCsv } from "./reservations";
+import {
+  actualReservationsForPage,
+  parseReservationCoverageJson,
+  parseReservationCsv,
+  type ParsedReservationCsv,
+  type ReservationCoverage,
+} from "./reservations";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -149,17 +155,27 @@ async function notifyLine(text: string): Promise<void> {
 interface ReservationCsvSnapshot {
   parsed: ParsedReservationCsv;
   syncedAt: string;
+  coverage: ReservationCoverage;
 }
 
 async function loadReservationCsv(
   path: string | undefined,
-  checkedAt: string
+  checkedAt: string,
+  coveragePath = path ? `${path}.coverage.json` : undefined
 ): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
   if (!path) return { state: "missing", reason: "not_configured", checkedAt };
   try {
-    const [content, file] = await Promise.all([readFile(path, "utf8"), stat(path)]);
+    const [content, file, coverageJson] = await Promise.all([
+      readFile(path, "utf8"),
+      stat(path),
+      readFile(coveragePath || `${path}.coverage.json`, "utf8"),
+    ]);
     try {
-      return { parsed: parseReservationCsv(content), syncedAt: file.mtime.toISOString() };
+      return {
+        parsed: parseReservationCsv(content),
+        syncedAt: file.mtime.toISOString(),
+        coverage: parseReservationCoverageJson(coverageJson),
+      };
     } catch (error) {
       console.warn("[metrics] 予約CSVが不正です:", error);
       return { state: "missing", reason: "invalid", checkedAt };
@@ -207,18 +223,32 @@ async function fetchArticleSearch(
 
 async function main(): Promise<void> {
   const config = loadGrowthConfig(process.env);
-  const accessToken = await getAccessToken(config);
   const { current, prior } = computeWeeklyPeriods(new Date());
-
-  const ga4 = await fetchGa4({
-    config,
-    accessToken,
-    current,
-    prior,
-    reports: [TOP_PAGES_REPORT, TOP_PAGE_CTA_EVENTS_REPORT],
-  });
-  const rows = ga4.topPages ?? [];
-  const ctaRows = ga4.topPageCtaEvents ?? [];
+  let accessToken: string | null = null;
+  try {
+    accessToken = await getAccessToken(config);
+  } catch (error) {
+    console.warn("[metrics] Google認証失敗(GA4/GSCを未取得として継続):", error);
+  }
+  let rows: Awaited<ReturnType<typeof fetchGa4>>[string] = [];
+  let ctaRows: Awaited<ReturnType<typeof fetchGa4>>[string] | undefined;
+  let isGa4Available = false;
+  if (accessToken) {
+    try {
+      const ga4 = await fetchGa4({
+        config,
+        accessToken,
+        current,
+        prior,
+        reports: [TOP_PAGES_REPORT, TOP_PAGE_CTA_EVENTS_REPORT],
+      });
+      rows = ga4.topPages ?? [];
+      ctaRows = ga4.topPageCtaEvents ?? [];
+      isGa4Available = true;
+    } catch (error) {
+      console.warn("[metrics] GA4取得失敗(実予約更新は継続):", error);
+    }
+  }
 
   const options = notionOptions();
   const pages = await publishedPages(options);
@@ -230,7 +260,11 @@ async function main(): Promise<void> {
   }
 
   const nowIso = new Date().toISOString();
-  const reservations = await loadReservationCsv(process.env.GROWTH_RESERVATION_CSV_PATH, nowIso);
+  const reservations = await loadReservationCsv(
+    process.env.GROWTH_RESERVATION_CSV_PATH,
+    nowIso,
+    process.env.GROWTH_RESERVATION_COVERAGE_PATH
+  );
   let updated = 0;
   let unmatched = 0;
   let gscFailed = 0; // #計測強化 S2: GSC 取得失敗(クォータ枯渇等)の沈黙を防ぐため件数を可視化。
@@ -247,28 +281,31 @@ async function main(): Promise<void> {
       continue;
     }
     const pagePath = articlePagePath(sl.slug, sl.locale, media);
-    const base = metricsForPagePath(pagePath, rows, current, ctaRows);
-    if (!base) {
+    const base = metricsForKnownPagePath(pagePath, rows, current, ctaRows);
+    if (!base.ga4Measured) {
       unmatched += 1;
       console.warn(`[metrics] GA4 一致なし: ${titleOf(page)} (${pagePath})`);
-      continue;
     }
     // #計測強化 S2: 記事ごとの GSC 検索成績を page フィルタで取得して合成。
     const pageUrl = articleSearchUrl(config.gscSiteUrl, pagePath);
-    const search = await fetchArticleSearch(config, accessToken, current, prior, pageUrl);
+    const search = accessToken
+      ? await fetchArticleSearch(config, accessToken, current, prior, pageUrl)
+      : null;
     if (search === null) gscFailed += 1; // 失敗は GA4 分を維持しつつ件数だけ数える(沈黙させない)。
     // #計測強化 S3: 公開日(要改稿判定)も載せる。
     const actualReservations: ActualReservationMetrics = isCsvSnapshot(reservations)
-      ? {
-          state: "available",
-          source: "csv",
-          syncedAt: reservations.syncedAt,
-          ...aggregateReservations(reservations.parsed, current, prior, pagePath),
-        }
+      ? actualReservationsForPage({
+          ...reservations,
+          current,
+          prior,
+          pagePath,
+          checkedAt: nowIso,
+        })
       : reservations;
     const metrics = {
       ...base,
-      ctaEventsMeasured: isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
+      ctaEventsMeasured:
+        isGa4Available && isKeyEventsMeasured(sl.publishedAt, KEY_EVENTS_SINCE),
       actualReservations,
       ...(search ? { search } : {}),
       ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),

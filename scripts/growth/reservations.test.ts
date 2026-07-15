@@ -2,13 +2,65 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   aggregateReservations,
+  actualReservationsForPage,
   isReservationDataFresh,
+  parseReservationCoverageJson,
   parseReservationCsv,
+  reservationCoverageForPeriods,
   selectLatestReservationSnapshot,
 } from "./reservations";
 
 const current = { start: "2026-07-07", end: "2026-07-13" };
 const prior = { start: "2026-06-30", end: "2026-07-06" };
+
+describe("reservation coverage", () => {
+  it("sidecar JSONの収録開始・終了日を検証して解析する", () => {
+    expect(
+      parseReservationCoverageJson(
+        JSON.stringify({ coverageStart: "2026-06-30", coverageEnd: "2026-07-13" })
+      )
+    ).toEqual({ start: "2026-06-30", end: "2026-07-13" });
+  });
+
+  it("sidecarの欠落・不正日付・逆転期間を拒否する", () => {
+    expect(() => parseReservationCoverageJson("null")).toThrow(/coverageStart/);
+    expect(() => parseReservationCoverageJson("{}")).toThrow(/coverageStart/);
+    expect(() =>
+      parseReservationCoverageJson(JSON.stringify({ coverageStart: "2026-06-30" }))
+    ).toThrow(/coverageEnd/);
+    expect(() =>
+      parseReservationCoverageJson(
+        JSON.stringify({ coverageStart: "bad", coverageEnd: "2026-03-01" })
+      )
+    ).toThrow(/日付/);
+    expect(() =>
+      parseReservationCoverageJson(
+        JSON.stringify({ coverageStart: "2026-02-30", coverageEnd: "2026-03-01" })
+      )
+    ).toThrow(/日付/);
+    expect(() =>
+      parseReservationCoverageJson(
+        JSON.stringify({ coverageStart: "2026-02-01", coverageEnd: "2026-02-30" })
+      )
+    ).toThrow(/日付/);
+    expect(() =>
+      parseReservationCoverageJson(
+        JSON.stringify({ coverageStart: "2026-07-13", coverageEnd: "2026-06-30" })
+      )
+    ).toThrow(/前後/);
+    expect(() => parseReservationCoverageJson("not json")).toThrow(/JSON/);
+  });
+
+  it("currentとpriorを別々に収録判定する", () => {
+    expect(
+      reservationCoverageForPeriods(
+        { start: "2026-07-07", end: "2026-07-13" },
+        current,
+        prior
+      )
+    ).toEqual({ current: true, prior: false });
+  });
+});
 
 describe("parseReservationCsv", () => {
   it("正規化CSVとquoted fieldを解析する", () => {
@@ -118,6 +170,59 @@ describe("aggregateReservations", () => {
     } finally {
       formatToParts.mockRestore();
     }
+  });
+});
+
+describe("actualReservationsForPage", () => {
+  const checkedAt = "2026-07-15T00:00:00.000Z";
+  const syncedAt = "2026-07-14T00:00:00.000Z";
+
+  it("current/prior両期間を収録した空CSVだけをfreshな実測0として扱う", () => {
+    const parsed = parseReservationCsv("reservation_id,booked_at,status\n");
+    expect(
+      actualReservationsForPage({
+        parsed,
+        coverage: { start: "2026-06-30", end: "2026-07-13" },
+        current,
+        prior,
+        pagePath: "/news/a",
+        syncedAt,
+        checkedAt,
+      })
+    ).toEqual({
+      state: "available",
+      source: "csv",
+      syncedAt,
+      facility: { current: 0, prior: 0, deltaPct: null },
+      article: null,
+    });
+  });
+
+  it("prior未収録なら0件ではなくcoverage_incompleteとして代理指標へ倒す", () => {
+    const parsed = parseReservationCsv(
+      "reservation_id,booked_at,status\nr1,2026-07-10T00:00:00+09:00,confirmed\n"
+    );
+    expect(
+      actualReservationsForPage({
+        parsed,
+        coverage: { start: "2026-07-07", end: "2026-07-13" },
+        current,
+        prior,
+        pagePath: "/news/a",
+        syncedAt,
+        checkedAt,
+      })
+    ).toEqual({
+      state: "missing",
+      reason: "coverage_incomplete",
+      checkedAt,
+      coverage: {
+        start: "2026-07-07",
+        end: "2026-07-13",
+        current: true,
+        prior: false,
+      },
+    });
   });
 });
 

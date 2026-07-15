@@ -416,9 +416,12 @@ function ActualReservations({ metrics }: { metrics: ArticleMetrics }) {
   const actual = metrics.actualReservations;
   if (!actual) return null;
   if (actual.state === "missing") {
+    const coverageText = actual.reason === "coverage_incomplete" && actual.coverage
+      ? `予約CSVの収録期間が不足しています（当週=${actual.coverage.current ? "収録" : "未収録"} / 前週=${actual.coverage.prior ? "収録" : "未収録"}）。予約意図を代理指標として扱います。`
+      : "実予約は未取得です。予約意図を代理指標として扱います。";
     return (
       <div className="mt-3 rounded-[10px] p-3 text-[12.5px]" style={{ background: "var(--p-bg-raised)", color: "var(--p-text-2)" }}>
-        実予約は未取得です。予約意図を代理指標として扱います。
+        {coverageText}
       </div>
     );
   }

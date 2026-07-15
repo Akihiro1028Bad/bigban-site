@@ -9,6 +9,7 @@ import {
   isKeyEventsMeasured,
   type ArticleMetrics,
   metricsForPagePath,
+  metricsForKnownPagePath,
   METRICS_PROPS,
   normalizePagePath,
   parseMetrics,
@@ -201,6 +202,34 @@ describe("metricsForPagePath", () => {
   });
 });
 
+describe("metricsForKnownPagePath", () => {
+  it("GA4 topPages一致なしでも既知の記事を未計測状態で返す", () => {
+    const metrics = metricsForKnownPagePath("/news/a", [], PERIOD, [
+      eventRow("/news/a", "reservation_click", [2, 1]),
+    ]);
+    expect(metrics).toMatchObject({
+      pagePath: "/news/a",
+      ga4Measured: false,
+      views: { current: 0, prior: 0, deltaPct: null },
+      users: { current: 0, prior: 0, deltaPct: null },
+      ctaEvents: {
+        reservationClick: { current: 2, prior: 1, deltaPct: 100 },
+      },
+    });
+    expect(metricsForKnownPagePath("/news/no-cta", [], PERIOD).ctaEvents).toBeUndefined();
+  });
+
+  it("GA4 topPages一致時は実測状態を保持する", () => {
+    const metrics = metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD
+    );
+    expect(metrics.ga4Measured).toBe(true);
+    expect(metrics.views.current).toBe(10);
+  });
+});
+
 describe("serializeMetrics / parseMetrics", () => {
   const metrics: ArticleMetrics = {
     pagePath: "/news/a",
@@ -278,6 +307,11 @@ describe("serializeMetrics / parseMetrics", () => {
     expect(parseMetrics(serializeMetrics(extended))).toEqual(extended);
   });
 
+  it("GA4未取得状態と実測0を区別して往復できる", () => {
+    const value: ArticleMetrics = { ...metrics, ga4Measured: false };
+    expect(parseMetrics(serializeMetrics(value))).toEqual(value);
+  });
+
   it("実予約missingを往復し不正stateは拒否する", () => {
     const missing: ArticleMetrics = {
       ...metrics,
@@ -289,6 +323,24 @@ describe("serializeMetrics / parseMetrics", () => {
     };
     expect(parseMetrics(serializeMetrics(missing))).toEqual(missing);
     expect(parseMetrics(JSON.stringify({ ...metrics, actualReservations: { state: "stale" } }))).toBeNull();
+  });
+
+  it("実予約のcurrent/prior収録状態を往復する", () => {
+    const incomplete: ArticleMetrics = {
+      ...metrics,
+      actualReservations: {
+        state: "missing",
+        reason: "coverage_incomplete",
+        checkedAt: "2026-07-15T00:00:00.000Z",
+        coverage: {
+          start: "2026-07-07",
+          end: "2026-07-13",
+          current: true,
+          prior: false,
+        },
+      },
+    };
+    expect(parseMetrics(serializeMetrics(incomplete))).toEqual(incomplete);
   });
 });
 

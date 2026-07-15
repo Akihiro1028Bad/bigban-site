@@ -132,6 +132,50 @@ describe("fetchGa4", () => {
     ]);
   });
 
+  it("eventNameレポートだけprior-only行を残し、通常レポートには混入させない", async () => {
+    const reportDefs: Ga4ReportDef[] = [
+      { key: "topPages", dimensions: ["pagePath"], metrics: ["screenPageViews"] },
+      { key: "cta", dimensions: ["pagePath", "eventName"], metrics: ["keyEvents"] },
+    ];
+    const ga4Report = (
+      dimensions: string[],
+      metrics: string[],
+      rows: Array<{ keys: string[]; values: string[] }>
+    ) => ({
+      dimensionHeaders: dimensions.map((name) => ({ name })),
+      metricHeaders: metrics.map((name) => ({ name })),
+      rows: rows.map((row) => ({
+        dimensionValues: row.keys.map((value) => ({ value })),
+        metricValues: row.values.map((value) => ({ value })),
+      })),
+    });
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({
+      reports: [
+        ga4Report(["pagePath"], ["screenPageViews"], [{ keys: ["/news/current"], values: ["3"] }]),
+        ga4Report(["pagePath"], ["screenPageViews"], [{ keys: ["/news/prior-only"], values: ["8"] }]),
+        ga4Report(["pagePath", "eventName"], ["keyEvents"], []),
+        ga4Report(["pagePath", "eventName"], ["keyEvents"], [
+          { keys: ["/news/a", "reservation_click"], values: ["2"] },
+        ]),
+      ],
+    }));
+
+    const result = await fetchGa4({
+      config,
+      accessToken: "t",
+      current,
+      prior,
+      fetchFn,
+      reports: reportDefs,
+    });
+
+    expect(result.topPages.map((row) => row.keys[0])).toEqual(["/news/current"]);
+    expect(result.cta).toEqual([{
+      keys: ["/news/a", "reservation_click"],
+      metrics: { keyEvents: { current: 0, prior: 2, deltaPct: -100 } },
+    }]);
+  });
+
   it("reports/fetchFn 未指定時は既定値(GA4_REPORTS・グローバル fetch)を用いる", async () => {
     const globalFetch = vi.fn().mockResolvedValue({
       ok: true,

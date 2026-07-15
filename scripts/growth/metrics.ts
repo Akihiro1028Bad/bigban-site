@@ -41,8 +41,14 @@ export interface SearchMetrics {
 export type ActualReservationMetrics =
   | {
       state: "missing";
-      reason: "not_configured" | "read_error" | "invalid";
+      reason: "not_configured" | "read_error" | "invalid" | "coverage_incomplete";
       checkedAt: string;
+      coverage?: {
+        start: string;
+        end: string;
+        current: boolean;
+        prior: boolean;
+      };
     }
   | {
       state: "available";
@@ -57,6 +63,8 @@ export interface ArticleMetrics {
   pagePath: string;
   views: MetricDelta;
   users: MetricDelta;
+  /** GA4 topPagesに記事行が存在したか。falseは実測0ではなく未取得。 */
+  ga4Measured?: boolean;
   ctaEvents?: CtaEventMetrics;
   ctaEventsMeasured?: boolean;
   actualReservations?: ActualReservationMetrics;
@@ -177,22 +185,52 @@ export function metricsForPagePath(
     usersC += r.metrics[USERS_METRIC]?.current ?? 0;
     usersP += r.metrics[USERS_METRIC]?.prior ?? 0;
   }
-  const matchingCta = ctaRows?.filter(
-    (row) => normalizePagePath(row.keys[0] ?? "") === target
-  );
-  const ctaEvents = matchingCta
-    ? aggregateCtaEvents(
-        matchingCta.map((row) => ({
-          eventName: row.keys[1] ?? "",
-          current: row.metrics[KEY_EVENTS_METRIC]?.current ?? 0,
-          prior: row.metrics[KEY_EVENTS_METRIC]?.prior ?? 0,
-        }))
-      )
-    : undefined;
+  const ctaEvents = ctaEventsForPagePath(target, ctaRows);
   return {
     pagePath: target,
     views: { current: viewsC, prior: viewsP, deltaPct: deltaPct(viewsC, viewsP) },
     users: { current: usersC, prior: usersP, deltaPct: deltaPct(usersC, usersP) },
+    ...(ctaEvents ? { ctaEvents } : {}),
+    period,
+  };
+}
+
+function ctaEventsForPagePath(
+  target: string,
+  ctaRows: readonly MergedRow[] | undefined
+): CtaEventMetrics | undefined {
+  if (!ctaRows) return undefined;
+  const matching = ctaRows.filter(
+    (row) => normalizePagePath(row.keys[0] ?? "") === target
+  );
+  return aggregateCtaEvents(
+    matching.map((row) => ({
+      eventName: row.keys[1] ?? "",
+      current: row.metrics[KEY_EVENTS_METRIC]?.current ?? 0,
+      prior: row.metrics[KEY_EVENTS_METRIC]?.prior ?? 0,
+    }))
+  );
+}
+
+/**
+ * microCMSで解決済みの既知記事を、GA4 topPages一致の有無にかかわらず成績モデルへ載せる。
+ * ga4Measured=false時の0はplaceholderであり、実測0として判断してはならない。
+ */
+export function metricsForKnownPagePath(
+  pagePath: string,
+  rows: readonly MergedRow[],
+  period: { start: string; end: string },
+  ctaRows?: readonly MergedRow[]
+): ArticleMetrics {
+  const measured = metricsForPagePath(pagePath, rows, period, ctaRows);
+  if (measured) return { ...measured, ga4Measured: true };
+  const target = normalizePagePath(pagePath);
+  const ctaEvents = ctaEventsForPagePath(target, ctaRows);
+  return {
+    pagePath: target,
+    views: { current: 0, prior: 0, deltaPct: null },
+    users: { current: 0, prior: 0, deltaPct: null },
+    ga4Measured: false,
     ...(ctaEvents ? { ctaEvents } : {}),
     period,
   };
@@ -243,8 +281,14 @@ const ctaEventsSchema = z.object({
 const actualReservationsSchema = z.discriminatedUnion("state", [
   z.object({
     state: z.literal("missing"),
-    reason: z.enum(["not_configured", "read_error", "invalid"]),
+    reason: z.enum(["not_configured", "read_error", "invalid", "coverage_incomplete"]),
     checkedAt: z.string(),
+    coverage: z.object({
+      start: z.string(),
+      end: z.string(),
+      current: z.boolean(),
+      prior: z.boolean(),
+    }).optional(),
   }),
   z.object({
     state: z.literal("available"),
@@ -259,6 +303,7 @@ const metricsSchema = z.object({
   pagePath: z.string(),
   views: deltaSchema,
   users: deltaSchema,
+  ga4Measured: z.boolean().optional(),
   ctaEvents: ctaEventsSchema.optional(),
   ctaEventsMeasured: z.boolean().optional(),
   actualReservations: actualReservationsSchema.optional(),

@@ -332,4 +332,4 @@ pull 型なので、依頼は自宅PCが拾って初めて処理される。次�
 
 ## 予約CSVの運用（#280）
 
-予約サービスから正規化したCSVを `GROWTH_RESERVATION_CSV_PATH` に配置し、週次計測前に更新する。必須列は `reservation_id,booked_at,status`、記事帰属が提供される場合だけ `source_page_path` を付ける。7日超のCSVは古いと表示されるため件数は参考値に留め、予約意図を代理指標として扱う。CSVを用意できない週は既存の「予約件数」手入力をfallbackにし、推測帰属はしない。
+予約サービスから正規化したCSVを `GROWTH_RESERVATION_CSV_PATH` に配置し、週次計測前に更新する。必須列は `reservation_id,booked_at,status`、記事帰属が提供される場合だけ `source_page_path` を付ける。同時に `<CSVパス>.coverage.json`（別パスなら `GROWTH_RESERVATION_COVERAGE_PATH`）へ `{"coverageStart":"YYYY-MM-DD","coverageEnd":"YYYY-MM-DD"}` を書き、CSVが完全収録する期間を明示する。current/priorの片方でも範囲外なら0件ではなく未取得になる。両期間を収録した空CSVだけが実測0件。7日超のCSVは古いと表示されるため件数は参考値に留め、予約意図を代理指標として扱う。CSVを用意できない週は既存の「予約件数」手入力をfallbackにし、推測帰属はしない。

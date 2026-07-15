@@ -259,7 +259,14 @@ export function articleReviewLabelLines(
     }
     const actual = metrics.actualReservations;
     if (actual?.state === "missing") {
-      outcomes.push("実予約=欠損（予約意図は代理指標）");
+      if (actual.reason === "coverage_incomplete" && actual.coverage) {
+        outcomes.push(
+          `実予約=収録不足（当週=${actual.coverage.current ? "収録" : "未収録"} / ` +
+            `前週=${actual.coverage.prior ? "収録" : "未収録"}、予約意図は代理指標）`
+        );
+      } else {
+        outcomes.push("実予約=欠損（予約意図は代理指標）");
+      }
     } else if (actual?.state === "available") {
       if (!isReservationDataFresh(actual.syncedAt, new Date(nowMs).toISOString())) {
         outcomes.push(`実予約=古い（最終取込 ${actual.syncedAt}、予約意図は代理指標）`);
