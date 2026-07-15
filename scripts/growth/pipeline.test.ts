@@ -1,9 +1,16 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
 
-import { createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
+import { canRestoreGeneratedFile, createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
 
 describe("runStages", () => {
+  it("生成ファイルのpathと実在を復元条件にする", () => {
+    const exists = vi.fn((filePath: string) => filePath === "/state/image.png");
+    expect(canRestoreGeneratedFile({ imagePath: "/state/image.png" }, exists)).toBe(true);
+    expect(canRestoreGeneratedFile({ imagePath: "/tmp/missing.png" }, exists)).toBe(false);
+    expect(canRestoreGeneratedFile({ imagePath: 1 }, exists)).toBe(false);
+    expect(canRestoreGeneratedFile(null, exists)).toBe(false);
+  });
   it("全ステージ成功で completed を全件・failedAt は null", async () => {
     const order: string[] = [];
     const log = vi.fn();
@@ -110,5 +117,32 @@ describe("runStages", () => {
       onEvent: (event) => events.push(`${event.event}:${event.at}`),
     });
     expect(events).toEqual(["started:now", "succeeded:now"]);
+  });
+
+  it("復元条件を満たさないstageから後続checkpointを破棄して再実行する", async () => {
+    const ran: string[] = [];
+    const stages: Stage[] = [
+      { name: "create", run: async () => void ran.push("create") },
+      {
+        name: "eyecatch:generate",
+        canRestore: async (output) => output === "exists",
+        run: async () => void ran.push("generate"),
+      },
+      { name: "eyecatch:upload", run: async () => void ran.push("upload") },
+    ];
+    const result = await runStages(stages, vi.fn(), {
+      specHash: "same",
+      checkpoint: {
+        version: 1,
+        specHash: "same",
+        completed: [
+          { stage: "create", output: "content" },
+          { stage: "eyecatch:generate", output: "missing" },
+          { stage: "eyecatch:upload", output: "asset" },
+        ],
+      },
+    });
+    expect(ran).toEqual(["generate", "upload"]);
+    expect(result.events.map((event) => event.event)).toEqual(["skipped", "started", "succeeded", "started", "succeeded"]);
   });
 });

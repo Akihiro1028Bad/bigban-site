@@ -77,7 +77,7 @@ import {
   updatePagePropsWithLedgerFallback,
 } from "./sourceLedger";
 import { evaluateOutlineCompliance, outlineFromPage } from "./outlineCompliance";
-import { createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
+import { canRestoreGeneratedFile, createSpecHash, runStages, type PipelineCheckpoint, type Stage } from "./pipeline";
 import { buildGrowthOperationResult } from "./operationOutcome";
 import { diagnosticDetail } from "./externalApiError";
 import {
@@ -87,6 +87,7 @@ import {
   validatedRebuildSourceId,
 } from "./rebuildDraft";
 import { evaluatePublishGate, resolveGateArticleType } from "./publishGate";
+import { matchesPublishCheckpointContext, publishDraftRecoveryCommand } from "./draftOrchestrator";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REF = path.join(here, "assets", "mascot-alien.png");
@@ -114,6 +115,7 @@ interface DraftImageInput {
 
 interface DraftSpec {
   payload: Record<string, unknown>;
+  rebuildSourceId?: string;
   /**
    * 媒体軸(#media)。記事ネタ案 `媒体` プロパティの表示名(`ニュース`/`コラム`)。
    * `ニュース` → 公開先 news(env 無視)/ それ以外・欠落 → column(env 従属・従来挙動)。
@@ -162,7 +164,6 @@ async function main(): Promise<void> {
   const stateDirectory = path.dirname(specPath);
   const checkpointPath = path.join(stateDirectory, "publish-checkpoint.json");
   const outcomePath = path.join(stateDirectory, "publish-outcome.json");
-  const specHash = createSpecHash(specRaw);
   const atomicJson = async (filePath: string, value: unknown): Promise<void> => {
     const temporary = `${filePath}.tmp`;
     await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
@@ -179,6 +180,12 @@ async function main(): Promise<void> {
   // 媒体軸(#media): 行の `媒体` で公開先を出し分ける。欠落=column=従来の env 従属。
   const media: GrowthMedia = growthMediaForRow(spec.media);
   const ENDPOINT = growthEndpoint(media);
+  const specHash = createSpecHash(JSON.stringify({
+    spec: JSON.parse(specRaw) as unknown,
+    endpoint: ENDPOINT,
+    notionPageId: spec.notion?.pageId ?? "",
+    rebuildSourceId: spec.rebuildSourceId ?? "",
+  }));
 
   const serviceDomain = requireEnv("MICROCMS_SERVICE_DOMAIN");
   const contentKey = requireEnv("MICROCMS_API_KEY");
@@ -228,6 +235,18 @@ async function main(): Promise<void> {
   if (spec.notion) {
     stages.push({
       name: "notion-context",
+      canRestore: async (output) => {
+        if (!output || typeof output !== "object") return false;
+        const current = await getPage(spec.notion!.pageId, {
+          token: requireEnv("NOTION_TOKEN"),
+          fetchFn: defaultFetch,
+        });
+        return matchesPublishCheckpointContext(output, {
+          rebuildSourceId: validatedRebuildSourceId(rebuildSourceIdOf(current)) ?? "",
+          endpoint: ENDPOINT,
+          notionPageId: spec.notion!.pageId,
+        });
+      },
       restore: (output) => {
         if (!output || typeof output !== "object") return;
         const saved = output as { rebuildSourceId?: unknown; payload?: unknown };
@@ -270,7 +289,7 @@ async function main(): Promise<void> {
           );
           spec.payload = preserveRebuildSourceSlug(spec.payload, sourceSlug);
         }
-        return { rebuildSourceId, payload: spec.payload };
+        return { rebuildSourceId, payload: spec.payload, endpoint: ENDPOINT, notionPageId: spec.notion!.pageId };
       },
     });
   }
@@ -384,6 +403,7 @@ async function main(): Promise<void> {
     stages.push(
       {
         name: "eyecatch:generate",
+        canRestore: (output) => canRestoreGeneratedFile(output, existsSync),
         run: async () => {
           const buf = await generateEyecatch(
             {
@@ -487,9 +507,7 @@ async function main(): Promise<void> {
   });
 
   if (result.failedAt) {
-    const resumeCommand = spec.notion
-      ? `npm run growth:draft-orchestrator -- ${spec.notion.pageId}`
-      : `npm run growth:publish-draft -- ${specPath}`;
+    const resumeCommand = publishDraftRecoveryCommand(specPath);
     const isPartial = result.completed.includes("create") && result.failedAt.name === "notion:update";
     const safeDetail = diagnosticDetail(result.failedAt.error, {
       secrets: [process.env.MICROCMS_API_KEY ?? "", process.env.NOTION_TOKEN ?? "", process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ""],

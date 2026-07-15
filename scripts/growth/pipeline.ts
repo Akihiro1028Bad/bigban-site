@@ -17,6 +17,7 @@ export interface Stage {
   name: string;
   run: () => Promise<unknown>;
   restore?: (output: unknown) => void;
+  canRestore?: (output: unknown) => boolean | Promise<boolean>;
 }
 
 export interface PipelineCheckpoint {
@@ -46,6 +47,16 @@ export function createSpecHash(spec: string | Uint8Array): string {
   return createHash("sha256").update(spec).digest("hex");
 }
 
+export function canRestoreGeneratedFile(
+  output: unknown,
+  exists: (filePath: string) => boolean,
+): boolean {
+  return output !== null
+    && typeof output === "object"
+    && typeof (output as { imagePath?: unknown }).imagePath === "string"
+    && exists((output as { imagePath: string }).imagePath);
+}
+
 function validPrefix(stages: readonly Stage[], checkpoint: PipelineCheckpoint | null | undefined, specHash: string | undefined): PipelineCheckpoint["completed"] {
   if (!checkpoint || !specHash || checkpoint.version !== 1 || checkpoint.specHash !== specHash) return [];
   return checkpoint.completed.every((entry, index) => stages[index]?.name === entry.stage)
@@ -71,9 +82,11 @@ export async function runStages(
     options.onEvent?.(event);
   };
   const restored = validPrefix(stages, options.checkpoint, options.specHash);
+  let isRestoring = true;
   for (const stage of stages) {
-    const saved = restored[completed.length];
-    if (saved) {
+    const saved = isRestoring ? restored[completed.length] : undefined;
+    const canRestore = saved && (stage.canRestore ? await stage.canRestore(saved.output) : true);
+    if (saved && canRestore) {
       stage.restore?.(saved.output);
       outputs[stage.name] = saved.output;
       completed.push(stage.name);
@@ -81,6 +94,7 @@ export async function runStages(
       log(`↷ ${stage.name}`);
       continue;
     }
+    isRestoring = false;
     log(`▶ ${stage.name}`);
     emit({ stage: stage.name, event: "started", at: now() });
     try {

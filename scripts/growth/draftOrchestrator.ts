@@ -376,6 +376,29 @@ export function runDraftNotificationBestEffort(params: {
   return runDraftNotification(params);
 }
 
+export function shouldResumePublishSpec(hasCheckpoint: boolean, hasSpec: boolean): boolean {
+  return hasCheckpoint && hasSpec;
+}
+
+export function draftRunMode(env: Record<string, string | undefined>): string {
+  return env.GROWTH_DRAFT_RUN_MODE || "drafts";
+}
+
+export function publishDraftRecoveryCommand(specPath: string): string {
+  return `npm run growth:publish-draft -- ${specPath}`;
+}
+
+export function matchesPublishCheckpointContext(
+  output: unknown,
+  current: { rebuildSourceId: string; endpoint: string; notionPageId: string },
+): boolean {
+  if (!output || typeof output !== "object") return false;
+  const saved = output as Record<string, unknown>;
+  return saved.rebuildSourceId === current.rebuildSourceId
+    && saved.endpoint === current.endpoint
+    && saved.notionPageId === current.notionPageId;
+}
+
 async function runDraftNotification(params: {
   notifyPath: string;
   notify: () => Promise<void>;
@@ -439,6 +462,7 @@ export function assemblePublishSpec(params: {
   }
   return {
     media: input.media === "ニュース" ? "ニュース" : "コラム",
+    rebuildSourceId: input.rebuildSourceId,
     payload,
     eyecatchAction: "pending",
     imagePath: `/tmp/growth-eyecatch-${writer.slug}.png`,

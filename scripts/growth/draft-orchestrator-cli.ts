@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
-import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
+import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldInvalidateWriterCacheForPublishFailure, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
@@ -275,6 +275,56 @@ async function runNpm(script: string, args: string[] = [], capture = false, time
   return capture ? result.stdout : "";
 }
 
+async function publishAndNotify(params: {
+  specPath: string;
+  input: ReturnType<typeof draftInputFromPage>;
+  stateDir: string;
+  generationMarkerPath: string;
+  hasGenerationMarker: boolean;
+  writerPath?: string;
+}): Promise<void> {
+  let publishOut: string;
+  try {
+    publishOut = await runNpm("growth:publish-draft", [params.specPath], true, timeoutPolicy.publishDraftMs);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (params.writerPath && shouldInvalidateWriterCacheForPublishFailure(message) && existsSync(params.writerPath)) {
+      unlinkSync(params.writerPath);
+    }
+    throw error;
+  }
+  process.stdout.write(publishOut);
+  const publishResult = operationResultFromOutput(publishOut);
+  const contentId = publishedContentId(publishOut);
+  if (publishResult.outcome === "success" && params.hasGenerationMarker && existsSync(params.generationMarkerPath)) {
+    unlinkSync(params.generationMarkerPath);
+  }
+  const notifyPath = path.join(params.stateDir, "notify.json");
+  writeFileSync(notifyPath, JSON.stringify([{ title: params.input.title, contentId, media: params.input.media }]));
+  const notificationResult = await runDraftNotificationBestEffort({
+    notifyPath,
+    notify: async () => void await runNpm("growth:notify-drafts", [notifyPath]),
+    warn: (message) => process.stderr.write(`${message}\n`),
+  });
+  const finalResult = mergeGrowthOperationResults(publishResult, notificationResult);
+  if (finalResult.outcome === "partial") {
+    const resumeCommand = finalResult.recovery?.command ?? `npm run growth:publish-draft -- ${params.specPath}`;
+    try {
+      await runNpm("growth:learning-log", [
+        "append-partial",
+        draftRunMode(process.env),
+        finalResult.failedStage ?? "unknown",
+        resumeCommand,
+        finalResult.message,
+      ]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`学習ログへの部分成功記録に失敗しました: ${message}\n`);
+    }
+  }
+  process.stdout.write(`draftOutcome=${JSON.stringify(finalResult)}\n`);
+}
+
 async function main(): Promise<void> {
   const workDirs: string[] = [];
   try {
@@ -282,6 +332,26 @@ async function main(): Promise<void> {
   const page = await targetPage(process.argv[2]);
   const input = draftInputFromPage(page);
   if (!input.title || !/^#{2,3}\s+\S+/m.test(input.outline)) throw new Error("承認済みタイトルまたは構成案が不足しています。");
+  const stateDir = path.join(root, ".growth-tmp", "drafts", input.pageId.replace(/[^a-zA-Z0-9-]/g, "-"));
+  mkdirSync(stateDir, { recursive: true });
+  const generationMarkerPath = path.join(stateDir, "generation-attempt.json");
+  const generation = resolveDraftGenerationScope(
+    input.rebuildSourceId,
+    readGenerationMarker(generationMarkerPath),
+    randomUUID,
+  );
+  const specPath = path.join(stateDir, "publish-spec.json");
+  const checkpointPath = path.join(stateDir, "publish-checkpoint.json");
+  if (shouldResumePublishSpec(existsSync(checkpointPath), existsSync(specPath))) {
+    await publishAndNotify({
+      specPath,
+      input,
+      stateDir,
+      generationMarkerPath,
+      hasGenerationMarker: generation.marker !== null,
+    });
+    return;
+  }
   const prepared = prepareOutlineImages(input.outline);
   const facilityRaw = JSON.parse(readFileSync(path.join(here, "facility-context.json"), "utf-8")) as unknown;
   const facility = parseFacilityContextData(facilityRaw);
@@ -297,14 +367,6 @@ async function main(): Promise<void> {
   ].join("; ");
   const promptResearch = readFileSync(path.join(here, "prompts", "draft-research.md"), "utf-8");
   const promptWrite = readFileSync(path.join(here, "prompts", "draft-write.md"), "utf-8");
-  const stateDir = path.join(root, ".growth-tmp", "drafts", input.pageId.replace(/[^a-zA-Z0-9-]/g, "-"));
-  mkdirSync(stateDir, { recursive: true });
-  const generationMarkerPath = path.join(stateDir, "generation-attempt.json");
-  const generation = resolveDraftGenerationScope(
-    input.rebuildSourceId,
-    readGenerationMarker(generationMarkerPath),
-    randomUUID,
-  );
   if (generation.marker) {
     writeFileSync(generationMarkerPath, JSON.stringify(generation.marker, null, 2));
   } else if (existsSync(generationMarkerPath)) {
@@ -391,42 +453,17 @@ async function main(): Promise<void> {
     throw new Error(`${draftPhaseExecutionLabel("draft-write", writerSetting)}; ${message}`);
   }
   const spec = assemblePublishSpec({ input, writer, research, images: prepared.images });
-  const specPath = path.join(stateDir, "publish-spec.json");
+  spec.imagePath = path.join(stateDir, "growth-eyecatch.png");
   writeFileSync(specPath, JSON.stringify(spec, null, 2));
   await runNpm("growth:image-prompt", [specPath], false, timeoutPolicy.imagePromptMs);
-  let publishOut: string;
-  try {
-    publishOut = await runNpm("growth:publish-draft", [specPath], true, timeoutPolicy.publishDraftMs);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (shouldInvalidateWriterCacheForPublishFailure(message) && existsSync(writerPath)) {
-      unlinkSync(writerPath);
-    }
-    throw error;
-  }
-  process.stdout.write(publishOut);
-  const publishResult = operationResultFromOutput(publishOut);
-  const contentId = publishedContentId(publishOut);
-  // CMS投入まで完了したattemptだけを閉じる。途中失敗ではmarkerを残し、再試行で本文を再利用する。
-  if (publishResult.outcome === "success" && generation.marker && existsSync(generationMarkerPath)) unlinkSync(generationMarkerPath);
-  const notifyPath = path.join(stateDir, "notify.json");
-  writeFileSync(notifyPath, JSON.stringify([{ title: input.title, contentId, media: input.media }]));
-  const notificationResult = await runDraftNotificationBestEffort({
-    notifyPath,
-    notify: async () => void await runNpm("growth:notify-drafts", [notifyPath]),
-    warn: (message) => process.stderr.write(`${message}\n`),
+  await publishAndNotify({
+    specPath,
+    input,
+    stateDir,
+    generationMarkerPath,
+    hasGenerationMarker: generation.marker !== null,
+    writerPath,
   });
-  const finalResult = mergeGrowthOperationResults(publishResult, notificationResult);
-  if (finalResult.outcome === "partial") {
-    const resumeCommand = finalResult.recovery?.command ?? `npm run growth:draft-orchestrator -- ${input.pageId}`;
-    try {
-      await runNpm("growth:learning-log", ["append-partial", "drafts", finalResult.failedStage ?? "unknown", resumeCommand, finalResult.message]);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`学習ログへの部分成功記録に失敗しました: ${message}\n`);
-    }
-  }
-  process.stdout.write(`draftOutcome=${JSON.stringify(finalResult)}\n`);
   } finally {
     await cleanupDraftWorkDirs(workDirs, rm);
   }

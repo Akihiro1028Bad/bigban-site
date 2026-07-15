@@ -40,6 +40,17 @@ describe("PublishQueue", () => {
     expect(screen.queryByRole("button", { name: /今すぐ公開/ })).not.toBeInTheDocument();
   });
 
+  it("公開後に再取得でキューが空になっても直前の結果を保持する", async () => {
+    const item = article({ id: "a", title: "公開済みになる記事" });
+    const { rerender } = render(<PublishQueue items={[item]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    expect(await screen.findByLabelText("success: 1件")).toBeInTheDocument();
+    rerender(<PublishQueue items={[]} token="t" onChanged={() => {}} />);
+    expect(screen.getByText("公開待ちの記事はありません")).toBeInTheDocument();
+    expect(screen.getByLabelText("success: 1件")).toBeInTheDocument();
+    expect(screen.getByText(/公開済みになる記事 — success/)).toBeInTheDocument();
+  });
+
   it("公開OK/予約済み/要対応を3サマリ＋3セクションで振り分けて出す", () => {
     const items = [
       article({ id: "ok", title: "公開できる" }),
@@ -314,6 +325,26 @@ describe("PublishQueue", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ pageId: "a", resumeFrom: "notion:status" });
     expect(screen.getByLabelText("success: 2件")).toBeInTheDocument();
+  });
+
+  it("microcms失敗の全体再試行はresumeFromを送らない", async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({
+        success: false,
+        outcome: "retryable-failure",
+        message: "publish failed",
+        completedStages: ["notion:read"],
+        failedStage: "microcms:publish",
+        events: [],
+        externalIds: {},
+        recovery: { retryable: true, resumeFrom: "microcms:publish" },
+      }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) });
+    render(<PublishQueue items={[article({ id: "a", title: "記事A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "記事A: 公開処理を再試行" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ pageId: "a" });
   });
 
   it("要対応のみ(公開OK 0件)でも例外リストは出し、公開ボタンは出さない", () => {

@@ -77,6 +77,7 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
             記事を承認して下書きができると、ここに公開待ちとして並びます。
           </p>
         </div>
+        <PublishOperationResults results={publishResults} onRetry={handleRetryPublish} />
       </section>
     );
   }
@@ -140,7 +141,7 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
     });
   }
 
-  function handleRetryPublish(pageId: string, resumeFrom: string): void {
+  function handleRetryPublish(pageId: string, resumeFrom?: string): void {
     void run(async () => {
       const result = await postPublish(pageId, resumeFrom);
       setPublishResults((current) => current.map((item) => item.pageId === pageId ? { ...item, result } : item));

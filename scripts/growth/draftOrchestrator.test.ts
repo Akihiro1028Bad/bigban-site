@@ -8,6 +8,7 @@ import {
   buildWriterInput,
   cleanupDraftWorkDirs,
   draftInputFromPage,
+  draftRunMode,
   prepareOutlineImages,
   parseValidatedWriterOutput,
   runDraftNotificationBestEffort,
@@ -18,6 +19,9 @@ import {
   stageCacheKey,
   validateWriterContract,
   workerLogTargetFields,
+  publishDraftRecoveryCommand,
+  matchesPublishCheckpointContext,
+  shouldResumePublishSpec,
 } from "./draftOrchestrator";
 import type { ResearchPacket, WriterOutput } from "./draftPipeline";
 
@@ -26,6 +30,27 @@ function page(properties: Record<string, unknown>): NotionPage {
 }
 
 describe("draftOrchestrator", () => {
+  it("checkpointと確定specが揃う場合だけ画像設計を飛ばして直接再開する", () => {
+    expect(shouldResumePublishSpec(true, true)).toBe(true);
+    expect(shouldResumePublishSpec(true, false)).toBe(false);
+    expect(shouldResumePublishSpec(false, true)).toBe(false);
+    expect(publishDraftRecoveryCommand("/state/publish-spec.json")).toBe("npm run growth:publish-draft -- /state/publish-spec.json");
+  });
+
+  it("部分成功の学習modeは実行モードを保持し未設定時だけdraftsへ戻す", () => {
+    expect(draftRunMode({ GROWTH_DRAFT_RUN_MODE: "drafts-auto" })).toBe("drafts-auto");
+    expect(draftRunMode({})).toBe("drafts");
+    expect(draftRunMode({ GROWTH_DRAFT_RUN_MODE: "" })).toBe("drafts");
+  });
+
+  it("checkpoint対象は再生成元・endpoint・Notion pageが全て一致する場合だけ復元する", () => {
+    const saved = { rebuildSourceId: "source-a", endpoint: "columns", notionPageId: "page-1" };
+    expect(matchesPublishCheckpointContext(saved, saved)).toBe(true);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, rebuildSourceId: "source-b" })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, endpoint: "news" })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, notionPageId: "page-2" })).toBe(false);
+    expect(matchesPublishCheckpointContext(null, saved)).toBe(false);
+  });
   it("一時作業ディレクトリを失敗の有無にかかわらず全て削除する", async () => {
     const calls: Array<{ directory: string; options: { recursive: true; force: true } }> = [];
     const remove = async (directory: string, options: { recursive: true; force: true }) => {
@@ -420,6 +445,7 @@ describe("draftOrchestrator", () => {
         category: "compare",
       },
       eyecatchAction: "pending",
+      rebuildSourceId: "",
       notion: { pageId: "page-1", property: "ステータス", value: "下書き作成済み" },
       sourceLedger: [{ source: "https://example.jp/official", confirmedFacts: ["公式事実"] }],
     });

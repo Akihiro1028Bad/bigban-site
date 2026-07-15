@@ -30,4 +30,18 @@ describe("PublishOperationResults", () => {
     expect(onRetry).toHaveBeenCalledWith("p1", "notion:status");
     expect(screen.queryByRole("button", { name: /記事0.*再試行/ })).not.toBeInTheDocument();
   });
+
+  it("Notion同期・全体再試行を区別し、retryable:falseにはボタンを出さない", () => {
+    const onRetry = vi.fn();
+    render(<PublishOperationResults results={[
+      { pageId: "notion", title: "Notion記事", result: buildGrowthOperationResult({ outcome: "partial", recovery: { retryable: true, resumeFrom: "notion:status" } }) },
+      { pageId: "publish", title: "公開記事", result: buildGrowthOperationResult({ outcome: "retryable-failure", recovery: { retryable: true, resumeFrom: "microcms:publish" } }) },
+      { pageId: "manual", title: "手動記事", result: buildGrowthOperationResult({ outcome: "manual-action-required", recovery: { retryable: false, resumeFrom: "notion:status" } }) },
+    ]} onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole("button", { name: "Notion記事: Notion同期のみ再試行" }));
+    fireEvent.click(screen.getByRole("button", { name: "公開記事: 公開処理を再試行" }));
+    expect(onRetry).toHaveBeenNthCalledWith(1, "notion", "notion:status");
+    expect(onRetry).toHaveBeenNthCalledWith(2, "publish");
+    expect(screen.queryByRole("button", { name: /手動記事/ })).not.toBeInTheDocument();
+  });
 });

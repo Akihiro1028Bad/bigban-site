@@ -8,7 +8,7 @@ export interface PublishOperationResultItem {
 
 interface PublishOperationResultsProps {
   results: readonly PublishOperationResultItem[];
-  onRetry: (pageId: string, resumeFrom: string) => void;
+  onRetry: (pageId: string, resumeFrom?: string) => void;
 }
 
 const OUTCOMES: readonly GrowthOutcome[] = ["success", "partial", "retryable-failure", "manual-action-required"];
@@ -25,14 +25,17 @@ export function PublishOperationResults({ results, onRetry }: PublishOperationRe
         })}
       </div>
       <ul className="mt-3 space-y-3">
-        {results.map(({ pageId, title, result }) => (
+        {results.map(({ pageId, title, result }) => {
+          const canRetryNotion = result.recovery?.retryable === true && result.recovery.resumeFrom === "notion:status";
+          const canRetryAll = result.recovery?.retryable === true && result.recovery.resumeFrom !== "notion:status";
+          return (
           <li key={pageId} className="rounded-[9px] p-3 text-[12px]" style={{ background: "var(--p-bg-raised)" }}>
             <div className="font-semibold">{title} — {result.outcome}</div>
             <p className="mt-1">{result.message}</p>
             {result.completedStages.length > 0 ? <p>完了: {result.completedStages.join(" → ")}</p> : null}
             {result.failedStage ? <p>失敗: {result.failedStage}</p> : null}
             {result.recovery?.manualAction ? <p className="mt-1">{result.recovery.manualAction}</p> : null}
-            {result.recovery?.resumeFrom ? (
+            {canRetryNotion ? (
               <button
                 type="button"
                 className="approve-btn-ghost mt-2"
@@ -42,8 +45,19 @@ export function PublishOperationResults({ results, onRetry }: PublishOperationRe
                 Notion同期のみ再試行
               </button>
             ) : null}
+            {canRetryAll ? (
+              <button
+                type="button"
+                className="approve-btn-ghost mt-2"
+                aria-label={`${title}: 公開処理を再試行`}
+                onClick={() => onRetry(pageId)}
+              >
+                公開処理を再試行
+              </button>
+            ) : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );
