@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageProps: vi.fn(), defaultFetch: vi.fn() };
@@ -31,8 +33,7 @@ const ADVICE = {
 
 function postReq(token: string | null, body: unknown): Request {
   const url = new URL("http://localhost/api/growth/advise/apply");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token), body: JSON.stringify(body) });
 }
 
 function page(opts: { applyStatus?: string; advice?: unknown; body?: string } = {}) {
@@ -107,7 +108,7 @@ describe("POST /api/growth/advise/apply", () => {
 
   it("JSON 本文が壊れていれば 400", async () => {
     const url = new URL("http://localhost/api/growth/advise/apply");
-    const res = await POST(new Request(url, { method: "POST", body: "{壊れ" }));
+    const res = await POST(new Request(url, { method: "POST", headers: growthAuthHeaders(null), body: "{壊れ" }));
     expect(res.status).toBe(400);
   });
 

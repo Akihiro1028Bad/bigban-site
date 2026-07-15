@@ -15,6 +15,7 @@
 - **git push / git commit しない**(`run.mjs` の `DISALLOW` で `Bash(git push:*)`/`Bash(git commit:*)` を明示拒否)。
 - **未確定情報を断定しない**(facility-context の `doNotWrite`(料金・正確な所要分・未確定の日時。列挙はファイルを正典とし、ここに再掲しない)。必要時は「最新情報をご確認ください」と促す)。なお営業時間 6:00-23:00・コート3面・デコターフは公表済みの確定事実(#217)で、断定してよい。
 - **失敗を沈黙させない**(途中失敗は工程名・再開コマンドを出力し、`data/growth-failures.log` に追記する。LINE は週次完了と週次モード自身の失敗だけに絞り、週次本文で直近7日の失敗件数をサマリする。冪等に再開できる設計を崩さない)。
+- **秘密を通知へ載せない**（承認合言葉はVercelだけに置き、LINE・URL・Bearer・通常APIへ渡さない。運用は[security.md](security.md)）。
 
 ## 実行(headless agent)
 

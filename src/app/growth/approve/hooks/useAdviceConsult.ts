@@ -11,7 +11,7 @@ import {
 } from "@/lib/growth/adviseApply";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
-import { authHeaders } from "../authHeaders";
+import { sessionHeaders } from "../sessionHeaders";
 
 interface UseAdviceConsultParams {
   pageId: string;
@@ -46,7 +46,7 @@ function errMsg(error: unknown, fallback: string): string {
 
 export function useAdviceConsult({
   pageId,
-  token,
+  token: _token,
   advice,
   adviceApply,
   bodyHtml,
@@ -88,7 +88,7 @@ export function useAdviceConsult({
     try {
       const res = await fetch(path, {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(body),
       });
       const json = await readJsonObject(res);
@@ -172,7 +172,7 @@ export function useAdviceConsult({
     try {
       await fetch("/api/growth/learning-log/reject", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId, source: "advise-apply", rejectedFixes }),
       });
     } catch {
@@ -227,7 +227,7 @@ export function useAdviceConsult({
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           pageId,
           bodyHtml: html,
@@ -240,7 +240,7 @@ export function useAdviceConsult({
       if (!saveRes.ok || !saveJson.success) throw new Error(saveJson.error ?? "保存に失敗しました。");
       const clearRes = await fetch("/api/growth/advise/apply/dismiss", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
       const clearJson = await readJsonObject(clearRes);

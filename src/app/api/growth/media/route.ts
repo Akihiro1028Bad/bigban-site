@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server";
 
-import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
+import { privilegedAuthFailure, verifyPrivileged } from "@/lib/growth/apiAuth";
 import {
   fetchMediaList,
   parseMediaListParams,
@@ -43,7 +43,8 @@ function managementOptions(): ManagementOptions | null {
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  if (!verifyToken(request, true)) return unauthorized("メディア操作には認証が必要です。");
+  const auth = verifyPrivileged(request, "media");
+  if (auth !== "authorized") return privilegedAuthFailure(auth, "media", "メディア操作には認証が必要です。");
 
   const options = managementOptions();
   if (!options) return serverError();
@@ -60,7 +61,8 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!verifyToken(request, true)) return unauthorized("メディア操作には認証が必要です。");
+  const auth = verifyPrivileged(request, "media");
+  if (auth !== "authorized") return privilegedAuthFailure(auth, "media", "メディア操作には認証が必要です。");
 
   const options = managementOptions();
   if (!options) return serverError();

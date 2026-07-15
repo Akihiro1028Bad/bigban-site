@@ -79,6 +79,10 @@ describe("slugToContentId", () => {
 });
 
 describe("createDraft（冪等 upsert: PUT→既存ならPATCH）", () => {
+  it("MicrocmsHttpError の既定値は already-exists ではない", () => {
+    expect(new MicrocmsHttpError("microcms.create", 500, "req-1").isAlreadyExists).toBe(false);
+  });
+
   it("slug由来IDで PUT し、作成された id を返す", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okId("my-slug"));
     const id = await createDraft(
@@ -256,9 +260,14 @@ describe("publishContent (#167)", () => {
       .mockResolvedValue({ ok: false, status: 403, json: async () => ({}), text: async () => "forbidden" } as Awaited<
         ReturnType<FetchFn>
       >);
-    await expect(
-      publishContent("news", "abc123", { serviceDomain: "d", apiKey: "k", fetchFn })
-    ).rejects.toThrow(/HTTP 403/);
+    const error = await publishContent("news", "abc123", {
+      serviceDomain: "d",
+      apiKey: "k",
+      fetchFn,
+    }).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/HTTP 403/);
+    expect((error as Error).message).not.toContain("forbidden");
   });
 });
 

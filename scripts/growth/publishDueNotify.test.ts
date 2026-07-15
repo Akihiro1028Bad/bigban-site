@@ -9,10 +9,25 @@ import {
 
 describe("buildPublishDueFailureMessage", () => {
   it("予約公開 cron の総失敗を沈黙させず理由付きで伝える", () => {
-    const msg = buildPublishDueFailureMessage("NOTION_TOKEN が未設定です。");
+    const msg = buildPublishDueFailureMessage({
+      operation: "microcms.publish",
+      status: 502,
+      requestId: "req-1",
+    });
     expect(msg).toContain("予約公開");
     expect(msg).toContain("失敗");
-    expect(msg).toContain("NOTION_TOKEN が未設定です。");
+    expect(msg).toContain("microcms.publish");
+    expect(msg).toContain("502");
+    expect(msg).toContain("req-1");
+  });
+
+  it("status が得られない場合もレスポンス本文を補わず unknown とする", () => {
+    const msg = buildPublishDueFailureMessage({
+      operation: "microcms.publish",
+      status: null,
+      requestId: "local-1",
+    });
+    expect(msg).toContain("HTTP status: unknown");
   });
 });
 

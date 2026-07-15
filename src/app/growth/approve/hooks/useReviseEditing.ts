@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OUTLINE_OVERALL_LINE, parseReviseInstructions } from "@/lib/growth/revise";
 
 import { fetchBoard, postRevise, postReviseApply, postReviseEdit } from "../api";
-import { authHeaders } from "../authHeaders";
+import { sessionHeaders } from "../sessionHeaders";
 import { toMessage } from "../errorMessage";
 import {
   outlineSections,
@@ -257,7 +257,7 @@ export function useReviseEditing({ token, openId, setBoardData }: UseReviseEditi
       try {
         await fetch("/api/growth/learning-log/reject", {
           method: "POST",
-          headers: authHeaders(token, { "Content-Type": "application/json" }),
+          headers: sessionHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             pageId,
             source,

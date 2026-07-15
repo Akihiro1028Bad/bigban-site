@@ -70,7 +70,7 @@ describe("PublishQueue", () => {
     const publishCalls = fetchMock.mock.calls.filter((c) => c[0] === "/api/growth/publish");
     expect(publishCalls).toHaveLength(2);
     expect(JSON.parse(publishCalls[0][1].body)).toEqual({ pageId: "a" });
-    expect(publishCalls[0][1].headers.Authorization).toBe("Bearer tok");
+    expect(publishCalls[0][1].headers.Authorization).toBeUndefined();
   });
 
   it("個別行の「公開」で当該記事だけ publish を呼ぶ", async () => {
@@ -304,13 +304,13 @@ describe("PublishQueue", () => {
       fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
       const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ: 画像なし記事/ });
       expect(dialog).toBeInTheDocument();
-      // 一覧を authHeaders 付きで GET する。
+      // 一覧を sessionHeaders 付きで GET する。
       await waitFor(() => {
         const listCall = fetchMock.mock.calls.find(
           (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method !== "POST"
         );
         expect(listCall).toBeTruthy();
-        expect(listCall![1].headers.Authorization).toBe("Bearer tok");
+        expect(listCall![1].headers.Authorization).toBeUndefined();
       });
       // グリッドにサムネ(next/image=jsdomでは img・空 alt は presentation)＋選択ボタンが出る。
       const thumb = await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
@@ -337,7 +337,7 @@ describe("PublishQueue", () => {
       const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
       expect(applyCall).toBeTruthy();
       expect(applyCall![1].method).toBe("POST");
-      expect(applyCall![1].headers.Authorization).toBe("Bearer tok");
+      expect(applyCall![1].headers.Authorization).toBeUndefined();
       expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-1", eyecatchUrl: MEDIA_URL });
       // 反映成功でモーダルは閉じる。
       await waitFor(() =>
@@ -434,7 +434,7 @@ describe("PublishQueue", () => {
         (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method === "POST"
       );
       expect(uploadCall).toBeTruthy();
-      expect(uploadCall![1].headers.Authorization).toBe("Bearer tok");
+      expect(uploadCall![1].headers.Authorization).toBeUndefined();
       const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
       expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-9", eyecatchUrl: UPLOADED });
     });

@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, listBlockChildren: vi.fn(), defaultFetch: vi.fn() };
@@ -127,7 +129,7 @@ describe("GET /api/growth/proposal-artifact", () => {
 
     const res = await GET(
       new Request(`http://localhost/api/growth/proposal-artifact?pageId=${PAGE_ID}`, {
-        headers: { authorization: "Bearer wrong" },
+        headers: growthAuthHeaders("wrong"),
       })
     );
 

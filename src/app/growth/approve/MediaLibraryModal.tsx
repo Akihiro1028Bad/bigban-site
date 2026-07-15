@@ -2,9 +2,9 @@
  * メディアライブラリ(#proto P5b・#143 差し替えの後継導線)。
  *
  * proto `approve-proto/MediaLibraryModal.tsx` の見た目を本番へ移植し、実 API に結線する:
- *  - 一覧 : `GET /api/growth/media?limit=…`(`authHeaders`)→ サムネグリッド(next/image)。
+ *  - 一覧 : `GET /api/growth/media?limit=…`(`sessionHeaders`)→ サムネグリッド(next/image)。
  *  - 追加 : `POST /api/growth/media`(multipart `file`)→ 返却 URL を先頭へ挿入し即選択候補に。
- *  - 反映 : `POST /api/growth/draft/eyecatch { pageId, eyecatchUrl }`(`authHeaders`)→ 成功で `onApplied`。
+ *  - 反映 : `POST /api/growth/draft/eyecatch { pageId, eyecatchUrl }`(`sessionHeaders`)→ 成功で `onApplied`。
  *
  * proto の `MOCK_MEDIA`(モックデータ)/種別フィルタ chip はこのモーダルでは不使用
  * (実データは API 経由で取得)。`mediaSvgUrl` はメディアプレビュー用途の純関数として残す。
@@ -20,7 +20,8 @@ import Image from "next/image";
 
 import { MEDIA_ALLOWED_MIME, validateUpload } from "@/lib/growth/media";
 
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
+import { useStepUp } from "./StepUpProvider";
 import { handleOverlayKeyDown } from "./hooks/overlayKeyDown";
 import { useDialog } from "./hooks/useDialog";
 import { IconCheck, IconUpload } from "./ui/icons";
@@ -74,7 +75,7 @@ function pickError(body: { error?: unknown }, fallback: string): string {
 }
 
 export function MediaLibraryModal({
-  token,
+  token: _token,
   pageId,
   heading,
   mode = "eyecatch",
@@ -83,6 +84,7 @@ export function MediaLibraryModal({
   onApplied,
   onSelect,
 }: MediaLibraryModalProps) {
+  const { runPrivileged } = useStepUp();
   const isBodyImage = mode === "body-image";
   const isSelectMode = typeof onSelect === "function";
   const [urls, setUrls] = useState<string[]>([]);
@@ -108,9 +110,9 @@ export function MediaLibraryModal({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/growth/media?limit=${LIST_LIMIT}`, {
-        headers: authHeaders(token),
-      });
+      const res = await runPrivileged("media", () =>
+        fetch(`/api/growth/media?limit=${LIST_LIMIT}`, { headers: sessionHeaders() })
+      );
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as MediaListResponse;
       setUrls(pickUrls(body));
@@ -119,7 +121,7 @@ export function MediaLibraryModal({
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [runPrivileged]);
 
   useEffect(() => {
     void loadList();
@@ -142,11 +144,13 @@ export function MediaLibraryModal({
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/growth/media", {
-        method: "POST",
-        headers: authHeaders(token),
-        body: form,
-      });
+      const res = await runPrivileged("media", () =>
+        fetch("/api/growth/media", {
+          method: "POST",
+          headers: sessionHeaders(),
+          body: form,
+        })
+      );
       const body = (await res.json().catch(() => ({}))) as UploadResponse;
       // 他の呼び出し(api.ts postDecision 等)と揃え、HTTP 200 でも success:false は失敗扱いにする。
       if (!res.ok || body.success === false || typeof body.url !== "string") {
@@ -184,7 +188,7 @@ export function MediaLibraryModal({
         : { pageId, eyecatchUrl: url };
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
       const body = (await res.json().catch(() => ({}))) as ApplyResponse;

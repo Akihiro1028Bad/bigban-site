@@ -1,7 +1,7 @@
 /**
  * 承認画面のサーバ通信(#H7)。ApproveClient から fetch ロジックを切り出し、
  * React Query の queryFn / mutationFn から呼べる純粋な I/O 関数にする。
- * 認証は Authorization ヘッダ方式(authHeaders)を維持し、?token= クエリには戻さない。
+ * 認証はHttpOnly Cookieを使い、unsafe requestにはCSRF補強ヘッダを付ける。
  */
 
 import type { PendingItem } from "@/lib/growth/approve";
@@ -16,7 +16,7 @@ import type {
   ModelSettingInput,
 } from "@/lib/growth/modelSettings";
 
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
 
 export const BOARD_URL = "/api/growth/approve";
 
@@ -49,8 +49,8 @@ export interface ModelSettingsData {
   efforts: Record<ModelProvider, readonly ModelEffort[]>;
 }
 
-export async function fetchModelSettings(token: string): Promise<ModelSettingsData> {
-  const res = await fetch(MODEL_SETTINGS_URL, { headers: authHeaders(token) });
+export async function fetchModelSettings(_token: string): Promise<ModelSettingsData> {
+  const res = await fetch(MODEL_SETTINGS_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(json.error ?? "AIモデル設定の取得に失敗しました。");
@@ -70,7 +70,7 @@ export async function putModelSetting(
 ): Promise<ModelPhaseSetting> {
   const res = await fetch(MODEL_SETTINGS_URL, {
     method: "PUT",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: sessionHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(input),
   });
   const json = await readJsonObject(res);
@@ -84,13 +84,13 @@ export async function putModelSetting(
  * 各フェーズのプロンプトと前提情報(facility-context)を取得する。read-only。
  * 失敗時は表示用メッセージを持つ Error を投げる(401 は合言葉エラー、その他は error 文言)。
  */
-export async function fetchPrompts(token: string): Promise<PromptsData> {
-  const res = await fetch(PROMPTS_URL, { headers: authHeaders(token) });
+export async function fetchPrompts(_token: string): Promise<PromptsData> {
+  const res = await fetch(PROMPTS_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(
       res.status === 401
-        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
         : json.error ?? "取得に失敗しました。"
     );
   }
@@ -106,13 +106,13 @@ export async function fetchPrompts(token: string): Promise<PromptsData> {
  * 承認待ち一覧を取得する。失敗時は表示用メッセージを持つ Error を投げる
  * (ApproveClient.fetchPending と同一挙動: 401 は合言葉エラー、その他は error 文言)。
  */
-export async function fetchBoard(token: string): Promise<PendingItem[]> {
-  const res = await fetch(BOARD_URL, { headers: authHeaders(token) });
+export async function fetchBoard(_token: string): Promise<PendingItem[]> {
+  const res = await fetch(BOARD_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(
       res.status === 401
-        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
         : json.error ?? "取得に失敗しました。"
     );
   }
@@ -120,13 +120,13 @@ export async function fetchBoard(token: string): Promise<PendingItem[]> {
 }
 
 /** Worker運用状態を取得する。未設定時は setupMissing=true の空データを返す。 */
-export async function fetchOps(token: string): Promise<GrowthOpsView> {
-  const res = await fetch(OPS_URL, { headers: authHeaders(token) });
+export async function fetchOps(_token: string): Promise<GrowthOpsView> {
+  const res = await fetch(OPS_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
     throw new Error(
       res.status === 401
-        ? "合言葉が違います。LINE グループでお知らせした合言葉をご確認ください。"
+        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
         : json.error ?? "運用状態の取得に失敗しました。"
     );
   }
@@ -136,7 +136,7 @@ export async function fetchOps(token: string): Promise<GrowthOpsView> {
 /** 成果物化済み施策の Notion 本文を、画面表示用のテキストブロックとして取得する。 */
 export async function fetchProposalArtifact(token: string, pageId: string): Promise<ProposalArtifactBlock[]> {
   const res = await fetch(`${PROPOSAL_ARTIFACT_URL}?pageId=${encodeURIComponent(pageId)}`, {
-    headers: authHeaders(token),
+    headers: sessionHeaders(),
   });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
@@ -149,7 +149,7 @@ export async function fetchProposalArtifact(token: string, pageId: string): Prom
 export async function postDecision(token: string, id: string, decision: string): Promise<void> {
   const res = await fetch(BOARD_URL, {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: sessionHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ decisions: [{ id, decision }] }),
   });
   const json = await readJsonObject(res);
@@ -161,7 +161,7 @@ export async function postDecision(token: string, id: string, decision: string):
 async function postJson(token: string, url: string, body: unknown): Promise<{ status: number; ok: boolean; error?: string }> {
   const res = await fetch(url, {
     method: "POST",
-    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    headers: sessionHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   const json = await readJsonObject(res);

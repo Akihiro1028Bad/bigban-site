@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 // getPage だけを差し替え、draftBodyOf/ideaTitleOf 等は実物を使う(#95)。
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
@@ -28,9 +30,8 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 function getRequest(token: string | null, pageId: string | null): Request {
   const url = new URL("http://localhost/api/growth/draft");
-  if (token !== null) url.searchParams.set("token", token);
   if (pageId !== null) url.searchParams.set("pageId", pageId);
-  return new Request(url, { method: "GET" });
+  return new Request(url, { method: "GET", headers: growthAuthHeaders(token) });
 }
 
 // #95: 本文ミラー(下書き本文HTML)＋タイトル案を持つ Notion ページ。

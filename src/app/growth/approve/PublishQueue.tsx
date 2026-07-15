@@ -18,7 +18,8 @@ import { useState } from "react";
 import { EYECATCH_MISSING_REASON } from "@/lib/growth/publishQueue";
 import { splitPublishQueue, formatSchedule } from "@/lib/growth/publishQueueView";
 
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
+import { useStepUp } from "./StepUpProvider";
 import { MediaLibraryModal } from "./MediaLibraryModal";
 import { SchedulePicker } from "./SchedulePicker";
 import { cardHue } from "./boardCardView";
@@ -45,6 +46,7 @@ interface PublishQueueProps {
 }
 
 export function PublishQueue({ items, token, onChanged, onFix }: PublishQueueProps) {
+  const { runPrivileged } = useStepUp();
   const { ready, scheduled, blocked } = splitPublishQueue(items);
   // 予約ピッカーの対象 id 群(null=閉)。まとめて/個別の両方で使う。
   const [scheduleFor, setScheduleFor] = useState<string[] | null>(null);
@@ -76,11 +78,13 @@ export function PublishQueue({ items, token, onChanged, onFix }: PublishQueuePro
   }
 
   async function post(url: string, body: unknown): Promise<void> {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: authHeaders(token, { "Content-Type": "application/json" }),
-      body: JSON.stringify(body),
-    });
+    const res = await runPrivileged("publish", () =>
+      fetch(url, {
+        method: "POST",
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+      })
+    );
     // 他の呼び出し(api.ts postDecision 等)と揃え、HTTP 200 でも success:false は失敗扱いにする
     // (防御的整合)。本文が空/非JSONでも例外にしないよう catch で握る。
     const json = (await res.json().catch(() => ({}))) as { success?: boolean };

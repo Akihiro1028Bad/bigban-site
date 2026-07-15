@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageSelect: vi.fn(), defaultFetch: vi.fn() };
@@ -27,8 +29,7 @@ const DISCLAIMER = "※この記事はAIが作成した下書きです。公開�
 
 function postReq(token: string | null, body: unknown, raw?: string): Request {
   const url = new URL("http://localhost/api/growth/publish");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token, "publish"), body: raw ?? JSON.stringify(body) });
 }
 
 function page(
@@ -351,6 +352,19 @@ describe("POST /api/growth/publish", () => {
 
   it("トークン無しは 401", async () => {
     expect((await POST(postReq(null, { pageId: PAGE_ID }))).status).toBe(401);
+  });
+
+  it("通常sessionだけなら403 STEP_UP_REQUIREDで外部APIを呼ばない", async () => {
+    const request = new Request("http://localhost/api/growth/publish", {
+      method: "POST",
+      headers: growthAuthHeaders(SECRET),
+      body: JSON.stringify({ pageId: PAGE_ID }),
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "STEP_UP_REQUIRED", scope: "publish" });
+    expect(getPage).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
   });
 
   it("NOTION_TOKEN 未設定は 500", async () => {

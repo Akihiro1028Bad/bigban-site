@@ -7,10 +7,18 @@
  */
 
 /** 予約公開 cron が総失敗したときの LINE 本文(沈黙させない)。 */
-export function buildPublishDueFailureMessage(reason: string): string {
+export interface PublishDueFailureReason {
+  operation: string;
+  status: number | null;
+  requestId: string;
+}
+
+export function buildPublishDueFailureMessage(reason: PublishDueFailureReason): string {
   return [
     "❌ 予約公開(publish-due)が失敗しました。到来分が公開されていない可能性があります。",
-    `理由: ${reason}`,
+    `操作: ${reason.operation}`,
+    `HTTP status: ${reason.status ?? "unknown"}`,
+    `request ID: ${reason.requestId}`,
     "ログを確認し、復旧後に npm run growth:publish-due を再実行してください。",
   ].join("\n");
 }

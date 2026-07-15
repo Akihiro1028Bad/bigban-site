@@ -12,6 +12,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
+import { StepUpProvider } from "./StepUpProvider";
+
 function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -37,5 +39,9 @@ function getQueryClient(): QueryClient {
 }
 
 export function ApproveProviders({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={getQueryClient()}>
+      <StepUpProvider>{children}</StepUpProvider>
+    </QueryClientProvider>
+  );
 }

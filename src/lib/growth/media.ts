@@ -11,6 +11,8 @@
 
 import { z } from "zod";
 
+import { externalApiErrorFromResponse } from "@/lib/growth/externalApiError";
+
 import type { FetchFn } from "./notion";
 
 /** アップロード上限(5MB)。 */
@@ -176,8 +178,7 @@ export async function fetchMediaList(
     headers: { "X-MICROCMS-API-KEY": apiKey },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`メディア一覧の取得に失敗しました (HTTP ${res.status}): ${text}`);
+    throw externalApiErrorFromResponse("microcms.media.list", res);
   }
   const parsed = mediaListSchema.parse(await res.json());
   return {
@@ -207,8 +208,7 @@ export async function uploadMediaBlob(
     body: form,
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`メディアのアップロードに失敗しました (HTTP ${res.status}): ${text}`);
+    throw externalApiErrorFromResponse("microcms.media.upload", res);
   }
   const body = (await res.json()) as { url?: string };
   if (!body.url) {

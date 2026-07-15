@@ -12,7 +12,7 @@ import { BODY_REGEN_BUSY_STATUSES } from "@/lib/growth/bodyImageRegen";
 import { REGEN_BUSY_STATUSES } from "@/lib/growth/eyecatchRegen";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
-import { authHeaders } from "../authHeaders";
+import { sessionHeaders } from "../sessionHeaders";
 import type { DraftPreview, DraftState } from "../draftTypes";
 import { toMessage } from "../errorMessage";
 
@@ -26,7 +26,7 @@ interface UseDraftPreviewParams {
   openHasDraft: boolean;
 }
 
-export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreviewParams) {
+export function useDraftPreview({ token: _token, openId, openHasDraft }: UseDraftPreviewParams) {
   const [draftState, setDraftState] = useState<DraftState>({ status: "idle" });
 
   const loadDraft = useCallback(
@@ -35,7 +35,7 @@ export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreview
       try {
         const res = await fetch(
           `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
-          { headers: authHeaders(token) }
+          { headers: sessionHeaders() }
         );
         const json = await readJsonObject(res);
         if (!res.ok || !json.success) {
@@ -50,7 +50,7 @@ export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreview
         setDraftState({ status: "error", error: toMessage(error, "下書きの取得に失敗しました。") });
       }
     },
-    [token]
+    []
   );
 
   // パネルを開いたら(下書きありの記事のみ)取得。閉じる/対象外は idle に戻す。
@@ -69,7 +69,7 @@ export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreview
       try {
         const res = await fetch(
           `/api/growth/draft?pageId=${encodeURIComponent(pageId)}`,
-          { headers: authHeaders(token) }
+          { headers: sessionHeaders() }
         );
         const json = await readJsonObject(res);
         if (!res.ok || !json.success || !json.exists) return;
@@ -78,7 +78,7 @@ export function useDraftPreview({ token, openId, openHasDraft }: UseDraftPreview
         // ネットワーク一時障害は無視(次の tick で回復)。
       }
     },
-    [token]
+    []
   );
 
   // #166: AI再生成(本文画像/アイキャッチ)が依頼中/処理中の間だけ下書きを定期再取得し、

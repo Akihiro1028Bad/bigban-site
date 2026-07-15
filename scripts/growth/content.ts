@@ -11,6 +11,7 @@
  */
 
 import type { FetchFn, HttpResponse } from "./http";
+import { ExternalApiError, externalApiErrorFromResponse, requestIdFromResponse } from "./externalApiError";
 
 /** リトライ・タイムアウトの設定(すべて任意・既定あり)。 */
 export interface RetryConfig {
@@ -88,15 +89,13 @@ export class ContentTimeoutError extends Error {
   }
 }
 
-/** microCMS API の非 2xx 応答を表す。status / body を保持し、4xx/5xx の判別に使う。 */
-export class MicrocmsHttpError extends Error {
-  readonly status: number;
-  readonly body: string;
-  constructor(status: number, body: string) {
-    super(`microCMS コンテンツ API に失敗しました (HTTP ${status}): ${body}`);
+/** microCMS API の非 2xx 応答を表す。応答本文は保持せず、構造化情報だけを公開する。 */
+export class MicrocmsHttpError extends ExternalApiError {
+  readonly isAlreadyExists: boolean;
+  constructor(operation: string, status: number, requestId: string, isAlreadyExists = false) {
+    super(operation, status, requestId);
     this.name = "MicrocmsHttpError";
-    this.status = status;
-    this.body = body;
+    this.isAlreadyExists = isAlreadyExists;
   }
 }
 
@@ -192,7 +191,13 @@ async function send(
     }
 
     if (!res.ok) {
-      const err = new MicrocmsHttpError(res.status, await res.text());
+      const body = await res.text();
+      const err = new MicrocmsHttpError(
+        `microcms.content.${method.toLowerCase()}`,
+        res.status,
+        requestIdFromResponse(res),
+        res.status === 400 && /already exists/i.test(body)
+      );
       if (res.status < 500) throw err; // 4xx は即失敗
       lastError = err;
       if (attempt >= cfg.maxAttempts) throw err;
@@ -212,7 +217,7 @@ async function send(
 }
 
 function isAlreadyExists(error: MicrocmsHttpError): boolean {
-  return error.status === 400 && /already exists/i.test(error.body);
+  return error.status === 400 && error.isAlreadyExists;
 }
 
 /**
@@ -327,7 +332,6 @@ export async function publishContent(
   });
   if (!res.ok) {
     // 本文(課金/キー情報を含むことがある)は読み捨て、ステータスのみ例外に載せる。
-    const text = await res.text();
-    throw new Error(`microCMS 公開に失敗しました (HTTP ${res.status}): ${text}`);
+    throw externalApiErrorFromResponse("microcms.publish", res);
   }
 }

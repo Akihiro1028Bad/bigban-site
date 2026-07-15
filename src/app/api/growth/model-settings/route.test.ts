@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", () => ({
   chunkRichText: (value: string) => (value ? [{ text: { content: value } }] : []),
   createPage: vi.fn(),
@@ -28,8 +30,7 @@ const SECRET = "approve-secret-token";
 function request(method: "GET" | "PUT", body?: unknown, token = SECRET): Request {
   return new Request("http://localhost/api/growth/model-settings", {
     method,
-    headers: {
-      authorization: `Bearer ${token}`,
+    headers: { ...growthAuthHeaders(token),
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),

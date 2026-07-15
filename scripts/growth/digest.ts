@@ -35,8 +35,6 @@ export interface DigestInput {
   sha?: string;
   /** Notionレポート本文から抽出した質的な要約。空/未指定なら非表示。 */
   reportSummary?: ReportSummary;
-  /** APPROVE_SECRET。空/未設定なら非表示。 */
-  passphrase?: string | null;
 }
 
 const MAX_TOP_ACTIONS = 3;
@@ -190,9 +188,6 @@ export function buildDigestMessage(input: DigestInput): string {
 
   if (input.reportUrl) lines.push(`レポートを見る → ${input.reportUrl}`);
   if (input.approveUrl) lines.push(`ダッシュボードを開く → ${input.approveUrl}`);
-  const passphrase = input.passphrase?.trim();
-  if (passphrase) lines.push(`🔑 合言葉: ${passphrase}`);
-
   const sha = input.sha?.trim();
   if (sha) lines.push("", `実行 SHA: ${sha}`);
 

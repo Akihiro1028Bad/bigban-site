@@ -236,19 +236,7 @@ describe("buildDigestFlex", () => {
     expect(empty).not.toContain("■ データ注意");
   });
 
-  it("合言葉がある場合はfooter付近に太字で表示する", () => {
-    const footer = buildDigestFlex(baseInput({ passphrase: " ピックルバン " })).footer;
-    const nodes = allTextNodes(footer);
-    const passphrase = nodes.find((node) => node.text === "🔑 合言葉: ピックルバン");
-
-    expect(passphrase?.weight).toBe("bold");
-  });
-
-  it("合言葉が未指定・空ならfooterに出さない", () => {
-    const omitted = texts(buildDigestFlex(baseInput()).footer).join("\n");
-    expect(omitted).not.toContain("🔑 合言葉:");
-
-    const empty = texts(buildDigestFlex(baseInput({ passphrase: "  " })).footer).join("\n");
-    expect(empty).not.toContain("🔑 合言葉:");
+  it("合言葉をfooterに出さない", () => {
+    expect(texts(buildDigestFlex(baseInput()).footer).join("\n")).not.toContain("合言葉");
   });
 });

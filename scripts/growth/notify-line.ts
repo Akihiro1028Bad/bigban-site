@@ -149,7 +149,6 @@ async function main(): Promise<void> {
     approveUrl,
     warnings: tokenWarnings(),
     reportSummary,
-    passphrase: process.env.APPROVE_SECRET,
     // 実行時 SHA(#219): run.mjs が pull 後に渡す。デプロイ側 SHA とのスキュー確認用。
     sha: process.env.GROWTH_RUN_SHA,
   };
