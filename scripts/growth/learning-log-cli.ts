@@ -25,7 +25,8 @@ import {
   summarizeEditDiff,
 } from "./learningLog";
 import { pushTextMessage } from "./line";
-import { createPage, queryDataSource } from "./notion";
+import { createPage } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import {
   failureSignature,
   shouldSendFailureNotice,
@@ -194,7 +195,7 @@ async function recent(weeksStr: string | undefined): Promise<void> {
   }
 
   const cutoffMs = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     DS,
     {
       filter: {
@@ -202,13 +203,9 @@ async function recent(weeksStr: string | undefined): Promise<void> {
         date: { on_or_after: new Date(cutoffMs).toISOString() },
       },
       sorts: [{ property: "記録時刻", direction: "descending" }],
-      pageSize: 100,
     },
     notionOptions()
   );
-  if (pages.length === 100) {
-    process.stderr.write(`警告: 学習ログが100件で打ち切られました(直近${weeks}週にそれ以上あります)\n`);
-  }
   process.stdout.write(`${JSON.stringify(pages.map(parseLearningLogPage))}\n`);
 }
 

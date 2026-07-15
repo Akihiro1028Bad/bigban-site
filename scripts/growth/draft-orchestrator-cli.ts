@@ -16,7 +16,8 @@ import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type WriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
 import { defaultFetch } from "./http";
-import { getPage, queryDataSource, updatePageSelect, type NotionApiOptions } from "./notion";
+import { getPage, updatePageSelect, type NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { selectDraftsAutoTarget, draftsAutoQueryFilter, DRAFTS_AUTO_STATUS_PROP } from "./draftsAuto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -56,8 +57,8 @@ function notionOptions(): NotionApiOptions {
 
 async function targetPage(pageId: string | undefined) {
   if (pageId) return getPage(pageId, notionOptions());
-  const result = await queryDataSource(ideaDataSource, { filter: draftsAutoQueryFilter(), pageSize: 100 }, notionOptions());
-  const target = selectDraftsAutoTarget(result.pages);
+  const pages = await queryAllDataSource(ideaDataSource, { filter: draftsAutoQueryFilter() }, notionOptions());
+  const target = selectDraftsAutoTarget(pages);
   if (!target) throw new Error("下書き生成対象がありません。");
   const status = target.properties[DRAFTS_AUTO_STATUS_PROP] as { select?: { name?: string } | null } | undefined;
   if (status?.select?.name === "承認") {

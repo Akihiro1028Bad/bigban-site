@@ -15,7 +15,7 @@ import path from "node:path";
 
 import { summarizeExisting, weekStartEqualsFilter } from "./existing";
 import { defaultFetch } from "./http";
-import { queryDataSource } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { jstDateString } from "./period";
 
 // weekly.md / notify-line.ts と同じ data source ID。
@@ -46,21 +46,21 @@ async function main(): Promise<void> {
   const opts = { token, fetchFn: defaultFetch };
 
   const [reportsForWeek, proposals, ideas] = await Promise.all([
-    queryDataSource(
+    queryAllDataSource(
       REPORT_DS,
-      { filter: weekStartEqualsFilter(period.start), pageSize: 10 },
+      { filter: weekStartEqualsFilter(period.start) },
       opts
     ),
-    queryDataSource(PROPOSAL_DS, { pageSize: 100 }, opts),
-    queryDataSource(IDEA_DS, { pageSize: 100 }, opts),
+    queryAllDataSource(PROPOSAL_DS, {}, opts),
+    queryAllDataSource(IDEA_DS, {}, opts),
   ]);
 
   const markdown = summarizeExisting({
     period,
     nowMs: Date.now(),
-    reportsForWeek: reportsForWeek.pages,
-    proposals: proposals.pages,
-    ideas: ideas.pages,
+    reportsForWeek,
+    proposals,
+    ideas,
   });
   process.stdout.write(`${markdown}\n`);
 }

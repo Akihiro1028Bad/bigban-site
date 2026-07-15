@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/growth/notion", () => ({
   getPage: vi.fn(),
-  queryDataSource: vi.fn(),
   updatePageProps: vi.fn(),
   updatePageSelect: vi.fn(),
   defaultFetch: vi.fn(),
 }));
+vi.mock("@/lib/growth/notionRepository", () => ({ queryAllDataSource: vi.fn() }));
 
 // 合言葉認証フラグはテストごとに切り替える(既定は有効=現行の token 検証)。
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
@@ -17,7 +17,8 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { getPage, queryDataSource, updatePageProps, updatePageSelect } from "@/lib/growth/notion";
+import { getPage, updatePageProps, updatePageSelect } from "@/lib/growth/notion";
+import { queryAllDataSource } from "@/lib/growth/notionRepository";
 import { GET, POST } from "./route";
 
 const SECRET = "approve-secret-token";
@@ -42,7 +43,7 @@ beforeEach(() => {
   flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
-  vi.mocked(queryDataSource).mockReset();
+  vi.mocked(queryAllDataSource).mockReset();
   vi.mocked(getPage).mockReset();
   vi.mocked(updatePageProps).mockReset();
   vi.mocked(updatePageSelect).mockReset();
@@ -55,9 +56,8 @@ afterEach(() => {
 
 describe("GET", () => {
   it("正しい token で承認待ち一覧を返す", async () => {
-    vi.mocked(queryDataSource)
-      .mockResolvedValueOnce({
-        pages: [
+    vi.mocked(queryAllDataSource)
+      .mockResolvedValueOnce([
           {
             id: "p1",
             url: "",
@@ -67,11 +67,8 @@ describe("GET", () => {
               "確度": { select: { name: "高" } },
             },
           },
-        ],
-        hasMore: false,
-        nextCursor: null,
-      })
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+        ])
+      .mockResolvedValueOnce([]);
 
     const res = await GET(getRequest(SECRET));
     expect(res.status).toBe(200);
@@ -88,15 +85,13 @@ describe("GET", () => {
         stage: "untouched",
       },
     ]);
-    expect(queryDataSource).toHaveBeenCalledTimes(2);
+    expect(queryAllDataSource).toHaveBeenCalledTimes(2);
   });
 
   it("記事は却下を含む全管理状態を横断取得する(#106/#167)", async () => {
-    vi.mocked(queryDataSource)
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    vi.mocked(queryAllDataSource).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     await GET(getRequest(SECRET));
-    const ideasArgs = vi.mocked(queryDataSource).mock.calls[1];
+    const ideasArgs = vi.mocked(queryAllDataSource).mock.calls[1];
     expect(ideasArgs[1].filter).toEqual({
       or: [
         { property: "ステータス", select: { equals: "提案中" } },
@@ -110,11 +105,9 @@ describe("GET", () => {
   });
 
   it("施策は却下を含む全管理状態を取得する", async () => {
-    vi.mocked(queryDataSource)
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    vi.mocked(queryAllDataSource).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     await GET(getRequest(SECRET));
-    const proposalArgs = vi.mocked(queryDataSource).mock.calls[0];
+    const proposalArgs = vi.mocked(queryAllDataSource).mock.calls[0];
     expect(proposalArgs[1].filter).toEqual({
       or: [
         { property: "ステータス", select: { equals: "未処理" } },
@@ -130,7 +123,7 @@ describe("GET", () => {
   it("token 不一致は 401", async () => {
     const res = await GET(getRequest("wrong"));
     expect(res.status).toBe(401);
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryAllDataSource).not.toHaveBeenCalled();
   });
 
   it("APPROVE_SECRET 未設定は 401", async () => {
@@ -151,7 +144,7 @@ describe("GET", () => {
   });
 
   it("Notion 取得が失敗したら 502(空ボディではなく JSON で詳細を返さない)", async () => {
-    vi.mocked(queryDataSource).mockRejectedValue(new Error("Notion 400: secret detail"));
+    vi.mocked(queryAllDataSource).mockRejectedValue(new Error("Notion 400: secret detail"));
     const res = await GET(getRequest(SECRET));
     expect(res.status).toBe(502);
     // 本文が空でない JSON であること(クライアントの res.json() が壊れない)
@@ -351,9 +344,7 @@ describe("認証無効(APPROVE_AUTH_ENABLED=false)", () => {
   });
 
   it("GET は token 無しでも 200(検証スキップ)", async () => {
-    vi.mocked(queryDataSource)
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null })
-      .mockResolvedValueOnce({ pages: [], hasMore: false, nextCursor: null });
+    vi.mocked(queryAllDataSource).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const res = await GET(getRequest(null));
     expect(res.status).toBe(200);
     expect((await res.json()).success).toBe(true);

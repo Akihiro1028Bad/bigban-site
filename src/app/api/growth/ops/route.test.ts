@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/growth/notion", () => ({
-  queryDataSource: vi.fn(),
   defaultFetch: vi.fn(),
 }));
+vi.mock("@/lib/growth/notionRepository", () => ({ queryAllDataSource: vi.fn() }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
 vi.mock("@/config/featureFlags", () => ({
@@ -13,7 +13,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { queryDataSource } from "@/lib/growth/notion";
+import { queryAllDataSource } from "@/lib/growth/notionRepository";
 import { GET } from "./route";
 
 const SECRET = "approve-secret-token";
@@ -28,7 +28,7 @@ beforeEach(() => {
   flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
-  vi.mocked(queryDataSource).mockReset();
+  vi.mocked(queryAllDataSource).mockReset();
 });
 
 afterEach(() => {
@@ -41,7 +41,7 @@ describe("GET /api/growth/ops", () => {
   it("token 不一致は 401", async () => {
     const res = await GET(request("wrong"));
     expect(res.status).toBe(401);
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryAllDataSource).not.toHaveBeenCalled();
   });
 
   it("GROWTH_WORKER_LOG_DS 未設定でも setupMissing=true で返す", async () => {
@@ -61,15 +61,12 @@ describe("GET /api/growth/ops", () => {
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ success: false, error: "サーバー設定エラー" });
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryAllDataSource).not.toHaveBeenCalled();
   });
 
   it("Notion の worker log から currentTargets を返す", async () => {
     process.env.GROWTH_WORKER_LOG_DS = "worker-log";
-    vi.mocked(queryDataSource).mockResolvedValue({
-      hasMore: false,
-      nextCursor: null,
-      pages: [
+    vi.mocked(queryAllDataSource).mockResolvedValue([
         {
           id: "r1",
           url: "",
@@ -84,8 +81,7 @@ describe("GET /api/growth/ops", () => {
             "記録時刻": { date: { start: new Date().toISOString() } },
           },
         },
-      ],
-    });
+      ]);
 
     const res = await GET(request(SECRET));
     expect(res.status).toBe(200);
@@ -97,7 +93,7 @@ describe("GET /api/growth/ops", () => {
 
   it("Notion 取得失敗は 502", async () => {
     process.env.GROWTH_WORKER_LOG_DS = "worker-log";
-    vi.mocked(queryDataSource).mockRejectedValue(new Error("secret"));
+    vi.mocked(queryAllDataSource).mockRejectedValue(new Error("secret"));
     const res = await GET(request(SECRET));
     expect(res.status).toBe(502);
     const json = await res.json();

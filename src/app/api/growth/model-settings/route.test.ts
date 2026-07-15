@@ -5,8 +5,11 @@ vi.mock("@/lib/growth/notion", () => ({
   chunkRichText: (value: string) => (value ? [{ text: { content: value } }] : []),
   createPage: vi.fn(),
   defaultFetch: vi.fn(),
-  queryDataSource: vi.fn(),
   updatePageProps: vi.fn(),
+}));
+vi.mock("@/lib/growth/notionRepository", () => ({
+  queryAllDataSource: vi.fn(),
+  queryFirstDataSource: vi.fn(),
 }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
@@ -16,7 +19,8 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { createPage, queryDataSource, updatePageProps } from "@/lib/growth/notion";
+import { createPage, updatePageProps } from "@/lib/growth/notion";
+import { queryAllDataSource, queryFirstDataSource } from "@/lib/growth/notionRepository";
 import { GET, PUT } from "./route";
 
 const SECRET = "approve-secret-token";
@@ -36,7 +40,8 @@ beforeEach(() => {
   flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
-  vi.mocked(queryDataSource).mockReset();
+  vi.mocked(queryAllDataSource).mockReset();
+  vi.mocked(queryFirstDataSource).mockReset();
   vi.mocked(createPage).mockReset();
   vi.mocked(updatePageProps).mockReset();
 });
@@ -48,10 +53,7 @@ afterEach(() => {
 
 describe("/api/growth/model-settings", () => {
   it("GETはNotion上書きを既定値へマージして10工程を返す", async () => {
-    vi.mocked(queryDataSource).mockResolvedValue({
-      hasMore: false,
-      nextCursor: null,
-      pages: [
+    vi.mocked(queryAllDataSource).mockResolvedValue([
         {
           id: "setting-1",
           url: "",
@@ -62,8 +64,7 @@ describe("/api/growth/model-settings", () => {
             "推論強度": { select: { name: "medium" } },
           },
         },
-      ],
-    });
+      ]);
 
     const res = await GET(request("GET"));
     expect(res.status).toBe(200);
@@ -84,7 +85,7 @@ describe("/api/growth/model-settings", () => {
   it("認証不一致はGET/PUTとも401", async () => {
     expect((await GET(request("GET", undefined, "wrong"))).status).toBe(401);
     expect((await PUT(request("PUT", {}, "wrong"))).status).toBe(401);
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryAllDataSource).not.toHaveBeenCalled();
   });
 
   it("Notion token未設定でも推奨値へフォールバックする", async () => {
@@ -115,11 +116,7 @@ describe("/api/growth/model-settings", () => {
   });
 
   it("PUTは既存工程を更新する", async () => {
-    vi.mocked(queryDataSource).mockResolvedValue({
-      hasMore: false,
-      nextCursor: null,
-      pages: [{ id: "setting-1", url: "", properties: {} }],
-    });
+    vi.mocked(queryFirstDataSource).mockResolvedValue({ id: "setting-1", url: "", properties: {} });
     vi.mocked(updatePageProps).mockResolvedValue("setting-1");
 
     const res = await PUT(
@@ -141,7 +138,7 @@ describe("/api/growth/model-settings", () => {
   });
 
   it("PUTは未登録工程を新規作成する", async () => {
-    vi.mocked(queryDataSource).mockResolvedValue({ hasMore: false, nextCursor: null, pages: [] });
+    vi.mocked(queryFirstDataSource).mockResolvedValue(null);
     vi.mocked(createPage).mockResolvedValue("setting-new");
 
     const res = await PUT(
@@ -172,11 +169,12 @@ describe("/api/growth/model-settings", () => {
     );
 
     expect(res.status).toBe(400);
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryFirstDataSource).not.toHaveBeenCalled();
   });
 
   it("Notion取得失敗は推奨値へフォールバックし、保存失敗は詳細を隠して502", async () => {
-    vi.mocked(queryDataSource).mockRejectedValue(new Error("secret"));
+    vi.mocked(queryAllDataSource).mockRejectedValue(new Error("secret"));
+    vi.mocked(queryFirstDataSource).mockRejectedValue(new Error("secret"));
     const getResponse = await GET(request("GET"));
     expect(getResponse.status).toBe(200);
     await expect(getResponse.json()).resolves.toMatchObject({

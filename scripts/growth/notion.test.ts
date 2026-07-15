@@ -12,11 +12,10 @@ import {
   DEFAULT_NOTION_VERSION,
   DRAFT_LINK_PROPS,
   EYECATCH_MIRROR_PROP,
-  getLatestReport,
   getPage,
   listBlockChildren,
-  queryAllDataSource,
-  queryDataSource,
+  NotionHttpError,
+  queryDataSourcePage,
   updatePageProps,
   updatePageSelect,
 } from "./notion";
@@ -42,14 +41,14 @@ function fail(status: number, text: string): HttpResponse {
 const TOKEN = "secret_test";
 const DS = "27d6794f-4133-4cd4-9407-491d95c1b82b";
 
-describe("queryDataSource", () => {
+describe("queryDataSourcePage", () => {
   it("POST /v1/data_sources/{id}/query を既定バージョンで叩き pages を返す", async () => {
     const page = { id: "p1", url: "https://notion.so/p1", properties: {} };
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(
       ok({ results: [page], has_more: true, next_cursor: "cur1" })
     );
 
-    const result = await queryDataSource(
+    const result = await queryDataSourcePage(
       DS,
       { filter: { property: "x" }, sorts: [{ property: "y", direction: "ascending" }], pageSize: 5, startCursor: "c0" },
       { token: TOKEN, fetchFn }
@@ -75,7 +74,7 @@ describe("queryDataSource", () => {
   it("空ボディと欠落フィールドに既定値を補う", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({}));
 
-    const result = await queryDataSource(DS, {}, { token: TOKEN, fetchFn });
+    const result = await queryDataSourcePage(DS, {}, { token: TOKEN, fetchFn });
 
     expect(result).toEqual({ pages: [], hasMore: false, nextCursor: null });
     const [, init] = fetchFn.mock.calls[0];
@@ -85,54 +84,29 @@ describe("queryDataSource", () => {
   it("version を上書きできる", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ results: [] }));
 
-    await queryDataSource(DS, {}, { token: TOKEN, fetchFn, version: "2022-06-28" });
+    await queryDataSourcePage(DS, {}, { token: TOKEN, fetchFn, version: "2022-06-28" });
 
     const [, init] = fetchFn.mock.calls[0];
     expect((init.headers as Record<string, string>)["Notion-Version"]).toBe("2022-06-28");
   });
 
-  it("失敗時は HTTP ステータス付きで throw する", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(401, "unauthorized"));
-
-    await expect(
-      queryDataSource(DS, {}, { token: TOKEN, fetchFn })
-    ).rejects.toThrow(/401.*unauthorized/);
-  });
-});
-
-describe("queryAllDataSource", () => {
-  it("next_cursor をたどって全ページを返す", async () => {
-    const page1 = { id: "p1", url: "https://notion.so/p1", properties: {} };
-    const page2 = { id: "p2", url: "https://notion.so/p2", properties: {} };
-    const fetchFn = vi
-      .fn<FetchFn>()
-      .mockResolvedValueOnce(ok({ results: [page1], has_more: true, next_cursor: "cur1" }))
-      .mockResolvedValueOnce(ok({ results: [page2], has_more: false, next_cursor: null }));
-
-    const pages = await queryAllDataSource(
-      DS,
-      { filter: { property: "状態" }, pageSize: 100 },
-      { token: TOKEN, fetchFn }
-    );
-
-    expect(pages).toEqual([page1, page2]);
-    expect(JSON.parse(fetchFn.mock.calls[0][1].body as string)).toEqual({
-      filter: { property: "状態" },
-      page_size: 100,
+  it("HTTPエラーにstatus・本文・Retry-Afterを保持する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ...fail(429, "rate limited"),
+      headers: { get: () => "1.5" },
     });
-    expect(JSON.parse(fetchFn.mock.calls[1][1].body as string)).toEqual({
-      filter: { property: "状態" },
-      page_size: 100,
-      start_cursor: "cur1",
-    });
+    const error = await queryDataSourcePage(DS, {}, { token: TOKEN, fetchFn }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(NotionHttpError);
+    expect(error).toMatchObject({ status: 429, responseBody: "rate limited", retryAfterMs: 1500 });
   });
 
-  it("has_more なのに next_cursor が無ければ停止せず拒否する", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ has_more: true }));
-
-    await expect(queryAllDataSource(DS, {}, { token: TOKEN, fetchFn })).rejects.toThrow(
-      "next_cursor"
-    );
+  it("不正なRetry-Afterはnullにする", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ...fail(500, "broken"),
+      headers: { get: () => "tomorrow" },
+    });
+    const error = await queryDataSourcePage(DS, {}, { token: TOKEN, fetchFn }).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ retryAfterMs: null });
   });
 });
 
@@ -384,29 +358,5 @@ describe("createPage", () => {
   it("失敗時は throw する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(fail(400, "bad request"));
     await expect(createPage(DS, {}, { token: TOKEN, fetchFn })).rejects.toThrow(/400/);
-  });
-});
-
-describe("getLatestReport", () => {
-  it("作成日降順で1件取得し先頭ページを返す", async () => {
-    const page = { id: "r1", url: "https://notion.so/r1", properties: {} };
-    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ results: [page], has_more: false }));
-
-    const result = await getLatestReport(DS, { token: TOKEN, fetchFn });
-
-    expect(result).toEqual(page);
-    const [, init] = fetchFn.mock.calls[0];
-    expect(JSON.parse(init.body as string)).toEqual({
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
-      page_size: 1,
-    });
-  });
-
-  it("結果が空なら null を返す", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({ results: [] }));
-
-    const result = await getLatestReport(DS, { token: TOKEN, fetchFn });
-
-    expect(result).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import {
 } from "../../src/lib/growth/modelSettings";
 import type { ModelPhaseSetting, ModelSettingInput } from "../../src/lib/growth/modelSettings";
 import { defaultFetch } from "./http";
-import { queryDataSource } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 async function resolveForModes(modes: readonly string[]): Promise<Record<string, ModelPhaseSetting>> {
   const fallback = modelSettingsSnapshotForModes(modes, []);
@@ -17,12 +17,12 @@ async function resolveForModes(modes: readonly string[]): Promise<Record<string,
   if (!token) return fallback;
 
   try {
-    const result = await queryDataSource(
+    const pages = await queryAllDataSource(
       process.env.GROWTH_MODEL_SETTINGS_DS || MODEL_SETTINGS_DS,
-      { pageSize: 50 },
+      {},
       { token, fetchFn: defaultFetch },
     );
-    const overrides: ModelSettingInput[] = result.pages
+    const overrides: ModelSettingInput[] = pages
       .map(modelSettingFromPage)
       .filter((setting): setting is ModelSettingInput => setting !== null);
     return modelSettingsSnapshotForModes(modes, overrides);

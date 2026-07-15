@@ -31,7 +31,8 @@ import { defaultFetch } from "./http";
 import { pushFlexMessage, pushTextMessage } from "./line";
 import { reapStaleRows } from "./loopReaper";
 import { buildNoticeFlex } from "./notice-flex";
-import { getPage, queryAllDataSource, updatePageProps } from "./notion";
+import { getPage, updatePageProps } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import type { BodyComment, BodyCommentRow } from "./bodyComment";
 import type { FlexContainer } from "./digest-flex";
 import type { NotionApiOptions, NotionPage } from "./notion";
@@ -64,7 +65,7 @@ function approveUrl(): string {
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<BodyCommentRow[]> {
   const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: { property: BODY_COMMENT_PROPS.status, select: { equals: value } }, pageSize: 100 },
+    { filter: { property: BODY_COMMENT_PROPS.status, select: { equals: value } } },
     options
   );
   return pages.map(bodyCommentRowFromPage);
