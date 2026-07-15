@@ -295,8 +295,8 @@ export function modelSettingsSnapshotForModes(
   const snapshot: Record<string, ModelPhaseSetting> = {};
   for (const mode of modes) {
     const phaseId = modelPhaseIdForMode(mode);
-    const setting = settings.find((item) => item.id === phaseId);
-    if (!phaseId || !setting) throw new Error(`未知の実行モードです: ${mode}`);
+    if (!phaseId) throw new Error(`未知の実行モードです: ${mode}`);
+    const setting = settings.find((item) => item.id === phaseId)!;
     snapshot[mode] = setting;
   }
   return snapshot;

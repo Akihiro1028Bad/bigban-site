@@ -178,6 +178,12 @@ describe("工程別AIモデル設定", () => {
     });
   });
 
+  it("未知の実行モードを拒否する", () => {
+    expect(() => modelSettingsSnapshotForModes(["unknown"], [])).toThrow(
+      "未知の実行モードです: unknown",
+    );
+  });
+
   it("未知工程や不正なNotion行は無視する", () => {
     expect(
       modelSettingFromPage(

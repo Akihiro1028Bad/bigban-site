@@ -107,6 +107,15 @@ describe("draftPipeline structured contracts", () => {
         statement: "パドルを無料で借りられる",
       }],
     }), trusted)).toThrow(/一次情報メモ/);
+    expect(() => validateResearchPacketSources(parseResearchPacket({
+      version: 1,
+      facts: [{
+        ...research.facts[0],
+        sourceType: "primary-note",
+        source: "任意のメモ",
+        statement: "シューズの貸出はない",
+      }],
+    }), trusted)).toThrow(/sourceが不正/);
   });
 
   it("一次情報メモから否定や条件を削った部分一致factを拒否する", () => {
@@ -304,6 +313,14 @@ describe("draftPipeline structured contracts", () => {
 
     expect(duplicateExternalLinks(html)).toEqual(["https://example.jp/official"]);
     expect(duplicateExternalLinks('<a href="/internal">内部</a>')).toEqual([]);
+  });
+
+  it("aタグ以外とhrefのないリンクを外部URLとして扱わない", () => {
+    expect(duplicateExternalLinks([
+      "<p>本文</p>",
+      "<a>リンク先なし</a>",
+      '<a href="  ">空のリンク</a>',
+    ].join(""))).toEqual([]);
   });
 
   it("空白付き・引用符なし・大文字属性の外部hrefも検出する", () => {
