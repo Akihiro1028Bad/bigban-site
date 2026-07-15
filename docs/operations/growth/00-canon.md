@@ -32,7 +32,7 @@
 | drafts | `growth:drafts` | 承認記事→microCMS下書き+画像 | [20-draft.md](20-draft.md) |
 | drafts-auto | `growth:drafts-auto` | opt-in: 承認済み/生成中かつ下書きID未作成がある時だけ下書き生成 | [20-draft.md](20-draft.md) |
 
-長時間ジョブは有限 timeout と JSON lease（既定 heartbeat 60秒・expiry 15分）で管理する。同一PCで生存中の PID は lease 時刻だけで奪わず、手動 `drafts` と `drafts-auto` は同じ `revise.lock` を共有する。
+長時間ジョブは有限 timeout と JSON lease（既定 heartbeat 60秒・expiry 15分）で管理する。PID死亡は即時回収し、同一PCでPIDが生存中でも heartbeat expiry 後は回収する。leaseを失った旧ジョブはSIGTERM→SIGKILLのfenceで停止する。手動 `drafts` と `drafts-auto` は同じ `revise.lock` を共有する。
 | initiatives | `growth:initiatives` | 承認施策→Notion本文に文案/仕様書 | runbook「施策実行モード」 |
 | initiatives-auto | `growth:initiatives-auto` | opt-in: 承認済み施策がある時だけ施策実行 | runbook「施策実行モード」 |
 | revise | `growth:revise-loop` | 構成案/タイトルの修正ループ(#40/#139B) | [30-loops.md](30-loops.md) |

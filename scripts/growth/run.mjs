@@ -27,7 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { acquireLock, heartbeatLock, releaseLock } from "./lockfile.mjs";
-import { resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptsDir = path.join(here, "prompts");
@@ -143,8 +143,8 @@ const MODES = {
 const REVISE_LOCK = path.join(tmpDir, "revise.lock");
 const REVISE_COUNT = path.join(tmpDir, "revise-count.json");
 const REVISE_DAILY_CAP = Number(process.env.GROWTH_REVISE_DAILY_CAP || "50");
-// lockfile は実行1回を JSON lease で覆う。生存中の同一host PIDは時刻だけで回収せず、
-// 別host/確認不能PIDだけ heartbeat expiry を回収判断に使う。
+// lockfile は実行1回を JSON lease で覆う。PID死亡は即時、heartbeat停止は
+// 同一hostの生存PIDを含めlease expiry後に回収する。旧所有者はfenceで停止する。
 const timeoutPolicy = resolveTimeoutPolicy(process.env);
 const jobId = process.env.GROWTH_JOB_ID || randomUUID();
 let lockToken = null;
@@ -777,6 +777,7 @@ const childResult = await runProcess(childCommand, childArgs, {
   heartbeatMs: cfg.lock ? timeoutPolicy.lockHeartbeatMs : undefined,
 });
 let exitCode = childResult.exitCode;
+if (childResult.kind === "lease-lost") isLeaseLost = true;
 if (isLeaseLost && exitCode === 0) exitCode = 1;
 if (mode === "image-prompt" && exitCode === 0) {
   const applied = await runProcess(
@@ -791,8 +792,8 @@ if (cfg.lock && exitCode === 0) exitCode = await assertLoopSettled();
 if (cfg.lock) releaseReviseLock();
 const resumeCommand = RESUME_COMMANDS[mode] || `npm run growth:${mode}`;
 const timeoutDetail = childResult.kind === "timeout"
-  ? `mode=${mode} phase=${childResult.phase} jobId=${jobId} timeoutMs=${childTimeoutMs} SIGTERM=${childResult.termSent} SIGKILL=${childResult.forceKilled} exit=124 resume=${resumeCommand}`
-  : isLeaseLost ? `lease lost; child stopped; jobId=${jobId}; resume=${resumeCommand}` : undefined;
+  ? `mode=${mode} ${buildProcessFailureDetail(childResult, { jobId, timeoutMs: childTimeoutMs, resumeCommand })}`
+  : isLeaseLost ? `lease lost; child fenced; phase=${childResult.phase} jobId=${jobId} SIGTERM=${childResult.termSent} SIGKILL=${childResult.forceKilled} exit=${exitCode} resume=${resumeCommand}` : undefined;
 await runWorkerLog("finish", {
     "page-id": workerRunPageId,
     mode,

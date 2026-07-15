@@ -1,10 +1,11 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess, startPeriodicTask } from "./processControl.mjs";
 
 describe("timeout policy", () => {
   it("全 mode・draft phase・daemon job に正の有限値を定義する", () => {
@@ -44,6 +45,7 @@ describe("runProcess", () => {
 
   it("inherit modeでも正常終了する", async () => {
     expect(await runProcess(process.execPath, ["-e", ""], { timeoutMs: 2_000, stdio: "inherit" })).toMatchObject({ kind: "success" });
+    expect(await runProcess("exit 0", [], { timeoutMs: 2_000, shell: true, stdio: "capture" })).toMatchObject({ kind: "success" });
   });
 
   it("stdin promptを子へ渡す", async () => {
@@ -83,9 +85,33 @@ describe("runProcess", () => {
 
   it("heartbeatを継続し、falseならlease喪失として子を止める", async () => {
     const heartbeat = vi.fn(() => false);
-    const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], { timeoutMs: 2_000, heartbeat, heartbeatMs: 100, stdio: "capture" });
+    const result = await runProcess(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)"], { timeoutMs: 2_000, killGraceMs: 500, heartbeat, heartbeatMs: 200, stdio: "capture" });
     expect(heartbeat).toHaveBeenCalled();
-    expect(result.kind).toBe("signal");
+    expect(heartbeat.mock.calls.length).toBeGreaterThan(1);
+    expect(result).toMatchObject({ kind: "lease-lost", forceKilled: true, termSent: true });
+  });
+
+  it("heartbeat例外もlease喪失としてSIGTERMからSIGKILLへ昇格する", async () => {
+    const result = await runProcess(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)"], {
+      timeoutMs: 2_000,
+      killGraceMs: 30,
+      heartbeat: () => { throw new Error("EIO"); },
+      heartbeatMs: 300,
+      stdio: "capture",
+    });
+    expect(result).toMatchObject({ kind: "lease-lost", forceKilled: true, termSent: true });
+    expect(result.error?.message).toContain("EIO");
+  });
+
+  it("Error以外のheartbeat例外もlease喪失理由として保持する", async () => {
+    const result = await runProcess(process.execPath, ["-e", "setInterval(()=>{},1000)"], { timeoutMs: 2_000, heartbeat: () => { throw "EIO-string"; }, heartbeatMs: 100, stdio: "capture" });
+    expect(result).toMatchObject({ kind: "lease-lost" });
+    expect(result.error?.message).toBe("EIO-string");
+  });
+
+  it("inheritでもfence grace完了までresolveしない", async () => {
+    const result = await runProcess(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)"], { timeoutMs: 300, killGraceMs: 30, stdio: "inherit" });
+    expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
   });
 
   it("true heartbeat中は正常終了を妨げない", async () => {
@@ -101,6 +127,39 @@ describe("runProcess", () => {
     expect(() => runProcess("x", [], { timeoutMs: 1, maxBuffer: 0 })).toThrow("maxBuffer");
     expect(() => runProcess("x", [], { timeoutMs: 1, heartbeatMs: 0 })).toThrow("heartbeatMs");
     expect(() => startPeriodicTask(() => undefined, 0)).toThrow("intervalMs");
+  });
+
+  it("外側timeoutがnested runProcessの子まで同じPOSIX groupで停止する", async () => {
+    if (process.platform === "win32") return;
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-process-tree-"));
+    const marker = path.join(dir, "orphan.txt");
+    const moduleUrl = new URL("./processControl.mjs", import.meta.url).href;
+    const nested = `import { runProcess } from ${JSON.stringify(moduleUrl)}; await runProcess(process.execPath,['-e',${JSON.stringify(`const fs=require('node:fs');process.on('SIGTERM',()=>{});setTimeout(()=>fs.writeFileSync(${JSON.stringify(marker)},'orphan'),500)`) }],{timeoutMs:5000,killGraceMs:30,stdio:'capture'});`;
+    try {
+      const result = await runProcess(process.execPath, ["--input-type=module", "-e", nested], { timeoutMs: 200, killGraceMs: 50, stdio: "capture" });
+      expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(marker)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("captureはexitではなくstdio closeまで待ち末尾を保持する", async () => {
+    const script = "const {spawn}=require('node:child_process');spawn(process.execPath,['-e',\"setTimeout(()=>process.stdout.write('late'),100)\"],{stdio:['ignore','inherit','inherit']});";
+    const result = await runProcess(process.execPath, ["-e", script], { timeoutMs: 2_000, stdio: "capture" });
+    expect(result).toMatchObject({ kind: "success", stdout: "late" });
+  });
+});
+
+describe("buildProcessFailureDetail", () => {
+  it("timeoutの完全な証跡を共通形式へ正規化する", () => {
+    const detail = buildProcessFailureDetail({ kind: "timeout", exitCode: 124, phase: "daemon:metrics", elapsedMs: 10, signal: "SIGKILL", stdout: "", stderr: "", timedOut: true, termSent: true, forceKilled: true }, { jobId: "job-1", timeoutMs: 1_800_000, resumeCommand: "npm run growth:metrics" });
+    expect(detail).toContain("phase=daemon:metrics");
+    expect(detail).toContain("jobId=job-1");
+    expect(detail).toContain("timeoutMs=1800000");
+    expect(detail).toContain("SIGTERM=true");
+    expect(detail).toContain("SIGKILL=true");
+    expect(detail).toContain("exit=124");
+    expect(detail).toContain("resume=npm run growth:metrics");
   });
 });
 
@@ -149,4 +208,17 @@ it("主要ランナーは child_process を直接使用しない", () => {
   for (const file of ["run.mjs", "draft-orchestrator-cli.ts", "daemon-cli.ts"]) {
     expect(readFileSync(path.join(process.cwd(), "scripts/growth", file), "utf8")).not.toContain('node:child_process');
   }
+});
+
+it("daemonとdraft orchestratorは完全なProcessResultからtimeout証跡を配線する", () => {
+  const daemon = readFileSync(path.join(process.cwd(), "scripts/growth/daemon-cli.ts"), "utf8");
+  expect(daemon).toContain("Promise<ProcessResult>");
+  expect(daemon).toContain("buildProcessFailureDetail");
+  expect(daemon).toContain("growth:notify-loop-fail");
+  expect(daemon).toContain("growth:learning-log");
+  expect(daemon).toContain("growth-failures.log");
+
+  const orchestrator = readFileSync(path.join(process.cwd(), "scripts/growth/draft-orchestrator-cli.ts"), "utf8");
+  expect(orchestrator).toContain("ProcessExecutionError");
+  expect(orchestrator).toContain("buildProcessFailureDetail");
 });

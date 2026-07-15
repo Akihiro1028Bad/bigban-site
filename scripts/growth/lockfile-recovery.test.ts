@@ -19,9 +19,13 @@ function withLock(content: string, run: (lockPath: string) => void): void {
 }
 
 describe("lease recovery", () => {
-  it("同一 host の生存 PID は stale mtime / lease expiry でも奪わない", () => withLock(lease({ pid: 123 }), (lockPath) => {
+  it("同一 host の生存 PID でも lease expiry 後は回収する", () => withLock(lease({ pid: 123 }), (lockPath) => {
     utimesSync(lockPath, new Date(0), new Date(0));
-    expect(acquireLock(lockPath, { host: "local", jobId: "new", nowMs: 9_999_999, leaseMs: 10, kill: vi.fn() }).acquired).toBe(false);
+    expect(acquireLock(lockPath, { host: "local", jobId: "new", nowMs: 9_999_999, leaseMs: 10, kill: vi.fn() })).toMatchObject({ acquired: true, recovery: "expired-lease" });
+  }));
+
+  it("同一 host の生存 PID は heartbeat fresh なら保持する", () => withLock(lease({ pid: 123, lastHeartbeatAt: new Date(9_500).toISOString() }), (lockPath) => {
+    expect(acquireLock(lockPath, { host: "local", jobId: "new", nowMs: 10_000, leaseMs: 1_000, kill: vi.fn() }).acquired).toBe(false);
   }));
 
   it("同一 host の死亡 PID は fresh heartbeat でも即時回収する", () => withLock(lease({ lastHeartbeatAt: new Date().toISOString() }), (lockPath) => {
@@ -54,7 +58,7 @@ describe("lease recovery", () => {
     expect(acquireLock("/tmp/fake.lock", { host: "local", jobId: "new", nowMs: 20_000, leaseMs: 1_000, mkdirSync, openSync, readFileSync, statSync: vi.fn(() => ({ mtimeMs: 0 })), kill: () => { throw Object.assign(new Error("dead"), { code: "ESRCH" }); }, rmSync: vi.fn() }).acquired).toBe(false);
   });
 
-  it.each([["EPERM", false], ["ESRCH", true], ["EINVAL", true]] as const)("process state %s", (code, acquired) => withLock(lease(), (lockPath) => {
+  it.each([["EPERM", true], ["ESRCH", true], ["EINVAL", true]] as const)("process state %s", (code, acquired) => withLock(lease(), (lockPath) => {
     expect(acquireLock(lockPath, { host: "local", jobId: "new", kill: () => { throw Object.assign(new Error(code), { code }); } }).acquired).toBe(acquired);
   }));
 

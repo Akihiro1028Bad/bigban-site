@@ -1,4 +1,4 @@
-export type ProcessResultKind = "success" | "nonzero-exit" | "spawn-error" | "signal" | "timeout" | "max-buffer";
+export type ProcessResultKind = "success" | "nonzero-exit" | "spawn-error" | "signal" | "timeout" | "lease-lost" | "max-buffer";
 
 export interface ProcessResult {
   kind: ProcessResultKind;
@@ -47,6 +47,13 @@ export interface TimeoutPolicy {
   draftPhaseTimeouts: Readonly<Record<string, number>>;
 }
 
+export interface ProcessFailureContext {
+  jobId: string;
+  timeoutMs: number;
+  resumeCommand: string;
+}
+
 export function resolveTimeoutPolicy(env?: Record<string, string | undefined>): TimeoutPolicy;
+export function buildProcessFailureDetail(result: ProcessResult, context: ProcessFailureContext): string;
 export function runProcess(command: string, args: readonly string[], options: RunProcessOptions): Promise<ProcessResult>;
 export function startPeriodicTask(task: () => void | Promise<void>, intervalMs: number, options?: { runImmediately?: boolean }): () => void;

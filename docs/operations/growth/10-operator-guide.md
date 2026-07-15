@@ -164,7 +164,7 @@
 
 ### 3-2. 5分間隔・1日上限・lock 共有の運用
 
-共有 lock は PID 文字列ではなく JSON lease で、手動下書きも対象。生存中のローカル PID は15分を超えても強制回収しない。timeout 通知（P1 critical）は `GROWTH_NOTIFY_LEVEL=weekly-only` でも送信され、記載された再開コマンドを使う。
+共有 lock は PID 文字列ではなく JSON lease で、手動下書きも対象。ローカル PID が生存中でも heartbeat が15分止まれば回収し、旧ジョブは子孫を含む単一プロセスグループごと停止する。timeout 通知（P1 critical）は `GROWTH_NOTIFY_LEVEL=weekly-only` でも送信され、記載された再開コマンドを使う。
 
 修正・画像再生成・アドバイス・装飾の**プル型ループ7種**(`revise` / `regen` / `regen-body` / `advise` / `decorate` / `apply` / `comment-revise`)は、次の共通ルールで動く。下書き自動生成を有効にした場合の `drafts-auto`、施策自動成果物化を有効にした場合の `initiatives-auto` も、同じ lock/上限で逐次処理される:
 

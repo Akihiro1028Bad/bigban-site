@@ -153,9 +153,10 @@ function recoveryDecision(owner, stat, deps) {
       const state = processState(owner.lease.pid, deps);
       if (state === "dead") return "dead-pid";
       if (state === "alive") {
-        return owner.lease.pid === deps.pid && owner.lease.jobId !== deps.jobId && isExpired
+        if (!isExpired) return null;
+        return owner.lease.pid === deps.pid && owner.lease.jobId !== deps.jobId
           ? "pid-reused"
-          : null;
+          : "expired-lease";
       }
       return isExpired ? "expired-lease" : null;
     }

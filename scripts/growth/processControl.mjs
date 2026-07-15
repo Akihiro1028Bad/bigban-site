@@ -1,5 +1,24 @@
 import { spawn } from "node:child_process";
 
+const PROCESS_GROUP_ENV = "GROWTH_PROCESS_GROUP_ID";
+const ROOT_LAUNCHER = `
+const { spawn } = require("node:child_process");
+const command = process.argv[1];
+const args = process.argv.slice(2);
+const child = spawn(command, args, {
+  cwd: process.cwd(),
+  env: { ...process.env, ${JSON.stringify(PROCESS_GROUP_ENV)}: String(process.pid) },
+  shell: process.env.GROWTH_PROCESS_GROUP_SHELL === "1",
+  stdio: "inherit",
+  windowsHide: true,
+});
+child.on("error", (error) => { process.stderr.write("GROWTH_SPAWN_ERROR:" + error.message + "\\n"); process.exit(126); });
+child.on("close", (code, signal) => {
+  if (signal) process.kill(process.pid, signal);
+  else process.exit(code ?? 1);
+});
+`;
+
 const DEFAULTS = Object.freeze({
   controlMs: 2 * 60 * 1000,
   pullLoopMs: 60 * 60 * 1000,
@@ -68,8 +87,26 @@ export function resolveTimeoutPolicy(env = process.env) {
   };
 }
 
+export function buildProcessFailureDetail(result, context) {
+  return [
+    `phase=${result.phase}`,
+    `jobId=${context.jobId}`,
+    `timeoutMs=${context.timeoutMs}`,
+    `SIGTERM=${result.termSent}`,
+    `SIGKILL=${result.forceKilled}`,
+    `exit=${result.exitCode}`,
+    `resume=${context.resumeCommand}`,
+  ].join(" ");
+}
+
 function assertPositiveFinite(name, value) {
   if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a positive finite number`);
+}
+
+function groupIdFor(child) {
+  const inherited = Number(process.env[PROCESS_GROUP_ENV]);
+  /* istanbul ignore next -- inherited branch executes in the integration-test subprocess */
+  return Number.isSafeInteger(inherited) && inherited > 0 ? inherited : child.pid;
 }
 
 function killTree(child, signal) {
@@ -83,7 +120,7 @@ function killTree(child, signal) {
       const killer = spawn("taskkill", args, { stdio: "ignore", windowsHide: true });
       killer.unref();
     } else {
-      process.kill(-child.pid, signal);
+      process.kill(-groupIdFor(child), signal);
     }
     return true;
   /* istanbul ignore next -- process-group fallback is platform/runtime defensive */
@@ -110,6 +147,29 @@ export function startPeriodicTask(task, intervalMs, options = {}) {
   return () => { isStopped = true; clearInterval(timer); };
 }
 
+function spawnSpec(command, args, options) {
+  const hasInheritedGroup = process.platform !== "win32" && Boolean(process.env[PROCESS_GROUP_ENV]);
+  /* istanbul ignore if -- Windows/inherited branches execute outside the instrumented test process */
+  if (process.platform === "win32" || hasInheritedGroup) {
+    return {
+      command,
+      args: [...args],
+      detached: false,
+      env: options.env,
+      shell: options.shell ?? false,
+      isWrapper: false,
+    };
+  }
+  return {
+    command: process.execPath,
+    args: ["-e", ROOT_LAUNCHER, command, ...args],
+    detached: true,
+    env: { ...options.env, GROWTH_PROCESS_GROUP_SHELL: options.shell ? "1" : "0" },
+    shell: false,
+    isWrapper: true,
+  };
+}
+
 export function runProcess(command, args, options) {
   assertPositiveFinite("timeoutMs", options.timeoutMs);
   const killGraceMs = options.killGraceMs ?? DEFAULTS.killGraceMs;
@@ -122,11 +182,12 @@ export function runProcess(command, args, options) {
 
   return new Promise((resolve) => {
     const capture = options.stdio === "capture";
-    const child = spawn(command, [...args], {
+    const spec = spawnSpec(command, args, options);
+    const child = spawn(spec.command, spec.args, {
       cwd: options.cwd,
-      env: options.env,
-      shell: options.shell ?? false,
-      detached: process.platform !== "win32",
+      env: spec.env,
+      shell: spec.shell,
+      detached: spec.detached,
       stdio: [options.stdin === undefined ? "ignore" : "pipe", capture ? "pipe" : "inherit", capture ? "pipe" : "inherit"],
       windowsHide: true,
     });
@@ -134,17 +195,57 @@ export function runProcess(command, args, options) {
     let stderr = "";
     let settled = false;
     let timedOut = false;
+    let leaseLost = false;
     let termSent = false;
     let forceKilled = false;
     let bufferExceeded = false;
+    let terminationError;
     let graceTimer;
+    let isGraceElapsed = false;
+    let closeResult = null;
+
+    const finish = (kind, code, signal, error) => {
+      /* istanbul ignore if -- spawn error/close races are guarded */
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      if (graceTimer) clearTimeout(graceTimer);
+      stopHeartbeat();
+      for (const parentSignal of parentSignals) process.off(parentSignal, forwardSignal);
+      resolve({ kind, exitCode: timedOut ? 124 : leaseLost ? 125 : code, phase, elapsedMs: Date.now() - startedAt, signal, stdout, stderr, timedOut, termSent, forceKilled, ...(error ? { error } : {}) });
+    };
+    const finishFromClose = () => {
+      if (!closeResult) return;
+      const { code, signal } = closeResult;
+      if (leaseLost) finish("lease-lost", 125, signal, terminationError);
+      else if (timedOut) finish("timeout", 124, signal, undefined);
+      else if (bufferExceeded) finish("max-buffer", 1, signal, undefined);
+      else if (signal) finish("signal", 1, signal, undefined);
+      else if (spec.isWrapper && code === 126 && stderr.includes("GROWTH_SPAWN_ERROR:")) finish("spawn-error", 1, null, new Error(stderr.trim()));
+      else finish(code === 0 ? "success" : "nonzero-exit", code, null, undefined);
+    };
+    const beginTermination = (kind, error) => {
+      if (kind === "timeout") timedOut = true;
+      if (kind === "lease-lost") {
+        leaseLost = true;
+        terminationError = error;
+      }
+      /* istanbul ignore next -- false only after the target group has already exited */
+      termSent = killTree(child, "SIGTERM") || termSent;
+      if (graceTimer) return;
+      graceTimer = setTimeout(() => {
+        /* istanbul ignore next -- false only after the target group has already exited */
+        forceKilled = killTree(child, "SIGKILL") || forceKilled;
+        isGraceElapsed = true;
+        setTimeout(finishFromClose, 0);
+      }, killGraceMs);
+    };
     const controlledHeartbeat = options.heartbeat
       ? async () => {
-          const ownsLease = await options.heartbeat();
-          if (ownsLease === false) {
-            /* istanbul ignore else -- periodic task is stopped during settlement cleanup */
-            /* istanbul ignore next -- false means an already-terminating child without a PID */
-            if (!settled) termSent = killTree(child, "SIGTERM") || termSent;
+          try {
+            if (await options.heartbeat() === false) beginTermination("lease-lost", new Error("lease heartbeat returned false"));
+          } catch (error) {
+            beginTermination("lease-lost", error instanceof Error ? error : new Error(String(error)));
           }
         }
       : null;
@@ -153,50 +254,28 @@ export function runProcess(command, args, options) {
       : () => {};
     const parentSignals = ["SIGINT", "SIGTERM"];
     const forwardSignal = (signal) => { killTree(child, signal); };
-    for (const signal of parentSignals) process.on(signal, forwardSignal);
+    for (const parentSignal of parentSignals) process.on(parentSignal, forwardSignal);
 
-    const cleanup = () => {
-      clearTimeout(timeoutTimer);
-      if (graceTimer) clearTimeout(graceTimer);
-      stopHeartbeat();
-      for (const signal of parentSignals) process.off(signal, forwardSignal);
-    };
-    const finish = (kind, code, signal, error) => {
-      /* istanbul ignore if -- event listeners are cleaned up by the first settlement */
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve({ kind, exitCode: timedOut ? 124 : code, phase, elapsedMs: Date.now() - startedAt, signal, stdout, stderr, timedOut, termSent, forceKilled, ...(error ? { error } : {}) });
-    };
     const append = (stream, chunk) => {
       const next = stream + chunk.toString();
       if (Buffer.byteLength(next) <= maxBuffer) return next;
       bufferExceeded = true;
-      /* istanbul ignore next -- duplicate chunks may arrive only after termination has begun */
-      termSent = killTree(child, "SIGTERM") || termSent;
-      /* istanbul ignore next -- duplicate max-buffer grace callbacks are runtime-dependent */
-      graceTimer = setTimeout(() => { forceKilled = killTree(child, "SIGKILL") || forceKilled; }, killGraceMs);
+      beginTermination("max-buffer");
       return next.slice(0, maxBuffer);
     };
     child.stdout?.on("data", (chunk) => { stdout = append(stdout, chunk); });
     child.stderr?.on("data", (chunk) => { stderr = append(stderr, chunk); });
+    /* istanbul ignore next -- POSIX root wrapper reports spawn errors via exit 126 */
     child.on("error", (error) => finish("spawn-error", 1, null, error));
-    child.on("exit", (code, signal) => {
-      if (timedOut) finish("timeout", 124, signal, undefined);
-      else if (bufferExceeded) finish("max-buffer", 1, signal, undefined);
-      else if (signal) finish("signal", 1, signal, undefined);
-      else finish(code === 0 ? "success" : "nonzero-exit", code, null, undefined);
+    child.on("close", (code, signal) => {
+      closeResult = { code, signal };
+      // capture の close は共有 pipe を持つ全子孫の終了後にだけ発火する。
+      // inherit は leader close だけでは子孫終了を証明できないため grace 完了まで待つ。
+      /* istanbul ignore next -- short-circuit variants are platform/stdio timing dependent */
+      if (!capture && (timedOut || leaseLost || bufferExceeded) && graceTimer && !isGraceElapsed) return;
+      finishFromClose();
     });
-    if (options.stdin !== undefined) {
-      child.stdin.end(options.stdin);
-    }
-    const timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      termSent = killTree(child, "SIGTERM");
-      graceTimer = setTimeout(() => {
-        /* istanbul ignore else -- settled paths clear this grace timer in cleanup */
-        if (!settled) forceKilled = killTree(child, "SIGKILL");
-      }, killGraceMs);
-    }, options.timeoutMs);
+    if (options.stdin !== undefined) child.stdin.end(options.stdin);
+    const timeoutTimer = setTimeout(() => beginTermination("timeout"), options.timeoutMs);
   });
 }

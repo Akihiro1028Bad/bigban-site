@@ -18,7 +18,8 @@ import { defaultFetch } from "./http";
 import { getPage, updatePageSelect, type NotionApiOptions } from "./notion";
 import { queryAllDataSource } from "./notionRepository";
 import { selectDraftsAutoTarget, draftsAutoQueryFilter, DRAFTS_AUTO_STATUS_PROP } from "./draftsAuto";
-import { resolveTimeoutPolicy, runProcess } from "./processControl.mjs";
+import { buildProcessFailureDetail, resolveTimeoutPolicy, runProcess } from "./processControl.mjs";
+import type { ProcessResult } from "./processControl.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..");
@@ -46,6 +47,26 @@ interface CacheEnvelope {
 }
 
 let executionSettingsSummary = "モデル設定確定前";
+
+class ProcessExecutionError extends Error {
+  constructor(
+    readonly result: ProcessResult,
+    readonly timeoutMs: number,
+    readonly resumeCommand: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProcessExecutionError";
+  }
+}
+
+function processFailureDetail(error: ProcessExecutionError): string {
+  return buildProcessFailureDetail(error.result, {
+    jobId,
+    timeoutMs: error.timeoutMs,
+    resumeCommand: error.resumeCommand,
+  });
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -80,7 +101,9 @@ async function resolveSettings(): Promise<Record<DraftAiPhase, DraftPhaseSetting
     shell: process.platform === "win32",
     env: { ...process.env, GROWTH_JOB_ID: jobId },
   });
-  if (result.exitCode !== 0) throw new Error("下書き工程のモデル設定を取得できませんでした。");
+  if (result.exitCode !== 0) {
+    throw new ProcessExecutionError(result, timeoutPolicy.controlMs, `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`, "下書き工程のモデル設定を取得できませんでした。");
+  }
   const parsed = JSON.parse(result.stdout.trim()) as Record<string, ModelPhaseSetting>;
   return {
     "draft-research": resolveDraftPhaseSetting(parsed["draft-research"]),
@@ -131,10 +154,10 @@ async function runAgent(params: {
     maxBuffer: 10 * 1024 * 1024,
   });
   if (result.exitCode !== 0) {
-    const timeout = result.kind === "timeout"
-      ? `timeout jobId=${jobId} timeoutMs=${timeoutMs} SIGTERM=${result.termSent} SIGKILL=${result.forceKilled} exit=124 resume=npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`
-      : "";
-    throw new Error(`${params.phase}に失敗しました: ${timeout || (result.stderr || result.stdout || "終了コード不明").trim()}`);
+    const resumeCommand = `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`;
+    const processError = new ProcessExecutionError(result, timeoutMs, resumeCommand, `${params.phase}に失敗しました: ${(result.stderr || result.stdout || "終了コード不明").trim()}`);
+    if (result.kind === "timeout") processError.message = `${params.phase}に失敗しました: ${processFailureDetail(processError)}`;
+    throw processError;
   }
   const raw = invocation.outputFromStdout ? result.stdout : await readFile(invocation.outputPath, "utf-8");
   return parseAgentJson(raw);
@@ -230,7 +253,10 @@ async function runNpm(script: string, args: string[] = [], capture = false, time
   });
   if (result.exitCode !== 0) {
     const detail = capture ? [result.stdout, result.stderr].filter(Boolean).join("\n").trim() : "";
-    throw new Error(`${script}に失敗しました。${detail ? ` ${detail}` : ""}`);
+    const resumeCommand = `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`;
+    const processError = new ProcessExecutionError(result, timeoutMs, resumeCommand, `${script}に失敗しました。${detail ? ` ${detail}` : ""}`);
+    if (result.kind === "timeout") processError.message = `${script}に失敗しました。 ${processFailureDetail(processError)}`;
+    throw processError;
   }
   return capture ? result.stdout : "";
 }
@@ -313,6 +339,7 @@ async function main(): Promise<void> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     await finishPhaseLog(researchLogId, input.pageId, "draft-research", researchSetting, "failed", message);
+    if (error instanceof ProcessExecutionError) throw error;
     throw new Error(`${draftPhaseExecutionLabel("draft-research", researchSetting)}; ${message}`);
   }
   const writerInput = buildWriterInput(
@@ -346,6 +373,7 @@ async function main(): Promise<void> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     await finishPhaseLog(writerLogId, input.pageId, "draft-write", writerSetting, "failed", message);
+    if (error instanceof ProcessExecutionError) throw error;
     throw new Error(`${draftPhaseExecutionLabel("draft-write", writerSetting)}; ${message}`);
   }
   const spec = assemblePublishSpec({ input, writer, research, images: prepared.images });
@@ -381,7 +409,8 @@ async function main(): Promise<void> {
 
 main().catch(async (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  const detail = `${executionSettingsSummary}; ${message}`;
+  const processDetail = error instanceof ProcessExecutionError ? processFailureDetail(error) : "";
+  const detail = `${executionSettingsSummary}; ${message}${processDetail && !message.includes(processDetail) ? `; ${processDetail}` : ""}`;
   process.stderr.write(`下書きオーケストレーターに失敗しました: ${detail}\n`);
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   await runProcess(npm, ["run", "growth:notify-loop-fail"], {
@@ -394,9 +423,14 @@ main().catch(async (error: unknown) => {
       ...process.env,
       GROWTH_LOOP_MODE: process.env.GROWTH_DRAFT_RUN_MODE || "drafts",
       GROWTH_LOOP_RESUME: `npm run growth:${process.env.GROWTH_DRAFT_RUN_MODE || "drafts"}`,
-      GROWTH_LOOP_KIND: detail.includes("timeout jobId=") ? "timeout" : "nonzero-exit",
+      GROWTH_LOOP_KIND: error instanceof ProcessExecutionError && error.result.kind === "timeout" ? "timeout" : "nonzero-exit",
       GROWTH_LOOP_EXIT: "70",
       GROWTH_LOOP_DETAIL: detail,
+      ...(error instanceof ProcessExecutionError ? {
+        GROWTH_LOOP_TIMEOUT_MS: String(error.timeoutMs),
+        GROWTH_LOOP_TERM_SENT: String(error.result.termSent),
+        GROWTH_LOOP_FORCE_KILLED: String(error.result.forceKilled),
+      } : {}),
     },
   });
   await runProcess(npm, ["run", "growth:learning-log", "--", "append-fail", process.env.GROWTH_DRAFT_RUN_MODE || "drafts", "70", detail], {
