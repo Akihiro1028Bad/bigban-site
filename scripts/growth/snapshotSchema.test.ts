@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { parseSnapshot, snapshotSchema } from "./snapshotSchema";
+
+function validSnapshot() {
+  return {
+    schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" },
+    meta: { inputs: [{ type: "yoyaku", rows: 1 }], excludedCount: 0, missingSections: [], warnings: [] },
+    kpi: { actual: { currentWeek: 1, priorWeek: 0, cumulative: 1 }, self: { selfCount4w: 1, total4w: 1, smartphone4w: 1 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } },
+    catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [],
+  };
+}
+
+describe("snapshotSchema", () => {
+  it("最小の妥当スナップショットを受理する", () => expect(snapshotSchema.safeParse(validSnapshot()).success).toBe(true));
+  it("不正なseverityとschemaVersionを拒否する", () => {
+    expect(snapshotSchema.safeParse({ ...validSnapshot(), schemaVersion: 2 }).success).toBe(false);
+    expect(snapshotSchema.safeParse({ ...validSnapshot(), insights: [{ id: "x", detector: "d", severity: "bad" }] }).success).toBe(false);
+  });
+  it("不正なJSONを日本語エラーにする", () => expect(() => parseSnapshot("{")).toThrow("スナップショットJSON"));
+  it("妥当JSONを型付きスナップショットへ変換し、構造不正は日本語エラーにする", () => {
+    expect(parseSnapshot(JSON.stringify(validSnapshot())).kpi.self.smartphone4w).toBe(1);
+    expect(() => parseSnapshot(JSON.stringify({ schemaVersion: 1 }))).toThrow("スナップショットの形式");
+  });
+});
