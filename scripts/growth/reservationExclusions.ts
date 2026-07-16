@@ -17,3 +17,8 @@ export function isExcluded(target: { email: string; name: string }, rules: Exclu
   if (email && rules.emails.some((entry) => entry.toLowerCase() === email)) return true;
   return rules.nameContains.some((fragment) => fragment && target.name.includes(fragment));
 }
+
+export function mergeExclusionRules(base: ExclusionRules, extraEmailsCsv: string | undefined): ExclusionRules {
+  const extra = (extraEmailsCsv ?? "").split(",").map((email) => email.trim()).filter(Boolean);
+  return { emails: [...new Set([...base.emails, ...extra])], nameContains: base.nameContains };
+}

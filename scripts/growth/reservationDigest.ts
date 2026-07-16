@@ -8,6 +8,7 @@ const SEVERITY_ORDER: Record<Insight["severity"], number> = { alert: 0, notice: 
 function sortedNewInsights(snapshot: Snapshot): Insight[] {
   return snapshot.insights.filter((insight) => insight.status === "new").sort((left, right) => SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]);
 }
+function digestTitle(insight: Insight): string { const n = insight.evidence.n; return insight.id.startsWith("d1:") || (typeof n === "number" && n < 3) ? "新しいエリアからの初予約がありました(詳細はスナップショット)" : insight.title; }
 
 export function formatIngestDigest(snapshot: Snapshot): string {
   const insights = sortedNewInsights(snapshot);
@@ -16,7 +17,7 @@ export function formatIngestDigest(snapshot: Snapshot): string {
     `実予約 今週${snapshot.kpi.actual.currentWeek}件(累積${snapshot.kpi.actual.cumulative}件)`,
     `新規気づき${insights.length}件`,
   ];
-  lines.push(...insights.slice(0, 5).map((insight) => `・${insight.title}`));
+  lines.push(...insights.slice(0, 5).map((insight) => `・${digestTitle(insight)}`));
   if (snapshot.meta.warnings.length > 0) lines.push(`⚠️ 警告${snapshot.meta.warnings.length}件`);
   return lines.join("\n");
 }

@@ -17,7 +17,7 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; current: DateRan
     generatedAt: bundle.meta.generatedAt,
     coverage: bundle.meta.coverage,
     meta: { inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: bundle.meta.warnings },
-    kpi: weeklyKpis(bundle, current, prior),
+    kpi: weeklyKpis(bundle, current, prior, todayYmd),
     catalog: { heatmap: demandHeatmap(bundle, todayYmd), leadTime: leadTimeStats(bundle, todayYmd), cancellation: cancellationStats(bundle, todayYmd), wards: wardCounts(bundle) },
     series: { weeklyReservations: weeklyReservationSeries(bundle) },
     insights: runDetectors({ bundle, current, prior, todayYmd, previousSnapshot }, CORE_DETECTORS),

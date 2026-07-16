@@ -4,7 +4,7 @@ import { weeklyReservationSeries } from "../reservationAggregates";
 import type { Detector } from "../insightEngine";
 
 function severityOf(observed: number, mean: number, p: number): { severity: "info" | "notice"; label: "観察" | "有意" } | null {
-  if (p < 0.05) return { severity: "notice", label: "有意" };
+  if (p < 0.05) return { severity: "notice", label: observed < 10 ? "観察" : "有意" };
   if (observed >= 2 * mean || (mean >= 1 && observed <= mean / 2)) return { severity: "info", label: "観察" };
   return null;
 }

@@ -81,6 +81,10 @@ describe("jstYmdOfIso", () => {
   it("UTCの境界をJST日付へ変換する", () => {
     expect(jstYmdOfIso("2026-07-15T15:00:00Z")).toBe("2026-07-16");
   });
+
+  it("不正な日時は日本語エラーにする", () => {
+    expect(() => jstYmdOfIso("不正な日時")).toThrow("日時を解釈できません");
+  });
 });
 
 describe("weeklyKpis", () => {
@@ -93,7 +97,7 @@ describe("weeklyKpis", () => {
     const kpi = weeklyKpis(
       data,
       { start: "2026-07-13", end: "2026-07-19" },
-      { start: "2026-07-06", end: "2026-07-12" }
+      { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16"
     );
     expect(kpi.actual).toEqual({ currentWeek: 1, priorWeek: 1, cumulative: 2 });
     expect(kpi.self).toEqual({ selfCount4w: 1, total4w: 2, smartphone4w: 1 });
@@ -110,7 +114,7 @@ describe("weeklyKpis", () => {
         { date: "2026-08-17", isForecast: true, rentalSpace: 400, event: 0, goods: 0, total: 400 },
       ],
     });
-    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" });
+    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
     expect(kpi.sales).toEqual({ currentWeek: 100, priorWeek: 200, forecast28: 300 });
   });
 
@@ -121,7 +125,7 @@ describe("weeklyKpis", () => {
       res({ reservationId: "3", bookedAt: "2026-07-12T23:59:00+09:00" }),
       res({ reservationId: "4", bookedAt: "2026-07-20T00:00:00+09:00" }),
     ]);
-    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" });
+    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
     expect(kpi.actual.currentWeek).toBe(2);
     expect(kpi.actual.priorWeek).toBe(1);
   });
@@ -160,6 +164,35 @@ describe("demandHeatmap", () => {
     expect(cells.find((cell) => cell.dow === 4 && cell.slot === "18-21")?.count).toBe(1);
     expect(cells.find((cell) => cell.dow === 4 && cell.slot === "21-23")?.count).toBe(0);
   });
+  it("不正時刻・営業時間外・対象期間外の予約を集計しない", () => {
+    const data = bundle([
+      res({ start: "invalid", end: "20:00" }),
+      res({ reservationId: "2", start: "25:00", end: "26:00" }),
+      res({ reservationId: "3", start: "01:00", end: "05:00" }),
+      res({ reservationId: "4", useDate: "2026-05-01" }),
+    ]);
+    expect(demandHeatmap(data, "2026-07-16").every((cell) => cell.count === 0)).toBe(true);
+  });
+  it("時刻パース不能・範囲外・6時前を飛ばし、有効な予約だけを計上する", () => {
+    const base = res({ useDate: "2026-07-10", start: "19:00", end: "20:00" });
+    const data: CanonicalBundle = {
+      reservations: [
+        { ...base, reservationId: "bad-format", start: "ab:cd" },
+        { ...base, reservationId: "out-of-range", start: "25:00", end: "26:00" },
+        { ...base, reservationId: "before-open", start: "01:00", end: "05:00" },
+        { ...base, reservationId: "valid" },
+      ],
+      customers: [], salesDaily: [], remarks: [],
+      meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
+    };
+    const cells = demandHeatmap(data, "2026-07-16");
+    expect(cells.find((cell) => cell.dow === 4 && cell.slot === "18-21")?.count).toBe(1);
+    expect(cells.reduce((sum, cell) => sum + cell.count, 0)).toBe(1);
+  });
+  it("不正な利用日は曜日計算前に日本語エラーにする", () => {
+    const data = bundle([res({ useDate: "2026-06-2x", status: "confirmed", start: "10:00", end: "11:00" })]);
+    expect(() => demandHeatmap(data, "2026-07-16")).toThrow("日付を解釈できません");
+  });
 });
 
 describe("leadTimeStats", () => {
@@ -192,6 +225,18 @@ describe("wardCounts", () => {
       { ward: "市川市", customers: 1, reservations: 1 },
       { ward: "不明", customers: 1, reservations: 1 },
     ]);
+  });
+  it("予約数・顧客数が同じ商圏は名称順にし、顧客だけの商圏も含める", () => {
+    const data = bundle([res({ ward: "横浜市" }), res({ reservationId: "2", ward: "荒川区" })], { customers: [customer({ ward: "横浜市" }), customer({ pseudoId: "z", ward: "荒川区" }), customer({ pseudoId: "only", ward: "千代田区" })] });
+    expect(wardCounts(data)).toEqual([
+      { ward: "横浜市", customers: 1, reservations: 1 },
+      { ward: "荒川区", customers: 1, reservations: 1 },
+      { ward: "千代田区", customers: 1, reservations: 0 },
+    ]);
+  });
+  it("不明が比較の右側でも常に末尾になる", () => {
+    const data = bundle([res({ ward: "不明" }), res({ reservationId: "2", ward: "台東区" }), res({ reservationId: "3", ward: "市川市" })]);
+    expect(wardCounts(data).at(-1)).toMatchObject({ ward: "不明" });
   });
 });
 

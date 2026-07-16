@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { decodeSjis, detectCsvType, parseCsvRows } from "./labolaCsv";
+import { decodeSjis, detectCsvType, parseCsvRows, selectLatestByType } from "./labolaCsv";
 
 const fixture = () =>
   readFileSync(join(__dirname, "__fixtures__", "labola", "yoyaku_sjis.csv"));
@@ -61,5 +61,21 @@ describe("detectCsvType", () => {
     expect(detectCsvType(["日付", "開始時間", "終了時間", "スペース"])).toBe("blocked");
     expect(detectCsvType(["対象期間", ""])).toBe("minerva");
     expect(detectCsvType(["未知", "列"])).toBeNull();
+  });
+});
+
+describe("selectLatestByType", () => {
+  it("未知CSVを警告し、同種別ではmtimeが新しいファイルを選ぶ", () => {
+    const result = selectLatestByType([
+      { name: "old.csv", mtimeMs: 1, type: "yoyaku" },
+      { name: "unknown.csv", mtimeMs: 2, type: null },
+      { name: "new.csv", mtimeMs: 3, type: "yoyaku" },
+    ]);
+    expect(result.selected.yoyaku).toBe("new.csv");
+    expect(result.warnings).toEqual(["未知CSVを無視: unknown.csv", "yoyaku CSVが複数のため古い方を無視"]);
+  });
+
+  it("同じmtimeでは先に渡したCSVを選ぶ", () => {
+    expect(selectLatestByType([{ name: "first.csv", mtimeMs: 1, type: "sales" }, { name: "second.csv", mtimeMs: 1, type: "sales" }]).selected.sales).toBe("first.csv");
   });
 });

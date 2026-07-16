@@ -44,7 +44,7 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const remarks: RemarkEntry[] = [];
   const onYmd = jstYmdOfIso(input.generatedAt);
   for (const row of input.yoyaku) {
-    if (seen.has(row.reservationId)) throw new Error(`予約番号が重複しています: ${row.reservationId}`);
+    if (seen.has(row.reservationId)) throw new Error("予約番号が重複しています");
     seen.add(row.reservationId);
     if (isExcluded(row, input.rules)) { excludedCount += 1; continue; }
     if (row.remarks) remarks.push({ reservationId: row.reservationId, useDate: row.useDate, category: row.category, remarks: row.remarks });
@@ -59,10 +59,13 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   }
   if (input.salesSummary === null) missingSections.push("salesSummary");
   const salesDaily = input.salesSummary ?? [];
-  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, coverage: { start: input.coverageStart, end: onYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings: input.parseWarnings } };
+  const warnings = [...input.parseWarnings];
+  const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
+  if (bookedDates.some((date) => date < input.coverageStart || date > onYmd)) warnings.push("予約受付日時が収録範囲外です");
+  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, coverage: { start: input.coverageStart, end: onYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
 }
 
 export function serializeJsonl(records: readonly unknown[]): string { return records.map((record) => JSON.stringify(record)).join("\n") + (records.length ? "\n" : ""); }
 export function parseJsonl<T>(content: string, guard: (value: unknown) => T): T[] {
-  return content.split("\n").filter((line) => line.trim() !== "").map((line, index) => { try { return guard(JSON.parse(line)); } catch (error) { throw new Error(`JSONLの${index + 1}行目が不正です: ${String(error)}`); } });
+  return content.split("\n").filter((line) => line.trim() !== "").map((line, index) => { try { return guard(JSON.parse(line)); } catch { throw new Error(`JSONLの${index + 1}行目が不正です`); } });
 }

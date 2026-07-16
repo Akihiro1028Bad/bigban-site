@@ -4,6 +4,7 @@ import {
   poissonUpperTailP,
   quantile,
   wilsonInterval,
+  wilsonIntervalPositive,
 } from "./reservationStats";
 
 describe("wilsonInterval", () => {
@@ -21,6 +22,15 @@ describe("wilsonInterval", () => {
   });
 });
 
+describe("wilsonIntervalPositive", () => {
+  it("正の標本数ではwilsonIntervalと同じ区間を返す", () => {
+    expect(wilsonIntervalPositive(3, 47)).toEqual(wilsonInterval(3, 47));
+  });
+  it("標本数0は日本語エラーにする", () => {
+    expect(() => wilsonIntervalPositive(0, 0)).toThrow("正の標本数");
+  });
+});
+
 describe("poisson tails", () => {
   it("P(X≥k)とP(X≤k)が基本性質を満たす", () => {
     expect(poissonUpperTailP(0, 2)).toBeCloseTo(1, 10);
@@ -28,6 +38,10 @@ describe("poisson tails", () => {
     expect(poissonLowerTailP(1, 4)).toBeCloseTo(0.091578, 4);
     expect(poissonUpperTailP(3, 0)).toBe(0);
     expect(poissonUpperTailP(0, 0)).toBe(1);
+    expect(poissonLowerTailP(0, 0)).toBe(1);
+    expect(poissonLowerTailP(-1, 2)).toBe(0);
+    expect(poissonLowerTailP(1000, 1000)).toBeGreaterThan(0.45);
+    expect(poissonLowerTailP(1000, 1000)).toBeLessThan(0.55);
   });
 });
 

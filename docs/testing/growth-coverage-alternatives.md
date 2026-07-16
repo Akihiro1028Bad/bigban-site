@@ -32,6 +32,7 @@
 | `scripts/growth/comment-revise-cli.ts` | `scripts/growth/bodyComment.test.ts` |
 | `scripts/growth/daemon-cli.ts` | `scripts/growth/daemonSmoke.test.ts`<br>`scripts/growth/daemonSchedule.test.ts`<br>`scripts/growth/processControl.test.ts` |
 | `scripts/growth/metrics-cli.ts` | `scripts/growth/metrics.test.ts` |
+| `scripts/growth/ingest-cli.ts` | `scripts/growth/labolaCsv.test.ts`<br>`scripts/growth/labolaSchemas.test.ts`<br>`scripts/growth/labolaNormalize.test.ts`<br>`scripts/growth/reservationAggregates.test.ts`<br>`scripts/growth/insightEngine.test.ts`<br>`scripts/growth/snapshotBuild.test.ts`<br>`scripts/growth/reservationDigest.test.ts` |
 | `scripts/growth/learning-log-cli.ts` | `scripts/growth/learningLog.test.ts` |
 | `scripts/growth/publish-due-cli.ts` | `scripts/growth/publishDueApplication.test.ts`<br>`scripts/growth/publishGate.test.ts` |
 | `scripts/growth/review-due-cli.ts` | `scripts/growth/review-due.test.ts` |

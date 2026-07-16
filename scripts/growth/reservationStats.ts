@@ -18,16 +18,21 @@ export function wilsonInterval(
   };
 }
 
+export function wilsonIntervalPositive(successes: number, n: number): { low: number; high: number } {
+  const interval = wilsonInterval(successes, n);
+  if (interval === null) throw new Error("Wilson区間は正の標本数が必要です");
+  return interval;
+}
+
 export function poissonLowerTailP(observed: number, mean: number): number {
   if (mean <= 0) return 1;
-  let term = Math.exp(-mean);
-  let sum = term;
-  for (let count = 1; count <= observed; count += 1) {
-    term *= mean / count;
-    sum += term;
-  }
-  return Math.min(1, sum);
+  if (observed < 0) return 0;
+  const logs = Array.from({ length: observed + 1 }, (_, count) => -mean + count * Math.log(mean) - logFactorial(count));
+  const maximum = Math.max(...logs);
+  return Math.min(1, Math.exp(maximum) * logs.reduce((sum, value) => sum + Math.exp(value - maximum), 0));
 }
+
+function logFactorial(value: number): number { let total = 0; for (let count = 2; count <= value; count += 1) total += Math.log(count); return total; }
 
 export function poissonUpperTailP(observed: number, mean: number): number {
   if (mean <= 0) return observed <= 0 ? 1 : 0;

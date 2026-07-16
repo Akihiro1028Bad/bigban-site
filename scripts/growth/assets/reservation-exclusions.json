@@ -1,4 +1,4 @@
 {
-  "emails": ["owner-main@example.com", "owner-sub@example.com"],
+  "emails": [],
   "nameContains": ["テスト", "試験"]
 }

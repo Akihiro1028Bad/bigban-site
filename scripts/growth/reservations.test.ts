@@ -32,6 +32,10 @@ describe("reservation coverage", () => {
     expect(parseCanonicalMeta('{"generatedAt":"2026-07-16T05:20:00.000Z","coverage":{"start":"2026-06-30","end":"2026-07-13"}}')).toEqual({ generatedAt: "2026-07-16T05:20:00.000Z", coverage: { start: "2026-06-30", end: "2026-07-13" } });
     expect(() => parseCanonicalMeta('{"generatedAt":"x","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/generatedAt/);
     expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/前後/);
+    expect(() => parseCanonicalMeta("{")).toThrow(/JSON/);
+    expect(() => parseCanonicalMeta("null")).toThrow(/形式/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z"}')).toThrow(/coverage/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"bad","end":"2026-07-16"}}')).toThrow(/日付/);
   });
 
   it("currentとpriorを別々に収録判定する", () => {
@@ -51,6 +55,15 @@ describe("parseCanonicalReservationsJsonl", () => {
     expect(parsed).toMatchObject({ hasSourcePagePath: false, records: [{ reservationId: "1" }, { reservationId: "2" }] });
   });
   it("不正statusを拒否する", () => expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T14:19:00+09:00","status":"pending"}\n')).toThrow(/status/));
+  it("JSON・形式・ID重複・日時不正を拒否する", () => {
+    expect(() => parseCanonicalReservationsJsonl("{\n")).toThrow(/JSON/);
+    expect(() => parseCanonicalReservationsJsonl("[]\n")).toThrow(/reservationId/);
+    expect(() => parseCanonicalReservationsJsonl("null\n")).toThrow(/形式/);
+    expect(() => parseCanonicalReservationsJsonl('"text"\n')).toThrow(/形式/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/reservationId/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"x","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/重複/);
+  });
 });
 
 describe("aggregateReservations", () => {

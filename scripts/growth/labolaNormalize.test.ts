@@ -12,6 +12,16 @@ describe("buildCanonical", () => {
   it("任意CSV欠落をmissingSectionsへ、coverage.endは生成日JST", () => { const bundle = buildCanonical({ ...base, yoyaku: [yoyaku({})] }); expect(bundle.meta.missingSections).toEqual(["customer", "salesSummary"]); expect(bundle.meta.coverage).toEqual({ start: "2026-06-01", end: "2026-07-16" }); expect(bundle.meta.warnings).toContain("w1"); });
   it("予約IDの重複はエラー", () => expect(() => buildCanonical({ ...base, yoyaku: [yoyaku({}), yoyaku({})] })).toThrow("重複"));
   it("顧客にも除外とPII境界を適用する", () => { const bundle = buildCanonical({ ...base, yoyaku: [], customers: [{ registeredAt: "2026-07-01", customerType: "一般", memberNo: "1", name: "削除対象", email: "", postal: "", address: "東京都台東区1", gender: "", birthDate: "", occupation: "" }] }); expect(bundle.customers).toEqual([]); expect(bundle.meta.excludedCount).toBe(1); });
+  it("除外されない顧客を正準化し、受付日が範囲外なら警告する", () => {
+    const bundle = buildCanonical({ ...base, coverageStart: "2026-07-01", yoyaku: [yoyaku({ bookedAt: "2026-06-30T10:00:00+09:00" })], customers: [{ registeredAt: "2026-07-01", customerType: "一般", memberNo: "2", name: "架空顧客", email: "customer@example.com", postal: "", address: "東京都台東区1", gender: "", birthDate: "1990/01/01", occupation: "会社員" }] });
+    expect(bundle.customers[0]).toMatchObject({ ward: "台東区", ageBand: "30代" });
+    expect(bundle.meta.warnings).toContain("予約受付日時が収録範囲外です");
+  });
+  it("売上サマリが空配列でも欠落扱いにしない", () => {
+    const bundle = buildCanonical({ ...base, yoyaku: [], salesSummary: [] });
+    expect(bundle.meta.missingSections).toEqual(["customer"]);
+    expect(bundle.salesDaily).toEqual([]);
+  });
 });
 describe("JSONL往復", () => {
   it("serialize→parseで同一になる", () => { const records = [{ a: 1 }, { a: 2 }]; expect(parseJsonl(serializeJsonl(records), (value) => value as { a: number })).toEqual(records); });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isExcluded, parseExclusionRules } from "./reservationExclusions";
+import { isExcluded, mergeExclusionRules, parseExclusionRules } from "./reservationExclusions";
 
 const rules = { emails: ["owner@example.com"], nameContains: ["テスト"] };
 describe("parseExclusionRules", () => {
@@ -12,4 +12,8 @@ describe("isExcluded", () => {
   it("名前部分一致で除外", () => expect(isExcluded({ email: "x@y.z", name: "▲テスト太郎" }, rules)).toBe(true));
   it("該当なしは残す", () => expect(isExcluded({ email: "x@y.z", name: "本物顧客" }, rules)).toBe(false));
   it("メールが空でも名前規則で判定する", () => expect(isExcluded({ email: "", name: "テスト利用" }, rules)).toBe(true));
+});
+describe("mergeExclusionRules", () => {
+  it("環境変数のメールを空白除去して追加する", () => expect(mergeExclusionRules(rules, " extra@example.com,owner@example.com ")).toEqual({ emails: ["owner@example.com", "extra@example.com"], nameContains: ["テスト"] }));
+  it("未設定なら元の規則を維持する", () => expect(mergeExclusionRules(rules, undefined)).toEqual(rules));
 });

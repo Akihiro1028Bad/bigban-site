@@ -1,5 +1,5 @@
 /** 正準予約データセットから経営ボード用のコア集計を作る純ロジック。 */
-import { quantile, wilsonInterval } from "./reservationStats";
+import { quantile, wilsonIntervalPositive } from "./reservationStats";
 import type { CanonicalBundle, CanonicalReservation } from "./labolaNormalize";
 import type { DateRange } from "./period";
 
@@ -50,7 +50,7 @@ function salesInRange(bundle: CanonicalBundle, range: DateRange, isForecast: boo
  * current.end を含む過去28日をセルフ予約の窓とする。
  * current/prior の週比較とは独立し、窓は current.end を基準に固定する。
  */
-export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: DateRange): {
+export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: DateRange, referenceYmd: string): {
   actual: { currentWeek: number; priorWeek: number; cumulative: number };
   self: { selfCount4w: number; total4w: number; smartphone4w: number };
   sales: { currentWeek: number | null; priorWeek: number | null; forecast28: number | null };
@@ -58,8 +58,7 @@ export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: D
   const confirmed = confirmedReservations(bundle);
   const selfRange = recent28Range(current.end);
   const recent = confirmed.filter((reservation) => isWithin(jstYmdOfIso(reservation.bookedAt), selfRange));
-  // 見込みは週末の翌日から27日後までを対象にする。
-  const forecastRange = { start: addDays(current.end, 1), end: addDays(current.end, 27) };
+  const forecastRange = { start: referenceYmd, end: addDays(referenceYmd, 27) };
   return {
     actual: { currentWeek: countBookedIn(confirmed, current), priorWeek: countBookedIn(confirmed, prior), cumulative: confirmed.length },
     self: { selfCount4w: recent.filter((reservation) => SELF_CHANNELS.has(reservation.channel)).length, total4w: recent.length, smartphone4w: recent.filter((reservation) => reservation.channel === "user_sp").length },
@@ -142,6 +141,7 @@ function increment(counts: Map<string, number>, ward: string): void {
   counts.set(ward, (counts.get(ward) ?? 0) + 1);
 }
 
+/** 予約数・顧客数の降順。同値時は文字列比較(コードポイント)順、「不明」は末尾。 */
 export function wardCounts(bundle: CanonicalBundle): { ward: string; customers: number; reservations: number }[] {
   const customers = new Map<string, number>(); const reservations = new Map<string, number>();
   for (const customer of bundle.customers) increment(customers, customer.ward);
@@ -159,7 +159,6 @@ export function cancellationStats(bundle: CanonicalBundle, referenceYmd: string)
   const reservations = bundle.reservations.filter((reservation) => isWithin(jstYmdOfIso(reservation.bookedAt), range));
   if (reservations.length === 0) return null;
   const cancelled = reservations.filter((reservation) => reservation.status === "cancelled").length;
-  const interval = wilsonInterval(cancelled, reservations.length);
-  if (interval === null) return null;
+  const interval = wilsonIntervalPositive(cancelled, reservations.length);
   return { n: reservations.length, cancelled, rate: cancelled / reservations.length, ciLow: interval.low, ciHigh: interval.high };
 }

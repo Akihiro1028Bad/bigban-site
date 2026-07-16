@@ -16,6 +16,10 @@ describe("日付変換", () => {
   it("スラッシュ・和文日付をYMDへ", () => { expect(jpDateToYmd("2026/08/13")).toBe("2026-08-13"); expect(jpDateToYmd("2026年7月5日")).toBe("2026-07-05"); });
   it("不正な日付はエラー", () => expect(() => jpDateToYmd("不明")).toThrow("日付"));
   it("不正な日時はエラー", () => expect(() => jpDateTimeToIso("2026/07/15 14:19")).toThrow("日時"));
+  it("実在しない日付と時刻範囲を拒否する", () => {
+    expect(() => jpDateToYmd("2026/02/30")).toThrow("日付");
+    expect(() => jpDateTimeToIso("2026年07月15日 24:00")).toThrow("日時");
+  });
 });
 
 describe("parseYoyakuRows", () => {
@@ -44,6 +48,7 @@ describe("parseYoyakuRows", () => {
     delete values[header.indexOf("備考")];
     expect(parseYoyakuRows([header, values]).rows[0]).toMatchObject({ partySize: null, remarks: "" });
   });
+  it("終了時刻が開始時刻以前の予約を拒否する", () => expect(() => parseYoyakuRows([header, row({ "開始時間": "20:00", "終了時間": "20:00" })])).toThrow("終了時間"));
 });
 
 describe("parseCustomerRows", () => {

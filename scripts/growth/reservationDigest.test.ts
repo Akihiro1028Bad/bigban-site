@@ -12,3 +12,17 @@ it("警告も新規気づきも無い場合はタイトルだけにし、備考�
   expect(digest).toContain("新規気づき0件");
   expect(formatRemarksReview([], "2026-07-16")).toContain("# 備考レビュー");
 });
+it("D1とn<3の気づきは具体名を含まないタイトルに置換する", () => {
+  const value = snapshotSchema.parse({ ...snapshot(), insights: [{ id: "d1:ward:具体エリア", detector: "D1", severity: "notice", title: "具体エリアの初予約", body: "", evidence: { n: 1 }, label: "観察", firstSeen: "", status: "new" }] });
+  const text = formatIngestDigest(value);
+  expect(text).toContain("新しいエリアからの初予約");
+  expect(text).not.toContain("具体エリア");
+});
+it("D1以外でnが数値でなければ元のタイトルを使う", () => {
+  const value = snapshotSchema.parse({ ...snapshot(), insights: [{ id: "d2:weekly:x", detector: "D2", severity: "info", title: "通常の変化", body: "", evidence: { n: "unknown" }, label: "観察", firstSeen: "", status: "new" }] });
+  expect(formatIngestDigest(value)).toContain("通常の変化");
+});
+it("D1以外でnが3以上なら元のタイトルを使う", () => {
+  const value = snapshotSchema.parse({ ...snapshot(), insights: [{ id: "d2:weekly:y", detector: "D2", severity: "info", title: "十分な標本の変化", body: "", evidence: { n: 3 }, label: "観察", firstSeen: "", status: "new" }] });
+  expect(formatIngestDigest(value)).toContain("十分な標本の変化");
+});

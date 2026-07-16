@@ -18,10 +18,11 @@ export function ageBand(birthDate: string, onYmd: string): string {
   const match = birthDate.trim().match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
   if (!match) return "不明";
   const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
-  const on = new Date(`${onYmd}T00:00:00+09:00`).getTime();
-  const birth = Date.UTC(year, month - 1, day);
-  if (!Number.isFinite(on) || !Number.isFinite(birth) || birth > on) return "不明";
-  const age = Math.floor((on - birth) / (365.25 * 24 * 3600 * 1000));
+  const onMatch = onYmd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!onMatch) return "不明";
+  const onYear = Number(onMatch[1]); const onMonth = Number(onMatch[2]); const onDay = Number(onMatch[3]);
+  if (month > 12 || day > 31 || year > onYear) return "不明";
+  const age = onYear - year - (onMonth < month || (onMonth === month && onDay < day) ? 1 : 0);
   if (age < 20) return "10代以下";
   if (age >= 60) return "60代以上";
   return `${Math.floor(age / 10) * 10}代`;

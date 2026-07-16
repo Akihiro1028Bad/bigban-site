@@ -24,23 +24,25 @@ export interface SalesSummaryRow {
 
 export function jpDateTimeToIso(value: string): string {
   const match = value.trim().match(/^(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})$/);
-  if (!match) throw new Error(`日時を解釈できません: ${value}`);
+  if (!match) throw new Error("日時を解釈できません");
   const [, year, month, day, hour, minute] = match;
+  if (!isCalendarDate(Number(year), Number(month), Number(day)) || Number(hour) > 23 || Number(minute) > 59) throw new Error("日時が不正です");
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hour.padStart(2, "0")}:${minute}:00+09:00`;
 }
 
 export function jpDateToYmd(value: string): string {
   const cleaned = value.trim().replace(/（.*?）|\(.*?\)/g, "");
   const match = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/) ?? cleaned.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/);
-  if (!match) throw new Error(`日付を解釈できません: ${value}`);
+  if (!match || !isCalendarDate(Number(match?.[1]), Number(match?.[2]), Number(match?.[3]))) throw new Error("日付を解釈できません");
   return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
 }
+function isCalendarDate(year: number, month: number, day: number): boolean { const date = new Date(Date.UTC(year, month - 1, day)); return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day; }
 
 function headerIndex(headers: readonly string[], required: readonly string[]): Record<string, number> {
   const map: Record<string, number> = {};
   headers.forEach((name, index) => { if (!(name.trim() in map)) map[name.trim()] = index; });
   for (const name of required) {
-    if (!(name in map)) throw new Error(`必須列 ${name} がありません(検出ヘッダー: ${headers.join(",")})`);
+    if (!(name in map)) throw new Error(`必須列 ${name} がありません`);
   }
   return map;
 }
@@ -49,7 +51,7 @@ function toAmount(value: string): number | null {
   const cleaned = value.replace(/[,¥\s]/g, "");
   if (cleaned === "") return null;
   const parsed = Number(cleaned);
-  if (!Number.isFinite(parsed)) throw new Error(`金額を解釈できません: ${value}`);
+  if (!Number.isFinite(parsed)) throw new Error("金額を解釈できません");
   return parsed;
 }
 
@@ -66,13 +68,14 @@ export function parseYoyakuRows(rows: string[][]): { rows: YoyakuRow[]; warnings
     const cell = (name: string) => (values[columns[name]] ?? "").trim();
     const statusRaw = cell("予約ステータス");
     const status = STATUS_MAP[statusRaw];
-    if (!status) throw new Error(`${rowIndex + 2}行目: 未知の予約ステータスです: ${statusRaw}(写像を更新してください)`);
+    if (!status) throw new Error(`${rowIndex + 2}行目: 予約ステータスが不正です`);
     const channelRaw = cell("予約方法");
     const channel = CHANNEL_MAP[channelRaw] ?? "unknown";
-    if (channel === "unknown" && channelRaw !== "") warnings.push(`${rowIndex + 2}行目: 未知の予約方法: ${channelRaw}`);
+    if (channel === "unknown" && channelRaw !== "") warnings.push(`${rowIndex + 2}行目: 予約方法が未対応です`);
     const partySizeRaw = partySizeIndex < 0 ? "" : (values[partySizeIndex] ?? "").trim();
     const partySize = partySizeRaw === "" ? null : Number(partySizeRaw);
-    if (partySize !== null && !Number.isFinite(partySize)) throw new Error(`利用人数を解釈できません: ${partySizeRaw}`);
+    if (partySize !== null && !Number.isFinite(partySize)) throw new Error(`${rowIndex + 2}行目: 利用人数が不正です`);
+    if (cell("終了時間") <= cell("開始時間")) throw new Error(`${rowIndex + 2}行目: 終了時間が開始時間以前です`);
     return { reservationId: cell("予約番号"), bookedAt: jpDateTimeToIso(cell("受付日時")), useDate: jpDateToYmd(cell("日付")), start: cell("開始時間"), end: cell("終了時間"), category: cell("カテゴリー"), space: cell("予約内容"), status, acceptStatus: cell("受付ステータス"), paymentStatus: cell("決済ステータス"), paymentMethod: cell("支払い方法"), plan: cell("料金プラン"), amount: toAmount(cell("金額")), partySize, channel, customerType: cell("顧客タイプ"), memberNo: cell("会員番号"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業"), remarks: cell("備考") };
   });
   return { rows: result, warnings };
