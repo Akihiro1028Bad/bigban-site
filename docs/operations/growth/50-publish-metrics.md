@@ -24,11 +24,6 @@
 - 純ロジック `scripts/growth/metrics.ts`(`articlePagePath`/`normalizePagePath`/`metricsForPagePath`/`serializeMetrics`/`parseMetrics`/`buildMetricsMirrorProps`/`summarizeMetrics`・`src/lib/growth/metrics.ts` 再エクスポート)＋表示整形 `articleMetricsView.ts`(`formatCount`/`formatDelta`)、CLI はカバレッジ除外。
 - `growth:metrics` は cron 等で定期実行(claude 不使用の純データ結線・`GROWTH_DRYRUN=1` で空実行)。
 
-### CTAイベント別・実予約CSV（#280）
+### 実予約データ(施設経営データ基盤)
 
-- GA4は `topPages(pagePath)` と `topPageCtaEvents(pagePath,eventName)` を別取得する。CTAレポートは正典 `ctaEvents.ts` のイベント名だけをfilterする。
-- `growth:metrics` は `GROWTH_RESERVATION_CSV_PATH` の正規化CSVと収録範囲sidecar（既定 `<CSVパス>.coverage.json`、任意 `GROWTH_RESERVATION_COVERAGE_PATH`）を1回読み、mtimeを `syncedAt` として全記事の同一snapshotへ保存する。sidecarは `{"coverageStart":"YYYY-MM-DD","coverageEnd":"YYYY-MM-DD"}`。
-- current/priorを別々に収録判定し、片方でも範囲外なら `coverage_incomplete` として実予約を未取得にする。両期間が完全収録された空CSVだけを実測0件として扱う。
-- CSV/sidecarが未設定・読取失敗・不正でもGA4/GSC更新は継続し、実予約だけ `missing` にする。逆にGoogle認証・GA4取得・topPages一致が失敗しても、既知記事へ実予約状態を書き込む。7日超・未来・不正mtimeは古い表示となる。
-- PerformanceBoardは予約意図、SNS、その他CTA、施設全体実予約、記事帰属実予約を混同せず表示する。
-- CTA計測状態は `GROWTH_GA4_KEYEVENTS_SINCE` とレポート期間で判定する。期間全体が設定日以降なら `measured`、期間内に設定日があれば `partial`、期間前・不正・GA4失敗は `unmeasured`。記事公開日は使わない。
+実予約は **施設経営データ基盤**(設計: `docs/superpowers/specs/2026-07-16-labola-reservation-ingest-design.md`)から供給する。週次でラボーラ管理画面から全期間CSVをドロップディレクトリへエクスポートし、`npm run growth:ingest` が正準データセット(PII除去済みJSONL)とスナップショット(集計+気づき)を生成、LINEダイジェストを送る。`growth:metrics` は `GROWTH_RESERVATION_DATA_DIR/canonical/` を読み、従来どおり記事別の実予約状態をNotionミラーへ書く(coverage不足→`coverage_incomplete`、未設定/読取失敗→`missing` の扱いは従来と同じ)。旧CSV+sidecar形式は廃止。
