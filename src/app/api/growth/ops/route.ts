@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { defaultFetch } from "@/lib/growth/notion";
-import { queryAllDataSource } from "@/lib/growth/notionRepository";
+import { queryRecentDataSource } from "@/lib/growth/notionRepository";
 import { growthOpsViewFromPages, type GrowthOpsView } from "@/lib/growth/workerLog";
 
 export const runtime = "nodejs";
@@ -36,11 +36,12 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const pages = await queryAllDataSource(
+    const pages = await queryRecentDataSource(
       dataSourceId,
       {
         sorts: [{ property: "記録時刻", direction: "descending" }],
       },
+      50,
       { token, fetchFn: defaultFetch }
     );
     return NextResponse.json({ success: true, ops: growthOpsViewFromPages(pages) });

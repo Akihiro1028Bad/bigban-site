@@ -240,6 +240,8 @@ function appendFactReferences(
       sectionPath: reference.sectionPath,
       container: reference.container,
       containerIndex: reference.containerIndex,
+      containerTextHash: reference.containerTextHash,
+      containerMatchCount: reference.containerMatchCount,
       recheckBeforePublish: reason !== undefined,
       ...(reason ? { recheckReason: reason } : {}),
       ...(binding ? { bindingVersion: binding.version, bodyHash: binding.bodyHash } : {}),

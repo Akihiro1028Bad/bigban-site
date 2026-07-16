@@ -13,13 +13,31 @@ export class UpstashFailureStore implements FailureStore {
     private readonly fetchFn: typeof fetch = fetch
   ) {}
 
+  async failureCount(key: string, nowMs: number): Promise<FailureCount> {
+    return this.execute(
+      "local n=tonumber(redis.call('GET',KEYS[1]) or '0'); return {n,redis.call('PTTL',KEYS[1])}",
+      key,
+      [],
+      nowMs,
+    );
+  }
+
   async incrementFailure(key: string, nowMs: number, windowMs: number): Promise<FailureCount> {
     const script =
       "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('PEXPIRE',KEYS[1],ARGV[1]) end; return {n,redis.call('PTTL',KEYS[1])}";
+    return this.execute(script, key, [String(windowMs)], nowMs);
+  }
+
+  private async execute(
+    script: string,
+    key: string,
+    args: readonly string[],
+    nowMs: number,
+  ): Promise<FailureCount> {
     const response = await this.fetchFn(this.url, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(["EVAL", script, "1", key, String(windowMs)]),
+      body: JSON.stringify(["EVAL", script, "1", key, ...args]),
     });
     if (!response.ok) throw new Error("rate limit backend unavailable");
     const body: unknown = await response.json();

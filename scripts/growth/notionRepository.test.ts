@@ -10,6 +10,7 @@ import {
   NOTION_MAX_PAGES,
   queryAllDataSource,
   queryFirstDataSource,
+  queryRecentDataSource,
 } from "./notionRepository";
 
 const page = (id: string): NotionPage => ({ id, url: `https://notion.so/${id}`, properties: {} });
@@ -126,5 +127,27 @@ describe("先頭1件reader", () => {
     await expect(getLatestReport("ds", options(fetchFn))).resolves.toEqual(page("latest"));
     expect(bodyOf(fetchFn, 0)).toEqual({ sorts: [{ timestamp: "created_time", direction: "descending" }], page_size: 1 });
     await expect(getLatestReport("ds", options(fetchFn))).resolves.toBeNull();
+  });
+});
+
+describe("件数上限付きreader", () => {
+  it("queryRecentDataSourceは指定件数を1ページだけ取得し、has_moreを追わない", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(ok({
+      results: [page("latest")],
+      has_more: true,
+      next_cursor: "unused",
+    }));
+
+    await expect(queryRecentDataSource(
+      "ds",
+      { sorts: [{ property: "記録時刻", direction: "descending" }] },
+      50,
+      options(fetchFn),
+    )).resolves.toEqual([page("latest")]);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(bodyOf(fetchFn, 0)).toEqual({
+      sorts: [{ property: "記録時刻", direction: "descending" }],
+      page_size: 50,
+    });
   });
 });

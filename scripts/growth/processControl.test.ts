@@ -166,6 +166,18 @@ describe("runProcess", () => {
     })).toMatchObject({ kind: "max-buffer", timedOut: false });
   });
 
+  it.skipIf(process.platform === "win32")("inherit modeでもwrapperのspawn errorを識別する", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await expect(runProcess("__missing_growth_command__", [], {
+        timeoutMs: 2_000,
+        stdio: "inherit",
+      })).resolves.toMatchObject({ kind: "spawn-error", timedOut: false });
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
   it.skipIf(process.platform === "win32")("signal終了をtimeoutと区別する", async () => {
     expect(await runProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], {
       timeoutMs: 2_000,
@@ -214,6 +226,35 @@ describe("runProcess", () => {
         await running;
         rmSync(dir, { recursive: true, force: true });
       }
+    }
+  }, SUBPROCESS_TEST_TIMEOUT_MS);
+
+  it.skipIf(process.platform === "win32")("親SIGTERM時も無視する子孫を猶予後に強制終了する", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-parent-signal-tree-"));
+    const ready = path.join(dir, "ready.txt");
+    const grandchild = `require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready');process.on('SIGTERM',()=>{});setInterval(()=>{},1000)`;
+    const parent = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:'inherit'});setInterval(()=>{},1000)`;
+    const running = runProcess(process.execPath, ["-e", parent], {
+      timeoutMs: 2_000,
+      killGraceMs: 30,
+      stdio: "capture",
+    });
+    let hasSignaled = false;
+    try {
+      await waitForPath(ready, 10_000);
+      process.emit("SIGTERM", "SIGTERM");
+      hasSignaled = true;
+      await expect(running).resolves.toMatchObject({
+        kind: "signal",
+        signal: "SIGTERM",
+        timedOut: false,
+        termSent: true,
+        forceKilled: true,
+      });
+    } finally {
+      if (!hasSignaled) process.emit("SIGTERM", "SIGTERM");
+      await running;
+      rmSync(dir, { recursive: true, force: true });
     }
   }, SUBPROCESS_TEST_TIMEOUT_MS);
 
@@ -273,7 +314,7 @@ describe("runProcess", () => {
     const nested = `import { existsSync } from 'node:fs'; import { runProcess } from ${JSON.stringify(moduleUrl)}; const running=runProcess(process.execPath,['-e',${JSON.stringify(nestedAgent)}],{timeoutMs:5000,killGraceMs:30,stdio:'capture'}); while(!existsSync(${JSON.stringify(ready)})) await new Promise(resolve=>setTimeout(resolve,10)); await running;`;
     try {
       const result = await runProcess(process.execPath, ["--input-type=module", "-e", nested], { timeoutMs: 1_000, killGraceMs: 50, stdio: "capture" });
-      expect(result).toMatchObject({ kind: "timeout", forceKilled: true });
+      expect(result).toMatchObject({ kind: "timeout", termSent: true });
       await new Promise((resolve) => setTimeout(resolve, 600));
       expect(existsSync(marker)).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }

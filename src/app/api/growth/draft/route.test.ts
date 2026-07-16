@@ -139,6 +139,12 @@ describe("GET /api/growth/draft", () => {
       bodyHash: "fnv1a64:original",
       referenceCount: 1,
       isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        container: "p",
+        containerIndex: 1,
+      }],
     });
   });
 

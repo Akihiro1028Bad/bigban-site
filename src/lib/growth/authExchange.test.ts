@@ -23,7 +23,7 @@ describe("authExchange", () => {
   });
 
   it("Upstash Lua応答をcount/resetへ変換し、HTTP/形式異常を拒否する", async () => {
-    const okFetch = vi.fn().mockResolvedValue(Response.json({ result: [2, 5000] }));
+    const okFetch = vi.fn().mockImplementation(async () => Response.json({ result: [2, 5000] }));
     const store = new UpstashFailureStore("https://redis.test", "token", okFetch);
     await expect(store.incrementFailure("hash", 1000, 900_000)).resolves.toEqual({ count: 2, resetAt: 6000 });
     expect(okFetch.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
@@ -34,6 +34,13 @@ describe("authExchange", () => {
       "1",
       "hash",
       "900000",
+    ]);
+    await expect(store.failureCount("hash", 1000)).resolves.toEqual({ count: 2, resetAt: 6000 });
+    expect(JSON.parse(String(okFetch.mock.calls[1][1].body))).toEqual([
+      "EVAL",
+      expect.stringMatching(/GET.*PTTL/),
+      "1",
+      "hash",
     ]);
 
     const badStatus = new UpstashFailureStore("x", "t", vi.fn().mockResolvedValue(new Response("", { status: 500 })));

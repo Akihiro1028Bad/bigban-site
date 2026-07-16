@@ -3266,6 +3266,53 @@ describe("ApproveClient 生成中の可視化(#108)", () => {
     }
   });
 
+  it("盤ポーリングでセッションが切れたら再ログイン画面へ戻す", async () => {
+    window.history.replaceState(null, "", "/?view=approve");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence(
+        { json: { success: true, items: [ideaItem({ id: "i1", title: "進行中", stage: "generating" })] } },
+        { ok: false, status: 401, json: { success: false, error: "認証に失敗しました" } },
+      );
+      render(<ApproveClient />);
+      await login();
+      expect(await screen.findByText("進行中")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_100);
+      });
+
+      expect(await screen.findByLabelText("合言葉")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("セッションの有効期限");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("運用ポーリングでセッションが切れたら再ログイン画面へ戻す", async () => {
+    window.history.replaceState(null, "", "/");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockFetchSequence({ json: { success: true, items: [ideaItem({ stage: "drafted" })] } });
+      render(<ApproveClient />);
+      await login();
+      await screen.findByRole("navigation", { name: "情報源" });
+
+      mockOpsResponse(Promise.resolve(jsonResponse(
+        { success: false, error: "認証に失敗しました" },
+        { ok: false, status: 401 },
+      )));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_100);
+      });
+
+      expect(await screen.findByLabelText("合言葉")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("セッションの有効期限");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("生成中が長引くと滞留警告を出す", async () => {
     flags.authEnabled = false;
     // Date は実物のまま spy で制御し、タイマだけ偽装する(setSystemTime の catch-up を避ける)。

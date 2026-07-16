@@ -1,6 +1,10 @@
 import { Parser } from "htmlparser2";
 
-import { bindingBodyHash, FACT_BINDING_VERSION } from "./factBindingMetadata";
+import {
+  bindingBodyHash,
+  bindingContainerTextHash,
+  FACT_BINDING_VERSION,
+} from "./factBindingMetadata";
 
 import type { ResearchFact } from "./draftPipeline";
 
@@ -19,6 +23,8 @@ export interface FactReference {
   sectionPath: string;
   container: "p" | "li" | "th" | "td";
   containerIndex: number;
+  containerTextHash: string;
+  containerMatchCount: number;
   claimKinds: FactClaimKind[];
 }
 
@@ -54,6 +60,7 @@ interface ContainerState {
   index: number;
   text: string;
   ranges: BoundRange[];
+  sectionPath: string;
   tableHeader?: string;
 }
 
@@ -316,6 +323,7 @@ export function validateAndStripFactBindings(params: {
           index: ++containerCounts[containerName],
           text: "",
           ranges: [],
+          sectionPath: sectionPath(headings),
           ...(containerName === "td" && tableHeaders ? { tableHeader: tableHeaders[tableColumn] } : {}),
         };
         containers.push(container);
@@ -349,7 +357,7 @@ export function validateAndStripFactBindings(params: {
         end: parser.endIndex,
         ids,
         excerpt,
-        sectionPath: sectionPath(headings),
+        sectionPath: container.sectionPath,
         container,
         atoms,
       };
@@ -417,6 +425,13 @@ export function validateAndStripFactBindings(params: {
         sectionPath: marker.sectionPath,
         container: marker.container.name,
         containerIndex: marker.container.index,
+        containerTextHash: bindingContainerTextHash(marker.container.text),
+        containerMatchCount: containers.filter(
+          (container) =>
+            container.name === marker.container.name
+            && container.sectionPath === marker.container.sectionPath
+            && bindingContainerTextHash(container.text) === bindingContainerTextHash(marker.container.text),
+        ).length,
         claimKinds: [...new Set(marker.atoms.map((atom) => atom.kind))],
       });
     }

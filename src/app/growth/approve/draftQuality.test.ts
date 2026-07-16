@@ -33,14 +33,32 @@ function okHtml(): string {
 }
 
 describe("draftQuality", () => {
-  it("bindingメタデータがある記事は本文hash不一致・不正versionをblockし、未設定記事は互換維持する", () => {
+  it("bindingメタデータがある記事はfact抜粋だけを照合し、不正versionをblockする", () => {
     const bodyHtml = okHtml();
     expect(pick(draftQuality({ bodyHtml, body: "", title: "t" }), "fact binding").level).toBe("ok");
+    const factBinding = {
+      version: 1,
+      bodyHash: "fnv1a64:original",
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "料金は500円です。",
+        container: "p" as const,
+        containerIndex: 1,
+      }],
+    };
     expect(pick(draftQuality({
-      bodyHtml,
+      bodyHtml: '<figure><img src="new.png"></figure><p>料金は500円です。</p><p>補足を変更</p>',
       body: "",
       title: "t",
-      factBinding: { version: 1, bodyHash: "fnv1a64:stale", referenceCount: 1, isValid: true },
+      factBinding,
+    }), "fact binding").level).toBe("ok");
+    expect(pick(draftQuality({
+      bodyHtml: "<p>料金は600円です。</p>",
+      body: "",
+      title: "t",
+      factBinding,
     }), "fact binding").level).toBe("block");
     expect(pick(draftQuality({
       bodyHtml,

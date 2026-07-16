@@ -467,6 +467,8 @@ describe("draftOrchestrator", () => {
         sectionPath: "場所",
         container: "p",
         containerIndex: 1,
+        containerTextHash: "fnv1a64:container",
+        containerMatchCount: 1,
         claimKinds: ["proper-noun"],
       }],
       binding: { version: 1, bodyHash: "fnv1a64:test" },

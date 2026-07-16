@@ -28,6 +28,19 @@ export const OPS_URL = "/api/growth/ops";
 
 export const MODEL_SETTINGS_URL = "/api/growth/model-settings";
 
+const SESSION_EXPIRED_MESSAGE = "セッションの有効期限が切れました。もう一度ログインしてください。";
+
+export class SessionExpiredError extends Error {
+  constructor() {
+    super(SESSION_EXPIRED_MESSAGE);
+    this.name = "SessionExpiredError";
+  }
+}
+
+export function isSessionExpiredError(error: unknown): error is SessionExpiredError {
+  return error instanceof SessionExpiredError;
+}
+
 export interface ProposalArtifactBlock {
   id: string;
   type: string;
@@ -88,11 +101,8 @@ export async function fetchPrompts(_token: string): Promise<PromptsData> {
   const res = await fetch(PROMPTS_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
-    throw new Error(
-      res.status === 401
-        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
-        : json.error ?? "取得に失敗しました。"
-    );
+    if (res.status === 401) throw new SessionExpiredError();
+    throw new Error(json.error ?? "取得に失敗しました。");
   }
   // 外部レスポンスを鵜呑みにせず最小限の形チェックをしてから返す(壊れた本文での描画時例外を防ぐ)。
   return {
@@ -110,11 +120,8 @@ export async function fetchBoard(_token: string): Promise<PendingItem[]> {
   const res = await fetch(BOARD_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
-    throw new Error(
-      res.status === 401
-        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
-        : json.error ?? "取得に失敗しました。"
-    );
+    if (res.status === 401) throw new SessionExpiredError();
+    throw new Error(json.error ?? "取得に失敗しました。");
   }
   return json.items as PendingItem[];
 }
@@ -124,11 +131,8 @@ export async function fetchOps(_token: string): Promise<GrowthOpsView> {
   const res = await fetch(OPS_URL, { headers: sessionHeaders() });
   const json = await readJsonObject(res);
   if (!res.ok || !json.success) {
-    throw new Error(
-      res.status === 401
-        ? "セッションの有効期限が切れました。もう一度ログインしてください。"
-        : json.error ?? "運用状態の取得に失敗しました。"
-    );
+    if (res.status === 401) throw new SessionExpiredError();
+    throw new Error(json.error ?? "運用状態の取得に失敗しました。");
   }
   return json.ops as GrowthOpsView;
 }

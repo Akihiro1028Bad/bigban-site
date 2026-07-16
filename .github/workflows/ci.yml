@@ -48,7 +48,7 @@ jobs:
         run: npm run build
 
   e2e:
-    name: Playwright critical journey (Chromium)
+    name: Playwright critical journey (3 browsers)
     runs-on: ubuntu-latest
 
     steps:
@@ -64,8 +64,8 @@ jobs:
       - name: 依存関係をインストール
         run: npm ci
 
-      - name: Chromiumをインストール
-        run: npx playwright install --with-deps chromium
+      - name: 3ブラウザをインストール
+        run: npx playwright install --with-deps
 
       - name: Critical journeyを実行
-        run: npx playwright test --project=chromium
+        run: npx playwright test

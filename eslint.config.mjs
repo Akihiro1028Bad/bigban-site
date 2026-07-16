@@ -10,6 +10,7 @@ export default tseslint.config(
       "node_modules/**",
       "__mocks__/**",
       "coverage/**",
+      ".claude/worktrees/**",
       "vitest.config.ts",
       "vitest.setup.ts",
     ],

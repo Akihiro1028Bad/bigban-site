@@ -287,12 +287,15 @@ export function runProcess(command, args, options) {
     /* istanbul ignore next -- parent group is supplied only to nested integration subprocesses */
     const parentGroupId = Number.isSafeInteger(parentGroup) && parentGroup > 0 ? parentGroup : null;
     const spec = spawnSpec(command, args, options, registryPath);
+    const pipeWrapperStderr = spec.isWrapper && !capture;
+    /* istanbul ignore next -- Windows inherit path runs on Windows CI/operation */
+    const stderrMode = capture || pipeWrapperStderr ? "pipe" : "inherit";
     const child = spawn(spec.command, spec.args, {
       cwd: options.cwd,
       env: spec.env,
       shell: spec.shell,
       detached: spec.detached,
-      stdio: [options.stdin === undefined ? "ignore" : "pipe", capture ? "pipe" : "inherit", capture ? "pipe" : "inherit"],
+      stdio: [options.stdin === undefined ? "ignore" : "pipe", capture ? "pipe" : "inherit", stderrMode],
       windowsHide: true,
     });
     /* istanbul ignore next -- spawn returns a PID before this synchronous line */
@@ -303,6 +306,7 @@ export function runProcess(command, args, options) {
     }
     let stdout = "";
     let stderr = "";
+    let wrapperStderr = "";
     let settled = false;
     let timedOut = false;
     let leaseLost = false;
@@ -351,10 +355,11 @@ export function runProcess(command, args, options) {
       /* istanbul ignore if -- callers invoke this only after closeResult is assigned */
       if (!closeResult) return;
       const { code, signal } = closeResult;
-      const kind = classifyProcessClose({ leaseLost, timedOut, bufferExceeded, isWrapper: spec.isWrapper, code, signal, stderr });
+      const diagnosticStderr = capture ? stderr : wrapperStderr;
+      const kind = classifyProcessClose({ leaseLost, timedOut, bufferExceeded, isWrapper: spec.isWrapper, code, signal, stderr: diagnosticStderr });
       if (kind === "spawn-error") {
         timedOut = false;
-        finish(kind, 1, null, new Error(stderr.trim()));
+        finish(kind, 1, null, new Error(diagnosticStderr.trim()));
       } else if (kind === "lease-lost") finish(kind, 125, signal, terminationError);
       else if (kind === "timeout") finish(kind, 124, signal, undefined);
       else if (kind === "max-buffer" || kind === "signal") finish(kind, 1, signal, undefined);
@@ -369,7 +374,7 @@ export function runProcess(command, args, options) {
       }
       if (haveTerminationGroupsExited()) finishFromClose();
     };
-    const beginTermination = (kind, error) => {
+    const beginTermination = (kind, error, initialSignal = "SIGTERM") => {
       terminationStarted = true;
       if (kind === "timeout") timedOut = true;
       if (kind === "lease-lost") {
@@ -389,7 +394,7 @@ export function runProcess(command, args, options) {
         return;
       }
       /* istanbul ignore next -- false only after the target tree has already exited */
-      termSent = signalProcessGroups(child, refreshTerminationGroups(), "SIGTERM") || termSent;
+      termSent = signalProcessGroups(child, refreshTerminationGroups(), initialSignal) || termSent;
       if (graceTimer) return;
       groupPollTimer = setInterval(finishTerminatedTree, 10);
       graceTimer = setTimeout(() => {
@@ -412,11 +417,11 @@ export function runProcess(command, args, options) {
       : () => {};
     const parentSignals = ["SIGINT", "SIGTERM"];
     const forwardSignal = (signal) => {
+      forwardedSignal = signal;
       /* istanbul ignore next -- Windows runProcess wiring is exercised through the injected controller */
       if (process.platform === "win32") {
-        forwardedSignal = signal;
         beginTermination("parent-signal");
-      } else signalProcessGroups(child, refreshTerminationGroups(), signal);
+      } else beginTermination("parent-signal", undefined, signal);
     };
     for (const parentSignal of parentSignals) process.on(parentSignal, forwardSignal);
 
@@ -428,7 +433,13 @@ export function runProcess(command, args, options) {
       return next.slice(0, maxBuffer);
     };
     child.stdout?.on("data", (chunk) => { stdout = append(stdout, chunk); });
-    child.stderr?.on("data", (chunk) => { stderr = append(stderr, chunk); });
+    child.stderr?.on("data", (chunk) => {
+      if (capture) stderr = append(stderr, chunk);
+      else {
+        wrapperStderr = (wrapperStderr + chunk.toString()).slice(-maxBuffer);
+        process.stderr.write(chunk);
+      }
+    });
     /* istanbul ignore next -- POSIX root wrapper reports spawn errors via exit 126 */
     child.on("error", (error) => finish("spawn-error", 1, null, error));
     child.on("close", (code, signal) => {

@@ -202,6 +202,23 @@ describe("公開権限の境界", () => {
   });
 });
 
+describe("承認画面の認証運用", () => {
+  it("レート制限は失敗回数だけを加算し、上限中は比較前に拒否すると統一する", () => {
+    const setupGuide = read("docs/operations/growth/01-setup-guide.md");
+    const securityGuide = read("docs/operations/growth/security.md");
+    const envExample = read(".env.example");
+
+    for (const document of [setupGuide, securityGuide]) {
+      expect(document).toContain("失敗回数");
+      expect(document).toContain("成功時は加算しません");
+      expect(document).toContain("上限超過中は正しい合言葉でも比較せず429");
+    }
+    expect(setupGuide).not.toContain("rate limit中でも正しい合言葉は受け付けます");
+    expect(envExample).toContain("認証失敗のrate limit");
+    expect(envExample).not.toContain("認証試行のrate limit");
+  });
+});
+
 describe("履歴資料", () => {
   it("旧日付・旧文書名を含む全資料のH1直後に正典注記を置く", () => {
     const targets = filesBelow(SUPERPOWERS_ROOT, ".md").filter((file) =>

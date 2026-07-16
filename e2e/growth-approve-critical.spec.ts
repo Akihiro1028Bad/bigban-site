@@ -38,16 +38,19 @@ test("承認から本文編集を経て公開予約できる", async ({ page }) 
   await expect(approvePage.publishQueue()).toContainText("初心者向けピックルボール入門");
 
   const accessibility = await new AxeBuilder({ page }).analyze();
-  // color-contrast 等の serious 違反は既知の製品側負債であり、別 issue で対応する。
-  // 本 critical journey では critical 違反だけを失敗対象とし、それ以外は成果物へ記録する。
-  const knownAccessibilityDebt = accessibility.violations.filter(({ impact }) => impact !== "critical");
-  if (knownAccessibilityDebt.length > 0) {
-    await test.info().attach("known-axe-serious-or-lower-violations", {
-      body: JSON.stringify(knownAccessibilityDebt, null, 2),
+  const failingImpacts = new Set(["serious", "critical"]);
+  const minorViolations = accessibility.violations.filter(
+    ({ impact }) => !failingImpacts.has(impact ?? ""),
+  );
+  if (minorViolations.length > 0) {
+    await test.info().attach("axe-moderate-or-lower-violations", {
+      body: JSON.stringify(minorViolations, null, 2),
       contentType: "application/json",
     });
   }
-  expect(accessibility.violations.filter(({ impact }) => impact === "critical")).toEqual([]);
+  expect(
+    accessibility.violations.filter(({ impact }) => failingImpacts.has(impact ?? "")),
+  ).toEqual([]);
   api.assertNoUnexpectedRequests();
 });
 
