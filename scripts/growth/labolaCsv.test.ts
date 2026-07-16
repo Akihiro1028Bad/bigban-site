@@ -39,6 +39,15 @@ describe("parseCsvRows", () => {
   it("引用符が閉じていなければエラー", () => {
     expect(() => parseCsvRows('a,"b')).toThrow("引用符");
   });
+
+  it("CR単独の改行を扱い、空入力では行を返さない", () => {
+    expect(parseCsvRows("a,b\rc,d\r")).toEqual([["a", "b"], ["c", "d"]]);
+    expect(parseCsvRows("")).toEqual([]);
+  });
+
+  it("末尾に改行がない最終行も確定する", () => {
+    expect(parseCsvRows("a,b\nc,d")).toEqual([["a", "b"], ["c", "d"]]);
+  });
 });
 
 describe("detectCsvType", () => {

@@ -13,4 +13,10 @@ describe("buildCanonical", () => {
   it("予約IDの重複はエラー", () => expect(() => buildCanonical({ ...base, yoyaku: [yoyaku({}), yoyaku({})] })).toThrow("重複"));
   it("顧客にも除外とPII境界を適用する", () => { const bundle = buildCanonical({ ...base, yoyaku: [], customers: [{ registeredAt: "2026-07-01", customerType: "一般", memberNo: "1", name: "削除対象", email: "", postal: "", address: "東京都台東区1", gender: "", birthDate: "", occupation: "" }] }); expect(bundle.customers).toEqual([]); expect(bundle.meta.excludedCount).toBe(1); });
 });
-describe("JSONL往復", () => { it("serialize→parseで同一になる", () => { const records = [{ a: 1 }, { a: 2 }]; expect(parseJsonl(serializeJsonl(records), (value) => value as { a: number })).toEqual(records); }); });
+describe("JSONL往復", () => {
+  it("serialize→parseで同一になる", () => { const records = [{ a: 1 }, { a: 2 }]; expect(parseJsonl(serializeJsonl(records), (value) => value as { a: number })).toEqual(records); });
+  it("空配列は空文字列にし、不正な行は行番号付きでエラーにする", () => {
+    expect(serializeJsonl([])).toBe("");
+    expect(() => parseJsonl("{bad}\n", (value) => value)).toThrow("JSONLの1行目");
+  });
+});
