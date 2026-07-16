@@ -22,6 +22,13 @@ describe("buildCanonical", () => {
     expect(bundle.meta.missingSections).toEqual(["customer"]);
     expect(bundle.salesDaily).toEqual([]);
   });
+  it("生成日時と収録範囲は共有日付スキーマで検証する", () => {
+    expect(() => buildCanonical({ ...base, yoyaku: [], coverageStart: "2026-02-30" })).toThrow("収録範囲");
+    expect(() => buildCanonical({ ...base, yoyaku: [], generatedAt: "日時" })).toThrow("生成日時");
+  });
+  it("生成日が収録開始日より前なら収録範囲を拒否する", () => {
+    expect(() => buildCanonical({ ...base, yoyaku: [], coverageStart: "2026-07-17" })).toThrow("収録範囲が不正");
+  });
 });
 describe("JSONL往復", () => {
   it("serialize→parseで同一になる", () => { const records = [{ a: 1 }, { a: 2 }]; expect(parseJsonl(serializeJsonl(records), (value) => value as { a: number })).toEqual(records); });

@@ -37,7 +37,15 @@ function logFactorial(value: number): number { let total = 0; for (let count = 2
 export function poissonUpperTailP(observed: number, mean: number): number {
   if (mean <= 0) return observed <= 0 ? 1 : 0;
   if (observed <= 0) return 1;
-  return Math.min(1, Math.max(0, 1 - poissonLowerTailP(observed - 1, mean)));
+  const logs: number[] = [];
+  let value = -mean + observed * Math.log(mean) - logFactorial(observed);
+  for (let count = observed; count < observed + 100_000; count += 1) {
+    logs.push(value);
+    if (count > mean && Math.exp(value - Math.max(...logs)) < 1e-15) break;
+    value += Math.log(mean) - Math.log(count + 1);
+  }
+  const maximum = Math.max(...logs);
+  return Math.min(1, Math.exp(maximum) * logs.reduce((sum, log) => sum + Math.exp(log - maximum), 0));
 }
 
 export function quantile(sorted: number[], q: number): number | null {

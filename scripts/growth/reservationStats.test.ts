@@ -42,6 +42,8 @@ describe("poisson tails", () => {
     expect(poissonLowerTailP(-1, 2)).toBe(0);
     expect(poissonLowerTailP(1000, 1000)).toBeGreaterThan(0.45);
     expect(poissonLowerTailP(1000, 1000)).toBeLessThan(0.55);
+    expect(poissonUpperTailP(2000, 1000)).toBeGreaterThan(0);
+    expect(poissonUpperTailP(2000, 1000)).toBeLessThan(1e-100);
   });
 });
 

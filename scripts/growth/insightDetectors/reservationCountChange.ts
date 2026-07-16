@@ -16,6 +16,7 @@ export const reservationCountChange: Detector = (context) => {
   const observed = series[index].count;
   const baseline = series.slice(index - 4, index).map((entry) => entry.count);
   const mean = baseline.reduce((sum, count) => sum + count, 0) / baseline.length;
+  if (mean === 0 && observed === 0) return [];
   const p = observed >= mean ? poissonUpperTailP(observed, mean) : poissonLowerTailP(observed, mean);
   const result = severityOf(observed, mean, p);
   if (result === null) return [];

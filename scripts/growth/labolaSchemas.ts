@@ -30,6 +30,16 @@ export function jpDateTimeToIso(value: string): string {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hour.padStart(2, "0")}:${minute}:00+09:00`;
 }
 
+/** 時刻を分へ変換し、ゼロ埋めした HH:mm へ正規化する。 */
+export function parseTimeOfDay(value: string): { minutes: number; normalized: string } {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) throw new Error("時刻が不正です");
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) throw new Error("時刻が不正です");
+  return { minutes: hour * 60 + minute, normalized: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}` };
+}
+
 export function jpDateToYmd(value: string): string {
   const cleaned = value.trim().replace(/（.*?）|\(.*?\)/g, "");
   const match = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/) ?? cleaned.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/);
@@ -75,8 +85,22 @@ export function parseYoyakuRows(rows: string[][]): { rows: YoyakuRow[]; warnings
     const partySizeRaw = partySizeIndex < 0 ? "" : (values[partySizeIndex] ?? "").trim();
     const partySize = partySizeRaw === "" ? null : Number(partySizeRaw);
     if (partySize !== null && !Number.isFinite(partySize)) throw new Error(`${rowIndex + 2}行目: 利用人数が不正です`);
-    if (cell("終了時間") <= cell("開始時間")) throw new Error(`${rowIndex + 2}行目: 終了時間が開始時間以前です`);
-    return { reservationId: cell("予約番号"), bookedAt: jpDateTimeToIso(cell("受付日時")), useDate: jpDateToYmd(cell("日付")), start: cell("開始時間"), end: cell("終了時間"), category: cell("カテゴリー"), space: cell("予約内容"), status, acceptStatus: cell("受付ステータス"), paymentStatus: cell("決済ステータス"), paymentMethod: cell("支払い方法"), plan: cell("料金プラン"), amount: toAmount(cell("金額")), partySize, channel, customerType: cell("顧客タイプ"), memberNo: cell("会員番号"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業"), remarks: cell("備考") };
+    const reservationId = cell("予約番号");
+    if (!reservationId) throw new Error(`${rowIndex + 2}行目: 予約番号が空です`);
+    let start: { minutes: number; normalized: string };
+    let end: { minutes: number; normalized: string };
+    try {
+      start = parseTimeOfDay(cell("開始時間"));
+    } catch {
+      throw new Error(`${rowIndex + 2}行目: 開始時間が不正です`);
+    }
+    try {
+      end = parseTimeOfDay(cell("終了時間"));
+    } catch {
+      throw new Error(`${rowIndex + 2}行目: 終了時間が不正です`);
+    }
+    if (end.minutes <= start.minutes) throw new Error(`${rowIndex + 2}行目: 終了時間が開始時間以前です`);
+    return { reservationId, bookedAt: jpDateTimeToIso(cell("受付日時")), useDate: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, category: cell("カテゴリー"), space: cell("予約内容"), status, acceptStatus: cell("受付ステータス"), paymentStatus: cell("決済ステータス"), paymentMethod: cell("支払い方法"), plan: cell("料金プラン"), amount: toAmount(cell("金額")), partySize, channel, customerType: cell("顧客タイプ"), memberNo: cell("会員番号"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業"), remarks: cell("備考") };
   });
   return { rows: result, warnings };
 }

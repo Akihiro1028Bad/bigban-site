@@ -16,6 +16,11 @@ describe("snapshotSchema", () => {
     expect(snapshotSchema.safeParse({ ...validSnapshot(), schemaVersion: 2 }).success).toBe(false);
     expect(snapshotSchema.safeParse({ ...validSnapshot(), insights: [{ id: "x", detector: "d", severity: "bad" }] }).success).toBe(false);
   });
+  it("実在しない日付・逆転した収録範囲・不正なISO日時を拒否する", () => {
+    expect(snapshotSchema.safeParse({ ...validSnapshot(), coverage: { start: "2026-02-30", end: "2026-07-16" } }).success).toBe(false);
+    expect(snapshotSchema.safeParse({ ...validSnapshot(), coverage: { start: "2026-07-17", end: "2026-07-16" } }).success).toBe(false);
+    expect(snapshotSchema.safeParse({ ...validSnapshot(), generatedAt: "日時" }).success).toBe(false);
+  });
   it("不正なJSONを日本語エラーにする", () => expect(() => parseSnapshot("{")).toThrow("スナップショットJSON"));
   it("妥当JSONを型付きスナップショットへ変換し、構造不正は日本語エラーにする", () => {
     expect(parseSnapshot(JSON.stringify(validSnapshot())).kpi.self.smartphone4w).toBe(1);

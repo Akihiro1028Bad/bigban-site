@@ -1,6 +1,7 @@
 /** ラボーラ行をPIIを含まない正準データセットへ変換する純ロジック。 */
 import { ageBand, extractWard, occupationGroup, pseudoId } from "./piiBoundary";
 import { jstYmdOfIso } from "./reservationAggregates";
+import { coverageSchema, isoDateTimeSchema } from "./dateSchemas";
 import { isExcluded } from "./reservationExclusions";
 import type { ExclusionRules } from "./reservationExclusions";
 import type { CustomerRow, SalesSummaryRow, YoyakuRow } from "./labolaSchemas";
@@ -38,6 +39,8 @@ function canonicalCustomer(row: CustomerRow, hashKey: string, onYmd: string): Ca
 }
 
 export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: CustomerRow[] | null; salesSummary: SalesSummaryRow[] | null; rules: ExclusionRules; hashKey: string; coverageStart: string; generatedAt: string; parseWarnings: string[] }): CanonicalBundle {
+  if (!coverageSchema.safeParse({ start: input.coverageStart, end: input.coverageStart }).success) throw new Error("収録範囲の開始日が不正です");
+  if (!isoDateTimeSchema.safeParse(input.generatedAt).success) throw new Error("生成日時が不正です");
   let excludedCount = 0;
   const seen = new Set<string>();
   const reservations: CanonicalReservation[] = [];
@@ -62,6 +65,7 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const warnings = [...input.parseWarnings];
   const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
   if (bookedDates.some((date) => date < input.coverageStart || date > onYmd)) warnings.push("予約受付日時が収録範囲外です");
+  if (!coverageSchema.safeParse({ start: input.coverageStart, end: onYmd }).success) throw new Error("収録範囲が不正です");
   return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, coverage: { start: input.coverageStart, end: onYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
 }
 

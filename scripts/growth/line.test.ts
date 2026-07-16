@@ -56,6 +56,13 @@ describe("pushTextMessage", () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it("通知レベル未設定でもweekly種別は送信する", async () => {
+    delete process.env.GROWTH_NOTIFY_LEVEL;
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));
+    await pushTextMessage("Gabc", "週次", { channelAccessToken: TOKEN, fetchFn, kind: "weekly" });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
   it("GROWTH_NOTIFY_LEVEL=all では routine メッセージも送信する", async () => {
     process.env.GROWTH_NOTIFY_LEVEL = "all";
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(res(true, 200));

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   jpDateTimeToIso,
   jpDateToYmd,
+  parseTimeOfDay,
   parseCustomerRows,
   parseSalesSummaryRows,
   parseYoyakuRows,
@@ -20,10 +21,18 @@ describe("日付変換", () => {
     expect(() => jpDateToYmd("2026/02/30")).toThrow("日付");
     expect(() => jpDateTimeToIso("2026年07月15日 24:00")).toThrow("日時");
   });
+  it("時刻を分で検証してHH:mmへ正規化する", () => {
+    expect(parseTimeOfDay("9:00")).toEqual({ minutes: 540, normalized: "09:00" });
+  });
+  it("時刻の形式・時・分の範囲を検証する", () => {
+    expect(() => parseTimeOfDay("abc")).toThrow("時刻");
+    expect(() => parseTimeOfDay("24:00")).toThrow("時刻");
+    expect(() => parseTimeOfDay("12:99")).toThrow("時刻");
+  });
 });
 
 describe("parseYoyakuRows", () => {
-  it("行を型付きに変換する", () => { const result = parseYoyakuRows([header, row({})]); expect(result.warnings).toEqual([]); expect(result.rows[0]).toMatchObject({ reservationId: "90", bookedAt: "2026-07-15T14:19:00+09:00", useDate: "2026-08-13", status: "confirmed", channel: "user_sp", amount: 15960, space: "A:テストコート" }); });
+  it("行を型付きに変換する", () => { const result = parseYoyakuRows([header, row({ "開始時間": "9:00" })]); expect(result.warnings).toEqual([]); expect(result.rows[0]).toMatchObject({ reservationId: "90", bookedAt: "2026-07-15T14:19:00+09:00", useDate: "2026-08-13", start: "09:00", status: "confirmed", channel: "user_sp", amount: 15960, space: "A:テストコート" }); });
   it("キャンセル・金額空・管理者経由を写像する", () => expect(parseYoyakuRows([header, row({ "予約ステータス": "キャンセル", "金額": "", "予約方法": "管理者" })]).rows[0]).toMatchObject({ status: "cancelled", amount: null, channel: "admin" }));
   it("未知の予約ステータスは即エラー", () => expect(() => parseYoyakuRows([header, row({ "予約ステータス": "仮予約" })])).toThrow("予約ステータス"));
   it("未知の予約方法はunknown+警告", () => { const result = parseYoyakuRows([header, row({ "予約方法": "電話" })]); expect(result.rows[0].channel).toBe("unknown"); expect(result.warnings[0]).toContain("予約方法"); });
@@ -49,6 +58,11 @@ describe("parseYoyakuRows", () => {
     expect(parseYoyakuRows([header, values]).rows[0]).toMatchObject({ partySize: null, remarks: "" });
   });
   it("終了時刻が開始時刻以前の予約を拒否する", () => expect(() => parseYoyakuRows([header, row({ "開始時間": "20:00", "終了時間": "20:00" })])).toThrow("終了時間"));
+  it("不正な開始時刻と終了時刻を行番号付きで拒否する", () => {
+    expect(() => parseYoyakuRows([header, row({ "開始時間": "24:00" })])).toThrow("2行目: 開始時間が不正");
+    expect(() => parseYoyakuRows([header, row({ "終了時間": "24:00" })])).toThrow("2行目: 終了時間が不正");
+  });
+  it("予約番号が空の行は行番号付きで拒否する", () => expect(() => parseYoyakuRows([header, row({ "予約番号": "" })])).toThrow("2行目: 予約番号"));
 });
 
 describe("parseCustomerRows", () => {

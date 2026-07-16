@@ -8,7 +8,10 @@ const SEVERITY_ORDER: Record<Insight["severity"], number> = { alert: 0, notice: 
 function sortedNewInsights(snapshot: Snapshot): Insight[] {
   return snapshot.insights.filter((insight) => insight.status === "new").sort((left, right) => SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]);
 }
-function digestTitle(insight: Insight): string { const n = insight.evidence.n; return insight.id.startsWith("d1:") || (typeof n === "number" && n < 3) ? "新しいエリアからの初予約がありました(詳細はスナップショット)" : insight.title; }
+function digestTitle(insight: Insight): string {
+  if (insight.id.startsWith("d1:")) return "新しいエリアからの初予約がありました(詳細はスナップショット)";
+  return typeof insight.evidence.n === "number" && insight.evidence.n < 3 ? "小標本の気づきがあります(詳細はスナップショット)" : insight.title;
+}
 
 export function formatIngestDigest(snapshot: Snapshot): string {
   const insights = sortedNewInsights(snapshot);

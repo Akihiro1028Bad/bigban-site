@@ -21,7 +21,9 @@ export function ageBand(birthDate: string, onYmd: string): string {
   const onMatch = onYmd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!onMatch) return "不明";
   const onYear = Number(onMatch[1]); const onMonth = Number(onMatch[2]); const onDay = Number(onMatch[3]);
-  if (month > 12 || day > 31 || year > onYear) return "不明";
+  const birth = new Date(Date.UTC(year, month - 1, day));
+  const onDate = new Date(Date.UTC(onYear, onMonth - 1, onDay));
+  if (birth.getUTCFullYear() !== year || birth.getUTCMonth() !== month - 1 || birth.getUTCDate() !== day || onDate.getUTCFullYear() !== onYear || onDate.getUTCMonth() !== onMonth - 1 || onDate.getUTCDate() !== onDay || birth > onDate) return "不明";
   const age = onYear - year - (onMonth < month || (onMonth === month && onDay < day) ? 1 : 0);
   if (age < 20) return "10代以下";
   if (age >= 60) return "60代以上";
