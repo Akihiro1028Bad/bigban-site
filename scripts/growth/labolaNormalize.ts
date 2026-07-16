@@ -1,5 +1,6 @@
 /** ラボーラ行をPIIを含まない正準データセットへ変換する純ロジック。 */
 import { ageBand, extractWard, occupationGroup, pseudoId } from "./piiBoundary";
+import { jstYmdOfIso } from "./reservationAggregates";
 import { isExcluded } from "./reservationExclusions";
 import type { ExclusionRules } from "./reservationExclusions";
 import type { CustomerRow, SalesSummaryRow, YoyakuRow } from "./labolaSchemas";
@@ -28,12 +29,6 @@ export interface CanonicalBundle {
   remarks: RemarkEntry[]; meta: CanonicalMeta;
 }
 
-function jstYmdOf(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) throw new Error(`生成日時を解釈できません: ${iso}`);
-  return new Date(date.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-}
-
 function canonicalReservation(row: YoyakuRow, hashKey: string, onYmd: string): CanonicalReservation {
   return { reservationId: row.reservationId, bookedAt: row.bookedAt, useDate: row.useDate, start: row.start, end: row.end, category: row.category, space: row.space, status: row.status, acceptStatus: row.acceptStatus, paymentStatus: row.paymentStatus, paymentMethod: row.paymentMethod, plan: row.plan, amount: row.amount, partySize: row.partySize, channel: row.channel, customerType: row.customerType, pseudoId: pseudoId(row.email, row.memberNo, hashKey), ward: extractWard(row.address), ageBand: ageBand(row.birthDate, onYmd), gender: row.gender, occupationGroup: occupationGroup(row.occupation), hasRemarks: row.remarks !== "" };
 }
@@ -47,7 +42,7 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const seen = new Set<string>();
   const reservations: CanonicalReservation[] = [];
   const remarks: RemarkEntry[] = [];
-  const onYmd = jstYmdOf(input.generatedAt);
+  const onYmd = jstYmdOfIso(input.generatedAt);
   for (const row of input.yoyaku) {
     if (seen.has(row.reservationId)) throw new Error(`予約番号が重複しています: ${row.reservationId}`);
     seen.add(row.reservationId);
