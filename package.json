@@ -40,6 +40,7 @@
     "growth:advise-apply": "tsx scripts/growth/advise-apply-cli.ts",
     "growth:advise-apply-loop": "node scripts/growth/run.mjs apply",
     "growth:metrics": "tsx scripts/growth/metrics-cli.ts",
+    "growth:ingest": "tsx scripts/growth/ingest-cli.ts",
     "growth:learning-log": "tsx scripts/growth/learning-log-cli.ts",
     "growth:learning-log:recent": "tsx scripts/growth/learning-log-cli.ts recent 4",
     "growth:worker-log": "tsx scripts/growth/worker-log-cli.ts",
