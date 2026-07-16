@@ -1,6 +1,8 @@
 # pull型 AI ループ(修正・画像再生成・アドバイス・装飾)
 
 > いずれも pull 型: 承認画面が Notion に「依頼」を書き、常時稼働PC のループ(5分間隔・`run.mjs` の lock/1日上限を共有)が headless agent で拾う。既定は承認画面 `AIモデル` の工程別設定で、Claude Code CLI / Codex CLI を工程ごとに選ぶ。
+
+各ループは既定60分で timeout（exit 124）し、子プロセスツリーへ SIGTERM、15秒後も残る場合は SIGKILL を送る。失敗記録の「再開コマンド」を実行して再開する。
 > 共通原則・段階ガードは [00-canon.md](00-canon.md)。必要 Notion プロパティは [40-notion-props.md](40-notion-props.md)。
 
 Codex の初期検証は、承認画面 `AIモデル` で対象工程をCodexに設定し、本文や microCMS を直接変更しない `growth:advise-loop` と、採用前のメタ提案までに留まる `growth:decorate-loop` から始める。

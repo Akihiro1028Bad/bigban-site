@@ -16,7 +16,8 @@ import {
   selectDraftsAutoTarget,
 } from "./draftsAuto";
 import { defaultFetch } from "./http";
-import { queryDataSource, updatePageSelect, type NotionApiOptions } from "./notion";
+import { updatePageSelect, type NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 
@@ -31,18 +32,18 @@ function notionOptions(): NotionApiOptions {
 }
 
 async function peek(options: NotionApiOptions): Promise<void> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: draftsAutoQueryFilter(), pageSize: 100 },
+    { filter: draftsAutoQueryFilter() },
     options
   );
   process.stdout.write(`${countDraftsAutoTargets(pages)}\n`);
 }
 
 async function claim(options: NotionApiOptions): Promise<void> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: draftsAutoQueryFilter(), pageSize: 100 },
+    { filter: draftsAutoQueryFilter() },
     options
   );
   const target = selectDraftsAutoTarget(pages);

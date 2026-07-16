@@ -47,6 +47,23 @@ export interface QueryDataSourceResult {
   nextCursor: string | null;
 }
 
+export class NotionHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly responseBody: string,
+    public readonly retryAfterMs: number | null,
+  ) {
+    super(`Notion API に失敗しました (HTTP ${status}): ${responseBody}`);
+    this.name = "NotionHttpError";
+  }
+}
+
+function retryAfterMsOf(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1_000 : null;
+}
+
 export interface ListBlockChildrenResult {
   blocks: NotionBlock[];
   hasMore: boolean;
@@ -76,7 +93,11 @@ async function notionRequest(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Notion API に失敗しました (HTTP ${res.status}): ${text}`);
+    throw new NotionHttpError(
+      res.status,
+      text,
+      retryAfterMsOf(res.headers?.get("Retry-After") ?? null),
+    );
   }
 
   return res.json();
@@ -120,7 +141,7 @@ export async function listBlockChildren(
 }
 
 /** data source を照会して該当ページ一覧(と次カーソル)を返す。 */
-export async function queryDataSource(
+export async function queryDataSourcePage(
   dataSourceId: string,
   body: QueryDataSourceBody,
   options: NotionApiOptions
@@ -145,28 +166,6 @@ export async function queryDataSource(
   };
 }
 
-/** data source の next_cursor を最後までたどり、該当ページをすべて返す。 */
-export async function queryAllDataSource(
-  dataSourceId: string,
-  body: Omit<QueryDataSourceBody, "startCursor">,
-  options: NotionApiOptions
-): Promise<NotionPage[]> {
-  const pages: NotionPage[] = [];
-  let startCursor: string | undefined;
-  while (true) {
-    const result = await queryDataSource(
-      dataSourceId,
-      { ...body, ...(startCursor === undefined ? {} : { startCursor }) },
-      options
-    );
-    pages.push(...result.pages);
-    if (!result.hasMore) return pages;
-    if (!result.nextCursor) {
-      throw new Error("Notion API が has_more=true なのに next_cursor を返しませんでした。");
-    }
-    startCursor = result.nextCursor;
-  }
-}
 
 /** Notion rich_text の書き込み 1 要素。content は最大 2000 文字。 */
 export interface NotionRichTextItem {
@@ -319,17 +318,4 @@ export async function createPage(
     throw new Error("Notion 応答に id が含まれていません。");
   }
   return json.id;
-}
-
-/** 指定 data source の最新ページ(作成日降順の先頭)を返す。無ければ null。 */
-export async function getLatestReport(
-  dataSourceId: string,
-  options: NotionApiOptions
-): Promise<NotionPage | null> {
-  const { pages } = await queryDataSource(
-    dataSourceId,
-    { sorts: [{ timestamp: "created_time", direction: "descending" }], pageSize: 1 },
-    options
-  );
-  return pages[0] ?? null;
 }

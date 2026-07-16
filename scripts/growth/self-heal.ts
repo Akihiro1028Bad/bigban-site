@@ -10,6 +10,7 @@
  * 破壊的操作のため**既定 dry-run・件数上限**。fetch は注入可能。
  */
 
+import { externalApiErrorFromResponse } from "./externalApiError";
 import type { FetchFn } from "./http";
 
 export interface SelfHealHttpOptions {
@@ -57,9 +58,7 @@ export async function listDraftMetas(
     headers: { "X-MICROCMS-API-KEY": options.apiKey },
   });
   if (!res.ok) {
-    throw new Error(
-      `下書きメタ一覧の取得に失敗しました (HTTP ${res.status}): ${await res.text()}`
-    );
+    throw externalApiErrorFromResponse("microcms.drafts.list", res);
   }
   const json = (await res.json()) as MetaListResponse;
   const items = (json.contents ?? [])
@@ -85,9 +84,7 @@ export async function fetchContentSlug(
     headers: { "X-MICROCMS-API-KEY": options.apiKey },
   });
   if (!res.ok) {
-    throw new Error(
-      `slug の取得に失敗しました (HTTP ${res.status}): ${await res.text()}`
-    );
+    throw externalApiErrorFromResponse("microcms.content.slug.get", res);
   }
   const json = (await res.json()) as { slug?: string | null };
   return json.slug ?? null;
@@ -107,9 +104,7 @@ export async function deleteContent(
     headers: { "X-MICROCMS-API-KEY": options.apiKey },
   });
   if (!res.ok) {
-    throw new Error(
-      `コンテンツ削除に失敗しました (HTTP ${res.status}): ${await res.text()}`
-    );
+    throw externalApiErrorFromResponse("microcms.content.delete", res);
   }
 }
 

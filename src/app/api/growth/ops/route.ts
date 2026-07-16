@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
-import { defaultFetch, queryDataSource } from "@/lib/growth/notion";
+import { defaultFetch } from "@/lib/growth/notion";
+import { queryRecentDataSource } from "@/lib/growth/notionRepository";
 import { growthOpsViewFromPages, type GrowthOpsView } from "@/lib/growth/workerLog";
 
 export const runtime = "nodejs";
@@ -35,15 +36,15 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await queryDataSource(
+    const pages = await queryRecentDataSource(
       dataSourceId,
       {
         sorts: [{ property: "記録時刻", direction: "descending" }],
-        pageSize: 50,
       },
+      50,
       { token, fetchFn: defaultFetch }
     );
-    return NextResponse.json({ success: true, ops: growthOpsViewFromPages(result.pages) });
+    return NextResponse.json({ success: true, ops: growthOpsViewFromPages(pages) });
   } catch {
     return NextResponse.json(
       { success: false, error: "運用ログの取得中にエラーが発生しました" },

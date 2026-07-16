@@ -7,6 +7,8 @@
 
 import type { FlexContainer } from "./digest-flex";
 import type { FetchFn } from "./http";
+import { externalApiErrorFromResponse } from "./externalApiError";
+import { sanitizeLinePayload } from "./lineRedaction";
 import { resolveNotifyLevel, shouldPushLine } from "./notifyGate";
 import type { NotifyKind } from "./notifyGate";
 
@@ -33,12 +35,23 @@ async function pushMessages(
       Authorization: `Bearer ${options.channelAccessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ to, messages }),
+    body: JSON.stringify(
+      sanitizeLinePayload(
+        { to, messages },
+        {
+          secrets: [
+            process.env.APPROVE_SECRET ?? "",
+            process.env.MICROCMS_API_KEY ?? "",
+            process.env.MICROCMS_MANAGEMENT_API_KEY ?? "",
+            options.channelAccessToken,
+          ],
+        }
+      )
+    ),
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`LINE push に失敗しました (HTTP ${res.status}): ${text}`);
+    throw externalApiErrorFromResponse("line.push", res);
   }
 }
 

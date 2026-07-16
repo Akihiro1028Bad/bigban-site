@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", () => ({
-  queryDataSource: vi.fn(),
   defaultFetch: vi.fn(),
 }));
+vi.mock("@/lib/growth/notionRepository", () => ({ queryRecentDataSource: vi.fn() }));
 
 const { flags } = vi.hoisted(() => ({ flags: { authEnabled: true } }));
 vi.mock("@/config/featureFlags", () => ({
@@ -13,14 +15,14 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { queryDataSource } from "@/lib/growth/notion";
+import { queryRecentDataSource } from "@/lib/growth/notionRepository";
 import { GET } from "./route";
 
 const SECRET = "approve-secret-token";
 
 function request(token: string | null): Request {
   return new Request("http://localhost/api/growth/ops", {
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: growthAuthHeaders(token),
   });
 }
 
@@ -28,7 +30,7 @@ beforeEach(() => {
   flags.authEnabled = true;
   process.env.APPROVE_SECRET = SECRET;
   process.env.NOTION_TOKEN = "secret_notion";
-  vi.mocked(queryDataSource).mockReset();
+  vi.mocked(queryRecentDataSource).mockReset();
 });
 
 afterEach(() => {
@@ -41,7 +43,7 @@ describe("GET /api/growth/ops", () => {
   it("token 不一致は 401", async () => {
     const res = await GET(request("wrong"));
     expect(res.status).toBe(401);
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryRecentDataSource).not.toHaveBeenCalled();
   });
 
   it("GROWTH_WORKER_LOG_DS 未設定でも setupMissing=true で返す", async () => {
@@ -61,15 +63,12 @@ describe("GET /api/growth/ops", () => {
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ success: false, error: "サーバー設定エラー" });
-    expect(queryDataSource).not.toHaveBeenCalled();
+    expect(queryRecentDataSource).not.toHaveBeenCalled();
   });
 
   it("Notion の worker log から currentTargets を返す", async () => {
     process.env.GROWTH_WORKER_LOG_DS = "worker-log";
-    vi.mocked(queryDataSource).mockResolvedValue({
-      hasMore: false,
-      nextCursor: null,
-      pages: [
+    vi.mocked(queryRecentDataSource).mockResolvedValue([
         {
           id: "r1",
           url: "",
@@ -84,11 +83,16 @@ describe("GET /api/growth/ops", () => {
             "記録時刻": { date: { start: new Date().toISOString() } },
           },
         },
-      ],
-    });
+      ]);
 
     const res = await GET(request(SECRET));
     expect(res.status).toBe(200);
+    expect(queryRecentDataSource).toHaveBeenCalledWith(
+      "worker-log",
+      { sorts: [{ property: "記録時刻", direction: "descending" }] },
+      50,
+      expect.objectContaining({ token: "secret_notion" }),
+    );
     const json = await res.json();
     expect(json.ops.currentTargets).toEqual([
       expect.objectContaining({ targetTitle: "記事A", mode: "advise", status: "running" }),
@@ -97,7 +101,7 @@ describe("GET /api/growth/ops", () => {
 
   it("Notion 取得失敗は 502", async () => {
     process.env.GROWTH_WORKER_LOG_DS = "worker-log";
-    vi.mocked(queryDataSource).mockRejectedValue(new Error("secret"));
+    vi.mocked(queryRecentDataSource).mockRejectedValue(new Error("secret"));
     const res = await GET(request(SECRET));
     expect(res.status).toBe(502);
     const json = await res.json();

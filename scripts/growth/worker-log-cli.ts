@@ -9,7 +9,8 @@ import {
   type WorkerRunStatus,
   type WorkerTargetType,
 } from "../../src/lib/growth/workerLog";
-import { createPage, queryDataSource, updatePageProps, type NotionApiOptions } from "./notion";
+import { createPage, updatePageProps, type NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { defaultFetch } from "./http";
 
 const DS_ENV = "GROWTH_WORKER_LOG_DS";
@@ -84,12 +85,11 @@ async function upsertHeartbeat(): Promise<void> {
   const mode = arg("mode") ?? "heartbeat";
   const runStatus = "heartbeat";
   const options = notionOptions();
-  const result = await queryDataSource(
+  const pages = await queryAllDataSource(
     ds,
     {
       filter: { property: WORKER_LOG_PROPS.kind, select: { equals: "heartbeat" } },
       sorts: [{ property: WORKER_LOG_PROPS.recordedAt, direction: "descending" }],
-      pageSize: 25,
     },
     options
   );
@@ -110,7 +110,7 @@ async function upsertHeartbeat(): Promise<void> {
     detail: arg("detail"),
     evidenceKey: arg("evidence-key"),
   });
-  const existing = selectHeartbeatPageId(result.pages, workerId());
+  const existing = selectHeartbeatPageId(pages, workerId());
   const id = existing
     ? await updatePageProps(existing, props, options)
     : await createPage(ds, props, options);

@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
-import { authHeaders } from "../authHeaders";
+import { sessionHeaders } from "../sessionHeaders";
 import { buildDraftEditPayload } from "../draftEditorContent";
 import { toMessage } from "../errorMessage";
 import { type PreviewDevice } from "../previewDevice";
@@ -30,7 +30,7 @@ interface UseDraftEditingParams {
   onSaved?: () => void;
 }
 
-export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftEditingParams) {
+export function useDraftEditing({ token: _token, openId, loadDraft, onSaved }: UseDraftEditingParams) {
   const [editingDraft, setEditingDraft] = useState(false);
   const [editedHtml, setEditedHtml] = useState("");
   const [draftOriginalHtml, setDraftOriginalHtml] = useState("");
@@ -84,7 +84,7 @@ export function useDraftEditing({ token, openId, loadDraft, onSaved }: UseDraftE
     try {
       const res = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(buildDraftEditPayload(pageId, html)),
       });
       const json = await readJsonObject(res);

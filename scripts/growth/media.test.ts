@@ -63,14 +63,14 @@ describe("uploadMedia", () => {
       text: async () => "file too large",
     });
 
-    await expect(
-      uploadMedia("/tmp/big.jpg", {
+    const error = await uploadMedia("/tmp/big.jpg", {
         serviceDomain: "thepicklebang",
         apiKey: "k",
         fetchFn,
         readFile: deps.readFile,
-      })
-    ).rejects.toThrow(/413/);
+      }).catch((reason: unknown) => reason);
+    expect((error as Error).message).toMatch(/413/);
+    expect((error as Error).message).not.toContain("file too large");
   });
 
   it("レスポンスに url が無い場合はエラーを投げる", async () => {

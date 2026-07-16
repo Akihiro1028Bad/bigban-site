@@ -40,6 +40,17 @@ describe("PublishQueue", () => {
     expect(screen.queryByRole("button", { name: /今すぐ公開/ })).not.toBeInTheDocument();
   });
 
+  it("公開後に再取得でキューが空になっても直前の結果を保持する", async () => {
+    const item = article({ id: "a", title: "公開済みになる記事" });
+    const { rerender } = render(<PublishQueue items={[item]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    expect(await screen.findByLabelText("success: 1件")).toBeInTheDocument();
+    rerender(<PublishQueue items={[]} token="t" onChanged={() => {}} />);
+    expect(screen.getByText("公開待ちの記事はありません")).toBeInTheDocument();
+    expect(screen.getByLabelText("success: 1件")).toBeInTheDocument();
+    expect(screen.getByText(/公開済みになる記事 — success/)).toBeInTheDocument();
+  });
+
   it("公開OK/予約済み/要対応を3サマリ＋3セクションで振り分けて出す", () => {
     const items = [
       article({ id: "ok", title: "公開できる" }),
@@ -70,7 +81,7 @@ describe("PublishQueue", () => {
     const publishCalls = fetchMock.mock.calls.filter((c) => c[0] === "/api/growth/publish");
     expect(publishCalls).toHaveLength(2);
     expect(JSON.parse(publishCalls[0][1].body)).toEqual({ pageId: "a" });
-    expect(publishCalls[0][1].headers.Authorization).toBe("Bearer tok");
+    expect(publishCalls[0][1].headers.Authorization).toBeUndefined();
   });
 
   it("個別行の「公開」で当該記事だけ publish を呼ぶ", async () => {
@@ -204,39 +215,136 @@ describe("PublishQueue", () => {
     expect(() => fireEvent.click(screen.getByRole("button", { name: /修正する/ }))).not.toThrow();
   });
 
-  it("失敗時はエラーを表示しつつ、盤は再取得する(部分公開の反映)", async () => {
+  it("失敗時は記事別結果を表示しつつ、盤は再取得する", async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 502, json: async () => ({ success: false, error: "publish failed" }) });
     const onChanged = vi.fn();
     render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
-    await waitFor(() => expect(screen.getByText(/処理中にエラーが発生しました/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("publish failed")).toBeInTheDocument());
+    expect(screen.getByLabelText("retryable-failure: 1件")).toBeInTheDocument();
     // 一括公開が途中失敗しても、既に公開済みの分を盤へ反映するため onChanged は呼ぶ。
     expect(onChanged).toHaveBeenCalled();
   });
 
-  it("本文が空/非JSONでも例外にせず success 扱いにする(catch 経路)", async () => {
-    // res.json() が reject(空ボディ/非JSON相当)しても post() は catch で {} に握り、
-    // res.ok=true のため成功扱い。onChanged が呼ばれる。
+  it("本文が空/非JSONはretryable-failureへ正規化する", async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => Promise.reject(new Error("empty")) });
     const onChanged = vi.fn();
     render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-    expect(screen.queryByText(/処理中にエラーが発生しました/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("retryable-failure: 1件")).toBeInTheDocument();
   });
 
-  it("HTTP 200 でも success:false なら失敗扱いにする(防御的整合)", async () => {
-    // res.ok は true だが API エンベロープが success:false のケース。post() が例外にし、
-    // run() がエラー表示へ落とす。他の呼び出し(api.ts postDecision 等)と挙動を揃える。
+  it("legacy success:falseをretryable-failureとして表示する", async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: false }) });
     const onChanged = vi.fn();
     render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
-    await waitFor(() => expect(screen.getByText(/処理中にエラーが発生しました/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("retryable-failure: 1件")).toBeInTheDocument());
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("publishの通信例外をretryable-failureとして表示する", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    expect(await screen.findByText("通信に失敗しました。")).toBeInTheDocument();
+  });
+
+  it("HTTP失敗なのにsuccess envelopeなら安全側のretryable-failureにする", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({ success: true }) });
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    expect(await screen.findByText("公開APIに失敗しました (HTTP 500)。")).toBeInTheDocument();
+  });
+
+  it("予約APIの通信例外は従来どおり汎用エラーを表示する", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /^予約$/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "公開日時を予約" })).getByRole("button", { name: /明日 09:00/ }));
+    expect(await screen.findByText(/処理中にエラーが発生しました/)).toBeInTheDocument();
+  });
+
+  it("予約APIの非JSON成功応答は従来どおり成功として扱う", async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => Promise.reject(new Error("empty")) });
+    const onChanged = vi.fn();
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: /^予約$/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "公開日時を予約" })).getByRole("button", { name: /明日 09:00/ }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(screen.queryByText(/処理中にエラー/)).not.toBeInTheDocument();
+  });
+
+  it("予約APIのHTTP失敗は従来どおり汎用エラーを表示する", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({ success: false }) });
+    render(<PublishQueue items={[article({ id: "a", title: "A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /^予約$/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "公開日時を予約" })).getByRole("button", { name: /明日 09:00/ }));
+    expect(await screen.findByText(/処理中にエラーが発生しました/)).toBeInTheDocument();
+  });
+
+  it("3件中1件が失敗しても全件実行し、タイトル別に集計してonChangedは1回", async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
+      .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ success: false, error: "B failed" }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) });
+    const onChanged = vi.fn();
+    render(<PublishQueue items={[article({ id: "a", title: "A" }), article({ id: "b", title: "B" }), article({ id: "c", title: "C" })]} token="t" onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls.filter((call) => call[0] === "/api/growth/publish")).toHaveLength(3);
+    expect(screen.getByLabelText("success: 2件")).toBeInTheDocument();
+    expect(screen.getByLabelText("retryable-failure: 1件")).toBeInTheDocument();
+    expect(screen.getByText(/B — retryable-failure/)).toBeInTheDocument();
+  });
+
+  it("207 partialの復旧文を表示し、再試行はresumeFromをPOSTして対象結果だけ置換する", async () => {
+    const partial = {
+      success: false,
+      outcome: "partial",
+      message: "microCMS公開済み、Notion同期失敗",
+      completedStages: ["microcms:publish"],
+      failedStage: "notion:status",
+      events: [],
+      externalIds: {},
+      recovery: { retryable: true, resumeFrom: "notion:status", manualAction: "Notionを手動で公開済みにしてください。" },
+    };
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 207, json: async () => partial })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) });
+    const onChanged = vi.fn();
+    render(<PublishQueue items={[article({ id: "a", title: "記事A" }), article({ id: "b", title: "記事B" })]} token="t" onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    await screen.findByText("Notionを手動で公開済みにしてください。");
+    fireEvent.click(screen.getByRole("button", { name: /記事A.*Notion同期のみ再試行/ }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ pageId: "a", resumeFrom: "notion:status" });
+    expect(screen.getByLabelText("success: 2件")).toBeInTheDocument();
+  });
+
+  it("microcms失敗の全体再試行はresumeFromを送らない", async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({
+        success: false,
+        outcome: "retryable-failure",
+        message: "publish failed",
+        completedStages: ["notion:read"],
+        failedStage: "microcms:publish",
+        events: [],
+        externalIds: {},
+        recovery: { retryable: true, resumeFrom: "microcms:publish" },
+      }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) });
+    render(<PublishQueue items={[article({ id: "a", title: "記事A" })]} token="t" onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /件を今すぐ公開/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "記事A: 公開処理を再試行" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ pageId: "a" });
   });
 
   it("要対応のみ(公開OK 0件)でも例外リストは出し、公開ボタンは出さない", () => {
@@ -304,13 +412,13 @@ describe("PublishQueue", () => {
       fireEvent.click(screen.getByRole("button", { name: /画像を選ぶ/ }));
       const dialog = await screen.findByRole("dialog", { name: /メディアライブラリ: 画像なし記事/ });
       expect(dialog).toBeInTheDocument();
-      // 一覧を authHeaders 付きで GET する。
+      // 一覧を sessionHeaders 付きで GET する。
       await waitFor(() => {
         const listCall = fetchMock.mock.calls.find(
           (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method !== "POST"
         );
         expect(listCall).toBeTruthy();
-        expect(listCall![1].headers.Authorization).toBe("Bearer tok");
+        expect(listCall![1].headers.Authorization).toBeUndefined();
       });
       // グリッドにサムネ(next/image=jsdomでは img・空 alt は presentation)＋選択ボタンが出る。
       const thumb = await within(dialog).findByRole("button", { name: "この画像をアイキャッチに設定" });
@@ -337,7 +445,7 @@ describe("PublishQueue", () => {
       const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
       expect(applyCall).toBeTruthy();
       expect(applyCall![1].method).toBe("POST");
-      expect(applyCall![1].headers.Authorization).toBe("Bearer tok");
+      expect(applyCall![1].headers.Authorization).toBeUndefined();
       expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-1", eyecatchUrl: MEDIA_URL });
       // 反映成功でモーダルは閉じる。
       await waitFor(() =>
@@ -434,7 +542,7 @@ describe("PublishQueue", () => {
         (c) => typeof c[0] === "string" && c[0].startsWith("/api/growth/media") && c[1]?.method === "POST"
       );
       expect(uploadCall).toBeTruthy();
-      expect(uploadCall![1].headers.Authorization).toBe("Bearer tok");
+      expect(uploadCall![1].headers.Authorization).toBeUndefined();
       const applyCall = fetchMock.mock.calls.find((c) => c[0] === "/api/growth/draft/eyecatch");
       expect(JSON.parse(applyCall![1].body)).toEqual({ pageId: "page-9", eyecatchUrl: UPLOADED });
     });

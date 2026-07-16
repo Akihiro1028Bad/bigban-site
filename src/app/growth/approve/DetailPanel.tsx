@@ -322,6 +322,7 @@ export function DetailPanel({
           title: item.title,
           knownNewsPaths: draft.knownNewsPaths ? new Set(draft.knownNewsPaths) : undefined,
           confirmedFacts: draft.confirmedFacts,
+          factBinding: draft.factBinding,
         })
       : [];
   const hasBlock = countByLevel(checks).block > 0;

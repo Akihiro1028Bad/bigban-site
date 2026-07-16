@@ -21,13 +21,23 @@ import { buildLoopFailureMessage, type LoopFailureKind } from "./loopFailure";
 async function main(): Promise<void> {
   const mode = process.env.GROWTH_LOOP_MODE ?? "(unknown)";
   const resumeCommand = process.env.GROWTH_LOOP_RESUME ?? "(再実行してください)";
-  const kind: LoopFailureKind =
-    process.env.GROWTH_LOOP_KIND === "spawn-error" ? "spawn-error" : "nonzero-exit";
+  const rawKind = process.env.GROWTH_LOOP_KIND;
+  const kind: LoopFailureKind = rawKind === "spawn-error" || rawKind === "timeout" ? rawKind : "nonzero-exit";
   const exitRaw = Number(process.env.GROWTH_LOOP_EXIT);
   const exitCode = Number.isFinite(exitRaw) ? exitRaw : undefined;
   const detail = process.env.GROWTH_LOOP_DETAIL;
 
-  const message = buildLoopFailureMessage({ mode, resumeCommand, kind, exitCode, detail });
+  const timeoutRaw = Number(process.env.GROWTH_LOOP_TIMEOUT_MS ?? detail?.match(/timeoutMs=(\d+)/)?.[1]);
+  const message = buildLoopFailureMessage({
+    mode,
+    resumeCommand,
+    kind,
+    exitCode,
+    detail,
+    timeoutMs: Number.isFinite(timeoutRaw) ? timeoutRaw : undefined,
+    termSent: process.env.GROWTH_LOOP_TERM_SENT === "true" || detail?.includes("SIGTERM=true"),
+    forceKilled: process.env.GROWTH_LOOP_FORCE_KILLED === "true" || detail?.includes("SIGKILL=true"),
+  });
   process.stderr.write(`${message}\n`);
 
   const to = process.env.LINE_GROUP_ID;
@@ -43,7 +53,7 @@ async function main(): Promise<void> {
     await pushTextMessage(to, message, {
       channelAccessToken: token,
       fetchFn: defaultFetch,
-      kind: "failure",
+      kind: kind === "timeout" ? "critical" : "failure",
     });
     process.stderr.write("LINE グループへ loop 失敗を通知しました。\n");
   } catch (error: unknown) {

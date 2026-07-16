@@ -1,5 +1,7 @@
 # 実装プラン: グロース週次 LINE通知 + 自前承認ページ
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 作成日: 2026-06-16
 対象ブランチ: `feature/growth-loop-mvp`(または派生 `feature/growth-line-notify`)
 関連: [週次運用ランブック](../../operations/growth-weekly-runbook.md) / [MVP設計書](../specs/2026-06-12-growth-loop-mvp-design.md)

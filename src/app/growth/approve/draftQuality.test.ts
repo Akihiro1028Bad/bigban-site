@@ -33,6 +33,48 @@ function okHtml(): string {
 }
 
 describe("draftQuality", () => {
+  it("bindingメタデータがある記事はfact抜粋だけを照合し、不正versionをblockする", () => {
+    const bodyHtml = okHtml();
+    expect(pick(draftQuality({ bodyHtml, body: "", title: "t" }), "fact binding").level).toBe("ok");
+    const factBinding = {
+      version: 1,
+      bodyHash: "fnv1a64:original",
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "料金は500円です。",
+        container: "p" as const,
+        containerIndex: 1,
+      }],
+    };
+    expect(pick(draftQuality({
+      bodyHtml: '<figure><img src="new.png"></figure><p>料金は500円です。</p><p>補足を変更</p>',
+      body: "",
+      title: "t",
+      factBinding,
+    }), "fact binding").level).toBe("ok");
+    expect(pick(draftQuality({
+      bodyHtml: "<p>料金は600円です。</p>",
+      body: "",
+      title: "t",
+      factBinding,
+    }), "fact binding").level).toBe("block");
+    expect(pick(draftQuality({
+      bodyHtml,
+      body: "",
+      title: "t",
+      factBinding: { version: 99, bodyHash: "fnv1a64:stale", referenceCount: 1, isValid: true },
+    }), "fact binding").level).toBe("block");
+  });
+  it("fact markerが残ったHTMLを安全性blockにする", () => {
+    const checks = draftQuality({
+      bodyHtml: `<p>料金は500円<!--FACT:fact-price-->。${DISCLAIMER}</p>`,
+      body: "",
+      title: "料金",
+    });
+    expect(pick(checks, "HTML安全性")).toMatchObject({ level: "block", value: "FACT marker" });
+  });
   it("十分な下書き(免責あり・断定なし)は全項目 ok・公開ブロックなし", () => {
     const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + DISCLAIMER;
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "短いタイトル" });
@@ -403,7 +445,7 @@ describe("countByLevel", () => {
     const body = "あ".repeat(QUALITY_THRESHOLDS.chars.single.min) + `最高です。${DISCLAIMER}`;
     const checks = draftQuality({ bodyHtml: okHtml(), body, title: "文体チェック" });
 
-    expect(countByLevel(checks)).toEqual({ block: 0, warn: 1, ok: 9 });
+    expect(countByLevel(checks)).toEqual({ block: 0, warn: 1, ok: 10 });
   });
 });
 

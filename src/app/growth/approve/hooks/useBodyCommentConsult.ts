@@ -20,7 +20,7 @@ import {
 } from "@/lib/growth/bodyComment";
 import { readJsonObject } from "@/lib/growth/safeJson";
 
-import { authHeaders } from "../authHeaders";
+import { sessionHeaders } from "../sessionHeaders";
 
 interface UseBodyCommentConsultParams {
   pageId: string;
@@ -58,7 +58,7 @@ const REJECT_BATCH_SIZE = 20;
 
 export function useBodyCommentConsult({
   pageId,
-  token,
+  token: _token,
   bodyHtml,
   bodyComment,
   onChanged,
@@ -142,7 +142,7 @@ export function useBodyCommentConsult({
     try {
       const res = await fetch(path, {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
       const json = await readJsonObject(res);
@@ -216,7 +216,7 @@ export function useBodyCommentConsult({
       try {
         await fetch("/api/growth/learning-log/reject", {
           method: "POST",
-          headers: authHeaders(token, { "Content-Type": "application/json" }),
+          headers: sessionHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             pageId,
             source: "comment-revise",
@@ -235,7 +235,7 @@ export function useBodyCommentConsult({
     try {
       const res = await fetch("/api/growth/body-comment/dismiss", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
       const json = await readJsonObject(res);
@@ -270,7 +270,7 @@ export function useBodyCommentConsult({
     try {
       const saveRes = await fetch("/api/growth/draft/edit", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           pageId,
           bodyHtml: html,
@@ -284,7 +284,7 @@ export function useBodyCommentConsult({
       // 反映後は依頼状態をクリア(なしに戻す)。
       await fetch("/api/growth/body-comment/dismiss", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ pageId }),
       });
       await reject(proposal.filter((item) => !selected.has(item.commentIndex)));

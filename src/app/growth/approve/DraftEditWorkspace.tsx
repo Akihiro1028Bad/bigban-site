@@ -66,7 +66,7 @@ const BTN =
  *
  * 左=エディタ(DraftEditor)/右=本番ライブプレビュー(DraftPreviewFrame)を横並びにし、
  * 狭い画面では 編集|プレビュー のタブにフォールバックする。route 遷移しない
- * クライアントオーバーレイ(passphrase 維持)。aria-modal・フォーカストラップ・Esc・
+ * クライアントオーバーレイ(Cookie session 維持)。aria-modal・フォーカストラップ・Esc・
  * スクロールロック・フォーカス復帰を備える。外殻は --p-* ダークトークンで統一。
  *
  * モーダル/フォーカストラップ/iframe への薄い DOM 結線のためカバレッジ対象外

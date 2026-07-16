@@ -14,7 +14,8 @@ import {
   countInitiativesAutoTargets,
   initiativesAutoQueryFilter,
 } from "./initiativesAuto";
-import { queryDataSource, type NotionApiOptions } from "./notion";
+import type { NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460"; // 施策提案
 
@@ -29,9 +30,9 @@ function notionOptions(): NotionApiOptions {
 }
 
 async function peek(options: NotionApiOptions): Promise<void> {
-  const { pages } = await queryDataSource(
+  const pages = await queryAllDataSource(
     PROPOSAL_DS,
-    { filter: initiativesAutoQueryFilter(), pageSize: 100 },
+    { filter: initiativesAutoQueryFilter() },
     options
   );
   process.stdout.write(`${countInitiativesAutoTargets(pages)}\n`);

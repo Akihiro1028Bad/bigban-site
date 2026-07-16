@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { fetchContentSlug, fetchContentSummary, fetchDraftKey } from "./draft-meta";
+import { ExternalApiError } from "./externalApiError";
 import type { FetchFn } from "./http";
 
 describe("fetchDraftKey", () => {
@@ -82,7 +83,7 @@ describe("fetchDraftKey", () => {
     expect(key).toBeNull();
   });
 
-  it("HTTP エラー時は内容付きで例外を投げる", async () => {
+  it("HTTP エラー時は本文を含めず構造化例外を投げる", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 404,
@@ -90,13 +91,18 @@ describe("fetchDraftKey", () => {
       text: async () => "not found",
     });
 
-    await expect(
-      fetchDraftKey("news", "missing", {
-        serviceDomain: "thepicklebang",
-        apiKey: "mgmt-key",
-        fetchFn,
-      })
-    ).rejects.toThrow("404");
+    const promise = fetchDraftKey("news", "missing", {
+      serviceDomain: "thepicklebang",
+      apiKey: "mgmt-key",
+      fetchFn,
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(ExternalApiError);
+    await expect(promise).rejects.toMatchObject({
+      operation: "microcms.draft-key.get",
+      status: 404,
+    });
+    await expect(promise).rejects.not.toThrow(/not found/);
   });
 });
 
@@ -138,7 +144,7 @@ describe("fetchContentSlug", () => {
     ).rejects.toThrow(/slug/);
   });
 
-  it("HTTPエラーは本文を制限して例外にする", async () => {
+  it("HTTPエラーは本文を含めず構造化例外にする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 404,
@@ -146,13 +152,17 @@ describe("fetchContentSlug", () => {
       text: async () => "not found",
     });
 
-    await expect(
-      fetchContentSlug("news", "missing", "dk-old", {
-        serviceDomain: "thepicklebang",
-        apiKey: "key",
-        fetchFn,
-      })
-    ).rejects.toThrow(/404.*not found/);
+    const promise = fetchContentSlug("news", "missing", "dk-old", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      operation: "microcms.content.slug.get",
+      status: 404,
+    });
+    await expect(promise).rejects.not.toThrow(/not found/);
   });
 });
 
@@ -205,6 +215,29 @@ describe("fetchContentSummary", () => {
     });
     const [url] = fetchFn.mock.calls[0];
     expect(url).not.toContain("draftKey");
+  });
+
+  it("HTTPエラーは本文を含めず構造化例外にする", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+      text: async () => "private response\nsecond line",
+    });
+
+    const error = await fetchContentSummary("news", "abc123", null, {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(ExternalApiError);
+    expect(error).toMatchObject({
+      operation: "microcms.content.summary.get",
+      status: 503,
+    });
+    expect((error as Error).message).not.toContain("private response");
+    expect((error as Error).message).not.toContain("second line");
   });
 
   it("category が文字列(配列でない)でもそのまま使う", async () => {
@@ -395,7 +428,7 @@ describe("fetchContentSummary", () => {
     expect(summary.category).toBeNull();
   });
 
-  it("HTTP エラー時は内容付きで例外を投げる(本文は固定長に制限)", async () => {
+  it("HTTP エラー時は本文を例外へ含めない", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue({
       ok: false,
       status: 500,
@@ -403,12 +436,13 @@ describe("fetchContentSummary", () => {
       text: async () => "boom".repeat(100),
     });
 
-    await expect(
-      fetchContentSummary("news", "id", "dk", {
-        serviceDomain: "thepicklebang",
-        apiKey: "key",
-        fetchFn,
-      })
-    ).rejects.toThrow(/500.*boom/);
+    const error = await fetchContentSummary("news", "id", "dk", {
+      serviceDomain: "thepicklebang",
+      apiKey: "key",
+      fetchFn,
+    }).catch((reason: unknown) => reason);
+
+    expect(error).toMatchObject({ operation: "microcms.content.summary.get", status: 500 });
+    expect((error as Error).message).not.toContain("boom");
   });
 });

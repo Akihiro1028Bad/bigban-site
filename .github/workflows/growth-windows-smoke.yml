@@ -1,0 +1,26 @@
+name: Growth Windows smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run scripts/growth/daemonSmoke.test.ts scripts/growth/daemonSchedule.test.ts scripts/growth/processControl.test.ts
+      - name: Smoke twice and verify restoration
+        shell: pwsh
+        env:
+          GROWTH_DRYRUN: "1"
+          GROWTH_DAEMON_SMOKE_STATE_PATH: ${{ runner.temp }}\growth-daemon-smoke.json
+        run: |
+          npm run growth:daemon -- --smoke
+          npm run growth:daemon -- --smoke | Tee-Object -Variable second
+          if (-not ($second -match '前回状態あり')) { throw 'smoke state was not restored' }

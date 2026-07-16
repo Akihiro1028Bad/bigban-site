@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageSelect: vi.fn(), defaultFetch: vi.fn() };
 });
-vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn(), patchDraft: vi.fn() }));
+vi.mock("@/lib/growth/content", () => ({ publishContent: vi.fn(), patchDraft: vi.fn(), readContentStatus: vi.fn() }));
 vi.mock("@/lib/microcms/columnsQueries", () => ({ getColumnSlugs: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/lib/microcms/queries", () => ({ getNewsSlugs: vi.fn().mockResolvedValue([]) }));
 
@@ -16,7 +18,7 @@ vi.mock("@/config/featureFlags", () => ({
   },
 }));
 
-import { patchDraft, publishContent } from "@/lib/growth/content";
+import { patchDraft, publishContent, readContentStatus } from "@/lib/growth/content";
 import { getNewsSlugs } from "@/lib/microcms/queries";
 import { getPage, updatePageSelect } from "@/lib/growth/notion";
 import { POST } from "./route";
@@ -27,8 +29,7 @@ const DISCLAIMER = "※この記事はAIが作成した下書きです。公開�
 
 function postReq(token: string | null, body: unknown, raw?: string): Request {
   const url = new URL("http://localhost/api/growth/publish");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token, "publish"), body: raw ?? JSON.stringify(body) });
 }
 
 function page(
@@ -88,6 +89,7 @@ beforeEach(() => {
   vi.mocked(updatePageSelect).mockReset();
   vi.mocked(publishContent).mockReset().mockResolvedValue(undefined);
   vi.mocked(patchDraft).mockReset().mockResolvedValue("my-article");
+  vi.mocked(readContentStatus).mockReset().mockResolvedValue("PUBLISH");
   vi.mocked(getNewsSlugs).mockReset().mockResolvedValue([]);
 });
 
@@ -101,11 +103,16 @@ afterEach(() => {
 });
 
 describe("POST /api/growth/publish", () => {
+  it("未知のresumeFromは400で拒否する", async () => {
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, resumeFrom: "create" }));
+    expect(res.status).toBe(400);
+    expect(readContentStatus).not.toHaveBeenCalled();
+  });
   it("認証有効＋正規トークン＋検証OKで公開し、ステータスを公開済みにする(200・媒体欠落=コラム既定・env未設定でnews)", async () => {
     vi.mocked(getPage).mockResolvedValue(READY);
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toMatchObject({ success: true, outcome: "success", completedStages: ["notion:read", "microcms:sync", "microcms:publish", "notion:status"] });
     // 媒体欠落 → コラム既定 → env(GROWTH_MICROCMS_ENDPOINT)未設定 → news フォールバック。
     expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
     expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
@@ -120,6 +127,64 @@ describe("POST /api/growth/publish", () => {
     expect(vi.mocked(patchDraft).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(publishContent).mock.invocationCallOrder[0]
     );
+  });
+
+  it("microCMS公開後のNotion失敗は207 partialと具体的な復旧情報を返す", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(updatePageSelect).mockRejectedValue(new Error("NOTION_TOKEN=secret response"));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
+    const body = await res.json();
+    expect(res.status).toBe(207);
+    expect(body).toMatchObject({
+      success: false,
+      outcome: "partial",
+      failedStage: "notion:status",
+      completedStages: ["notion:read", "microcms:sync", "microcms:publish"],
+      externalIds: { contentId: "my-article", notionPageId: PAGE_ID },
+      recovery: { retryable: true, resumeFrom: "notion:status" },
+    });
+    expect(body.recovery.manualAction).toContain("手動で公開済み");
+    expect(JSON.stringify(body)).not.toContain("NOTION_TOKEN");
+    expect(JSON.stringify(body)).not.toContain("response");
+  });
+
+  it("resume時はPUBLISH確認後にNotionだけ同期し、patch/publishを再実行しない", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(readContentStatus).mockResolvedValue("PUBLISH");
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, resumeFrom: "notion:status" }));
+    expect(res.status).toBe(200);
+    expect(readContentStatus).toHaveBeenCalledWith("news", "my-article", expect.anything());
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+    expect(updatePageSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("resume中にNotion同期が再失敗しても207 partialを返す", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(readContentStatus).mockResolvedValue("PUBLISH");
+    vi.mocked(updatePageSelect).mockRejectedValue(new Error("again"));
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, resumeFrom: "notion:status" }));
+    expect(res.status).toBe(207);
+    expect(await res.json()).toMatchObject({ outcome: "partial", failedStage: "notion:status", recovery: { resumeFrom: "notion:status" } });
+    expect(patchDraft).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
+  it("resume時にNotionが既に公開済みなら外部書き込みなしで成功", async () => {
+    vi.mocked(getPage).mockResolvedValue({ ...READY, properties: { ...READY.properties, ステータス: { select: { name: "公開済み" } } } });
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, resumeFrom: "notion:status" }));
+    expect(res.status).toBe(200);
+    expect(readContentStatus).not.toHaveBeenCalled();
+    expect(updatePageSelect).not.toHaveBeenCalled();
+  });
+
+  it("resume時にmicroCMS公開を確認できなければ409 manual-action-requiredでNotionを更新しない", async () => {
+    vi.mocked(getPage).mockResolvedValue(READY);
+    vi.mocked(readContentStatus).mockResolvedValue("DRAFT");
+    const res = await POST(postReq(SECRET, { pageId: PAGE_ID, resumeFrom: "notion:status" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ outcome: "manual-action-required", failedStage: "microcms:publish" });
+    expect(updatePageSelect).not.toHaveBeenCalled();
   });
 
   it("媒体=コラム + env=columns なら columns へ publish(記事ごとの媒体を解決)", async () => {
@@ -353,6 +418,19 @@ describe("POST /api/growth/publish", () => {
     expect((await POST(postReq(null, { pageId: PAGE_ID }))).status).toBe(401);
   });
 
+  it("通常sessionだけなら403 STEP_UP_REQUIREDで外部APIを呼ばない", async () => {
+    const request = new Request("http://localhost/api/growth/publish", {
+      method: "POST",
+      headers: growthAuthHeaders(SECRET),
+      body: JSON.stringify({ pageId: PAGE_ID }),
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "STEP_UP_REQUIRED", scope: "publish" });
+    expect(getPage).not.toHaveBeenCalled();
+    expect(publishContent).not.toHaveBeenCalled();
+  });
+
   it("NOTION_TOKEN 未設定は 500", async () => {
     delete process.env.NOTION_TOKEN;
     expect((await POST(postReq(SECRET, { pageId: PAGE_ID }))).status).toBe(500);
@@ -446,7 +524,7 @@ describe("POST /api/growth/publish", () => {
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toMatchObject({ success: true, outcome: "success" });
     expect(getNewsSlugs).toHaveBeenCalled();
     expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());
     expect(updatePageSelect).toHaveBeenCalledWith(PAGE_ID, "ステータス", "公開済み", expect.anything());
@@ -507,9 +585,10 @@ describe("POST /api/growth/publish", () => {
     const res = await POST(postReq(SECRET, { pageId: PAGE_ID }));
 
     expect(res.status).toBe(207);
-    expect(await res.json()).toEqual({
+    expect(await res.json()).toMatchObject({
       success: false,
-      partial: "notion-status",
+      outcome: "partial",
+      failedStage: "notion:status",
       error: "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。",
     });
     expect(publishContent).toHaveBeenCalledWith("news", "my-article", expect.anything());

@@ -62,7 +62,8 @@ describe("requestAdvice", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/growth/advise");
-    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect((init.headers as Record<string, string>)["X-Growth-Request"]).toBe("1");
     const sent = JSON.parse(init.body as string);
     expect(sent).toEqual({ pageId: PAGE_ID, instruction: "見た目も" });
     expect(view.result.current.busy).toBe(false);

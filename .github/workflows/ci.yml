@@ -46,3 +46,26 @@ jobs:
 
       - name: プロダクションビルド
         run: npm run build
+
+  e2e:
+    name: Playwright critical journey (3 browsers)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js 22.x をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 3ブラウザをインストール
+        run: npx playwright install --with-deps
+
+      - name: Critical journeyを実行
+        run: npx playwright test

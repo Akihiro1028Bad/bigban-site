@@ -1,5 +1,7 @@
 # グロースループ 記事品質アップリフト(Quality Uplift)設計 — 即対応2件＋フェーズA
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 **日付**: 2026-07-06 / **ステータス**: ドラフト / **対象**: グロースループ記事生成の記事品質向上(即対応の設計穴修正＋プロンプト・文体ガイドの磨き)
 **関連監査**: `docs/superpowers/research/2026-07-05-article-quality-audit-prompts.md`(監査①・プロンプト/文体)・`-article.md`(監査②・実記事のプロ批評)・`-analysis.md`(監査③・週次/ネタ選定)
 **体裁の手本**: `docs/superpowers/specs/2026-07-05-growth-self-tuning-loop-design.md`(セルフチューニングループ設計)

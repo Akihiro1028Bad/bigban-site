@@ -1,71 +1,89 @@
-/**
- * 承認画面 API 共通の認証(#H6 / #H27 / #SEC-11 / #SEC-03)。
- *
- * 全 api/growth/* ルートが import し、トークン検証の重複(約20ファイル)と実装ブレを解消する。
- * - トークンは `Authorization: Bearer <token>` ヘッダで受け取る(#SEC-03: URL/クエリに載せない)。
- * - 比較は sha256 ダイジェストの定数時間比較で、**長さ差もタイミングに漏らさない**(#H27)。
- * - 認証ゲートは Phase 0 の `APPROVE_AUTH_ENABLED`(env駆動・既定ON)を踏襲。
- */
-
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
 import { APPROVE_AUTH_ENABLED } from "@/config/featureFlags";
+import {
+  GROWTH_SESSION_COOKIE,
+  GROWTH_STEP_UP_COOKIE,
+  verifySession,
+  verifyStepUp,
+  type SessionPayload,
+  type StepUpScope,
+} from "@/lib/growth/authSession";
 
 function digest(value: string): Buffer {
   return createHash("sha256").update(value, "utf8").digest();
 }
 
-/**
- * 定数時間の文字列一致判定。sha256 ダイジェスト(常に32バイト)同士を timingSafeEqual で比較するため、
- * 長さの違いを早期 return で漏らさない(#H27 タイミングリーク修正)。
- */
 export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(digest(a), digest(b));
 }
 
-/**
- * `Authorization: Bearer <token>` からトークンを取り出す。無ければ空文字。
- *
- * クライアント(authHeaders)は ISO-8859-1 制約を満たすため token を percent-encode して送るので、
- * ここで decodeURIComponent して元の値に戻す(日本語等の合言葉に対応)。ASCII の token は不変。
- * 不正な % シーケンス(復号失敗)は素のまま返す(後方互換・沈黙故障を避ける)。
- */
-export function bearerToken(request: Request): string {
-  const header = request.headers.get("authorization") ?? "";
-  if (!header.startsWith("Bearer ")) return "";
-  const raw = header.slice("Bearer ".length);
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
+function cookieValue(request: Request, name: string): string {
+  const header = request.headers.get("cookie") ?? "";
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return "";
+      }
+    }
   }
+  return "";
 }
 
-/**
- * トークンを取り出す。**Authorization: Bearer ヘッダを優先**する(#SEC-03: 承認画面の新クライアントは
- * トークンを URL に載せずヘッダで送る)。`?token=` クエリは**非推奨の後方互換**として受理するのみで、
- * 新クライアントは送らない(URL露出=ログ/Referer/履歴 漏れを防ぐ)。
- */
-function tokenFrom(request: Request): string {
-  const header = bearerToken(request);
-  if (header) return header;
-  return new URL(request.url).searchParams.get("token") ?? "";
+function hasLegacyCredential(request: Request): boolean {
+  return request.headers.has("authorization") || new URL(request.url).searchParams.has("token");
 }
 
-/**
- * トークン検証。認証無効(APPROVE_AUTH_ENABLED=false)時の既定挙動は denyWhenDisabled で分岐:
- * - false(既定): 検証をスキップして許可(承認/編集など通常 API)。
- * - true: 認証無効でも常に拒否(公開など最強権限 API)。
- */
+function hasCsrfHeader(request: Request): boolean {
+  return ["GET", "HEAD", "OPTIONS"].includes(request.method)
+    ? true
+    : request.headers.get("x-growth-request") === "1";
+}
+
+export function authenticatedSession(request: Request): SessionPayload | null {
+  if (hasLegacyCredential(request) || !hasCsrfHeader(request)) return null;
+  const key = process.env.APPROVE_SESSION_SECRET ?? "";
+  if (!key) return null;
+  return verifySession(cookieValue(request, GROWTH_SESSION_COOKIE), key);
+}
+
 export function verifyToken(request: Request, denyWhenDisabled = false): boolean {
+  if (hasLegacyCredential(request)) return false;
   if (!APPROVE_AUTH_ENABLED) return !denyWhenDisabled;
-  const expected = process.env.APPROVE_SECRET ?? "";
-  return Boolean(expected) && safeEqual(tokenFrom(request), expected);
+  return authenticatedSession(request) !== null;
 }
 
-/** 401 レスポンス(JSON 本文必須=client の res.json() を壊さない)。 */
+export type PrivilegedAuthResult = "authorized" | "unauthorized" | "step-up-required";
+
+export function verifyPrivileged(request: Request, scope: StepUpScope): PrivilegedAuthResult {
+  if (!APPROVE_AUTH_ENABLED || hasLegacyCredential(request)) return "unauthorized";
+  const session = authenticatedSession(request);
+  if (!session) return "unauthorized";
+  const key = process.env.APPROVE_SESSION_SECRET!;
+  const token = cookieValue(request, GROWTH_STEP_UP_COOKIE[scope]);
+  return verifyStepUp(token, key, scope, session.sid) ? "authorized" : "step-up-required";
+}
+
 export function unauthorized(message = "認証に失敗しました"): Response {
   return NextResponse.json({ success: false, error: message }, { status: 401 });
+}
+
+export function stepUpRequired(scope: StepUpScope): Response {
+  return NextResponse.json(
+    { success: false, error: "再認証が必要です。", code: "STEP_UP_REQUIRED", scope },
+    { status: 403 }
+  );
+}
+
+export function privilegedAuthFailure(
+  result: Exclude<PrivilegedAuthResult, "authorized">,
+  scope: StepUpScope,
+  unauthorizedMessage: string
+): Response {
+  return result === "unauthorized" ? unauthorized(unauthorizedMessage) : stepUpRequired(scope);
 }

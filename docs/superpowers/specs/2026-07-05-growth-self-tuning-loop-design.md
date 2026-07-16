@@ -1,5 +1,7 @@
 # グロースループ セルフチューニングループ(自己改善機能)設計 — SI1 / SI2
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 **日付**: 2026-07-05 / **ステータス**: ドラフト / **対象**: グロースループ記事生成システムの自己改善機能
 **関連文書**: `docs/operations/growth/00-canon.md`・`30-loops.md`・`40-notion-props.md`・`50-publish-metrics.md`・`docs/operations/growth-weekly-runbook.md`・`docs/operations/growth-article-style.md`
 **前提コード**: `scripts/growth/notion.ts`(`createPage`/`chunkRichText`/`updatePageProps`/`updatePageSelect`)・`scripts/growth/advise-cli.ts`(pull 型 CLI の型)・`scripts/growth/loopFailure.ts`(失敗通知本文)・`scripts/growth/run.mjs`(モード定義・DISALLOW)・`src/app/api/growth/draft/edit/route.ts`(手動リッチ編集の保存 API)・`scripts/growth/metrics.ts`(成績データミラー)

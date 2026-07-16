@@ -23,7 +23,7 @@ function baseInput(overrides: Partial<DigestInput> = {}): DigestInput {
     topActions: ["成果を数える設定を入れる", "市川の受け皿ページを作る", "トップに予約ボタン"],
     pendingCount: 20,
     reportUrl: "https://xxx.notion.site/report",
-    approveUrl: "https://example.com/growth/approve?token=abc",
+    approveUrl: "https://example.com/growth/approve",
     ...overrides,
   };
 }
@@ -42,7 +42,7 @@ describe("buildDigestMessage", () => {
     expect(msg).toContain("3. トップに予約ボタン");
     expect(msg).toContain("確認待ち 20件");
     expect(msg).toContain("レポートを見る → https://xxx.notion.site/report");
-    expect(msg).toContain("ダッシュボードを開く → https://example.com/growth/approve?token=abc");
+    expect(msg).toContain("ダッシュボードを開く → https://example.com/growth/approve");
   });
 
   it("順位が改善・横ばいの表現を出し分ける", () => {
@@ -176,19 +176,8 @@ describe("buildDigestMessage", () => {
     expect(empty).not.toContain("■ データ注意");
   });
 
-  it("合言葉がある場合は承認リンク付近に表示する", () => {
-    const msg = buildDigestMessage(baseInput({ passphrase: " ピックルバン " }));
-
-    expect(msg).toContain("ダッシュボードを開く → https://example.com/growth/approve?token=abc");
-    expect(msg).toContain("🔑 合言葉: ピックルバン");
-  });
-
-  it("合言葉が未指定・空なら表示しない", () => {
-    const omitted = buildDigestMessage(baseInput());
-    expect(omitted).not.toContain("🔑 合言葉:");
-
-    const empty = buildDigestMessage(baseInput({ passphrase: "  " }));
-    expect(empty).not.toContain("🔑 合言葉:");
+  it("合言葉を表示しない", () => {
+    expect(buildDigestMessage(baseInput())).not.toContain("合言葉");
   });
 });
 

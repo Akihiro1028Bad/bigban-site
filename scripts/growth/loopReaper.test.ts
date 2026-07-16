@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FetchFn, HttpResponse } from "./http";
 import { reapStaleRows } from "./loopReaper";
-import { queryAllDataSource } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const NOW = 1_700_000_000_000;
 const TIMEOUT = 15 * 60 * 1000;
@@ -23,7 +23,7 @@ describe("reapStaleRows", () => {
       .fn<FetchFn>()
       .mockResolvedValueOnce(ok({ results: firstPage, has_more: true, next_cursor: "page-2" }))
       .mockResolvedValueOnce(ok({ results: [stalePage], has_more: false, next_cursor: null }));
-    const pages = await queryAllDataSource("ideas", { pageSize: 100 }, { token: "token", fetchFn });
+    const pages = await queryAllDataSource("ideas", {}, { token: "token", fetchFn });
     const rows = pages.map((page, index) => ({
       id: page.id,
       status: "処理中",

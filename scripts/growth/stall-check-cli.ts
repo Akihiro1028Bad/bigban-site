@@ -15,7 +15,8 @@ import "dotenv/config";
 
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
-import { queryAllDataSource, type NotionApiOptions } from "./notion";
+import type { NotionApiOptions } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 import { detectStalls } from "./stallDetection";
 import { buildStallMessage } from "./stallNotify";
 
@@ -44,7 +45,7 @@ async function notifyLine(text: string): Promise<void> {
 
 async function main(): Promise<void> {
   const opts: NotionApiOptions = { token: requireEnv("NOTION_TOKEN"), fetchFn: defaultFetch };
-  const pages = await queryAllDataSource(IDEA_DS, { pageSize: 100 }, opts);
+  const pages = await queryAllDataSource(IDEA_DS, {}, opts);
 
   const nowMs = Date.now();
   const { generatingTitles, staleLoopTitles, wedgeTitles } = detectStalls(

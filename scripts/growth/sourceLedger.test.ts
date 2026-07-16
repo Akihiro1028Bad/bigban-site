@@ -5,11 +5,15 @@ import {
   confirmedFactsFromEntries,
   confirmedFactsFromPage,
   confirmedFactsFromRenderedText,
+  factBindingFromEntries,
+  factBindingFromPage,
+  factBindingFromRenderedText,
   hasReferenceEligibleSource,
   parseSourceLedger,
   renderSourceLedgerText,
   SOURCE_LEDGER_PROP,
   updatePagePropsWithLedgerFallback,
+  withBindingBodyHash,
   type SourceLedgerEntry,
 } from "./sourceLedger";
 
@@ -17,6 +21,31 @@ const validEntry: SourceLedgerEntry = {
   sourceType: "official-site",
   source: "https://example.com/report",
   confirmedFacts: ["2024年の公式レポートで競技人口を公表"],
+};
+
+const auditReference = {
+  factId: "fact-price",
+  statement: "参加費は500円",
+  excerpt: "参加費は500円",
+  sectionPath: "料金",
+  container: "p" as const,
+  containerIndex: 2,
+  containerTextHash: "fnv1a64:container",
+  containerMatchCount: 1,
+  recheckBeforePublish: true,
+  recheckReason: "料金",
+  bindingVersion: 1,
+  bodyHash: "fnv1a64:abc",
+};
+
+const storedAuditReference = {
+  factId: "fact-price",
+  excerpt: auditReference.excerpt,
+  sectionPath: "料金",
+  container: "p" as const,
+  containerIndex: 2,
+  containerTextHash: "fnv1a64:container",
+  containerMatchCount: 1,
 };
 
 const legacyEntry = {
@@ -52,6 +81,13 @@ describe("parseSourceLedger", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("監査参照を任意で受理し、不正な参照だけ警告付きで除外する", () => {
+    expect(parseSourceLedger([{ ...validEntry, factReferences: [auditReference] }]).entries[0].factReferences).toEqual([auditReference]);
+    const result = parseSourceLedger([{ ...validEntry, factReferences: [auditReference, { ...auditReference, container: "h2" }] }]);
+    expect(result.entries[0].factReferences).toEqual([auditReference]);
+    expect(result.warnings).toHaveLength(1);
+  });
+
   it("同じ情報源の確認済み事実を1件へ集約する", () => {
     const result = parseSourceLedger([
       validEntry,
@@ -65,6 +101,19 @@ describe("parseSourceLedger", () => {
       },
     ]);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("同じ情報源の監査参照も重複なく集約する", () => {
+    const first = { ...validEntry, factReferences: [auditReference] };
+    const second = {
+      ...validEntry,
+      factReferences: [auditReference, { ...auditReference, factId: "fact-capacity", excerpt: "定員は20人" }],
+    };
+    expect(parseSourceLedger([first, second]).entries[0].factReferences).toEqual([
+      auditReference,
+      { ...auditReference, factId: "fact-capacity", excerpt: "定員は20人" },
+    ]);
+    expect(parseSourceLedger([validEntry, second]).entries[0].factReferences).toEqual(second.factReferences);
   });
 
   it("旧claim形式は確認済み情報源形式へ変換して再実行互換を保つ", () => {
@@ -154,6 +203,159 @@ describe("renderSourceLedgerText", () => {
     expect(text).toBe(
       "official-site | https://example.com/report | 2024年の公式レポートで競技人口を公表"
     );
+  });
+
+  it("親行の下へfact監査行を表示し、品質ゲートのfact復元には混ぜない", () => {
+    const text = renderSourceLedgerText([{ ...validEntry, factReferences: [auditReference] }]);
+    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] [binding:v1;hash=fnv1a64:abc]");
+    expect(text).toContain("[locator:hash=fnv1a64:container;matches=1;section=%E6%96%99%E9%87%91] 料金 > p#2");
+    expect(text).toContain("根拠「参加費は500円」");
+    expect(text).toContain("[binding:v1;hash=fnv1a64:abc]");
+    expect(confirmedFactsFromRenderedText(text)).toEqual(validEntry.confirmedFacts);
+  });
+
+  it("bindingメタデータをentry・Notionテキストから復元し、不整合をinvalidにする", () => {
+    const entry = { ...validEntry, factReferences: [auditReference] };
+    expect(factBindingFromEntries([entry])).toEqual({
+      version: 1,
+      bodyHash: "fnv1a64:abc",
+      referenceCount: 1,
+      isValid: true,
+      references: [storedAuditReference],
+    });
+    expect(factBindingFromEntries([validEntry])).toBeUndefined();
+    expect(factBindingFromEntries([{ ...entry, factReferences: [auditReference, { ...auditReference, bodyHash: "fnv1a64:def" }] }])?.isValid).toBe(false);
+    const page = {
+      id: "page-binding",
+      url: "",
+      properties: { 根拠台帳: { rich_text: [{ plain_text: renderSourceLedgerText([entry]) }] } },
+    };
+    expect(factBindingFromPage(page)).toMatchObject({
+      bodyHash: "fnv1a64:abc",
+      isValid: true,
+      references: [storedAuditReference],
+    });
+  });
+
+  it("改行を含むfact抜粋をNotionテキストから位置情報付きで復元する", () => {
+    const excerpt = "参加費は\r\nC:\\fees\\n500円です";
+    const entry = {
+      ...validEntry,
+      factReferences: [{ ...auditReference, excerpt }],
+    };
+    const rendered = renderSourceLedgerText([entry]);
+
+    expect(rendered.split("\n")).toHaveLength(2);
+    expect(factBindingFromRenderedText(rendered)).toMatchObject({
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        ...storedAuditReference,
+        excerpt,
+      }],
+    });
+  });
+
+  it("部分的・混在したbindingメタデータと旧監査行を安全側に扱う", () => {
+    const withoutMetadata = { ...auditReference, bindingVersion: undefined, bodyHash: undefined };
+    const withoutLocator = {
+      ...auditReference,
+      containerTextHash: undefined,
+      containerMatchCount: undefined,
+    };
+    const versionOnly = { ...withoutMetadata, bindingVersion: 1 };
+    const hashOnly = { ...withoutMetadata, bodyHash: "fnv1a64:partial" };
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [withoutMetadata] }])).toBeUndefined();
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [versionOnly] }])).toEqual({
+      version: 1,
+      bodyHash: "",
+      referenceCount: 1,
+      isValid: false,
+      references: [storedAuditReference],
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [hashOnly] }])).toEqual({
+      version: 0,
+      bodyHash: "fnv1a64:partial",
+      referenceCount: 1,
+      isValid: false,
+      references: [storedAuditReference],
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [withoutLocator] }])).toMatchObject({
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        sectionPath: "料金",
+        container: "p",
+        containerIndex: 2,
+      }],
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [auditReference, withoutMetadata] }])?.isValid).toBe(false);
+    expect(factBindingFromRenderedText("  ↳ fact-old p#1 根拠「旧形式」 本文「旧本文」")).toBeUndefined();
+    expect(factBindingFromRenderedText(
+      "  ↳ fact-new [binding:v1;hash=fnv1a64:abc] p#1\n  ↳ fact-old p#2",
+    )?.isValid).toBe(false);
+  });
+
+  it("壊れたlocatorのsectionエンコードは例外にせず旧位置情報へフォールバックする", () => {
+    const rendered = "  ↳ fact-price [binding:v1;hash=fnv1a64:abc] [locator:hash=fnv1a64:container;matches=1;section=%] p#2 根拠「参加費は500円」 本文「参加費は500円」";
+
+    expect(factBindingFromRenderedText(rendered)).toMatchObject({
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        container: "p",
+        containerIndex: 2,
+      }],
+    });
+  });
+
+  it("最終本文に合わせて全referenceのhashを更新する", () => {
+    const entry = { ...validEntry, factReferences: [auditReference] };
+    const updated = withBindingBodyHash([entry], "<p>最終本文</p>");
+    expect(updated[0].factReferences?.[0].bodyHash).not.toBe(auditReference.bodyHash);
+    expect(entry.factReferences[0].bodyHash).toBe("fnv1a64:abc");
+    expect(withBindingBodyHash([validEntry], "<p>最終本文</p>")).toEqual([validEntry]);
+    expect(withBindingBodyHash([
+      { ...validEntry, factReferences: [{ ...auditReference, bindingVersion: undefined, bodyHash: undefined }] },
+    ], "<p>最終本文</p>")[0].factReferences?.[0].bodyHash).toBeUndefined();
+  });
+
+  it("再確認不要・見出しなしの監査行も表示する", () => {
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{
+        ...auditReference,
+        sectionPath: "",
+        recheckBeforePublish: false,
+        recheckReason: undefined,
+      }],
+    }])).toContain("↳ fact-price [binding:v1;hash=fnv1a64:abc] [locator:hash=fnv1a64:container;matches=1;section=] p#2");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{ ...auditReference, recheckReason: undefined }],
+    }])).toContain("[公開前再確認:要確認]");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{ ...auditReference, bindingVersion: undefined, bodyHash: undefined }],
+    }])).not.toContain("[binding:");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{
+        ...auditReference,
+        containerTextHash: undefined,
+        containerMatchCount: undefined,
+      }],
+    }])).not.toContain("[locator:");
+  });
+
+  it("binding台帳プロパティの欠落・空rich_text・plain_text欠落は旧記事として扱う", () => {
+    expect(factBindingFromPage({ id: "missing", url: "", properties: {} })).toBeUndefined();
+    expect(factBindingFromPage({
+      id: "empty",
+      url: "",
+      properties: { 根拠台帳: { rich_text: [{}] } },
+    })).toBeUndefined();
   });
 
   it("同じ情報源の複数事実は読点で連結する", () => {
