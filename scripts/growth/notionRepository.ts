@@ -109,6 +109,23 @@ export async function queryFirstDataSource(
   return result.pages[0] ?? null;
 }
 
+/** 降順ログ等を上限件数だけ読み、履歴全体はページングしない。 */
+export async function queryRecentDataSource(
+  dataSourceId: string,
+  body: QueryBody,
+  limit: number,
+  options: NotionApiOptions,
+  repositoryOptions: NotionRepositoryOptions = {},
+): Promise<NotionPage[]> {
+  const result = await queryPageWithRetry(
+    dataSourceId,
+    { ...body, pageSize: limit },
+    options,
+    repositoryOptions,
+  );
+  return result.pages;
+}
+
 export function getLatestReport(
   dataSourceId: string,
   options: NotionApiOptions,

@@ -6,19 +6,51 @@ import {
   publishGateReason,
   resolveGateArticleType,
 } from "./publishGate";
-import { bindingBodyHash } from "./factBindingMetadata";
+import { bindingBodyHash, bindingContainerTextHash } from "./factBindingMetadata";
 
 const DISCLAIMER = "※この記事はAIが作成した下書きです。公開前に内容をご確認ください。";
 
 describe("evaluatePublishGate", () => {
-  it("検証後に本文が変わったbindingを公開blockする", () => {
+  it("fact参照箇所の変更だけをblockし、画像・非fact本文の編集は許可する", () => {
     const original = `<p>料金は500円です。${DISCLAIMER}</p>`;
-    const changed = `<p>料金は600円です。${DISCLAIMER}</p>`;
-    const factBinding = { version: 1, bodyHash: bindingBodyHash(original), referenceCount: 1, isValid: true };
+    const factBinding = {
+      version: 1,
+      bodyHash: bindingBodyHash(original),
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "料金は500円です。",
+        sectionPath: "",
+        container: "p" as const,
+        containerIndex: 1,
+        containerTextHash: bindingContainerTextHash(`料金は500円です。${DISCLAIMER}`),
+        containerMatchCount: 1,
+      }],
+    };
     expect(evaluatePublishGate({ title: "料金", bodyHtml: original, factBinding }).ok).toBe(true);
-    const result = evaluatePublishGate({ title: "料金", bodyHtml: changed, factBinding });
+    expect(evaluatePublishGate({
+      title: "料金",
+      bodyHtml: `<figure><img src="https://images.microcms-assets.io/new.png"></figure>${original}<p>補足を更新しました。</p>`,
+      factBinding,
+    }).ok).toBe(true);
+    const result = evaluatePublishGate({
+      title: "料金",
+      bodyHtml: `<p>料金は600円です。${DISCLAIMER}</p>`,
+      factBinding,
+    });
     expect(result.ok).toBe(false);
     expect(result.blockReasons.some((reason) => reason.includes("fact binding"))).toBe(true);
+    expect(evaluatePublishGate({
+      title: "料金",
+      bodyHtml: `<p>料金は500円です。入会金は10万円です。${DISCLAIMER}</p>`,
+      factBinding,
+    }).ok).toBe(false);
+    expect(evaluatePublishGate({
+      title: "料金",
+      bodyHtml: `${original}<p>入会金は10万円です。</p>`,
+      factBinding,
+    }).ok).toBe(false);
   });
   it("fact markerが残った本文を公開不可にする", () => {
     const result = evaluatePublishGate({

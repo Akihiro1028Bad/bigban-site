@@ -9,7 +9,11 @@
  */
 
 import { styleLint, styleLintSummary } from "@/lib/growth/styleLint";
-import { bindingBodyHash, FACT_BINDING_VERSION } from "@/lib/growth/factBindingMetadata";
+import {
+  bindingBodyHash,
+  bindingReferencesMatchBody,
+  FACT_BINDING_VERSION,
+} from "@/lib/growth/factBindingMetadata";
 import type { StoredFactBindingMetadata } from "@/lib/growth/sourceLedger";
 
 
@@ -360,11 +364,16 @@ export function draftQuality(input: DraftQualityInput): QualityCheck[] {
   const unsafeHtml = detectUnsafeHtml(input.bodyHtml);
   const hasDisclaimer = plain.includes(DISCLAIMER_MARK);
   const binding = input.factBinding;
+  const bindingReferences = binding?.references ?? [];
+  const isBoundBodyCurrent = binding === undefined
+    || (bindingReferences.length > 0
+      ? bindingReferencesMatchBody(input.bodyHtml, bindingReferences)
+      : binding.bodyHash === bindingBodyHash(input.bodyHtml));
   const isBindingValid = binding === undefined || (
     binding.isValid
     && binding.referenceCount > 0
     && binding.version === FACT_BINDING_VERSION
-    && binding.bodyHash === bindingBodyHash(input.bodyHtml)
+    && isBoundBodyCurrent
   );
 
   return [

@@ -10,6 +10,22 @@ import {
 } from "./authRateLimit";
 
 describe("authRateLimit", () => {
+  it("正しい認証を繰り返しても失敗枠を消費しない", async () => {
+    const store = new InMemoryFailureStore();
+    const request = {
+      expected: "right",
+      supplied: "right",
+      ip: "203.0.113.1",
+      hmacKey: "key",
+      store,
+      nowMs: 1_000,
+    };
+
+    for (let index = 0; index < 6; index += 1) {
+      await expect(checkAuthAttempt(request)).resolves.toEqual({ status: "valid" });
+    }
+  });
+
   it("同一IPの誤入力は5回まで401、6回目から429になる", async () => {
     const store = new InMemoryFailureStore();
     const base = { expected: "right", ip: "203.0.113.1", hmacKey: "key", store, nowMs: 1_000 };
@@ -48,14 +64,30 @@ describe("authRateLimit", () => {
   });
 
   it("store通信失敗はservice unavailableへ倒す", async () => {
-    const store = { incrementFailure: async () => { throw new Error("redis secret"); } };
+    const store = {
+      failureCount: async () => { throw new Error("redis secret"); },
+      incrementFailure: async () => ({ count: 1, resetAt: 1 }),
+    };
     await expect(
       checkAuthAttempt({ expected: "right", supplied: "right", ip: "a", hmacKey: "key", store })
     ).resolves.toEqual({ status: "unavailable" });
+    await expect(checkAuthAttempt({
+      expected: "right",
+      supplied: "wrong",
+      ip: "a",
+      hmacKey: "key",
+      store: {
+        failureCount: async () => ({ count: 0, resetAt: 0 }),
+        incrementFailure: async () => { throw new Error("redis secret"); },
+      },
+    })).resolves.toEqual({ status: "unavailable" });
   });
 
   it("上限超過時は合言葉を読み取らず比較しない", async () => {
-    const store = { incrementFailure: async () => ({ count: 6, resetAt: 901_000 }) };
+    const store = {
+      failureCount: async () => ({ count: 5, resetAt: 901_000 }),
+      incrementFailure: async () => ({ count: 6, resetAt: 901_000 }),
+    };
     const input = {
       expected: "right",
       get supplied(): string {
@@ -73,8 +105,27 @@ describe("authRateLimit", () => {
     });
   });
 
+  it("並行した誤入力で上限を超えた場合はそのリクエストから429にする", async () => {
+    const store = {
+      failureCount: async () => ({ count: 4, resetAt: 901_000 }),
+      incrementFailure: async () => ({ count: 6, resetAt: 901_000 }),
+    };
+
+    await expect(checkAuthAttempt({
+      expected: "right",
+      supplied: "wrong",
+      ip: "a",
+      hmacKey: "key",
+      store,
+      nowMs: 1_000,
+    })).resolves.toEqual({ status: "limited", retryAfterSeconds: 900 });
+  });
+
   it("現在時刻の既定・空expected・retry最小値とglobal store再利用を扱う", async () => {
-    const store = { incrementFailure: async () => ({ count: 6, resetAt: 0 }) };
+    const store = {
+      failureCount: async () => ({ count: 5, resetAt: 0 }),
+      incrementFailure: async () => ({ count: 6, resetAt: 0 }),
+    };
     await expect(
       checkAuthAttempt({ expected: "", supplied: "", ip: "a", hmacKey: "key", store })
     ).resolves.toEqual({ status: "limited", retryAfterSeconds: 1 });

@@ -82,9 +82,15 @@ describe("vitest config", () => {
     expect(excluded).not.toContain("scripts/growth/daemonSmoke.ts");
   });
 
-  it("PR CIでChromium critical journeyを必須実行する", () => {
+  it("PR CIで3ブラウザのcritical journeyを必須実行する", () => {
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-    expect(workflow).toContain("npx playwright install --with-deps chromium");
-    expect(workflow).toContain("npx playwright test --project=chromium");
+    expect(workflow).toContain("Playwright critical journey (3 browsers)");
+    expect(workflow).toContain("npx playwright install --with-deps\n");
+    expect(workflow).toMatch(/run: npx playwright test\s*$/m);
+  });
+
+  it("ESLintもローカルのClaude worktreeを探索対象から除外する", () => {
+    const eslintConfig = readFileSync("eslint.config.mjs", "utf8");
+    expect(eslintConfig).toContain('".claude/worktrees/**"');
   });
 });

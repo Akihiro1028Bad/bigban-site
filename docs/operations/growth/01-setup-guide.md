@@ -129,7 +129,7 @@
 | `APPROVE_AUTH_ENABLED` | 承認画面の合言葉認証 | ✗ | ✗ | ⚠️本番ON必須 |
 | `APPROVE_SECRET` | 承認画面の合言葉 | ✗ | ✗ | ✅ |
 | `APPROVE_SESSION_SECRET` | 承認session署名専用キー | ✗ | ✗ | ✅ |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 認証誤入力rate limit | ✗ | ✗ | ✅ |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 認証失敗のrate limit | ✗ | ✗ | ✅ |
 
 凡例: ✅=必須 / △=任意・環境に応じて / ✗=不要 / ⚠️=特記あり（下記）。
 ※ Mac は「開発・動作確認をしたい場合に一式そろえる」位置づけ。本番の週次自動実行は自宅 PC が担うため、Mac 側は必須ではありません。
@@ -306,7 +306,7 @@ OAuth 同意画面のステータスが**「テスト」のままだと、付与
 承認ページ（`/growth/approve`）は URL にトークンを載せず、**画面で「合言葉」を入力して入る**方式です。この合言葉を `APPROVE_SECRET` に設定します。
 
 - **社外秘**として扱い、LINEでは共有せず、管理者から安全な経路で共有する。
-- 誤入力は同一IPごとに15分5回までです。本番はUpstash未設定・障害時に認証交換を503で閉じます。rate limit中でも正しい合言葉は受け付けます。合言葉には推測されにくい長い値を使います（例 `openssl rand -hex 16` の出力）。
+- 認証失敗回数は同一IPごとに15分5回までです。合言葉が不正な場合だけ加算し、成功時は加算しません。上限超過中は正しい合言葉でも比較せず429を返します。本番はUpstash未設定・障害時に認証交換を503で閉じます。合言葉には推測されにくい長い値を使います（例 `openssl rand -hex 16` の出力）。
 - 合言葉を変更したらVercelの`APPROVE_SECRET`を更新して再デプロイする。詳細は[security.md](security.md)を参照。
 
 ### 手順 6-3: Vercel に環境変数を設定する
@@ -316,7 +316,7 @@ Vercel の **Production 環境変数**に次を設定し、再デプロイする
 - `NOTION_TOKEN`（手順 4-1・自宅 PC と同じ値）
 - `APPROVE_SECRET`（手順 6-2）
 - `APPROVE_SESSION_SECRET`（`APPROVE_SECRET`とは別に生成した署名専用キー）
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`（認証誤入力rate limit）
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`（認証失敗のrate limit）
 - `APPROVE_AUTH_ENABLED=true`（本番では ON。未設定＝ONだが、意図を明確にするため明示を推奨）
 - `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_MAINTENANCE`
 - `MICROCMS_SERVICE_DOMAIN` / `MICROCMS_API_KEY` / `MICROCMS_WEBHOOK_SECRET` / `MICROCMS_DRAFT_SECRET`

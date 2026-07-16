@@ -71,4 +71,3 @@
 | `src/app/growth/approve/BodyImageInsertModal.tsx` | `scripts/growth/body-image-insert.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
 | `src/app/growth/approve/ArtboardView.tsx` | `src/app/growth/approve/ArtboardView.test.tsx` |
 | `src/app/growth/approve/OpsView.tsx` | `src/lib/growth/workerLog.test.ts`<br>`src/app/growth/approve/DashboardView.test.tsx` |
-

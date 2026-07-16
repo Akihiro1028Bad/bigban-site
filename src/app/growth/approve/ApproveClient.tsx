@@ -33,7 +33,7 @@ import {
   toggleId,
 } from "./boardPrefs";
 
-import { fetchBoard, fetchOps, postRevert } from "./api";
+import { fetchBoard, fetchOps, isSessionExpiredError, postRevert } from "./api";
 import { sessionHeaders } from "./sessionHeaders";
 import { readJsonObject } from "@/lib/growth/safeJson";
 import { BoardCard } from "./BoardCard";
@@ -375,6 +375,20 @@ export function ApproveClient() {
   useEffect(() => {
     if (boardQuery.isError) setPollFailures((f) => f + 1);
   }, [boardQuery.isError, boardQuery.errorUpdatedAt]);
+
+  useEffect(() => {
+    const error = isSessionExpiredError(boardQuery.error)
+      ? boardQuery.error
+      : isSessionExpiredError(opsQuery.error)
+        ? opsQuery.error
+        : null;
+    if (!error) return;
+    setMessage(error.message);
+    setAuthed(false);
+    setBoardSeeded(false);
+    setPollFailures(0);
+    queryClient.clear();
+  }, [boardQuery.error, opsQuery.error, queryClient]);
 
   // #109: キーボード操作の最新ハンドラを ref に保持(早期 return より前で document に結線するため)。
   const dispatchRef = useRef<(action: ShortcutAction, editable: boolean) => void>(

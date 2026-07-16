@@ -11,6 +11,7 @@ export interface FailureCount {
 }
 
 export interface FailureStore {
+  failureCount(key: string, nowMs: number): Promise<FailureCount>;
   incrementFailure(key: string, nowMs: number, windowMs: number): Promise<FailureCount>;
 }
 
@@ -18,6 +19,15 @@ type MemoryEntry = FailureCount;
 
 export class InMemoryFailureStore implements FailureStore {
   private readonly entries = new Map<string, MemoryEntry>();
+
+  async failureCount(key: string, nowMs: number): Promise<FailureCount> {
+    const current = this.entries.get(key);
+    if (!current || current.resetAt <= nowMs) {
+      if (current) this.entries.delete(key);
+      return { count: 0, resetAt: nowMs };
+    }
+    return { ...current };
+  }
 
   async incrementFailure(key: string, nowMs: number, windowMs: number): Promise<FailureCount> {
     const current = this.entries.get(key);
@@ -58,24 +68,32 @@ interface CheckAuthAttemptInput {
 
 export async function checkAuthAttempt(input: CheckAuthAttemptInput): Promise<AuthAttemptResult> {
   const nowMs = input.nowMs ?? Date.now();
+  const key = hashClientIp(input.ip, input.hmacKey);
   try {
-    const result = await input.store.incrementFailure(
-      hashClientIp(input.ip, input.hmacKey),
-      nowMs,
-      WINDOW_MS
-    );
-    if (result.count > MAX_FAILURES) {
+    const current = await input.store.failureCount(key, nowMs);
+    if (current.count >= MAX_FAILURES) {
       return {
         status: "limited",
-        retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - nowMs) / 1_000)),
+        retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - nowMs) / 1_000)),
       };
     }
   } catch {
     return { status: "unavailable" };
   }
-  return input.expected && safeEqual(input.supplied, input.expected)
-    ? { status: "valid" }
-    : { status: "invalid" };
+  if (Boolean(input.expected) && safeEqual(input.supplied, input.expected)) {
+    return { status: "valid" };
+  }
+  try {
+    const result = await input.store.incrementFailure(key, nowMs, WINDOW_MS);
+    return result.count > MAX_FAILURES
+      ? {
+          status: "limited",
+          retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - nowMs) / 1_000)),
+        }
+      : { status: "invalid" };
+  } catch {
+    return { status: "unavailable" };
+  }
 }
 
 declare global {

@@ -21,6 +21,7 @@ import {
   OPS_URL,
   MODEL_SETTINGS_URL,
   PROPOSAL_ARTIFACT_URL,
+  SessionExpiredError,
 } from "./api";
 
 setupMswServer();
@@ -131,8 +132,9 @@ describe("fetchBoard", () => {
     expect(auth).toBeNull();
   });
 
-  it("401 は合言葉エラー", async () => {
+  it("401 は再ログイン遷移に使えるセッション切れエラー", async () => {
     server.use(http.get(BOARD_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
+    await expect(fetchBoard("tok")).rejects.toBeInstanceOf(SessionExpiredError);
     await expect(fetchBoard("tok")).rejects.toThrow(/セッションの有効期限/);
   });
 

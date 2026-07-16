@@ -2,7 +2,7 @@ import { toPendingItems, DRAFT_READY_STATUS } from "../../src/lib/growth/approve
 import { reconcileGrowthState } from "../../src/lib/growth/reconcile";
 import { buildWorkerLogProps, workerRunFromPage } from "../../src/lib/growth/workerLog";
 import { createPage, type NotionApiOptions } from "./notion";
-import { queryAllDataSource } from "./notionRepository";
+import { queryAllDataSource, queryRecentDataSource } from "./notionRepository";
 import { defaultFetch } from "./http";
 
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460";
@@ -44,7 +44,12 @@ async function main(): Promise<void> {
 
   const workerDs = process.env.GROWTH_WORKER_LOG_DS;
   const workerPages = workerDs
-    ? await queryAllDataSource(workerDs, { sorts: [{ property: "記録時刻", direction: "descending" }] }, options)
+    ? await queryRecentDataSource(
+        workerDs,
+        { sorts: [{ property: "記録時刻", direction: "descending" }] },
+        50,
+        options,
+      )
     : [];
   const runs = workerPages.map((page) => workerRunFromPage(page));
   const findings = reconcileGrowthState(toPendingItems(proposals, ideas), runs);

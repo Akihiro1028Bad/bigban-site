@@ -315,6 +315,8 @@ describe("draftPipeline structured contracts", () => {
       sectionPath: "場所",
       container: "p" as const,
       containerIndex: 1,
+      containerTextHash: "fnv1a64:container",
+      containerMatchCount: 1,
       claimKinds: ["proper-noun" as const],
     };
     const entries = buildSourceLedgerFromUsedFacts(
@@ -325,6 +327,8 @@ describe("draftPipeline structured contracts", () => {
     );
     expect(entries[0].factReferences).toEqual([expect.objectContaining({
       factId: "fact-option",
+      containerTextHash: "fnv1a64:container",
+      containerMatchCount: 1,
       recheckBeforePublish: true,
       recheckReason: "予約サービス名",
     })]);

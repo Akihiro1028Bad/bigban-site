@@ -30,10 +30,22 @@ const auditReference = {
   sectionPath: "料金",
   container: "p" as const,
   containerIndex: 2,
+  containerTextHash: "fnv1a64:container",
+  containerMatchCount: 1,
   recheckBeforePublish: true,
   recheckReason: "料金",
   bindingVersion: 1,
   bodyHash: "fnv1a64:abc",
+};
+
+const storedAuditReference = {
+  factId: "fact-price",
+  excerpt: auditReference.excerpt,
+  sectionPath: "料金",
+  container: "p" as const,
+  containerIndex: 2,
+  containerTextHash: "fnv1a64:container",
+  containerMatchCount: 1,
 };
 
 const legacyEntry = {
@@ -195,7 +207,8 @@ describe("renderSourceLedgerText", () => {
 
   it("親行の下へfact監査行を表示し、品質ゲートのfact復元には混ぜない", () => {
     const text = renderSourceLedgerText([{ ...validEntry, factReferences: [auditReference] }]);
-    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] [binding:v1;hash=fnv1a64:abc] 料金 > p#2");
+    expect(text).toContain("  ↳ fact-price [公開前再確認:料金] [binding:v1;hash=fnv1a64:abc]");
+    expect(text).toContain("[locator:hash=fnv1a64:container;matches=1;section=%E6%96%99%E9%87%91] 料金 > p#2");
     expect(text).toContain("根拠「参加費は500円」");
     expect(text).toContain("[binding:v1;hash=fnv1a64:abc]");
     expect(confirmedFactsFromRenderedText(text)).toEqual(validEntry.confirmedFacts);
@@ -208,6 +221,7 @@ describe("renderSourceLedgerText", () => {
       bodyHash: "fnv1a64:abc",
       referenceCount: 1,
       isValid: true,
+      references: [storedAuditReference],
     });
     expect(factBindingFromEntries([validEntry])).toBeUndefined();
     expect(factBindingFromEntries([{ ...entry, factReferences: [auditReference, { ...auditReference, bodyHash: "fnv1a64:def" }] }])?.isValid).toBe(false);
@@ -216,11 +230,39 @@ describe("renderSourceLedgerText", () => {
       url: "",
       properties: { 根拠台帳: { rich_text: [{ plain_text: renderSourceLedgerText([entry]) }] } },
     };
-    expect(factBindingFromPage(page)).toMatchObject({ bodyHash: "fnv1a64:abc", isValid: true });
+    expect(factBindingFromPage(page)).toMatchObject({
+      bodyHash: "fnv1a64:abc",
+      isValid: true,
+      references: [storedAuditReference],
+    });
+  });
+
+  it("改行を含むfact抜粋をNotionテキストから位置情報付きで復元する", () => {
+    const excerpt = "参加費は\r\nC:\\fees\\n500円です";
+    const entry = {
+      ...validEntry,
+      factReferences: [{ ...auditReference, excerpt }],
+    };
+    const rendered = renderSourceLedgerText([entry]);
+
+    expect(rendered.split("\n")).toHaveLength(2);
+    expect(factBindingFromRenderedText(rendered)).toMatchObject({
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        ...storedAuditReference,
+        excerpt,
+      }],
+    });
   });
 
   it("部分的・混在したbindingメタデータと旧監査行を安全側に扱う", () => {
     const withoutMetadata = { ...auditReference, bindingVersion: undefined, bodyHash: undefined };
+    const withoutLocator = {
+      ...auditReference,
+      containerTextHash: undefined,
+      containerMatchCount: undefined,
+    };
     const versionOnly = { ...withoutMetadata, bindingVersion: 1 };
     const hashOnly = { ...withoutMetadata, bodyHash: "fnv1a64:partial" };
     expect(factBindingFromEntries([{ ...validEntry, factReferences: [withoutMetadata] }])).toBeUndefined();
@@ -229,18 +271,43 @@ describe("renderSourceLedgerText", () => {
       bodyHash: "",
       referenceCount: 1,
       isValid: false,
+      references: [storedAuditReference],
     });
     expect(factBindingFromEntries([{ ...validEntry, factReferences: [hashOnly] }])).toEqual({
       version: 0,
       bodyHash: "fnv1a64:partial",
       referenceCount: 1,
       isValid: false,
+      references: [storedAuditReference],
+    });
+    expect(factBindingFromEntries([{ ...validEntry, factReferences: [withoutLocator] }])).toMatchObject({
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        sectionPath: "料金",
+        container: "p",
+        containerIndex: 2,
+      }],
     });
     expect(factBindingFromEntries([{ ...validEntry, factReferences: [auditReference, withoutMetadata] }])?.isValid).toBe(false);
     expect(factBindingFromRenderedText("  ↳ fact-old p#1 根拠「旧形式」 本文「旧本文」")).toBeUndefined();
     expect(factBindingFromRenderedText(
       "  ↳ fact-new [binding:v1;hash=fnv1a64:abc] p#1\n  ↳ fact-old p#2",
     )?.isValid).toBe(false);
+  });
+
+  it("壊れたlocatorのsectionエンコードは例外にせず旧位置情報へフォールバックする", () => {
+    const rendered = "  ↳ fact-price [binding:v1;hash=fnv1a64:abc] [locator:hash=fnv1a64:container;matches=1;section=%] p#2 根拠「参加費は500円」 本文「参加費は500円」";
+
+    expect(factBindingFromRenderedText(rendered)).toMatchObject({
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        container: "p",
+        containerIndex: 2,
+      }],
+    });
   });
 
   it("最終本文に合わせて全referenceのhashを更新する", () => {
@@ -263,7 +330,7 @@ describe("renderSourceLedgerText", () => {
         recheckBeforePublish: false,
         recheckReason: undefined,
       }],
-    }])).toContain("↳ fact-price [binding:v1;hash=fnv1a64:abc] p#2");
+    }])).toContain("↳ fact-price [binding:v1;hash=fnv1a64:abc] [locator:hash=fnv1a64:container;matches=1;section=] p#2");
     expect(renderSourceLedgerText([{
       ...validEntry,
       factReferences: [{ ...auditReference, recheckReason: undefined }],
@@ -272,6 +339,14 @@ describe("renderSourceLedgerText", () => {
       ...validEntry,
       factReferences: [{ ...auditReference, bindingVersion: undefined, bodyHash: undefined }],
     }])).not.toContain("[binding:");
+    expect(renderSourceLedgerText([{
+      ...validEntry,
+      factReferences: [{
+        ...auditReference,
+        containerTextHash: undefined,
+        containerMatchCount: undefined,
+      }],
+    }])).not.toContain("[locator:");
   });
 
   it("binding台帳プロパティの欠落・空rich_text・plain_text欠落は旧記事として扱う", () => {
