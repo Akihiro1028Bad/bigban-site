@@ -10,7 +10,7 @@ describe("decodeSjis", () => {
   it("Shift_JISのCSVをUTF-8文字列に復号する", () => {
     const text = decodeSjis(fixture());
     expect(text).toContain("予約番号");
-    expect(text).toContain("試験太郎");
+    expect(text).toContain("架空太郎");
   });
 
   it("不正なバイト列はエラーにする", () => {
