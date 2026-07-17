@@ -102,7 +102,7 @@ describe("weeklyKpis", () => {
       { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16"
     );
     expect(kpi.actual).toEqual({ currentWeek: 1, priorWeek: 1, cumulative: 2 });
-    expect(kpi.self).toEqual({ selfCount4w: 1, total4w: 2, smartphone4w: 1 });
+    expect(kpi.self).toEqual({ selfCount4w: 1, total4w: 2, smartphone4w: 1, unknown4w: 0 });
     expect(kpi.sales).toEqual({ currentWeek: null, priorWeek: null, forecast28: null });
   });
 
@@ -147,8 +147,17 @@ describe("weeklyKpis", () => {
       ],
     });
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
-    expect(kpi.self).toEqual({ selfCount4w: 2, total4w: 2, smartphone4w: 1 });
+    expect(kpi.self).toEqual({ selfCount4w: 2, total4w: 2, smartphone4w: 1, unknown4w: 0 });
     expect(kpi.sales.forecast28).toBe(300);
+  });
+
+  it("直近28日のunknown予約方法を別集計する", () => {
+    const data = bundle([
+      res({ channel: "unknown" }),
+      res({ reservationId: "2", channel: "unknown", status: "cancelled" }),
+    ]);
+    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
+    expect(kpi.self.unknown4w).toBe(1);
   });
 });
 

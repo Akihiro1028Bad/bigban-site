@@ -33,7 +33,7 @@ export const snapshotSchema = z.object({
   }),
   kpi: z.object({
     actual: z.object({ currentWeek: z.number(), priorWeek: z.number(), cumulative: z.number() }),
-    self: z.object({ selfCount4w: z.number(), total4w: z.number(), smartphone4w: z.number() }),
+    self: z.object({ selfCount4w: z.number(), total4w: z.number(), smartphone4w: z.number(), unknown4w: z.number().default(0) }),
     sales: z.object({ currentWeek: z.number().nullable(), priorWeek: z.number().nullable(), forecast28: z.number().nullable() }),
   }),
   catalog: z.object({

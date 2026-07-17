@@ -69,6 +69,46 @@ describe("runIngestApplication", () => {
     await expect(stat(join(data, "canonical.old"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("promoteとLINE通知の後に検証済みスナップショットをボードへアップロードする", async () => {
+    const { drop, data } = await setup();
+    const order: string[] = [];
+    const uploadSnapshot = vi.fn(async (json: string) => {
+      order.push("upload");
+      expect(snapshotSchema.safeParse(JSON.parse(json)).success).toBe(true);
+    });
+    const notify = vi.fn(async () => { order.push("notify"); });
+
+    await runIngestApplication(input(drop, data), {
+      ...deps(notify),
+      uploadSnapshot,
+    });
+
+    expect(uploadSnapshot).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["notify", "upload"]);
+    await expect(readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")).resolves.toContain("schemaVersion");
+  });
+
+  it("ボードへのアップロードがタイムアウトしてもローカル取り込みを完了し警告する", async () => {
+    const { drop, data } = await setup();
+    const log = vi.fn();
+    const uploadSnapshot = vi.fn(async () => { throw new DOMException("The operation timed out", "TimeoutError"); });
+
+    await expect(runIngestApplication(input(drop, data), {
+      ...deps(),
+      log,
+      uploadSnapshot,
+    })).resolves.toMatchObject({ wasDryRun: false });
+
+    expect(log).toHaveBeenCalledWith("[ingest] ボードへのアップロードに失敗しました(ローカル処理は完了)");
+    await expect(readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")).resolves.toContain("schemaVersion");
+  });
+
+  it("アップロード依存が未設定ならP1互換でローカル取り込みだけを完了する", async () => {
+    const { drop, data } = await setup();
+    await expect(runIngestApplication(input(drop, data), deps())).resolves.toMatchObject({ wasDryRun: false });
+    await expect(readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")).resolves.toContain("schemaVersion");
+  });
+
   it("tmpだけが残ったクラッシュ後も再実行で正しく昇格する", async () => {
     const { drop, data } = await setup();
     await mkdir(join(data, "canonical.tmp"), { recursive: true });

@@ -52,7 +52,7 @@ function salesInRange(bundle: CanonicalBundle, range: DateRange, isForecast: boo
  */
 export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: DateRange, referenceYmd: string): {
   actual: { currentWeek: number; priorWeek: number; cumulative: number };
-  self: { selfCount4w: number; total4w: number; smartphone4w: number };
+  self: { selfCount4w: number; total4w: number; smartphone4w: number; unknown4w: number };
   sales: { currentWeek: number | null; priorWeek: number | null; forecast28: number | null };
 } {
   const confirmed = confirmedReservations(bundle);
@@ -61,7 +61,7 @@ export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: D
   const forecastRange = { start: referenceYmd, end: addDays(referenceYmd, 27) };
   return {
     actual: { currentWeek: countBookedIn(confirmed, current), priorWeek: countBookedIn(confirmed, prior), cumulative: confirmed.length },
-    self: { selfCount4w: recent.filter((reservation) => SELF_CHANNELS.has(reservation.channel)).length, total4w: recent.length, smartphone4w: recent.filter((reservation) => reservation.channel === "user_sp").length },
+    self: { selfCount4w: recent.filter((reservation) => SELF_CHANNELS.has(reservation.channel)).length, total4w: recent.length, smartphone4w: recent.filter((reservation) => reservation.channel === "user_sp").length, unknown4w: recent.filter((reservation) => reservation.channel === "unknown").length },
     sales: { currentWeek: salesInRange(bundle, current, false), priorWeek: salesInRange(bundle, prior, false), forecast28: salesInRange(bundle, forecastRange, true) },
   };
 }

@@ -5,6 +5,7 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   const bundle = { reservations: [], customers: [], salesDaily: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: { yoyaku: 0 }, excludedCount: 0, missingSections: [], warnings: [] } };
   const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null });
   expect(snapshot.kpi.actual.cumulative).toBe(0);
+  expect(snapshot.kpi.self.unknown4w).toBe(0);
   expect(snapshot.meta.inputs).toEqual([{ type: "yoyaku", rows: 0 }]);
   expect(snapshot.meta.sourceSyncedAt).toBe("2026-07-16T12:00:00+09:00");
   expect(snapshot.analysis).toEqual({ referenceYmd: "2026-07-16", currentWeek: { start: "2026-07-06", end: "2026-07-12" } });

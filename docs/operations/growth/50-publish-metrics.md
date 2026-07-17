@@ -27,3 +27,11 @@
 ### 実予約データ(施設経営データ基盤)
 
 実予約は **施設経営データ基盤**(設計: `docs/superpowers/specs/2026-07-16-labola-reservation-ingest-design.md`)から供給する。週次でラボーラ管理画面から全期間CSVをドロップディレクトリへエクスポートし、`npm run growth:ingest` が正準データセット(PII除去済みJSONL)とスナップショット(集計+気づき)を生成、LINEダイジェストを送る。`growth:metrics` は `GROWTH_RESERVATION_DATA_DIR/canonical/` を読み、従来どおり記事別の実予約状態をNotionミラーへ書く(coverage不足→`coverage_incomplete`、未設定/読取失敗→`missing` の扱いは従来と同じ)。旧CSV+sidecar形式は廃止。
+
+### 経営ボード(P2)
+
+`npm run growth:ingest` はローカルの正準データと日付別スナップショットを昇格し、LINE週次ダイジェスト送信後に、PIIを含まない検証済みスナップショットだけを `POST /api/growth/analytics/snapshot` へ送る。Vercel側はマシン専用の `Authorization: Bearer` を検証し、Private Vercel Blobへlatestと日付別の2ファイルを保存する。アップロードが失敗してもローカル取り込みは完了扱いで、次回実行時にlatestを上書きして回復する。
+
+- Vercel: Private Blobストアを作成し、`BLOB_READ_WRITE_TOKEN` と32文字以上の `GROWTH_ANALYTICS_INGEST_TOKEN` を設定する。Blobのアクセス設定はPrivateにする。
+- 自宅PC: 同じ `GROWTH_ANALYTICS_INGEST_TOKEN` と、`GROWTH_ANALYTICS_UPLOAD_URL=https://<本番ドメイン>/api/growth/analytics/snapshot` を設定する。片方でも未設定ならアップロードは1行ログでスキップする。
+- ローカル確認: `BLOB_READ_WRITE_TOKEN` を設定せず、`GROWTH_ANALYTICS_FILE_DIR`（未設定なら `GROWTH_RESERVATION_DATA_DIR/snapshots`）を使う。スナップショットストアはこの順でBlob→明示ファイルディレクトリ→予約データ配下のsnapshotsを選ぶ。

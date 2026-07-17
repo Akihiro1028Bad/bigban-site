@@ -3,6 +3,7 @@
  */
 "use client";
 
+import Link from "next/link";
 import type { RefObject } from "react";
 
 import { IconInbox, IconLayout, IconPlus, IconRefresh, IconSearch } from "@/app/growth/approve/ui/icons";
@@ -76,6 +77,13 @@ export function TopBar({
         >
           承認
         </span>
+        <Link
+          href="/growth/analytics"
+          className="hidden rounded-[7px] px-2 py-1 text-[11px] font-medium sm:inline"
+          style={{ color: "var(--p-accent)", background: "var(--p-bg-input)" }}
+        >
+          経営ボード
+        </Link>
       </div>
 
       {showSegments ? <div
