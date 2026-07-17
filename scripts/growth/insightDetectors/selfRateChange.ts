@@ -9,6 +9,9 @@ function addDays(ymd: string, days: number): string {
 }
 
 function windowEnding(end: string): DateRange { return { start: addDays(end, -27), end }; }
+function hasUnknownChannel(context: Parameters<Detector>[0], range: DateRange): boolean {
+  return context.bundle.reservations.some((reservation) => reservation.channel === "unknown" && jstYmdOfIso(reservation.bookedAt) >= range.start && jstYmdOfIso(reservation.bookedAt) <= range.end);
+}
 function countSelf(context: Parameters<Detector>[0], range: DateRange): { self: number; total: number } {
   const reservations = context.bundle.reservations.filter((reservation) => reservation.status !== "cancelled" && jstYmdOfIso(reservation.bookedAt) >= range.start && jstYmdOfIso(reservation.bookedAt) <= range.end);
   return { self: reservations.filter((reservation) => reservation.channel === "user_sp" || reservation.channel === "user_pc").length, total: reservations.length };
@@ -18,6 +21,8 @@ export const selfRateChange: Detector = (context) => {
   const priorWindow = windowEnding(addDays(context.current.end, -28));
   const currentWindow = windowEnding(context.current.end);
   if (context.bundle.meta.coverage.start > priorWindow.start || context.bundle.meta.coverage.end < currentWindow.end) return [];
+  // KPI（要確認）と同様に、unknown混在時はチャネル別率を確定値として扱わない。
+  if (hasUnknownChannel(context, currentWindow) || hasUnknownChannel(context, priorWindow)) return [];
   const current = countSelf(context, currentWindow);
   const prior = countSelf(context, priorWindow);
   if (current.total < 10 || prior.total < 10) return [];

@@ -27,6 +27,7 @@ export function analyticsSnapshotUploader(
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
       body,
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`経営ボードへのアップロードに失敗しました(HTTP ${response.status})`);
   };

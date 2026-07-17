@@ -21,6 +21,7 @@ describe("analyticsSnapshotUploader", () => {
       method: "POST",
       headers: { Authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
       body: '{"schemaVersion":1}',
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -40,5 +41,18 @@ describe("analyticsSnapshotUploader", () => {
     expect(upload).toBeDefined();
     if (!upload) throw new Error("アップロード関数が未作成です");
     await expect(upload("{}")).rejects.toThrow("経営ボードへのアップロードに失敗しました(HTTP 500)");
+  });
+
+  it("タイムアウトによるfetch失敗を既存の失敗警告経路へ伝える", async () => {
+    const timeout = new DOMException("The operation timed out", "TimeoutError");
+    const upload = analyticsSnapshotUploader(
+      { GROWTH_ANALYTICS_UPLOAD_URL: "https://example.test/snapshot", GROWTH_ANALYTICS_INGEST_TOKEN: TOKEN },
+      async () => { throw timeout; },
+      vi.fn()
+    );
+
+    expect(upload).toBeDefined();
+    if (!upload) throw new Error("アップロード関数が未作成です");
+    await expect(upload("{}")).rejects.toBe(timeout);
   });
 });

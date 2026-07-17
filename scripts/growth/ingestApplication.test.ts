@@ -88,10 +88,10 @@ describe("runIngestApplication", () => {
     await expect(readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")).resolves.toContain("schemaVersion");
   });
 
-  it("ボードへのアップロードが失敗してもローカル取り込みを完了し警告する", async () => {
+  it("ボードへのアップロードがタイムアウトしてもローカル取り込みを完了し警告する", async () => {
     const { drop, data } = await setup();
     const log = vi.fn();
-    const uploadSnapshot = vi.fn(async () => { throw new Error("upload token must not leak"); });
+    const uploadSnapshot = vi.fn(async () => { throw new DOMException("The operation timed out", "TimeoutError"); });
 
     await expect(runIngestApplication(input(drop, data), {
       ...deps(),

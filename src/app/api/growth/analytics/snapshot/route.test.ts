@@ -81,10 +81,14 @@ describe("POST /api/growth/analytics/snapshot", () => {
   });
 
   it("保存失敗を秘密値なしのエラーにする", async () => {
-    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => { throw new Error("token leaked"); }, getLatest: async () => null });
+    const error = new Error("token leaked");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => { throw error; }, getLatest: async () => null });
     const res = await POST(request(JSON.stringify(snapshot), `Bearer ${TOKEN}`));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("スナップショットの保存に失敗しました");
+    expect(consoleError).toHaveBeenCalledWith("[analytics snapshot] 保存に失敗しました", { name: error.name, message: error.message });
+    consoleError.mockRestore();
   });
 });
 
@@ -118,10 +122,13 @@ describe("GET /api/growth/analytics/snapshot", () => {
   });
 
   it("ストア読取の失敗を500にする", async () => {
-    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => { throw new Error("storage unavailable"); } });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => { throw "storage unavailable"; } });
     const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("スナップショットの取得に失敗しました");
+    expect(consoleError).toHaveBeenCalledWith("[analytics snapshot] 取得に失敗しました", { name: "UnknownError", message: "不明なエラー" });
+    consoleError.mockRestore();
   });
 
   it("検証済みの最新スナップショットを返す", async () => {

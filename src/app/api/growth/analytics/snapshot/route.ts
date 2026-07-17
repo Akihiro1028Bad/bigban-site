@@ -14,6 +14,13 @@ function errorResponse(status: number, error: string): Response {
   return NextResponse.json({ success: false, error }, { status });
 }
 
+function logError(message: string, error: unknown): void {
+  const detail = error instanceof Error
+    ? { name: error.name, message: error.message }
+    : { name: "UnknownError", message: "不明なエラー" };
+  console.error(message, detail);
+}
+
 /**
  * PC取り込み専用の受け口。
  * 既存authRateLimitは承認画面の合言葉とsession署名キーに結び付くため、
@@ -47,7 +54,8 @@ export async function POST(request: Request): Promise<Response> {
       GROWTH_RESERVATION_DATA_DIR: process.env.GROWTH_RESERVATION_DATA_DIR,
     // parse済みの値だけを永続化し、未知フィールドをそのままBlobへ渡さない。
     }).putLatest(JSON.stringify(snapshot), snapshot.analysis.referenceYmd);
-  } catch {
+  } catch (error) {
+    logError("[analytics snapshot] 保存に失敗しました", error);
     return errorResponse(502, "スナップショットの保存に失敗しました");
   }
   return NextResponse.json({ success: true }, { status: 202 });
@@ -72,7 +80,8 @@ export async function GET(request: Request): Promise<Response> {
       return errorResponse(500, "保存済みスナップショットの形式が不正です");
     }
     return NextResponse.json({ success: true, snapshot });
-  } catch {
+  } catch (error) {
+    logError("[analytics snapshot] 取得に失敗しました", error);
     return errorResponse(500, "スナップショットの取得に失敗しました");
   }
 }
