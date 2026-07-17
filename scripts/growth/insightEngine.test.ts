@@ -3,7 +3,7 @@ import { runDetectors } from "./insightEngine";
 import { snapshotSchema } from "./snapshotSchema";
 
 const context = {
-  bundle: { reservations: [], customers: [], salesDaily: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T00:00:00+09:00", sourceSyncedAt: "2026-07-16T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } },
+  bundle: { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T00:00:00+09:00", sourceSyncedAt: "2026-07-16T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } },
   baselineInputs: null,
   current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "2026-07-06", end: "2026-07-12" }, todayYmd: "2026-07-16",
 };
