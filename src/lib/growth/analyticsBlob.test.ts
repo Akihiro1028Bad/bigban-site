@@ -85,7 +85,11 @@ describe("analyticsBlob", () => {
     const store = blobSnapshotStore("blob-token", vi.fn(), get);
 
     await expect(store.getLatest()).resolves.toBe('{"version":1}');
-    expect(get).toHaveBeenCalledWith(SNAPSHOT_LATEST_PATH, { access: "private", token: "blob-token" });
+    expect(get).toHaveBeenCalledWith(SNAPSHOT_LATEST_PATH, {
+      access: "private",
+      token: "blob-token",
+      useCache: false,
+    });
   });
 
   it("Blobストアはlatestが存在しない場合nullを返す", async () => {

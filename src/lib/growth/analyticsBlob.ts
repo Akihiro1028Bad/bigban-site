@@ -26,7 +26,7 @@ export interface BlobGetResult {
   stream: ReadableStream<Uint8Array> | null;
 }
 
-export type BlobGetFn = (pathname: string, options: { access: "private"; token: string }) => Promise<BlobGetResult | null>;
+export type BlobGetFn = (pathname: string, options: { access: "private"; token: string; useCache: false }) => Promise<BlobGetResult | null>;
 
 export function snapshotDatedPath(ymd: string): string {
   if (!ymdSchema.safeParse(ymd).success) throw new Error("スナップショット日付が不正です");
@@ -57,7 +57,7 @@ export function blobSnapshotStore(
   return {
     putLatest: (json, ymd) => putSnapshot(json, ymd, putWithToken(token, put)),
     async getLatest(): Promise<string | null> {
-      const result = await get(SNAPSHOT_LATEST_PATH, { access: "private", token });
+      const result = await get(SNAPSHOT_LATEST_PATH, { access: "private", token, useCache: false });
       if (!result?.stream) return null;
       return new Response(result.stream).text();
     },
