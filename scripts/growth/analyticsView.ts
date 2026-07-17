@@ -58,14 +58,21 @@ export function freshnessOf(snapshot: Snapshot, todayYmd: string): FreshnessView
   return { level: daysOld > 7 ? "stale" : "fresh", daysOld, sourceSyncedYmd };
 }
 
+/** 対象週の範囲を「MM/DD〜MM/DD」の短い表記にする。 */
+function shortWeekOf(range: { start: string; end: string }): string {
+  const short = (ymd: string) => ymd.slice(5).replace("-", "/");
+  return `${short(range.start)}〜${short(range.end)}`;
+}
+
 export function kpiCards(snapshot: Snapshot): KpiCard[] {
   const { actual, self, sales } = snapshot.kpi;
+  const targetWeek = shortWeekOf(snapshot.analysis.currentWeek);
   const selfRate = self.total4w === 0 ? null : Math.round((self.selfCount4w / self.total4w) * 100);
   const hasUnknownChannel = self.unknown4w > 0 || snapshot.meta.warnings.some((warning) => warning.includes("予約方法"));
   return [
-    { label: "実予約（対象週）", value: count(actual.currentWeek), sub: `累積 ${count(actual.cumulative)}・${sampleNote(actual.currentWeek)}` },
+    { label: `実予約（${targetWeek}）`, value: count(actual.currentWeek), sub: `累積 ${count(actual.cumulative)}・${sampleNote(actual.currentWeek)}` },
     { label: "セルフ予約比率", value: hasUnknownChannel ? "要確認" : selfRate === null ? "収集中" : `${selfRate}%`, sub: hasUnknownChannel ? `未知の予約方法が含まれます(${count(self.unknown4w)})` : selfRate === null ? "対象データを待っています" : `${self.selfCount4w.toLocaleString("ja-JP")}/${count(self.total4w)}・${sampleNote(self.total4w)}` },
-    { label: "売上（対象週）", value: yen(sales.currentWeek), sub: sales.currentWeek === null ? "売上CSVを待っています" : `28日見込み ${yen(sales.forecast28)}` },
+    { label: `売上（${targetWeek}）`, value: yen(sales.currentWeek), sub: sales.currentWeek === null ? "売上CSVを待っています" : `28日見込み ${yen(sales.forecast28)}` },
   ];
 }
 
