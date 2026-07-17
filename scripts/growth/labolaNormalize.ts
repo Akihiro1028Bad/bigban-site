@@ -4,7 +4,7 @@ import { jstYmdOfIso } from "./reservationAggregates";
 import { coverageSchema, isoDateTimeSchema } from "./dateSchemas";
 import { isExcluded } from "./reservationExclusions";
 import type { ExclusionRules } from "./reservationExclusions";
-import type { CustomerRow, SalesSummaryRow, YoyakuRow } from "./labolaSchemas";
+import type { BlockedSlotRow, CustomerRow, ProgramRow, SalesSummaryRow, YoyakuRow } from "./labolaSchemas";
 
 export interface CanonicalReservation {
   reservationId: string; bookedAt: string; useDate: string; start: string; end: string;
@@ -19,6 +19,8 @@ export interface CanonicalCustomer {
   pseudoId: string | null; registeredAt: string; customerType: string; ward: string;
   ageBand: string; gender: string; occupationGroup: string;
 }
+export interface CanonicalProgram { name: string; category: string; heldOn: string; start: string; end: string; capacity: number | null; status: string; publishStatus: string; }
+export interface CanonicalBlockedSlot { date: string; start: string; end: string; space: string; label: string; }
 
 export interface RemarkEntry { reservationId: string; useDate: string; category: string; remarks: string; }
 export interface CanonicalMeta {
@@ -27,7 +29,7 @@ export interface CanonicalMeta {
 }
 export interface CanonicalBundle {
   reservations: CanonicalReservation[]; customers: CanonicalCustomer[]; salesDaily: SalesSummaryRow[];
-  remarks: RemarkEntry[]; meta: CanonicalMeta;
+  programs: CanonicalProgram[]; blockedSlots: CanonicalBlockedSlot[]; remarks: RemarkEntry[]; meta: CanonicalMeta;
 }
 
 function canonicalReservation(row: YoyakuRow, hashKey: string, onYmd: string): CanonicalReservation {
@@ -38,7 +40,7 @@ function canonicalCustomer(row: CustomerRow, hashKey: string, onYmd: string): Ca
   return { pseudoId: pseudoId(row.email, row.memberNo, hashKey), registeredAt: row.registeredAt, customerType: row.customerType, ward: extractWard(row.address), ageBand: ageBand(row.birthDate, onYmd), gender: row.gender, occupationGroup: occupationGroup(row.occupation) };
 }
 
-export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: CustomerRow[] | null; salesSummary: SalesSummaryRow[] | null; rules: ExclusionRules; hashKey: string; coverageStart: string; generatedAt: string; sourceSyncedAt: string; parseWarnings: string[] }): CanonicalBundle {
+export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: CustomerRow[] | null; salesSummary: SalesSummaryRow[] | null; programs?: ProgramRow[] | null; blockedSlots?: BlockedSlotRow[] | null; rules: ExclusionRules; hashKey: string; coverageStart: string; generatedAt: string; sourceSyncedAt: string; parseWarnings: string[] }): CanonicalBundle {
   if (!coverageSchema.safeParse({ start: input.coverageStart, end: input.coverageStart }).success) throw new Error("収録範囲の開始日が不正です");
   if (!isoDateTimeSchema.safeParse(input.generatedAt).success) throw new Error("生成日時が不正です");
   if (!isoDateTimeSchema.safeParse(input.sourceSyncedAt).success) throw new Error("予約CSV同期日時が不正です");
@@ -64,11 +66,16 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   }
   if (input.salesSummary === null) missingSections.push("salesSummary");
   const salesDaily = input.salesSummary ?? [];
+  if (input.programs === null) missingSections.push("program");
+  const programs: CanonicalProgram[] = input.programs ?? [];
+  if (input.blockedSlots === null) missingSections.push("blocked");
+  // None は面に紐付かない補助行。ここで除外して以降の集計をPIIなしで単純化する。
+  const blockedSlots: CanonicalBlockedSlot[] = (input.blockedSlots ?? []).filter((row) => row.space !== "None");
   const warnings = [...input.parseWarnings];
   const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
   if (bookedDates.some((date) => date < input.coverageStart || date > sourceSyncedYmd)) warnings.push("予約受付日時が収録範囲外です");
   if (!coverageSchema.safeParse({ start: input.coverageStart, end: sourceSyncedYmd }).success) throw new Error("収録範囲が不正です");
-  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, sourceSyncedAt: input.sourceSyncedAt, coverage: { start: input.coverageStart, end: sourceSyncedYmd }, reservationsDigest: "", counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
+  return { reservations, customers, salesDaily, programs, blockedSlots, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, sourceSyncedAt: input.sourceSyncedAt, coverage: { start: input.coverageStart, end: sourceSyncedYmd }, reservationsDigest: "", counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length, program: programs.length, blocked: blockedSlots.length }, excludedCount, missingSections, warnings } };
 }
 
 export function serializeJsonl(records: readonly unknown[]): string { return records.map((record) => JSON.stringify(record)).join("\n") + (records.length ? "\n" : ""); }

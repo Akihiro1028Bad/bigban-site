@@ -22,6 +22,11 @@ describe("buildCanonical", () => {
     expect(bundle.meta.missingSections).toEqual(["customer"]);
     expect(bundle.salesDaily).toEqual([]);
   });
+  it("プログラムと予約不可を正準化し、Noneを除外する", () => {
+    const bundle = buildCanonical({ ...base, yoyaku: [], programs: [{ name: "初級", category: "スクール", heldOn: "2026-07-17", start: "10:00", end: "11:00", capacity: 6, status: "", publishStatus: "公開" }], blockedSlots: [{ date: "2026-07-17", start: "10:00", end: "11:00", space: "None", label: "" }, { date: "2026-07-17", start: "10:00", end: "11:00", space: "A", label: "清掃" }] });
+    expect(bundle.programs).toHaveLength(1); expect(bundle.blockedSlots).toEqual([expect.objectContaining({ space: "A" })]); expect(bundle.meta.counts).toMatchObject({ program: 1, blocked: 1 });
+  });
+  it("新CSVの欠落をmissingSectionsへ積む", () => expect(buildCanonical({ ...base, yoyaku: [], programs: null, blockedSlots: null }).meta.missingSections).toEqual(["customer", "salesSummary", "program", "blocked"]));
   it("生成日時と収録範囲は共有日付スキーマで検証する", () => {
     expect(() => buildCanonical({ ...base, yoyaku: [], coverageStart: "2026-02-30" })).toThrow("収録範囲");
     expect(() => buildCanonical({ ...base, yoyaku: [], generatedAt: "日時" })).toThrow("生成日時");
