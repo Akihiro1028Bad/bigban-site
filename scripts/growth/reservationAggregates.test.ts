@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   cancellationStats,
+  demographics,
   demandHeatmap,
   jstYmdOfIso,
   leadTimeStats,
+  paymentMethodShare,
+  programFills,
+  revPach,
+  unpaidAging,
   wardCounts,
   weeklyKpis,
   weeklyReservationSeries,
@@ -11,8 +16,7 @@ import {
 import type {
   CanonicalBundle,
   CanonicalCustomer,
-  CanonicalReservation,
-} from "./labolaNormalize";
+  CanonicalReservation, CanonicalProgram, CanonicalBlockedSlot } from "./labolaNormalize";
 import type { SalesSummaryRow } from "./labolaSchemas";
 
 function res(overrides: Partial<CanonicalReservation> = {}): CanonicalReservation {
@@ -58,12 +62,14 @@ function customer(overrides: Partial<CanonicalCustomer> = {}): CanonicalCustomer
 
 function bundle(
   reservations: CanonicalReservation[],
-  options: { customers?: CanonicalCustomer[]; salesDaily?: SalesSummaryRow[] } = {}
+  options: { customers?: CanonicalCustomer[]; salesDaily?: SalesSummaryRow[]; programs?: CanonicalProgram[]; blockedSlots?: CanonicalBlockedSlot[] } = {}
 ): CanonicalBundle {
   return {
     reservations,
     customers: options.customers ?? [],
     salesDaily: options.salesDaily ?? [],
+    programs: options.programs ?? [],
+    blockedSlots: options.blockedSlots ?? [],
     remarks: [],
     meta: {
       schemaVersion: 1,
@@ -87,6 +93,37 @@ describe("jstYmdOfIso", () => {
   it("不正な日時は日本語エラーにする", () => {
     expect(() => jstYmdOfIso("不正な日時")).toThrow("日時を解釈できません");
   });
+});
+
+describe("P1拡張集計", () => {
+  it("公開プログラムを予約と突合し、非公開・期間外を除外する", () => {
+    const data = bundle([res({ space: "初級", category: "スクール", useDate: "2026-07-17", start: "10:00" }), res({ reservationId: "x", status: "cancelled", space: "初級", category: "スクール", useDate: "2026-07-17", start: "10:00" })]); data.programs = [{ name: "初級", category: "スクール", heldOn: "2026-07-17", start: "10:00", end: "11:00", capacity: 1, status: "", publishStatus: "公開" }, { name: "非公開", category: "", heldOn: "2026-07-17", start: "10:00", end: "", capacity: null, status: "", publishStatus: "非公開" }];
+    expect(programFills(data, "2026-07-16")).toEqual([expect.objectContaining({ name: "初級", reserved: 1, fillRate: 1 })]);
+  });
+  it("プログラムは時刻順に並べ、定員なし・0は充足率なしとして対象外予約を数えない", () => {
+    const data = bundle([
+      res({ space: "午後", category: "スクール", useDate: "2026-07-17", start: "15:00" }),
+      res({ reservationId: "space", space: "午前", category: "スペース予約", useDate: "2026-07-17", start: "09:00" }),
+      res({ reservationId: "mismatch", space: "別名", category: "スクール", useDate: "2026-07-17", start: "09:00" }),
+    ]);
+    data.programs = [
+      { name: "午後", category: "", heldOn: "2026-07-17", start: "15:00", end: "16:00", capacity: 0, status: "", publishStatus: "公開" },
+      { name: "午前", category: "", heldOn: "2026-07-17", start: "09:00", end: "10:00", capacity: null, status: "", publishStatus: "公開" },
+      { name: "翌日", category: "", heldOn: "2026-07-18", start: "09:00", end: "10:00", capacity: 1, status: "", publishStatus: "公開" },
+      { name: "未来", category: "", heldOn: "2026-08-14", start: "09:00", end: "10:00", capacity: 1, status: "", publishStatus: "公開" },
+    ];
+    expect(programFills(data, "2026-07-16")).toEqual([
+      expect.objectContaining({ name: "午前", reserved: 0, fillRate: null }),
+      expect.objectContaining({ name: "午後", reserved: 1, fillRate: null }),
+      expect.objectContaining({ name: "翌日", reserved: 0, fillRate: 0 }),
+    ]);
+  });
+  it("未収金は未来利用を除外し、15日以上を分桶する", () => {
+    const data = bundle([res({ bookedAt: "2026-06-30T10:00:00+09:00", useDate: "2026-07-01", amount: 1000 }), res({ reservationId: "future", useDate: "2026-07-20", amount: 999 })]);
+    expect(unpaidAging(data, "2026-07-16")).toMatchObject({ count: 1, amount: 1000, buckets: [expect.anything(), expect.anything(), { label: "15日以上", count: 1, amount: 1000 }] }); expect(unpaidAging(bundle([], {}), "2026-07-16")).toBeNull();
+  });
+  it("支払方法と顧客分布を集計する", () => { const data = bundle([res({ paymentMethod: "" }), res({ reservationId: "2", paymentMethod: "カード" })], { customers: [customer({ gender: "女性" }), customer({ pseudoId: "d", gender: "女性" })] }); expect(paymentMethodShare(data, "2026-07-16")).toEqual([{ method: "カード", count: 1 }, { method: "不明", count: 1 }]); expect(demographics(data)).toEqual([{ ageBand: "30代", gender: "女性", customerType: "一般", count: 2 }]); });
+  it("RevPACHは営業時間クリップとNone除外を反映する", () => { const data = bundle([res({ useDate: "2026-07-16", amount: 1020 })]); data.blockedSlots = [{ date: "2026-07-16", start: "05:00", end: "07:00", space: "Aコート", label: "" }, { date: "2026-07-16", start: "12:00", end: "13:00", space: "None", label: "" }]; expect(revPach(data, "2026-07-16")).toMatchObject({ revenue: 1020, availableCourtHours: 475, spaces: 1 }); });
 });
 
 describe("weeklyKpis", () => {
@@ -221,7 +258,7 @@ describe("demandHeatmap", () => {
         { ...base, reservationId: "before-open", start: "01:00", end: "05:00" },
         { ...base, reservationId: "valid" },
       ],
-      customers: [], salesDaily: [], remarks: [],
+      customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [],
       meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
     };
     const cells = demandHeatmap(data, "2026-07-16");
@@ -291,5 +328,70 @@ describe("cancellationStats", () => {
     expect(stats?.ciLow).toBeLessThan(0.5);
     expect(stats?.ciHigh).toBeGreaterThan(0.5);
     expect(cancellationStats(bundle([]), "2026-07-16")).toBeNull();
+  });
+});
+
+describe("P1拡張ライトのカバレッジ境界", () => {
+  it("jstYmdOfIsoは不正な日時を日本語エラーにする", () => {
+    expect(() => jstYmdOfIso("不正")).toThrow("日時を解釈できません");
+  });
+
+  it("unpaidAgingは経過日数帯ごとに件数と金額(null=0)を積む", () => {
+    const data = bundle([
+      res({ reservationId: "u1", bookedAt: "2026-07-14T10:00:00+09:00", useDate: "2026-07-15", amount: 500 }),
+      res({ reservationId: "u2", bookedAt: "2026-07-06T10:00:00+09:00", useDate: "2026-07-07", amount: null }),
+      res({ reservationId: "u3", bookedAt: "2026-06-25T10:00:00+09:00", useDate: "2026-06-26", amount: 2000 }),
+    ]);
+    expect(unpaidAging(data, "2026-07-16")).toEqual({
+      count: 3,
+      amount: 2500,
+      buckets: [
+        { label: "0-7日", count: 1, amount: 500 },
+        { label: "8-14日", count: 1, amount: 0 },
+        { label: "15日以上", count: 1, amount: 2000 },
+      ],
+    });
+  });
+
+  it("demographicsは件数降順・同数は年代の五十音順にする", () => {
+    const data = bundle([], {
+      customers: [
+        customer({ pseudoId: "c1", ageBand: "30代", gender: "女性" }),
+        customer({ pseudoId: "c2", ageBand: "30代", gender: "女性" }),
+        customer({ pseudoId: "c3", ageBand: "20代", gender: "男性" }),
+        customer({ pseudoId: "c4", ageBand: "40代", gender: "男性" }),
+      ],
+    });
+    expect(demographics(data)).toEqual([
+      { ageBand: "30代", gender: "女性", customerType: "一般", count: 2 },
+      { ageBand: "20代", gender: "男性", customerType: "一般", count: 1 },
+      { ageBand: "40代", gender: "男性", customerType: "一般", count: 1 },
+    ]);
+  });
+
+  it("revPachは収録範囲外でnull・None面と不正時刻とnull金額を安全に扱う", () => {
+    const early = bundle([res({})]);
+    early.meta.coverage = { start: "2026-07-20", end: "2026-07-21" };
+    expect(revPach(early, "2026-07-16")).toBeNull();
+
+    const data = bundle(
+      [
+        res({ reservationId: "r1", useDate: "2026-07-10", amount: 1020, space: "Aコート" }),
+        res({ reservationId: "r2", useDate: "2026-07-10", amount: null, space: "Aコート" }),
+        res({ reservationId: "r3", useDate: "2026-07-10", space: "None" }),
+      ],
+      { blockedSlots: [{ date: "2026-07-10", start: "ab:cd", end: "10:00", space: "Aコート", label: "" }] }
+    );
+    const result = revPach(data, "2026-07-16");
+    expect(result).not.toBeNull();
+    expect(result?.spaces).toBe(1);
+    expect(result?.revenue).toBe(2020);
+  });
+
+  it("revPachは全時間が予約不可なら時間あたり売上を0にする", () => {
+    const data = bundle([res({ reservationId: "r1", useDate: "2026-07-10", amount: 100, space: "Aコート" })]);
+    data.meta.coverage = { start: "2026-07-10", end: "2026-07-10" };
+    data.blockedSlots = [{ date: "2026-07-10", start: "06:00", end: "23:00", space: "Aコート", label: "" }];
+    expect(revPach(data, "2026-07-10")).toMatchObject({ availableCourtHours: 0, revPerCourtHour: 0 });
   });
 });
