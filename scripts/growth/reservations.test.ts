@@ -4,51 +4,41 @@ import {
   aggregateReservations,
   actualReservationsForPage,
   isReservationDataFresh,
-  parseReservationCoverageJson,
-  parseReservationCsv,
+  parseCanonicalMeta,
+  parseCanonicalReservationsJsonl,
   reservationCoverageForPeriods,
   selectLatestReservationSnapshot,
 } from "./reservations";
+import { parseCsvRows } from "./labolaCsv";
+import type { ParsedReservationCsv, ReservationRecord } from "./reservations";
 
 const current = { start: "2026-07-07", end: "2026-07-13" };
 const prior = { start: "2026-06-30", end: "2026-07-06" };
 
-describe("reservation coverage", () => {
-  it("sidecar JSONの収録開始・終了日を検証して解析する", () => {
-    expect(
-      parseReservationCoverageJson(
-        JSON.stringify({ coverageStart: "2026-06-30", coverageEnd: "2026-07-13" })
-      )
-    ).toEqual({ start: "2026-06-30", end: "2026-07-13" });
-  });
+/** 集計既存ケース用の入力ビルダー。旧CSVパーサのAPIではない。 */
+function parsedFixture(input: string): ParsedReservationCsv {
+  const rows = parseCsvRows(input);
+  const headers = rows[0] ?? [];
+  const sourceIndex = headers.indexOf("source_page_path");
+  const records = rows.slice(1).map((row): ReservationRecord => ({
+    reservationId: row[0] ?? "", bookedAt: row[1] ?? "", status: (row[2] ?? "confirmed") as ReservationRecord["status"],
+    ...(sourceIndex >= 0 ? { sourcePagePath: row[sourceIndex] ?? "" } : {}),
+  }));
+  return { records, hasSourcePagePath: sourceIndex >= 0 };
+}
 
-  it("sidecarの欠落・不正日付・逆転期間を拒否する", () => {
-    expect(() => parseReservationCoverageJson("null")).toThrow(/coverageStart/);
-    expect(() => parseReservationCoverageJson("{}")).toThrow(/coverageStart/);
-    expect(() =>
-      parseReservationCoverageJson(JSON.stringify({ coverageStart: "2026-06-30" }))
-    ).toThrow(/coverageEnd/);
-    expect(() =>
-      parseReservationCoverageJson(
-        JSON.stringify({ coverageStart: "bad", coverageEnd: "2026-03-01" })
-      )
-    ).toThrow(/日付/);
-    expect(() =>
-      parseReservationCoverageJson(
-        JSON.stringify({ coverageStart: "2026-02-30", coverageEnd: "2026-03-01" })
-      )
-    ).toThrow(/日付/);
-    expect(() =>
-      parseReservationCoverageJson(
-        JSON.stringify({ coverageStart: "2026-02-01", coverageEnd: "2026-02-30" })
-      )
-    ).toThrow(/日付/);
-    expect(() =>
-      parseReservationCoverageJson(
-        JSON.stringify({ coverageStart: "2026-07-13", coverageEnd: "2026-06-30" })
-      )
-    ).toThrow(/前後/);
-    expect(() => parseReservationCoverageJson("not json")).toThrow(/JSON/);
+describe("reservation coverage", () => {
+  it("正準metaの収録開始・終了日を検証して解析する", () => {
+    expect(parseCanonicalMeta('{"generatedAt":"2026-07-16T05:20:00.000Z","sourceSyncedAt":"2026-07-08T05:20:00.000Z","reservationsDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","coverage":{"start":"2026-06-30","end":"2026-07-13"}}')).toEqual({ generatedAt: "2026-07-16T05:20:00.000Z", sourceSyncedAt: "2026-07-08T05:20:00.000Z", reservationsDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", coverage: { start: "2026-06-30", end: "2026-07-13" } });
+    expect(() => parseCanonicalMeta('{"generatedAt":"x","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/generatedAt/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","reservationsDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/前後/);
+    expect(() => parseCanonicalMeta("{")).toThrow(/JSON/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","reservationsDigest":"xyz","coverage":{"start":"2026-07-01","end":"2026-07-16"}}')).toThrow(/reservationsDigest/);
+    expect(() => parseCanonicalMeta("null")).toThrow(/形式/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","reservationsDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')).toThrow(/coverage/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","reservationsDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","coverage":{"start":"bad","end":"2026-07-16"}}')).toThrow(/日付/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"2026-07-01","end":"2026-07-16"}}')).toThrow(/sourceSyncedAt/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-02-30T12:00:00Z","coverage":{"start":"2026-07-01","end":"2026-07-16"}}')).toThrow(/sourceSyncedAt/);
   });
 
   it("currentとpriorを別々に収録判定する", () => {
@@ -62,67 +52,28 @@ describe("reservation coverage", () => {
   });
 });
 
-describe("parseReservationCsv", () => {
-  it("正規化CSVとquoted fieldを解析する", () => {
-    const parsed = parseReservationCsv(
-      'reservation_id,booked_at,status,source_page_path\n"r,1",2026-07-10T12:30:00+09:00,confirmed,"/news/a?x=1"\n'
-    );
-    expect(parsed.hasSourcePagePath).toBe(true);
-    expect(parsed.records).toEqual([
-      {
-        reservationId: "r,1",
-        bookedAt: "2026-07-10T12:30:00+09:00",
-        status: "confirmed",
-        sourcePagePath: "/news/a?x=1",
-      },
-    ]);
+describe("parseCanonicalReservationsJsonl", () => {
+  it("JSONLを既存のParsedReservationCsvへ変換する", () => {
+    const parsed = parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T14:19:00+09:00","status":"confirmed"}\n{"reservationId":"2","bookedAt":"2026-07-13T10:00:00+09:00","status":"cancelled"}\n');
+    expect(parsed).toMatchObject({ hasSourcePagePath: false, records: [{ reservationId: "1" }, { reservationId: "2" }] });
   });
-
-  it("quoted field内の二重引用符を1文字の引用符として復元する", () => {
-    const parsed = parseReservationCsv(
-      'reservation_id,booked_at,status,source_page_path\n"r""1",2026-07-10T12:30:00+09:00,confirmed,/news/a\n'
-    );
-    expect(parsed.records[0]?.reservationId).toBe('r"1');
-  });
-
-  it("CR単独改行と空行を受け入れる", () => {
-    const parsed = parseReservationCsv(
-      "reservation_id,booked_at,status\r\rr1,2026-07-10T12:30:00+09:00,confirmed\r"
-    );
-    expect(parsed.records).toHaveLength(1);
-    expect(
-      parseReservationCsv(
-        "reservation_id,booked_at,status\r\nr2,2026-07-11T12:30:00+09:00,completed\r\n"
-      ).records
-    ).toHaveLength(1);
-  });
-
-  it("空入力・閉じていない引用符・空の必須値を拒否する", () => {
-    expect(() => parseReservationCsv("")).toThrow(/reservation_id/);
-    expect(() => parseReservationCsv('reservation_id,booked_at,status\n"r1,2026-07-10,confirmed')).toThrow(/引用符/);
-    expect(() => parseReservationCsv("reservation_id,booked_at,status\n,2026-07-10T00:00:00+09:00,confirmed")).toThrow(/reservation_idが空/);
-    expect(() => parseReservationCsv("booked_at,status,reservation_id\n2026-07-10T00:00:00+09:00,confirmed")).toThrow(/reservation_idが空/);
-    expect(() => parseReservationCsv("reservation_id,booked_at,status\nr1")).toThrow(/日時/);
-  });
-
-  it("source_page_path列の値が欠けた行は空文字として扱う", () => {
-    const parsed = parseReservationCsv(
-      "reservation_id,booked_at,status,source_page_path\nr1,2026-07-10T00:00:00+09:00,confirmed"
-    );
-    expect(parsed.records[0]?.sourcePagePath).toBe("");
-  });
-
-  it("必須列不足・不正日時・未知status・重複IDを拒否する", () => {
-    expect(() => parseReservationCsv("reservation_id,booked_at\nr1,2026-07-10")).toThrow(/status/);
-    expect(() => parseReservationCsv("reservation_id,booked_at,status\nr1,nope,confirmed")).toThrow(/日時/);
-    expect(() => parseReservationCsv("reservation_id,booked_at,status\nr1,2026-07-10T00:00:00+09:00,pending")).toThrow(/status/);
-    expect(() => parseReservationCsv("reservation_id,booked_at,status\nr1,2026-07-10T00:00:00+09:00,confirmed\nr1,2026-07-11T00:00:00+09:00,completed")).toThrow(/重複/);
+  it("不正statusを拒否する", () => expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T14:19:00+09:00","status":"pending"}\n')).toThrow(/status/));
+  it("JSON・形式・ID重複・日時不正を拒否する", () => {
+    expect(() => parseCanonicalReservationsJsonl("{\n")).toThrow(/JSON/);
+    expect(() => parseCanonicalReservationsJsonl("[]\n")).toThrow(/reservationId/);
+    expect(() => parseCanonicalReservationsJsonl("null\n")).toThrow(/形式/);
+    expect(() => parseCanonicalReservationsJsonl('"text"\n')).toThrow(/形式/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/reservationId/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"x","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-02-30T12:00:00Z","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T12:00:00","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/重複/);
   });
 });
 
 describe("aggregateReservations", () => {
   it("confirmed/completedだけをJST境界日で集計しcancelledを除外する", () => {
-    const parsed = parseReservationCsv(
+    const parsed = parsedFixture(
       "reservation_id,booked_at,status,source_page_path\n" +
         "a,2026-07-07T00:00:00+09:00,confirmed,/news/a\n" +
         "b,2026-07-13T23:59:59+09:00,completed,/news/a\n" +
@@ -136,7 +87,7 @@ describe("aggregateReservations", () => {
   });
 
   it("source_page_path列がなければarticle=null、空CSVは有効な0件", () => {
-    const parsed = parseReservationCsv("reservation_id,booked_at,status\n");
+    const parsed = parsedFixture("reservation_id,booked_at,status\n");
     expect(aggregateReservations(parsed, current, prior, "/news/a")).toEqual({
       facility: { current: 0, prior: 0, deltaPct: null },
       article: null,
@@ -144,7 +95,7 @@ describe("aggregateReservations", () => {
   });
 
   it("source_page_pathが空・別記事なら記事帰属へ数えない", () => {
-    const parsed = parseReservationCsv(
+    const parsed = parsedFixture(
       "reservation_id,booked_at,status,source_page_path\n" +
         "a,2026-07-10T00:00:00+09:00,confirmed,\n" +
         "b,2026-07-11T00:00:00+09:00,confirmed,/news/other\n"
@@ -163,7 +114,7 @@ describe("aggregateReservations", () => {
         { type: "month", value: "07" },
       ]);
     try {
-      const parsed = parseReservationCsv(
+      const parsed = parsedFixture(
         "reservation_id,booked_at,status\nr1,2026-07-10T00:00:00+09:00,confirmed\n"
       );
       expect(aggregateReservations(parsed, current, prior, "/news/a").facility.current).toBe(0);
@@ -178,7 +129,7 @@ describe("actualReservationsForPage", () => {
   const syncedAt = "2026-07-14T00:00:00.000Z";
 
   it("current/prior両期間を収録した空CSVだけをfreshな実測0として扱う", () => {
-    const parsed = parseReservationCsv("reservation_id,booked_at,status\n");
+    const parsed = parsedFixture("reservation_id,booked_at,status\n");
     expect(
       actualReservationsForPage({
         parsed,
@@ -199,7 +150,7 @@ describe("actualReservationsForPage", () => {
   });
 
   it("prior未収録なら0件ではなくcoverage_incompleteとして代理指標へ倒す", () => {
-    const parsed = parseReservationCsv(
+    const parsed = parsedFixture(
       "reservation_id,booked_at,status\nr1,2026-07-10T00:00:00+09:00,confirmed\n"
     );
     expect(

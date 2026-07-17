@@ -1,0 +1,28 @@
+/** D2: 前4週平均からの週次予約数の急変を検出する。 */
+import { poissonLowerTailP, poissonUpperTailP } from "../reservationStats";
+import { weeklyReservationSeries } from "../reservationAggregates";
+import type { Detector } from "../insightEngine";
+
+function severityOf(observed: number, mean: number, p: number): { severity: "info" | "notice"; label: "観察" | "有意" } | null {
+  if (p < 0.05) return { severity: "notice", label: observed < 10 ? "観察" : "有意" };
+  if (observed >= 2 * mean || (mean >= 1 && observed <= mean / 2)) return { severity: "info", label: "観察" };
+  return null;
+}
+
+export const reservationCountChange: Detector = (context) => {
+  const baselineStart = new Date(`${context.current.start}T00:00:00Z`);
+  baselineStart.setUTCDate(baselineStart.getUTCDate() - 28);
+  const baselineStartYmd = baselineStart.toISOString().slice(0, 10);
+  if (context.bundle.meta.coverage.start > baselineStartYmd || context.bundle.meta.coverage.end < context.current.end) return [];
+  const series = weeklyReservationSeries(context.bundle);
+  const index = series.findIndex((entry) => entry.weekStart === context.current.start);
+  if (index < 4) return [];
+  const observed = series[index].count;
+  const baseline = series.slice(index - 4, index).map((entry) => entry.count);
+  const mean = baseline.reduce((sum, count) => sum + count, 0) / baseline.length;
+  if (mean === 0 && observed === 0) return [];
+  const p = observed >= mean ? poissonUpperTailP(observed, mean) : poissonLowerTailP(observed, mean);
+  const result = severityOf(observed, mean, p);
+  if (result === null) return [];
+  return [{ id: `d2:weekly:${context.current.start}`, detector: "D2", severity: result.severity, title: "週次予約数の変化", body: `今週の予約数は${observed}件です。`, evidence: { n: observed, observed, baselineMean: mean, p }, label: result.label }];
+};

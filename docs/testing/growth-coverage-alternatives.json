@@ -323,6 +323,24 @@
         "scripts/growth/metrics-cli.ts"
       ]
     },
+    "scripts/growth/ingest-cli.ts": {
+      "reason": "ラボーラCSV・ファイルシステム・LINEを結線する薄い実行入口",
+      "guarantees": [
+        "scripts/growth/ingestApplication.test.ts",
+        "scripts/growth/labolaCsv.test.ts",
+        "scripts/growth/labolaSchemas.test.ts",
+        "scripts/growth/labolaNormalize.test.ts",
+        "scripts/growth/reservationAggregates.test.ts",
+        "scripts/growth/insightEngine.test.ts",
+        "scripts/growth/snapshotBuild.test.ts",
+        "scripts/growth/reservationDigest.test.ts"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の環境変数・LINE認証はCI外",
+      "excludedFiles": [
+        "scripts/growth/ingest-cli.ts"
+      ]
+    },
     "scripts/growth/learning-log-cli.ts": {
       "reason": "外部I/Oを結線する薄い実行入口",
       "guarantees": [

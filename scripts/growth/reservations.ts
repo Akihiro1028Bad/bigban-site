@@ -1,6 +1,7 @@
 /** ベンダー非依存の正規化予約CSVを扱う純ロジック。I/Oはmetrics-cli側に限定する。 */
 
 import { metricDelta } from "./ctaEvents";
+import { isIsoDateTime, isCalendarYmd } from "./dateSchemas";
 import { normalizePagePath, type ActualReservationMetrics, type MetricDelta } from "./metrics";
 import type { DateRange } from "./period";
 
@@ -23,37 +24,19 @@ export interface ReservationCoverage {
   end: string;
 }
 
-function isValidYmd(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-/** 予約CSV sidecar JSONを解析する。 */
-export function parseReservationCoverageJson(input: string): ReservationCoverage {
+export function parseCanonicalMeta(json: string): { generatedAt: string; sourceSyncedAt: string; coverage: ReservationCoverage; reservationsDigest: string } {
   let value: unknown;
-  try {
-    value = JSON.parse(input);
-  } catch {
-    throw new Error("予約CSV収録範囲sidecarがJSONではありません");
-  }
-  if (!value || typeof value !== "object") {
-    throw new Error("予約CSV収録範囲sidecarにcoverageStartがありません");
-  }
-  const record = value as Record<string, unknown>;
-  const start = record.coverageStart;
-  const end = record.coverageEnd;
-  if (typeof start !== "string") {
-    throw new Error("予約CSV収録範囲sidecarにcoverageStartがありません");
-  }
-  if (typeof end !== "string") {
-    throw new Error("予約CSV収録範囲sidecarにcoverageEndがありません");
-  }
-  if (!isValidYmd(start) || !isValidYmd(end)) {
-    throw new Error("予約CSV収録範囲sidecarの日付が不正です");
-  }
-  if (start > end) throw new Error("予約CSV収録範囲sidecarの日付前後が逆です");
-  return { start, end };
+  try { value = JSON.parse(json); } catch { throw new Error("正準メタデータがJSONではありません"); }
+  if (!value || typeof value !== "object") throw new Error("正準メタデータの形式が不正です");
+  const record = value as Record<string, unknown>; const coverage = record.coverage;
+  if (typeof record.generatedAt !== "string" || !isIsoDateTime(record.generatedAt)) throw new Error("正準メタデータのgeneratedAtが不正です");
+  if (typeof record.sourceSyncedAt !== "string" || !isIsoDateTime(record.sourceSyncedAt)) throw new Error("正準メタデータのsourceSyncedAtが不正です");
+  if (typeof record.reservationsDigest !== "string" || !/^[a-f0-9]{64}$/.test(record.reservationsDigest)) throw new Error("正準メタデータのreservationsDigestが不正です");
+  if (!coverage || typeof coverage !== "object") throw new Error("正準メタデータのcoverageがありません");
+  const range = coverage as Record<string, unknown>;
+  if (typeof range.start !== "string" || typeof range.end !== "string" || !isCalendarYmd(range.start) || !isCalendarYmd(range.end)) throw new Error("正準メタデータのcoverage日付が不正です");
+  if (range.start > range.end) throw new Error("正準メタデータのcoverage日付前後が逆です");
+  return { generatedAt: record.generatedAt, sourceSyncedAt: record.sourceSyncedAt, coverage: { start: range.start, end: range.end }, reservationsDigest: record.reservationsDigest };
 }
 
 export function reservationCoverageForPeriods(
@@ -66,76 +49,21 @@ export function reservationCoverageForPeriods(
   return { current: covers(current), prior: covers(prior) };
 }
 
-function csvRows(input: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let isQuoted = false;
-  for (let index = 0; index < input.length; index += 1) {
-    const char = input[index];
-    if (char === '"') {
-      if (isQuoted && input[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        isQuoted = !isQuoted;
-      }
-    } else if (char === "," && !isQuoted) {
-      row.push(field);
-      field = "";
-    } else if ((char === "\n" || char === "\r") && !isQuoted) {
-      if (char === "\r" && input[index + 1] === "\n") index += 1;
-      row.push(field);
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += char;
-    }
-  }
-  if (isQuoted) throw new Error("CSVの引用符が閉じていません");
-  row.push(field);
-  if (row.some((value) => value !== "")) rows.push(row);
-  return rows;
-}
-
-export function parseReservationCsv(input: string): ParsedReservationCsv {
-  const rows = csvRows(input);
-  const headers = (rows[0] ?? []).map((header, index) =>
-    index === 0 ? header.replace(/^\uFEFF/, "").trim() : header.trim()
-  );
-  const required = ["reservation_id", "booked_at", "status"] as const;
-  for (const name of required) {
-    if (!headers.includes(name)) throw new Error(`必須列 ${name} がありません`);
-  }
-  const indexes = Object.fromEntries(headers.map((name, index) => [name, index])) as Record<
-    string,
-    number
-  >;
-  const hasSourcePagePath = headers.includes("source_page_path");
+export function parseCanonicalReservationsJsonl(content: string): ParsedReservationCsv {
   const seen = new Set<string>();
-  const records = rows.slice(1).map((values, rowIndex): ReservationRecord => {
-    const reservationId = values[indexes.reservation_id] ?? "";
-    const bookedAt = values[indexes.booked_at] ?? "";
-    const status = values[indexes.status] ?? "";
-    if (!reservationId) throw new Error(`${rowIndex + 2}行目のreservation_idが空です`);
-    if (seen.has(reservationId)) throw new Error(`reservation_idが重複しています: ${reservationId}`);
+  const records = content.split("\n").filter((line) => line.trim() !== "").map((line, index): ReservationRecord => {
+    let value: unknown;
+    try { value = JSON.parse(line); } catch { throw new Error(`${index + 1}行目のJSONが不正です`); }
+    if (!value || typeof value !== "object") throw new Error(`${index + 1}行目の形式が不正です`);
+    const record = value as Record<string, unknown>; const reservationId = record.reservationId; const bookedAt = record.bookedAt; const status = record.status;
+    if (typeof reservationId !== "string" || reservationId === "") throw new Error(`${index + 1}行目のreservationIdが空です`);
+    if (seen.has(reservationId)) throw new Error(`reservationIdが重複しています: ${reservationId}`);
     seen.add(reservationId);
-    if (Number.isNaN(Date.parse(bookedAt))) throw new Error(`${rowIndex + 2}行目の日時が不正です`);
-    if (status !== "confirmed" && status !== "completed" && status !== "cancelled") {
-      throw new Error(`${rowIndex + 2}行目のstatusが不正です: ${status}`);
-    }
-    const sourcePagePath = hasSourcePagePath
-      ? (values[indexes.source_page_path] ?? "").trim()
-      : undefined;
-    return {
-      reservationId,
-      bookedAt,
-      status,
-      ...(sourcePagePath !== undefined ? { sourcePagePath } : {}),
-    };
+    if (typeof bookedAt !== "string" || !isIsoDateTime(bookedAt)) throw new Error(`${index + 1}行目の日時が不正です`);
+    if (status !== "confirmed" && status !== "cancelled") throw new Error(`${index + 1}行目のstatusが不正です: ${String(status)}`);
+    return { reservationId, bookedAt, status };
   });
-  return { records, hasSourcePagePath };
+  return { records, hasSourcePagePath: false };
 }
 
 function jstYmd(iso: string): string {

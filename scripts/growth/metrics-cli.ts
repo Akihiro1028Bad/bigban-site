@@ -13,7 +13,9 @@
 
 import "dotenv/config";
 
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
@@ -44,8 +46,8 @@ import { queryAllDataSource } from "./notionRepository";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
 import {
   actualReservationsForPage,
-  parseReservationCoverageJson,
-  parseReservationCsv,
+  parseCanonicalMeta,
+  parseCanonicalReservationsJsonl,
   type ParsedReservationCsv,
   type ReservationCoverage,
 } from "./reservations";
@@ -160,30 +162,29 @@ interface ReservationCsvSnapshot {
   coverage: ReservationCoverage;
 }
 
-async function loadReservationCsv(
-  path: string | undefined,
-  checkedAt: string,
-  coveragePath = path ? `${path}.coverage.json` : undefined
+async function loadCanonicalReservations(
+  dataDir: string | undefined,
+  checkedAt: string
 ): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
-  if (!path) return { state: "missing", reason: "not_configured", checkedAt };
+  if (!dataDir) return { state: "missing", reason: "not_configured", checkedAt };
   try {
-    const [content, file, coverageJson] = await Promise.all([
-      readFile(path, "utf8"),
-      stat(path),
-      readFile(coveragePath || `${path}.coverage.json`, "utf8"),
+    const [jsonl, metaJson] = await Promise.all([
+      readFile(join(dataDir, "canonical", "reservations.jsonl"), "utf8"),
+      readFile(join(dataDir, "canonical", "meta.json"), "utf8"),
     ]);
     try {
-      return {
-        parsed: parseReservationCsv(content),
-        syncedAt: file.mtime.toISOString(),
-        coverage: parseReservationCoverageJson(coverageJson),
-      };
-    } catch (error) {
-      console.warn("[metrics] 予約CSVが不正です:", error);
+      const meta = parseCanonicalMeta(metaJson);
+      const actualDigest = createHash("sha256").update(jsonl).digest("hex");
+      if (actualDigest !== meta.reservationsDigest) throw new Error("正準予約データのダイジェストが一致しません");
+      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+      console.warn("[metrics] 正準データセットが不正です:", detail);
       return { state: "missing", reason: "invalid", checkedAt };
     }
-  } catch (error) {
-    console.warn("[metrics] 予約CSVを読み込めません:", error);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+    console.warn("[metrics] 正準データセットを読み込めません:", detail);
     return { state: "missing", reason: "read_error", checkedAt };
   }
 }
@@ -267,11 +268,7 @@ async function main(): Promise<void> {
   }
 
   const nowIso = new Date().toISOString();
-  const reservations = await loadReservationCsv(
-    process.env.GROWTH_RESERVATION_CSV_PATH,
-    nowIso,
-    process.env.GROWTH_RESERVATION_COVERAGE_PATH
-  );
+  const reservations = await loadCanonicalReservations(process.env.GROWTH_RESERVATION_DATA_DIR, nowIso);
   let updated = 0;
   let slugFailed = 0;
   let sourceError = 0;
