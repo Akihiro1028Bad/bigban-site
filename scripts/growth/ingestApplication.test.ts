@@ -1,10 +1,11 @@
 // @vitest-environment node
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runIngestApplication } from "./ingestApplication";
+import { parsePendingDigest, runIngestApplication } from "./ingestApplication";
 import { snapshotSchema } from "./snapshotSchema";
 import type { IngestFs } from "./ingestApplication";
 
@@ -43,6 +44,18 @@ const deps = (notify: (text: string, kind: "weekly") => Promise<void> = async ()
 afterEach(async () => { await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
 describe("runIngestApplication", () => {
+  it("pendingダイジェストは本文と一致するhashだけを受け付ける", () => {
+    const text = "保留中の本文";
+    const hash = createHash("sha256").update(text).digest("hex");
+    expect(parsePendingDigest(JSON.stringify({ text, hash }))).toEqual({ text, hash });
+    expect(parsePendingDigest("{")).toBeNull();
+    expect(parsePendingDigest("null")).toBeNull();
+    expect(parsePendingDigest("[]")).toBeNull();
+    expect(parsePendingDigest(JSON.stringify({ text, hash: "不正" }))).toBeNull();
+    expect(parsePendingDigest(JSON.stringify({ text: 1, hash }))).toBeNull();
+    expect(parsePendingDigest(JSON.stringify({ text: "", hash: createHash("sha256").update("").digest("hex") }))).toBeNull();
+  });
+
   it("正準データとスナップショットをtmp世代から昇格し、既定通知を送る", async () => {
     const { drop, data } = await setup();
     const notify = vi.fn<(text: string, kind: "weekly") => Promise<void>>(async () => undefined);
@@ -254,7 +267,7 @@ describe("runIngestApplication", () => {
     await expect(readFile(join(data, "canonical", "reservations.jsonl"), "utf8")).resolves.toBe(canonicalBefore);
   });
 
-  it("同日同一ダイジェストは再送せず、送信失敗ならマーカーを残さない", async () => {
+  it("同日同一ダイジェストは再送せず、送信失敗ならpendingを原子的に残す", async () => {
     const { drop, data } = await setup();
     const notify = vi.fn(async () => undefined);
     await runIngestApplication(input(drop, data), deps(notify));
@@ -264,6 +277,70 @@ describe("runIngestApplication", () => {
     const second = await setup();
     await expect(runIngestApplication(input(second.drop, second.data), deps(failing))).rejects.toThrow("LINE失敗");
     await expect(stat(join(second.data, "snapshots", ".digest-sent-2026-07-16.json"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(join(second.data, "snapshots", ".digest-pending.json"), "utf8")).resolves.toMatch(/"text"/);
+    await expect(stat(join(second.data, "snapshots", ".digest-pending.json.tmp"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("翌日はpendingを先に再送してから今回分を送り、成功時にpendingを削除する", async () => {
+    const { drop, data } = await setup();
+    const firstFailure = vi.fn(async () => { throw new Error("LINE失敗"); });
+    await expect(runIngestApplication(input(drop, data), deps(firstFailure))).rejects.toThrow("LINE失敗");
+    const pending = JSON.parse(await readFile(join(data, "snapshots", ".digest-pending.json"), "utf8")) as { text: string };
+    const notify = vi.fn<(text: string, kind: "weekly") => Promise<void>>(async () => undefined);
+    await runIngestApplication(input(drop, data), {
+      ...deps(notify),
+      now: () => new Date("2026-07-17T12:00:00+09:00"),
+    });
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify).toHaveBeenNthCalledWith(1, pending.text, "weekly");
+    expect(notify.mock.calls[1]?.[0]).not.toBe(pending.text);
+    await expect(stat(join(data, "snapshots", ".digest-pending.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("破損したpendingは警告して破棄し、今回分だけを送る", async () => {
+    const { drop, data } = await setup();
+    await mkdir(join(data, "snapshots"), { recursive: true });
+    await writeFile(join(data, "snapshots", ".digest-pending.json"), "{");
+    const notify = vi.fn(async () => undefined);
+    const log = vi.fn();
+    await runIngestApplication(input(drop, data), { ...deps(notify), log });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("pending"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("破損"));
+    await expect(stat(join(data, "snapshots", ".digest-pending.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("pendingと今回のhashが同一なら一度だけ送る", async () => {
+    const { drop, data } = await setup();
+    const firstFailure = vi.fn(async () => { throw new Error("LINE失敗"); });
+    await expect(runIngestApplication(input(drop, data), deps(firstFailure))).rejects.toThrow("LINE失敗");
+    const notify = vi.fn(async () => undefined);
+    await runIngestApplication(input(drop, data), deps(notify));
+    expect(notify).toHaveBeenCalledTimes(1);
+    await expect(stat(join(data, "snapshots", ".digest-pending.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("送信済みマーカーと同じpendingは再送せずに掃除する", async () => {
+    const { drop, data } = await setup();
+    const firstFailure = vi.fn(async () => { throw new Error("LINE失敗"); });
+    await expect(runIngestApplication(input(drop, data), deps(firstFailure))).rejects.toThrow("LINE失敗");
+    const pending = JSON.parse(await readFile(join(data, "snapshots", ".digest-pending.json"), "utf8")) as { hash: string };
+    await writeFile(join(data, "snapshots", ".digest-sent-2026-07-16.json"), JSON.stringify({ hash: pending.hash }));
+    const notify = vi.fn(async () => undefined);
+    await runIngestApplication(input(drop, data), deps(notify));
+    expect(notify).not.toHaveBeenCalled();
+    await expect(stat(join(data, "snapshots", ".digest-pending.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("pendingの再送失敗時はpendingを保持して今回分を送らず停止する", async () => {
+    const { drop, data } = await setup();
+    const firstFailure = vi.fn(async () => { throw new Error("LINE失敗"); });
+    await expect(runIngestApplication(input(drop, data), deps(firstFailure))).rejects.toThrow("LINE失敗");
+    const pendingBefore = await readFile(join(data, "snapshots", ".digest-pending.json"), "utf8");
+    const retryFailure = vi.fn(async () => { throw new Error("再送失敗"); });
+    await expect(runIngestApplication(input(drop, data), deps(retryFailure))).rejects.toThrow("再送失敗");
+    expect(retryFailure).toHaveBeenCalledTimes(1);
+    await expect(readFile(join(data, "snapshots", ".digest-pending.json"), "utf8")).resolves.toBe(pendingBefore);
   });
 
   it("異なる送信済みハッシュなら再通知し、マーカー読取の権限エラーは停止する", async () => {
@@ -284,6 +361,18 @@ describe("runIngestApplication", () => {
     };
     const second = await setup();
     await expect(runIngestApplication(input(second.drop, second.data), { ...deps(), fs: blockedFs })).rejects.toThrow("ダイジェスト送信記録の読取に失敗しました");
+  });
+
+  it("pendingの読取権限エラーは日本語エラーで停止する", async () => {
+    const { drop, data } = await setup();
+    const blockedFs: IngestFs = {
+      ...fs,
+      readFile: async (path, encoding) => {
+        if (path.endsWith(".digest-pending.json")) throw Object.assign(new Error("denied"), { code: "EACCES" });
+        return fs.readFile(path, encoding);
+      },
+    };
+    await expect(runIngestApplication(input(drop, data), { ...deps(), fs: blockedFs })).rejects.toThrow("保留ダイジェストの読取に失敗しました");
   });
 
   it("破損した送信済みマーカーは警告して再送し、原子的に置換する", async () => {

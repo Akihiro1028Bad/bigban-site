@@ -155,34 +155,104 @@ async function promoteOutputs(input: { fs: IngestFs; dataDir: string; todayYmd: 
 }
 
 function digestMarkerPath(dataDir: string, todayYmd: string): string { return join(dataDir, "snapshots", `.digest-sent-${todayYmd}.json`); }
+function digestPendingPath(dataDir: string): string { return join(dataDir, "snapshots", ".digest-pending.json"); }
 function digestHash(text: string): string { return createHash("sha256").update(text).digest("hex"); }
+
+interface PendingDigest { text: string; hash: string; }
+
+/** pendingファイルの内容を安全に検証する。I/Oを含めずテスト可能に保つ。 */
+export function parsePendingDigest(value: string): PendingDigest | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { text, hash } = parsed as { text?: unknown; hash?: unknown };
+    return typeof text === "string" && text.length > 0 && typeof hash === "string" && hash === digestHash(text)
+      ? { text, hash }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readPendingDigest(fs: IngestFs, dataDir: string, log: (message: string) => void): Promise<PendingDigest | null> {
+  const pendingPath = digestPendingPath(dataDir);
+  let content: string;
+  try {
+    content = String(await fs.readFile(pendingPath, "utf8"));
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "ENOENT") return null;
+    throw new Error("保留ダイジェストの読取に失敗しました");
+  }
+  const pending = parsePendingDigest(content);
+  if (pending !== null) return pending;
+  log("[ingest] pendingダイジェストが破損しているため破棄します");
+  await fs.rm(pendingPath, { force: true });
+  return null;
+}
+
+async function writePendingDigest(fs: IngestFs, dataDir: string, digest: string): Promise<void> {
+  const pendingPath = digestPendingPath(dataDir);
+  const temporaryPath = `${pendingPath}.tmp`;
+  await fs.writeFile(temporaryPath, JSON.stringify({ text: digest, hash: digestHash(digest) }));
+  await fs.rename(temporaryPath, pendingPath);
+}
+
+async function hasSentDigest(fs: IngestFs, marker: string, hash: string, log: (message: string) => void): Promise<boolean> {
+  let markerContent: string;
+  try {
+    markerContent = String(await fs.readFile(marker, "utf8"));
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code !== "ENOENT") throw new Error("ダイジェスト送信記録の読取に失敗しました");
+    return false;
+  }
+  try {
+    const previous: unknown = JSON.parse(markerContent);
+    if (!previous || typeof previous !== "object" || typeof (previous as { hash?: unknown }).hash !== "string") throw new Error("marker_invalid");
+    return (previous as { hash: string }).hash === hash;
+  } catch {
+    log("[ingest] ダイジェスト送信記録が破損しているため再送します");
+    return false;
+  }
+}
+
+async function writeDigestMarker(fs: IngestFs, marker: string, hash: string): Promise<void> {
+  const temporaryMarker = `${marker}.tmp`;
+  await fs.writeFile(temporaryMarker, JSON.stringify({ hash }));
+  await fs.rename(temporaryMarker, marker);
+}
 
 /**
  * 通知は at-least-once。送信成功後にマーカー書込が失敗すると翌日を含む次回再送される可能性がある。
  */
 async function notifyDigest(fs: IngestFs, dataDir: string, todayYmd: string, digest: string, notify: (text: string, kind: "weekly") => Promise<void>, log: (message: string) => void): Promise<void> {
   const marker = digestMarkerPath(dataDir, todayYmd);
-  const temporaryMarker = `${marker}.tmp`;
   const hash = digestHash(digest);
-  let markerContent: string;
-  try {
-    markerContent = String(await fs.readFile(marker, "utf8"));
-  } catch (error: unknown) {
-    if ((error as { code?: string }).code !== "ENOENT") throw new Error("ダイジェスト送信記録の読取に失敗しました");
-    markerContent = "";
-  }
-  if (markerContent) {
-    try {
-      const previous: unknown = JSON.parse(markerContent);
-      if (!previous || typeof previous !== "object" || typeof (previous as { hash?: unknown }).hash !== "string") throw new Error("marker_invalid");
-      if ((previous as { hash: string }).hash === hash) { log("[ingest] 同一ダイジェストは送信済みのためスキップします"); return; }
-    } catch {
-      log("[ingest] ダイジェスト送信記録が破損しているため再送します");
+  const pendingPath = digestPendingPath(dataDir);
+  const pending = await readPendingDigest(fs, dataDir, log);
+  const wasCurrentSent = await hasSentDigest(fs, marker, hash, log);
+
+  if (pending !== null) {
+    if (pending.hash === hash && wasCurrentSent) {
+      await fs.rm(pendingPath, { force: true });
+      log("[ingest] 送信済みのpendingダイジェストを破棄します");
+      return;
+    }
+    await notify(pending.text, "weekly");
+    await fs.rm(pendingPath, { force: true });
+    if (pending.hash === hash) {
+      await writeDigestMarker(fs, marker, hash);
+      log("[ingest] pendingダイジェストが今回分と同一のため送信を完了しました");
+      return;
     }
   }
-  await notify(digest, "weekly");
-  await fs.writeFile(temporaryMarker, JSON.stringify({ hash }));
-  await fs.rename(temporaryMarker, marker);
+  if (wasCurrentSent) { log("[ingest] 同一ダイジェストは送信済みのためスキップします"); return; }
+  try {
+    await notify(digest, "weekly");
+  } catch (error: unknown) {
+    await writePendingDigest(fs, dataDir, digest);
+    throw error;
+  }
+  await writeDigestMarker(fs, marker, hash);
 }
 
 export async function runIngestApplication(input: IngestApplicationInput, deps: IngestApplicationDeps): Promise<{ snapshot: Snapshot; wasDryRun: boolean }> {

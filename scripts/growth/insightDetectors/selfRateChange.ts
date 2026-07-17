@@ -19,7 +19,6 @@ export const selfRateChange: Detector = (context) => {
   const currentWindow = windowEnding(context.current.end);
   if (context.bundle.meta.coverage.start > priorWindow.start || context.bundle.meta.coverage.end < currentWindow.end) return [];
   const current = countSelf(context, currentWindow);
-  const priorEnd = addDays(context.current.end, -28);
   const prior = countSelf(context, priorWindow);
   if (current.total < 10 || prior.total < 10) return [];
   const currentCi = wilsonInterval(current.self, current.total); const priorCi = wilsonInterval(prior.self, prior.total);
