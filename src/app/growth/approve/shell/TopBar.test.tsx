@@ -40,6 +40,10 @@ function setup(over: Partial<Parameters<typeof TopBar>[0]> = {}) {
 }
 
 describe("TopBar", () => {
+  it("経営ボードへの導線を表示する", () => {
+    setup();
+    expect(screen.getByRole("link", { name: "経営ボード" })).toHaveAttribute("href", "/growth/analytics");
+  });
   it("段階フィルタは group + aria-pressed で絞り込みを表し、クリックで onSegmentChange", async () => {
     const { onSegmentChange } = setup();
     const group = screen.getByRole("group", { name: "段階フィルタ" });
