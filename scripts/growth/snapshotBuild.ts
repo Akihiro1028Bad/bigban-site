@@ -20,6 +20,7 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     schemaVersion: 1,
     generatedAt: bundle.meta.generatedAt,
     coverage,
+    analysis: { referenceYmd, currentWeek: current },
     meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: bundle.meta.warnings },
     kpi: weeklyKpis(bundle, current, prior, referenceYmd),
     catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle) },

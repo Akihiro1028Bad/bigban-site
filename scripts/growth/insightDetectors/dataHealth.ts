@@ -4,7 +4,8 @@ import type { Detector } from "../insightEngine";
 export const dataHealth: Detector = (context) => {
   const insights = [] as ReturnType<Detector>;
   if (context.bundle.meta.missingSections.length > 0) {
-    insights.push({ id: "d11:missing", detector: "D11", severity: "info", title: "入力データの欠落", body: "一部の任意CSVが見つかりません。", evidence: { n: context.bundle.meta.missingSections.length, missingSections: context.bundle.meta.missingSections }, label: "観察" });
+    const missingSections = [...context.bundle.meta.missingSections].sort();
+    insights.push({ id: `d11:missing:${missingSections.join(",")}`, detector: "D11", severity: "info", title: "入力データの欠落", body: "一部の任意CSVが見つかりません。", evidence: { n: missingSections.length, missingSections }, label: "観察" });
   }
   const previous = context.previousSnapshot;
   if (previous === null) return insights;

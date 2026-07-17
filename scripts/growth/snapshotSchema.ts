@@ -1,6 +1,6 @@
 /** 予約分析スナップショットの共有スキーマ。 */
 import { z } from "zod";
-import { coverageSchema, isoDateTimeSchema } from "./dateSchemas";
+import { coverageSchema, isoDateTimeSchema, ymdSchema } from "./dateSchemas";
 
 export const insightSchema = z.object({
   id: z.string(),
@@ -20,6 +20,10 @@ export const snapshotSchema = z.object({
   schemaVersion: z.literal(1),
   generatedAt: isoDateTimeSchema,
   coverage: coverageSchema,
+  analysis: z.object({
+    referenceYmd: ymdSchema,
+    currentWeek: z.object({ start: ymdSchema, end: ymdSchema }),
+  }),
   meta: z.object({
     sourceSyncedAt: isoDateTimeSchema,
     inputs: z.array(z.object({ type: z.string(), rows: z.number() })),

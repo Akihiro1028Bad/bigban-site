@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runIngestApplication } from "./ingestApplication";
+import { snapshotSchema } from "./snapshotSchema";
 import type { IngestFs } from "./ingestApplication";
 
 const directories: string[] = [];
@@ -34,7 +35,7 @@ async function setup(): Promise<{ root: string; drop: string; data: string }> {
 }
 
 function input(dropDir: string, dataDir: string, isDryRun = false) {
-  return { dropDir, dataDir, hashKey: "0123456789abcdef0123456789abcdef", coverageStart: "2026-06-01", rules: { emails: [], nameContains: [] }, isDryRun };
+  return { dropDir, dataDir, hashKey: "0123456789abcdef0123456789abcdef", coverageStart: "2026-06-01", rules: { emails: [], nameContains: [] }, allowRowDrop: false, isDryRun };
 }
 
 const deps = (notify: (text: string, kind: "weekly") => Promise<void> = async () => undefined) => ({ fs, now: () => new Date("2026-07-16T12:00:00+09:00"), notify, log: vi.fn() });
@@ -98,6 +99,34 @@ describe("runIngestApplication", () => {
     await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("工程 lock: 別の取り込みが実行中です");
     await rm(join(data, ".ingest-lock"), { recursive: true, force: true });
     await expect(runIngestApplication({ ...input(drop, data), hashKey: " short-key " }, deps())).rejects.toThrow("工程 env: GROWTH_ANALYTICS_HASH_KEY");
+  });
+
+  it("24時間超の残留lockは警告して破棄し、取り込みを再開する", async () => {
+    const { drop, data } = await setup();
+    const lock = join(data, ".ingest-lock");
+    await mkdir(lock, { recursive: true });
+    await utimes(lock, new Date("2026-07-15T10:00:00+09:00"), new Date("2026-07-15T10:00:00+09:00"));
+    const log = vi.fn();
+    await runIngestApplication(input(drop, data), { ...deps(), log });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("残留lockを破棄"));
+    await expect(stat(join(data, "canonical", "meta.json"))).resolves.toBeDefined();
+  });
+
+  it("残留lockの破棄に失敗した場合はlock取得エラーとして停止する", async () => {
+    const { drop, data } = await setup();
+    const lock = join(data, ".ingest-lock");
+    await mkdir(lock, { recursive: true });
+    await utimes(lock, new Date("2026-07-15T10:00:00+09:00"), new Date("2026-07-15T10:00:00+09:00"));
+    const failingFs: IngestFs = {
+      ...fs,
+      rm: async (path, options) => {
+        if (path.endsWith(".ingest-lock")) throw new Error("EACCES");
+        return rm(path, options);
+      },
+    };
+    await expect(runIngestApplication(input(drop, data), { ...deps(), fs: failingFs })).rejects.toThrow(
+      "工程 lock: 別の取り込みが実行中です"
+    );
   });
 
   it("DRYRUNでは書込みも通知も行わない", async () => {
@@ -194,6 +223,22 @@ describe("runIngestApplication", () => {
     await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("previous-snapshot");
     await rm(join(data, "snapshots"), { recursive: true, force: true });
     await runIngestApplication(input(drop, data), deps());
+  });
+
+  it("予約CSVの行数急減時は昇格もダイジェスト送信もせず、allowRowDropなら警告して続行する", async () => {
+    const { drop, data } = await setup();
+    const notify = vi.fn<(text: string, kind: "weekly") => Promise<void>>(async () => undefined);
+    await runIngestApplication(input(drop, data), deps(notify));
+    const canonicalBefore = await readFile(join(data, "canonical", "reservations.jsonl"), "utf8");
+    const currentSnapshot = snapshotSchema.parse(JSON.parse(await readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")));
+    await writeFile(join(data, "snapshots", "snapshot-2026-07-15.json"), JSON.stringify({ ...currentSnapshot, meta: { ...currentSnapshot.meta, inputs: [{ type: "yoyaku", rows: 100 }] } }));
+    await expect(runIngestApplication(input(drop, data), deps(notify))).rejects.toThrow("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
+    await expect(readFile(join(data, "canonical", "reservations.jsonl"), "utf8")).resolves.toBe(canonicalBefore);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const log = vi.fn();
+    await expect(runIngestApplication({ ...input(drop, data), allowRowDrop: true }, { ...deps(notify), log })).resolves.toMatchObject({ wasDryRun: false });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("行数急減を許可"));
+    expect(notify).toHaveBeenCalledTimes(2);
   });
 
   it("同日同一ダイジェストは再送せず、送信失敗ならマーカーを残さない", async () => {

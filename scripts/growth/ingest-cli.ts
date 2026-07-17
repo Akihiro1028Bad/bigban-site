@@ -47,6 +47,7 @@ async function main(): Promise<void> {
     coverageStart: process.env.GROWTH_RESERVATION_COVERAGE_START || "2026-06-01",
     rules,
     extraEmailsCsv: process.env.GROWTH_RESERVATION_EXCLUDE_EMAILS,
+    allowRowDrop: process.env.GROWTH_INGEST_ALLOW_ROWDROP === "1",
     isDryRun: process.env.GROWTH_DRYRUN === "1",
   }, {
     fs,

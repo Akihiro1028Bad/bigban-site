@@ -35,6 +35,7 @@ export interface IngestApplicationInput {
   coverageStart: string;
   rules: ExclusionRules;
   extraEmailsCsv?: string;
+  allowRowDrop: boolean;
   isDryRun: boolean;
 }
 
@@ -66,13 +67,27 @@ async function restoreCanonical(fs: IngestFs, dataDir: string): Promise<void> {
   if (!(await exists(fs, canonical)) && await exists(fs, old)) await fs.rename(old, canonical);
 }
 
-async function acquireIngestLock(fs: IngestFs, dataDir: string): Promise<string> {
+const LOCK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+async function acquireIngestLock(fs: IngestFs, dataDir: string, now: () => Date, log: (message: string) => void): Promise<string> {
   const lock = join(dataDir, ".ingest-lock");
   await fs.mkdir(dataDir, { recursive: true });
   try {
     await fs.mkdir(lock, { recursive: false });
   } catch {
-    throw new Error("工程 lock: 別の取り込みが実行中です");
+    try {
+      const ageMs = now().getTime() - (await fs.stat(lock)).mtimeMs;
+      if (ageMs > LOCK_MAX_AGE_MS) {
+        log("[ingest] 24時間超の残留lockを破棄して取り込みを再開します");
+        await fs.rm(lock, { recursive: true, force: true });
+        await fs.mkdir(lock, { recursive: false });
+      } else {
+        throw new Error("工程 lock: 別の取り込みが実行中です");
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === "工程 lock: 別の取り込みが実行中です") throw error;
+      throw new Error("工程 lock: 別の取り込みが実行中です");
+    }
   }
   return lock;
 }
@@ -135,7 +150,7 @@ function digestMarkerPath(dataDir: string, todayYmd: string): string { return jo
 function digestHash(text: string): string { return createHash("sha256").update(text).digest("hex"); }
 
 /**
- * 通知は at-least-once。送信成功後にマーカー書込が失敗すると次回再送される可能性がある。
+ * 通知は at-least-once。送信成功後にマーカー書込が失敗すると翌日を含む次回再送される可能性がある。
  */
 async function notifyDigest(fs: IngestFs, dataDir: string, todayYmd: string, digest: string, notify: (text: string, kind: "weekly") => Promise<void>, log: (message: string) => void): Promise<void> {
   const marker = digestMarkerPath(dataDir, todayYmd);
@@ -167,7 +182,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   validateHashKey(input.hashKey);
   const log = deps.log ?? (() => undefined);
   let lock: string | null = null;
-  if (!input.isDryRun) lock = await acquireIngestLock(deps.fs, input.dataDir);
+  if (!input.isDryRun) lock = await acquireIngestLock(deps.fs, input.dataDir, deps.now, log);
   try {
   if (!input.isDryRun) await restoreCanonical(deps.fs, input.dataDir);
   const { files, warnings } = await collectFiles(deps.fs, input.dropDir);
@@ -184,6 +199,9 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   canonical.meta.reservationsDigest = digestHash(serializeJsonl(canonical.reservations));
   const { current, prior } = computeWeeklyPeriods(now);
   const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot: await readPreviousSnapshot(deps.fs, input.dataDir, todayYmd) });
+  const hasRowDrop = snapshot.insights.some((insight) => insight.id.startsWith("d11:rowdrop"));
+  if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
+  if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");
   if (input.isDryRun) { log(`[ingest] DRYRUN: 予約${canonical.reservations.length}件`); return { snapshot, wasDryRun: true }; }
   await promoteOutputs({ fs: deps.fs, dataDir: input.dataDir, todayYmd, canonical, snapshot });
   if (canonical.remarks.length > 0) {
@@ -197,7 +215,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   } else {
     await deps.fs.rm(join(input.dataDir, "remarks", `remarks-review-${todayYmd}.md`), { recursive: false, force: true });
   }
-  await notifyDigest(deps.fs, input.dataDir, todayYmd, formatIngestDigest(snapshot), deps.notify, log);
+  await notifyDigest(deps.fs, input.dataDir, todayYmd, formatIngestDigest(snapshot, todayYmd), deps.notify, log);
   return { snapshot, wasDryRun: false };
   } finally {
     if (lock !== null) await deps.fs.rm(lock, { recursive: true, force: true });
