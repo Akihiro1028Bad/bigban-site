@@ -4,7 +4,7 @@ import { parseSnapshot, snapshotSchema } from "./snapshotSchema";
 function validSnapshot() {
   return {
     schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" },
-    meta: { inputs: [{ type: "yoyaku", rows: 1 }], excludedCount: 0, missingSections: [], warnings: [] },
+    meta: { sourceSyncedAt: "2026-07-16T12:00:00+09:00", inputs: [{ type: "yoyaku", rows: 1 }], excludedCount: 0, missingSections: [], warnings: [] },
     kpi: { actual: { currentWeek: 1, priorWeek: 0, cumulative: 1 }, self: { selfCount4w: 1, total4w: 1, smartphone4w: 1 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } },
     catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [],
   };

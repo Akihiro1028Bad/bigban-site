@@ -34,7 +34,7 @@ async function setup(): Promise<{ root: string; drop: string; data: string }> {
 }
 
 function input(dropDir: string, dataDir: string, isDryRun = false) {
-  return { dropDir, dataDir, hashKey: "test-key", coverageStart: "2026-06-01", rules: { emails: [], nameContains: [] }, isDryRun };
+  return { dropDir, dataDir, hashKey: "0123456789abcdef0123456789abcdef", coverageStart: "2026-06-01", rules: { emails: [], nameContains: [] }, isDryRun };
 }
 
 const deps = (notify: (text: string, kind: "weekly") => Promise<void> = async () => undefined) => ({ fs, now: () => new Date("2026-07-16T12:00:00+09:00"), notify, log: vi.fn() });
@@ -47,6 +47,8 @@ describe("runIngestApplication", () => {
     const notify = vi.fn<(text: string, kind: "weekly") => Promise<void>>(async () => undefined);
     await runIngestApplication(input(drop, data), deps(notify));
     await expect(readFile(join(data, "canonical", "reservations.jsonl"), "utf8")).resolves.toContain("reservationId");
+    const meta = JSON.parse(await readFile(join(data, "canonical", "meta.json"), "utf8")) as { reservationsDigest: string };
+    expect(meta.reservationsDigest).toMatch(/^[a-f0-9]{64}$/);
     await expect(readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")).resolves.toContain("schemaVersion");
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith(expect.any(String), "weekly");
@@ -68,6 +70,34 @@ describe("runIngestApplication", () => {
     await runIngestApplication(input(drop, data), deps());
     await expect(stat(join(data, "canonical", "meta.json"))).resolves.toBeDefined();
     await expect(stat(join(data, "canonical.old"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("promoteでcanonicalをoldへ移した直後に失敗しても次回起動で復旧する", async () => {
+    const { drop, data } = await setup();
+    await runIngestApplication(input(drop, data), deps());
+    let shouldFail = true;
+    const failingFs: IngestFs = {
+      ...fs,
+      rename: async (from, to) => {
+        await fs.rename(from, to);
+        if (shouldFail && from.endsWith("canonical") && to.endsWith("canonical.old")) {
+          shouldFail = false;
+          throw new Error("rename injected failure");
+        }
+      },
+    };
+    await expect(runIngestApplication(input(drop, data), { ...deps(), fs: failingFs })).rejects.toThrow("rename injected failure");
+    await expect(stat(join(data, "canonical"))).rejects.toMatchObject({ code: "ENOENT" });
+    await runIngestApplication(input(drop, data), deps());
+    await expect(readFile(join(data, "canonical", "meta.json"), "utf8")).resolves.toContain("coverage");
+  });
+
+  it("取り込みlockが取得済みなら日本語エラーで停止し、hash keyの弱値も停止する", async () => {
+    const { drop, data } = await setup();
+    await mkdir(join(data, ".ingest-lock"), { recursive: true });
+    await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("工程 lock: 別の取り込みが実行中です");
+    await rm(join(data, ".ingest-lock"), { recursive: true, force: true });
+    await expect(runIngestApplication({ ...input(drop, data), hashKey: " short-key " }, deps())).rejects.toThrow("工程 env: GROWTH_ANALYTICS_HASH_KEY");
   });
 
   it("DRYRUNでは書込みも通知も行わない", async () => {
@@ -138,7 +168,7 @@ describe("runIngestApplication", () => {
     await writeFile(join(drop, "unknown.csv"), "foo,bar\n1,2\n");
     await runIngestApplication(input(drop, data), deps());
     const snapshot = JSON.parse(await readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")) as { meta: { warnings: string[] } };
-    expect(snapshot.meta.warnings).toEqual(expect.arrayContaining([expect.stringContaining("未知CSV"), expect.stringContaining("yoyaku CSVが複数")]));
+    expect(snapshot.meta.warnings).toEqual(expect.arrayContaining([expect.stringContaining("未知種別のCSV"), expect.stringContaining("yoyaku CSVが複数")]));
     await expect(runIngestApplication({ ...input(drop, data), coverageStart: "2026-02-30" }, deps())).rejects.toThrow("工程 env");
   });
 
@@ -154,7 +184,7 @@ describe("runIngestApplication", () => {
     };
     await runIngestApplication(input(drop, data), { ...deps(), fs: stringFs });
     const snapshot = JSON.parse(await readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")) as { meta: { warnings: string[] } };
-    expect(snapshot.meta.warnings).toEqual(expect.arrayContaining(["未知CSVを無視: unknown.csv", "未知CSVを無視: empty.csv"]));
+    expect(snapshot.meta.warnings).toEqual(expect.arrayContaining(["未知種別のCSVを2件無視"]));
   });
 
   it("前回スナップショットの破損は沈黙させない", async () => {
@@ -210,6 +240,21 @@ describe("runIngestApplication", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("破損"));
     await expect(readFile(marker, "utf8")).resolves.toContain("hash");
     await expect(stat(`${marker}.tmp`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("chmod成功と失敗の両方を沈黙させない", async () => {
+    const okChmod = vi.fn(async () => undefined);
+    const first = await setup();
+    await runIngestApplication(input(first.drop, first.data), { ...deps(), fs: { ...fs, chmod: okChmod } });
+    expect(okChmod).toHaveBeenCalledWith(expect.stringContaining("remarks-review-"), 0o600);
+    const second = await setup();
+    const log = vi.fn();
+    await runIngestApplication(input(second.drop, second.data), {
+      ...deps(),
+      fs: { ...fs, chmod: async () => { throw new Error("EPERM"); } },
+      log,
+    });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("権限設定に失敗"));
   });
 
   it.each(["null", "123", '{"hash":123}'])(

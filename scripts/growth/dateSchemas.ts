@@ -11,8 +11,11 @@ export function isCalendarYmd(value: string): boolean {
 export const ymdSchema = z.string().refine(isCalendarYmd, "実在する日付ではありません");
 /** 暦上実在する日付とタイムゾーンを含むISO日時だけを受理する。 */
 export function isIsoDateTime(value: string): boolean {
-  const match = value.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/);
-  return match !== null && isCalendarYmd(match[1]) && Number.isFinite(Date.parse(value));
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/);
+  return match !== null && isCalendarYmd(match[1])
+    && Number(match[2]) <= 23 && Number(match[3]) <= 59
+    && (match[4] === undefined || Number(match[4]) <= 59)
+    && Number.isFinite(Date.parse(value));
 }
 
 export const isoDateTimeSchema = z.string().refine(isIsoDateTime, "ISO日時ではありません");

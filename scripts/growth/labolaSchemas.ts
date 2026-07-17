@@ -57,6 +57,13 @@ function headerIndex(headers: readonly string[], required: readonly string[]): R
   return map;
 }
 
+/** 必須列のセル自体が欠けた短い行を、空欄と区別して停止する。 */
+function requiredCell(values: readonly string[], columns: Record<string, number>, name: string, rowNumber: number): string {
+  const value = values[columns[name]];
+  if (value === undefined) throw new Error(`${rowNumber}行目: 必須列 ${name} のセルがありません`);
+  return value.trim();
+}
+
 function toAmount(value: string): number | null {
   const cleaned = value.replace(/[,¥\s]/g, "");
   if (cleaned === "") return null;
@@ -75,7 +82,8 @@ export function parseYoyakuRows(rows: string[][]): { rows: YoyakuRow[]; warnings
   const partySizeIndex = rows[0].findIndex((header) => header.trim() === "利用人数");
   const warnings: string[] = [];
   const result = rows.slice(1).map((values, rowIndex): YoyakuRow => {
-    const cell = (name: string) => (values[columns[name]] ?? "").trim();
+    const rowNumber = rowIndex + 2;
+    const cell = (name: string) => requiredCell(values, columns, name, rowNumber);
     const statusRaw = cell("予約ステータス");
     const status = STATUS_MAP[statusRaw];
     if (!status) throw new Error(`${rowIndex + 2}行目: 予約ステータスが不正です`);
@@ -110,8 +118,8 @@ const CUSTOMER_REQUIRED = ["登録日", "顧客タイプ", "会員番号(自動�
 export function parseCustomerRows(rows: string[][]): { rows: CustomerRow[]; warnings: string[] } {
   if (rows.length === 0) throw new Error("顧客一覧CSVが空です");
   const columns = headerIndex(rows[0], CUSTOMER_REQUIRED);
-  const result = rows.slice(1).map((values): CustomerRow => {
-    const cell = (name: string) => (values[columns[name]] ?? "").trim();
+  const result = rows.slice(1).map((values, rowIndex): CustomerRow => {
+    const cell = (name: string) => requiredCell(values, columns, name, rowIndex + 2);
     return { registeredAt: jpDateToYmd(cell("登録日")), customerType: cell("顧客タイプ"), memberNo: cell("会員番号(自動発行)"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業") };
   });
   return { rows: result, warnings: [] };
@@ -122,8 +130,8 @@ const SALES_SUMMARY_REQUIRED = ["売上日", "レンタルスペース", "イベ
 export function parseSalesSummaryRows(rows: string[][]): { rows: SalesSummaryRow[]; warnings: string[] } {
   if (rows.length === 0) throw new Error("売上サマリCSVが空です");
   const columns = headerIndex(rows[0], SALES_SUMMARY_REQUIRED);
-  const result = rows.slice(1).map((values): SalesSummaryRow => {
-    const cell = (name: string) => (values[columns[name]] ?? "").trim();
+  const result = rows.slice(1).map((values, rowIndex): SalesSummaryRow => {
+    const cell = (name: string) => requiredCell(values, columns, name, rowIndex + 2);
     const dateRaw = cell("売上日");
     return { date: jpDateToYmd(dateRaw), isForecast: /見込み/.test(dateRaw), rentalSpace: toAmount(cell("レンタルスペース")) ?? 0, event: toAmount(cell("イベント")) ?? 0, goods: toAmount(cell("物販")) ?? 0, total: toAmount(cell("売上合計")) ?? 0 };
   });

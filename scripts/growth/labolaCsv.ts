@@ -78,12 +78,14 @@ export function detectCsvType(headerRow: readonly string[]): LabolaCsvType | nul
 
 export function selectLatestByType(files: { name: string; mtimeMs: number; type: LabolaCsvType | null }[]): { selected: Record<string, string>; warnings: string[] } {
   const selected: Record<string, string> = {}; const newest = new Map<LabolaCsvType, { name: string; mtimeMs: number }>(); const warnings: string[] = [];
+  let unknownCount = 0;
   for (const file of files) {
-    if (file.type === null) { warnings.push(`未知CSVを無視: ${file.name}`); continue; }
+    if (file.type === null) { unknownCount += 1; continue; }
     const previous = newest.get(file.type);
     if (previous && previous.mtimeMs >= file.mtimeMs) { warnings.push(`${file.type} CSVが複数のため古い方を無視`); continue; }
     if (previous) warnings.push(`${file.type} CSVが複数のため古い方を無視`);
     newest.set(file.type, file); selected[file.type] = file.name;
   }
+  if (unknownCount > 0) warnings.push(`未知種別のCSVを${unknownCount}件無視`);
   return { selected, warnings };
 }

@@ -70,6 +70,7 @@ function bundle(
       generatedAt: "2026-07-16T12:00:00+09:00",
       sourceSyncedAt: "2026-07-16T12:00:00+09:00",
       coverage: { start: "2026-06-01", end: "2026-07-16" },
+      reservationsDigest: "",
       counts: {},
       excludedCount: 0,
       missingSections: [],
@@ -152,17 +153,26 @@ describe("weeklyKpis", () => {
 });
 
 describe("weeklyReservationSeries", () => {
-  it("月曜始まりで最古週から実行週までを0埋めし、キャンセルを除外する", () => {
+  it("coverage開始週から収録終了週までを0埋めし、キャンセルを除外する", () => {
     const data = bundle([
       res({ bookedAt: "2026-07-01T10:00:00+09:00" }),
       res({ reservationId: "2", bookedAt: "2026-07-15T10:00:00+09:00" }),
       res({ reservationId: "3", bookedAt: "2026-07-15T10:00:00+09:00", status: "cancelled" }),
     ]);
     expect(weeklyReservationSeries(data)).toEqual([
+      { weekStart: "2026-06-01", count: 0 },
+      { weekStart: "2026-06-08", count: 0 },
+      { weekStart: "2026-06-15", count: 0 },
+      { weekStart: "2026-06-22", count: 0 },
       { weekStart: "2026-06-29", count: 1 },
       { weekStart: "2026-07-06", count: 0 },
-      { weekStart: "2026-07-13", count: 1 },
     ]);
+  });
+
+  it("収録範囲に完了週が1つも無ければ空を返す", () => {
+    const data = bundle([]);
+    data.meta.coverage = { start: "2026-07-14", end: "2026-07-15" };
+    expect(weeklyReservationSeries(data)).toEqual([]);
   });
 });
 
@@ -203,7 +213,7 @@ describe("demandHeatmap", () => {
         { ...base, reservationId: "valid" },
       ],
       customers: [], salesDaily: [], remarks: [],
-      meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
+      meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
     };
     const cells = demandHeatmap(data, "2026-07-16");
     expect(cells.find((cell) => cell.dow === 4 && cell.slot === "18-21")?.count).toBe(1);

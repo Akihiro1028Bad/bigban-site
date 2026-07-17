@@ -72,7 +72,7 @@ describe("selectLatestByType", () => {
       { name: "new.csv", mtimeMs: 3, type: "yoyaku" },
     ]);
     expect(result.selected.yoyaku).toBe("new.csv");
-    expect(result.warnings).toEqual(["未知CSVを無視: unknown.csv", "yoyaku CSVが複数のため古い方を無視"]);
+    expect(result.warnings).toEqual(["yoyaku CSVが複数のため古い方を無視", "未知種別のCSVを1件無視"]);
   });
 
   it("同じmtimeでは先に渡したCSVを選ぶ", () => {

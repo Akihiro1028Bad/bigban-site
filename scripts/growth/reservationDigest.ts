@@ -9,7 +9,7 @@ function sortedNewInsights(snapshot: Snapshot): Insight[] {
   return snapshot.insights.filter((insight) => insight.status === "new").sort((left, right) => SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]);
 }
 function digestTitle(insight: Insight): string {
-  if (insight.id.startsWith("d1:")) return "新しいエリアからの初予約がありました(詳細はスナップショット)";
+  if (/^d(?:1|12):/.test(insight.id)) return "新しいエリアからの初予約がありました(詳細はスナップショット)";
   return typeof insight.evidence.n === "number" && insight.evidence.n < 3 ? "小標本の気づきがあります(詳細はスナップショット)" : insight.title;
 }
 

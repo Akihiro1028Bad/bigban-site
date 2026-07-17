@@ -10,6 +10,10 @@ function severityOf(observed: number, mean: number, p: number): { severity: "inf
 }
 
 export const reservationCountChange: Detector = (context) => {
+  const baselineStart = new Date(`${context.current.start}T00:00:00Z`);
+  baselineStart.setUTCDate(baselineStart.getUTCDate() - 28);
+  const baselineStartYmd = baselineStart.toISOString().slice(0, 10);
+  if (context.bundle.meta.coverage.start > baselineStartYmd || context.bundle.meta.coverage.end < context.current.end) return [];
   const series = weeklyReservationSeries(context.bundle);
   const index = series.findIndex((entry) => entry.weekStart === context.current.start);
   if (index < 4) return [];

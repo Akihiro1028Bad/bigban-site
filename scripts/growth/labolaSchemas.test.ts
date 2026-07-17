@@ -51,11 +51,11 @@ describe("parseYoyakuRows", () => {
     const duplicated = [...header, "金額"];
     expect(parseYoyakuRows([duplicated, [...row({}), "99999"]]).rows[0].amount).toBe(15960);
   });
-  it("欠損した利用人数と備考セルを空として扱う", () => {
+  it("必須列の物理的に欠けたセルは行番号付きで拒否する", () => {
     const values = row({});
     delete values[header.indexOf("利用人数")];
     delete values[header.indexOf("備考")];
-    expect(parseYoyakuRows([header, values]).rows[0]).toMatchObject({ partySize: null, remarks: "" });
+    expect(() => parseYoyakuRows([header, values])).toThrow("2行目: 必須列");
   });
   it("終了時刻が開始時刻以前の予約を拒否する", () => expect(() => parseYoyakuRows([header, row({ "開始時間": "20:00", "終了時間": "20:00" })])).toThrow("終了時間"));
   it("不正な開始時刻と終了時刻を行番号付きで拒否する", () => {
@@ -70,8 +70,8 @@ describe("parseCustomerRows", () => {
   it("顧客行をヘッダー名で型付きに変換する", () => expect(parseCustomerRows([customerHeader, ["2026年7月5日", "一般", "001", "試験顧客", "sample@example.com", "", "東京都台東区1-1", "", "", "会社員"]]).rows[0]).toMatchObject({ registeredAt: "2026-07-05", memberNo: "001" }));
   it("必須列不足はエラーにする", () => expect(() => parseCustomerRows([["登録日"]])).toThrow("必須列"));
   it("空CSVはエラーにする", () => expect(() => parseCustomerRows([])).toThrow("顧客一覧CSVが空"));
-  it("短い顧客行の欠けた任意値を空文字列にする", () => {
-    expect(parseCustomerRows([customerHeader, ["2026/07/05", "一般", "001"]]).rows[0]).toMatchObject({ memberNo: "001", occupation: "" });
+  it("短い顧客行を行番号付きで拒否する", () => {
+    expect(() => parseCustomerRows([customerHeader, ["2026/07/05", "一般", "001"]])).toThrow("2行目: 必須列");
   });
 });
 
@@ -86,8 +86,7 @@ describe("parseSalesSummaryRows", () => {
     const rows = parseSalesSummaryRows([["売上日", "レンタルスペース", "イベント", "物販", "売上合計"], ["2026/07/15", "", "", "", ""]]).rows;
     expect(rows[0]).toMatchObject({ rentalSpace: 0, event: 0, goods: 0, total: 0 });
   });
-  it("売上行の欠損セルも空欄と同じく0に補完する", () => {
-    const rows = parseSalesSummaryRows([["売上日", "レンタルスペース", "イベント", "物販", "売上合計"], ["2026/07/15"]]).rows;
-    expect(rows[0]).toMatchObject({ rentalSpace: 0, event: 0, goods: 0, total: 0 });
+  it("売上行の欠損セルを行番号付きで拒否する", () => {
+    expect(() => parseSalesSummaryRows([["売上日", "レンタルスペース", "イベント", "物販", "売上合計"], ["2026/07/15"]])).toThrow("2行目: 必須列 レンタルスペース のセルがありません");
   });
 });

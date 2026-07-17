@@ -72,6 +72,12 @@ function mondayOf(ymd: string): string {
   return addDays(ymd, -offset);
 }
 
+function completedWeekEndingAt(coverageEnd: string): string {
+  const weekStart = mondayOf(coverageEnd);
+  // 日曜まで収録済みの週だけを系列へ出す。途中週を0件で確定させない。
+  return addDays(weekStart, 6) <= coverageEnd ? weekStart : addDays(weekStart, -7);
+}
+
 function countsByWeek(reservations: readonly CanonicalReservation[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const reservation of reservations) {
@@ -83,11 +89,12 @@ function countsByWeek(reservations: readonly CanonicalReservation[]): Map<string
 
 export function weeklyReservationSeries(bundle: CanonicalBundle): { weekStart: string; count: number }[] {
   const counts = countsByWeek(confirmedReservations(bundle));
-  const starts = [...counts.keys()].sort();
-  if (starts.length === 0) return [];
   const result: { weekStart: string; count: number }[] = [];
-  const end = mondayOf(jstYmdOfIso(bundle.meta.generatedAt));
-  for (let week = starts[0]; week <= end; week = addDays(week, 7)) result.push({ weekStart: week, count: counts.get(week) ?? 0 });
+  const start = mondayOf(bundle.meta.coverage.start);
+  // coverage.end まで完了した週だけ。同期日時/実行日を終端に使うと未収録週を0件化する。
+  const end = completedWeekEndingAt(bundle.meta.coverage.end);
+  if (end < start) return [];
+  for (let week = start; week <= end; week = addDays(week, 7)) result.push({ weekStart: week, count: counts.get(week) ?? 0 });
   return result;
 }
 

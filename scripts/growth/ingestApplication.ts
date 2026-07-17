@@ -18,13 +18,14 @@ import type { Snapshot } from "./snapshotSchema";
 export interface IngestFsEntry { name: string; isFile(): boolean; }
 export interface IngestFs {
   access(path: string): Promise<void>;
-  mkdir(path: string, options: { recursive: true }): Promise<unknown>;
+  mkdir(path: string, options: { recursive?: boolean }): Promise<unknown>;
   readFile(path: string, encoding?: "utf8"): Promise<string | Uint8Array>;
   readdir(path: string, options: { withFileTypes: true }): Promise<IngestFsEntry[]>;
   rename(from: string, to: string): Promise<void>;
   rm(path: string, options: { recursive?: boolean; force?: boolean }): Promise<void>;
   stat(path: string): Promise<{ mtimeMs: number }>;
   writeFile(path: string, content: string): Promise<void>;
+  chmod?(path: string, mode: number): Promise<void>;
 }
 
 export interface IngestApplicationInput {
@@ -50,6 +51,11 @@ function asBytes(value: string | Uint8Array): Uint8Array {
   return typeof value === "string" ? new TextEncoder().encode(value) : value;
 }
 
+/** 秘密鍵は十分な長さかつ前後空白なしの値だけを受け付ける。 */
+export function validateHashKey(value: string): void {
+  if (value !== value.trim() || value.trim().length < 32) throw new Error("工程 env: GROWTH_ANALYTICS_HASH_KEY は前後空白なしの32文字以上にしてください");
+}
+
 async function exists(fs: IngestFs, path: string): Promise<boolean> {
   try { await fs.access(path); return true; } catch { return false; }
 }
@@ -58,6 +64,17 @@ async function restoreCanonical(fs: IngestFs, dataDir: string): Promise<void> {
   const canonical = join(dataDir, "canonical");
   const old = join(dataDir, "canonical.old");
   if (!(await exists(fs, canonical)) && await exists(fs, old)) await fs.rename(old, canonical);
+}
+
+async function acquireIngestLock(fs: IngestFs, dataDir: string): Promise<string> {
+  const lock = join(dataDir, ".ingest-lock");
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.mkdir(lock, { recursive: false });
+  } catch {
+    throw new Error("工程 lock: 別の取り込みが実行中です");
+  }
+  return lock;
 }
 
 async function collectFiles(fs: IngestFs, dropDir: string): Promise<{ files: Map<LabolaCsvType, ParsedFile>; warnings: string[] }> {
@@ -117,6 +134,9 @@ async function promoteOutputs(input: { fs: IngestFs; dataDir: string; todayYmd: 
 function digestMarkerPath(dataDir: string, todayYmd: string): string { return join(dataDir, "snapshots", `.digest-sent-${todayYmd}.json`); }
 function digestHash(text: string): string { return createHash("sha256").update(text).digest("hex"); }
 
+/**
+ * 通知は at-least-once。送信成功後にマーカー書込が失敗すると次回再送される可能性がある。
+ */
 async function notifyDigest(fs: IngestFs, dataDir: string, todayYmd: string, digest: string, notify: (text: string, kind: "weekly") => Promise<void>, log: (message: string) => void): Promise<void> {
   const marker = digestMarkerPath(dataDir, todayYmd);
   const temporaryMarker = `${marker}.tmp`;
@@ -144,7 +164,11 @@ async function notifyDigest(fs: IngestFs, dataDir: string, todayYmd: string, dig
 
 export async function runIngestApplication(input: IngestApplicationInput, deps: IngestApplicationDeps): Promise<{ snapshot: Snapshot; wasDryRun: boolean }> {
   if (!ymdSchema.safeParse(input.coverageStart).success) throw new Error("工程 env: GROWTH_RESERVATION_COVERAGE_START が不正です");
+  validateHashKey(input.hashKey);
   const log = deps.log ?? (() => undefined);
+  let lock: string | null = null;
+  if (!input.isDryRun) lock = await acquireIngestLock(deps.fs, input.dataDir);
+  try {
   if (!input.isDryRun) await restoreCanonical(deps.fs, input.dataDir);
   const { files, warnings } = await collectFiles(deps.fs, input.dropDir);
   const yoyakuFile = files.get("yoyaku");
@@ -157,17 +181,25 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   const now = deps.now();
   const todayYmd = jstDateString(now);
   const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? [])] });
+  canonical.meta.reservationsDigest = digestHash(serializeJsonl(canonical.reservations));
   const { current, prior } = computeWeeklyPeriods(now);
-  const snapshot = buildSnapshot({ bundle: canonical, current, prior, todayYmd, previousSnapshot: await readPreviousSnapshot(deps.fs, input.dataDir, todayYmd) });
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot: await readPreviousSnapshot(deps.fs, input.dataDir, todayYmd) });
   if (input.isDryRun) { log(`[ingest] DRYRUN: 予約${canonical.reservations.length}件`); return { snapshot, wasDryRun: true }; }
   await promoteOutputs({ fs: deps.fs, dataDir: input.dataDir, todayYmd, canonical, snapshot });
   if (canonical.remarks.length > 0) {
     const remarksDir = join(input.dataDir, "remarks");
     await deps.fs.mkdir(remarksDir, { recursive: true });
-    await deps.fs.writeFile(join(remarksDir, `remarks-review-${todayYmd}.md`), formatRemarksReview(canonical.remarks, todayYmd));
+    const remarksPath = join(remarksDir, `remarks-review-${todayYmd}.md`);
+    await deps.fs.writeFile(remarksPath, formatRemarksReview(canonical.remarks, todayYmd));
+    if (deps.fs.chmod) {
+      try { await deps.fs.chmod(remarksPath, 0o600); } catch { log("[ingest] 備考レビューの権限設定に失敗しました"); }
+    }
   } else {
     await deps.fs.rm(join(input.dataDir, "remarks", `remarks-review-${todayYmd}.md`), { recursive: false, force: true });
   }
   await notifyDigest(deps.fs, input.dataDir, todayYmd, formatIngestDigest(snapshot), deps.notify, log);
   return { snapshot, wasDryRun: false };
+  } finally {
+    if (lock !== null) await deps.fs.rm(lock, { recursive: true, force: true });
+  }
 }

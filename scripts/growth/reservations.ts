@@ -24,18 +24,19 @@ export interface ReservationCoverage {
   end: string;
 }
 
-export function parseCanonicalMeta(json: string): { generatedAt: string; sourceSyncedAt: string; coverage: ReservationCoverage } {
+export function parseCanonicalMeta(json: string): { generatedAt: string; sourceSyncedAt: string; coverage: ReservationCoverage; reservationsDigest: string } {
   let value: unknown;
   try { value = JSON.parse(json); } catch { throw new Error("正準メタデータがJSONではありません"); }
   if (!value || typeof value !== "object") throw new Error("正準メタデータの形式が不正です");
   const record = value as Record<string, unknown>; const coverage = record.coverage;
   if (typeof record.generatedAt !== "string" || !isIsoDateTime(record.generatedAt)) throw new Error("正準メタデータのgeneratedAtが不正です");
   if (typeof record.sourceSyncedAt !== "string" || !isIsoDateTime(record.sourceSyncedAt)) throw new Error("正準メタデータのsourceSyncedAtが不正です");
+  if (typeof record.reservationsDigest !== "string" || !/^[a-f0-9]{64}$/.test(record.reservationsDigest)) throw new Error("正準メタデータのreservationsDigestが不正です");
   if (!coverage || typeof coverage !== "object") throw new Error("正準メタデータのcoverageがありません");
   const range = coverage as Record<string, unknown>;
   if (typeof range.start !== "string" || typeof range.end !== "string" || !isCalendarYmd(range.start) || !isCalendarYmd(range.end)) throw new Error("正準メタデータのcoverage日付が不正です");
   if (range.start > range.end) throw new Error("正準メタデータのcoverage日付前後が逆です");
-  return { generatedAt: record.generatedAt, sourceSyncedAt: record.sourceSyncedAt, coverage: { start: range.start, end: range.end } };
+  return { generatedAt: record.generatedAt, sourceSyncedAt: record.sourceSyncedAt, coverage: { start: range.start, end: range.end }, reservationsDigest: record.reservationsDigest };
 }
 
 export function reservationCoverageForPeriods(

@@ -15,9 +15,12 @@ function countSelf(context: Parameters<Detector>[0], range: DateRange): { self: 
 }
 
 export const selfRateChange: Detector = (context) => {
-  const current = countSelf(context, windowEnding(context.current.end));
+  const priorWindow = windowEnding(addDays(context.current.end, -28));
+  const currentWindow = windowEnding(context.current.end);
+  if (context.bundle.meta.coverage.start > priorWindow.start || context.bundle.meta.coverage.end < currentWindow.end) return [];
+  const current = countSelf(context, currentWindow);
   const priorEnd = addDays(context.current.end, -28);
-  const prior = countSelf(context, windowEnding(priorEnd));
+  const prior = countSelf(context, priorWindow);
   if (current.total < 10 || prior.total < 10) return [];
   const currentCi = wilsonInterval(current.self, current.total); const priorCi = wilsonInterval(prior.self, prior.total);
   if (currentCi === null || priorCi === null || !(currentCi.low > priorCi.high || priorCi.low > currentCi.high)) return [];

@@ -1,7 +1,7 @@
 /** ラボーラ取り込みの環境変数・Node I/O配線だけを担うCLI。 */
 import "dotenv/config";
 
-import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 
 import { runIngestApplication } from "./ingestApplication";
 import { defaultFetch } from "./http";
@@ -18,6 +18,7 @@ const fs: IngestFs = {
   rm: async (path, options) => rm(path, options),
   stat: async (path) => stat(path),
   writeFile: async (path, content) => writeFile(path, content),
+  chmod: async (path, mode) => chmod(path, mode),
 };
 
 function requireEnv(name: string): string {
@@ -57,15 +58,17 @@ async function main(): Promise<void> {
 
 main().catch(async (error: unknown) => {
   const message = "[ingest] 工程 ingest で失敗。再開: npm run growth:ingest";
-  console.error(message, error);
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+  console.error(message, detail);
   if (process.env.GROWTH_DRYRUN === "1") {
     process.exitCode = 1;
     return;
   }
   try {
     await notify(message, "weekly");
-  } catch (notifyError) {
-    console.error("[ingest] LINE失敗通知を送れません", notifyError);
+  } catch (notifyError: unknown) {
+    const notifyDetail = notifyError instanceof Error ? `${notifyError.name}: ${notifyError.message}` : "不明なエラー";
+    console.error("[ingest] LINE失敗通知を送れません", notifyDetail);
   }
   process.exitCode = 1;
 });

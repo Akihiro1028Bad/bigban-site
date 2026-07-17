@@ -23,7 +23,7 @@ export interface CanonicalCustomer {
 export interface RemarkEntry { reservationId: string; useDate: string; category: string; remarks: string; }
 export interface CanonicalMeta {
   schemaVersion: 1; generatedAt: string; sourceSyncedAt: string; coverage: { start: string; end: string };
-  counts: Record<string, number>; excludedCount: number; missingSections: string[]; warnings: string[];
+  reservationsDigest: string; counts: Record<string, number>; excludedCount: number; missingSections: string[]; warnings: string[];
 }
 export interface CanonicalBundle {
   reservations: CanonicalReservation[]; customers: CanonicalCustomer[]; salesDaily: SalesSummaryRow[];
@@ -68,7 +68,7 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
   if (bookedDates.some((date) => date < input.coverageStart || date > sourceSyncedYmd)) warnings.push("予約受付日時が収録範囲外です");
   if (!coverageSchema.safeParse({ start: input.coverageStart, end: sourceSyncedYmd }).success) throw new Error("収録範囲が不正です");
-  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, sourceSyncedAt: input.sourceSyncedAt, coverage: { start: input.coverageStart, end: sourceSyncedYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
+  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, sourceSyncedAt: input.sourceSyncedAt, coverage: { start: input.coverageStart, end: sourceSyncedYmd }, reservationsDigest: "", counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
 }
 
 export function serializeJsonl(records: readonly unknown[]): string { return records.map((record) => JSON.stringify(record)).join("\n") + (records.length ? "\n" : ""); }

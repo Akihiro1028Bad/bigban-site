@@ -14,6 +14,7 @@
 import "dotenv/config";
 
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
@@ -173,13 +174,17 @@ async function loadCanonicalReservations(
     ]);
     try {
       const meta = parseCanonicalMeta(metaJson);
+      const actualDigest = createHash("sha256").update(jsonl).digest("hex");
+      if (actualDigest !== meta.reservationsDigest) throw new Error("正準予約データのダイジェストが一致しません");
       return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
-    } catch (error) {
-      console.warn("[metrics] 正準データセットが不正です:", error);
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+      console.warn("[metrics] 正準データセットが不正です:", detail);
       return { state: "missing", reason: "invalid", checkedAt };
     }
-  } catch (error) {
-    console.warn("[metrics] 正準データセットを読み込めません:", error);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+    console.warn("[metrics] 正準データセットを読み込めません:", detail);
     return { state: "missing", reason: "read_error", checkedAt };
   }
 }

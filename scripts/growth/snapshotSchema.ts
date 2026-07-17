@@ -21,6 +21,7 @@ export const snapshotSchema = z.object({
   generatedAt: isoDateTimeSchema,
   coverage: coverageSchema,
   meta: z.object({
+    sourceSyncedAt: isoDateTimeSchema,
     inputs: z.array(z.object({ type: z.string(), rows: z.number() })),
     excludedCount: z.number(),
     missingSections: z.array(z.string()),
