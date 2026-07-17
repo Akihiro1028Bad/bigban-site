@@ -22,7 +22,7 @@ export interface IngestFs {
   readFile(path: string, encoding?: "utf8"): Promise<string | Uint8Array>;
   readdir(path: string, options: { withFileTypes: true }): Promise<IngestFsEntry[]>;
   rename(from: string, to: string): Promise<void>;
-  rm(path: string, options: { recursive: true; force: true }): Promise<void>;
+  rm(path: string, options: { recursive?: boolean; force?: boolean }): Promise<void>;
   stat(path: string): Promise<{ mtimeMs: number }>;
   writeFile(path: string, content: string): Promise<void>;
 }
@@ -119,15 +119,27 @@ function digestHash(text: string): string { return createHash("sha256").update(t
 
 async function notifyDigest(fs: IngestFs, dataDir: string, todayYmd: string, digest: string, notify: (text: string, kind: "weekly") => Promise<void>, log: (message: string) => void): Promise<void> {
   const marker = digestMarkerPath(dataDir, todayYmd);
+  const temporaryMarker = `${marker}.tmp`;
   const hash = digestHash(digest);
+  let markerContent: string;
   try {
-    const previous = JSON.parse(String(await fs.readFile(marker, "utf8"))) as { hash?: unknown };
-    if (previous.hash === hash) { log("[ingest] 同一ダイジェストは送信済みのためスキップします"); return; }
+    markerContent = String(await fs.readFile(marker, "utf8"));
   } catch (error: unknown) {
     if ((error as { code?: string }).code !== "ENOENT") throw new Error("ダイジェスト送信記録の読取に失敗しました");
+    markerContent = "";
+  }
+  if (markerContent) {
+    try {
+      const previous: unknown = JSON.parse(markerContent);
+      if (!previous || typeof previous !== "object" || typeof (previous as { hash?: unknown }).hash !== "string") throw new Error("marker_invalid");
+      if ((previous as { hash: string }).hash === hash) { log("[ingest] 同一ダイジェストは送信済みのためスキップします"); return; }
+    } catch {
+      log("[ingest] ダイジェスト送信記録が破損しているため再送します");
+    }
   }
   await notify(digest, "weekly");
-  await fs.writeFile(marker, JSON.stringify({ hash }));
+  await fs.writeFile(temporaryMarker, JSON.stringify({ hash }));
+  await fs.rename(temporaryMarker, marker);
 }
 
 export async function runIngestApplication(input: IngestApplicationInput, deps: IngestApplicationDeps): Promise<{ snapshot: Snapshot; wasDryRun: boolean }> {
@@ -144,7 +156,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   const salesSummary = salesFile ? parseSalesSummaryRows(salesFile.rows) : null;
   const now = deps.now();
   const todayYmd = jstDateString(now);
-  const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? [])] });
+  const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? [])] });
   const { current, prior } = computeWeeklyPeriods(now);
   const snapshot = buildSnapshot({ bundle: canonical, current, prior, todayYmd, previousSnapshot: await readPreviousSnapshot(deps.fs, input.dataDir, todayYmd) });
   if (input.isDryRun) { log(`[ingest] DRYRUN: 予約${canonical.reservations.length}件`); return { snapshot, wasDryRun: true }; }
@@ -153,6 +165,8 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
     const remarksDir = join(input.dataDir, "remarks");
     await deps.fs.mkdir(remarksDir, { recursive: true });
     await deps.fs.writeFile(join(remarksDir, `remarks-review-${todayYmd}.md`), formatRemarksReview(canonical.remarks, todayYmd));
+  } else {
+    await deps.fs.rm(join(input.dataDir, "remarks", `remarks-review-${todayYmd}.md`), { recursive: false, force: true });
   }
   await notifyDigest(deps.fs, input.dataDir, todayYmd, formatIngestDigest(snapshot), deps.notify, log);
   return { snapshot, wasDryRun: false };

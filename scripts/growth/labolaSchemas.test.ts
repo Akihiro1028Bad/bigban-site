@@ -15,7 +15,7 @@ const row = (over: Record<string, string>) => header.map((name) => over[name] ??
 describe("日付変換", () => {
   it("和文日時をISO(+09:00)へ", () => expect(jpDateTimeToIso("2026年07月15日 14:19")).toBe("2026-07-15T14:19:00+09:00"));
   it("スラッシュ・和文日付をYMDへ", () => { expect(jpDateToYmd("2026/08/13")).toBe("2026-08-13"); expect(jpDateToYmd("2026年7月5日")).toBe("2026-07-05"); });
-  it("不正な日付はエラー", () => expect(() => jpDateToYmd("不明")).toThrow("日付"));
+  it("不正な日付はエラー", () => { expect(() => jpDateToYmd("不明")).toThrow("日付"); expect(() => jpDateToYmd("2026/08/13garbage")).toThrow("日付"); });
   it("不正な日時はエラー", () => expect(() => jpDateTimeToIso("2026/07/15 14:19")).toThrow("日時"));
   it("実在しない日付と時刻範囲を拒否する", () => {
     expect(() => jpDateToYmd("2026/02/30")).toThrow("日付");

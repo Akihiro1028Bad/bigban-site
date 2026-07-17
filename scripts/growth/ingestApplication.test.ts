@@ -79,6 +79,23 @@ describe("runIngestApplication", () => {
     await expect(stat(join(data, "canonical"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("DRYRUNで予約CSV不足に失敗しても通知しない", async () => {
+    const { drop, data } = await setup();
+    await rm(join(drop, "yoyaku.csv"));
+    const notify = vi.fn(async () => undefined);
+    await expect(runIngestApplication(input(drop, data, true), deps(notify))).rejects.toThrow("予約一覧詳細CSVが見つかりません");
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("8日前mtimeのCSVを今日取り込んでもsourceSyncedAtと収録終了日はCSV時点のまま", async () => {
+    const { drop, data } = await setup();
+    await utimes(join(drop, "yoyaku.csv"), new Date("2026-07-08T15:30:00Z"), new Date("2026-07-08T15:30:00Z"));
+    await runIngestApplication(input(drop, data), deps());
+    const meta = JSON.parse(await readFile(join(data, "canonical", "meta.json"), "utf8")) as { sourceSyncedAt: string; coverage: { end: string } };
+    expect(meta.sourceSyncedAt).toBe("2026-07-08T15:30:00.000Z");
+    expect(meta.coverage.end).toBe("2026-07-09");
+  });
+
   it("log未指定のDRYRUNでは通知せず結果を返す", async () => {
     const { drop, data } = await setup();
     const notify = vi.fn(async () => undefined);
@@ -102,13 +119,15 @@ describe("runIngestApplication", () => {
     await expect(readFile(join(data, "remarks", "remarks-review-2026-07-16.md"), "utf8")).resolves.toContain("備考");
   });
 
-  it("備考がなければremarksディレクトリを作成しない", async () => {
+  it("備考がなければ当日既存のレビューを削除する", async () => {
     const { drop, data } = await setup();
     const contents = await readFile(fixture);
     const firstDataRowEnd = contents.indexOf(0x0a, contents.indexOf(0x0a) + 1);
     await writeFile(join(drop, "yoyaku.csv"), contents.subarray(0, firstDataRowEnd + 1));
+    await mkdir(join(data, "remarks"), { recursive: true });
+    await writeFile(join(data, "remarks", "remarks-review-2026-07-16.md"), "古い備考");
     await runIngestApplication(input(drop, data), deps());
-    await expect(stat(join(data, "remarks"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(join(data, "remarks", "remarks-review-2026-07-16.md"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("未知CSV・重複CSVの警告をmetaへ統合し、不正なcoverage環境値を停止する", async () => {
@@ -138,15 +157,13 @@ describe("runIngestApplication", () => {
     expect(snapshot.meta.warnings).toEqual(expect.arrayContaining(["未知CSVを無視: unknown.csv", "未知CSVを無視: empty.csv"]));
   });
 
-  it("前回スナップショットと送信記録の破損は沈黙させない", async () => {
+  it("前回スナップショットの破損は沈黙させない", async () => {
     const { drop, data } = await setup();
     await mkdir(join(data, "snapshots"), { recursive: true });
     await writeFile(join(data, "snapshots", "snapshot-2026-07-15.json"), "{");
     await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("previous-snapshot");
     await rm(join(data, "snapshots"), { recursive: true, force: true });
     await runIngestApplication(input(drop, data), deps());
-    await writeFile(join(data, "snapshots", ".digest-sent-2026-07-16.json"), "{");
-    await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("送信記録");
   });
 
   it("同日同一ダイジェストは再送せず、送信失敗ならマーカーを残さない", async () => {
@@ -180,4 +197,33 @@ describe("runIngestApplication", () => {
     const second = await setup();
     await expect(runIngestApplication(input(second.drop, second.data), { ...deps(), fs: blockedFs })).rejects.toThrow("ダイジェスト送信記録の読取に失敗しました");
   });
+
+  it("破損した送信済みマーカーは警告して再送し、原子的に置換する", async () => {
+    const { drop, data } = await setup();
+    const marker = join(data, "snapshots", ".digest-sent-2026-07-16.json");
+    await mkdir(join(data, "snapshots"), { recursive: true });
+    await writeFile(marker, "{");
+    const notify = vi.fn(async () => undefined);
+    const log = vi.fn();
+    await runIngestApplication(input(drop, data), { ...deps(notify), log });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("破損"));
+    await expect(readFile(marker, "utf8")).resolves.toContain("hash");
+    await expect(stat(`${marker}.tmp`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it.each(["null", "123", '{"hash":123}'])(
+    "マーカーがJSONとして有効でも形式不正(%s)なら警告して再送する",
+    async (content) => {
+      const { drop, data } = await setup();
+      const marker = join(data, "snapshots", ".digest-sent-2026-07-16.json");
+      await mkdir(join(data, "snapshots"), { recursive: true });
+      await writeFile(marker, content);
+      const notify = vi.fn(async () => undefined);
+      const log = vi.fn();
+      await runIngestApplication(input(drop, data), { ...deps(notify), log });
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("破損"));
+    }
+  );
 });

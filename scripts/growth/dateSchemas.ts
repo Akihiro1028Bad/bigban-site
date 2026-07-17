@@ -9,5 +9,11 @@ export function isCalendarYmd(value: string): boolean {
 }
 
 export const ymdSchema = z.string().refine(isCalendarYmd, "実在する日付ではありません");
-export const isoDateTimeSchema = z.string().refine((value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value)), "ISO日時ではありません");
+/** 暦上実在する日付とタイムゾーンを含むISO日時だけを受理する。 */
+export function isIsoDateTime(value: string): boolean {
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/);
+  return match !== null && isCalendarYmd(match[1]) && Number.isFinite(Date.parse(value));
+}
+
+export const isoDateTimeSchema = z.string().refine(isIsoDateTime, "ISO日時ではありません");
 export const coverageSchema = z.object({ start: ymdSchema, end: ymdSchema }).refine((value) => value.start <= value.end, "収録範囲の開始は終了以前にしてください");

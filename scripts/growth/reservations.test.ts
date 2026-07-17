@@ -29,13 +29,15 @@ function parsedFixture(input: string): ParsedReservationCsv {
 
 describe("reservation coverage", () => {
   it("正準metaの収録開始・終了日を検証して解析する", () => {
-    expect(parseCanonicalMeta('{"generatedAt":"2026-07-16T05:20:00.000Z","coverage":{"start":"2026-06-30","end":"2026-07-13"}}')).toEqual({ generatedAt: "2026-07-16T05:20:00.000Z", coverage: { start: "2026-06-30", end: "2026-07-13" } });
+    expect(parseCanonicalMeta('{"generatedAt":"2026-07-16T05:20:00.000Z","sourceSyncedAt":"2026-07-08T05:20:00.000Z","coverage":{"start":"2026-06-30","end":"2026-07-13"}}')).toEqual({ generatedAt: "2026-07-16T05:20:00.000Z", sourceSyncedAt: "2026-07-08T05:20:00.000Z", coverage: { start: "2026-06-30", end: "2026-07-13" } });
     expect(() => parseCanonicalMeta('{"generatedAt":"x","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/generatedAt/);
-    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/前後/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","coverage":{"start":"2026-07-13","end":"2026-06-30"}}')).toThrow(/前後/);
     expect(() => parseCanonicalMeta("{")).toThrow(/JSON/);
     expect(() => parseCanonicalMeta("null")).toThrow(/形式/);
-    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z"}')).toThrow(/coverage/);
-    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"bad","end":"2026-07-16"}}')).toThrow(/日付/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z"}')).toThrow(/coverage/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-07-16T00:00:00Z","coverage":{"start":"bad","end":"2026-07-16"}}')).toThrow(/日付/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","coverage":{"start":"2026-07-01","end":"2026-07-16"}}')).toThrow(/sourceSyncedAt/);
+    expect(() => parseCanonicalMeta('{"generatedAt":"2026-07-16T00:00:00Z","sourceSyncedAt":"2026-02-30T12:00:00Z","coverage":{"start":"2026-07-01","end":"2026-07-16"}}')).toThrow(/sourceSyncedAt/);
   });
 
   it("currentとpriorを別々に収録判定する", () => {
@@ -62,6 +64,8 @@ describe("parseCanonicalReservationsJsonl", () => {
     expect(() => parseCanonicalReservationsJsonl('"text"\n')).toThrow(/形式/);
     expect(() => parseCanonicalReservationsJsonl('{"reservationId":"","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/reservationId/);
     expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"x","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-02-30T12:00:00Z","status":"confirmed"}\n')).toThrow(/日時/);
+    expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T12:00:00","status":"confirmed"}\n')).toThrow(/日時/);
     expect(() => parseCanonicalReservationsJsonl('{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n{"reservationId":"1","bookedAt":"2026-07-15T00:00:00Z","status":"confirmed"}\n')).toThrow(/重複/);
   });
 });

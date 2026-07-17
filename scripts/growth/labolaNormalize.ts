@@ -22,7 +22,7 @@ export interface CanonicalCustomer {
 
 export interface RemarkEntry { reservationId: string; useDate: string; category: string; remarks: string; }
 export interface CanonicalMeta {
-  schemaVersion: 1; generatedAt: string; coverage: { start: string; end: string };
+  schemaVersion: 1; generatedAt: string; sourceSyncedAt: string; coverage: { start: string; end: string };
   counts: Record<string, number>; excludedCount: number; missingSections: string[]; warnings: string[];
 }
 export interface CanonicalBundle {
@@ -38,14 +38,16 @@ function canonicalCustomer(row: CustomerRow, hashKey: string, onYmd: string): Ca
   return { pseudoId: pseudoId(row.email, row.memberNo, hashKey), registeredAt: row.registeredAt, customerType: row.customerType, ward: extractWard(row.address), ageBand: ageBand(row.birthDate, onYmd), gender: row.gender, occupationGroup: occupationGroup(row.occupation) };
 }
 
-export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: CustomerRow[] | null; salesSummary: SalesSummaryRow[] | null; rules: ExclusionRules; hashKey: string; coverageStart: string; generatedAt: string; parseWarnings: string[] }): CanonicalBundle {
+export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: CustomerRow[] | null; salesSummary: SalesSummaryRow[] | null; rules: ExclusionRules; hashKey: string; coverageStart: string; generatedAt: string; sourceSyncedAt: string; parseWarnings: string[] }): CanonicalBundle {
   if (!coverageSchema.safeParse({ start: input.coverageStart, end: input.coverageStart }).success) throw new Error("収録範囲の開始日が不正です");
   if (!isoDateTimeSchema.safeParse(input.generatedAt).success) throw new Error("生成日時が不正です");
+  if (!isoDateTimeSchema.safeParse(input.sourceSyncedAt).success) throw new Error("予約CSV同期日時が不正です");
   let excludedCount = 0;
   const seen = new Set<string>();
   const reservations: CanonicalReservation[] = [];
   const remarks: RemarkEntry[] = [];
   const onYmd = jstYmdOfIso(input.generatedAt);
+  const sourceSyncedYmd = jstYmdOfIso(input.sourceSyncedAt);
   for (const row of input.yoyaku) {
     if (seen.has(row.reservationId)) throw new Error("予約番号が重複しています");
     seen.add(row.reservationId);
@@ -64,9 +66,9 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const salesDaily = input.salesSummary ?? [];
   const warnings = [...input.parseWarnings];
   const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
-  if (bookedDates.some((date) => date < input.coverageStart || date > onYmd)) warnings.push("予約受付日時が収録範囲外です");
-  if (!coverageSchema.safeParse({ start: input.coverageStart, end: onYmd }).success) throw new Error("収録範囲が不正です");
-  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, coverage: { start: input.coverageStart, end: onYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
+  if (bookedDates.some((date) => date < input.coverageStart || date > sourceSyncedYmd)) warnings.push("予約受付日時が収録範囲外です");
+  if (!coverageSchema.safeParse({ start: input.coverageStart, end: sourceSyncedYmd }).success) throw new Error("収録範囲が不正です");
+  return { reservations, customers, salesDaily, remarks, meta: { schemaVersion: 1, generatedAt: input.generatedAt, sourceSyncedAt: input.sourceSyncedAt, coverage: { start: input.coverageStart, end: sourceSyncedYmd }, counts: { yoyaku: reservations.length, customer: customers.length, salesSummary: salesDaily.length }, excludedCount, missingSections, warnings } };
 }
 
 export function serializeJsonl(records: readonly unknown[]): string { return records.map((record) => JSON.stringify(record)).join("\n") + (records.length ? "\n" : ""); }

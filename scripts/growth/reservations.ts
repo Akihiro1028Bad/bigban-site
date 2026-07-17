@@ -1,6 +1,7 @@
 /** ベンダー非依存の正規化予約CSVを扱う純ロジック。I/Oはmetrics-cli側に限定する。 */
 
 import { metricDelta } from "./ctaEvents";
+import { isIsoDateTime, isCalendarYmd } from "./dateSchemas";
 import { normalizePagePath, type ActualReservationMetrics, type MetricDelta } from "./metrics";
 import type { DateRange } from "./period";
 
@@ -23,23 +24,18 @@ export interface ReservationCoverage {
   end: string;
 }
 
-function isValidYmd(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-export function parseCanonicalMeta(json: string): { generatedAt: string; coverage: ReservationCoverage } {
+export function parseCanonicalMeta(json: string): { generatedAt: string; sourceSyncedAt: string; coverage: ReservationCoverage } {
   let value: unknown;
   try { value = JSON.parse(json); } catch { throw new Error("正準メタデータがJSONではありません"); }
   if (!value || typeof value !== "object") throw new Error("正準メタデータの形式が不正です");
   const record = value as Record<string, unknown>; const coverage = record.coverage;
-  if (typeof record.generatedAt !== "string" || Number.isNaN(Date.parse(record.generatedAt))) throw new Error("正準メタデータのgeneratedAtが不正です");
+  if (typeof record.generatedAt !== "string" || !isIsoDateTime(record.generatedAt)) throw new Error("正準メタデータのgeneratedAtが不正です");
+  if (typeof record.sourceSyncedAt !== "string" || !isIsoDateTime(record.sourceSyncedAt)) throw new Error("正準メタデータのsourceSyncedAtが不正です");
   if (!coverage || typeof coverage !== "object") throw new Error("正準メタデータのcoverageがありません");
   const range = coverage as Record<string, unknown>;
-  if (typeof range.start !== "string" || typeof range.end !== "string" || !isValidYmd(range.start) || !isValidYmd(range.end)) throw new Error("正準メタデータのcoverage日付が不正です");
+  if (typeof range.start !== "string" || typeof range.end !== "string" || !isCalendarYmd(range.start) || !isCalendarYmd(range.end)) throw new Error("正準メタデータのcoverage日付が不正です");
   if (range.start > range.end) throw new Error("正準メタデータのcoverage日付前後が逆です");
-  return { generatedAt: record.generatedAt, coverage: { start: range.start, end: range.end } };
+  return { generatedAt: record.generatedAt, sourceSyncedAt: record.sourceSyncedAt, coverage: { start: range.start, end: range.end } };
 }
 
 export function reservationCoverageForPeriods(
@@ -62,7 +58,7 @@ export function parseCanonicalReservationsJsonl(content: string): ParsedReservat
     if (typeof reservationId !== "string" || reservationId === "") throw new Error(`${index + 1}行目のreservationIdが空です`);
     if (seen.has(reservationId)) throw new Error(`reservationIdが重複しています: ${reservationId}`);
     seen.add(reservationId);
-    if (typeof bookedAt !== "string" || Number.isNaN(Date.parse(bookedAt))) throw new Error(`${index + 1}行目の日時が不正です`);
+    if (typeof bookedAt !== "string" || !isIsoDateTime(bookedAt)) throw new Error(`${index + 1}行目の日時が不正です`);
     if (status !== "confirmed" && status !== "cancelled") throw new Error(`${index + 1}行目のstatusが不正です: ${String(status)}`);
     return { reservationId, bookedAt, status };
   });

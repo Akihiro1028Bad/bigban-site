@@ -58,6 +58,10 @@ async function main(): Promise<void> {
 main().catch(async (error: unknown) => {
   const message = "[ingest] 工程 ingest で失敗。再開: npm run growth:ingest";
   console.error(message, error);
+  if (process.env.GROWTH_DRYRUN === "1") {
+    process.exitCode = 1;
+    return;
+  }
   try {
     await notify(message, "weekly");
   } catch (notifyError) {

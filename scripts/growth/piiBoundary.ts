@@ -31,6 +31,6 @@ export function ageBand(birthDate: string, onYmd: string): string {
 }
 
 const OCCUPATION_GROUPS: readonly { group: string; pattern: RegExp }[] = [
-  { group: "医療・施術", pattern: /医|師|療|鍼|整体|看護|柔道整復/ }, { group: "学生", pattern: /学生|学校/ }, { group: "経営・自営", pattern: /経営|自営|役員|代表|フリーランス/ }, { group: "会社員", pattern: /会社員|社員|公務員|団体職員/ },
+  { group: "医療・施術", pattern: /医師|医療|歯科|看護|鍼灸|整体|柔道整復|理学療法|作業療法|薬剤|医/ }, { group: "学生", pattern: /学生|学校/ }, { group: "経営・自営", pattern: /経営|自営|役員|代表|フリーランス/ }, { group: "会社員", pattern: /会社員|社員|公務員|団体職員/ },
 ];
 export function occupationGroup(occupation: string): string { const value = occupation.trim(); if (!value) return "不明"; for (const { group, pattern } of OCCUPATION_GROUPS) if (pattern.test(value)) return group; return "その他"; }

@@ -173,7 +173,7 @@ async function loadCanonicalReservations(
     ]);
     try {
       const meta = parseCanonicalMeta(metaJson);
-      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.generatedAt, coverage: meta.coverage };
+      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
     } catch (error) {
       console.warn("[metrics] 正準データセットが不正です:", error);
       return { state: "missing", reason: "invalid", checkedAt };

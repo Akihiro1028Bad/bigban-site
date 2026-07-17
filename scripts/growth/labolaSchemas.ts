@@ -42,7 +42,7 @@ export function parseTimeOfDay(value: string): { minutes: number; normalized: st
 
 export function jpDateToYmd(value: string): string {
   const cleaned = value.trim().replace(/（.*?）|\(.*?\)/g, "");
-  const match = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/) ?? cleaned.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  const match = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/) ?? cleaned.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日$/);
   if (!match || !isCalendarDate(Number(match?.[1]), Number(match?.[2]), Number(match?.[3]))) throw new Error("日付を解釈できません");
   return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
 }

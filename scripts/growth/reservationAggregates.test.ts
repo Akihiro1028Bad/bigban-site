@@ -68,6 +68,7 @@ function bundle(
     meta: {
       schemaVersion: 1,
       generatedAt: "2026-07-16T12:00:00+09:00",
+      sourceSyncedAt: "2026-07-16T12:00:00+09:00",
       coverage: { start: "2026-06-01", end: "2026-07-16" },
       counts: {},
       excludedCount: 0,
@@ -129,6 +130,25 @@ describe("weeklyKpis", () => {
     expect(kpi.actual.currentWeek).toBe(2);
     expect(kpi.actual.priorWeek).toBe(1);
   });
+
+  it("28日セルフ予約窓と28日見込み売上窓の両端を含め、直外を除く", () => {
+    const data = bundle([
+      res({ bookedAt: "2026-06-22T00:00:00+09:00", channel: "user_sp" }),
+      res({ reservationId: "2", bookedAt: "2026-07-19T23:59:59+09:00", channel: "user_pc" }),
+      res({ reservationId: "3", bookedAt: "2026-06-21T23:59:59+09:00", channel: "user_sp" }),
+      res({ reservationId: "4", bookedAt: "2026-07-20T00:00:00+09:00", channel: "user_sp" }),
+    ], {
+      salesDaily: [
+        { date: "2026-07-16", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 100 },
+        { date: "2026-08-12", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 200 },
+        { date: "2026-07-15", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 400 },
+        { date: "2026-08-13", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 800 },
+      ],
+    });
+    const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
+    expect(kpi.self).toEqual({ selfCount4w: 2, total4w: 2, smartphone4w: 1 });
+    expect(kpi.sales.forecast28).toBe(300);
+  });
 });
 
 describe("weeklyReservationSeries", () => {
@@ -183,7 +203,7 @@ describe("demandHeatmap", () => {
         { ...base, reservationId: "valid" },
       ],
       customers: [], salesDaily: [], remarks: [],
-      meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
+      meta: { schemaVersion: 1, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, counts: {}, excludedCount: 0, missingSections: [], warnings: [] },
     };
     const cells = demandHeatmap(data, "2026-07-16");
     expect(cells.find((cell) => cell.dow === 4 && cell.slot === "18-21")?.count).toBe(1);
