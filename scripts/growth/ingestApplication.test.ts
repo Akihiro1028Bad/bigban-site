@@ -311,6 +311,20 @@ describe("runIngestApplication", () => {
     expect(notify).toHaveBeenCalledTimes(2);
   });
 
+  it("プログラムCSVの行数急減は警告しても取り込みを停止しない", async () => {
+    const { drop, data } = await setup();
+    await copyFile(programFixture, join(drop, "program.csv"));
+    await runIngestApplication(input(drop, data), deps());
+    const snapshotPath = join(data, "snapshots", "snapshot-2026-07-16.json");
+    const firstSnapshot = snapshotSchema.parse(JSON.parse(await readFile(snapshotPath, "utf8")));
+    await writeFile(snapshotPath, JSON.stringify({ ...firstSnapshot, meta: { ...firstSnapshot.meta, inputs: [{ type: "yoyaku", rows: 1 }, { type: "program", rows: 10 }] } }));
+    await rm(join(drop, "program.csv"));
+
+    await expect(runIngestApplication(input(drop, data), deps())).resolves.toMatchObject({ wasDryRun: false });
+    const snapshot = snapshotSchema.parse(JSON.parse(await readFile(snapshotPath, "utf8")));
+    expect(snapshot.insights).toEqual(expect.arrayContaining([expect.objectContaining({ id: "d11:rowdrop:program" })]));
+  });
+
   it("同日再実行で行数が急減した場合も昇格せず旧canonicalを残す", async () => {
     const { drop, data } = await setup();
     await runIngestApplication(input(drop, data), deps());
@@ -482,4 +496,5 @@ describe("runIngestApplication", () => {
     await runIngestApplication(input(drop, data), deps());
     const blocked = await readFile(join(data, "canonical", "blocked_slots.jsonl"), "utf8");
     expect(blocked).toContain('"space":"Court A"');
+    expect(blocked).not.toContain('"label"');
   });

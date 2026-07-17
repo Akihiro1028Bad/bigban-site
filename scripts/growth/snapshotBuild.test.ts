@@ -18,6 +18,13 @@ it("入力欠落をD11の気づきとしてスナップショットへ接続す�
   expect(snapshot.insights).toEqual([expect.objectContaining({ id: "d11:missing:customer", status: "new" })]);
 });
 
+it("予約不可・プログラムCSVが欠落した集計値は未計上にする", () => {
+  const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: ["program", "blocked"], warnings: [] } };
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null });
+  expect(snapshot.catalog.programFills).toBeUndefined();
+  expect(snapshot.catalog.revPach).toBeUndefined();
+});
+
 it("7/5までのCSVを7/16に取り込んでも、未収録の7/6週を0件の急減として検出しない", () => {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-05T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-05" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
   const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null });

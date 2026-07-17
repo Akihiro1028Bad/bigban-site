@@ -123,7 +123,7 @@ describe("P1拡張集計", () => {
     expect(unpaidAging(data, "2026-07-16")).toMatchObject({ count: 1, amount: 1000, buckets: [expect.anything(), expect.anything(), { label: "15日以上", count: 1, amount: 1000 }] }); expect(unpaidAging(bundle([], {}), "2026-07-16")).toBeNull();
   });
   it("支払方法と顧客分布を集計する", () => { const data = bundle([res({ paymentMethod: "" }), res({ reservationId: "2", paymentMethod: "カード" })], { customers: [customer({ gender: "女性" }), customer({ pseudoId: "d", gender: "女性" })] }); expect(paymentMethodShare(data, "2026-07-16")).toEqual([{ method: "カード", count: 1 }, { method: "不明", count: 1 }]); expect(demographics(data)).toEqual([{ ageBand: "30代", gender: "女性", customerType: "一般", count: 2 }]); });
-  it("RevPACHは営業時間クリップとNone除外を反映する", () => { const data = bundle([res({ useDate: "2026-07-16", amount: 1020 })]); data.blockedSlots = [{ date: "2026-07-16", start: "05:00", end: "07:00", space: "Aコート", label: "" }, { date: "2026-07-16", start: "12:00", end: "13:00", space: "None", label: "" }]; expect(revPach(data, "2026-07-16")).toMatchObject({ revenue: 1020, availableCourtHours: 475, spaces: 1 }); });
+  it("RevPACHは営業時間クリップとNone除外を反映する", () => { const data = bundle([res({ useDate: "2026-07-16", amount: 1020 })]); data.blockedSlots = [{ date: "2026-07-16", start: "05:00", end: "07:00", space: "Aコート" }, { date: "2026-07-16", start: "12:00", end: "13:00", space: "None" }]; expect(revPach(data, "2026-07-16")).toMatchObject({ revenue: 1020, availableCourtHours: 475, spaces: 1 }); });
 });
 
 describe("weeklyKpis", () => {
@@ -380,7 +380,7 @@ describe("P1拡張ライトのカバレッジ境界", () => {
         res({ reservationId: "r2", useDate: "2026-07-10", amount: null, space: "Aコート" }),
         res({ reservationId: "r3", useDate: "2026-07-10", space: "None" }),
       ],
-      { blockedSlots: [{ date: "2026-07-10", start: "ab:cd", end: "10:00", space: "Aコート", label: "" }] }
+      { blockedSlots: [{ date: "2026-07-10", start: "ab:cd", end: "10:00", space: "Aコート" }] }
     );
     const result = revPach(data, "2026-07-16");
     expect(result).not.toBeNull();
@@ -391,7 +391,7 @@ describe("P1拡張ライトのカバレッジ境界", () => {
   it("revPachは全時間が予約不可なら時間あたり売上を0にする", () => {
     const data = bundle([res({ reservationId: "r1", useDate: "2026-07-10", amount: 100, space: "Aコート" })]);
     data.meta.coverage = { start: "2026-07-10", end: "2026-07-10" };
-    data.blockedSlots = [{ date: "2026-07-10", start: "06:00", end: "23:00", space: "Aコート", label: "" }];
+    data.blockedSlots = [{ date: "2026-07-10", start: "06:00", end: "23:00", space: "Aコート" }];
     expect(revPach(data, "2026-07-10")).toMatchObject({ availableCourtHours: 0, revPerCourtHour: 0 });
   });
 });

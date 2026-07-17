@@ -35,6 +35,28 @@ describe("AnalyticsClient", () => {
     expect(screen.getByRole("heading", { name: "顧客の年代・性別" })).toBeVisible();
   });
 
+  it("予約不可CSVが欠落したスナップショットではRevPACHを表示しない", async () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.catalog.revPach = undefined;
+    mockSnapshot(snapshot);
+    render(<AnalyticsClient />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "経営サマリー" })).toBeVisible());
+    expect(screen.queryByText("RevPACH")).toBeNull();
+  });
+
+  it("同じ年代・性別の顧客種別は一行に統合して表示する", async () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.catalog.demographics = [
+      { ageBand: "30代", gender: "女性", customerType: "一般", count: 2 },
+      { ageBand: "30代", gender: "女性", customerType: "会員", count: 3 },
+    ];
+    mockSnapshot(snapshot);
+    render(<AnalyticsClient />);
+    await waitFor(() => expect(screen.getByText("30代 女性")).toBeVisible());
+    expect(screen.getAllByText("30代 女性")).toHaveLength(1);
+    expect(screen.getByText("5人")).toBeVisible();
+  });
+
   it("通信失敗時は取得エラーを表示する", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("ネットワークに接続できません"); }));
     render(<AnalyticsClient />);

@@ -20,7 +20,7 @@ export interface CanonicalCustomer {
   ageBand: string; gender: string; occupationGroup: string;
 }
 export interface CanonicalProgram { name: string; category: string; heldOn: string; start: string; end: string; capacity: number | null; status: string; publishStatus: string; }
-export interface CanonicalBlockedSlot { date: string; start: string; end: string; space: string; label: string; }
+export interface CanonicalBlockedSlot { date: string; start: string; end: string; space: string; }
 
 export interface RemarkEntry { reservationId: string; useDate: string; category: string; remarks: string; }
 export interface CanonicalMeta {
@@ -70,7 +70,9 @@ export function buildCanonical(input: { yoyaku: YoyakuRow[]; customers: Customer
   const programs: CanonicalProgram[] = input.programs ?? [];
   if (input.blockedSlots === null) missingSections.push("blocked");
   // None は面に紐付かない補助行。ここで除外して以降の集計をPIIなしで単純化する。
-  const blockedSlots: CanonicalBlockedSlot[] = (input.blockedSlots ?? []).filter((row) => row.space !== "None");
+  const blockedSlots: CanonicalBlockedSlot[] = (input.blockedSlots ?? [])
+    .filter((row) => row.space !== "None")
+    .map(({ date, start, end, space }) => ({ date, start, end, space }));
   const warnings = [...input.parseWarnings];
   const bookedDates = input.yoyaku.map((row) => jstYmdOfIso(row.bookedAt));
   if (bookedDates.some((date) => date < input.coverageStart || date > sourceSyncedYmd)) warnings.push("予約受付日時が収録範囲外です");

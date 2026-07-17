@@ -64,7 +64,8 @@ describe("analyticsView", () => {
   });
 
   it("P1拡張の表示整形は旧スナップショットで空またはnullにする", () => { const snapshot = analyticsSnapshot(); expect(programList(snapshot)).toEqual([]); expect(demographicsView(snapshot)).toEqual([]); expect(moneyExtra(snapshot)).toEqual({ unpaid: null, paymentShare: [], revPach: null }); });
-  it("P1拡張の表示整形は埋まり率・金額・構成比を整形する", () => { const snapshot = analyticsSnapshot(); snapshot.catalog.programFills = [{ name: "初級", heldOn: "2026-07-17", start: "10:00", capacity: 6, reserved: 6, fillRate: 1 }]; snapshot.catalog.unpaidAging = { count: 2, amount: 3000, buckets: [{ label: "0-7日", count: 0, amount: 0 }, { label: "8-14日", count: 0, amount: 0 }, { label: "15日以上", count: 1, amount: 2000 }] }; snapshot.catalog.paymentMethods = [{ method: "カード", count: 3 }, { method: "現金", count: 1 }]; snapshot.catalog.demographics = [{ ageBand: "30代", gender: "女性", customerType: "一般", count: 4 }]; snapshot.catalog.revPach = { revenue: 1000, availableCourtHours: 10, revPerCourtHour: 100, spaces: 1 }; expect(programList(snapshot)[0]).toMatchObject({ fill: "6/6", state: "full" }); expect(moneyExtra(snapshot)).toMatchObject({ unpaid: { headline: "2件 ¥3,000", overdue: "15日以上 ¥2,000" }, paymentShare: [{ method: "カード", pct: 75 }, { method: "現金", pct: 25 }], revPach: "¥100" }); expect(demographicsView(snapshot)).toEqual([{ label: "30代 女性", count: 4 }]); });
+  it("P1拡張の表示整形は埋まり率・金額・構成比を整形する", () => { const snapshot = analyticsSnapshot(); snapshot.catalog.programFills = [{ name: "初級", heldOn: "2026-07-17", start: "10:00", capacity: 6, reserved: 6, fillRate: 1 }]; snapshot.catalog.unpaidAging = { count: 2, amount: 3000, buckets: [{ label: "0-7日", count: 0, amount: 0 }, { label: "8-14日", count: 0, amount: 0 }, { label: "15日以上", count: 1, amount: 2000 }] }; snapshot.catalog.paymentMethods = [{ method: "カード", count: 3 }, { method: "現金", count: 1 }]; snapshot.catalog.demographics = [{ ageBand: "30代", gender: "女性", customerType: "一般", count: 4 }]; snapshot.catalog.revPach = { revenue: 1000, availableCourtHours: 10, revPerCourtHour: 100, spaces: 1 }; expect(programList(snapshot)[0]).toMatchObject({ fill: "6/6", state: "full" }); expect(moneyExtra(snapshot)).toMatchObject({ unpaid: { headline: "2件 ¥3,000", overdue: "15日以上 ¥2,000(1件)" }, paymentShare: [{ method: "カード", pct: 75 }, { method: "現金", pct: 25 }], revPach: "¥100" }); expect(demographicsView(snapshot)).toEqual([{ label: "30代 女性", count: 4 }]); });
+  it("15日以上の未収は金額が0でも件数を表示する", () => { const snapshot = analyticsSnapshot(); snapshot.catalog.unpaidAging = { count: 1, amount: 0, buckets: [{ label: "0-7日", count: 0, amount: 0 }, { label: "8-14日", count: 0, amount: 0 }, { label: "15日以上", count: 2, amount: 0 }] }; expect(moneyExtra(snapshot).unpaid?.overdue).toBe("15日以上 ¥0(2件)"); });
   it("プログラムの定員未設定・低充足・通常充足を区別し、未収金なしも整形する", () => {
     const snapshot = analyticsSnapshot();
     snapshot.catalog.programFills = [
@@ -101,6 +102,15 @@ describe("analyticsView", () => {
       { label: "30代 女性", count: 4 },
       { label: "20代 男性", count: 1 },
     ]);
+  });
+
+  it("年代・性別が同じ顧客種別は統合して表示する", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.catalog.demographics = [
+      { ageBand: "30代", gender: "女性", customerType: "一般", count: 2 },
+      { ageBand: "30代", gender: "女性", customerType: "会員", count: 3 },
+    ];
+    expect(demographicsView(snapshot)).toEqual([{ label: "30代 女性", count: 5 }]);
   });
 
   it("欠落データと将来解禁領域を収集中にする", () => {

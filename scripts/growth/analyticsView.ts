@@ -103,18 +103,23 @@ export function programList(snapshot: Snapshot): ProgramListItem[] {
 
 export function moneyExtra(snapshot: Snapshot): MoneyExtraView {
   const aging = snapshot.catalog.unpaidAging;
-  const overdueAmount = aging?.buckets.find((bucket) => bucket.label === "15日以上")?.amount ?? 0;
+  const overdue = aging?.buckets.find((bucket) => bucket.label === "15日以上");
   const methods = snapshot.catalog.paymentMethods ?? [];
   const total = methods.reduce((sum, method) => sum + method.count, 0);
   return {
-    unpaid: aging === undefined || aging === null ? null : { headline: `${aging.count}件 ${yen(aging.amount)}`, overdue: overdueAmount > 0 ? `15日以上 ${yen(overdueAmount)}` : null },
+    unpaid: aging === undefined || aging === null ? null : { headline: `${aging.count}件 ${yen(aging.amount)}`, overdue: overdue !== undefined && overdue.count > 0 ? `15日以上 ${yen(overdue.amount)}(${overdue.count}件)` : null },
     paymentShare: total === 0 ? [] : methods.map((method) => ({ method: method.method, pct: Math.round((method.count / total) * 100) })),
     revPach: snapshot.catalog.revPach === undefined || snapshot.catalog.revPach === null ? null : yen(Math.round(snapshot.catalog.revPach.revPerCourtHour)),
   };
 }
 
 export function demographicsView(snapshot: Snapshot): { label: string; count: number }[] {
-  return [...(snapshot.catalog.demographics ?? [])].sort((left, right) => right.count - left.count).slice(0, 8).map((cell) => ({ label: `${cell.ageBand} ${cell.gender}`, count: cell.count }));
+  const counts = new Map<string, number>();
+  for (const cell of snapshot.catalog.demographics ?? []) {
+    const label = `${cell.ageBand} ${cell.gender}`;
+    counts.set(label, (counts.get(label) ?? 0) + cell.count);
+  }
+  return [...counts.entries()].map(([label, count]) => ({ label, count })).sort((left, right) => right.count - left.count).slice(0, 8);
 }
 
 /** 気づきの根拠をPIIなしの短い表示チップにする。 */
