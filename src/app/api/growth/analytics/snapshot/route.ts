@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { resolveSnapshotStore } from "@/lib/growth/analyticsBlob";
+import { getLatestSnapshot, resolveSnapshotStore } from "@/lib/growth/analyticsBlob";
+import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
 import { verifyMachineToken } from "@/lib/growth/machineAuth";
 import { snapshotSchema } from "@/lib/growth/snapshotSchema";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -49,4 +51,28 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(502, "スナップショットの保存に失敗しました");
   }
   return NextResponse.json({ success: true }, { status: 202 });
+}
+
+/** 承認画面のセッション内だけで最新の集計済みスナップショットを返す。 */
+export async function GET(request: Request): Promise<Response> {
+  if (!verifyToken(request)) return unauthorized();
+
+  try {
+    const json = await getLatestSnapshot(resolveSnapshotStore({
+      BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+      GROWTH_ANALYTICS_FILE_DIR: process.env.GROWTH_ANALYTICS_FILE_DIR,
+      GROWTH_RESERVATION_DATA_DIR: process.env.GROWTH_RESERVATION_DATA_DIR,
+    }));
+    if (json === null) return NextResponse.json({ success: true, snapshot: null });
+
+    let snapshot: ReturnType<typeof snapshotSchema.parse>;
+    try {
+      snapshot = snapshotSchema.parse(JSON.parse(json));
+    } catch {
+      return errorResponse(500, "保存済みスナップショットの形式が不正です");
+    }
+    return NextResponse.json({ success: true, snapshot });
+  } catch {
+    return errorResponse(500, "スナップショットの取得に失敗しました");
+  }
 }

@@ -1,4 +1,4 @@
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { get as vercelGet, put as vercelPut } from "@vercel/blob";
@@ -10,6 +10,11 @@ export const SNAPSHOT_LATEST_PATH = "growth-analytics/snapshot-latest.json";
 export interface SnapshotStore {
   putLatest(json: string, ymd: string): Promise<void>;
   getLatest(): Promise<string | null>;
+}
+
+/** ドライバ差異を隠して最新スナップショットを読むGET側の入口。 */
+export async function getLatestSnapshot(store: SnapshotStore): Promise<string | null> {
+  return store.getLatest();
 }
 
 export interface BlobPutOptions {
@@ -79,6 +84,17 @@ export function fileSnapshotStore(directory: string): SnapshotStore {
     async getLatest(): Promise<string | null> {
       try {
         return await readFile(latestPath, "utf8");
+      } catch (error: unknown) {
+        if ((error as { code?: string }).code !== "ENOENT") throw error;
+      }
+
+      try {
+        const datedPath = (await readdir(directory))
+          .filter((name) => /^snapshot-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+          .sort()
+          .at(-1);
+        if (!datedPath) return null;
+        return await readFile(join(directory, datedPath), "utf8");
       } catch (error: unknown) {
         if ((error as { code?: string }).code === "ENOENT") return null;
         throw error;

@@ -1,18 +1,16 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/growth/analyticsBlob", () => ({ resolveSnapshotStore: vi.fn() }));
+vi.mock("@/lib/growth/analyticsBlob", () => ({ resolveSnapshotStore: vi.fn(), getLatestSnapshot: vi.fn((store: { getLatest: () => Promise<string | null> }) => store.getLatest()) }));
+vi.mock("@/lib/growth/apiAuth", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/growth/apiAuth")>()), verifyToken: vi.fn(() => true) }));
 
-import { resolveSnapshotStore } from "@/lib/growth/analyticsBlob";
-import { POST } from "./route";
+import { getLatestSnapshot, resolveSnapshotStore } from "@/lib/growth/analyticsBlob";
+import { verifyToken } from "@/lib/growth/apiAuth";
+import { analyticsSnapshot } from "../../../../../../scripts/growth/__fixtures__/analyticsSnapshot";
+import { GET, POST } from "./route";
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
-const snapshot = {
-  schemaVersion: 1, generatedAt: "2026-07-17T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-17" }, analysis: { referenceYmd: "2026-07-17", currentWeek: { start: "2026-07-13", end: "2026-07-19" } },
-  meta: { sourceSyncedAt: "2026-07-17T12:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] },
-  kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } },
-  catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [],
-};
+const snapshot = analyticsSnapshot();
 
 function request(body: BodyInit, authorization?: string): Request {
   return new Request("http://localhost/api/growth/analytics/snapshot", {
@@ -23,6 +21,8 @@ function request(body: BodyInit, authorization?: string): Request {
 beforeEach(() => {
   process.env.GROWTH_ANALYTICS_INGEST_TOKEN = TOKEN;
   vi.mocked(resolveSnapshotStore).mockReset();
+  vi.mocked(getLatestSnapshot).mockClear();
+  vi.mocked(verifyToken).mockReturnValue(true);
 });
 
 afterEach(() => { delete process.env.GROWTH_ANALYTICS_INGEST_TOKEN; });
@@ -85,5 +85,49 @@ describe("POST /api/growth/analytics/snapshot", () => {
     const res = await POST(request(JSON.stringify(snapshot), `Bearer ${TOKEN}`));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("スナップショットの保存に失敗しました");
+  });
+});
+
+describe("GET /api/growth/analytics/snapshot", () => {
+  it("セッション認証に失敗すると401でストアに触れない", async () => {
+    vi.mocked(verifyToken).mockReturnValue(false);
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(401);
+    expect(resolveSnapshotStore).not.toHaveBeenCalled();
+  });
+
+  it("保存済みデータが無い初回はnullを正常に返す", async () => {
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => null });
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, snapshot: null });
+  });
+
+  it("保存済みJSONが不正なら500を返す", async () => {
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => "{" });
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("保存済みスナップショットの形式が不正です");
+  });
+
+  it("保存済みJSONがスキーマ不正なら500を返す", async () => {
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => JSON.stringify({ schemaVersion: 1 }) });
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("保存済みスナップショットの形式が不正です");
+  });
+
+  it("ストア読取の失敗を500にする", async () => {
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => { throw new Error("storage unavailable"); } });
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("スナップショットの取得に失敗しました");
+  });
+
+  it("検証済みの最新スナップショットを返す", async () => {
+    vi.mocked(resolveSnapshotStore).mockReturnValue({ putLatest: async () => undefined, getLatest: async () => JSON.stringify(snapshot) });
+    const res = await GET(new Request("http://localhost/api/growth/analytics/snapshot"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, snapshot });
   });
 });

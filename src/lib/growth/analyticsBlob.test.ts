@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import {
   SNAPSHOT_LATEST_PATH,
   blobSnapshotStore,
   fileSnapshotStore,
+  getLatestSnapshot,
   resolveSnapshotStore,
   snapshotDatedPath,
 } from "./analyticsBlob";
@@ -20,6 +21,11 @@ afterEach(async () => {
 });
 
 describe("analyticsBlob", () => {
+  it("GET側はストアのlatestだけを読む", async () => {
+    const getLatest = vi.fn(async () => "latest");
+    await expect(getLatestSnapshot({ putLatest: async () => undefined, getLatest })).resolves.toBe("latest");
+    expect(getLatest).toHaveBeenCalledOnce();
+  });
   it("日付別Blobパスを作り、暦上不正な日付は拒否する", () => {
     expect(SNAPSHOT_LATEST_PATH).toBe("growth-analytics/snapshot-latest.json");
     expect(snapshotDatedPath("2026-07-17")).toBe("growth-analytics/snapshot-2026-07-17.json");
@@ -38,10 +44,53 @@ describe("analyticsBlob", () => {
     await expect(store.getLatest()).resolves.toBe('{"version":1}');
   });
 
-  it("ファイルストアはまだlatestがない場合nullを返す", async () => {
+  it("ファイルストアはlatestがない場合、日付別スナップショットの最新を読む", async () => {
     const directory = await mkdtemp(join(tmpdir(), "analytics-blob-"));
     directories.push(directory);
+    await Promise.all([
+      writeFile(join(directory, "snapshot-2026-07-16.json"), '{"version":1}', "utf8"),
+      writeFile(join(directory, "snapshot-2026-07-17.json"), '{"version":2}', "utf8"),
+      writeFile(join(directory, "snapshot-invalid.json"), '{"version":3}', "utf8"),
+    ]);
+
+    await expect(fileSnapshotStore(directory).getLatest()).resolves.toBe('{"version":2}');
+  });
+
+  it("datedフォールバック中の権限エラーは握りつぶさずthrowする", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-blob-"));
+    directories.push(directory);
+    await chmod(directory, 0o311);
+    try {
+      await expect(fileSnapshotStore(directory).getLatest()).rejects.toMatchObject({ code: "EACCES" });
+    } finally {
+      await chmod(directory, 0o755);
+    }
+  });
+
+  it("ファイルストアはlatestがない空ディレクトリではnullを返す", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-blob-"));
+    directories.push(directory);
+
     await expect(fileSnapshotStore(directory).getLatest()).resolves.toBeNull();
+  });
+
+  it("ファイルストアはディレクトリがない場合nullを返す", async () => {
+    const parentDirectory = await mkdtemp(join(tmpdir(), "analytics-blob-"));
+    directories.push(parentDirectory);
+    const directory = join(parentDirectory, "missing");
+
+    await expect(fileSnapshotStore(directory).getLatest()).resolves.toBeNull();
+  });
+
+  it("ファイルストアは日付別スナップショットよりlatestを優先する", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-blob-"));
+    directories.push(directory);
+    await Promise.all([
+      writeFile(join(directory, "snapshot-latest.json"), '{"version":1}', "utf8"),
+      writeFile(join(directory, "snapshot-2026-07-17.json"), '{"version":2}', "utf8"),
+    ]);
+
+    await expect(fileSnapshotStore(directory).getLatest()).resolves.toBe('{"version":1}');
   });
 
   it("ファイルストアは不正な日付を拒否し、ENOENT以外の読取失敗は隠さない", async () => {
