@@ -4,6 +4,8 @@ import {
   jpDateToYmd,
   parseTimeOfDay,
   parseCustomerRows,
+  parseBlockedSlotRows,
+  parseProgramRows,
   parseSalesSummaryRows,
   parseYoyakuRows,
 } from "./labolaSchemas";
@@ -28,6 +30,26 @@ describe("日付変換", () => {
     expect(() => parseTimeOfDay("abc")).toThrow("時刻");
     expect(() => parseTimeOfDay("24:00")).toThrow("時刻");
     expect(() => parseTimeOfDay("12:99")).toThrow("時刻");
+  });
+});
+
+describe("parseProgramRows / parseBlockedSlotRows", () => {
+  const programHeader = ["名称", "カテゴリ", "開催日", "開始時間", "終了時間", "募集数", "ステータス", "公開ステータス"];
+  it("プログラムを日付・時刻正規化し、募集数空欄をnullにする", () => expect(parseProgramRows([programHeader, ["初級", "スクール", "2026/07/17", "9:00", "10:00", "", "受付中", "公開"]]).rows[0]).toMatchObject({ heldOn: "2026-07-17", start: "09:00", capacity: null }));
+  it("プログラムの不正募集数と物理欠落を拒否する", () => { expect(() => parseProgramRows([programHeader, ["初級", "スクール", "2026/07/17", "9:00", "10:00", "多い", "受付中", "公開"]])).toThrow("募集数"); expect(() => parseProgramRows([programHeader, ["初級"]])).toThrow("2行目: 必須列"); });
+  it("プログラムの空CSV・不正時刻・逆転時刻を行番号付きで拒否する", () => {
+    expect(() => parseProgramRows([])).toThrow("プログラム一覧CSVが空");
+    expect(() => parseProgramRows([programHeader, ["初級", "スクール", "2026/07/17", "x", "10:00", "1", "受付中", "公開"]])).toThrow("2行目: 開始時間が不正");
+    expect(() => parseProgramRows([programHeader, ["初級", "スクール", "2026/07/17", "09:00", "x", "1", "受付中", "公開"]])).toThrow("2行目: 終了時間が不正");
+    expect(() => parseProgramRows([programHeader, ["初級", "スクール", "2026/07/17", "10:00", "09:00", "1", "受付中", "公開"]])).toThrow("2行目: 終了時間が開始時間以前");
+  });
+  it("予約不可行はNoneを含めて通し、終了以前を拒否する", () => { const header = ["日付", "開始時間", "終了時間", "スペース", "予約名"]; expect(parseBlockedSlotRows([header, ["2026/07/17", "9:00", "10:00", "None", "補助"]]).rows[0]).toMatchObject({ space: "None", label: "補助", start: "09:00" }); expect(() => parseBlockedSlotRows([header, ["2026/07/17", "10:00", "10:00", "A", ""]])).toThrow("終了時間"); });
+  it("予約不可CSVの空・不正時刻と予約名列なしを扱う", () => {
+    const blockedHeader = ["日付", "開始時間", "終了時間", "スペース"];
+    expect(() => parseBlockedSlotRows([])).toThrow("予約不可一覧CSVが空");
+    expect(() => parseBlockedSlotRows([blockedHeader, ["2026/07/17", "x", "10:00", "A"]])).toThrow("2行目: 開始時間が不正");
+    expect(() => parseBlockedSlotRows([blockedHeader, ["2026/07/17", "09:00", "x", "A"]])).toThrow("2行目: 終了時間が不正");
+    expect(parseBlockedSlotRows([blockedHeader, ["2026/07/17", "09:00", "10:00", "A"]]).rows[0]).toMatchObject({ label: "" });
   });
 });
 
@@ -89,4 +111,12 @@ describe("parseSalesSummaryRows", () => {
   it("売上行の欠損セルを行番号付きで拒否する", () => {
     expect(() => parseSalesSummaryRows([["売上日", "レンタルスペース", "イベント", "物販", "売上合計"], ["2026/07/15"]])).toThrow("2行目: 必須列 レンタルスペース のセルがありません");
   });
+});
+
+it("予約不可の予約名セルが物理的に欠けていてもlabelは空で通す", () => {
+  const rows = [
+    ["日付", "開始時間", "終了時間", "スペース", "予約名"],
+    ["2026/07/18", "10:00", "12:00", "Aコート"],
+  ];
+  expect(parseBlockedSlotRows(rows).rows[0]).toMatchObject({ space: "Aコート", label: "" });
 });

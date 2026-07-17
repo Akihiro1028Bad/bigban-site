@@ -22,6 +22,9 @@ export interface SalesSummaryRow {
   rentalSpace: number; event: number; goods: number; total: number;
 }
 
+export interface ProgramRow { name: string; category: string; heldOn: string; start: string; end: string; capacity: number | null; status: string; publishStatus: string; }
+export interface BlockedSlotRow { date: string; start: string; end: string; space: string; label: string; }
+
 export function jpDateTimeToIso(value: string): string {
   const match = value.trim().match(/^(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})$/);
   if (!match) throw new Error("日時を解釈できません");
@@ -134,6 +137,51 @@ export function parseSalesSummaryRows(rows: string[][]): { rows: SalesSummaryRow
     const cell = (name: string) => requiredCell(values, columns, name, rowIndex + 2);
     const dateRaw = cell("売上日");
     return { date: jpDateToYmd(dateRaw), isForecast: /見込み/.test(dateRaw), rentalSpace: toAmount(cell("レンタルスペース")) ?? 0, event: toAmount(cell("イベント")) ?? 0, goods: toAmount(cell("物販")) ?? 0, total: toAmount(cell("売上合計")) ?? 0 };
+  });
+  return { rows: result, warnings: [] };
+}
+
+const PROGRAM_REQUIRED = ["名称", "カテゴリ", "開催日", "開始時間", "終了時間", "募集数", "ステータス", "公開ステータス"] as const;
+
+/** プログラム一覧は料金説明の引用内改行をCSV層で復元済みの行として受け取る。 */
+export function parseProgramRows(rows: string[][]): { rows: ProgramRow[]; warnings: string[] } {
+  if (rows.length === 0) throw new Error("プログラム一覧CSVが空です");
+  const columns = headerIndex(rows[0], PROGRAM_REQUIRED);
+  const result = rows.slice(1).map((values, rowIndex): ProgramRow => {
+    const rowNumber = rowIndex + 2;
+    const cell = (name: string) => requiredCell(values, columns, name, rowNumber);
+    const startRaw = cell("開始時間");
+    const endRaw = cell("終了時間");
+    let start: { minutes: number; normalized: string };
+    let end: { minutes: number; normalized: string };
+    try { start = parseTimeOfDay(startRaw); } catch { throw new Error(`${rowNumber}行目: 開始時間が不正です`); }
+    try { end = parseTimeOfDay(endRaw); } catch { throw new Error(`${rowNumber}行目: 終了時間が不正です`); }
+    if (end.minutes <= start.minutes) throw new Error(`${rowNumber}行目: 終了時間が開始時間以前です`);
+    const capacityRaw = cell("募集数");
+    const capacity = capacityRaw === "" ? null : Number(capacityRaw);
+    if (capacity !== null && !Number.isFinite(capacity)) throw new Error(`${rowNumber}行目: 募集数が不正です`);
+    return { name: cell("名称"), category: cell("カテゴリ"), heldOn: jpDateToYmd(cell("開催日")), start: start.normalized, end: end.normalized, capacity, status: cell("ステータス"), publishStatus: cell("公開ステータス") };
+  });
+  return { rows: result, warnings: [] };
+}
+
+const BLOCKED_REQUIRED = ["日付", "開始時間", "終了時間", "スペース"] as const;
+
+export function parseBlockedSlotRows(rows: string[][]): { rows: BlockedSlotRow[]; warnings: string[] } {
+  if (rows.length === 0) throw new Error("予約不可一覧CSVが空です");
+  const columns = headerIndex(rows[0], BLOCKED_REQUIRED);
+  const labelIndex = rows[0].findIndex((header) => header.trim() === "予約名");
+  const result = rows.slice(1).map((values, rowIndex): BlockedSlotRow => {
+    const rowNumber = rowIndex + 2;
+    const cell = (name: string) => requiredCell(values, columns, name, rowNumber);
+    const startRaw = cell("開始時間");
+    const endRaw = cell("終了時間");
+    let start: { minutes: number; normalized: string };
+    let end: { minutes: number; normalized: string };
+    try { start = parseTimeOfDay(startRaw); } catch { throw new Error(`${rowNumber}行目: 開始時間が不正です`); }
+    try { end = parseTimeOfDay(endRaw); } catch { throw new Error(`${rowNumber}行目: 終了時間が不正です`); }
+    if (end.minutes <= start.minutes) throw new Error(`${rowNumber}行目: 終了時間が開始時間以前です`);
+    return { date: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, space: cell("スペース"), label: labelIndex < 0 ? "" : (values[labelIndex] ?? "").trim() };
   });
   return { rows: result, warnings: [] };
 }
