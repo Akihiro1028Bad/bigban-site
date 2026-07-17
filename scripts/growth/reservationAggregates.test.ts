@@ -30,7 +30,7 @@ function res(overrides: Partial<CanonicalReservation> = {}): CanonicalReservatio
     space: "Aコート",
     status: "confirmed",
     acceptStatus: "受付済",
-    paymentStatus: "入金待ち",
+    paymentStatus: "未払い",
     paymentMethod: "カード",
     plan: "一般",
     amount: 1000,
@@ -146,11 +146,11 @@ describe("weeklyKpis", () => {
   it("実績売上と翌日から27日後までの見込み売上を合計する", () => {
     const data = bundle([], {
       salesDaily: [
-        { date: "2026-07-14", isForecast: false, rentalSpace: 100, event: 0, goods: 0, total: 100 },
-        { date: "2026-07-06", isForecast: false, rentalSpace: 200, event: 0, goods: 0, total: 200 },
-        { date: "2026-07-20", isForecast: true, rentalSpace: 300, event: 0, goods: 0, total: 300 },
-        { date: "2026-08-16", isForecast: true, rentalSpace: 400, event: 0, goods: 0, total: 400 },
-        { date: "2026-08-17", isForecast: true, rentalSpace: 400, event: 0, goods: 0, total: 400 },
+        { date: "2026-07-14", isForecast: false, rentalSpace: 100, event: 0, memberFees: 0, total: 100 },
+        { date: "2026-07-06", isForecast: false, rentalSpace: 200, event: 0, memberFees: 0, total: 200 },
+        { date: "2026-07-20", isForecast: true, rentalSpace: 300, event: 0, memberFees: 0, total: 300 },
+        { date: "2026-08-16", isForecast: true, rentalSpace: 400, event: 0, memberFees: 0, total: 400 },
+        { date: "2026-08-17", isForecast: true, rentalSpace: 400, event: 0, memberFees: 0, total: 400 },
       ],
     });
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
@@ -177,10 +177,10 @@ describe("weeklyKpis", () => {
       res({ reservationId: "4", bookedAt: "2026-07-20T00:00:00+09:00", channel: "user_sp" }),
     ], {
       salesDaily: [
-        { date: "2026-07-16", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 100 },
-        { date: "2026-08-12", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 200 },
-        { date: "2026-07-15", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 400 },
-        { date: "2026-08-13", isForecast: true, rentalSpace: 0, event: 0, goods: 0, total: 800 },
+        { date: "2026-07-16", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 100 },
+        { date: "2026-08-12", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 200 },
+        { date: "2026-07-15", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 400 },
+        { date: "2026-08-13", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 800 },
       ],
     });
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
@@ -351,6 +351,11 @@ describe("P1拡張ライトのカバレッジ境界", () => {
         { label: "15日以上", count: 1, amount: 2000 },
       ],
     });
+  });
+
+  it("unpaidAgingは処理待ちを決済処理中として未収金から除外する", () => {
+    const data = bundle([res({ paymentStatus: "処理待ち", useDate: "2026-07-15" })]);
+    expect(unpaidAging(data, "2026-07-16")).toMatchObject({ count: 0, amount: 0 });
   });
 
   it("demographicsは件数降順・同数は年代の五十音順にする", () => {
