@@ -25,6 +25,9 @@ export interface MoneyView {
   forecast28: string;
 }
 
+export interface ProgramListItem { title: string; schedule: string; fill: string; state: "full" | "warn" | "open" | "unknown"; }
+export interface MoneyExtraView { unpaid: { headline: string; overdue: string | null } | null; paymentShare: { method: string; pct: number }[]; revPach: string | null; }
+
 /** ISO日時を経営ボードの最終同期表示用JST文字列にする。 */
 export function formatSyncedAtJst(iso: string): string {
   const jst = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
@@ -90,6 +93,35 @@ export function moneyPanel(snapshot: Snapshot): MoneyView {
   return { currentWeek: yen(snapshot.kpi.sales.currentWeek), forecast28: yen(snapshot.kpi.sales.forecast28) };
 }
 
+export function programList(snapshot: Snapshot): ProgramListItem[] {
+  return (snapshot.catalog.programFills ?? []).map((program) => {
+    if (program.capacity === null) return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: "—", state: "unknown" };
+    const state = program.fillRate !== null && program.fillRate >= 1 ? "full" : program.fillRate !== null && program.fillRate < 0.34 ? "warn" : "open";
+    return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: `${program.reserved}/${program.capacity}`, state };
+  });
+}
+
+export function moneyExtra(snapshot: Snapshot): MoneyExtraView {
+  const aging = snapshot.catalog.unpaidAging;
+  const overdue = aging?.buckets.find((bucket) => bucket.label === "15日以上");
+  const methods = snapshot.catalog.paymentMethods ?? [];
+  const total = methods.reduce((sum, method) => sum + method.count, 0);
+  return {
+    unpaid: aging === undefined || aging === null ? null : { headline: `${aging.count}件 ${yen(aging.amount)}`, overdue: overdue !== undefined && overdue.count > 0 ? `15日以上 ${yen(overdue.amount)}(${overdue.count}件)` : null },
+    paymentShare: total === 0 ? [] : methods.map((method) => ({ method: method.method, pct: Math.round((method.count / total) * 100) })),
+    revPach: snapshot.catalog.revPach === undefined || snapshot.catalog.revPach === null ? null : yen(Math.round(snapshot.catalog.revPach.revPerCourtHour)),
+  };
+}
+
+export function demographicsView(snapshot: Snapshot): { label: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const cell of snapshot.catalog.demographics ?? []) {
+    const label = `${cell.ageBand} ${cell.gender}`;
+    counts.set(label, (counts.get(label) ?? 0) + cell.count);
+  }
+  return [...counts.entries()].map(([label, count]) => ({ label, count })).sort((left, right) => right.count - left.count).slice(0, 8);
+}
+
 /** 気づきの根拠をPIIなしの短い表示チップにする。 */
 export function insightEvidenceText(evidence: Record<string, unknown>): string | null {
   const chips = Object.entries(evidence)
@@ -102,6 +134,8 @@ export function insightEvidenceText(evidence: Record<string, unknown>): string |
 const COLLECTING_LABELS: Record<string, string> = {
   customer: "商圏・顧客データ",
   salesSummary: "売上データ",
+  program: "プログラムデータ",
+  blocked: "予約不可データ",
 };
 
 export function collectingSections(snapshot: Snapshot): string[] {

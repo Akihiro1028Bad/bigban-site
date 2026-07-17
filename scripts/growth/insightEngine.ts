@@ -4,6 +4,7 @@ import { firstSeenWard } from "./insightDetectors/firstSeenWard";
 import { newRemarks } from "./insightDetectors/newRemarks";
 import { reservationCountChange } from "./insightDetectors/reservationCountChange";
 import { selfRateChange } from "./insightDetectors/selfRateChange";
+import { unpaidOverdue } from "./insightDetectors/unpaidOverdue";
 import type { CanonicalBundle } from "./labolaNormalize";
 import type { DateRange } from "./period";
 import type { Insight, Snapshot } from "./snapshotSchema";
@@ -39,4 +40,5 @@ export const CORE_DETECTORS: readonly Detector[] = [
   selfRateChange,
   dataHealth,
   newRemarks,
+  unpaidOverdue,
 ];

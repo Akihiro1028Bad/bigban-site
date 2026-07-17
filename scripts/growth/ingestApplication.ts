@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { decodeSjis, detectCsvType, parseCsvRows, selectLatestByType } from "./labolaCsv";
 import { buildCanonical, serializeJsonl } from "./labolaNormalize";
-import { parseCustomerRows, parseSalesSummaryRows, parseYoyakuRows } from "./labolaSchemas";
+import { parseBlockedSlotRows, parseCustomerRows, parseProgramRows, parseSalesSummaryRows, parseYoyakuRows } from "./labolaSchemas";
 import { computeWeeklyPeriods, jstDateString } from "./period";
 import { formatIngestDigest, formatRemarksReview } from "./reservationDigest";
 import { mergeExclusionRules } from "./reservationExclusions";
@@ -101,10 +101,17 @@ async function collectFiles(fs: IngestFs, dropDir: string): Promise<{ files: Map
     const rows = parseCsvRows(decodeSjis(asBytes(await fs.readFile(path))));
     parsed.push({ name: entry.name, rows, mtimeMs: (await fs.stat(path)).mtimeMs, type: detectCsvType(rows[0] ?? []) });
   }
-  const selection = selectLatestByType(parsed);
+  // programだけはschool/event/individualの同型CSVを全採用する。他種別の最新選択規則は維持する。
+  const programFiles = parsed.filter((entry) => entry.type === "program");
+  const selection = selectLatestByType(parsed.filter((entry) => entry.type !== "program"));
   const files = new Map<LabolaCsvType, ParsedFile>();
   for (const [type, name] of Object.entries(selection.selected) as [LabolaCsvType, string][]) {
     files.set(type, parsed.find((entry) => entry.name === name && entry.type === type) as ParsedFile);
+  }
+  if (programFiles.length > 0) {
+    const [first] = programFiles;
+    const rows = [first.rows[0] as string[], ...programFiles.flatMap((file) => file.rows.slice(1))];
+    files.set("program", { name: programFiles.map((file) => file.name).join(","), rows, mtimeMs: Math.max(...programFiles.map((file) => file.mtimeMs)), type: "program" });
   }
   return { files, warnings: selection.warnings };
 }
@@ -144,6 +151,8 @@ async function promoteOutputs(input: { fs: IngestFs; dataDir: string; todayYmd: 
     fs.writeFile(join(tempDir, "reservations.jsonl"), serializeJsonl(canonical.reservations)),
     fs.writeFile(join(tempDir, "customers.jsonl"), serializeJsonl(canonical.customers)),
     fs.writeFile(join(tempDir, "sales_daily.jsonl"), serializeJsonl(canonical.salesDaily)),
+    fs.writeFile(join(tempDir, "programs.jsonl"), serializeJsonl(canonical.programs)),
+    fs.writeFile(join(tempDir, "blocked_slots.jsonl"), serializeJsonl(canonical.blockedSlots)),
     fs.writeFile(join(tempDir, "meta.json"), JSON.stringify(canonical.meta, null, 2)),
     fs.writeFile(join(tempDir, snapshotName), JSON.stringify(snapshot, null, 2)),
   ]);
@@ -270,11 +279,16 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   const yoyaku = parseYoyakuRows(yoyakuFile.rows);
   const customerFile = files.get("customer");
   const salesFile = files.get("salesSummary");
+  const programFile = files.get("program");
+  const blockedFile = files.get("blocked");
   const customers = customerFile ? parseCustomerRows(customerFile.rows) : null;
   const salesSummary = salesFile ? parseSalesSummaryRows(salesFile.rows) : null;
+  const parsedPrograms = programFile ? parseProgramRows(programFile.rows) : null;
+  const programs = parsedPrograms === null ? null : [...new Map(parsedPrograms.rows.map((program) => [`${program.name}\u0000${program.heldOn}\u0000${program.start}`, program])).values()];
+  const blockedSlots = blockedFile ? parseBlockedSlotRows(blockedFile.rows) : null;
   const now = deps.now();
   const todayYmd = jstDateString(now);
-  const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? [])] });
+  const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, programs, blockedSlots: blockedSlots?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? []), ...(parsedPrograms?.warnings ?? []), ...(blockedSlots?.warnings ?? [])] });
   canonical.meta.reservationsDigest = digestHash(serializeJsonl(canonical.reservations));
   const { current, prior } = computeWeeklyPeriods(now);
   const [previousSnapshot, baselineInputs] = await Promise.all([
@@ -282,7 +296,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
     readBaselineInputs(deps.fs, input.dataDir, todayYmd),
   ]);
   const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs });
-  const hasRowDrop = snapshot.insights.some((insight) => insight.id.startsWith("d11:rowdrop"));
+  const hasRowDrop = snapshot.insights.some((insight) => insight.id === "d11:rowdrop:yoyaku");
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");
   if (input.isDryRun) { log(`[ingest] DRYRUN: 予約${canonical.reservations.length}件`); return { snapshot, wasDryRun: true }; }

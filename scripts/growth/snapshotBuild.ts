@@ -1,5 +1,5 @@
 /** 正準データから集計・検出を接続して検証済みスナップショットを作る。 */
-import { cancellationStats, demandHeatmap, leadTimeStats, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
+import { cancellationStats, demographics, demandHeatmap, leadTimeStats, paymentMethodShare, programFills, revPach, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
 import { CORE_DETECTORS, runDetectors } from "./insightEngine";
 import { computeWeeklyPeriods } from "./period";
 import { snapshotSchema } from "./snapshotSchema";
@@ -23,7 +23,7 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     analysis: { referenceYmd, currentWeek: current },
     meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: bundle.meta.warnings },
     kpi: weeklyKpis(bundle, current, prior, referenceYmd),
-    catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle) },
+    catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd) },
     series: { weeklyReservations: weeklyReservationSeries(bundle) },
     insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs }, CORE_DETECTORS),
   });

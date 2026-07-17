@@ -27,6 +27,13 @@ function recent28Range(referenceYmd: string): DateRange {
   return { start: addDays(referenceYmd, -27), end: referenceYmd };
 }
 
+function clippedRecent28Range(bundle: CanonicalBundle, referenceYmd: string): DateRange | null {
+  const recent = recent28Range(referenceYmd);
+  const start = recent.start > bundle.meta.coverage.start ? recent.start : bundle.meta.coverage.start;
+  const end = recent.end < bundle.meta.coverage.end ? recent.end : bundle.meta.coverage.end;
+  return start <= end ? { start, end } : null;
+}
+
 export function jstYmdOfIso(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) throw new Error(`日時を解釈できません: ${iso}`);
@@ -168,4 +175,75 @@ export function cancellationStats(bundle: CanonicalBundle, referenceYmd: string)
   const cancelled = reservations.filter((reservation) => reservation.status === "cancelled").length;
   const interval = wilsonIntervalPositive(cancelled, reservations.length);
   return { n: reservations.length, cancelled, rate: cancelled / reservations.length, ciLow: interval.low, ciHigh: interval.high };
+}
+
+const SPACE_RESERVATION_CATEGORY = "スペース予約";
+
+export function programFills(bundle: CanonicalBundle, referenceYmd: string): { name: string; heldOn: string; start: string; capacity: number | null; reserved: number; fillRate: number | null }[] {
+  const range = { start: addDays(referenceYmd, -27), end: addDays(referenceYmd, 28) };
+  return bundle.programs
+    .filter((program) => isWithin(program.heldOn, range) && program.publishStatus !== "非公開")
+    .map((program) => {
+      const reserved = confirmedReservations(bundle).filter((reservation) => reservation.category !== SPACE_RESERVATION_CATEGORY && reservation.space === program.name && reservation.useDate === program.heldOn && reservation.start === program.start).length;
+      return { name: program.name, heldOn: program.heldOn, start: program.start, capacity: program.capacity, reserved, fillRate: program.capacity === null || program.capacity === 0 ? null : reserved / program.capacity };
+    }).sort((left, right) => left.heldOn.localeCompare(right.heldOn) || left.start.localeCompare(right.start));
+}
+
+type AgingBucket = { label: "0-7日" | "8-14日" | "15日以上"; count: number; amount: number };
+
+export function unpaidAging(bundle: CanonicalBundle, referenceYmd: string): { count: number; amount: number; buckets: AgingBucket[] } | null {
+  if (bundle.reservations.length === 0) return null;
+  const buckets: AgingBucket[] = [{ label: "0-7日", count: 0, amount: 0 }, { label: "8-14日", count: 0, amount: 0 }, { label: "15日以上", count: 0, amount: 0 }];
+  for (const reservation of confirmedReservations(bundle)) {
+    if (reservation.paymentStatus !== "入金待ち" || reservation.useDate > referenceYmd) continue;
+    const days = dayDifference(referenceYmd, jstYmdOfIso(reservation.bookedAt));
+    const bucket = days <= 7 ? buckets[0] : days <= 14 ? buckets[1] : buckets[2];
+    bucket.count += 1;
+    bucket.amount += reservation.amount ?? 0;
+  }
+  return { count: buckets.reduce((sum, bucket) => sum + bucket.count, 0), amount: buckets.reduce((sum, bucket) => sum + bucket.amount, 0), buckets };
+}
+
+export function paymentMethodShare(bundle: CanonicalBundle, referenceYmd: string): { method: string; count: number }[] {
+  const range = recent28Range(referenceYmd);
+  const counts = new Map<string, number>();
+  for (const reservation of confirmedReservations(bundle)) {
+    if (!isWithin(jstYmdOfIso(reservation.bookedAt), range)) continue;
+    const method = reservation.paymentMethod || "不明";
+    counts.set(method, (counts.get(method) ?? 0) + 1);
+  }
+  return [...counts].map(([method, count]) => ({ method, count })).sort((left, right) => right.count - left.count || left.method.localeCompare(right.method, "ja"));
+}
+
+export function demographics(bundle: CanonicalBundle): { ageBand: string; gender: string; customerType: string; count: number }[] {
+  const counts = new Map<string, { ageBand: string; gender: string; customerType: string; count: number }>();
+  for (const customer of bundle.customers) {
+    const key = `${customer.ageBand}\u0000${customer.gender}\u0000${customer.customerType}`;
+    const current = counts.get(key) ?? { ageBand: customer.ageBand, gender: customer.gender, customerType: customer.customerType, count: 0 };
+    current.count += 1;
+    counts.set(key, current);
+  }
+  return [...counts.values()].sort((left, right) => right.count - left.count || left.ageBand.localeCompare(right.ageBand, "ja"));
+}
+
+function overlapMinutes(start: string, end: string, lower: number, upper: number): number {
+  const startMinutes = minutesOf(start); const endMinutes = minutesOf(end);
+  if (startMinutes === null || endMinutes === null) return 0;
+  return Math.max(0, Math.min(endMinutes, upper) - Math.max(startMinutes, lower));
+}
+
+export function revPach(bundle: CanonicalBundle, referenceYmd: string): { revenue: number; availableCourtHours: number; revPerCourtHour: number; spaces: number } | null {
+  const range = clippedRecent28Range(bundle, referenceYmd);
+  if (range === null) return null;
+  const spaces = new Set<string>();
+  for (const reservation of bundle.reservations) if (reservation.category === SPACE_RESERVATION_CATEGORY && reservation.space !== "None") spaces.add(reservation.space);
+  for (const blocked of bundle.blockedSlots) if (blocked.space !== "None") spaces.add(blocked.space);
+  if (spaces.size === 0) return null;
+  let days = 0;
+  for (let day = range.start; day <= range.end; day = addDays(day, 1)) days += 1;
+  const blockedMinutes = bundle.blockedSlots.filter((slot) => spaces.has(slot.space) && isWithin(slot.date, range)).reduce((sum, slot) => sum + overlapMinutes(slot.start, slot.end, 6 * 60, 23 * 60), 0);
+  const availableMinutes = spaces.size * days * 1020 - blockedMinutes;
+  const revenue = confirmedReservations(bundle).filter((reservation) => reservation.category === SPACE_RESERVATION_CATEGORY && isWithin(reservation.useDate, range)).reduce((sum, reservation) => sum + (reservation.amount ?? 0), 0);
+  const availableCourtHours = availableMinutes / 60;
+  return { revenue, availableCourtHours, revPerCourtHour: availableCourtHours === 0 ? 0 : revenue / availableCourtHours, spaces: spaces.size };
 }

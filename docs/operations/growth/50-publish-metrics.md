@@ -26,7 +26,7 @@
 
 ### 実予約データ(施設経営データ基盤)
 
-実予約は **施設経営データ基盤**(設計: `docs/superpowers/specs/2026-07-16-labola-reservation-ingest-design.md`)から供給する。週次でラボーラ管理画面から全期間CSVをドロップディレクトリへエクスポートし、`npm run growth:ingest` が正準データセット(PII除去済みJSONL)とスナップショット(集計+気づき)を生成、LINEダイジェストを送る。`growth:metrics` は `GROWTH_RESERVATION_DATA_DIR/canonical/` を読み、従来どおり記事別の実予約状態をNotionミラーへ書く(coverage不足→`coverage_incomplete`、未設定/読取失敗→`missing` の扱いは従来と同じ)。旧CSV+sidecar形式は廃止。
+実予約は **施設経営データ基盤**(設計: `docs/superpowers/specs/2026-07-16-labola-reservation-ingest-design.md`)から供給する。週次でラボーラ管理画面から全期間CSVをドロップディレクトリへエクスポートし(予約一覧詳細は必須。顧客・売上サマリに加え、プログラム(スクール/イベント/個人参加)・予約不可も推奨 — プログラム埋まり率・未収金・RevPACH等の経営集計に使う)、`npm run growth:ingest` が正準データセット(PII除去済みJSONL)とスナップショット(集計+気づき)を生成、LINEダイジェストを送る。`growth:metrics` は `GROWTH_RESERVATION_DATA_DIR/canonical/` を読み、従来どおり記事別の実予約状態をNotionミラーへ書く(coverage不足→`coverage_incomplete`、未設定/読取失敗→`missing` の扱いは従来と同じ)。旧CSV+sidecar形式は廃止。
 
 ### 経営ボード(P2)
 

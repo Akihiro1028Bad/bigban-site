@@ -15,6 +15,12 @@ describe("snapshotSchema", () => {
   it("既存スナップショットのunknown4w欠落を0として受理する", () => {
     expect(snapshotSchema.parse(validSnapshot()).kpi.self.unknown4w).toBe(0);
   });
+  it("P1拡張フィールドがない旧スナップショットを後方互換で受理する", () => {
+    const parsed = parseSnapshot(JSON.stringify(validSnapshot()));
+    expect(parsed.catalog.programFills).toBeUndefined();
+    expect(parsed.catalog.unpaidAging).toBeUndefined();
+    expect(parsed.catalog.revPach).toBeUndefined();
+  });
   it("不正なseverityとschemaVersionを拒否する", () => {
     expect(snapshotSchema.safeParse({ ...validSnapshot(), schemaVersion: 2 }).success).toBe(false);
     expect(snapshotSchema.safeParse({ ...validSnapshot(), insights: [{ id: "x", detector: "d", severity: "bad" }] }).success).toBe(false);
