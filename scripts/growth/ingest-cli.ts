@@ -4,6 +4,7 @@ import "dotenv/config";
 import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 
 import { runIngestApplication } from "./ingestApplication";
+import { analyticsSnapshotUploader } from "./analyticsUpload";
 import { defaultFetch } from "./http";
 import { pushTextMessage } from "./line";
 import { parseExclusionRules } from "./reservationExclusions";
@@ -53,6 +54,14 @@ async function main(): Promise<void> {
     fs,
     now: () => new Date(),
     notify,
+    uploadSnapshot: analyticsSnapshotUploader(
+      {
+        GROWTH_ANALYTICS_UPLOAD_URL: process.env.GROWTH_ANALYTICS_UPLOAD_URL,
+        GROWTH_ANALYTICS_INGEST_TOKEN: process.env.GROWTH_ANALYTICS_INGEST_TOKEN,
+      },
+      fetch,
+      console.log
+    ),
     log: console.log,
   });
 }

@@ -43,6 +43,7 @@ export interface IngestApplicationDeps {
   fs: IngestFs;
   now: () => Date;
   notify: (text: string, kind: "weekly") => Promise<void>;
+  uploadSnapshot?: (json: string) => Promise<void>;
   log?: (message: string) => void;
 }
 
@@ -298,6 +299,14 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
     await deps.fs.rm(join(input.dataDir, "remarks", `remarks-review-${todayYmd}.md`), { recursive: false, force: true });
   }
   await notifyDigest(deps.fs, input.dataDir, todayYmd, formatIngestDigest(snapshot, todayYmd), deps.notify, log);
+  if (deps.uploadSnapshot) {
+    try {
+      await deps.uploadSnapshot(JSON.stringify(snapshot));
+    } catch {
+      // ローカルの正準データ・snapshot昇格を成功扱いに保ち、次回のlatest上書きで自然回復する。
+      log("[ingest] ボードへのアップロードに失敗しました(ローカル処理は完了)");
+    }
+  }
   return { snapshot, wasDryRun: false };
   } finally {
     if (lock !== null) await deps.fs.rm(lock, { recursive: true, force: true });
