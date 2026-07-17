@@ -58,7 +58,12 @@
 - Create: `src/lib/growth/analyticsBlob.ts` + `analyticsBlob.test.ts`(Blob I/Oの薄いラッパ+パス規約の純ロジック)
 
 **Interfaces:**
-- `analyticsBlob.ts`:
+- `analyticsBlob.ts`(**ドライバ切替式**: 本番=Vercel Blob / ローカル開発・テスト=ファイル):
+  - `type SnapshotStore = { putLatest(json: string, ymd: string): Promise<void>; getLatest(): Promise<string | null> }`
+  - `blobSnapshotStore(token: string): SnapshotStore`(@vercel/blob 使用)
+  - `fileSnapshotStore(dir: string): SnapshotStore`(`dir/snapshot-latest.json` と `dir/snapshot-<ymd>.json` に読み書き。ローカル開発では `GROWTH_RESERVATION_DATA_DIR/snapshots` を指せば ingest の出力を直接読める=アップロード不要でボード確認可)
+  - `resolveSnapshotStore(env): SnapshotStore`(`BLOB_READ_WRITE_TOKEN` があれば blob、なければ `GROWTH_ANALYTICS_FILE_DIR`(または `GROWTH_RESERVATION_DATA_DIR/snapshots`)の file。どちらも無ければ「ストア未設定」の日本語エラー)
+  - テストは fileSnapshotStore を実ディレクトリで検証し、blob側は put/get 関数注入でモック
   - `SNAPSHOT_LATEST_PATH = "growth-analytics/snapshot-latest.json"`
   - `snapshotDatedPath(ymd: string): string`(`growth-analytics/snapshot-<ymd>.json`。ymdは実在日検証、不正はthrow)
   - `putSnapshot(json: string, ymd: string, put: BlobPutFn): Promise<void>`(latest と dated の2箇所へ `access: "public"` **ではなく** `access` は @vercel/blob の非公開が使えるなら非公開、使えない場合はURL秘匿+ランダムsuffix既定に任せ、**取得はサーバー経由のみ**とする。`addRandomSuffix: false`, `contentType: "application/json"`)
@@ -147,6 +152,8 @@
 2. Vercel環境変数に `GROWTH_ANALYTICS_INGEST_TOKEN`(`openssl rand -hex 32` で生成)を追加 → 再デプロイ
 3. 自宅PCの `.env` に `GROWTH_ANALYTICS_UPLOAD_URL=https://<本番ドメイン>/api/growth/analytics/snapshot` と同じ `GROWTH_ANALYTICS_INGEST_TOKEN` を追加
 4. `npm run growth:ingest` を実行し、承認画面と同じログイン後 `/growth/analytics` で表示確認
+
+**ローカルでの動作確認(Vercel不要・完全オフライン)**: `.env.local` に `GROWTH_ANALYTICS_FILE_DIR=<GROWTH_RESERVATION_DATA_DIRのsnapshots>` を設定 → `npm run growth:ingest` → `npm run dev` → `/growth/analytics`。BLOB_READ_WRITE_TOKEN が無ければ自動でファイルドライバになる。
 
 ## 未確定事項
 
