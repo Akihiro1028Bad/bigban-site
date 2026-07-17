@@ -83,7 +83,7 @@ metrics-cli(GA4/GSC取得)は正準データセットを直接読み、記事別
 - 任意CSVが欠けても停止しない。依存する集計・気づきは `missing` を記録(欠落耐性)。
 - `予約ステータス` 写像: `予約完了→confirmed` / `キャンセル→cancelled`。**未知値は即エラー停止**(写像は明示的に増やす)。
 - テスト予約除外: `scripts/growth/assets/reservation-exclusions.json`(メール完全一致+名前部分一致)。除外件数は meta に記録。
-- エクスポートは**毎回全期間**が前提。収録範囲メタ(`coverageStart=2026-06-01` 固定env / `coverageEnd=実行日JST`)を正準データセットに持たせる。CSV内の受付日時の最古/最新と矛盾したら警告。
+- エクスポートは**毎回全期間**が前提。収録範囲メタ(`coverageStart=2026-06-01` 固定env / `coverageEnd=予約CSVファイル更新時刻(sourceSyncedAt)のJST日付`)を正準データセットに持たせる。取り込み実行日ではなくCSVのmtimeを終端にすることで、古いCSVの再取り込みが鮮度・収録範囲を偽装できない(レビューR3-01/R4-01対応)。分析窓・週次系列・鮮度判定はすべて `sourceSyncedAt`/coverage を基準にする。CSV内の受付日時の最古/最新と矛盾したら警告。
 
 ## 5. 正準データセットとスナップショット
 
