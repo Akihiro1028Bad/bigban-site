@@ -16,7 +16,7 @@ export function analyticsSnapshot() {
     },
     kpi: {
       actual: { currentWeek: 8, priorWeek: 6, cumulative: 42 },
-      self: { selfCount4w: 9, total4w: 12, smartphone4w: 7 },
+      self: { selfCount4w: 9, total4w: 12, smartphone4w: 7, unknown4w: 0 },
       sales: { currentWeek: 32000, priorWeek: 28000, forecast28: 128000 },
     },
     catalog: {

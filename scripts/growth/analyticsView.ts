@@ -1,3 +1,4 @@
+import { jstYmdOfIso } from "./reservationAggregates";
 import type { Insight, Snapshot } from "./snapshotSchema";
 
 export interface FreshnessView {
@@ -22,10 +23,6 @@ export interface HeatmapCell {
 export interface MoneyView {
   currentWeek: string;
   forecast28: string;
-}
-
-function ymdOf(iso: string): string {
-  return iso.slice(0, 10);
 }
 
 /** ISO日時を経営ボードの最終同期表示用JST文字列にする。 */
@@ -53,7 +50,7 @@ function sampleNote(n: number): string {
 }
 
 export function freshnessOf(snapshot: Snapshot, todayYmd: string): FreshnessView {
-  const sourceSyncedYmd = ymdOf(snapshot.meta.sourceSyncedAt);
+  const sourceSyncedYmd = jstYmdOfIso(snapshot.meta.sourceSyncedAt);
   const daysOld = daysBetween(sourceSyncedYmd, todayYmd);
   return { level: daysOld > 7 ? "stale" : "fresh", daysOld, sourceSyncedYmd };
 }
@@ -61,9 +58,10 @@ export function freshnessOf(snapshot: Snapshot, todayYmd: string): FreshnessView
 export function kpiCards(snapshot: Snapshot): KpiCard[] {
   const { actual, self, sales } = snapshot.kpi;
   const selfRate = self.total4w === 0 ? null : Math.round((self.selfCount4w / self.total4w) * 100);
+  const hasUnknownChannel = self.unknown4w > 0 || snapshot.meta.warnings.some((warning) => warning.includes("予約方法"));
   return [
     { label: "実予約（対象週）", value: count(actual.currentWeek), sub: `累積 ${count(actual.cumulative)}・${sampleNote(actual.currentWeek)}` },
-    { label: "セルフ予約比率", value: selfRate === null ? "収集中" : `${selfRate}%`, sub: selfRate === null ? "対象データを待っています" : `${count(self.selfCount4w)} / ${count(self.total4w)}・${sampleNote(self.total4w)}` },
+    { label: "セルフ予約比率", value: hasUnknownChannel ? "要確認" : selfRate === null ? "収集中" : `${selfRate}%`, sub: hasUnknownChannel ? `未知の予約方法が含まれます(${count(self.unknown4w)})` : selfRate === null ? "対象データを待っています" : `${self.selfCount4w.toLocaleString("ja-JP")}/${count(self.total4w)}・${sampleNote(self.total4w)}` },
     { label: "売上（対象週）", value: yen(sales.currentWeek), sub: sales.currentWeek === null ? "売上CSVを待っています" : `28日見込み ${yen(sales.forecast28)}` },
   ];
 }

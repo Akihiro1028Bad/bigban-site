@@ -12,6 +12,9 @@ function validSnapshot() {
 
 describe("snapshotSchema", () => {
   it("最小の妥当スナップショットを受理する", () => expect(snapshotSchema.safeParse(validSnapshot()).success).toBe(true));
+  it("既存スナップショットのunknown4w欠落を0として受理する", () => {
+    expect(snapshotSchema.parse(validSnapshot()).kpi.self.unknown4w).toBe(0);
+  });
   it("不正なseverityとschemaVersionを拒否する", () => {
     expect(snapshotSchema.safeParse({ ...validSnapshot(), schemaVersion: 2 }).success).toBe(false);
     expect(snapshotSchema.safeParse({ ...validSnapshot(), insights: [{ id: "x", detector: "d", severity: "bad" }] }).success).toBe(false);
