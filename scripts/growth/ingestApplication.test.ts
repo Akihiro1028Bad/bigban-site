@@ -232,6 +232,7 @@ describe("runIngestApplication", () => {
     const canonicalBefore = await readFile(join(data, "canonical", "reservations.jsonl"), "utf8");
     const currentSnapshot = snapshotSchema.parse(JSON.parse(await readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")));
     await writeFile(join(data, "snapshots", "snapshot-2026-07-15.json"), JSON.stringify({ ...currentSnapshot, meta: { ...currentSnapshot.meta, inputs: [{ type: "yoyaku", rows: 100 }] } }));
+    await rm(join(data, "snapshots", "snapshot-2026-07-16.json"));
     await expect(runIngestApplication(input(drop, data), deps(notify))).rejects.toThrow("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
     await expect(readFile(join(data, "canonical", "reservations.jsonl"), "utf8")).resolves.toBe(canonicalBefore);
     expect(notify).toHaveBeenCalledTimes(1);
@@ -239,6 +240,18 @@ describe("runIngestApplication", () => {
     await expect(runIngestApplication({ ...input(drop, data), allowRowDrop: true }, { ...deps(notify), log })).resolves.toMatchObject({ wasDryRun: false });
     expect(log).toHaveBeenCalledWith(expect.stringContaining("行数急減を許可"));
     expect(notify).toHaveBeenCalledTimes(2);
+  });
+
+  it("同日再実行で行数が急減した場合も昇格せず旧canonicalを残す", async () => {
+    const { drop, data } = await setup();
+    await runIngestApplication(input(drop, data), deps());
+    const canonicalBefore = await readFile(join(data, "canonical", "reservations.jsonl"), "utf8");
+    const snapshotPath = join(data, "snapshots", "snapshot-2026-07-16.json");
+    const firstSnapshot = snapshotSchema.parse(JSON.parse(await readFile(snapshotPath, "utf8")));
+    await writeFile(snapshotPath, JSON.stringify({ ...firstSnapshot, meta: { ...firstSnapshot.meta, inputs: [{ type: "yoyaku", rows: 100 }] } }));
+
+    await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("工程 anomaly: 予約CSVの行数が前回から急減しています");
+    await expect(readFile(join(data, "canonical", "reservations.jsonl"), "utf8")).resolves.toBe(canonicalBefore);
   });
 
   it("同日同一ダイジェストは再送せず、送信失敗ならマーカーを残さない", async () => {

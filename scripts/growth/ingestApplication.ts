@@ -108,11 +108,11 @@ async function collectFiles(fs: IngestFs, dropDir: string): Promise<{ files: Map
   return { files, warnings: selection.warnings };
 }
 
-async function readPreviousSnapshot(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot | null> {
+async function readLatestSnapshot(fs: IngestFs, dataDir: string, todayYmd: string, isTodayIncluded: boolean): Promise<Snapshot | null> {
   const directory = join(dataDir, "snapshots");
   try {
     const names = (await fs.readdir(directory, { withFileTypes: true })).map((entry) => entry.name)
-      .filter((name) => /^snapshot-.*\.json$/.test(name) && name !== `snapshot-${todayYmd}.json`).sort();
+      .filter((name) => /^snapshot-.*\.json$/.test(name) && (isTodayIncluded || name !== `snapshot-${todayYmd}.json`)).sort();
     if (names.length === 0) return null;
     const latest = names[names.length - 1] as string;
     return parseSnapshot(String(await fs.readFile(join(directory, latest), "utf8")));
@@ -120,6 +120,14 @@ async function readPreviousSnapshot(fs: IngestFs, dataDir: string, todayYmd: str
     if ((error as { code?: string }).code === "ENOENT") return null;
     throw new Error("previous-snapshotの読取または検証に失敗しました");
   }
+}
+
+async function readPreviousSnapshot(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot | null> {
+  return readLatestSnapshot(fs, dataDir, todayYmd, false);
+}
+
+async function readBaselineInputs(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot["meta"]["inputs"] | null> {
+  return (await readLatestSnapshot(fs, dataDir, todayYmd, true))?.meta.inputs ?? null;
 }
 
 async function promoteOutputs(input: { fs: IngestFs; dataDir: string; todayYmd: string; canonical: ReturnType<typeof buildCanonical>; snapshot: Snapshot }): Promise<void> {
@@ -198,7 +206,11 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? [])] });
   canonical.meta.reservationsDigest = digestHash(serializeJsonl(canonical.reservations));
   const { current, prior } = computeWeeklyPeriods(now);
-  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot: await readPreviousSnapshot(deps.fs, input.dataDir, todayYmd) });
+  const [previousSnapshot, baselineInputs] = await Promise.all([
+    readPreviousSnapshot(deps.fs, input.dataDir, todayYmd),
+    readBaselineInputs(deps.fs, input.dataDir, todayYmd),
+  ]);
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs });
   const hasRowDrop = snapshot.insights.some((insight) => insight.id.startsWith("d11:rowdrop"));
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");

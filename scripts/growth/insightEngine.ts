@@ -11,6 +11,7 @@ import type { Insight, Snapshot } from "./snapshotSchema";
 export interface DetectorContext {
   bundle: CanonicalBundle;
   previousSnapshot: Snapshot | null;
+  baselineInputs: Snapshot["meta"]["inputs"] | null;
   current: DateRange;
   prior: DateRange;
   todayYmd: string;
