@@ -13,6 +13,8 @@
 
 import "dotenv/config";
 
+import { readFile } from "node:fs/promises";
+
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
@@ -32,6 +34,7 @@ import {
   metricsForKnownPagePath,
   reserveCompleteMeasuredForPeriod,
   type ActualReservationMetrics,
+  type MetricsFs,
   type ReservationCsvSnapshot,
   type SearchMetrics,
 } from "./metrics";
@@ -54,6 +57,10 @@ const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const KEY_EVENTS_SINCE = process.env.GROWTH_GA4_KEYEVENTS_SINCE;
+
+const metricsFs: MetricsFs = {
+  readFile: async (path, encoding) => readFile(path, encoding),
+};
 
 // 表示指標とCTAイベント別指標は別レポートで取得し、keyEvents合計を予約と混同しない。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
@@ -246,7 +253,7 @@ async function main(): Promise<void> {
   }
 
   const nowIso = new Date().toISOString();
-  const reservations = await loadCanonicalReservations(process.env.GROWTH_RESERVATION_DATA_DIR, nowIso);
+  const reservations = await loadCanonicalReservations(process.env.GROWTH_RESERVATION_DATA_DIR, nowIso, metricsFs);
   let updated = 0;
   let slugFailed = 0;
   let sourceError = 0;

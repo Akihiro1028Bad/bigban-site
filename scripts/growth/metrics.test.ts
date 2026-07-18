@@ -49,10 +49,6 @@ describe("loadCanonicalReservations", () => {
     expect(readFile).toHaveBeenCalledTimes(2);
   });
 
-  it("fs未注入(既定I/O)でも未設定時は読み取りせず返す", async () => {
-    await expect(loadCanonicalReservations(undefined, "checked")).resolves.toEqual({ state: "missing", reason: "not_configured", checkedAt: "checked" });
-  });
-
   it("ダイジェスト不一致はinvalid、非Errorのthrowは不明なエラーとして扱う", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const badDigestMeta = JSON.stringify({ generatedAt: "2026-07-16T00:00:00Z", sourceSyncedAt: "2026-07-16T00:00:00Z", reservationsDigest: "f".repeat(64), coverage: { start: "2026-07-01", end: "2026-07-16" } });
