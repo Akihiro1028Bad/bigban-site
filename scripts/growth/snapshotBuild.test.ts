@@ -46,6 +46,8 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null });
   expect(snapshot.kpi.actual.cumulative).toBe(0);
   expect(snapshot.kpi.self.unknown4w).toBe(0);
+  expect(snapshot.catalog.cancelResale).toEqual({ n: 0, resold: 0, rate: null, medianHours: null });
+  expect(snapshot.catalog.cohorts).toEqual([]);
   expect(snapshot.meta.inputs).toEqual([{ type: "yoyaku", rows: 0 }]);
   expect(snapshot.meta.sourceSyncedAt).toBe("2026-07-16T12:00:00+09:00");
   expect(snapshot.analysis).toEqual({ referenceYmd: "2026-07-16", currentWeek: { start: "2026-07-06", end: "2026-07-12" } });

@@ -3,13 +3,13 @@ import { paceDeviation } from "./paceDeviation";
 
 it("history未指定(旧コンテキスト)では通知しない", () => {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { coverage: { start: "", end: "" } } };
-  expect(paceDeviation({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, funnel: null, onTheBooks: [{ daysOut: 28, reservations: 1, baselineMedian: 10 }], current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "" })).toEqual([]);
+  expect(paceDeviation({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, funnel: null, kpi: null, onTheBooks: [{ daysOut: 28, reservations: 1, baselineMedian: 10 }], current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "" })).toEqual([]);
 });
 
 function detect(onTheBooks: { daysOut: number; reservations: number; baselineMedian: number | null }[] | null, historyWeeks = 6) {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { coverage: { start: "", end: "" } } };
   const history = Array.from({ length: historyWeeks }, () => ({ series: { onTheBooks: [{ daysOut: 28, reservations: 1, forecastSales: null, baselineMedian: null }] } }));
-  return paceDeviation({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: history as never, funnel: null, onTheBooks, current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "" });
+  return paceDeviation({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: history as never, funnel: null, kpi: null, onTheBooks, current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "" });
 }
 
 it.each([[4, "d6:weak", "今後28日の予約ペースが弱い"], [16, "d6:strong", "今後28日の予約ペースが強い"]] as const)("28日先予約が%s件なら逸脱を通知する", (reservations, id, body) => {

@@ -5,7 +5,7 @@ function program(name: string, heldOn: string, capacity: number | null = 2, star
 function reservation(reservationId: string, name: string, heldOn: string, bookedAt: string) { return { reservationId, bookedAt, useDate: heldOn, start: "10:00", category: "スクール", space: name, status: "confirmed" }; }
 function detect(programs: object[], reservations: object[]) {
   const bundle = { programs, reservations, customers: [], salesDaily: [], blockedSlots: [], remarks: [], meta: { coverage: { start: "2026-06-01", end: "2026-07-19" } } };
-  return fillSpeed({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: [], funnel: null, onTheBooks: null, current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "", end: "" }, todayYmd: "2026-07-19" });
+  return fillSpeed({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: [], funnel: null, onTheBooks: null, kpi: null, current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "", end: "" }, todayYmd: "2026-07-19" });
 }
 
 it("過去より早く満枠になった回をnoticeにする", () => {

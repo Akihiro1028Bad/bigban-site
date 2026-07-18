@@ -60,6 +60,8 @@ export const snapshotSchema = z.object({
     paymentMethods: z.array(z.object({ method: z.string(), count: z.number() })).optional(),
     demographics: z.array(z.object({ ageBand: z.string(), gender: z.string(), customerType: z.string(), count: z.number() })).optional(),
     revPach: z.object({ revenue: z.number(), availableCourtHours: z.number(), revPerCourtHour: z.number(), spaces: z.number() }).nullable().optional(),
+    cancelResale: z.object({ n: z.number(), resold: z.number(), rate: z.number().nullable(), medianHours: z.number().nullable() }).nullable().optional(),
+    cohorts: z.array(z.object({ month: z.string(), customers: z.number(), repeated: z.number(), cumulativeRevenue: z.number() })).optional(),
   }),
   series: z.object({
     weeklyReservations: z.array(z.object({ weekStart: z.string(), count: z.number() })),

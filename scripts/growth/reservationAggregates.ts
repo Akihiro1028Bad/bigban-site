@@ -198,6 +198,51 @@ export function cancellationStats(bundle: CanonicalBundle, referenceYmd: string)
   return { n: reservations.length, cancelled, rate: cancelled / reservations.length, ciLow: interval.low, ciHigh: interval.high };
 }
 
+export type CancelResaleStats = { n: number; resold: number; rate: number | null; medianHours: number | null };
+
+/** キャンセル後に同一枠へ入った確定予約を、過去4週の利用枠で集計する。 */
+export function cancelResaleStats(bundle: CanonicalBundle, referenceYmd: string, useDateRange: DateRange = recent28Range(referenceYmd)): CancelResaleStats {
+  const cancelled = bundle.reservations.filter((reservation) => reservation.status === "cancelled" && isWithin(reservation.useDate, useDateRange));
+  const confirmedBySlot = new Map<string, CanonicalReservation[]>();
+  for (const reservation of bundle.reservations) {
+    if (reservation.status !== "confirmed") continue;
+    const key = `${reservation.useDate}\u0000${reservation.start}\u0000${reservation.space}`;
+    const values = confirmedBySlot.get(key) ?? [];
+    values.push(reservation);
+    confirmedBySlot.set(key, values);
+  }
+  const hours: number[] = [];
+  for (const reservation of cancelled) {
+    const key = `${reservation.useDate}\u0000${reservation.start}\u0000${reservation.space}`;
+    const resale = (confirmedBySlot.get(key) ?? []).find((candidate) => new Date(candidate.bookedAt).getTime() > new Date(reservation.bookedAt).getTime());
+    if (resale !== undefined) hours.push((new Date(resale.bookedAt).getTime() - new Date(reservation.bookedAt).getTime()) / (60 * 60 * 1000));
+  }
+  const medianHours = quantile(hours.sort((left, right) => left - right), 0.5);
+  return { n: cancelled.length, resold: hours.length, rate: cancelled.length === 0 ? null : hours.length / cancelled.length, medianHours };
+}
+
+/** 初回利用月で顧客をまとめる。pseudoId欠損行は顧客を同定できないため除外する。 */
+export function customerCohorts(bundle: CanonicalBundle): { month: string; customers: number; repeated: number; cumulativeRevenue: number }[] {
+  const customers = new Map<string, CanonicalReservation[]>();
+  for (const reservation of bundle.reservations) {
+    if (reservation.status !== "confirmed" || reservation.pseudoId === null) continue;
+    const values = customers.get(reservation.pseudoId) ?? [];
+    values.push(reservation);
+    customers.set(reservation.pseudoId, values);
+  }
+  const cohorts = new Map<string, { customers: number; repeated: number; cumulativeRevenue: number }>();
+  for (const reservations of customers.values()) {
+    // Map の値は必ず1件以上の予約を持つため先頭要素の存在は保証される。
+    const month = reservations.reduce((first, reservation) => reservation.useDate < first ? reservation.useDate : first, (reservations[0] as CanonicalReservation).useDate).slice(0, 7);
+    const cohort = cohorts.get(month) ?? { customers: 0, repeated: 0, cumulativeRevenue: 0 };
+    cohort.customers += 1;
+    if (new Set(reservations.map((reservation) => reservation.useDate)).size >= 2) cohort.repeated += 1;
+    cohort.cumulativeRevenue += reservations.reduce((sum, reservation) => sum + (reservation.amount ?? 0), 0);
+    cohorts.set(month, cohort);
+  }
+  return [...cohorts.entries()].map(([month, cohort]) => ({ month, ...cohort })).sort((left, right) => left.month.localeCompare(right.month));
+}
+
 const SPACE_RESERVATION_CATEGORY = "スペース予約";
 
 /** プログラム参加予約は、プログラム名・開催日・開始時刻で予約CSVと突合する。 */

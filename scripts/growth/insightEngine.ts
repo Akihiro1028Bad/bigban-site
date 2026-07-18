@@ -8,6 +8,10 @@ import { paceDeviation } from "./insightDetectors/paceDeviation";
 import { reservationCountChange } from "./insightDetectors/reservationCountChange";
 import { selfRateChange } from "./insightDetectors/selfRateChange";
 import { unpaidOverdue } from "./insightDetectors/unpaidOverdue";
+import { lifecycleEvents } from "./insightDetectors/lifecycleEvents";
+import { dormantRisk } from "./insightDetectors/dormantRisk";
+import { pipelineErosion } from "./insightDetectors/pipelineErosion";
+import { cancelResale } from "./insightDetectors/cancelResale";
 import type { CanonicalBundle } from "./labolaNormalize";
 import type { DateRange } from "./period";
 import type { Insight, Snapshot } from "./snapshotSchema";
@@ -19,6 +23,7 @@ export interface DetectorContext {
   history?: Snapshot[];
   funnel: Snapshot["funnel"] | null;
   onTheBooks?: { daysOut: number; reservations: number; baselineMedian: number | null }[] | null;
+  kpi: Snapshot["kpi"] | null;
   current: DateRange;
   prior: DateRange;
   todayYmd: string;
@@ -50,4 +55,8 @@ export const CORE_DETECTORS: readonly Detector[] = [
   dataHealth,
   newRemarks,
   unpaidOverdue,
+  lifecycleEvents,
+  dormantRisk,
+  pipelineErosion,
+  cancelResale,
 ];

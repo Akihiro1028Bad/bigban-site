@@ -9,7 +9,7 @@ function reservation(reservationId: string, bookedYmd: string, leadDays: number)
 
 function detect(reservations: object[]) {
   const bundle = { reservations, customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { coverage: { start: "2026-05-01", end: "2026-07-10" } } };
-  return leadTimeShift({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: [], funnel: null, onTheBooks: null, current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "2026-07-10" });
+  return leadTimeShift({ bundle: bundle as never, previousSnapshot: null, baselineInputs: null, history: [], funnel: null, onTheBooks: null, kpi: null, current: { start: "", end: "" }, prior: { start: "", end: "" }, todayYmd: "2026-07-10" });
 }
 
 it("リードタイムが伸びる前倒し傾向をnoticeにする", () => {

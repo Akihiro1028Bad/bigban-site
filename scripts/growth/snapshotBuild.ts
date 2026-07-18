@@ -1,5 +1,5 @@
 /** 正準データから集計・検出を接続して検証済みスナップショットを作る。 */
-import { cancellationStats, demographics, demandHeatmap, leadTimeStats, onTheBooksPoints, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
+import { cancelResaleStats, cancellationStats, customerCohorts, demographics, demandHeatmap, leadTimeStats, onTheBooksPoints, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
 import { CORE_DETECTORS, runDetectors } from "./insightEngine";
 import { computeWeeklyPeriods } from "./period";
 import { snapshotSchema } from "./snapshotSchema";
@@ -42,19 +42,20 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     return { week: { start: input.current.start, end: input.current.end }, current: funnelCounts.current, prior: funnelCounts.prior, capture: { ga4Complete, selfBooked, rate: selfBooked === 0 ? null : ga4Complete / selfBooked } };
   })();
   const onTheBooks = onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: baselineMedian(history, point.daysOut) }));
+  const kpi = weeklyKpis(bundle, current, prior, referenceYmd);
   return snapshotSchema.parse({
     schemaVersion: 1,
     generatedAt: bundle.meta.generatedAt,
     coverage,
     analysis: { referenceYmd, currentWeek: current },
     meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: [...bundle.meta.warnings, ...(funnelCounts !== null && !isFunnelWeekCovered ? ["CSVの収録範囲が対象週を含まないためファネルを省略しました"] : [])] },
-    kpi: weeklyKpis(bundle, current, prior, referenceYmd),
-    catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd) },
+    kpi,
+    catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd), cancelResale: cancelResaleStats(bundle, referenceYmd), cohorts: customerCohorts(bundle) },
     series: {
       weeklyReservations: weeklyReservationSeries(bundle),
       onTheBooks,
     },
     ...(funnel === undefined ? {} : { funnel }),
-    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null, onTheBooks, history }, CORE_DETECTORS),
+    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null, onTheBooks, history, kpi }, CORE_DETECTORS),
   });
 }
