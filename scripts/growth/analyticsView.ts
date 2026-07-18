@@ -41,6 +41,27 @@ export interface FunnelView {
   note: string;
 }
 
+export interface PaceCurvePointView {
+  daysOut: number;
+  current: number;
+  baseline: number | null;
+  pct: number | null;
+  currentWidthPct: number;
+  baselineWidthPct: number;
+}
+
+export interface PaceCurveView {
+  points: PaceCurvePointView[];
+  state: "ready" | "collecting";
+}
+
+export interface CohortRowView {
+  month: string;
+  customers: number;
+  repeatText: string;
+  revenueText: string;
+}
+
 export interface ProgramListItem { title: string; schedule: string; fill: string; state: "full" | "warn" | "open" | "unknown"; }
 export interface MoneyExtraView { unpaid: { headline: string; overdue: string | null } | null; paymentShare: { method: string; pct: number }[]; revPach: string | null; }
 
@@ -155,6 +176,38 @@ export function funnelView(snapshot: Snapshot): FunnelView | null {
   };
 }
 
+/** 予約ペースを基準値との比較バーを含む表示用データへ整形する。 */
+export function paceCurveView(snapshot: Snapshot): PaceCurveView | null {
+  const onTheBooks = snapshot.series.onTheBooks;
+  if (onTheBooks === undefined) return null;
+
+  const maxValue = Math.max(0, ...onTheBooks.flatMap((point) => point.baselineMedian === null ? [point.reservations] : [point.reservations, point.baselineMedian]));
+  const widthPct = (value: number | null): number => value === null || maxValue === 0 ? 0 : Math.round((value / maxValue) * 100);
+  const points = [...onTheBooks]
+    .sort((left, right) => left.daysOut - right.daysOut)
+    .map((point) => ({
+      daysOut: point.daysOut,
+      current: point.reservations,
+      baseline: point.baselineMedian,
+      pct: point.baselineMedian !== null && point.baselineMedian > 0 ? Math.round((point.reservations / point.baselineMedian) * 100) : null,
+      currentWidthPct: widthPct(point.reservations),
+      baselineWidthPct: widthPct(point.baselineMedian),
+    }));
+  return { points, state: points.some((point) => point.baseline !== null) ? "ready" : "collecting" };
+}
+
+/** 月別の継続状況を、表がそのまま表示できる文字列に整形する。 */
+export function cohortView(snapshot: Snapshot): CohortRowView[] | null {
+  const cohorts = snapshot.catalog.cohorts;
+  if (cohorts === undefined) return null;
+  return cohorts.map((cohort) => ({
+    month: cohort.month,
+    customers: cohort.customers,
+    repeatText: `${cohort.repeated}/${cohort.customers}人`,
+    revenueText: `¥${cohort.cumulativeRevenue.toLocaleString("ja-JP")}`,
+  }));
+}
+
 export function programList(snapshot: Snapshot): ProgramListItem[] {
   return (snapshot.catalog.programFills ?? []).map((program) => {
     if (program.capacity === null) return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: "—", state: "unknown" };
@@ -202,5 +255,5 @@ const COLLECTING_LABELS: Record<string, string> = {
 
 export function collectingSections(snapshot: Snapshot): string[] {
   const missing = snapshot.meta.missingSections.map((section) => COLLECTING_LABELS[section] ?? section);
-  return [...missing, "ペースカーブはP4で解禁"];
+  return missing;
 }

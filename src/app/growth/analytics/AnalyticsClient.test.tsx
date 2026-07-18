@@ -24,6 +24,8 @@ describe("AnalyticsClient", () => {
     expect(screen.queryByRole("heading", { name: "プログラム" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "顧客の年代・性別" })).toBeNull();
     expect(screen.queryByText("ファネルはP3で解禁")).toBeNull();
+    expect(screen.getByRole("heading", { name: "ペースカーブ" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "コホート" })).toBeVisible();
   });
 
   it("拡張データがあればプログラムと年代・性別を表示する", async () => {
@@ -48,6 +50,20 @@ describe("AnalyticsClient", () => {
     render(<AnalyticsClient />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "予約ファネル(07/13〜07/19)" })).toBeVisible());
     expect(screen.getByRole("heading", { name: "気づき" }).compareDocumentPosition(screen.getByRole("heading", { name: "予約ファネル(07/13〜07/19)" }) ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("お金パネルの後にペースカーブ、コホートの順で表示する", async () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [{ daysOut: 7, reservations: 4, forecastSales: null, baselineMedian: null }];
+    snapshot.catalog.cohorts = [{ month: "2026-07", customers: 3, repeated: 1, cumulativeRevenue: 12000 }];
+    mockSnapshot(snapshot);
+    render(<AnalyticsClient />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "ペースカーブ" })).toBeVisible());
+    const moneyHeading = screen.getByRole("heading", { name: "経営サマリー" });
+    const paceHeading = screen.getByRole("heading", { name: "ペースカーブ" });
+    const cohortHeading = screen.getByRole("heading", { name: "コホート" });
+    expect(moneyHeading.compareDocumentPosition(paceHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(paceHeading.compareDocumentPosition(cohortHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("予約不可CSVが欠落したスナップショットではRevPACHを表示しない", async () => {
