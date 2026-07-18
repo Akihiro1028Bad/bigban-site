@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { analyticsSnapshot } from "./__fixtures__/analyticsSnapshot";
-import { collectingSections, demographicsView, formatSyncedAtJst, freshnessOf, funnelView, heatmapCells, insightEvidenceText, kpiCards, moneyExtra, moneyPanel, programList, sortedInsights } from "./analyticsView";
+import { cohortView, collectingSections, demographicsView, formatSyncedAtJst, freshnessOf, funnelView, heatmapCells, insightEvidenceText, kpiCards, moneyExtra, moneyPanel, paceCurveView, programList, sortedInsights } from "./analyticsView";
 
 describe("analyticsView", () => {
   it("sourceSyncedAtを基準に鮮度を判定する", () => {
@@ -113,10 +113,82 @@ describe("analyticsView", () => {
     expect(demographicsView(snapshot)).toEqual([{ label: "30代 女性", count: 5 }]);
   });
 
-  it("欠落データと将来解禁領域を収集中にする", () => {
+  it("欠落データを収集中にする", () => {
     const snapshot = analyticsSnapshot();
     snapshot.meta.missingSections = ["customer", "unknown"];
-    expect(collectingSections(snapshot)).toEqual(["商圏・顧客データ", "unknown", "ペースカーブはP4で解禁"]);
+    expect(collectingSections(snapshot)).toEqual(["商圏・顧客データ", "unknown"]);
+  });
+
+  it("ペースカーブがない旧スナップショットはnullにする", () => {
+    expect(paceCurveView(analyticsSnapshot())).toBeNull();
+  });
+
+  it("ペースカーブを日数順、丸めた基準比とバー幅つきで整形する", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [
+      { daysOut: 14, reservations: 3, forecastSales: 0, baselineMedian: 2 },
+      { daysOut: 7, reservations: 12, forecastSales: 0, baselineMedian: 10 },
+      { daysOut: 21, reservations: 4, forecastSales: 0, baselineMedian: 3 },
+    ];
+    expect(paceCurveView(snapshot)).toEqual({
+      state: "ready",
+      points: [
+        { daysOut: 7, current: 12, baseline: 10, pct: 120, currentWidthPct: 100, baselineWidthPct: 83 },
+        { daysOut: 14, current: 3, baseline: 2, pct: 150, currentWidthPct: 25, baselineWidthPct: 17 },
+        { daysOut: 21, current: 4, baseline: 3, pct: 133, currentWidthPct: 33, baselineWidthPct: 25 },
+      ],
+    });
+  });
+
+  it("ペースカーブは履歴未満なら収集中にする", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [
+      { daysOut: 7, reservations: 0, forecastSales: null, baselineMedian: null },
+      { daysOut: 14, reservations: 4, forecastSales: null, baselineMedian: null },
+    ];
+    expect(paceCurveView(snapshot)).toEqual({
+      state: "collecting",
+      points: [
+        { daysOut: 7, current: 0, baseline: null, pct: null, currentWidthPct: 0, baselineWidthPct: 0 },
+        { daysOut: 14, current: 4, baseline: null, pct: null, currentWidthPct: 100, baselineWidthPct: 0 },
+      ],
+    });
+  });
+
+  it("ペースカーブは基準が一部でも欠ける間は収集中にする", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [
+      { daysOut: 7, reservations: 4, forecastSales: null, baselineMedian: 3 },
+      { daysOut: 14, reservations: 2, forecastSales: null, baselineMedian: null },
+    ];
+
+    expect(paceCurveView(snapshot)?.state).toBe("collecting");
+  });
+
+  it("ペースカーブは基準0を比率なしにして0除算を避ける", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [{ daysOut: 7, reservations: 4, forecastSales: null, baselineMedian: 0 }];
+    expect(paceCurveView(snapshot)).toEqual({ state: "ready", points: [{ daysOut: 7, current: 4, baseline: 0, pct: null, currentWidthPct: 100, baselineWidthPct: 0 }] });
+  });
+
+  it("ペースカーブの空配列は収集中にする", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [];
+
+    expect(paceCurveView(snapshot)).toEqual({ state: "collecting", points: [] });
+  });
+
+  it("コホートがない旧スナップショットはnull、空配列はそのままにする", () => {
+    expect(cohortView(analyticsSnapshot())).toBeNull();
+    const snapshot = analyticsSnapshot();
+    snapshot.catalog.cohorts = [];
+    expect(cohortView(snapshot)).toEqual([]);
+  });
+
+  it("コホートの人数・リピート・累積売上を表示用に整形する", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.catalog.cohorts = [{ month: "2026-07", customers: 3, repeated: 2, cumulativeRevenue: 123456 }];
+    expect(cohortView(snapshot)).toEqual([{ month: "2026-07", customers: 3, repeatText: "2/3人", revenueText: "¥123,456" }]);
   });
 
   it("ファネルがない旧スナップショットはnullにする", () => {

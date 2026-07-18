@@ -152,7 +152,7 @@ onTheBooks: z.array(z.object({
 **Interfaces:**
 - **注意 — ボードは Blob スナップショット読み取り専用で履歴を持たない**。そのため snapshot 生成時に比較値を焼き込む: snapshotSchema の series.onTheBooks 各点に optional `baselineMedian: z.number().nullable()`(ingest 時に history から計算した同 daysOut 中央値。履歴6週未満は null)を追加し、`paceCurveView(snapshot): { points: { daysOut, current, baseline: number | null }[]; state: "ready" | "collecting" } | null` は snapshot 単体から整形する(Task 1/2 実装時にこの焼き込みまで含めてもよい。その場合は本タスクで参照のみ)
 - `cohortView(snapshot): { month: string; customers: number; repeatRate: string; revenue: string }[] | null`(cohorts 欠落は null → 収集中表示)
-- PaceCurvePanel: daysOut 7/14/21/28 の横並び。current と baseline を並記、baseline null は「基準収集中(あと◯週)」。バーは div 幅%(FunnelPanel と同流儀)
+- PaceCurvePanel: daysOut 7/14/21/28 の横並び(狭幅2列)。current と baseline を並記、baseline null は「基準 収集中」+履歴6週の注記(**「あと◯週」はスナップショット単体が履歴件数を持たないため表示しない**=レビューP1rC-M2で確定)。バーは div 幅%(FunnelPanel と同流儀)
 - CohortPanel: 月別の小さいテーブル(`overflow-x: auto`)
 
 ### Task 11: publicFacingPack(§11 経路2 の土台)
