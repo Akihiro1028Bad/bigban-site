@@ -155,10 +155,27 @@ describe("analyticsView", () => {
     });
   });
 
+  it("ペースカーブは基準が一部でも欠ける間は収集中にする", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [
+      { daysOut: 7, reservations: 4, forecastSales: null, baselineMedian: 3 },
+      { daysOut: 14, reservations: 2, forecastSales: null, baselineMedian: null },
+    ];
+
+    expect(paceCurveView(snapshot)?.state).toBe("collecting");
+  });
+
   it("ペースカーブは基準0を比率なしにして0除算を避ける", () => {
     const snapshot = analyticsSnapshot();
     snapshot.series.onTheBooks = [{ daysOut: 7, reservations: 4, forecastSales: null, baselineMedian: 0 }];
     expect(paceCurveView(snapshot)).toEqual({ state: "ready", points: [{ daysOut: 7, current: 4, baseline: 0, pct: null, currentWidthPct: 100, baselineWidthPct: 0 }] });
+  });
+
+  it("ペースカーブの空配列は収集中にする", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.series.onTheBooks = [];
+
+    expect(paceCurveView(snapshot)).toEqual({ state: "collecting", points: [] });
   });
 
   it("コホートがない旧スナップショットはnull、空配列はそのままにする", () => {

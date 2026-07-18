@@ -29,4 +29,12 @@ describe("PaceCurvePanel", () => {
     render(<PaceCurvePanel view={{ state: "ready", points: [{ daysOut: 7, current: 3, baseline: 2, pct: 150, currentWidthPct: 100, baselineWidthPct: 67 }] }} />);
     expect(screen.queryByText("基準は履歴6週で表示されます")).toBeNull();
   });
+
+  it("点がないときは収集中と区別してデータなしを表示する", () => {
+    render(<PaceCurvePanel view={{ state: "collecting", points: [] }} />);
+
+    expect(screen.getByText("データなし")).toBeVisible();
+    expect(screen.queryByRole("list")).toBeNull();
+    expect(screen.queryByText("基準は履歴6週で表示されます")).toBeNull();
+  });
 });

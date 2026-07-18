@@ -193,7 +193,7 @@ export function paceCurveView(snapshot: Snapshot): PaceCurveView | null {
       currentWidthPct: widthPct(point.reservations),
       baselineWidthPct: widthPct(point.baselineMedian),
     }));
-  return { points, state: points.some((point) => point.baseline !== null) ? "ready" : "collecting" };
+  return { points, state: points.length > 0 && points.every((point) => point.baseline !== null) ? "ready" : "collecting" };
 }
 
 /** 月別の継続状況を、表がそのまま表示できる文字列に整形する。 */

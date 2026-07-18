@@ -11,6 +11,7 @@ export function PaceCurvePanel({ view }: PaceCurvePanelProps) {
 
   return <section aria-labelledby="analytics-pace-heading">
     <h2 id="analytics-pace-heading">ペースカーブ</h2>
+    {view.points.length === 0 ? <p>データなし</p> : <>
     <ul className="analytics-pace-points">
       {view.points.map((point) => <li key={point.daysOut}>
         <strong>+{point.daysOut}日 {point.current}件</strong>
@@ -22,5 +23,6 @@ export function PaceCurvePanel({ view }: PaceCurvePanelProps) {
       </li>)}
     </ul>
     {view.state === "collecting" ? <small className="analytics-pace-note">基準は履歴6週で表示されます</small> : null}
+    </>}
   </section>;
 }
