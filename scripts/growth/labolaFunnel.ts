@@ -1,5 +1,8 @@
 /** Labola予約ファネルのGA4イベント定義と集計。 */
 
+import { z } from "zod";
+
+import { CTA_EVENTS } from "./ctaEvents";
 import type { Ga4ReportDef } from "./ga4";
 import type { MergedRow } from "./transform";
 
@@ -17,16 +20,13 @@ export const LABOLA_FUNNEL_EVENTS = {
     pending: "labola_reserve_pending_program",
     complete: "labola_reserve_complete_program",
   },
-  intent: {
-    reservationClick: "reservation_click",
-    reserveEntryClick: "reserve_entry_click",
-  },
 } as const;
 
 const LABOLA_FUNNEL_EVENT_NAMES = [
   ...Object.values(LABOLA_FUNNEL_EVENTS.rental),
   ...Object.values(LABOLA_FUNNEL_EVENTS.program),
-  ...Object.values(LABOLA_FUNNEL_EVENTS.intent),
+  CTA_EVENTS.reservation,
+  CTA_EVENTS.reserveEntry,
 ] as const;
 
 /** Labola予約ファネルをGA4から取得するレポート定義。 */
@@ -53,13 +53,26 @@ export interface FunnelCounts {
   program: FunnelStageCounts;
 }
 
+const funnelStageCountsSchema = z.object({
+  input: z.number().finite().min(0),
+  confirm: z.number().finite().min(0),
+  pending: z.number().finite().min(0),
+  complete: z.number().finite().min(0),
+});
+
+// FunnelCounts型と同じ全フィールドを検証し、GA4由来の不正値を取り込み境界で除外する。
+export const funnelCountsResultSchema = z.object({
+  current: z.object({ intent: z.number().finite().min(0), rental: funnelStageCountsSchema, program: funnelStageCountsSchema }),
+  prior: z.object({ intent: z.number().finite().min(0), rental: funnelStageCountsSchema, program: funnelStageCountsSchema }),
+}) satisfies z.ZodType<{ current: FunnelCounts; prior: FunnelCounts }>;
+
 type FunnelEventBucket =
   | { flow: "intent" }
   | { flow: "rental" | "program"; stage: keyof FunnelStageCounts };
 
 const BUCKET_BY_EVENT: Readonly<Partial<Record<string, FunnelEventBucket>>> = {
-  [LABOLA_FUNNEL_EVENTS.intent.reservationClick]: { flow: "intent" },
-  [LABOLA_FUNNEL_EVENTS.intent.reserveEntryClick]: { flow: "intent" },
+  [CTA_EVENTS.reservation]: { flow: "intent" },
+  [CTA_EVENTS.reserveEntry]: { flow: "intent" },
   [LABOLA_FUNNEL_EVENTS.rental.input]: { flow: "rental", stage: "input" },
   [LABOLA_FUNNEL_EVENTS.rental.confirm]: { flow: "rental", stage: "confirm" },
   [LABOLA_FUNNEL_EVENTS.rental.pending]: { flow: "rental", stage: "pending" },

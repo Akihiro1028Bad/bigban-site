@@ -233,6 +233,24 @@ describe("runIngestApplication", () => {
     expect(log).toHaveBeenCalledWith("[ingest] GA4ファネル取得に失敗しました(スナップショットはファネルなしで継続)");
   });
 
+  it("GA4ファネルにNaNが含まれる場合も取り込みを継続し、警告を記録する", async () => {
+    const { drop, data } = await setup();
+    const log = vi.fn();
+
+    const result = await runIngestApplication(input(drop, data), {
+      ...deps(),
+      log,
+      fetchFunnel: async () => ({
+        current: { intent: Number.NaN, rental: { input: 0, confirm: 0, pending: 0, complete: 0 }, program: { input: 0, confirm: 0, pending: 0, complete: 0 } },
+        prior: { intent: 0, rental: { input: 0, confirm: 0, pending: 0, complete: 0 }, program: { input: 0, confirm: 0, pending: 0, complete: 0 } },
+      }),
+    });
+
+    expect(result.snapshot.funnel).toBeUndefined();
+    expect(result.snapshot.meta.warnings).toContain("GA4ファネル取得失敗");
+    expect(log).toHaveBeenCalledWith("[ingest] GA4ファネル取得に失敗しました(スナップショットはファネルなしで継続)");
+  });
+
   it("GA4ファネル取得がnullなら警告なしでファネルを省略する", async () => {
     const { drop, data } = await setup();
 

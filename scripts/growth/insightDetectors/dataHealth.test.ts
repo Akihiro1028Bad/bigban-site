@@ -49,7 +49,7 @@ it("セルフ予約が5件以上でGA4予約完了が0件ならタグ破損の�
   expect(dataHealth(dataHealthContext(captureFunnel(0, 5)))).toContainEqual(expect.objectContaining({
     id: "d11:capture:zero",
     severity: "alert",
-    title: "タグ破損の疑い: GA4予約完了が0件",
+    title: "タグ破損の疑い: セルフ予約があるのにGA4完了が0件",
     body: "セルフ予約があるのにGA4の予約完了イベントが1件も計測されていません。LaBOLAのタグ設定を確認してください。",
     evidence: { n: 5, ga4Complete: 0 },
     label: "観察",

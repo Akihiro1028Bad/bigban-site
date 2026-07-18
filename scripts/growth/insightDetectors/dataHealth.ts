@@ -21,7 +21,7 @@ export const dataHealth: Detector = (context) => {
   // 少数のセルフ予約では偶然の揺れが大きいため、誤検知を避ける。
   if (selfBooked < 5) return insights;
   if (ga4Complete === 0) {
-    insights.push({ id: "d11:capture:zero", detector: "D11", severity: "alert", title: "タグ破損の疑い: GA4予約完了が0件", body: "セルフ予約があるのにGA4の予約完了イベントが1件も計測されていません。LaBOLAのタグ設定を確認してください。", evidence: { n: selfBooked, ga4Complete: 0 }, label: "観察" });
+    insights.push({ id: "d11:capture:zero", detector: "D11", severity: "alert", title: "タグ破損の疑い: セルフ予約があるのにGA4完了が0件", body: "セルフ予約があるのにGA4の予約完了イベントが1件も計測されていません。LaBOLAのタグ設定を確認してください。", evidence: { n: selfBooked, ga4Complete: 0 }, label: "観察" });
     return insights;
   }
   const previousRate = context.previousSnapshot?.funnel?.capture.rate;

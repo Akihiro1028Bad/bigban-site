@@ -11,6 +11,7 @@ import { mergeExclusionRules } from "./reservationExclusions";
 import { buildSnapshot } from "./snapshotBuild";
 import { parseSnapshot } from "./snapshotSchema";
 import { ymdSchema } from "./dateSchemas";
+import { funnelCountsResultSchema } from "./labolaFunnel";
 import type { ExclusionRules } from "./reservationExclusions";
 import type { FunnelCounts } from "./labolaFunnel";
 import type { LabolaCsvType } from "./labolaCsv";
@@ -297,7 +298,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   let funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null = null;
   if (deps.fetchFunnel) {
     try {
-      funnelCounts = await deps.fetchFunnel(current, prior);
+      funnelCounts = funnelCountsResultSchema.nullable().parse(await deps.fetchFunnel(current, prior));
     } catch {
       log("[ingest] GA4ファネル取得に失敗しました(スナップショットはファネルなしで継続)");
       canonical.meta.warnings.push("GA4ファネル取得失敗");

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { MergedRow } from "./transform";
+import { CTA_EVENTS } from "./ctaEvents";
 import {
   funnelFromRows,
   LABOLA_FUNNEL_EVENTS,
@@ -19,8 +20,8 @@ function row(eventName: string, values: [number, number]): MergedRow {
 describe("funnelFromRows", () => {
   it("10イベントすべてを対応するファネルのバケットへ集計する", () => {
     const result = funnelFromRows([
-      row(LABOLA_FUNNEL_EVENTS.intent.reservationClick, [1, 11]),
-      row(LABOLA_FUNNEL_EVENTS.intent.reserveEntryClick, [2, 12]),
+      row(CTA_EVENTS.reservation, [1, 11]),
+      row(CTA_EVENTS.reserveEntry, [2, 12]),
       row(LABOLA_FUNNEL_EVENTS.rental.input, [3, 13]),
       row(LABOLA_FUNNEL_EVENTS.rental.confirm, [4, 14]),
       row(LABOLA_FUNNEL_EVENTS.rental.pending, [5, 15]),
@@ -48,8 +49,8 @@ describe("funnelFromRows", () => {
   it("intentは2種類の予約意図クリックを合算する", () => {
     expect(
       funnelFromRows([
-        row(LABOLA_FUNNEL_EVENTS.intent.reservationClick, [4, 2]),
-        row(LABOLA_FUNNEL_EVENTS.intent.reserveEntryClick, [6, 3]),
+        row(CTA_EVENTS.reservation, [4, 2]),
+        row(CTA_EVENTS.reserveEntry, [6, 3]),
       ])
     ).toMatchObject({ current: { intent: 10 }, prior: { intent: 5 } });
   });
@@ -113,8 +114,8 @@ describe("LABOLA_FUNNEL_REPORT", () => {
           "labola_step_confirm_program",
           "labola_reserve_pending_program",
           "labola_reserve_complete_program",
-          "reservation_click",
-          "reserve_entry_click",
+          CTA_EVENTS.reservation,
+          CTA_EVENTS.reserveEntry,
         ],
       },
       limit: 100,

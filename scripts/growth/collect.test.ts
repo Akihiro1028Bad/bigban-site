@@ -83,11 +83,16 @@ describe("collectGrowthData", () => {
   });
 
   it("deps 未指定時は実装の fetchGa4/fetchGsc を用いる(グローバル fetch をスタブ)", async () => {
-    const globalFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ reports: [], rows: [] }),
-      text: async () => "",
+    // fetchGa4 は要求数と応答レポート数の一致を検証するため、リクエスト本文に応じた件数を返す。
+    const globalFetch = vi.fn().mockImplementation(async (_url: unknown, init?: { body?: string }) => {
+      const parsed = init?.body ? (JSON.parse(init.body) as { requests?: unknown[] }) : {};
+      const reports = (parsed.requests ?? []).map(() => ({}));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ reports, rows: [] }),
+        text: async () => "",
+      };
     });
     vi.stubGlobal("fetch", globalFetch);
 
