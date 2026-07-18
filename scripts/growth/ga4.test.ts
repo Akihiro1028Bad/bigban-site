@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { fetchGa4, GA4_REPORTS, type Ga4ReportDef } from "./ga4";
+import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
 import type { FetchFn } from "./http";
 import type { GrowthConfig } from "./config";
 
@@ -99,6 +100,18 @@ describe("fetchGa4", () => {
     expect(GA4_REPORTS.find((report) => report.key === "byChannel")?.excludeHostContains).toBeUndefined();
     expect(GA4_REPORTS.find((report) => report.key === "byDevice")?.excludeHostContains).toBeUndefined();
     expect(GA4_REPORTS.find((report) => report.key === "ctaEvents")?.excludeHostContains).toBeUndefined();
+    const reserveCompleteReport = GA4_REPORTS.find((report) => report.key === "reserveCompleteEvents");
+    expect(reserveCompleteReport).toMatchObject({
+      dimensions: ["eventName"],
+      metrics: ["eventCount"],
+      dimensionFilter: {
+        fieldName: "eventName",
+        values: [LABOLA_FUNNEL_EVENTS.rental.complete, LABOLA_FUNNEL_EVENTS.program.complete],
+      },
+      limit: 10,
+      includePriorOnly: true,
+    });
+    expect(reserveCompleteReport?.excludeHostContains).toBeUndefined();
   });
 
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
@@ -268,15 +281,17 @@ describe("fetchGa4", () => {
   });
 
   it("reports/fetchFn 未指定時は既定値(GA4_REPORTS・グローバル fetch)を用いる", async () => {
-    const globalFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 5 }, () => ({ rows: [] })) }), text: async () => "" })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 5 }, () => ({ rows: [] })) }), text: async () => "" })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 2 }, () => ({ rows: [] })) }), text: async () => "" });
+    // 件数検証があるため、リクエスト本文のバッチ数に応じたレポート数を返す。
+    const globalFetch = vi.fn().mockImplementation(async (_url: unknown, init?: { body?: string }) => {
+      const parsed = init?.body ? (JSON.parse(init.body) as { requests?: unknown[] }) : {};
+      const reports = (parsed.requests ?? []).map(() => ({ rows: [] }));
+      return { ok: true, status: 200, json: async () => ({ reports }), text: async () => "" };
+    });
     vi.stubGlobal("fetch", globalFetch);
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior });
 
-    // 既定6レポート × 2期間 = 12リクエスト → 5件ずつ3バッチ
+    // 既定7レポート × 2期間 = 14リクエスト → 5件ずつ3バッチ
     expect(globalFetch).toHaveBeenCalledTimes(3);
     // 既定レポートの各 key が結果に存在する
     for (const def of GA4_REPORTS) {

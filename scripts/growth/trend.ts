@@ -59,6 +59,13 @@ function summaryRow(snapshot: SnapshotLike, source: "ga4" | "gsc"): MergedRow | 
   return snapshot[source]?.summary?.[0];
 }
 
+/** 完了イベント専用レポートの2イベントを合算する。レポート欠落は旧スナップショットとして欠測にする。 */
+function reserveCompleteValue(snapshot: SnapshotLike): number | null {
+  const rows = snapshot.ga4?.reserveCompleteEvents;
+  if (rows === undefined) return null;
+  return rows.reduce((sum, row) => sum + (row.metrics.eventCount?.current ?? 0), 0);
+}
+
 function average(values: readonly (number | null)[]): number | null {
   const nums = values.filter((value): value is number => value !== null);
   if (nums.length === 0) return null;
@@ -77,7 +84,9 @@ export function buildTrend(snapshots: readonly SnapshotLike[]): TrendReport {
   const series: TrendSeries[] = METRICS.map(({ key, source }) => {
     const points = recent.map((snapshot) => ({
       weekEnd: snapshot.period.end,
-      value: metricValue(summaryRow(snapshot, source), key),
+      value: key === "reserveComplete"
+        ? reserveCompleteValue(snapshot)
+        : metricValue(summaryRow(snapshot, source), key),
     }));
     return {
       metric: key,

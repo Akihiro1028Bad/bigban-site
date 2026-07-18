@@ -124,7 +124,7 @@ GA4(プロパティ: G-XEP1C5L70P)の **管理 > データストリーム > (ウ
 
 ## 5. フォールバック(script 不可だった場合)
 
-Measurement Protocol を**自サイトの中継エンドポイント経由**で叩くピクセルタグに切り替える(P3b で実装。api_secret はサーバー側にのみ保持し、タグには書かない)。
+Measurement Protocol を**自サイトの中継エンドポイント経由**で叩くピクセルタグに切り替える(**未実装の代替案**。script 可と実地確認済みのため実装しなかった。必要になった時点で `/api/growth/ga-pixel` 相当を実装する。api_secret はサーバー側にのみ保持し、タグには書かない)。
 
 ```html
 <img src="https://thepicklebangtheory.com/api/growth/ga-pixel?e=labola_reserve_complete" width="1" height="1" alt="">

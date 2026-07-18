@@ -15,6 +15,7 @@ import {
   type MergedRow,
 } from "./transform";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
+import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -89,6 +90,18 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
     metrics: ["keyEvents"],
     dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
     limit: 10_000,
+    includePriorOnly: true,
+  },
+  {
+    // 週次trend用の予約完了。完了イベントはLabolaドメイン上で発火するためhost除外を付けない。
+    key: "reserveCompleteEvents",
+    dimensions: ["eventName"],
+    metrics: ["eventCount"],
+    dimensionFilter: {
+      fieldName: "eventName",
+      values: [LABOLA_FUNNEL_EVENTS.rental.complete, LABOLA_FUNNEL_EVENTS.program.complete],
+    },
+    limit: 10,
     includePriorOnly: true,
   },
 ];

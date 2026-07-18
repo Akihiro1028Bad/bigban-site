@@ -23,6 +23,7 @@ describe("AnalyticsClient", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "経営サマリー" })).toBeVisible());
     expect(screen.queryByRole("heading", { name: "プログラム" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "顧客の年代・性別" })).toBeNull();
+    expect(screen.queryByText("ファネルはP3で解禁")).toBeNull();
   });
 
   it("拡張データがあればプログラムと年代・性別を表示する", async () => {

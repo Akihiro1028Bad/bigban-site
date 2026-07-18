@@ -32,7 +32,7 @@
 | 階層 | KPI | データ源 | 見る場所 |
 |---|---|---|---|
 | **北極星** | 月間実予約数（記事帰属／施設全体） | 予約サービスCSVまたは同週手入力 | 週次レポート経営サマリ(§4) / PerformanceBoard |
-| **予約完了(GA4)** | `labola_reserve_complete + labola_reserve_complete_program`（記事帰属は landingPage）。真値はあくまでCSV実予約で、GA4完了は捕捉率(=GA4完了÷セルフ予約)付きの参考値 | GA4 `metrics.ts` の `reserveComplete`(P3b) / スナップショット `funnel.capture` | 経営ボード「予約ファネル」/ PerformanceBoard |
+| **予約完了(GA4)** | `labola_reserve_complete + labola_reserve_complete_program`（記事帰属は landingPage）。真値はあくまでCSV実予約で、GA4完了は捕捉率(=GA4完了÷セルフ予約)付きの参考値 | GA4 `metrics.ts` の `reserveComplete`(P3b) / スナップショット `funnel.capture` | 経営ボード「予約ファネル」(記事別はNotionミラーJSONに保存のみ。PerformanceBoard表示は未実装) |
 | **予約意図** | `reservation_click + reserve_entry_click`（予約完了とは別バケット。合算しない） | GA4 `ctaEvents.reservationClick/reserveEntryClick` | PerformanceBoard「予約意図」/ 週次レポート |
 | **SNS・その他CTA** | LINE / Instagram / その他CTA（相互に合算しない） | GA4 `ctaEvents.lineClick/instagramClick/other` | PerformanceBoard「SNS」「その他CTA」/ 週次レポート |
 | **流入系中間** | 記事セッション(views)/ 平均掲載順位(position)/ 検索CTR | GA4 `topPages`(views)/ GSC(clicks・impressions・ctr・position。`metrics.ts` の `search`) | PerformanceBoard / 週次レポート先頭の数字 |
