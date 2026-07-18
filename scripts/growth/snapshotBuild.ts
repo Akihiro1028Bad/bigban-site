@@ -1,5 +1,5 @@
 /** 正準データから集計・検出を接続して検証済みスナップショットを作る。 */
-import { cancelResaleStats, cancellationStats, customerCohorts, demographics, demandHeatmap, leadTimeStats, onTheBooksPoints, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
+import { cancelResaleStats, cancellationStats, customerCohorts, demographics, demandHeatmap, isRecent28RangeClippedAtStart, leadTimeStats, onTheBooksPoints, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
 import { CORE_DETECTORS, runDetectors } from "./insightEngine";
 import { computeWeeklyPeriods } from "./period";
 import { snapshotSchema } from "./snapshotSchema";
@@ -29,6 +29,19 @@ function baselineMedian(history: Snapshot[], daysOut: number): number | null {
   return median(reservations);
 }
 
+function snapshotWarnings(bundle: CanonicalBundle, current: DateRange, referenceYmd: string, isFunnelWeekCovered: boolean, funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null): string[] {
+  const warnings = [...bundle.meta.warnings];
+  const addWarning = (warning: string) => { if (!warnings.includes(warning)) warnings.push(warning); };
+  if (isRecent28RangeClippedAtStart(bundle, current.end)) addWarning("4週集計は収録範囲により部分集計です");
+  const latestActualSalesDate = bundle.salesDaily.filter((row) => !row.isForecast).map((row) => row.date).sort().at(-1);
+  if (!bundle.meta.missingSections.includes("salesSummary") && latestActualSalesDate !== undefined && referenceYmd >= latestActualSalesDate) {
+    const daysOld = Math.round((Date.parse(`${referenceYmd}T00:00:00Z`) - Date.parse(`${latestActualSalesDate}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
+    if (daysOld >= 7) addWarning("売上CSVの実績が7日以上古い可能性があります");
+  }
+  if (funnelCounts !== null && !isFunnelWeekCovered) addWarning("CSVの収録範囲が対象週を含まないためファネルを省略しました");
+  return warnings;
+}
+
 export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: CanonicalBundle["meta"]["coverage"]; sourceSyncedAt: string; current: DateRange; prior: DateRange; todayYmd: string; previousSnapshot: Snapshot | null; baselineInputs: Snapshot["meta"]["inputs"] | null; funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null; history?: Snapshot[] }): Snapshot {
   const { bundle, coverage, sourceSyncedAt, todayYmd, previousSnapshot, baselineInputs, funnelCounts, history = [] } = input;
   const referenceYmd = todayYmd <= coverage.end ? todayYmd : coverage.end;
@@ -48,7 +61,7 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     generatedAt: bundle.meta.generatedAt,
     coverage,
     analysis: { referenceYmd, currentWeek: current },
-    meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: [...bundle.meta.warnings, ...(funnelCounts !== null && !isFunnelWeekCovered ? ["CSVの収録範囲が対象週を含まないためファネルを省略しました"] : [])] },
+    meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: snapshotWarnings(bundle, current, referenceYmd, isFunnelWeekCovered, funnelCounts) },
     kpi,
     catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd), cancelResale: cancelResaleStats(bundle, referenceYmd), cohorts: customerCohorts(bundle) },
     series: {

@@ -13,10 +13,6 @@
 
 import "dotenv/config";
 
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { join } from "node:path";
-
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
 import { getAccessToken } from "./auth";
@@ -31,10 +27,12 @@ import {
   buildMetricsNotificationSummary,
   buildSearchMetrics,
   ctaEventsMeasurementStatusForPeriod,
+  loadCanonicalReservations,
   measurementBucketOf,
   metricsForKnownPagePath,
   reserveCompleteMeasuredForPeriod,
   type ActualReservationMetrics,
+  type ReservationCsvSnapshot,
   type SearchMetrics,
 } from "./metrics";
 import { computeWeeklyPeriods, type DateRange } from "./period";
@@ -46,13 +44,7 @@ import {
 import { queryAllDataSource } from "./notionRepository";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
 import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
-import {
-  actualReservationsForPage,
-  parseCanonicalMeta,
-  parseCanonicalReservationsJsonl,
-  type ParsedReservationCsv,
-  type ReservationCoverage,
-} from "./reservations";
+import { actualReservationsForPage } from "./reservations";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -171,39 +163,6 @@ async function notifyLine(text: string): Promise<void> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!to || !token) return; // LINE 未設定なら通知はスキップ(エラーにしない)。
   await pushTextMessage(to, text, { channelAccessToken: token, fetchFn: defaultFetch });
-}
-
-interface ReservationCsvSnapshot {
-  parsed: ParsedReservationCsv;
-  syncedAt: string;
-  coverage: ReservationCoverage;
-}
-
-async function loadCanonicalReservations(
-  dataDir: string | undefined,
-  checkedAt: string
-): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
-  if (!dataDir) return { state: "missing", reason: "not_configured", checkedAt };
-  try {
-    const [jsonl, metaJson] = await Promise.all([
-      readFile(join(dataDir, "canonical", "reservations.jsonl"), "utf8"),
-      readFile(join(dataDir, "canonical", "meta.json"), "utf8"),
-    ]);
-    try {
-      const meta = parseCanonicalMeta(metaJson);
-      const actualDigest = createHash("sha256").update(jsonl).digest("hex");
-      if (actualDigest !== meta.reservationsDigest) throw new Error("正準予約データのダイジェストが一致しません");
-      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
-      console.warn("[metrics] 正準データセットが不正です:", detail);
-      return { state: "missing", reason: "invalid", checkedAt };
-    }
-  } catch (error: unknown) {
-    const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
-    console.warn("[metrics] 正準データセットを読み込めません:", detail);
-    return { state: "missing", reason: "read_error", checkedAt };
-  }
 }
 
 function isCsvSnapshot(

@@ -211,6 +211,7 @@ export function cohortView(snapshot: Snapshot): CohortRowView[] | null {
 export function programList(snapshot: Snapshot): ProgramListItem[] {
   return (snapshot.catalog.programFills ?? []).map((program) => {
     if (program.capacity === null) return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: "—", state: "unknown" };
+    if (program.capacity === 0) return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: `${program.reserved}/0`, state: "unknown" };
     const state = program.fillRate !== null && program.fillRate >= 1 ? "full" : program.fillRate !== null && program.fillRate < 0.34 ? "warn" : "open";
     return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: `${program.reserved}/${program.capacity}`, state };
   });
@@ -239,10 +240,11 @@ export function demographicsView(snapshot: Snapshot): { label: string; count: nu
 
 /** 気づきの根拠をPIIなしの短い表示チップにする。 */
 export function insightEvidenceText(evidence: Record<string, unknown>): string | null {
-  const chips = Object.entries(evidence)
-    .filter(([, value]) => ["string", "number"].includes(typeof value))
-    .slice(0, 2)
+  const entries = Object.entries(evidence).filter(([, value]) => ["string", "number"].includes(typeof value));
+  const chips = entries
+    .slice(0, 4)
     .map(([key, value]) => `${key}=${String(value)}`);
+  if (entries.length > 4) chips.push(`他${entries.length - 4}件`);
   return chips.length > 0 ? chips.join(" / ") : null;
 }
 

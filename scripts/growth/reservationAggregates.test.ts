@@ -240,9 +240,21 @@ describe("weeklyKpis", () => {
         { date: "2026-08-13", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 800 },
       ],
     });
+    // 窓はcoverage内へ切り詰められるため、coverage.endを窓終端(07-19)まで収録済みにする。
+    data.meta.coverage.end = "2026-07-19";
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
     expect(kpi.self).toEqual({ selfCount4w: 2, total4w: 2, smartphone4w: 1, unknown4w: 0 });
     expect(kpi.sales.forecast28).toBe(300);
+  });
+
+  it("4週セルフ予約はCSVの収録開始日より前を集計しない", () => {
+    const data = bundle([
+      res({ reservationId: "before", bookedAt: "2026-06-22T10:00:00+09:00", channel: "user_sp" }),
+      res({ reservationId: "covered", bookedAt: "2026-06-25T10:00:00+09:00", channel: "user_pc" }),
+    ]);
+    data.meta.coverage = { start: "2026-06-25", end: "2026-07-19" };
+    expect(weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16").self)
+      .toEqual({ selfCount4w: 1, total4w: 1, smartphone4w: 0, unknown4w: 0 });
   });
 
   it("直近28日のunknown予約方法を別集計する", () => {
