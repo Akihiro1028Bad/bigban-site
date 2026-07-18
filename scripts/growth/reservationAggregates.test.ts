@@ -123,6 +123,16 @@ describe("D13・コホート集計", () => {
     const data = bundle([res({ reservationId: "c", status: "cancelled", useDate: "2026-07-15", bookedAt: "2026-07-10T10:00:00Z" })]);
     expect(cancelResaleStats(data, "2026-07-19")).toEqual({ n: 1, resold: 0, rate: 0, medianHours: null });
   });
+  it("再販は利用開始前の最初の確定予約だけを行順によらず採用する", () => {
+    const data = bundle([
+      res({ reservationId: "c", status: "cancelled", useDate: "2026-07-15", start: "19:00", bookedAt: "2026-07-10T10:00:00+09:00" }),
+      res({ reservationId: "late", useDate: "2026-07-15", start: "19:00", bookedAt: "2026-07-10T14:00:00+09:00" }),
+      res({ reservationId: "early", useDate: "2026-07-15", start: "19:00", bookedAt: "2026-07-10T12:00:00+09:00" }),
+      res({ reservationId: "after-use", useDate: "2026-07-15", start: "19:00", bookedAt: "2026-07-15T20:00:00+09:00" }),
+    ]);
+
+    expect(cancelResaleStats(data, "2026-07-19")).toEqual({ n: 1, resold: 1, rate: 1, medianHours: 2 });
+  });
   it("初回利用月別に、利用日が2日以上のリピートと売上を集計する", () => {
     const data = bundle([
       res({ reservationId: "a", pseudoId: "one", useDate: "2026-06-01", amount: 100 }), res({ reservationId: "b", pseudoId: "one", useDate: "2026-06-02", amount: null }),
@@ -131,6 +141,14 @@ describe("D13・コホート集計", () => {
       res({ reservationId: "d1", pseudoId: "three", useDate: "2026-07-02", amount: 50 }), res({ reservationId: "d2", pseudoId: "three", useDate: "2026-06-30", amount: 50 }),
     ]);
     expect(customerCohorts(data)).toEqual([{ month: "2026-06", customers: 2, repeated: 2, cumulativeRevenue: 200 }, { month: "2026-07", customers: 1, repeated: 0, cumulativeRevenue: 300 }]);
+  });
+  it("同日複数予約は1回の来店として扱い、リピートに数えない", () => {
+    const data = bundle([
+      res({ reservationId: "morning", pseudoId: "same-day", useDate: "2026-07-10", start: "10:00" }),
+      res({ reservationId: "evening", pseudoId: "same-day", useDate: "2026-07-10", start: "19:00" }),
+    ]);
+
+    expect(customerCohorts(data)).toEqual([{ month: "2026-07", customers: 1, repeated: 0, cumulativeRevenue: 2000 }]);
   });
 });
 

@@ -214,7 +214,15 @@ export function cancelResaleStats(bundle: CanonicalBundle, referenceYmd: string,
   const hours: number[] = [];
   for (const reservation of cancelled) {
     const key = `${reservation.useDate}\u0000${reservation.start}\u0000${reservation.space}`;
-    const resale = (confirmedBySlot.get(key) ?? []).find((candidate) => new Date(candidate.bookedAt).getTime() > new Date(reservation.bookedAt).getTime());
+    const cancelledAt = new Date(reservation.bookedAt).getTime();
+    const useStartAt = new Date(`${reservation.useDate}T${reservation.start}:00+09:00`).getTime();
+    // 再販所要時間は、キャンセル後に最初に枠が埋まり直すまでの時間として扱う。
+    const resale = (confirmedBySlot.get(key) ?? [])
+      .filter((candidate) => {
+        const bookedAt = new Date(candidate.bookedAt).getTime();
+        return bookedAt > cancelledAt && bookedAt < useStartAt;
+      })
+      .sort((left, right) => new Date(left.bookedAt).getTime() - new Date(right.bookedAt).getTime())[0];
     if (resale !== undefined) hours.push((new Date(resale.bookedAt).getTime() - new Date(reservation.bookedAt).getTime()) / (60 * 60 * 1000));
   }
   const medianHours = quantile(hours.sort((left, right) => left - right), 0.5);

@@ -6,8 +6,12 @@ import type { Detector } from "../insightEngine";
 const MEMBER_TEXT = "会員";
 
 function isMember(customerType: string): boolean {
-  // 入力CSVの会員種別は固定列挙ではないため、運用上の共通文字列で判定する。
-  return customerType.includes(MEMBER_TEXT);
+  // 「非会員」は会員文字列を含むが、会員系としては扱わない。
+  return customerType.includes(MEMBER_TEXT) && !customerType.includes("非会員");
+}
+
+function isVisitor(customerType: string): boolean {
+  return customerType.includes("ビジター");
 }
 
 function reservationsByCustomer(reservations: readonly CanonicalReservation[]): Map<string, CanonicalReservation[]> {
@@ -39,7 +43,10 @@ export const lifecycleEvents: Detector = (context) => {
   const conversions = [...customers.values()].filter((reservations) => {
     const past = reservations.filter((reservation) => jstYmdOfIso(reservation.bookedAt) < context.current.start);
     const current = reservations.filter((reservation) => jstYmdOfIso(reservation.bookedAt) >= context.current.start && jstYmdOfIso(reservation.bookedAt) <= context.current.end);
-    return past.length > 0 && past.every((reservation) => !isMember(reservation.customerType)) && current.some((reservation) => isMember(reservation.customerType));
+    // 空欄・法人などは転換元に含めず、ビジター利用だけを会員転換の起点として観察する。
+    return past.some((reservation) => isVisitor(reservation.customerType))
+      && !past.some((reservation) => isMember(reservation.customerType))
+      && current.some((reservation) => isMember(reservation.customerType));
   });
   if (conversions.length > 0) insights.push({ id: `d7:conversion:${context.current.start}`, detector: "D7", severity: "info", title: "ビジターから会員への転換", body: `今週、${conversions.length}人が会員予約に転換しました`, evidence: { n: conversions.length }, label: "観察" });
   return insights;

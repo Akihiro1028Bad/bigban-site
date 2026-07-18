@@ -15,4 +15,16 @@ describe("dormantRisk", () => {
   it("中央値の2倍ちょうどは休眠とせず、pseudoIdなしと3回未満を除外する", () => {
     expect(detect([reservation("a", "edge", "2026-07-07"), reservation("b", "edge", "2026-07-12"), reservation("c", "edge", "2026-07-17"), reservation("n", null, "2026-06-01"), reservation("n2", null, "2026-06-02"), reservation("n3", null, "2026-06-03")])).toEqual([]);
   });
+  it("不等間隔の中央値は入力順でなく昇順に並べて判定する", () => {
+    const rows = [
+      reservation("a", "uneven", "2026-06-01"),
+      reservation("b", "uneven", "2026-06-02"),
+      reservation("c", "uneven", "2026-07-01"),
+      reservation("d", "uneven", "2026-07-02"),
+    ];
+
+    expect(detect(rows)).toContainEqual(expect.objectContaining({
+      evidence: expect.objectContaining({ members: [expect.objectContaining({ medianGap: 1 })] }),
+    }));
+  });
 });

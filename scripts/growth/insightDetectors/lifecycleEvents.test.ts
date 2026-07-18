@@ -20,7 +20,16 @@ describe("lifecycleEvents", () => {
     const cancelled = { ...reservation("c", "x", "2026-07-14T10:00:00+09:00"), status: "cancelled" };
     expect(detect([reservation("a", "x", "2026-07-01T10:00:00+09:00"), cancelled, reservation("n", null, "2026-07-14T10:00:00+09:00")])).toEqual([]);
   });
-  it("過去が非会員だけで今週に会員予約がある顧客を転換として数える", () => {
-    expect(detect([reservation("a", "member", "2026-07-01T10:00:00+09:00"), reservation("b", "member", "2026-07-14T10:00:00+09:00", "月額会員")])).toContainEqual(expect.objectContaining({ id: "d7:conversion:2026-07-13", evidence: { n: 1 }, label: "観察" }));
+  it("ビジターだけを転換元とし、非会員・空欄は対象外にする", () => {
+    const insights = detect([
+      reservation("non-member-past", "non-member", "2026-07-01T10:00:00+09:00", "非会員"),
+      reservation("non-member-current", "non-member", "2026-07-14T10:00:00+09:00", "月額会員"),
+      reservation("blank-past", "blank", "2026-07-01T10:00:00+09:00", ""),
+      reservation("blank-current", "blank", "2026-07-14T10:00:00+09:00", "月額会員"),
+      reservation("visitor-past", "visitor", "2026-07-01T10:00:00+09:00", "ビジター"),
+      reservation("visitor-current", "visitor", "2026-07-14T10:00:00+09:00", "月額会員"),
+    ]);
+
+    expect(insights).toContainEqual(expect.objectContaining({ id: "d7:conversion:2026-07-13", evidence: { n: 1 }, label: "観察" }));
   });
 });

@@ -21,7 +21,7 @@ export const dormantRisk: Detector = (context) => {
     const dates = reservations.map((reservation) => reservation.useDate).sort();
     const gaps = dates.slice(1).map((date, index) => daysBetween(date, dates[index] as string));
     // 3回以上の予約が保証されるため gaps は2件以上・dates は空でなく、中央値と最終利用日は必ず得られる。
-    const medianGap = quantile(gaps, 0.5) as number;
+    const medianGap = quantile(gaps.sort((left, right) => left - right), 0.5) as number;
     const lastUse = dates.at(-1) as string;
     const elapsed = daysBetween(context.todayYmd, lastUse);
     return elapsed > Math.max(medianGap * 2, MIN_DORMANT_DAYS) ? [{ pseudoId, lastUse, medianGap, elapsed }] : [];
