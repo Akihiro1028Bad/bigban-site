@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { fillSpeed } from "./fillSpeed";
 
-function program(name: string, heldOn: string, capacity: number | null = 2) { return { name, heldOn, start: "10:00", end: "11:00", capacity, publishStatus: "公開" }; }
+function program(name: string, heldOn: string, capacity: number | null = 2, start = "10:00") { return { name, heldOn, start, end: "11:00", capacity, publishStatus: "公開" }; }
 function reservation(reservationId: string, name: string, heldOn: string, bookedAt: string) { return { reservationId, bookedAt, useDate: heldOn, start: "10:00", category: "スクール", space: name, status: "confirmed" }; }
 function detect(programs: object[], reservations: object[]) {
   const bundle = { programs, reservations, customers: [], salesDaily: [], blockedSlots: [], remarks: [], meta: { coverage: { start: "2026-06-01", end: "2026-07-19" } } };
@@ -40,6 +40,18 @@ it("定員なし・0人定員・開催後に到達した満枠を除外する", 
   const programs = [program("定員なし", "2026-07-25", null), program("定員0", "2026-07-25", 0), program("開催後", "2026-07-15")];
   const reservations = [reservation("n1", "定員なし", "2026-07-25", "2026-07-14T10:00:00+09:00"), reservation("z1", "定員0", "2026-07-25", "2026-07-14T10:00:00+09:00"), reservation("a1", "開催後", "2026-07-15", "2026-07-14T10:00:00+09:00"), reservation("a2", "開催後", "2026-07-15", "2026-07-16T10:00:00+09:00")];
   expect(detect(programs, reservations)).toEqual([]);
+});
+
+it("同日内では満枠時刻が早い回を先に比較する", () => {
+  const programs = [program("初級", "2026-07-20"), program("初級", "2026-07-25")];
+  const reservations = [reservation("late-1", "初級", "2026-07-20", "2026-07-14T17:00:00+09:00"), reservation("late-2", "初級", "2026-07-20", "2026-07-14T18:00:00+09:00"), reservation("early-1", "初級", "2026-07-25", "2026-07-14T08:00:00+09:00"), reservation("early-2", "初級", "2026-07-25", "2026-07-14T09:00:00+09:00")];
+  expect(detect(programs, reservations)).toEqual([expect.objectContaining({ id: "d5:first:初級", evidence: { n: 2, daysBeforeHeld: 11, previousBest: null } })]);
+});
+
+it("開催当日の開始前は有効とし、開始時刻ちょうど以降は除外する", () => {
+  const programs = [program("開始前", "2026-07-15", 2), program("開始時刻", "2026-07-15", 2), program("開始後", "2026-07-15", 2)];
+  const reservations = [reservation("before-1", "開始前", "2026-07-15", "2026-07-15T09:00:00+09:00"), reservation("before-2", "開始前", "2026-07-15", "2026-07-15T09:59:00+09:00"), reservation("at-1", "開始時刻", "2026-07-15", "2026-07-15T09:00:00+09:00"), reservation("at-2", "開始時刻", "2026-07-15", "2026-07-15T10:00:00+09:00"), reservation("after-1", "開始後", "2026-07-15", "2026-07-15T09:00:00+09:00"), reservation("after-2", "開始後", "2026-07-15", "2026-07-15T10:01:00+09:00")];
+  expect(detect(programs, reservations)).toEqual([expect.objectContaining({ id: "d5:first:開始前", evidence: { n: 2, daysBeforeHeld: 0, previousBest: null } })]);
 });
 
 it("満枠時刻が同時なら開催日→開始時刻の順で安定して並べる", () => {

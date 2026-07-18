@@ -9,6 +9,7 @@ interface FilledProgram {
   program: CanonicalProgram;
   capacity: number;
   filledAt: string;
+  filledOn: string;
   daysBeforeHeld: number;
 }
 
@@ -23,11 +24,12 @@ function filledProgram(context: Parameters<Detector>[0], program: CanonicalProgr
   const reservations = programParticipationReservations(context.bundle, program).sort((left, right) => left.bookedAt.localeCompare(right.bookedAt));
   const capacityReservation = reservations[program.capacity - 1];
   if (capacityReservation === undefined) return null;
-  const filledAt = jstYmdOfIso(capacityReservation.bookedAt);
-  // 開催後の定員到達は遅延入力などを含み得るため、満枠到達速度として通知しない。
-  if (filledAt > program.heldOn) return null;
+  const filledAt = capacityReservation.bookedAt;
+  const filledOn = jstYmdOfIso(filledAt);
+  // 開催開始以降の到達は遅延入力などを含み得るため、満枠到達速度として通知しない。
+  if (filledAt >= `${program.heldOn}T${program.start}:00+09:00`) return null;
   // 受付開始時刻を持たないため、開催何日前に満枠かを到達速度の指標にする。
-  return { program, capacity: program.capacity, filledAt, daysBeforeHeld: daysBetween(program.heldOn, filledAt) };
+  return { program, capacity: program.capacity, filledAt, filledOn, daysBeforeHeld: daysBetween(program.heldOn, filledOn) };
 }
 
 export const fillSpeed: Detector = (context) => {
@@ -36,7 +38,7 @@ export const fillSpeed: Detector = (context) => {
   const bestByName = new Map<string, number>();
   return filled.flatMap((current): DetectorInsight[] => {
     const previousBest = bestByName.get(current.program.name);
-    const isCurrentWeek = current.filledAt >= context.current.start && current.filledAt <= context.current.end;
+    const isCurrentWeek = current.filledOn >= context.current.start && current.filledOn <= context.current.end;
     const insight = previousBest === undefined
       ? { id: `d5:first:${current.program.name}`, detector: "D5" as const, severity: "info" as const, title: "満枠到達速度", body: "初の満枠", evidence: { n: current.capacity, daysBeforeHeld: current.daysBeforeHeld, previousBest: null }, label: "観察" as const }
       : current.daysBeforeHeld > previousBest

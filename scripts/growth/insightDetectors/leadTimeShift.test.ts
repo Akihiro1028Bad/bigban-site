@@ -63,6 +63,18 @@ it("差が2日ちょうどなら沈黙し、2日超なら通知する", () => {
   expect(detect([...prior, ...greater])).toHaveLength(1);
 });
 
+it("短縮方向で2日ちょうどの差なら沈黙する", () => {
+  const prior = Array.from({ length: 8 }, (_, index) => reservation(`p${index}`, "2026-06-01", 7));
+  const current = Array.from({ length: 8 }, (_, index) => reservation(`c${index}`, "2026-07-01", 5));
+  expect(detect([...prior, ...current])).toEqual([]);
+});
+
+it("前窓の終了日と今窓の開始日を別々の窓へ集計する", () => {
+  const prior = Array.from({ length: 8 }, (_, index) => reservation(`p${index}`, "2026-06-12", 3));
+  const current = Array.from({ length: 8 }, (_, index) => reservation(`c${index}`, "2026-06-13", 7));
+  expect(detect([...prior, ...current])[0]).toMatchObject({ evidence: { n: 8, median: 7, baselineMedian: 3 } });
+});
+
 it("28日窓の開始日・終了日を含み、その外側を除外する", () => {
   const prior = Array.from({ length: 8 }, (_, index) => reservation(`p${index}`, "2026-05-16", 3));
   const current = [...Array.from({ length: 7 }, (_, index) => reservation(`c${index}`, "2026-06-13", 7)), reservation("current-end", "2026-07-10", 7)];
