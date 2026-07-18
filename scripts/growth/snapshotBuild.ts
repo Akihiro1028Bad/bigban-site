@@ -12,8 +12,25 @@ function inputsOf(bundle: CanonicalBundle): { type: string; rows: number }[] {
   return Object.entries(bundle.meta.counts).map(([type, rows]) => ({ type, rows }));
 }
 
-export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: CanonicalBundle["meta"]["coverage"]; sourceSyncedAt: string; current: DateRange; prior: DateRange; todayYmd: string; previousSnapshot: Snapshot | null; baselineInputs: Snapshot["meta"]["inputs"] | null; funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null }): Snapshot {
-  const { bundle, coverage, sourceSyncedAt, todayYmd, previousSnapshot, baselineInputs, funnelCounts } = input;
+function median(values: number[]): number | null {
+  if (values.length < 6) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = sorted.length / 2;
+  return sorted.length % 2 === 0
+    ? ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2
+    : sorted[Math.floor(middle)] as number;
+}
+
+function baselineMedian(history: Snapshot[], daysOut: number): number | null {
+  const reservations = history.flatMap((snapshot) => snapshot.series.onTheBooks ?? [])
+    .filter((point) => point.daysOut === daysOut)
+    .map((point) => point.reservations);
+  // 履歴不足時に誤った基準を出さないため、6件未満では基準値を表示しない。
+  return median(reservations);
+}
+
+export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: CanonicalBundle["meta"]["coverage"]; sourceSyncedAt: string; current: DateRange; prior: DateRange; todayYmd: string; previousSnapshot: Snapshot | null; baselineInputs: Snapshot["meta"]["inputs"] | null; funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null; history?: Snapshot[] }): Snapshot {
+  const { bundle, coverage, sourceSyncedAt, todayYmd, previousSnapshot, baselineInputs, funnelCounts, history = [] } = input;
   const referenceYmd = todayYmd <= coverage.end ? todayYmd : coverage.end;
   // 完了週は収録最終日を基準に確定する。これにより古いCSVの未収録期間を分析しない。
   const { current, prior } = computeWeeklyPeriods(new Date(`${referenceYmd}T12:00:00+09:00`));
@@ -34,10 +51,9 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd) },
     series: {
       weeklyReservations: weeklyReservationSeries(bundle),
-      // Task 2で履歴から同じdaysOutの中央値を計算して上書きする。
-      onTheBooks: onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: null })),
+      onTheBooks: onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: baselineMedian(history, point.daysOut) })),
     },
     ...(funnel === undefined ? {} : { funnel }),
-    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null }, CORE_DETECTORS),
+    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null, history }, CORE_DETECTORS),
   });
 }

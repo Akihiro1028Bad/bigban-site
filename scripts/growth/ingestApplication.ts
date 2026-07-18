@@ -134,6 +134,31 @@ async function readLatestSnapshot(fs: IngestFs, dataDir: string, todayYmd: strin
   }
 }
 
+/** 当日分を除いた直近の履歴を、集計に使いやすい古い順で読む。 */
+export async function readSnapshotHistory(fs: IngestFs, dataDir: string, todayYmd: string, log: (message: string) => void): Promise<Snapshot[]> {
+  const directory = join(dataDir, "snapshots");
+  let names: string[];
+  try {
+    names = (await fs.readdir(directory, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && /^snapshot-.*\.json$/.test(entry.name) && entry.name !== `snapshot-${todayYmd}.json`)
+      .map((entry) => entry.name)
+      .sort((left, right) => right.localeCompare(left))
+      .slice(0, 13);
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "ENOENT") return [];
+    throw error;
+  }
+  const history: Snapshot[] = [];
+  for (const name of names) {
+    try {
+      history.push(parseSnapshot(String(await fs.readFile(join(directory, name), "utf8"))));
+    } catch {
+      log(`[ingest] スナップショット履歴の読取に失敗したためスキップします: ${name}`);
+    }
+  }
+  return history.reverse();
+}
+
 async function readPreviousSnapshot(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot | null> {
   return readLatestSnapshot(fs, dataDir, todayYmd, false);
 }
@@ -304,11 +329,12 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
       canonical.meta.warnings.push("GA4ファネル取得失敗");
     }
   }
-  const [previousSnapshot, baselineInputs] = await Promise.all([
+  const [previousSnapshot, baselineInputs, history] = await Promise.all([
     readPreviousSnapshot(deps.fs, input.dataDir, todayYmd),
     readBaselineInputs(deps.fs, input.dataDir, todayYmd),
+    readSnapshotHistory(deps.fs, input.dataDir, todayYmd, log),
   ]);
-  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts });
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts, history });
   const hasRowDrop = snapshot.insights.some((insight) => insight.id === "d11:rowdrop:yoyaku");
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");

@@ -13,6 +13,7 @@ export interface DetectorContext {
   bundle: CanonicalBundle;
   previousSnapshot: Snapshot | null;
   baselineInputs: Snapshot["meta"]["inputs"] | null;
+  history?: Snapshot[];
   funnel: Snapshot["funnel"] | null;
   current: DateRange;
   prior: DateRange;
