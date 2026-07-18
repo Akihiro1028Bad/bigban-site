@@ -1,6 +1,6 @@
 /** 正準予約データセットから経営ボード用のコア集計を作る純ロジック。 */
 import { quantile, wilsonIntervalPositive } from "./reservationStats";
-import type { CanonicalBundle, CanonicalReservation } from "./labolaNormalize";
+import type { CanonicalBundle, CanonicalProgram, CanonicalReservation } from "./labolaNormalize";
 import type { DateRange } from "./period";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -200,12 +200,17 @@ export function cancellationStats(bundle: CanonicalBundle, referenceYmd: string)
 
 const SPACE_RESERVATION_CATEGORY = "スペース予約";
 
+/** プログラム参加予約は、プログラム名・開催日・開始時刻で予約CSVと突合する。 */
+export function programParticipationReservations(bundle: CanonicalBundle, program: CanonicalProgram): CanonicalReservation[] {
+  return confirmedReservations(bundle).filter((reservation) => reservation.category !== SPACE_RESERVATION_CATEGORY && reservation.space === program.name && reservation.useDate === program.heldOn && reservation.start === program.start);
+}
+
 export function programFills(bundle: CanonicalBundle, referenceYmd: string): { name: string; heldOn: string; start: string; capacity: number | null; reserved: number; fillRate: number | null }[] {
   const range = { start: addDays(referenceYmd, -27), end: addDays(referenceYmd, 28) };
   return bundle.programs
     .filter((program) => isWithin(program.heldOn, range) && program.publishStatus !== "非公開")
     .map((program) => {
-      const reserved = confirmedReservations(bundle).filter((reservation) => reservation.category !== SPACE_RESERVATION_CATEGORY && reservation.space === program.name && reservation.useDate === program.heldOn && reservation.start === program.start).length;
+      const reserved = programParticipationReservations(bundle, program).length;
       return { name: program.name, heldOn: program.heldOn, start: program.start, capacity: program.capacity, reserved, fillRate: program.capacity === null || program.capacity === 0 ? null : reserved / program.capacity };
     }).sort((left, right) => left.heldOn.localeCompare(right.heldOn) || left.start.localeCompare(right.start));
 }

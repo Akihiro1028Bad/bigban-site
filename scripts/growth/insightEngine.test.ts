@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { runDetectors } from "./insightEngine";
+import { CORE_DETECTORS, runDetectors } from "./insightEngine";
+import { fillSpeed } from "./insightDetectors/fillSpeed";
+import { leadTimeShift } from "./insightDetectors/leadTimeShift";
+import { paceDeviation } from "./insightDetectors/paceDeviation";
 import { snapshotSchema } from "./snapshotSchema";
 
 const context = {
@@ -11,6 +14,10 @@ const context = {
 };
 
 describe("runDetectors", () => {
+  it("D4からD6をコア検出器として登録する", () => {
+    expect(CORE_DETECTORS).toEqual(expect.arrayContaining([leadTimeShift, fillSpeed, paceDeviation]));
+  });
+
   it("前回と同じidをrecurringにしてfirstSeenを引き継ぐ", () => {
     const previousSnapshot = snapshotSchema.parse({ schemaVersion: 1, generatedAt: "2026-07-09T00:00:00+09:00", coverage: context.bundle.meta.coverage, analysis: { referenceYmd: "2026-07-09", currentWeek: { start: "2026-07-06", end: "2026-07-12" } }, meta: { sourceSyncedAt: "2026-07-09T00:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] }, kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } }, catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [{ id: "d1:ward:葛飾区", detector: "D1", severity: "notice", title: "x", body: "x", evidence: {}, label: "観察", firstSeen: "2026-07-09", status: "new" }] });
     const output = runDetectors({ ...context, previousSnapshot }, [() => [{ id: "d1:ward:葛飾区", detector: "D1", severity: "notice", title: "x", body: "x", evidence: {}, label: "観察" }]]);

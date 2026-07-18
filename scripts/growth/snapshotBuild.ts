@@ -41,6 +41,7 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     const ga4Complete = funnelCounts.current.rental.complete + funnelCounts.current.program.complete;
     return { week: { start: input.current.start, end: input.current.end }, current: funnelCounts.current, prior: funnelCounts.prior, capture: { ga4Complete, selfBooked, rate: selfBooked === 0 ? null : ga4Complete / selfBooked } };
   })();
+  const onTheBooks = onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: baselineMedian(history, point.daysOut) }));
   return snapshotSchema.parse({
     schemaVersion: 1,
     generatedAt: bundle.meta.generatedAt,
@@ -51,9 +52,9 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd) },
     series: {
       weeklyReservations: weeklyReservationSeries(bundle),
-      onTheBooks: onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: baselineMedian(history, point.daysOut) })),
+      onTheBooks,
     },
     ...(funnel === undefined ? {} : { funnel }),
-    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null, history }, CORE_DETECTORS),
+    insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null, onTheBooks, history }, CORE_DETECTORS),
   });
 }

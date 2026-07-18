@@ -1,7 +1,10 @@
 /** 気づき検出器を実行し、前回スナップショットとの継続状態を付与する。 */
 import { dataHealth } from "./insightDetectors/dataHealth";
+import { fillSpeed } from "./insightDetectors/fillSpeed";
 import { firstSeenWard } from "./insightDetectors/firstSeenWard";
+import { leadTimeShift } from "./insightDetectors/leadTimeShift";
 import { newRemarks } from "./insightDetectors/newRemarks";
+import { paceDeviation } from "./insightDetectors/paceDeviation";
 import { reservationCountChange } from "./insightDetectors/reservationCountChange";
 import { selfRateChange } from "./insightDetectors/selfRateChange";
 import { unpaidOverdue } from "./insightDetectors/unpaidOverdue";
@@ -15,6 +18,7 @@ export interface DetectorContext {
   baselineInputs: Snapshot["meta"]["inputs"] | null;
   history?: Snapshot[];
   funnel: Snapshot["funnel"] | null;
+  onTheBooks?: { daysOut: number; reservations: number; baselineMedian: number | null }[] | null;
   current: DateRange;
   prior: DateRange;
   todayYmd: string;
@@ -40,6 +44,9 @@ export const CORE_DETECTORS: readonly Detector[] = [
   firstSeenWard,
   reservationCountChange,
   selfRateChange,
+  leadTimeShift,
+  fillSpeed,
+  paceDeviation,
   dataHealth,
   newRemarks,
   unpaidOverdue,
