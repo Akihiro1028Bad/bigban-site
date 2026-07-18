@@ -137,7 +137,7 @@ export function funnelView(snapshot: Snapshot): FunnelView | null {
     const previousTotal = index === 0 ? null : (rawStages[index - 1] as { total: number }).total;
     return {
       ...stage,
-      widthPct: index === 0 ? 100 : firstTotal === 0 ? 0 : Math.round((stage.total / firstTotal) * 100),
+      widthPct: index === 0 ? (firstTotal === 0 ? 0 : 100) : firstTotal === 0 ? 0 : Math.round((stage.total / firstTotal) * 100),
       retentionPct: previousTotal === null || previousTotal === 0
         ? null
         : Math.round((stage.total / previousTotal) * 100),

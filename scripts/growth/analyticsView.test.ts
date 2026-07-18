@@ -193,7 +193,7 @@ describe("analyticsView", () => {
       capture: { ga4Complete: 4, selfBooked: 4, rate: 1 },
     };
     expect(funnelView(snapshot)?.stages).toEqual([
-      { label: "予約クリック", rental: 0, program: 0, total: 0, widthPct: 100, retentionPct: null },
+      { label: "予約クリック", rental: 0, program: 0, total: 0, widthPct: 0, retentionPct: null },
       { label: "情報入力", rental: 2, program: 0, total: 2, widthPct: 0, retentionPct: null },
       { label: "内容確認", rental: 3, program: 0, total: 3, widthPct: 0, retentionPct: 150 },
       { label: "予約完了", rental: 4, program: 0, total: 4, widthPct: 0, retentionPct: 133 },

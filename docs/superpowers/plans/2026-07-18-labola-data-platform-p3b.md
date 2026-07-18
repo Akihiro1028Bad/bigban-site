@@ -160,7 +160,8 @@ const ARTICLE_RESERVE_COMPLETE_REPORT: Ga4ReportDef = {
 
 **Interfaces:**
 - `Ga4ReportDef` に `excludeHostContains?: string` を追加。buildRequest で指定時は `andGroup` を構成: 既存 `inListFilter`(あれば)+ `notExpression: { filter: { fieldName: "hostName", stringFilter: { matchType: "CONTAINS", value: <値> } } }`
-- 適用対象(**ページ次元のレポートのみ**): GA4_REPORTS の `topPages`・`landingPages`、metrics-cli の `TOP_PAGES_REPORT`・`TOP_PAGE_CTA_EVENTS_REPORT`・`ARTICLE_RESERVE_COMPLETE_REPORT` に `excludeHostContains: "labola.jp"`
+- 適用対象(**ページ次元のレポートのみ**): GA4_REPORTS の `topPages`・`landingPages`、metrics-cli の `TOP_PAGES_REPORT`・`TOP_PAGE_CTA_EVENTS_REPORT` に `excludeHostContains: "labola.jp"`
+- ⚠️ **`ARTICLE_RESERVE_COMPLETE_REPORT` には付けない**(レビューP3bB-H1で修正済み): 完了イベントは labola ドメイン上で発火するため、host 除外を付けると取りたい行が全滅する。labola 直行セッションは landingPage が記事パスに一致しないため自然に除外される
 - summary/byChannel/byDevice には**適用しない**(セッション指標を歪めるため。コメントで理由を明記)
 
 **Steps:** TDD(andGroup構成・filter未指定時のnot単独・従来defの後方互換)→実装→ゲート→コミット `fix(growth): ページ系GA4レポートからlabolaドメインの混入を除外`
