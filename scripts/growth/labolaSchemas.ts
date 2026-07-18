@@ -19,7 +19,7 @@ export interface CustomerRow {
 
 export interface SalesSummaryRow {
   date: string; isForecast: boolean;
-  rentalSpace: number; event: number; goods: number; total: number;
+  rentalSpace: number; event: number; memberFees: number; total: number;
 }
 
 export interface ProgramRow { name: string; category: string; heldOn: string; start: string; end: string; capacity: number | null; status: string; publishStatus: string; }
@@ -51,11 +51,21 @@ export function jpDateToYmd(value: string): string {
 }
 function isCalendarDate(year: number, month: number, day: number): boolean { const date = new Date(Date.UTC(year, month - 1, day)); return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day; }
 
+function normalizeHeaderName(name: string): string {
+  return name.trim().replaceAll("（", "(").replaceAll("）", ")").replaceAll("／", "/");
+}
+
 function headerIndex(headers: readonly string[], required: readonly string[]): Record<string, number> {
+  const normalizedHeaders: Record<string, number> = {};
+  headers.forEach((name, index) => {
+    const normalizedName = normalizeHeaderName(name);
+    if (!(normalizedName in normalizedHeaders)) normalizedHeaders[normalizedName] = index;
+  });
   const map: Record<string, number> = {};
-  headers.forEach((name, index) => { if (!(name.trim() in map)) map[name.trim()] = index; });
   for (const name of required) {
-    if (!(name in map)) throw new Error(`必須列 ${name} がありません`);
+    const index = normalizedHeaders[normalizeHeaderName(name)];
+    if (index === undefined) throw new Error(`必須列 ${name} がありません`);
+    map[name] = index;
   }
   return map;
 }
@@ -76,8 +86,8 @@ function toAmount(value: string): number | null {
 }
 
 const STATUS_MAP: Record<string, YoyakuRow["status"]> = { "予約完了": "confirmed", "キャンセル": "cancelled" };
-const CHANNEL_MAP: Record<string, YoyakuRow["channel"]> = { "スマートフォンでのユーザー": "user_sp", "PCでのユーザー": "user_pc", "管理者": "admin" };
-const YOYAKU_REQUIRED = ["予約番号", "予約内容", "日付", "開始時間", "終了時間", "カテゴリー", "予約ステータス", "受付ステータス", "決済ステータス", "料金プラン", "金額", "支払い方法", "受付日時", "予約方法", "顧客タイプ", "会員番号", "名前", "メールアドレス", "郵便番号", "住所", "性別", "生年月日", "職業", "備考"] as const;
+const CHANNEL_MAP: Record<string, YoyakuRow["channel"]> = { "スマートフォン版のユーザー": "user_sp", "PC版のユーザー": "user_pc", "管理者": "admin" };
+const YOYAKU_REQUIRED = ["予約番号", "予約内容", "日付", "開始時間", "終了時間", "カテゴリー", "予約ステータス", "受付ステータス", "入金ステータス", "料金プラン", "金額", "支払い方法", "受付日時", "予約方法", "顧客タイプ", "会員番号", "名前", "メールアドレス", "郵便番号", "住所", "性別", "生年月日", "職業", "備考"] as const;
 
 export function parseYoyakuRows(rows: string[][]): { rows: YoyakuRow[]; warnings: string[] } {
   if (rows.length === 0) throw new Error("予約一覧CSVが空です");
@@ -111,7 +121,7 @@ export function parseYoyakuRows(rows: string[][]): { rows: YoyakuRow[]; warnings
       throw new Error(`${rowIndex + 2}行目: 終了時間が不正です`);
     }
     if (end.minutes <= start.minutes) throw new Error(`${rowIndex + 2}行目: 終了時間が開始時間以前です`);
-    return { reservationId, bookedAt: jpDateTimeToIso(cell("受付日時")), useDate: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, category: cell("カテゴリー"), space: cell("予約内容"), status, acceptStatus: cell("受付ステータス"), paymentStatus: cell("決済ステータス"), paymentMethod: cell("支払い方法"), plan: cell("料金プラン"), amount: toAmount(cell("金額")), partySize, channel, customerType: cell("顧客タイプ"), memberNo: cell("会員番号"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業"), remarks: cell("備考") };
+    return { reservationId, bookedAt: jpDateTimeToIso(cell("受付日時")), useDate: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, category: cell("カテゴリー"), space: cell("予約内容"), status, acceptStatus: cell("受付ステータス"), paymentStatus: cell("入金ステータス"), paymentMethod: cell("支払い方法"), plan: cell("料金プラン"), amount: toAmount(cell("金額")), partySize, channel, customerType: cell("顧客タイプ"), memberNo: cell("会員番号"), name: cell("名前"), email: cell("メールアドレス"), postal: cell("郵便番号"), address: cell("住所"), gender: cell("性別"), birthDate: cell("生年月日"), occupation: cell("職業"), remarks: cell("備考") };
   });
   return { rows: result, warnings };
 }
@@ -128,7 +138,7 @@ export function parseCustomerRows(rows: string[][]): { rows: CustomerRow[]; warn
   return { rows: result, warnings: [] };
 }
 
-const SALES_SUMMARY_REQUIRED = ["売上日", "レンタルスペース", "イベント", "物販", "売上合計"] as const;
+const SALES_SUMMARY_REQUIRED = ["売上日", "レンタルスペース", "イベント", "会員費", "売上合計"] as const;
 
 export function parseSalesSummaryRows(rows: string[][]): { rows: SalesSummaryRow[]; warnings: string[] } {
   if (rows.length === 0) throw new Error("売上サマリCSVが空です");
@@ -136,7 +146,7 @@ export function parseSalesSummaryRows(rows: string[][]): { rows: SalesSummaryRow
   const result = rows.slice(1).map((values, rowIndex): SalesSummaryRow => {
     const cell = (name: string) => requiredCell(values, columns, name, rowIndex + 2);
     const dateRaw = cell("売上日");
-    return { date: jpDateToYmd(dateRaw), isForecast: /見込み/.test(dateRaw), rentalSpace: toAmount(cell("レンタルスペース")) ?? 0, event: toAmount(cell("イベント")) ?? 0, goods: toAmount(cell("物販")) ?? 0, total: toAmount(cell("売上合計")) ?? 0 };
+    return { date: jpDateToYmd(dateRaw), isForecast: /見込み/.test(dateRaw), rentalSpace: toAmount(cell("レンタルスペース")) ?? 0, event: toAmount(cell("イベント")) ?? 0, memberFees: toAmount(cell("会員費")) ?? 0, total: toAmount(cell("売上合計")) ?? 0 };
   });
   return { rows: result, warnings: [] };
 }
@@ -170,7 +180,8 @@ const BLOCKED_REQUIRED = ["日付", "開始時間", "終了時間", "スペー�
 export function parseBlockedSlotRows(rows: string[][]): { rows: BlockedSlotRow[]; warnings: string[] } {
   if (rows.length === 0) throw new Error("予約不可一覧CSVが空です");
   const columns = headerIndex(rows[0], BLOCKED_REQUIRED);
-  const labelIndex = rows[0].findIndex((header) => header.trim() === "予約名");
+  const displayNameIndex = rows[0].findIndex((header) => header.trim() === "表示名");
+  const reservationNameIndex = rows[0].findIndex((header) => header.trim() === "予約名");
   const result = rows.slice(1).map((values, rowIndex): BlockedSlotRow => {
     const rowNumber = rowIndex + 2;
     const cell = (name: string) => requiredCell(values, columns, name, rowNumber);
@@ -181,7 +192,8 @@ export function parseBlockedSlotRows(rows: string[][]): { rows: BlockedSlotRow[]
     try { start = parseTimeOfDay(startRaw); } catch { throw new Error(`${rowNumber}行目: 開始時間が不正です`); }
     try { end = parseTimeOfDay(endRaw); } catch { throw new Error(`${rowNumber}行目: 終了時間が不正です`); }
     if (end.minutes <= start.minutes) throw new Error(`${rowNumber}行目: 終了時間が開始時間以前です`);
-    return { date: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, space: cell("スペース"), label: labelIndex < 0 ? "" : (values[labelIndex] ?? "").trim() };
+    const resolvedLabelIndex = displayNameIndex >= 0 ? displayNameIndex : reservationNameIndex;
+    return { date: jpDateToYmd(cell("日付")), start: start.normalized, end: end.normalized, space: cell("スペース"), label: resolvedLabelIndex < 0 ? "" : (values[resolvedLabelIndex] ?? "").trim() };
   });
   return { rows: result, warnings: [] };
 }

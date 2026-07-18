@@ -22,7 +22,7 @@ describe("analyticsView", () => {
 
   it("KPIを表示用文字列にし、小標本と未収集を注記する", () => {
     const cards = kpiCards(analyticsSnapshot());
-    expect(cards[0]).toEqual({ label: "実予約（対象週）", value: "8件", sub: "累積 42件・n<10のため参考値" });
+    expect(cards[0]).toEqual({ label: "実予約（07/13〜07/19）", value: "8件", sub: "累積 42件・n<10のため参考値" });
     expect(kpiCards(analyticsSnapshot()).map((card) => card.value)).toContain("¥32,000");
     expect(kpiCards(analyticsSnapshot()).map((card) => card.label)).toContain("セルフ予約比率");
     const snapshot = analyticsSnapshot();

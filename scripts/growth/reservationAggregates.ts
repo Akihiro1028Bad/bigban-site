@@ -191,11 +191,12 @@ export function programFills(bundle: CanonicalBundle, referenceYmd: string): { n
 
 type AgingBucket = { label: "0-7日" | "8-14日" | "15日以上"; count: number; amount: number };
 
+/** 利用済みで未払いの未収金を集計する。処理待ちは決済処理中のため未収金に含めない。 */
 export function unpaidAging(bundle: CanonicalBundle, referenceYmd: string): { count: number; amount: number; buckets: AgingBucket[] } | null {
   if (bundle.reservations.length === 0) return null;
   const buckets: AgingBucket[] = [{ label: "0-7日", count: 0, amount: 0 }, { label: "8-14日", count: 0, amount: 0 }, { label: "15日以上", count: 0, amount: 0 }];
   for (const reservation of confirmedReservations(bundle)) {
-    if (reservation.paymentStatus !== "入金待ち" || reservation.useDate > referenceYmd) continue;
+    if (reservation.paymentStatus !== "未払い" || reservation.useDate > referenceYmd) continue;
     const days = dayDifference(referenceYmd, jstYmdOfIso(reservation.bookedAt));
     const bucket = days <= 7 ? buckets[0] : days <= 14 ? buckets[1] : buckets[2];
     bucket.count += 1;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildCanonical, parseJsonl, serializeJsonl } from "./labolaNormalize";
 import type { YoyakuRow } from "./labolaSchemas";
 
-const yoyaku = (over: Partial<YoyakuRow>): YoyakuRow => ({ reservationId: "90", bookedAt: "2026-07-15T14:19:00+09:00", useDate: "2026-08-13", start: "19:00", end: "21:00", category: "スペース予約", space: "A:テストコート", status: "confirmed", acceptStatus: "受付済", paymentStatus: "入金待ち", paymentMethod: "クレジットカード", plan: "一般価格", amount: 15960, partySize: null, channel: "user_sp", customerType: "一般会員", memberNo: "00901", name: "試験対象", email: "taro@example.com", postal: "1000001", address: "東京都千代田区1-1-1", gender: "男性", birthDate: "1990/01/02", occupation: "会社員", remarks: "", ...over });
+const yoyaku = (over: Partial<YoyakuRow>): YoyakuRow => ({ reservationId: "90", bookedAt: "2026-07-15T14:19:00+09:00", useDate: "2026-08-13", start: "19:00", end: "21:00", category: "スペース予約", space: "A:テストコート", status: "confirmed", acceptStatus: "受付済", paymentStatus: "未払い", paymentMethod: "クレジットカード", plan: "一般価格", amount: 15960, partySize: null, channel: "user_sp", customerType: "一般会員", memberNo: "00901", name: "試験対象", email: "taro@example.com", postal: "1000001", address: "東京都千代田区1-1-1", gender: "男性", birthDate: "1990/01/02", occupation: "会社員", remarks: "", ...over });
 const base = { customers: null, salesSummary: null, rules: { emails: ["owner@example.com"], nameContains: ["削除対象"] }, hashKey: "k", coverageStart: "2026-06-01", generatedAt: "2026-07-16T14:20:00+09:00", sourceSyncedAt: "2026-07-08T14:20:00+09:00", parseWarnings: ["w1"] };
 
 describe("buildCanonical", () => {
