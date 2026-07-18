@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parsePendingDigest, runIngestApplication } from "./ingestApplication";
+import { parsePendingDigest, readSnapshotHistory, runIngestApplication } from "./ingestApplication";
 import { snapshotSchema } from "./snapshotSchema";
 import type { IngestFs } from "./ingestApplication";
 
@@ -47,6 +47,66 @@ const deps = (notify: (text: string, kind: "weekly") => Promise<void> = async ()
 afterEach(async () => { await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
 describe("runIngestApplication", () => {
+  it("スナップショット履歴は今日を除く新しい13件を古い順に返し、破損分を通知してスキップする", async () => {
+    const { data } = await setup();
+    const snapshots = join(data, "snapshots");
+    await mkdir(snapshots, { recursive: true });
+    const valid = JSON.stringify(snapshotSchema.parse({ schemaVersion: 1, generatedAt: "2026-07-01T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-01" }, analysis: { referenceYmd: "2026-07-01", currentWeek: { start: "2026-06-29", end: "2026-07-05" } }, meta: { sourceSyncedAt: "2026-07-01T00:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] }, kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } }, catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [] }));
+    for (let day = 1; day <= 14; day += 1) {
+      const ymd = `2026-07-${String(day).padStart(2, "0")}`;
+      await writeFile(join(snapshots, `snapshot-${ymd}.json`), valid.replaceAll("2026-07-01", ymd));
+    }
+    await writeFile(join(snapshots, "other.json"), valid);
+    await mkdir(join(snapshots, "snapshot-2026-07-99.json"));
+    await writeFile(join(snapshots, "snapshot-2026-07-15.json"), "{");
+    const log = vi.fn();
+
+    const history = await readSnapshotHistory(fs, data, "2026-07-14", log);
+
+    expect(history).toHaveLength(12);
+    expect(history.map((snapshot) => snapshot.generatedAt.slice(0, 10))).toEqual([
+      "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06", "2026-07-07",
+      "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-11", "2026-07-12", "2026-07-13",
+    ]);
+    expect(log).toHaveBeenCalledWith("[ingest] スナップショット履歴の読取に失敗したためスキップします: snapshot-2026-07-15.json");
+  });
+
+  it("スナップショット履歴はディレクトリがなければ空配列にする", async () => {
+    const { data } = await setup();
+    await expect(readSnapshotHistory(fs, data, "2026-07-16", vi.fn())).resolves.toEqual([]);
+  });
+
+  it("スナップショット履歴はENOENT以外のreaddir失敗を投げ直す", async () => {
+    const { data } = await setup();
+    const brokenFs = { ...fs, readdir: async () => { throw Object.assign(new Error("permission denied"), { code: "EACCES" }); } };
+    await expect(readSnapshotHistory(brokenFs as typeof fs, data, "2026-07-16", vi.fn())).rejects.toThrow("permission denied");
+  });
+
+  it("履歴の予約数中央値をonTheBooksへ焼き込む", async () => {
+    const { drop, data } = await setup();
+    await runIngestApplication(input(drop, data), deps());
+    const original = JSON.parse(await readFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "utf8")) as { series: { onTheBooks: { reservations: number }[] } };
+    for (let day = 1; day <= 6; day += 1) {
+      const snapshot = structuredClone(original);
+      for (const point of snapshot.series.onTheBooks) point.reservations = day * 10;
+      await writeFile(join(data, "snapshots", `snapshot-2026-07-${String(day).padStart(2, "0")}.json`), JSON.stringify(snapshot));
+    }
+
+    const result = await runIngestApplication(input(drop, data), deps());
+
+    expect(result.snapshot.series.onTheBooks?.every((point) => point.baselineMedian === 35)).toBe(true);
+  });
+  it("当日スナップショットが破損していても取り込みを継続してスキップを記録する", async () => {
+    const { drop, data } = await setup();
+    await runIngestApplication(input(drop, data), deps());
+    await writeFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "{");
+    const log = vi.fn();
+    const brokenDeps = { ...deps(), log };
+
+    await expect(runIngestApplication(input(drop, data), brokenDeps)).resolves.toMatchObject({ wasDryRun: false });
+    expect(log).toHaveBeenCalledWith("[ingest] スナップショット履歴の読取に失敗したためスキップします: snapshot-2026-07-16.json");
+  });
+
   it("pendingダイジェストは本文と一致するhashだけを受け付ける", () => {
     const text = "保留中の本文";
     const hash = createHash("sha256").update(text).digest("hex");
@@ -364,13 +424,13 @@ describe("runIngestApplication", () => {
     expect(snapshot.meta.warnings).toEqual(expect.arrayContaining(["未知種別のCSVを2件無視"]));
   });
 
-  it("前回スナップショットの破損は沈黙させない", async () => {
+  it("前回スナップショットの破損をログしてスキップし、取り込みを継続する", async () => {
     const { drop, data } = await setup();
     await mkdir(join(data, "snapshots"), { recursive: true });
     await writeFile(join(data, "snapshots", "snapshot-2026-07-15.json"), "{");
-    await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("previous-snapshot");
-    await rm(join(data, "snapshots"), { recursive: true, force: true });
-    await runIngestApplication(input(drop, data), deps());
+    const log = vi.fn();
+    await expect(runIngestApplication(input(drop, data), { ...deps(), log })).resolves.toMatchObject({ wasDryRun: false });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("snapshot-2026-07-15.json"));
   });
 
   it("予約CSVの行数急減時は昇格もダイジェスト送信もせず、allowRowDropなら警告して続行する", async () => {

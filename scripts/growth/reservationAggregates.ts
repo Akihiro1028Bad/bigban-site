@@ -1,6 +1,6 @@
 /** 正準予約データセットから経営ボード用のコア集計を作る純ロジック。 */
 import { quantile, wilsonIntervalPositive } from "./reservationStats";
-import type { CanonicalBundle, CanonicalReservation } from "./labolaNormalize";
+import type { CanonicalBundle, CanonicalProgram, CanonicalReservation } from "./labolaNormalize";
 import type { DateRange } from "./period";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -113,6 +113,19 @@ export function weeklyReservationSeries(bundle: CanonicalBundle): { weekStart: s
   return result;
 }
 
+const ON_THE_BOOKS_DAYS_OUT = [7, 14, 21, 28] as const;
+
+/** 基準日の翌日から各観測点までに確定している予約と見込み売上を集計する。 */
+export function onTheBooksPoints(bundle: CanonicalBundle, referenceYmd: string): { daysOut: number; reservations: number; forecastSales: number | null }[] {
+  return ON_THE_BOOKS_DAYS_OUT.map((daysOut) => {
+    const range = { start: addDays(referenceYmd, 1), end: addDays(referenceYmd, daysOut) };
+    const reservations = confirmedReservations(bundle).filter((reservation) => isWithin(reservation.useDate, range)).length;
+    // 売上CSVが欠落している場合は、見込み0と区別してnullにする。
+    const forecastSales = bundle.meta.missingSections.includes("salesSummary") ? null : bundle.salesDaily.filter((row) => row.isForecast === true && isWithin(row.date, range)).reduce((sum, row) => sum + row.total, 0);
+    return { daysOut, reservations, forecastSales };
+  });
+}
+
 function minutesOf(value: string): number | null {
   const match = value.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;
@@ -187,12 +200,17 @@ export function cancellationStats(bundle: CanonicalBundle, referenceYmd: string)
 
 const SPACE_RESERVATION_CATEGORY = "スペース予約";
 
+/** プログラム参加予約は、プログラム名・開催日・開始時刻で予約CSVと突合する。 */
+export function programParticipationReservations(bundle: CanonicalBundle, program: CanonicalProgram): CanonicalReservation[] {
+  return confirmedReservations(bundle).filter((reservation) => reservation.category !== SPACE_RESERVATION_CATEGORY && reservation.space === program.name && reservation.useDate === program.heldOn && reservation.start === program.start);
+}
+
 export function programFills(bundle: CanonicalBundle, referenceYmd: string): { name: string; heldOn: string; start: string; capacity: number | null; reserved: number; fillRate: number | null }[] {
   const range = { start: addDays(referenceYmd, -27), end: addDays(referenceYmd, 28) };
   return bundle.programs
     .filter((program) => isWithin(program.heldOn, range) && program.publishStatus !== "非公開")
     .map((program) => {
-      const reserved = confirmedReservations(bundle).filter((reservation) => reservation.category !== SPACE_RESERVATION_CATEGORY && reservation.space === program.name && reservation.useDate === program.heldOn && reservation.start === program.start).length;
+      const reserved = programParticipationReservations(bundle, program).length;
       return { name: program.name, heldOn: program.heldOn, start: program.start, capacity: program.capacity, reserved, fillRate: program.capacity === null || program.capacity === 0 ? null : reserved / program.capacity };
     }).sort((left, right) => left.heldOn.localeCompare(right.heldOn) || left.start.localeCompare(right.start));
 }

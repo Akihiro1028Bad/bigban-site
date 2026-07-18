@@ -20,6 +20,7 @@ describe("snapshotSchema", () => {
     expect(parsed.catalog.programFills).toBeUndefined();
     expect(parsed.catalog.unpaidAging).toBeUndefined();
     expect(parsed.catalog.revPach).toBeUndefined();
+    expect(parsed.series.onTheBooks).toBeUndefined();
   });
   it("ファネルあり・なしのJSONを後方互換で受理する", () => {
     const withFunnel = {

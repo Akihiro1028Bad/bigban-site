@@ -120,26 +120,41 @@ async function collectFiles(fs: IngestFs, dropDir: string): Promise<{ files: Map
   return { files, warnings: selection.warnings };
 }
 
-async function readLatestSnapshot(fs: IngestFs, dataDir: string, todayYmd: string, isTodayIncluded: boolean): Promise<Snapshot | null> {
+/** 当日分を除いた直近の履歴を、集計に使いやすい古い順で読む。 */
+export async function readSnapshotHistory(fs: IngestFs, dataDir: string, todayYmd: string, log: (message: string) => void): Promise<Snapshot[]> {
   const directory = join(dataDir, "snapshots");
+  let names: string[];
   try {
-    const names = (await fs.readdir(directory, { withFileTypes: true })).map((entry) => entry.name)
-      .filter((name) => /^snapshot-.*\.json$/.test(name) && (isTodayIncluded || name !== `snapshot-${todayYmd}.json`)).sort();
-    if (names.length === 0) return null;
-    const latest = names[names.length - 1] as string;
-    return parseSnapshot(String(await fs.readFile(join(directory, latest), "utf8")));
+    names = (await fs.readdir(directory, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && /^snapshot-.*\.json$/.test(entry.name) && entry.name !== `snapshot-${todayYmd}.json`)
+      .map((entry) => entry.name)
+      .sort((left, right) => right.localeCompare(left))
+      .slice(0, 13);
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "ENOENT") return [];
+    throw error;
+  }
+  const history: Snapshot[] = [];
+  for (const name of names) {
+    try {
+      history.push(parseSnapshot(String(await fs.readFile(join(directory, name), "utf8"))));
+    } catch {
+      log(`[ingest] スナップショット履歴の読取に失敗したためスキップします: ${name}`);
+    }
+  }
+  return history.reverse();
+}
+
+/** 当日分は履歴に含めず、基準入力だけに使う。破損しても取り込みを継続する。 */
+async function readTodaySnapshot(fs: IngestFs, dataDir: string, todayYmd: string, log: (message: string) => void): Promise<Snapshot | null> {
+  const name = `snapshot-${todayYmd}.json`;
+  try {
+    return parseSnapshot(String(await fs.readFile(join(dataDir, "snapshots", name), "utf8")));
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "ENOENT") return null;
-    throw new Error("previous-snapshotの読取または検証に失敗しました");
+    log(`[ingest] スナップショット履歴の読取に失敗したためスキップします: ${name}`);
+    return null;
   }
-}
-
-async function readPreviousSnapshot(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot | null> {
-  return readLatestSnapshot(fs, dataDir, todayYmd, false);
-}
-
-async function readBaselineInputs(fs: IngestFs, dataDir: string, todayYmd: string): Promise<Snapshot["meta"]["inputs"] | null> {
-  return (await readLatestSnapshot(fs, dataDir, todayYmd, true))?.meta.inputs ?? null;
 }
 
 async function promoteOutputs(input: { fs: IngestFs; dataDir: string; todayYmd: string; canonical: ReturnType<typeof buildCanonical>; snapshot: Snapshot }): Promise<void> {
@@ -304,11 +319,14 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
       canonical.meta.warnings.push("GA4ファネル取得失敗");
     }
   }
-  const [previousSnapshot, baselineInputs] = await Promise.all([
-    readPreviousSnapshot(deps.fs, input.dataDir, todayYmd),
-    readBaselineInputs(deps.fs, input.dataDir, todayYmd),
+  const [history, todaySnapshot] = await Promise.all([
+    readSnapshotHistory(deps.fs, input.dataDir, todayYmd, log),
+    readTodaySnapshot(deps.fs, input.dataDir, todayYmd, log),
   ]);
-  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts });
+  const previousSnapshot = history.at(-1) ?? null;
+  // 破損履歴を飛ばすとD11の行数急減比較が弱まるため、必ずスキップログを残して運用で追跡する。
+  const baselineInputs = (todaySnapshot ?? previousSnapshot)?.meta.inputs ?? null;
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts, history });
   const hasRowDrop = snapshot.insights.some((insight) => insight.id === "d11:rowdrop:yoyaku");
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");

@@ -1,10 +1,45 @@
 import { expect, it } from "vitest";
 import { buildSnapshot } from "./snapshotBuild";
+import { snapshotSchema } from "./snapshotSchema";
 
 const funnelCounts = {
   current: { intent: 10, rental: { input: 8, confirm: 6, pending: 5, complete: 3 }, program: { input: 4, confirm: 3, pending: 2, complete: 2 } },
   prior: { intent: 8, rental: { input: 6, confirm: 5, pending: 4, complete: 2 }, program: { input: 3, confirm: 2, pending: 1, complete: 1 } },
 };
+
+function historyWithReservations(reservations: number[]): ReturnType<typeof snapshotSchema.parse>[] {
+  return reservations.map((value) => snapshotSchema.parse({ schemaVersion: 1, generatedAt: "2026-07-01T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-01" }, analysis: { referenceYmd: "2026-07-01", currentWeek: { start: "2026-06-29", end: "2026-07-05" } }, meta: { sourceSyncedAt: "2026-07-01T00:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] }, kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } }, catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [], onTheBooks: [{ daysOut: 7, reservations: value, forecastSales: null, baselineMedian: null }] }, insights: [] }));
+}
+
+function historyWith28DayReservations(reservations: number[]): ReturnType<typeof snapshotSchema.parse>[] {
+  return reservations.map((value) => snapshotSchema.parse({ schemaVersion: 1, generatedAt: "2026-07-01T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-01" }, analysis: { referenceYmd: "2026-07-01", currentWeek: { start: "2026-06-29", end: "2026-07-05" } }, meta: { sourceSyncedAt: "2026-07-01T00:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] }, kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } }, catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [], onTheBooks: [{ daysOut: 28, reservations: value, forecastSales: null, baselineMedian: null }] }, insights: [] }));
+}
+
+it("onTheBooksは6件以上の履歴から同じdaysOutの中央値を焼き込む", () => {
+  const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null, history: historyWithReservations([1, 2, 3, 4, 5, 6]) });
+  expect(snapshot.series.onTheBooks?.find((point) => point.daysOut === 7)?.baselineMedian).toBe(3.5);
+  expect(snapshot.series.onTheBooks?.find((point) => point.daysOut === 14)?.baselineMedian).toBeNull();
+});
+
+it("onTheBooksは奇数件の履歴では中央の値を中央値にする", () => {
+  const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null, history: historyWithReservations([9, 1, 7, 3, 5, 11, 13]) });
+  expect(snapshot.series.onTheBooks?.find((point) => point.daysOut === 7)?.baselineMedian).toBe(7);
+});
+
+it("計算済みonTheBooksをD6へ渡して予約ペースの逸脱を検出する", () => {
+  const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null, history: historyWith28DayReservations([10, 10, 10, 10, 10, 10]) });
+  expect(snapshot.insights).toContainEqual(expect.objectContaining({ id: "d6:weak", evidence: { n: 0, baselineMedian: 10, historyWeeks: 6 } }));
+});
+
+it("onTheBooksは5件以下とonTheBooksを持たない履歴では中央値を出さない", () => {
+  const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
+  const oldSnapshot = snapshotSchema.parse({ schemaVersion: 1, generatedAt: "2026-07-01T00:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-01" }, analysis: { referenceYmd: "2026-07-01", currentWeek: { start: "2026-06-29", end: "2026-07-05" } }, meta: { sourceSyncedAt: "2026-07-01T00:00:00+09:00", inputs: [], excludedCount: 0, missingSections: [], warnings: [] }, kpi: { actual: { currentWeek: 0, priorWeek: 0, cumulative: 0 }, self: { selfCount4w: 0, total4w: 0, smartphone4w: 0 }, sales: { currentWeek: null, priorWeek: null, forecast28: null } }, catalog: { heatmap: [], leadTime: null, cancellation: null, wards: [] }, series: { weeklyReservations: [] }, insights: [] });
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null, history: [...historyWithReservations([1, 2, 3, 4, 5]), oldSnapshot] });
+  expect(snapshot.series.onTheBooks?.find((point) => point.daysOut === 7)?.baselineMedian).toBeNull();
+});
 
 it("集計と検出結果をスキーマ適合したスナップショットにする", () => {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: { yoyaku: 0 }, excludedCount: 0, missingSections: [], warnings: [] } };
@@ -14,6 +49,12 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   expect(snapshot.meta.inputs).toEqual([{ type: "yoyaku", rows: 0 }]);
   expect(snapshot.meta.sourceSyncedAt).toBe("2026-07-16T12:00:00+09:00");
   expect(snapshot.analysis).toEqual({ referenceYmd: "2026-07-16", currentWeek: { start: "2026-07-06", end: "2026-07-12" } });
+  expect(snapshot.series.onTheBooks).toEqual([
+    { daysOut: 7, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 14, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 21, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 28, reservations: 0, forecastSales: 0, baselineMedian: null },
+  ]);
   expect(snapshot.insights).toEqual([]);
 });
 
