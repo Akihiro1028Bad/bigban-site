@@ -3,6 +3,10 @@ import { CORE_DETECTORS, runDetectors } from "./insightEngine";
 import { fillSpeed } from "./insightDetectors/fillSpeed";
 import { leadTimeShift } from "./insightDetectors/leadTimeShift";
 import { paceDeviation } from "./insightDetectors/paceDeviation";
+import { cancelResale } from "./insightDetectors/cancelResale";
+import { dormantRisk } from "./insightDetectors/dormantRisk";
+import { lifecycleEvents } from "./insightDetectors/lifecycleEvents";
+import { pipelineErosion } from "./insightDetectors/pipelineErosion";
 import { snapshotSchema } from "./snapshotSchema";
 
 const context = {
@@ -10,12 +14,13 @@ const context = {
   baselineInputs: null,
   history: [],
   funnel: null,
+  kpi: null,
   current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "2026-07-06", end: "2026-07-12" }, todayYmd: "2026-07-16",
 };
 
 describe("runDetectors", () => {
-  it("D4からD6をコア検出器として登録する", () => {
-    expect(CORE_DETECTORS).toEqual(expect.arrayContaining([leadTimeShift, fillSpeed, paceDeviation]));
+  it("D4からD13をコア検出器として登録する", () => {
+    expect(CORE_DETECTORS).toEqual(expect.arrayContaining([leadTimeShift, fillSpeed, paceDeviation, lifecycleEvents, dormantRisk, pipelineErosion, cancelResale]));
   });
 
   it("前回と同じidをrecurringにしてfirstSeenを引き継ぐ", () => {
