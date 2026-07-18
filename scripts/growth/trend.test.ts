@@ -8,6 +8,7 @@ function snapshot(
     sessions: number;
     activeUsers: number;
     keyEvents: number;
+    reserveComplete: number;
     clicks: number;
     impressions: number;
     ctr: number;
@@ -24,6 +25,7 @@ function snapshot(
             ...(values.sessions === undefined ? {} : { sessions: { current: values.sessions, prior: 0, deltaPct: null } }),
             ...(values.activeUsers === undefined ? {} : { activeUsers: { current: values.activeUsers, prior: 0, deltaPct: null } }),
             ...(values.keyEvents === undefined ? {} : { keyEvents: { current: values.keyEvents, prior: 0, deltaPct: null } }),
+            ...(values.reserveComplete === undefined ? {} : { reserveComplete: { current: values.reserveComplete, prior: 0, deltaPct: null } }),
           },
         },
       ],
@@ -108,6 +110,19 @@ describe("buildTrend", () => {
     ]);
     expect(sessions?.latest).toBeNull();
     expect(sessions?.movingAvg).toBe(10);
+  });
+
+  it("予約完了のGA4系列を作り、旧データの週は欠測として扱う", () => {
+    const report = buildTrend([
+      snapshot("2026-07-12", {}),
+      snapshot("2026-07-19", { reserveComplete: 3 }),
+    ]);
+    const reserveComplete = report.series.find((series) => series.metric === "reserveComplete");
+    expect(reserveComplete?.points).toEqual([
+      { weekEnd: "2026-07-12", value: null },
+      { weekEnd: "2026-07-19", value: 3 },
+    ]);
+    expect(reserveComplete?.movingAvg).toBe(3);
   });
 
   it("直近4週だけ採る(5件以上でも4件)", () => {

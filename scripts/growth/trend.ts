@@ -9,6 +9,7 @@ export type TrendMetricKey =
   | "sessions"
   | "activeUsers"
   | "keyEvents"
+  | "reserveComplete"
   | "clicks"
   | "impressions"
   | "ctr"
@@ -42,6 +43,7 @@ const METRICS = [
   { key: "sessions", source: "ga4" },
   { key: "activeUsers", source: "ga4" },
   { key: "keyEvents", source: "ga4" },
+  { key: "reserveComplete", source: "ga4" },
   { key: "clicks", source: "gsc" },
   { key: "impressions", source: "gsc" },
   { key: "ctr", source: "gsc" },
