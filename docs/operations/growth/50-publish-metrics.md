@@ -35,3 +35,12 @@
 - Vercel: Private Blobストアを作成し、`BLOB_READ_WRITE_TOKEN` と32文字以上の `GROWTH_ANALYTICS_INGEST_TOKEN` を設定する。Blobのアクセス設定はPrivateにする。
 - 自宅PC: 同じ `GROWTH_ANALYTICS_INGEST_TOKEN` と、`GROWTH_ANALYTICS_UPLOAD_URL=https://<本番ドメイン>/api/growth/analytics/snapshot` を設定する。片方でも未設定ならアップロードは1行ログでスキップする。
 - ローカル確認: `BLOB_READ_WRITE_TOKEN` を設定せず、`GROWTH_ANALYTICS_FILE_DIR`（未設定なら `GROWTH_RESERVATION_DATA_DIR/snapshots`）を使う。スナップショットストアはこの順でBlob→明示ファイルディレクトリ→予約データ配下のsnapshotsを選ぶ。
+
+### 予約ファネルと捕捉率(P3b)
+
+タグ設置(P3a: `61-ga4-labola-tags.md`)後、`npm run growth:ingest` は GA4 から LaBOLA 予約画面の8イベント+予約意図クリックを取得し、スナップショットに `funnel`(週次ファネル+捕捉率=GA4完了÷セルフ予約)を同梱する。経営ボードの「予約ファネル」がこれを描画する。
+
+- GA4 env(`GROWTH_GA4_PROPERTY_ID`・`GROWTH_GOOGLE_*`・`GROWTH_GSC_SITE_URL`)が未設定ならファネルはスキップ(1行ログ)。取得失敗・不正値でも ingest は継続し、warnings に記録される
+- CSVの収録範囲が対象週を含まない場合はファネルを省略する(捕捉率の誤判定防止)
+- D11 がタグ破損を自動検知: セルフ予約5件以上でGA4完了0件、または捕捉率が前回の半分未満 → alert
+- 記事別の予約完了(GA4帰属)は `growth:metrics` が landingPage×完了イベントで取得し、Notionミラーの `reserveComplete` へ書く(タグ設置日 2026-07-18 以降の週のみ計測扱い)。ページ系レポートは labola.jp ドメインの混入を除外する
