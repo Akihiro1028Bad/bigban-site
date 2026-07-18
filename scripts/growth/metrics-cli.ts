@@ -70,6 +70,7 @@ const TOP_PAGES_REPORT: Ga4ReportDef = {
   metrics: ["screenPageViews", "activeUsers"],
   limit: 200,
   includePriorOnly: true,
+  excludeHostContains: "labola.jp",
 };
 const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
   key: "topPageCtaEvents",
@@ -78,8 +79,9 @@ const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
   dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
   limit: 10_000,
   includePriorOnly: true,
+  excludeHostContains: "labola.jp",
 };
-// 記事別の予約完了(GA4帰属)。landingPage=セッション起点の記事パスに、Labola完了イベントを紐づける。
+// 記事別の予約完了(GA4帰属)。Labola直行セッションの完了を記事帰属から除外する。
 const ARTICLE_RESERVE_COMPLETE_REPORT: Ga4ReportDef = {
   key: "articleReserveComplete",
   dimensions: ["landingPage", "eventName"],
@@ -90,6 +92,7 @@ const ARTICLE_RESERVE_COMPLETE_REPORT: Ga4ReportDef = {
   },
   limit: 10_000,
   includePriorOnly: true,
+  excludeHostContains: "labola.jp",
 };
 
 // #計測強化 S2: 記事ごとの上位クエリ取得件数。

@@ -31,6 +31,76 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGa4", () => {
+  it("host除外だけのレポートではnotExpressionのdimensionFilterを設定する", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }] }));
+    const hostExcludedReport: Ga4ReportDef = {
+      key: "topPages",
+      dimensions: ["pagePath"],
+      metrics: ["screenPageViews"],
+      excludeHostContains: "labola.jp",
+    };
+
+    await fetchGa4({ config, accessToken: "t", current, prior, fetchFn, reports: [hostExcludedReport] });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<Record<string, unknown>>;
+    };
+    expect(body.requests[0].dimensionFilter).toEqual({
+      notExpression: {
+        filter: {
+          fieldName: "hostName",
+          stringFilter: { matchType: "CONTAINS", value: "labola.jp" },
+        },
+      },
+    });
+  });
+
+  it("値リストとhost除外をandGroupの順序どおりに組み合わせる", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }] }));
+    const filteredReport: Ga4ReportDef = {
+      key: "cta",
+      dimensions: ["pagePath", "eventName"],
+      metrics: ["keyEvents"],
+      dimensionFilter: { fieldName: "eventName", values: ["reservation_click"] },
+      excludeHostContains: "labola.jp",
+    };
+
+    await fetchGa4({ config, accessToken: "t", current, prior, fetchFn, reports: [filteredReport] });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<Record<string, unknown>>;
+    };
+    expect(body.requests[0].dimensionFilter).toEqual({
+      andGroup: {
+        expressions: [
+          {
+            filter: {
+              fieldName: "eventName",
+              inListFilter: { values: ["reservation_click"] },
+            },
+          },
+          {
+            notExpression: {
+              filter: {
+                fieldName: "hostName",
+                stringFilter: { matchType: "CONTAINS", value: "labola.jp" },
+              },
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("既定のページ系レポートだけでLabola hostを除外する", () => {
+    expect(GA4_REPORTS.find((report) => report.key === "topPages")?.excludeHostContains).toBe("labola.jp");
+    expect(GA4_REPORTS.find((report) => report.key === "landingPages")?.excludeHostContains).toBe("labola.jp");
+    expect(GA4_REPORTS.find((report) => report.key === "summary")?.excludeHostContains).toBeUndefined();
+    expect(GA4_REPORTS.find((report) => report.key === "byChannel")?.excludeHostContains).toBeUndefined();
+    expect(GA4_REPORTS.find((report) => report.key === "byDevice")?.excludeHostContains).toBeUndefined();
+    expect(GA4_REPORTS.find((report) => report.key === "ctaEvents")?.excludeHostContains).toBeUndefined();
+  });
+
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
