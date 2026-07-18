@@ -8,6 +8,7 @@ import {
   buildSearchMetrics,
   buildMetricsNotificationSummary,
   ctaEventsMeasurementStatusForPeriod,
+  ctaEventsMeasurementStatusOf,
   measurementBucketOf,
   measurementStatusOf,
   type ArticleMetrics,
@@ -16,6 +17,8 @@ import {
   METRICS_PROPS,
   normalizePagePath,
   parseMetrics,
+  reserveCompleteForPagePath,
+  reserveCompleteMeasuredForPeriod,
   type SearchMetrics,
   serializeMetrics,
   summarizeMetrics,
@@ -48,6 +51,19 @@ function eventRow(
     keys: [pagePath, eventName],
     metrics: {
       keyEvents: { current: values[0], prior: values[1], deltaPct: null },
+    },
+  };
+}
+
+function reserveCompleteRow(
+  landingPage: string,
+  eventName: string,
+  values: [number, number]
+): MergedRow {
+  return {
+    keys: [landingPage, eventName],
+    metrics: {
+      eventCount: { current: values[0], prior: values[1], deltaPct: null },
     },
   };
 }
@@ -245,6 +261,26 @@ describe("metricsForKnownPagePath", () => {
     expect(metrics.views.current).toBe(10);
   });
 
+  it("予約完了レポートがあればtopPagesの一致有無に関わらず別バケットで載せる", () => {
+    const reserveCompleteRows = [
+      reserveCompleteRow("/news/a", "labola_reserve_complete", [2, 1]),
+    ];
+    expect(metricsForKnownPagePath(
+      "/news/a",
+      [row("/news/a", [10, 5], [8, 4])],
+      PERIOD,
+      undefined,
+      { reserveCompleteRows }
+    ).reserveComplete).toEqual({ current: 2, prior: 1, deltaPct: 100 });
+    expect(metricsForKnownPagePath(
+      "/news/a",
+      [],
+      PERIOD,
+      undefined,
+      { reserveCompleteRows }
+    ).reserveComplete).toEqual({ current: 2, prior: 1, deltaPct: 100 });
+  });
+
   it("topPagesの前週のみ記事を0/80・-100%の実測急落として保持する", () => {
     const metrics = metricsForKnownPagePath(
       "/news/a",
@@ -255,6 +291,39 @@ describe("metricsForKnownPagePath", () => {
     expect(metrics.measurementStatus).toBe("measured");
     expect(metrics.views).toEqual({ current: 0, prior: 80, deltaPct: -100 });
     expect(metrics.users).toEqual({ current: 0, prior: 40, deltaPct: -100 });
+  });
+});
+
+describe("reserveCompleteForPagePath", () => {
+  it("完全一致・クエリ・末尾スラッシュを正規化し、2完了イベントを合算する", () => {
+    const result = reserveCompleteForPagePath("/news/a", [
+      reserveCompleteRow("/news/a", "labola_reserve_complete", [2, 1]),
+      reserveCompleteRow("/news/a?utm_source=line", "labola_reserve_complete_program", [3, 2]),
+      reserveCompleteRow("/news/a/", "labola_reserve_complete", [4, 3]),
+      reserveCompleteRow("/news/b", "labola_reserve_complete", [99, 99]),
+    ]);
+    expect(result).toEqual({ current: 9, prior: 6, deltaPct: 50 });
+  });
+
+  it("eventName列が欠けた行は無視する", () => {
+    const row = reserveCompleteRow("/news/a", "labola_reserve_complete", [2, 1]);
+    expect(
+      reserveCompleteForPagePath("/news/a", [{ ...row, keys: [row.keys[0] as string] }])
+    ).toEqual({ current: 0, prior: 0, deltaPct: null });
+  });
+
+  it("該当行が無ければ0件として返す", () => {
+    expect(reserveCompleteForPagePath("/news/a", [
+      reserveCompleteRow("/news/b", "labola_reserve_complete", [2, 1]),
+    ])).toEqual({ current: 0, prior: 0, deltaPct: null });
+  });
+
+  it("別イベント・欠損値は除外または0件として安全に扱う", () => {
+    expect(reserveCompleteForPagePath("/news/a", [
+      { keys: ["/news/a", "labola_reserve_complete"], metrics: {} },
+      { keys: ["/news/a", "reservation_click"], metrics: { eventCount: { current: 9, prior: 9, deltaPct: 0 } } },
+      { keys: [], metrics: {} },
+    ])).toEqual({ current: 0, prior: 0, deltaPct: null });
   });
 });
 
@@ -311,6 +380,16 @@ describe("serializeMetrics / parseMetrics", () => {
       keyEventsMeasured: true,
     };
     expect(parseMetrics(serializeMetrics(withMeasured))).toEqual(withMeasured);
+  });
+
+  it("reserveComplete無しの旧JSONもvalidで、計測済み値も往復できる", () => {
+    expect(parseMetrics(serializeMetrics(metrics))?.reserveComplete).toBeUndefined();
+    const withReserveComplete: ArticleMetrics = {
+      ...metrics,
+      reserveComplete: { current: 2, prior: 1, deltaPct: 100 },
+      reserveCompleteMeasured: true,
+    };
+    expect(parseMetrics(serializeMetrics(withReserveComplete))).toEqual(withReserveComplete);
   });
 
   it("ctaEventsとactualReservations付きも往復できる", () => {
@@ -387,6 +466,12 @@ describe("measurement status", () => {
     expect(measurementStatusOf({})).toBe("measured");
   });
 
+  it("CTA計測状態は新状態を優先し、旧booleanは安全側に正規化する", () => {
+    expect(ctaEventsMeasurementStatusOf({ ctaEventsMeasurementStatus: "partial", ctaEventsMeasured: true })).toBe("partial");
+    expect(ctaEventsMeasurementStatusOf({ ctaEventsMeasured: true })).toBe("measured");
+    expect(ctaEventsMeasurementStatusOf({})).toBe("unmeasured");
+  });
+
   it.each([
     ["2026-07-01", { start: "2026-07-01", end: "2026-07-07" }, "measured"],
     ["2026-07-07", { start: "2026-07-01", end: "2026-07-07" }, "partial"],
@@ -418,6 +503,17 @@ describe("measurement status", () => {
       "2024-02-29",
       true
     )).toBe("measured");
+  });
+
+  it("予約完了はタグ設置日の前日は未計測、当日から計測済みとする", () => {
+    expect(reserveCompleteMeasuredForPeriod(
+      { start: "2026-07-17", end: "2026-07-17" },
+      true
+    )).toBe(false);
+    expect(reserveCompleteMeasuredForPeriod(
+      { start: "2026-07-18", end: "2026-07-18" },
+      true
+    )).toBe(true);
   });
 
   it("パス不一致・一致済み0流入・ソース失敗を分離する", () => {

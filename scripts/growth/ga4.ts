@@ -15,6 +15,7 @@ import {
   type MergedRow,
 } from "./transform";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
+import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -40,24 +41,29 @@ export interface Ga4ReportDef {
   limit?: number;
   /** 単一ディメンションの値を許可リストで絞る。 */
   dimensionFilter?: { fieldName: string; values: readonly string[] };
+  /** ページ次元レポートで他ドメイン混入を除外する用途。 */
+  excludeHostContains?: string;
   /** currentに無くpriorにだけある行をcurrent=0として保持する。 */
   includePriorOnly?: boolean;
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
 export const GA4_REPORTS: Ga4ReportDef[] = [
+  // セッション集計のため host 除外を加えると全体値を歪める。
   {
     key: "summary",
     dimensions: [],
     metrics: ["sessions", "activeUsers", "engagementRate", "keyEvents"],
   },
   {
+    // セッション集計のため host 除外を加えると全体値を歪める。
     key: "byChannel",
     dimensions: ["sessionDefaultChannelGroup"],
     metrics: ["sessions", "activeUsers", "keyEvents"],
     limit: 20,
   },
   {
+    // セッション集計のため host 除外を加えると全体値を歪める。
     key: "byDevice",
     dimensions: ["deviceCategory"],
     metrics: ["sessions", "activeUsers", "engagementRate"],
@@ -68,19 +74,34 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
     metrics: ["screenPageViews", "activeUsers"],
     limit: 20,
     includePriorOnly: true,
+    excludeHostContains: "labola.jp",
   },
   {
     key: "landingPages",
     dimensions: ["landingPage"],
     metrics: ["sessions", "activeUsers", "keyEvents"],
     limit: 20,
+    excludeHostContains: "labola.jp",
   },
   {
+    // セッション/イベント集計を歪めない。CTAは自社サイトだけが送るイベント名のため除外不要。
     key: "ctaEvents",
     dimensions: ["eventName"],
     metrics: ["keyEvents"],
     dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
     limit: 10_000,
+    includePriorOnly: true,
+  },
+  {
+    // 週次trend用の予約完了。完了イベントはLabolaドメイン上で発火するためhost除外を付けない。
+    key: "reserveCompleteEvents",
+    dimensions: ["eventName"],
+    metrics: ["eventCount"],
+    dimensionFilter: {
+      fieldName: "eventName",
+      values: [LABOLA_FUNNEL_EVENTS.rental.complete, LABOLA_FUNNEL_EVENTS.program.complete],
+    },
+    limit: 10,
     includePriorOnly: true,
   },
 ];
@@ -103,13 +124,33 @@ function buildRequest(def: Ga4ReportDef, range: DateRange) {
   if (def.limit !== undefined) {
     request.limit = String(def.limit);
   }
-  if (def.dimensionFilter) {
+  const inListExpression = def.dimensionFilter
+    ? {
+        filter: {
+          fieldName: def.dimensionFilter.fieldName,
+          inListFilter: { values: [...def.dimensionFilter.values] },
+        },
+      }
+    : undefined;
+  const excludedHostExpression = def.excludeHostContains
+    ? {
+        notExpression: {
+          filter: {
+            fieldName: "hostName",
+            stringFilter: { matchType: "CONTAINS", value: def.excludeHostContains },
+          },
+        },
+      }
+    : undefined;
+
+  if (inListExpression && excludedHostExpression) {
     request.dimensionFilter = {
-      filter: {
-        fieldName: def.dimensionFilter.fieldName,
-        inListFilter: { values: [...def.dimensionFilter.values] },
-      },
+      andGroup: { expressions: [inListExpression, excludedHostExpression] },
     };
+  } else if (inListExpression) {
+    request.dimensionFilter = inListExpression;
+  } else if (excludedHostExpression) {
+    request.dimensionFilter = excludedHostExpression;
   }
   return request;
 }

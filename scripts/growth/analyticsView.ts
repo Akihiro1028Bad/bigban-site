@@ -25,6 +25,22 @@ export interface MoneyView {
   forecast28: string;
 }
 
+export interface FunnelStageView {
+  label: string;
+  rental: number;
+  program: number;
+  total: number;
+  widthPct: number;
+  retentionPct: number | null;
+}
+
+export interface FunnelView {
+  week: string;
+  stages: FunnelStageView[];
+  capture: { text: string; isAlert: boolean };
+  note: string;
+}
+
 export interface ProgramListItem { title: string; schedule: string; fill: string; state: "full" | "warn" | "open" | "unknown"; }
 export interface MoneyExtraView { unpaid: { headline: string; overdue: string | null } | null; paymentShare: { method: string; pct: number }[]; revPach: string | null; }
 
@@ -100,6 +116,45 @@ export function moneyPanel(snapshot: Snapshot): MoneyView {
   return { currentWeek: yen(snapshot.kpi.sales.currentWeek), forecast28: yen(snapshot.kpi.sales.forecast28) };
 }
 
+/** 予約導線の集計値を、経営ボードのファネル表示用に整形する。 */
+export function funnelView(snapshot: Snapshot): FunnelView | null {
+  const funnel = snapshot.funnel;
+  if (funnel === undefined || funnel === null) return null;
+
+  const stage = (label: string, rental: number, program: number) => ({ label, rental, program, total: rental + program });
+  const { current, capture } = funnel;
+  const rawStages = [
+    { label: "予約クリック", rental: 0, program: 0, total: current.intent },
+    stage("情報入力", current.rental.input, current.program.input),
+    stage("内容確認", current.rental.confirm, current.program.confirm),
+  ];
+  const pending = stage("仮予約", current.rental.pending, current.program.pending);
+  if (pending.total > 0) rawStages.push(pending);
+  rawStages.push(stage("予約完了", current.rental.complete, current.program.complete));
+  // rawStages は必ず先頭「予約クリック」を含むため、先頭・直前段の存在は保証される。
+  const firstTotal = (rawStages[0] as { total: number }).total;
+  const stages: FunnelStageView[] = rawStages.map((stage, index) => {
+    const previousTotal = index === 0 ? null : (rawStages[index - 1] as { total: number }).total;
+    return {
+      ...stage,
+      widthPct: index === 0 ? (firstTotal === 0 ? 0 : 100) : firstTotal === 0 ? 0 : Math.round((stage.total / firstTotal) * 100),
+      retentionPct: previousTotal === null || previousTotal === 0
+        ? null
+        : Math.round((stage.total / previousTotal) * 100),
+    };
+  });
+
+  const captureView = capture.rate === null
+    ? { text: "セルフ予約0件のため捕捉率は算出不可", isAlert: false }
+    : { text: `捕捉率 ${Math.round(capture.rate * 100)}%(GA4完了${capture.ga4Complete}件 ÷ セルフ予約${capture.selfBooked}件)`, isAlert: capture.rate < 0.5 };
+  return {
+    week: shortWeekOf(funnel.week),
+    stages,
+    capture: captureView,
+    note: "実予約の真値はKPIヘッダー(CSV由来)。GA4は参考値(捕捉率つき)",
+  };
+}
+
 export function programList(snapshot: Snapshot): ProgramListItem[] {
   return (snapshot.catalog.programFills ?? []).map((program) => {
     if (program.capacity === null) return { title: program.name, schedule: `${program.heldOn} ${program.start}`, fill: "—", state: "unknown" };
@@ -147,5 +202,5 @@ const COLLECTING_LABELS: Record<string, string> = {
 
 export function collectingSections(snapshot: Snapshot): string[] {
   const missing = snapshot.meta.missingSections.map((section) => COLLECTING_LABELS[section] ?? section);
-  return [...missing, "ファネルはP3で解禁", "ペースカーブはP4で解禁"];
+  return [...missing, "ペースカーブはP4で解禁"];
 }

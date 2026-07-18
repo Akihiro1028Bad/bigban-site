@@ -9,6 +9,7 @@ export type TrendMetricKey =
   | "sessions"
   | "activeUsers"
   | "keyEvents"
+  | "reserveComplete"
   | "clicks"
   | "impressions"
   | "ctr"
@@ -42,6 +43,7 @@ const METRICS = [
   { key: "sessions", source: "ga4" },
   { key: "activeUsers", source: "ga4" },
   { key: "keyEvents", source: "ga4" },
+  { key: "reserveComplete", source: "ga4" },
   { key: "clicks", source: "gsc" },
   { key: "impressions", source: "gsc" },
   { key: "ctr", source: "gsc" },
@@ -55,6 +57,13 @@ function metricValue(row: MergedRow | undefined, key: TrendMetricKey): number | 
 
 function summaryRow(snapshot: SnapshotLike, source: "ga4" | "gsc"): MergedRow | undefined {
   return snapshot[source]?.summary?.[0];
+}
+
+/** 完了イベント専用レポートの2イベントを合算する。レポート欠落は旧スナップショットとして欠測にする。 */
+function reserveCompleteValue(snapshot: SnapshotLike): number | null {
+  const rows = snapshot.ga4?.reserveCompleteEvents;
+  if (rows === undefined) return null;
+  return rows.reduce((sum, row) => sum + (row.metrics.eventCount?.current ?? 0), 0);
 }
 
 function average(values: readonly (number | null)[]): number | null {
@@ -75,7 +84,9 @@ export function buildTrend(snapshots: readonly SnapshotLike[]): TrendReport {
   const series: TrendSeries[] = METRICS.map(({ key, source }) => {
     const points = recent.map((snapshot) => ({
       weekEnd: snapshot.period.end,
-      value: metricValue(summaryRow(snapshot, source), key),
+      value: key === "reserveComplete"
+        ? reserveCompleteValue(snapshot)
+        : metricValue(summaryRow(snapshot, source), key),
     }));
     return {
       metric: key,

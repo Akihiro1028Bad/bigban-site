@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { collectGrowthData } from "./collect";
+import type { GrowthConfig } from "./config";
 import { buildTrend, type SnapshotLike } from "./trend";
 
 function snapshot(
@@ -108,6 +110,44 @@ describe("buildTrend", () => {
     ]);
     expect(sessions?.latest).toBeNull();
     expect(sessions?.movingAvg).toBe(10);
+  });
+
+  it("collect後の完了イベント別GA4出力を合算して予約完了系列を作り、旧データの週は欠測として扱う", async () => {
+    const config: GrowthConfig = {
+      ga4PropertyId: "1",
+      gscSiteUrl: "https://example.com/",
+      googleClientId: "id",
+      googleClientSecret: "secret",
+      googleRefreshToken: "token",
+    };
+    const withCompleteEvents = await collectGrowthData({
+      config,
+      accessToken: "token",
+      current: { start: "2026-07-13", end: "2026-07-19" },
+      prior: { start: "2026-07-06", end: "2026-07-12" },
+      generatedAt: "2026-07-20T00:00:00Z",
+      deps: {
+        fetchGa4: async () => ({
+          reserveCompleteEvents: [
+            { keys: ["labola_reserve_complete"], metrics: { eventCount: { current: 2, prior: 1, deltaPct: 100 } } },
+            { keys: ["labola_reserve_complete_program"], metrics: { eventCount: { current: 3, prior: 2, deltaPct: 50 } } },
+            // eventCount 欠落行は0扱い(防御分岐の検証)
+            { keys: ["labola_reserve_complete"], metrics: {} as Record<string, never> },
+          ],
+        }),
+        fetchGsc: async () => ({}),
+      },
+    });
+    const report = buildTrend([
+      snapshot("2026-07-12", {}),
+      withCompleteEvents,
+    ]);
+    const reserveComplete = report.series.find((series) => series.metric === "reserveComplete");
+    expect(reserveComplete?.points).toEqual([
+      { weekEnd: "2026-07-12", value: null },
+      { weekEnd: "2026-07-19", value: 5 },
+    ]);
+    expect(reserveComplete?.movingAvg).toBe(5);
   });
 
   it("直近4週だけ採る(5件以上でも4件)", () => {

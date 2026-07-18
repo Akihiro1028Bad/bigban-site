@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { aggregateCtaEvents, type CtaEventMetrics } from "./ctaEvents";
 import { growthArticleSegment, type GrowthMedia } from "./endpoint";
+import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
 import type { MergedRow } from "./transform";
 
 /** 1指標の今期/前期/前週比。 */
@@ -78,6 +79,10 @@ export interface ArticleMetrics {
   keyEvents?: MetricDelta;
   // R6: GA4 keyEvents が実測できる期間の記事か。未指定は未計測扱い(後方互換・安全側)。
   keyEventsMeasured?: boolean;
+  // R6: GA4帰属の予約完了。意図CTAとは別バケットで、旧データには無い。
+  reserveComplete?: MetricDelta;
+  // R6: 予約完了タグを実測できる期間の記事か。未指定は未計測扱い(後方互換・安全側)。
+  reserveCompleteMeasured?: boolean;
   // #計測強化 S2: GSC 検索成績(後方互換のため任意。旧データには無い)。
   search?: SearchMetrics;
   // #計測強化 S3: 公開日(microCMS publishedAt・ISO)。要改稿(公開28日後)判定に使う。任意・後方互換。
@@ -94,6 +99,13 @@ export const METRICS_PROPS = {
 const VIEWS_METRIC = "screenPageViews";
 const USERS_METRIC = "activeUsers";
 const KEY_EVENTS_METRIC = "keyEvents";
+const EVENT_COUNT_METRIC = "eventCount";
+const RESERVE_COMPLETE_EVENTS: ReadonlySet<string> = new Set([
+  LABOLA_FUNNEL_EVENTS.rental.complete,
+  LABOLA_FUNNEL_EVENTS.program.complete,
+]);
+/** Labola予約完了タグの設置日。環境変数にせず正典として固定する。 */
+export const RESERVE_COMPLETE_MEASURED_SINCE = "2026-07-18";
 
 /**
  * 公開記事の GA4 pagePath を組み立てる。ja は接頭辞なし、それ以外(en)は /en。
@@ -202,6 +214,26 @@ export function metricsForPagePath(
   };
 }
 
+/**
+ * landingPage を記事パスへ正規化し、Labolaのレンタル/プログラム予約完了を合算する。
+ * 予約意図CTAとは別レポートの eventCount を使い、keyEventsとは混同しない。
+ */
+export function reserveCompleteForPagePath(
+  pagePath: string,
+  rows: readonly MergedRow[]
+): MetricDelta {
+  const target = normalizePagePath(pagePath);
+  let current = 0;
+  let prior = 0;
+  for (const row of rows) {
+    if (normalizePagePath(row.keys[0] ?? "") !== target) continue;
+    if (!RESERVE_COMPLETE_EVENTS.has(row.keys[1] ?? "")) continue;
+    current += row.metrics[EVENT_COUNT_METRIC]?.current ?? 0;
+    prior += row.metrics[EVENT_COUNT_METRIC]?.prior ?? 0;
+  }
+  return { current, prior, deltaPct: deltaPct(current, prior) };
+}
+
 function ctaEventsForPagePath(
   target: string,
   ctaRows: readonly MergedRow[] | undefined
@@ -228,25 +260,42 @@ export function metricsForKnownPagePath(
   rows: readonly MergedRow[],
   period: { start: string; end: string },
   ctaRows?: readonly MergedRow[],
-  options: { isGa4SourceAvailable?: boolean } = {}
+  options: {
+    isGa4SourceAvailable?: boolean;
+    reserveCompleteRows?: readonly MergedRow[];
+  } = {}
 ): ArticleMetrics {
   const isGa4SourceAvailable = options.isGa4SourceAvailable ?? true;
   if (!isGa4SourceAvailable) {
-    return zeroMetrics(pagePath, period, "source-error", ctaRows);
+    return zeroMetrics(pagePath, period, "source-error", ctaRows, options.reserveCompleteRows);
   }
   const measured = metricsForPagePath(pagePath, rows, period, ctaRows);
-  if (measured) return { ...measured, ga4Measured: true, measurementStatus: "measured" };
-  return zeroMetrics(pagePath, period, "path-unmatched", ctaRows);
+  if (measured) {
+    const reserveComplete = options.reserveCompleteRows
+      ? reserveCompleteForPagePath(pagePath, options.reserveCompleteRows)
+      : undefined;
+    return {
+      ...measured,
+      ga4Measured: true,
+      measurementStatus: "measured",
+      ...(reserveComplete ? { reserveComplete } : {}),
+    };
+  }
+  return zeroMetrics(pagePath, period, "path-unmatched", ctaRows, options.reserveCompleteRows);
 }
 
 function zeroMetrics(
   pagePath: string,
   period: { start: string; end: string },
   measurementStatus: Exclude<MeasurementStatus, "measured">,
-  ctaRows: readonly MergedRow[] | undefined
+  ctaRows: readonly MergedRow[] | undefined,
+  reserveCompleteRows: readonly MergedRow[] | undefined
 ): ArticleMetrics {
   const target = normalizePagePath(pagePath);
   const ctaEvents = ctaEventsForPagePath(target, ctaRows);
+  const reserveComplete = reserveCompleteRows
+    ? reserveCompleteForPagePath(target, reserveCompleteRows)
+    : undefined;
   return {
     pagePath: target,
     views: { current: 0, prior: 0, deltaPct: null },
@@ -254,6 +303,7 @@ function zeroMetrics(
     ga4Measured: false,
     measurementStatus,
     ...(ctaEvents ? { ctaEvents } : {}),
+    ...(reserveComplete ? { reserveComplete } : {}),
     period,
   };
 }
@@ -296,6 +346,18 @@ export function ctaEventsMeasurementStatusOf(
 ): CtaEventsMeasurementStatus {
   if (metrics.ctaEventsMeasurementStatus) return metrics.ctaEventsMeasurementStatus;
   return metrics.ctaEventsMeasured === true ? "measured" : "unmeasured";
+}
+
+/** 予約完了タグ設置日以降の全期間だけを計測済みとする。部分期間は安全側で未計測。 */
+export function reserveCompleteMeasuredForPeriod(
+  period: { start: string; end: string } | undefined,
+  isGa4SourceAvailable: boolean
+): boolean {
+  return ctaEventsMeasurementStatusForPeriod(
+    period,
+    RESERVE_COMPLETE_MEASURED_SINCE,
+    isGa4SourceAvailable
+  ) === "measured";
 }
 
 export type MeasurementBucket = MeasurementStatus | "zero-inflow";
@@ -390,6 +452,8 @@ const metricsSchema = z.object({
   // #計測強化 S2/S3: 後方互換。旧データ(keyEvents/search/publishedAt 無し)も valid のまま。
   keyEvents: deltaSchema.optional(),
   keyEventsMeasured: z.boolean().optional(),
+  reserveComplete: deltaSchema.optional(),
+  reserveCompleteMeasured: z.boolean().optional(),
   search: searchSchema.optional(),
   publishedAt: z.string().optional(),
   period: z.object({ start: z.string(), end: z.string() }),

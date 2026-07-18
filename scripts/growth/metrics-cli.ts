@@ -33,6 +33,7 @@ import {
   ctaEventsMeasurementStatusForPeriod,
   measurementBucketOf,
   metricsForKnownPagePath,
+  reserveCompleteMeasuredForPeriod,
   type ActualReservationMetrics,
   type SearchMetrics,
 } from "./metrics";
@@ -44,6 +45,7 @@ import {
 } from "./notion";
 import { queryAllDataSource } from "./notionRepository";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
+import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
 import {
   actualReservationsForPage,
   parseCanonicalMeta,
@@ -68,12 +70,27 @@ const TOP_PAGES_REPORT: Ga4ReportDef = {
   metrics: ["screenPageViews", "activeUsers"],
   limit: 200,
   includePriorOnly: true,
+  excludeHostContains: "labola.jp",
 };
 const TOP_PAGE_CTA_EVENTS_REPORT: Ga4ReportDef = {
   key: "topPageCtaEvents",
   dimensions: ["pagePath", "eventName"],
   metrics: ["keyEvents"],
   dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
+  limit: 10_000,
+  includePriorOnly: true,
+  excludeHostContains: "labola.jp",
+};
+// 記事別の予約完了(GA4帰属)。完了イベントはlabolaドメイン上で発火するためhost除外は付けない。
+// Labola直行セッションはlandingPageが記事パスに一致しないため自然に除外される。
+const ARTICLE_RESERVE_COMPLETE_REPORT: Ga4ReportDef = {
+  key: "articleReserveComplete",
+  dimensions: ["landingPage", "eventName"],
+  metrics: ["eventCount"],
+  dimensionFilter: {
+    fieldName: "eventName",
+    values: [LABOLA_FUNNEL_EVENTS.rental.complete, LABOLA_FUNNEL_EVENTS.program.complete],
+  },
   limit: 10_000,
   includePriorOnly: true,
 };
@@ -240,6 +257,7 @@ async function main(): Promise<void> {
   }
   let rows: Awaited<ReturnType<typeof fetchGa4>>[string] = [];
   let ctaRows: Awaited<ReturnType<typeof fetchGa4>>[string] | undefined;
+  let reserveCompleteRows: Awaited<ReturnType<typeof fetchGa4>>[string] | undefined;
   let isGa4Available = false;
   if (accessToken) {
     try {
@@ -248,10 +266,11 @@ async function main(): Promise<void> {
         accessToken,
         current,
         prior,
-        reports: [TOP_PAGES_REPORT, TOP_PAGE_CTA_EVENTS_REPORT],
+        reports: [TOP_PAGES_REPORT, TOP_PAGE_CTA_EVENTS_REPORT, ARTICLE_RESERVE_COMPLETE_REPORT],
       });
       rows = ga4.topPages ?? [];
       ctaRows = ga4.topPageCtaEvents ?? [];
+      reserveCompleteRows = ga4.articleReserveComplete ?? [];
       isGa4Available = true;
     } catch (error) {
       console.warn("[metrics] GA4取得失敗(実予約更新は継続):", error);
@@ -290,6 +309,7 @@ async function main(): Promise<void> {
     const pagePath = articlePagePath(sl.slug, sl.locale, media);
     const base = metricsForKnownPagePath(pagePath, rows, current, ctaRows, {
       isGa4SourceAvailable: isGa4Available,
+      reserveCompleteRows,
     });
     const bucket = measurementBucketOf(base);
     if (bucket === "source-error") sourceError += 1;
@@ -319,10 +339,12 @@ async function main(): Promise<void> {
       KEY_EVENTS_SINCE,
       isGa4Available
     );
+    const reserveCompleteMeasured = reserveCompleteMeasuredForPeriod(current, isGa4Available);
     const metrics = {
       ...base,
       ctaEventsMeasurementStatus,
       ctaEventsMeasured: ctaEventsMeasurementStatus === "measured",
+      reserveCompleteMeasured,
       actualReservations,
       ...(search ? { search } : {}),
       ...(sl.publishedAt ? { publishedAt: sl.publishedAt } : {}),
