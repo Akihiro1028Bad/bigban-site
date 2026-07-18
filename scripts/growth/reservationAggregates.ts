@@ -40,6 +40,14 @@ export function jstYmdOfIso(iso: string): string {
   return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * 指定週に受付されたセルフ予約を数える。
+ * GA4の完了イベントは予約時点で発火するため、後日取消された予約も比較対象に含める。
+ */
+export function selfBookedInWeek(reservations: CanonicalReservation[], week: { start: string; end: string }): number {
+  return reservations.filter((reservation) => SELF_CHANNELS.has(reservation.channel) && isWithin(jstYmdOfIso(reservation.bookedAt), week)).length;
+}
+
 function confirmedReservations(bundle: CanonicalBundle): CanonicalReservation[] {
   return bundle.reservations.filter((reservation) => reservation.status !== "cancelled");
 }

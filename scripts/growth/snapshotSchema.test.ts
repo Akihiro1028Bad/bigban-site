@@ -21,6 +21,14 @@ describe("snapshotSchema", () => {
     expect(parsed.catalog.unpaidAging).toBeUndefined();
     expect(parsed.catalog.revPach).toBeUndefined();
   });
+  it("ファネルあり・なしのJSONを後方互換で受理する", () => {
+    const withFunnel = {
+      ...validSnapshot(),
+      funnel: { week: { start: "2026-07-13", end: "2026-07-19" }, current: { intent: 1, rental: { input: 1, confirm: 1, pending: 1, complete: 1 }, program: { input: 1, confirm: 1, pending: 1, complete: 1 } }, prior: { intent: 0, rental: { input: 0, confirm: 0, pending: 0, complete: 0 }, program: { input: 0, confirm: 0, pending: 0, complete: 0 } }, capture: { ga4Complete: 2, selfBooked: 1, rate: 2 } },
+    };
+    expect(parseSnapshot(JSON.stringify(validSnapshot())).funnel).toBeUndefined();
+    expect(parseSnapshot(JSON.stringify(withFunnel)).funnel?.capture.rate).toBe(2);
+  });
   it("不正なseverityとschemaVersionを拒否する", () => {
     expect(snapshotSchema.safeParse({ ...validSnapshot(), schemaVersion: 2 }).success).toBe(false);
     expect(snapshotSchema.safeParse({ ...validSnapshot(), insights: [{ id: "x", detector: "d", severity: "bad" }] }).success).toBe(false);

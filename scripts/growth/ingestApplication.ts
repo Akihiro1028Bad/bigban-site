@@ -295,7 +295,7 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
     readPreviousSnapshot(deps.fs, input.dataDir, todayYmd),
     readBaselineInputs(deps.fs, input.dataDir, todayYmd),
   ]);
-  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs });
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts: null });
   const hasRowDrop = snapshot.insights.some((insight) => insight.id === "d11:rowdrop:yoyaku");
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");
