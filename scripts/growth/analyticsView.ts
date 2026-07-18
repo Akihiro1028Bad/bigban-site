@@ -25,6 +25,20 @@ export interface MoneyView {
   forecast28: string;
 }
 
+export interface FunnelStageView {
+  label: string;
+  rental: number;
+  program: number;
+  total: number;
+}
+
+export interface FunnelView {
+  week: string;
+  stages: FunnelStageView[];
+  capture: { text: string; isAlert: boolean };
+  note: string;
+}
+
 export interface ProgramListItem { title: string; schedule: string; fill: string; state: "full" | "warn" | "open" | "unknown"; }
 export interface MoneyExtraView { unpaid: { headline: string; overdue: string | null } | null; paymentShare: { method: string; pct: number }[]; revPach: string | null; }
 
@@ -98,6 +112,33 @@ export function heatmapCells(snapshot: Snapshot): HeatmapCell[] {
 /** 数値を持つスナップショットを、金額パネルがそのまま表示できる文字列にする。 */
 export function moneyPanel(snapshot: Snapshot): MoneyView {
   return { currentWeek: yen(snapshot.kpi.sales.currentWeek), forecast28: yen(snapshot.kpi.sales.forecast28) };
+}
+
+/** 予約導線の集計値を、経営ボードのファネル表示用に整形する。 */
+export function funnelView(snapshot: Snapshot): FunnelView | null {
+  const funnel = snapshot.funnel;
+  if (funnel === undefined || funnel === null) return null;
+
+  const stage = (label: string, rental: number, program: number): FunnelStageView => ({ label, rental, program, total: rental + program });
+  const { current, capture } = funnel;
+  const stages: FunnelStageView[] = [
+    { label: "予約クリック", rental: 0, program: 0, total: current.intent },
+    stage("情報入力", current.rental.input, current.program.input),
+    stage("内容確認", current.rental.confirm, current.program.confirm),
+  ];
+  const pending = stage("仮予約", current.rental.pending, current.program.pending);
+  if (pending.total > 0) stages.push(pending);
+  stages.push(stage("予約完了", current.rental.complete, current.program.complete));
+
+  const captureView = capture.rate === null
+    ? { text: "セルフ予約0件のため捕捉率は算出不可", isAlert: false }
+    : { text: `捕捉率 ${Math.round(capture.rate * 100)}%(GA4完了${capture.ga4Complete}件 ÷ セルフ予約${capture.selfBooked}件)`, isAlert: capture.rate < 0.5 };
+  return {
+    week: shortWeekOf(funnel.week),
+    stages,
+    capture: captureView,
+    note: "実予約の真値はKPIヘッダー(CSV由来)。GA4は参考値(捕捉率つき)",
+  };
 }
 
 export function programList(snapshot: Snapshot): ProgramListItem[] {

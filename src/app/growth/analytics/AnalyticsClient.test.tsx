@@ -35,6 +35,20 @@ describe("AnalyticsClient", () => {
     expect(screen.getByRole("heading", { name: "顧客の年代・性別" })).toBeVisible();
   });
 
+  it("ファネルデータがあれば気づきの後に予約ファネルを表示する", async () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.funnel = {
+      week: { start: "2026-07-13", end: "2026-07-19" },
+      current: { intent: 1, rental: { input: 1, confirm: 1, pending: 0, complete: 1 }, program: { input: 0, confirm: 0, pending: 0, complete: 0 } },
+      prior: { intent: 0, rental: { input: 0, confirm: 0, pending: 0, complete: 0 }, program: { input: 0, confirm: 0, pending: 0, complete: 0 } },
+      capture: { ga4Complete: 1, selfBooked: 1, rate: 1 },
+    };
+    mockSnapshot(snapshot);
+    render(<AnalyticsClient />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "予約ファネル(07/13〜07/19)" })).toBeVisible());
+    expect(screen.getByRole("heading", { name: "気づき" }).compareDocumentPosition(screen.getByRole("heading", { name: "予約ファネル(07/13〜07/19)" }) ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("予約不可CSVが欠落したスナップショットではRevPACHを表示しない", async () => {
     const snapshot = analyticsSnapshot();
     snapshot.catalog.revPach = undefined;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { analyticsSnapshot } from "./__fixtures__/analyticsSnapshot";
-import { collectingSections, demographicsView, formatSyncedAtJst, freshnessOf, heatmapCells, insightEvidenceText, kpiCards, moneyExtra, moneyPanel, programList, sortedInsights } from "./analyticsView";
+import { collectingSections, demographicsView, formatSyncedAtJst, freshnessOf, funnelView, heatmapCells, insightEvidenceText, kpiCards, moneyExtra, moneyPanel, programList, sortedInsights } from "./analyticsView";
 
 describe("analyticsView", () => {
   it("sourceSyncedAtを基準に鮮度を判定する", () => {
@@ -117,5 +117,65 @@ describe("analyticsView", () => {
     const snapshot = analyticsSnapshot();
     snapshot.meta.missingSections = ["customer", "unknown"];
     expect(collectingSections(snapshot)).toEqual(["商圏・顧客データ", "unknown", "ファネルはP3で解禁", "ペースカーブはP4で解禁"]);
+  });
+
+  it("ファネルがない旧スナップショットはnullにする", () => {
+    expect(funnelView(analyticsSnapshot())).toBeNull();
+    const snapshot = analyticsSnapshot();
+    snapshot.funnel = null;
+    expect(funnelView(snapshot)).toBeNull();
+  });
+
+  it("ファネルを週表記・段別内訳・捕捉率つきで整形する", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.funnel = {
+      week: { start: "2026-07-13", end: "2026-07-19" },
+      current: {
+        intent: 20,
+        rental: { input: 8, confirm: 6, pending: 0, complete: 4 },
+        program: { input: 5, confirm: 4, pending: 0, complete: 3 },
+      },
+      prior: {
+        intent: 0,
+        rental: { input: 0, confirm: 0, pending: 0, complete: 0 },
+        program: { input: 0, confirm: 0, pending: 0, complete: 0 },
+      },
+      capture: { ga4Complete: 7, selfBooked: 13, rate: 7 / 13 },
+    };
+    expect(funnelView(snapshot)).toEqual({
+      week: "07/13〜07/19",
+      stages: [
+        { label: "予約クリック", rental: 0, program: 0, total: 20 },
+        { label: "情報入力", rental: 8, program: 5, total: 13 },
+        { label: "内容確認", rental: 6, program: 4, total: 10 },
+        { label: "予約完了", rental: 4, program: 3, total: 7 },
+      ],
+      capture: { text: "捕捉率 54%(GA4完了7件 ÷ セルフ予約13件)", isAlert: false },
+      note: "実予約の真値はKPIヘッダー(CSV由来)。GA4は参考値(捕捉率つき)",
+    });
+  });
+
+  it("仮予約がある週は段に含め、捕捉率の境界と算出不可を区別する", () => {
+    const snapshot = analyticsSnapshot();
+    snapshot.funnel = {
+      week: { start: "2026-07-13", end: "2026-07-19" },
+      current: {
+        intent: 10,
+        rental: { input: 5, confirm: 4, pending: 1, complete: 3 },
+        program: { input: 3, confirm: 2, pending: 2, complete: 1 },
+      },
+      prior: {
+        intent: 0,
+        rental: { input: 0, confirm: 0, pending: 0, complete: 0 },
+        program: { input: 0, confirm: 0, pending: 0, complete: 0 },
+      },
+      capture: { ga4Complete: 5, selfBooked: 10, rate: 0.5 },
+    };
+    expect(funnelView(snapshot)?.stages[3]).toEqual({ label: "仮予約", rental: 1, program: 2, total: 3 });
+    expect(funnelView(snapshot)?.capture).toEqual({ text: "捕捉率 50%(GA4完了5件 ÷ セルフ予約10件)", isAlert: false });
+    snapshot.funnel.capture.rate = 0.499;
+    expect(funnelView(snapshot)?.capture.isAlert).toBe(true);
+    snapshot.funnel.capture.rate = null;
+    expect(funnelView(snapshot)?.capture).toEqual({ text: "セルフ予約0件のため捕捉率は算出不可", isAlert: false });
   });
 });
