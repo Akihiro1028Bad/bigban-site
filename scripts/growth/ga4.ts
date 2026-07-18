@@ -138,13 +138,17 @@ export async function fetchGa4(
   for (const batch of chunk(requests, MAX_BATCH_SIZE)) {
     const body = await postJson(url, accessToken, { requests: batch }, fetchFn);
     const reportsInBatch = (body as { reports?: Ga4Report[] }).reports ?? [];
+    if (reportsInBatch.length !== batch.length) {
+      throw new Error(`GA4レスポンスのレポート数が要求と一致しません(要求${batch.length}件・応答${reportsInBatch.length}件)`);
+    }
     allReports.push(...reportsInBatch);
   }
 
   const result: Record<string, MergedRow[]> = {};
   reports.forEach((def, index) => {
-    const currentReport = allReports[index * 2] ?? {};
-    const priorReport = allReports[index * 2 + 1] ?? {};
+    // 件数検証済みのため allReports は要求数と同数(current/prior の2件×レポート数)存在する。
+    const currentReport = allReports[index * 2] as Ga4Report;
+    const priorReport = allReports[index * 2 + 1] as Ga4Report;
     result[def.key] = mergeRows(
       parseGa4Report(currentReport),
       parseGa4Report(priorReport),

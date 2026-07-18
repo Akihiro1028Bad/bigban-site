@@ -16,6 +16,20 @@ export const insightSchema = z.object({
 
 export type Insight = z.infer<typeof insightSchema>;
 
+const funnelStageSchema = z.object({
+  input: z.number(),
+  confirm: z.number(),
+  pending: z.number(),
+  complete: z.number(),
+});
+
+// labolaFunnel.ts の FunnelCounts / FunnelStageCounts と同じ構造を保持する。
+const funnelCountsSchema = z.object({
+  intent: z.number(),
+  rental: funnelStageSchema,
+  program: funnelStageSchema,
+});
+
 export const snapshotSchema = z.object({
   schemaVersion: z.literal(1),
   generatedAt: isoDateTimeSchema,
@@ -48,6 +62,16 @@ export const snapshotSchema = z.object({
     revPach: z.object({ revenue: z.number(), availableCourtHours: z.number(), revPerCourtHour: z.number(), spaces: z.number() }).nullable().optional(),
   }),
   series: z.object({ weeklyReservations: z.array(z.object({ weekStart: z.string(), count: z.number() })) }),
+  funnel: z.object({
+    week: z.object({ start: ymdSchema, end: ymdSchema }),
+    current: funnelCountsSchema,
+    prior: funnelCountsSchema,
+    capture: z.object({
+      ga4Complete: z.number(),
+      selfBooked: z.number(),
+      rate: z.number().nullable(),
+    }),
+  }).nullable().optional(),
   insights: z.array(insightSchema),
 });
 

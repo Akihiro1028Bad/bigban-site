@@ -8,6 +8,7 @@ import {
   paymentMethodShare,
   programFills,
   revPach,
+  selfBookedInWeek,
   unpaidAging,
   wardCounts,
   weeklyKpis,
@@ -195,6 +196,21 @@ describe("weeklyKpis", () => {
     ]);
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
     expect(kpi.self.unknown4w).toBe(1);
+  });
+});
+
+describe("selfBookedInWeek", () => {
+  it("セルフ経路だけを受付日の週境界を含めて数え、取消済みも比較対象に含める", () => {
+    const reservations = [
+      res({ reservationId: "start", bookedAt: "2026-07-13T00:00:00+09:00", channel: "user_sp" }),
+      res({ reservationId: "end", bookedAt: "2026-07-19T23:59:59+09:00", channel: "user_pc", status: "cancelled" }),
+      res({ reservationId: "admin", bookedAt: "2026-07-15T10:00:00+09:00", channel: "admin" }),
+      res({ reservationId: "unknown", bookedAt: "2026-07-15T10:00:00+09:00", channel: "unknown" }),
+      res({ reservationId: "before", bookedAt: "2026-07-12T23:59:59+09:00", channel: "user_sp" }),
+      res({ reservationId: "after", bookedAt: "2026-07-20T00:00:00+09:00", channel: "user_pc" }),
+    ];
+
+    expect(selfBookedInWeek(reservations, { start: "2026-07-13", end: "2026-07-19" })).toBe(2);
   });
 });
 

@@ -32,7 +32,7 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 
 describe("fetchGa4", () => {
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
     expect(ctaReport).toBeDefined();
     expect(ctaReport?.includePriorOnly).toBe(true);
@@ -63,7 +63,7 @@ describe("fetchGa4", () => {
   });
 
   it("batchRunReports を正しい URL と Bearer トークンで叩く", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }] }));
 
     await fetchGa4({ config, accessToken: "ya29.token", current, prior, fetchFn, reports });
 
@@ -78,7 +78,7 @@ describe("fetchGa4", () => {
   });
 
   it("各レポートを current/prior の2期間ぶんリクエストする", async () => {
-    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }] }));
 
     await fetchGa4({ config, accessToken: "t", current, prior, fetchFn, reports });
 
@@ -198,12 +198,10 @@ describe("fetchGa4", () => {
   });
 
   it("reports/fetchFn 未指定時は既定値(GA4_REPORTS・グローバル fetch)を用いる", async () => {
-    const globalFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ reports: [] }),
-      text: async () => "",
-    });
+    const globalFetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 5 }, () => ({ rows: [] })) }), text: async () => "" })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 5 }, () => ({ rows: [] })) }), text: async () => "" })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reports: Array.from({ length: 2 }, () => ({ rows: [] })) }), text: async () => "" });
     vi.stubGlobal("fetch", globalFetch);
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior });
@@ -262,8 +260,16 @@ describe("fetchGa4", () => {
     expect(result.c).toEqual([]);
   });
 
-  it("レスポンスに reports が無くても各 key を空配列で返す", async () => {
+  it("レスポンスのレポート数が要求数より少ない場合はエラーにする", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({}));
+
+    await expect(
+      fetchGa4({ config, accessToken: "t", current, prior, reports, fetchFn })
+    ).rejects.toThrow("GA4レスポンスのレポート数が要求と一致しません(要求4件・応答0件)");
+  });
+
+  it("rowsが空のレポートは正常な0件として返す", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }] }));
 
     const result = await fetchGa4({ config, accessToken: "t", current, prior, reports, fetchFn });
 

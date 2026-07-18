@@ -11,8 +11,11 @@ import { mergeExclusionRules } from "./reservationExclusions";
 import { buildSnapshot } from "./snapshotBuild";
 import { parseSnapshot } from "./snapshotSchema";
 import { ymdSchema } from "./dateSchemas";
+import { funnelCountsResultSchema } from "./labolaFunnel";
 import type { ExclusionRules } from "./reservationExclusions";
+import type { FunnelCounts } from "./labolaFunnel";
 import type { LabolaCsvType } from "./labolaCsv";
+import type { DateRange } from "./period";
 import type { Snapshot } from "./snapshotSchema";
 
 export interface IngestFsEntry { name: string; isFile(): boolean; }
@@ -44,6 +47,7 @@ export interface IngestApplicationDeps {
   now: () => Date;
   notify: (text: string, kind: "weekly") => Promise<void>;
   uploadSnapshot?: (json: string) => Promise<void>;
+  fetchFunnel?: (current: DateRange, prior: DateRange) => Promise<{ current: FunnelCounts; prior: FunnelCounts } | null>;
   log?: (message: string) => void;
 }
 
@@ -291,11 +295,20 @@ export async function runIngestApplication(input: IngestApplicationInput, deps: 
   const canonical = buildCanonical({ yoyaku: yoyaku.rows, customers: customers?.rows ?? null, salesSummary: salesSummary?.rows ?? null, programs, blockedSlots: blockedSlots?.rows ?? null, rules: mergeExclusionRules(input.rules, input.extraEmailsCsv), hashKey: input.hashKey, coverageStart: input.coverageStart, generatedAt: now.toISOString(), sourceSyncedAt: new Date(yoyakuFile.mtimeMs).toISOString(), parseWarnings: [...warnings, ...yoyaku.warnings, ...(customers?.warnings ?? []), ...(salesSummary?.warnings ?? []), ...(parsedPrograms?.warnings ?? []), ...(blockedSlots?.warnings ?? [])] });
   canonical.meta.reservationsDigest = digestHash(serializeJsonl(canonical.reservations));
   const { current, prior } = computeWeeklyPeriods(now);
+  let funnelCounts: { current: FunnelCounts; prior: FunnelCounts } | null = null;
+  if (deps.fetchFunnel) {
+    try {
+      funnelCounts = funnelCountsResultSchema.nullable().parse(await deps.fetchFunnel(current, prior));
+    } catch {
+      log("[ingest] GA4ファネル取得に失敗しました(スナップショットはファネルなしで継続)");
+      canonical.meta.warnings.push("GA4ファネル取得失敗");
+    }
+  }
   const [previousSnapshot, baselineInputs] = await Promise.all([
     readPreviousSnapshot(deps.fs, input.dataDir, todayYmd),
     readBaselineInputs(deps.fs, input.dataDir, todayYmd),
   ]);
-  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs });
+  const snapshot = buildSnapshot({ bundle: canonical, coverage: canonical.meta.coverage, sourceSyncedAt: canonical.meta.sourceSyncedAt, current, prior, todayYmd, previousSnapshot, baselineInputs, funnelCounts });
   const hasRowDrop = snapshot.insights.some((insight) => insight.id === "d11:rowdrop:yoyaku");
   if (hasRowDrop && !input.allowRowDrop) throw new Error("工程 anomaly: 予約CSVの行数が前回から急減しています(絞り込みエクスポートの可能性)。入力を確認し、意図的な場合は GROWTH_INGEST_ALLOW_ROWDROP=1 で再実行してください");
   if (hasRowDrop) log("[ingest] 予約CSVの行数急減を許可して取り込みを続行します");
