@@ -7,7 +7,7 @@ function context(): DetectorContext {
 }
 
 describe("unpaidOverdue", () => {
-  it("15日以上の利用済み未収金を固定IDで通知する", () => expect(unpaidOverdue(context())).toEqual([expect.objectContaining({ id: "d10:unpaid", evidence: expect.objectContaining({ reservationIds: ["r1"] }) })]));
+  it("15日以上の利用済み未収金を固定ID・観察ラベルで通知する", () => expect(unpaidOverdue(context())).toEqual([expect.objectContaining({ id: "d10:unpaid", label: "観察", evidence: expect.objectContaining({ reservationIds: ["r1"] }) })]));
   it("金額未入力の滞留も件数には含め、合計は0として通知する", () => {
     const value = context();
     value.bundle.reservations[0].amount = null;

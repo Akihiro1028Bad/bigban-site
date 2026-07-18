@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+
+import { describe, expect, it, vi } from "vitest";
 
 import type { MergedRow } from "./transform";
 import {
@@ -11,6 +13,7 @@ import {
   ctaEventsMeasurementStatusOf,
   measurementBucketOf,
   measurementStatusOf,
+  loadCanonicalReservations,
   type ArticleMetrics,
   metricsForPagePath,
   metricsForKnownPagePath,
@@ -20,11 +23,49 @@ import {
   reserveCompleteForPagePath,
   reserveCompleteMeasuredForPeriod,
   type SearchMetrics,
+  type MetricsFs,
   serializeMetrics,
   summarizeMetrics,
 } from "./metrics";
 
 const PERIOD = { start: "2026-06-15", end: "2026-06-21" };
+
+describe("loadCanonicalReservations", () => {
+  const jsonl = '{"reservationId":"r1","bookedAt":"2026-07-15T10:00:00+09:00","status":"confirmed"}\n';
+  const digest = createHash("sha256").update(jsonl).digest("hex");
+  const meta = JSON.stringify({ generatedAt: "2026-07-16T00:00:00Z", sourceSyncedAt: "2026-07-16T00:00:00Z", reservationsDigest: digest, coverage: { start: "2026-07-01", end: "2026-07-16" } });
+  const fsOf = (readFile: MetricsFs["readFile"]): MetricsFs => ({ readFile });
+
+  it("未設定時は読み取りをせずnot_configuredを返す", async () => {
+    const readFile = vi.fn<MetricsFs["readFile"]>();
+    await expect(loadCanonicalReservations(undefined, "2026-07-17T00:00:00Z", fsOf(readFile))).resolves.toEqual({ state: "missing", reason: "not_configured", checkedAt: "2026-07-17T00:00:00Z" });
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("注入したI/Oから正準データを検証して読む", async () => {
+    const readFile = vi.fn<MetricsFs["readFile"]>(async (path) => path.endsWith("reservations.jsonl") ? jsonl : meta);
+    const result = await loadCanonicalReservations("/data", "2026-07-17T00:00:00Z", fsOf(readFile));
+    expect(result).toMatchObject({ syncedAt: "2026-07-16T00:00:00Z", coverage: { start: "2026-07-01", end: "2026-07-16" }, parsed: { records: [{ reservationId: "r1" }] } });
+    expect(readFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("ダイジェスト不一致はinvalid、非Errorのthrowは不明なエラーとして扱う", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const badDigestMeta = JSON.stringify({ generatedAt: "2026-07-16T00:00:00Z", sourceSyncedAt: "2026-07-16T00:00:00Z", reservationsDigest: "f".repeat(64), coverage: { start: "2026-07-01", end: "2026-07-16" } });
+    await expect(loadCanonicalReservations("/data", "checked", fsOf(async (path) => path.endsWith("reservations.jsonl") ? jsonl : badDigestMeta))).resolves.toEqual({ state: "missing", reason: "invalid", checkedAt: "checked" });
+    await expect(loadCanonicalReservations("/data", "checked", fsOf(async () => { throw "文字列エラー"; }))).resolves.toEqual({ state: "missing", reason: "read_error", checkedAt: "checked" });
+    expect(warn).toHaveBeenCalledWith("[metrics] 正準データセットを読み込めません:", "不明なエラー");
+    warn.mockRestore();
+  });
+
+  it("検証失敗はinvalid、読み取り失敗はread_errorにする", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await expect(loadCanonicalReservations("/data", "checked", fsOf(async () => "{}"))).resolves.toEqual({ state: "missing", reason: "invalid", checkedAt: "checked" });
+    await expect(loadCanonicalReservations("/data", "checked", fsOf(async () => { throw new Error("denied"); }))).resolves.toEqual({ state: "missing", reason: "read_error", checkedAt: "checked" });
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+});
 
 function row(
   pagePath: string,

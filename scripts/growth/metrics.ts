@@ -2,16 +2,21 @@
  * 計測ループ(C4)の純ロジック。GA4 の topPages(pagePath→表示数/ユーザー数)を、
  * 公開記事(microCMS slug/locale から組み立てた pagePath)へ突き合わせる。
  *
- * I/O は持たない(GA4 取得・microCMS 読み・Notion 書きは CLI 側)。
+ * GA4取得・microCMS読込・Notion書込はCLI側。正準予約データ読込は
+ * クライアント安全のためNode APIを持ち込まず、差し替え可能なI/O境界にする。
  * 承認画面は Notion ミラー(`成績データ`)を読むだけ(プル型)。
  */
+
+import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
 import { aggregateCtaEvents, type CtaEventMetrics } from "./ctaEvents";
 import { growthArticleSegment, type GrowthMedia } from "./endpoint";
 import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
+import { parseCanonicalMeta, parseCanonicalReservationsJsonl } from "./reservations";
 import type { MergedRow } from "./transform";
+import type { ParsedReservationCsv, ReservationCoverage } from "./reservations";
 
 /** 1指標の今期/前期/前週比。 */
 export interface MetricDelta {
@@ -61,6 +66,48 @@ export type ActualReservationMetrics =
 
 export type MeasurementStatus = "measured" | "path-unmatched" | "source-error";
 export type CtaEventsMeasurementStatus = "measured" | "partial" | "unmeasured";
+
+/** 正準データセットの読み取りを差し替えるための最小I/O境界。 */
+export interface MetricsFs {
+  readFile(path: string, encoding: "utf8"): Promise<string>;
+}
+
+export interface ReservationCsvSnapshot {
+  parsed: ParsedReservationCsv;
+  syncedAt: string;
+  coverage: ReservationCoverage;
+}
+
+/**
+ * 正準予約データセットを検証して読み込む。クライアントへNode APIを混入させないため、
+ * 読み取りI/Oは呼び出し側から必ず注入する。
+ */
+/** unknownなthrow値をログ用の一行に整形する(両catchで共用し分岐を一元化)。 */
+function unknownErrorDetail(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
+}
+
+export async function loadCanonicalReservations(dataDir: string | undefined, checkedAt: string, fs: MetricsFs): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
+  if (!dataDir) return { state: "missing", reason: "not_configured", checkedAt };
+  try {
+    const [jsonl, metaJson] = await Promise.all([
+      fs.readFile(`${dataDir}/canonical/reservations.jsonl`, "utf8"),
+      fs.readFile(`${dataDir}/canonical/meta.json`, "utf8"),
+    ]);
+    try {
+      const meta = parseCanonicalMeta(metaJson);
+      const actualDigest = createHash("sha256").update(jsonl).digest("hex");
+      if (actualDigest !== meta.reservationsDigest) throw new Error("正準予約データのダイジェストが一致しません");
+      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
+    } catch (error: unknown) {
+      console.warn("[metrics] 正準データセットが不正です:", unknownErrorDetail(error));
+      return { state: "missing", reason: "invalid", checkedAt };
+    }
+  } catch (error: unknown) {
+    console.warn("[metrics] 正準データセットを読み込めません:", unknownErrorDetail(error));
+    return { state: "missing", reason: "read_error", checkedAt };
+  }
+}
 
 /** 1記事ぶんの成績(承認画面の成績ボードで表示)。 */
 export interface ArticleMetrics {

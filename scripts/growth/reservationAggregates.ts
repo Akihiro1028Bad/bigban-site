@@ -34,6 +34,11 @@ function clippedRecent28Range(bundle: CanonicalBundle, referenceYmd: string): Da
   return start <= end ? { start, end } : null;
 }
 
+/** 4週窓の開始が収録範囲より前なら、自己予約比率は部分集計になる。 */
+export function isRecent28RangeClippedAtStart(bundle: CanonicalBundle, referenceYmd: string): boolean {
+  return recent28Range(referenceYmd).start < bundle.meta.coverage.start;
+}
+
 export function jstYmdOfIso(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) throw new Error(`日時を解釈できません: ${iso}`);
@@ -71,8 +76,8 @@ export function weeklyKpis(bundle: CanonicalBundle, current: DateRange, prior: D
   sales: { currentWeek: number | null; priorWeek: number | null; forecast28: number | null };
 } {
   const confirmed = confirmedReservations(bundle);
-  const selfRange = recent28Range(current.end);
-  const recent = confirmed.filter((reservation) => isWithin(jstYmdOfIso(reservation.bookedAt), selfRange));
+  const selfRange = clippedRecent28Range(bundle, current.end);
+  const recent = selfRange === null ? [] : confirmed.filter((reservation) => isWithin(jstYmdOfIso(reservation.bookedAt), selfRange));
   const forecastRange = { start: referenceYmd, end: addDays(referenceYmd, 27) };
   return {
     actual: { currentWeek: countBookedIn(confirmed, current), priorWeek: countBookedIn(confirmed, prior), cumulative: confirmed.length },
@@ -264,6 +269,7 @@ export function programFills(bundle: CanonicalBundle, referenceYmd: string): { n
     .filter((program) => isWithin(program.heldOn, range) && program.publishStatus !== "非公開")
     .map((program) => {
       const reserved = programParticipationReservations(bundle, program).length;
+      // 定員0は募集停止などを表すため、0除算を避けつつ未算出(null)を維持する。
       return { name: program.name, heldOn: program.heldOn, start: program.start, capacity: program.capacity, reserved, fillRate: program.capacity === null || program.capacity === 0 ? null : reserved / program.capacity };
     }).sort((left, right) => left.heldOn.localeCompare(right.heldOn) || left.start.localeCompare(right.start));
 }

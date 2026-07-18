@@ -60,6 +60,24 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   expect(snapshot.insights).toEqual([]);
 });
 
+it("4週集計の窓が収録開始日で切れる場合は部分集計の警告を一度だけ出す", () => {
+  const reservation = { reservationId: "covered", bookedAt: "2026-06-25T10:00:00+09:00", useDate: "2026-07-01", start: "10:00", end: "11:00", category: "スペース予約", space: "A", status: "confirmed", acceptStatus: "", paymentStatus: "", paymentMethod: "", plan: "", amount: 0, partySize: null, channel: "user_sp", customerType: "", pseudoId: null, ward: "", ageBand: "", gender: "", occupationGroup: "", hasRemarks: false };
+  const bundle = { reservations: [reservation], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-19T12:00:00+09:00", sourceSyncedAt: "2026-07-19T12:00:00+09:00", coverage: { start: "2026-06-25", end: "2026-07-19" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: ["4週集計は収録範囲により部分集計です"] } };
+  const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "2026-07-06", end: "2026-07-12" }, todayYmd: "2026-07-19", previousSnapshot: null, baselineInputs: null, funnelCounts: null });
+  expect(snapshot.kpi.self.total4w).toBe(1);
+  expect(snapshot.meta.warnings.filter((warning) => warning === "4週集計は収録範囲により部分集計です")).toHaveLength(1);
+});
+
+it("売上CSVの実績が7日以上古い時だけ鮮度警告を出す", () => {
+  const base = { reservations: [], customers: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
+  const snapshotOf = (salesDaily: { date: string; isForecast: boolean; rentalSpace: number; event: number; memberFees: number; total: number }[], isSalesMissing = false) => buildSnapshot({ bundle: { ...base, salesDaily, meta: { ...base.meta, missingSections: isSalesMissing ? ["salesSummary"] : [] } } as never, coverage: base.meta.coverage, sourceSyncedAt: base.meta.sourceSyncedAt, current: { start: "2026-07-13", end: "2026-07-19" }, prior: { start: "2026-07-06", end: "2026-07-12" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null });
+  expect(snapshotOf([{ date: "2026-07-08", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 0 }]).meta.warnings).toContain("売上CSVの実績が7日以上古い可能性があります");
+  expect(snapshotOf([{ date: "2026-07-10", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 0 }]).meta.warnings).not.toContain("売上CSVの実績が7日以上古い可能性があります");
+  expect(snapshotOf([{ date: "2026-07-17", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 0 }]).meta.warnings).not.toContain("売上CSVの実績が7日以上古い可能性があります");
+  expect(snapshotOf([{ date: "2026-07-08", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 0 }], true).meta.warnings).not.toContain("売上CSVの実績が7日以上古い可能性があります");
+  expect(snapshotOf([{ date: "2026-07-01", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 0 }]).meta.warnings).not.toContain("売上CSVの実績が7日以上古い可能性があります");
+});
+
 it("入力欠落をD11の気づきとしてスナップショットへ接続する", () => {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: ["customer"], warnings: [] } };
   const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null });

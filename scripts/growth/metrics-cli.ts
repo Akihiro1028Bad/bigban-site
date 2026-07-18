@@ -14,8 +14,6 @@
 import "dotenv/config";
 
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { join } from "node:path";
 
 import { fetchGa4, type Ga4ReportDef } from "./ga4";
 import { fetchGsc, type GscReportDef } from "./gsc";
@@ -31,10 +29,13 @@ import {
   buildMetricsNotificationSummary,
   buildSearchMetrics,
   ctaEventsMeasurementStatusForPeriod,
+  loadCanonicalReservations,
   measurementBucketOf,
   metricsForKnownPagePath,
   reserveCompleteMeasuredForPeriod,
   type ActualReservationMetrics,
+  type MetricsFs,
+  type ReservationCsvSnapshot,
   type SearchMetrics,
 } from "./metrics";
 import { computeWeeklyPeriods, type DateRange } from "./period";
@@ -46,13 +47,7 @@ import {
 import { queryAllDataSource } from "./notionRepository";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
 import { LABOLA_FUNNEL_EVENTS } from "./labolaFunnel";
-import {
-  actualReservationsForPage,
-  parseCanonicalMeta,
-  parseCanonicalReservationsJsonl,
-  type ParsedReservationCsv,
-  type ReservationCoverage,
-} from "./reservations";
+import { actualReservationsForPage } from "./reservations";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -62,6 +57,10 @@ const PUBLISHED_STATUS = "公開済み";
 const CONTENT_ID_RE = /^[a-z0-9-]{1,64}$/;
 const DRYRUN = Boolean(process.env.GROWTH_DRYRUN);
 const KEY_EVENTS_SINCE = process.env.GROWTH_GA4_KEYEVENTS_SINCE;
+
+const metricsFs: MetricsFs = {
+  readFile: async (path, encoding) => readFile(path, encoding),
+};
 
 // 表示指標とCTAイベント別指標は別レポートで取得し、keyEvents合計を予約と混同しない。
 const TOP_PAGES_REPORT: Ga4ReportDef = {
@@ -173,39 +172,6 @@ async function notifyLine(text: string): Promise<void> {
   await pushTextMessage(to, text, { channelAccessToken: token, fetchFn: defaultFetch });
 }
 
-interface ReservationCsvSnapshot {
-  parsed: ParsedReservationCsv;
-  syncedAt: string;
-  coverage: ReservationCoverage;
-}
-
-async function loadCanonicalReservations(
-  dataDir: string | undefined,
-  checkedAt: string
-): Promise<ReservationCsvSnapshot | ActualReservationMetrics> {
-  if (!dataDir) return { state: "missing", reason: "not_configured", checkedAt };
-  try {
-    const [jsonl, metaJson] = await Promise.all([
-      readFile(join(dataDir, "canonical", "reservations.jsonl"), "utf8"),
-      readFile(join(dataDir, "canonical", "meta.json"), "utf8"),
-    ]);
-    try {
-      const meta = parseCanonicalMeta(metaJson);
-      const actualDigest = createHash("sha256").update(jsonl).digest("hex");
-      if (actualDigest !== meta.reservationsDigest) throw new Error("正準予約データのダイジェストが一致しません");
-      return { parsed: parseCanonicalReservationsJsonl(jsonl), syncedAt: meta.sourceSyncedAt, coverage: meta.coverage };
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
-      console.warn("[metrics] 正準データセットが不正です:", detail);
-      return { state: "missing", reason: "invalid", checkedAt };
-    }
-  } catch (error: unknown) {
-    const detail = error instanceof Error ? `${error.name}: ${error.message}` : "不明なエラー";
-    console.warn("[metrics] 正準データセットを読み込めません:", detail);
-    return { state: "missing", reason: "read_error", checkedAt };
-  }
-}
-
 function isCsvSnapshot(
   value: ReservationCsvSnapshot | ActualReservationMetrics
 ): value is ReservationCsvSnapshot {
@@ -287,7 +253,7 @@ async function main(): Promise<void> {
   }
 
   const nowIso = new Date().toISOString();
-  const reservations = await loadCanonicalReservations(process.env.GROWTH_RESERVATION_DATA_DIR, nowIso);
+  const reservations = await loadCanonicalReservations(process.env.GROWTH_RESERVATION_DATA_DIR, nowIso, metricsFs);
   let updated = 0;
   let slugFailed = 0;
   let sourceError = 0;

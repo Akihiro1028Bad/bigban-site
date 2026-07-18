@@ -56,6 +56,7 @@ describe("analyticsView", () => {
     snapshot.insights.push({ ...infoInsight, id: "newer-info", firstSeen: "2026-07-17" });
     expect(sortedInsights(snapshot).filter((insight) => insight.severity === "info").map((insight) => insight.id)).toEqual(["newer-info", "info"]);
     expect(insightEvidenceText({ n: 3, ci: "95%", ignored: null })).toBe("n=3 / ci=95%");
+    expect(insightEvidenceText({ a: 1, b: 2, c: 3, d: 4, e: 5 })).toBe("a=1 / b=2 / c=3 / d=4 / 他1件");
     expect(insightEvidenceText({ nested: {} })).toBeNull();
   });
 
@@ -70,6 +71,7 @@ describe("analyticsView", () => {
     const snapshot = analyticsSnapshot();
     snapshot.catalog.programFills = [
       { name: "定員未設定", heldOn: "2026-07-17", start: "09:00", capacity: null, reserved: 3, fillRate: null },
+      { name: "募集停止", heldOn: "2026-07-17", start: "09:30", capacity: 0, reserved: 2, fillRate: null },
       { name: "低充足", heldOn: "2026-07-17", start: "10:00", capacity: 10, reserved: 3, fillRate: 0.3 },
       { name: "通常", heldOn: "2026-07-17", start: "11:00", capacity: 10, reserved: 4, fillRate: 0.4 },
     ];
@@ -78,6 +80,7 @@ describe("analyticsView", () => {
     snapshot.catalog.revPach = null;
     expect(programList(snapshot)).toEqual([
       { title: "定員未設定", schedule: "2026-07-17 09:00", fill: "—", state: "unknown" },
+      { title: "募集停止", schedule: "2026-07-17 09:30", fill: "2/0", state: "unknown" },
       { title: "低充足", schedule: "2026-07-17 10:00", fill: "3/10", state: "warn" },
       { title: "通常", schedule: "2026-07-17 11:00", fill: "4/10", state: "open" },
     ]);

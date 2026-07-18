@@ -12,5 +12,6 @@ export const unpaidOverdue: Detector = (context) => {
   const overdue = context.bundle.reservations.filter((reservation) => reservation.status !== "cancelled" && reservation.paymentStatus === "未払い" && reservation.useDate <= context.todayYmd && daysSince(context.todayYmd, reservation.bookedAt) >= 15);
   if (overdue.length === 0) return [];
   const amount = overdue.reduce((sum, reservation) => sum + (reservation.amount ?? 0), 0);
-  return [{ id: "d10:unpaid", detector: "D10", severity: "notice", title: "未収金の滞留", body: `15日以上の未払いが${overdue.length}件、合計¥${amount.toLocaleString("ja-JP")}です。`, evidence: { count: overdue.length, amount, reservationIds: overdue.map((reservation) => reservation.reservationId) }, label: "有意" }];
+  // 閾値による運用上の観察であり統計検定を伴わないため、§9によりlabelは「観察」に固定する。
+  return [{ id: "d10:unpaid", detector: "D10", severity: "notice", title: "未収金の滞留", body: `15日以上の未払いが${overdue.length}件、合計¥${amount.toLocaleString("ja-JP")}です。`, evidence: { count: overdue.length, amount, reservationIds: overdue.map((reservation) => reservation.reservationId) }, label: "観察" }];
 };
