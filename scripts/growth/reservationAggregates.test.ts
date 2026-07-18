@@ -5,6 +5,7 @@ import {
   demandHeatmap,
   jstYmdOfIso,
   leadTimeStats,
+  onTheBooksPoints,
   paymentMethodShare,
   programFills,
   revPach,
@@ -196,6 +197,36 @@ describe("weeklyKpis", () => {
     ]);
     const kpi = weeklyKpis(data, { start: "2026-07-13", end: "2026-07-19" }, { start: "2026-07-06", end: "2026-07-12" }, "2026-07-16");
     expect(kpi.self.unknown4w).toBe(1);
+  });
+});
+
+describe("onTheBooksPoints", () => {
+  it("利用日の先行日数ごとに確定予約と見込み売上を境界を含めて集計する", () => {
+    const data = bundle([
+      res({ reservationId: "today", useDate: "2026-07-16" }),
+      res({ reservationId: "seven", useDate: "2026-07-23" }),
+      res({ reservationId: "eight", useDate: "2026-07-24" }),
+      res({ reservationId: "cancelled", useDate: "2026-07-20", status: "cancelled" }),
+    ], {
+      salesDaily: [
+        { date: "2026-07-23", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 100 },
+        { date: "2026-07-24", isForecast: true, rentalSpace: 0, event: 0, memberFees: 0, total: 200 },
+        { date: "2026-07-30", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 500 },
+      ],
+    });
+
+    expect(onTheBooksPoints(data, "2026-07-16")).toEqual([
+      { daysOut: 7, reservations: 1, forecastSales: 100 },
+      { daysOut: 14, reservations: 2, forecastSales: 300 },
+      { daysOut: 21, reservations: 2, forecastSales: 300 },
+      { daysOut: 28, reservations: 2, forecastSales: 300 },
+    ]);
+  });
+
+  it("売上CSV欠落はnull、実績日だけなら見込み0として区別する", () => {
+    expect(onTheBooksPoints(bundle([]), "2026-07-16").every((point) => point.forecastSales === null)).toBe(true);
+    const data = bundle([], { salesDaily: [{ date: "2026-07-17", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 100 }] });
+    expect(onTheBooksPoints(data, "2026-07-16").every((point) => point.forecastSales === 0)).toBe(true);
   });
 });
 

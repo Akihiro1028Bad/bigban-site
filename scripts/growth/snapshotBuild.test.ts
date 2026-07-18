@@ -14,6 +14,12 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   expect(snapshot.meta.inputs).toEqual([{ type: "yoyaku", rows: 0 }]);
   expect(snapshot.meta.sourceSyncedAt).toBe("2026-07-16T12:00:00+09:00");
   expect(snapshot.analysis).toEqual({ referenceYmd: "2026-07-16", currentWeek: { start: "2026-07-06", end: "2026-07-12" } });
+  expect(snapshot.series.onTheBooks).toEqual([
+    { daysOut: 7, reservations: 0, forecastSales: null, baselineMedian: null },
+    { daysOut: 14, reservations: 0, forecastSales: null, baselineMedian: null },
+    { daysOut: 21, reservations: 0, forecastSales: null, baselineMedian: null },
+    { daysOut: 28, reservations: 0, forecastSales: null, baselineMedian: null },
+  ]);
   expect(snapshot.insights).toEqual([]);
 });
 

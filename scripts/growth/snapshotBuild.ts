@@ -1,5 +1,5 @@
 /** 正準データから集計・検出を接続して検証済みスナップショットを作る。 */
-import { cancellationStats, demographics, demandHeatmap, leadTimeStats, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
+import { cancellationStats, demographics, demandHeatmap, leadTimeStats, onTheBooksPoints, paymentMethodShare, programFills, revPach, selfBookedInWeek, unpaidAging, wardCounts, weeklyKpis, weeklyReservationSeries } from "./reservationAggregates";
 import { CORE_DETECTORS, runDetectors } from "./insightEngine";
 import { computeWeeklyPeriods } from "./period";
 import { snapshotSchema } from "./snapshotSchema";
@@ -32,7 +32,11 @@ export function buildSnapshot(input: { bundle: CanonicalBundle; coverage: Canoni
     meta: { sourceSyncedAt, inputs: inputsOf(bundle), excludedCount: bundle.meta.excludedCount, missingSections: bundle.meta.missingSections, warnings: [...bundle.meta.warnings, ...(funnelCounts !== null && !isFunnelWeekCovered ? ["CSVの収録範囲が対象週を含まないためファネルを省略しました"] : [])] },
     kpi: weeklyKpis(bundle, current, prior, referenceYmd),
     catalog: { heatmap: demandHeatmap(bundle, referenceYmd), leadTime: leadTimeStats(bundle, referenceYmd), cancellation: cancellationStats(bundle, referenceYmd), wards: wardCounts(bundle), programFills: bundle.meta.missingSections.includes("program") ? undefined : programFills(bundle, referenceYmd), unpaidAging: unpaidAging(bundle, referenceYmd), paymentMethods: paymentMethodShare(bundle, referenceYmd), demographics: demographics(bundle), revPach: bundle.meta.missingSections.includes("blocked") ? undefined : revPach(bundle, referenceYmd) },
-    series: { weeklyReservations: weeklyReservationSeries(bundle) },
+    series: {
+      weeklyReservations: weeklyReservationSeries(bundle),
+      // Task 2で履歴から同じdaysOutの中央値を計算して上書きする。
+      onTheBooks: onTheBooksPoints(bundle, referenceYmd).map((point) => ({ ...point, baselineMedian: null })),
+    },
     ...(funnel === undefined ? {} : { funnel }),
     insights: runDetectors({ bundle, current, prior, todayYmd: referenceYmd, previousSnapshot, baselineInputs, funnel: funnel ?? null }, CORE_DETECTORS),
   });

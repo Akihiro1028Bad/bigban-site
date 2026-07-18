@@ -113,6 +113,19 @@ export function weeklyReservationSeries(bundle: CanonicalBundle): { weekStart: s
   return result;
 }
 
+const ON_THE_BOOKS_DAYS_OUT = [7, 14, 21, 28] as const;
+
+/** 基準日の翌日から各観測点までに確定している予約と見込み売上を集計する。 */
+export function onTheBooksPoints(bundle: CanonicalBundle, referenceYmd: string): { daysOut: number; reservations: number; forecastSales: number | null }[] {
+  return ON_THE_BOOKS_DAYS_OUT.map((daysOut) => {
+    const range = { start: addDays(referenceYmd, 1), end: addDays(referenceYmd, daysOut) };
+    const reservations = confirmedReservations(bundle).filter((reservation) => isWithin(reservation.useDate, range)).length;
+    // 売上CSVが欠落している場合は、見込み0と区別してnullにする。
+    const forecastSales = bundle.salesDaily.length === 0 ? null : bundle.salesDaily.filter((row) => row.isForecast === true && isWithin(row.date, range)).reduce((sum, row) => sum + row.total, 0);
+    return { daysOut, reservations, forecastSales };
+  });
+}
+
 function minutesOf(value: string): number | null {
   const match = value.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;

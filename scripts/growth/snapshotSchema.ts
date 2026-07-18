@@ -61,7 +61,15 @@ export const snapshotSchema = z.object({
     demographics: z.array(z.object({ ageBand: z.string(), gender: z.string(), customerType: z.string(), count: z.number() })).optional(),
     revPach: z.object({ revenue: z.number(), availableCourtHours: z.number(), revPerCourtHour: z.number(), spaces: z.number() }).nullable().optional(),
   }),
-  series: z.object({ weeklyReservations: z.array(z.object({ weekStart: z.string(), count: z.number() })) }),
+  series: z.object({
+    weeklyReservations: z.array(z.object({ weekStart: z.string(), count: z.number() })),
+    onTheBooks: z.array(z.object({
+      daysOut: z.number(),
+      reservations: z.number(),
+      forecastSales: z.number().nullable(),
+      baselineMedian: z.number().nullable(),
+    })).optional(),
+  }),
   funnel: z.object({
     week: z.object({ start: ymdSchema, end: ymdSchema }),
     current: funnelCountsSchema,
