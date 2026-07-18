@@ -128,7 +128,7 @@ onTheBooks: z.array(z.object({
 
 **D13 判定(§7: 枠キー突合):**
 - 枠キー = useDate×start×space。cancelled 行それぞれについて、同キーの confirmed 行で bookedAt > キャンセル行の bookedAt のものがあれば「再販成立」
-- catalog に optional `cancelResale: { n: number; resold: number; rate: number | null; medianHours: number | null }`(過去4週にキャンセルされ useDate を迎えた枠のみ対象。n=0 は rate null)
+- catalog に optional `cancelResale: { n: number; resold: number; rate: number | null; medianHours: number | null }`(**useDate が過去4週(todayYmd基準)に入るキャンセル枠**のみ対象。正準データにキャンセル日時が存在しない(bookedAtは申込日時)ため、キャンセル日基準の窓は実装不可=useDate窓が正。n=0 は rate null)。再販候補は「キャンセル行のbookedAtより後・枠の利用開始日時より前」で最早のもの
 - 気づき: 今週 useDate を迎えた再販成立が1件以上 → info(id `d13:resold:<週>`、evidence { n, medianHours })/ label「観察」
 
 **コホート集計:**
