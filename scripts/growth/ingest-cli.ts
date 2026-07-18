@@ -3,9 +3,13 @@ import "dotenv/config";
 
 import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 
-import { runIngestApplication } from "./ingestApplication";
 import { analyticsSnapshotUploader } from "./analyticsUpload";
+import { getAccessToken } from "./auth";
+import { loadGrowthConfig } from "./config";
+import { fetchGa4 } from "./ga4";
+import { runIngestApplication } from "./ingestApplication";
 import { defaultFetch } from "./http";
+import { funnelFromRows, LABOLA_FUNNEL_REPORT } from "./labolaFunnel";
 import { pushTextMessage } from "./line";
 import { parseExclusionRules } from "./reservationExclusions";
 import type { IngestFs } from "./ingestApplication";
@@ -41,6 +45,15 @@ async function notify(text: string, kind: "weekly" = "weekly"): Promise<void> {
 
 async function main(): Promise<void> {
   const rules = parseExclusionRules(await readFile(new URL("./assets/reservation-exclusions.json", import.meta.url), "utf8"));
+  const ga4FunnelEnvNames = [
+    "GROWTH_GA4_PROPERTY_ID",
+    "GROWTH_GSC_SITE_URL",
+    "GROWTH_GOOGLE_CLIENT_ID",
+    "GROWTH_GOOGLE_CLIENT_SECRET",
+    "GROWTH_GOOGLE_REFRESH_TOKEN",
+  ] as const;
+  const hasGa4FunnelEnv = ga4FunnelEnvNames.every((name) => Boolean(process.env[name]));
+  if (!hasGa4FunnelEnv) console.log("[ingest] GA4ファネル: env未設定のためスキップします");
   await runIngestApplication({
     dataDir: requireEnv("GROWTH_RESERVATION_DATA_DIR"),
     dropDir: requireEnv("GROWTH_LABOLA_DROP_DIR"),
@@ -63,6 +76,14 @@ async function main(): Promise<void> {
       console.log
     ),
     log: console.log,
+    ...(hasGa4FunnelEnv ? {
+      fetchFunnel: async (current, prior) => {
+        const config = loadGrowthConfig(process.env);
+        const token = await getAccessToken(config);
+        const rows = await fetchGa4({ config, accessToken: token, current, prior, reports: [LABOLA_FUNNEL_REPORT] });
+        return funnelFromRows(rows.labolaFunnel ?? []);
+      },
+    } : {}),
   });
 }
 

@@ -194,6 +194,66 @@ describe("runIngestApplication", () => {
     await expect(stat(join(data, "canonical"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("GA4ファネル取得成功時はスナップショットにcaptureを含める", async () => {
+    const { drop, data } = await setup();
+    const fetchFunnel = vi.fn(async () => ({
+      current: {
+        intent: 12,
+        rental: { input: 8, confirm: 6, pending: 5, complete: 4 },
+        program: { input: 3, confirm: 2, pending: 2, complete: 1 },
+      },
+      prior: {
+        intent: 9,
+        rental: { input: 6, confirm: 5, pending: 4, complete: 3 },
+        program: { input: 2, confirm: 1, pending: 1, complete: 1 },
+      },
+    }));
+
+    const result = await runIngestApplication(input(drop, data), { ...deps(), fetchFunnel });
+
+    expect(fetchFunnel).toHaveBeenCalledWith({ start: "2026-07-06", end: "2026-07-12" }, { start: "2026-06-29", end: "2026-07-05" });
+    expect(result.snapshot.funnel).toMatchObject({
+      current: { rental: { complete: 4 }, program: { complete: 1 } },
+      capture: { ga4Complete: 5 },
+    });
+  });
+
+  it("GA4ファネル取得失敗時も取り込みを継続し、警告を記録する", async () => {
+    const { drop, data } = await setup();
+    const log = vi.fn();
+
+    const result = await runIngestApplication(input(drop, data), {
+      ...deps(),
+      log,
+      fetchFunnel: async () => { throw new Error("GA4失敗"); },
+    });
+
+    expect(result.snapshot.funnel).toBeUndefined();
+    expect(result.snapshot.meta.warnings).toContain("GA4ファネル取得失敗");
+    expect(log).toHaveBeenCalledWith("[ingest] GA4ファネル取得に失敗しました(スナップショットはファネルなしで継続)");
+  });
+
+  it("GA4ファネル取得がnullなら警告なしでファネルを省略する", async () => {
+    const { drop, data } = await setup();
+
+    const result = await runIngestApplication(input(drop, data), {
+      ...deps(),
+      fetchFunnel: async () => null,
+    });
+
+    expect(result.snapshot.funnel).toBeUndefined();
+    expect(result.snapshot.meta.warnings).not.toContain("GA4ファネル取得失敗");
+  });
+
+  it("DRYRUNでもGA4ファネルを読み取る", async () => {
+    const { drop, data } = await setup();
+    const fetchFunnel = vi.fn(async () => null);
+
+    await runIngestApplication(input(drop, data, true), { ...deps(), fetchFunnel });
+
+    expect(fetchFunnel).toHaveBeenCalledTimes(1);
+  });
+
   it("DRYRUNで予約CSV不足に失敗しても通知しない", async () => {
     const { drop, data } = await setup();
     await rm(join(drop, "yoyaku.csv"));
