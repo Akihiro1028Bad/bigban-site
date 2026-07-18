@@ -121,7 +121,7 @@ export function onTheBooksPoints(bundle: CanonicalBundle, referenceYmd: string):
     const range = { start: addDays(referenceYmd, 1), end: addDays(referenceYmd, daysOut) };
     const reservations = confirmedReservations(bundle).filter((reservation) => isWithin(reservation.useDate, range)).length;
     // 売上CSVが欠落している場合は、見込み0と区別してnullにする。
-    const forecastSales = bundle.salesDaily.length === 0 ? null : bundle.salesDaily.filter((row) => row.isForecast === true && isWithin(row.date, range)).reduce((sum, row) => sum + row.total, 0);
+    const forecastSales = bundle.meta.missingSections.includes("salesSummary") ? null : bundle.salesDaily.filter((row) => row.isForecast === true && isWithin(row.date, range)).reduce((sum, row) => sum + row.total, 0);
     return { daysOut, reservations, forecastSales };
   });
 }

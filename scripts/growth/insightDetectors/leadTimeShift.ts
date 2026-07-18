@@ -17,15 +17,17 @@ function median(values: readonly number[]): number {
   return sorted.length % 2 === 0 ? ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2 : sorted[middle] as number;
 }
 
-function leadDays(useDate: string, bookedAt: string): number {
+function leadDays(useDate: string, bookedAt: string): number | null {
   const difference = (new Date(`${useDate}T00:00:00Z`).getTime() - new Date(`${jstYmdOfIso(bookedAt)}T00:00:00Z`).getTime()) / DAY_MS;
-  return Math.max(0, Math.round(difference));
+  // 遅延入力などの負値を当日予約として混入させず、中央値と標本数の両方から除外する。
+  return difference < 0 ? null : Math.round(difference);
 }
 
 function valuesInWindow(context: Parameters<Detector>[0], start: string, end: string): number[] {
   return context.bundle.reservations
     .filter((reservation) => reservation.status === "confirmed" && jstYmdOfIso(reservation.bookedAt) >= start && jstYmdOfIso(reservation.bookedAt) <= end)
-    .map((reservation) => leadDays(reservation.useDate, reservation.bookedAt));
+    .map((reservation) => leadDays(reservation.useDate, reservation.bookedAt))
+    .filter((value): value is number => value !== null);
 }
 
 export const leadTimeShift: Detector = (context) => {

@@ -224,7 +224,8 @@ describe("onTheBooksPoints", () => {
   });
 
   it("売上CSV欠落はnull、実績日だけなら見込み0として区別する", () => {
-    expect(onTheBooksPoints(bundle([]), "2026-07-16").every((point) => point.forecastSales === null)).toBe(true);
+    expect(onTheBooksPoints({ ...bundle([]), meta: { ...bundle([]).meta, missingSections: ["salesSummary"] } }, "2026-07-16").every((point) => point.forecastSales === null)).toBe(true);
+    expect(onTheBooksPoints(bundle([]), "2026-07-16").every((point) => point.forecastSales === 0)).toBe(true);
     const data = bundle([], { salesDaily: [{ date: "2026-07-17", isForecast: false, rentalSpace: 0, event: 0, memberFees: 0, total: 100 }] });
     expect(onTheBooksPoints(data, "2026-07-16").every((point) => point.forecastSales === 0)).toBe(true);
   });

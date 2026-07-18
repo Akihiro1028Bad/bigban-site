@@ -31,7 +31,7 @@ it("onTheBooksは奇数件の履歴では中央の値を中央値にする", () 
 it("計算済みonTheBooksをD6へ渡して予約ペースの逸脱を検出する", () => {
   const bundle = { reservations: [], customers: [], salesDaily: [], programs: [], blockedSlots: [], remarks: [], meta: { schemaVersion: 1 as const, generatedAt: "2026-07-16T12:00:00+09:00", sourceSyncedAt: "2026-07-16T12:00:00+09:00", coverage: { start: "2026-06-01", end: "2026-07-16" }, reservationsDigest: "", counts: {}, excludedCount: 0, missingSections: [], warnings: [] } };
   const snapshot = buildSnapshot({ bundle: bundle as never, coverage: bundle.meta.coverage, sourceSyncedAt: bundle.meta.sourceSyncedAt, current: { start: "2026-07-06", end: "2026-07-12" }, prior: { start: "2026-06-29", end: "2026-07-05" }, todayYmd: "2026-07-16", previousSnapshot: null, baselineInputs: null, funnelCounts: null, history: historyWith28DayReservations([10, 10, 10, 10, 10, 10]) });
-  expect(snapshot.insights).toContainEqual(expect.objectContaining({ id: "d6:weak", evidence: { n: 0, baselineMedian: 10 } }));
+  expect(snapshot.insights).toContainEqual(expect.objectContaining({ id: "d6:weak", evidence: { n: 0, baselineMedian: 10, historyWeeks: 6 } }));
 });
 
 it("onTheBooksは5件以下とonTheBooksを持たない履歴では中央値を出さない", () => {
@@ -50,10 +50,10 @@ it("集計と検出結果をスキーマ適合したスナップショットに�
   expect(snapshot.meta.sourceSyncedAt).toBe("2026-07-16T12:00:00+09:00");
   expect(snapshot.analysis).toEqual({ referenceYmd: "2026-07-16", currentWeek: { start: "2026-07-06", end: "2026-07-12" } });
   expect(snapshot.series.onTheBooks).toEqual([
-    { daysOut: 7, reservations: 0, forecastSales: null, baselineMedian: null },
-    { daysOut: 14, reservations: 0, forecastSales: null, baselineMedian: null },
-    { daysOut: 21, reservations: 0, forecastSales: null, baselineMedian: null },
-    { daysOut: 28, reservations: 0, forecastSales: null, baselineMedian: null },
+    { daysOut: 7, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 14, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 21, reservations: 0, forecastSales: 0, baselineMedian: null },
+    { daysOut: 28, reservations: 0, forecastSales: 0, baselineMedian: null },
   ]);
   expect(snapshot.insights).toEqual([]);
 });

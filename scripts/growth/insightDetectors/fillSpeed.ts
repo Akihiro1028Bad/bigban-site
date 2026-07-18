@@ -7,6 +7,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface FilledProgram {
   program: CanonicalProgram;
+  capacity: number;
   filledAt: string;
   daysBeforeHeld: number;
 }
@@ -14,7 +15,7 @@ interface FilledProgram {
 type DetectorInsight = ReturnType<Detector>[number];
 
 function daysBetween(laterYmd: string, earlierYmd: string): number {
-  return Math.max(0, Math.round((new Date(`${laterYmd}T00:00:00Z`).getTime() - new Date(`${earlierYmd}T00:00:00Z`).getTime()) / DAY_MS));
+  return Math.round((new Date(`${laterYmd}T00:00:00Z`).getTime() - new Date(`${earlierYmd}T00:00:00Z`).getTime()) / DAY_MS);
 }
 
 function filledProgram(context: Parameters<Detector>[0], program: CanonicalProgram): FilledProgram | null {
@@ -23,19 +24,25 @@ function filledProgram(context: Parameters<Detector>[0], program: CanonicalProgr
   const capacityReservation = reservations[program.capacity - 1];
   if (capacityReservation === undefined) return null;
   const filledAt = jstYmdOfIso(capacityReservation.bookedAt);
+  // 開催後の定員到達は遅延入力などを含み得るため、満枠到達速度として通知しない。
+  if (filledAt > program.heldOn) return null;
   // 受付開始時刻を持たないため、開催何日前に満枠かを到達速度の指標にする。
-  return { program, filledAt, daysBeforeHeld: daysBetween(program.heldOn, filledAt) };
+  return { program, capacity: program.capacity, filledAt, daysBeforeHeld: daysBetween(program.heldOn, filledAt) };
 }
 
 export const fillSpeed: Detector = (context) => {
-  const filled = context.bundle.programs.map((program) => filledProgram(context, program)).filter((value): value is FilledProgram => value !== null);
-  return filled
-    .filter((current) => current.filledAt >= context.current.start && current.filledAt <= context.current.end)
-    .flatMap((current): DetectorInsight[] => {
-      const prior = filled.filter((candidate) => candidate.program.name === current.program.name && candidate.filledAt < context.current.start);
-      if (prior.length === 0) return [{ id: `d5:first:${current.program.name}:${current.program.heldOn}`, detector: "D5", severity: "info" as const, title: "満枠到達速度", body: "初の満枠", evidence: { n: current.program.capacity as number, daysBeforeHeld: current.daysBeforeHeld, previousBest: null }, label: "観察" as const }];
-      const previousBest = Math.max(...prior.map((candidate) => candidate.daysBeforeHeld));
-      if (current.daysBeforeHeld <= previousBest) return [];
-      return [{ id: `d5:fastest:${current.program.name}:${current.program.heldOn}`, detector: "D5", severity: "notice" as const, title: "満枠到達速度", body: "満枠が過去最速", evidence: { n: current.program.capacity as number, daysBeforeHeld: current.daysBeforeHeld, previousBest }, label: "観察" as const }];
-    });
+  const filled = context.bundle.programs.map((program) => filledProgram(context, program)).filter((value): value is FilledProgram => value !== null)
+    .sort((left, right) => left.filledAt.localeCompare(right.filledAt) || left.program.heldOn.localeCompare(right.program.heldOn) || left.program.start.localeCompare(right.program.start));
+  const bestByName = new Map<string, number>();
+  return filled.flatMap((current): DetectorInsight[] => {
+    const previousBest = bestByName.get(current.program.name);
+    const isCurrentWeek = current.filledAt >= context.current.start && current.filledAt <= context.current.end;
+    const insight = previousBest === undefined
+      ? { id: `d5:first:${current.program.name}`, detector: "D5" as const, severity: "info" as const, title: "満枠到達速度", body: "初の満枠", evidence: { n: current.capacity, daysBeforeHeld: current.daysBeforeHeld, previousBest: null }, label: "観察" as const }
+      : current.daysBeforeHeld > previousBest
+        ? { id: `d5:fastest:${current.program.name}`, detector: "D5" as const, severity: "notice" as const, title: "満枠到達速度", body: "満枠が過去最速", evidence: { n: current.capacity, daysBeforeHeld: current.daysBeforeHeld, previousBest }, label: "観察" as const }
+        : null;
+    bestByName.set(current.program.name, Math.max(previousBest ?? current.daysBeforeHeld, current.daysBeforeHeld));
+    return isCurrentWeek && insight !== null ? [insight] : [];
+  });
 };

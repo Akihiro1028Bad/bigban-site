@@ -96,6 +96,17 @@ describe("runIngestApplication", () => {
 
     expect(result.snapshot.series.onTheBooks?.every((point) => point.baselineMedian === 35)).toBe(true);
   });
+  it("当日スナップショットが破損していても取り込みを継続してスキップを記録する", async () => {
+    const { drop, data } = await setup();
+    await runIngestApplication(input(drop, data), deps());
+    await writeFile(join(data, "snapshots", "snapshot-2026-07-16.json"), "{");
+    const log = vi.fn();
+    const brokenDeps = { ...deps(), log };
+
+    await expect(runIngestApplication(input(drop, data), brokenDeps)).resolves.toMatchObject({ wasDryRun: false });
+    expect(log).toHaveBeenCalledWith("[ingest] スナップショット履歴の読取に失敗したためスキップします: snapshot-2026-07-16.json");
+  });
+
   it("pendingダイジェストは本文と一致するhashだけを受け付ける", () => {
     const text = "保留中の本文";
     const hash = createHash("sha256").update(text).digest("hex");
@@ -413,13 +424,13 @@ describe("runIngestApplication", () => {
     expect(snapshot.meta.warnings).toEqual(expect.arrayContaining(["未知種別のCSVを2件無視"]));
   });
 
-  it("前回スナップショットの破損は沈黙させない", async () => {
+  it("前回スナップショットの破損をログしてスキップし、取り込みを継続する", async () => {
     const { drop, data } = await setup();
     await mkdir(join(data, "snapshots"), { recursive: true });
     await writeFile(join(data, "snapshots", "snapshot-2026-07-15.json"), "{");
-    await expect(runIngestApplication(input(drop, data), deps())).rejects.toThrow("previous-snapshot");
-    await rm(join(data, "snapshots"), { recursive: true, force: true });
-    await runIngestApplication(input(drop, data), deps());
+    const log = vi.fn();
+    await expect(runIngestApplication(input(drop, data), { ...deps(), log })).resolves.toMatchObject({ wasDryRun: false });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("snapshot-2026-07-15.json"));
   });
 
   it("予約CSVの行数急減時は昇格もダイジェスト送信もせず、allowRowDropなら警告して続行する", async () => {
