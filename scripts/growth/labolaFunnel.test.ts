@@ -50,4 +50,17 @@ describe("summarizeLabolaFunnel", () => {
       rows: [],
     })).toMatchObject({ observedDays: 7, isReferenceOnly: false });
   });
+
+  it("計測開始後に始まる期間を数え、eventCount欠測は0件として集計する", () => {
+    const result = summarizeLabolaFunnel({
+      period: { start: "2026-07-20", end: "2026-07-26" },
+      rows: [{ keys: ["reservation_click"], metrics: {} }],
+    });
+
+    expect(result).toMatchObject({
+      observedDays: 7,
+      isReferenceOnly: false,
+      siteToLabola: 0,
+    });
+  });
 });
