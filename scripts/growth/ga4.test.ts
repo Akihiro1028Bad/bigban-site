@@ -65,6 +65,29 @@ describe("fetchGa4", () => {
       { startDate: "2026-07-27", endDate: "2026-08-02" },
     ]);
   });
+
+  it("対象期間が計測開始日を跨ぐ場合は開始日まで切り詰める", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const labolaReport = GA4_REPORTS.find((report) => report.key === "labolaFunnel");
+
+    await fetchGa4({
+      config,
+      accessToken: "t",
+      current: { start: "2026-07-20", end: "2026-08-02" },
+      prior: { start: "2026-07-06", end: "2026-07-19" },
+      fetchFn,
+      reports: [labolaReport!],
+    });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<{ dateRanges: Array<{ startDate: string; endDate: string }> }>;
+    };
+    expect(body.requests).toHaveLength(1);
+    expect(body.requests[0].dateRanges).toEqual([
+      { startDate: "2026-07-27", endDate: "2026-08-02" },
+    ]);
+  });
+
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");

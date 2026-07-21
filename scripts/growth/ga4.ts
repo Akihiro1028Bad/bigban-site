@@ -175,8 +175,8 @@ export async function fetchGa4(
 
   const result: Record<string, MergedRow[]> = {};
   reports.forEach((def, index) => {
-    const currentReport = allReports[index * 2] ?? {};
-    const priorReport = allReports[index * 2 + 1] ?? {};
+    const currentReport = allReports[index * 2];
+    const priorReport = allReports[index * 2 + 1];
     result[def.key] = mergeRows(
       parseGa4Report(currentReport),
       parseGa4Report(priorReport),

@@ -72,18 +72,20 @@ describe("summarizeLabolaFunnel", () => {
     });
   });
 
-  it("eventCountを離脱判定へ混ぜず、セッション数だけを集計する", () => {
+  it("eventCountを離脱判定へ混ぜず、sessions欠測は0件として集計する", () => {
     const result = summarizeLabolaFunnel({
-      period: { start: "2026-07-27", end: "2026-08-02" },
+      period: { start: "2026-08-03", end: "2026-08-09" },
       rows: [{
         keys: [LABOLA_ENTRY_EVENTS.rental],
         metrics: {
-          sessions: { current: 3, prior: 0, deltaPct: null },
           eventCount: { current: 30, prior: 0, deltaPct: null },
         },
       }],
     });
 
-    expect(result.siteToLabola).toBe(3);
+    expect(result).toMatchObject({
+      observedDays: 7,
+      siteToLabola: 0,
+    });
   });
 });
