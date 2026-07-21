@@ -50,6 +50,14 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(goals).toContain("実予約");
   });
 
+  it("LaBOLA予約導線を参考値として施策・記事の選択に使う", () => {
+    expect(weekly).toContain("reservationFunnel");
+    expect(weekly).toContain("計測開始から7日未満");
+    expect(weekly).toContain("参考値");
+    expect(weekly).toContain("入力後の離脱");
+    expect(weekly).toContain("記事ではなく予約画面や操作説明");
+    expect(weekly).toContain("料金変更");
+  });
   it("承認画面のプロンプトタブで分析基準を参考資料として表示する", () => {
     expect(PROMPT_REGISTRY).toContainEqual(
       expect.objectContaining({

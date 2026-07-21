@@ -15,6 +15,7 @@ import {
   type MergedRow,
 } from "./transform";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
+import { LABOLA_FUNNEL_EVENT_NAMES } from "./labolaFunnel";
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -81,6 +82,15 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
     metrics: ["keyEvents"],
     dimensionFilter: { fieldName: "eventName", values: CTA_EVENT_NAMES },
     limit: 10_000,
+    includePriorOnly: true,
+  },
+  {
+    key: "labolaFunnel",
+    dimensions: ["eventName"],
+    // キーイベント登録に依存せず、タグの発火件数を参考値として取得する。
+    metrics: ["eventCount"],
+    dimensionFilter: { fieldName: "eventName", values: LABOLA_FUNNEL_EVENT_NAMES },
+    limit: 100,
     includePriorOnly: true,
   },
 ];

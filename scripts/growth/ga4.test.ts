@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { fetchGa4, GA4_REPORTS, type Ga4ReportDef } from "./ga4";
+import { LABOLA_FUNNEL_EVENT_NAMES } from "./labolaFunnel";
 import type { FetchFn } from "./http";
 import type { GrowthConfig } from "./config";
 
@@ -31,6 +32,16 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGa4", () => {
+  it("既定レポートでLaBOLA予約導線をkey event設定に依存せず取得する", () => {
+    expect(GA4_REPORTS).toContainEqual({
+      key: "labolaFunnel",
+      dimensions: ["eventName"],
+      metrics: ["eventCount"],
+      dimensionFilter: { fieldName: "eventName", values: LABOLA_FUNNEL_EVENT_NAMES },
+      limit: 100,
+      includePriorOnly: true,
+    });
+  });
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");
