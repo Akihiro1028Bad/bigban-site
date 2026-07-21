@@ -16,8 +16,9 @@ export function isCmsColumnsEnabled(): boolean {
  * 承認画面(/growth/approve)の合言葉認証フラグ。**フェイルセーフ(既定ON)**。
  *
  * - 未設定 / "false" 以外 → 有効(true): 本番で env 未設定でも認証が外れない(C1: フェイルオープン解消)。
- * - "false" のときだけ無効: 合言葉ゲートを出さず token 検証もスキップする(ローカル開発用)。
- * - 有効時は APPROVE_SECRET と入力合言葉の定数時間比較で保護する。
+ * - "false" のときだけ無効: 通常APIのCookie session検証をスキップする(ローカル開発用)。
+ *   公開・予約公開・メディアAPIは無効時もfail-closed。
+ * - 有効時は合言葉交換後の署名付きHttpOnly Cookieで保護する。
  *
  * サーバ(API ルート)は env の実値で判定する。クライアント束には server 環境変数が載らない
  * (Next.js が NEXT_PUBLIC_ 以外を undefined 化)ため、ブラウザ側では常に true=ゲート表示となり

@@ -70,6 +70,8 @@ npm run growth:reconcile
 
 `growth:daemon` は heartbeat と各 `run.mjs` の開始/終了を Worker 運用ログ DB に記録する。`growth:reconcile` は自動修復せず、不整合を検出して JSON と Worker 運用ログ DB に記録する。
 
+daemon は長時間ジョブ中も既定5分ごとに Worker heartbeat を更新する。ローカル lease heartbeat とは用途を分離し、同じ jobId で Workerログ・lock・失敗ログを照合する。timeout は failed / exit 124 / timeout値 / SIGTERM・SIGKILL / 再開コマンドをWorkerログ・学習ログ・LINE・ローカル失敗ログへ記録する。POSIXでは最上位だけがプロセスグループを作りnested subprocessは継承するため、外側timeoutやlease喪失時も子孫を残さない。
+
 ## reconcile が見るもの
 
 - AI 依頼中/処理中なのに直近 worker 実行履歴がない

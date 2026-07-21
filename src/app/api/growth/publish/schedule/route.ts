@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server";
 
-import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
+import { privilegedAuthFailure, verifyPrivileged } from "@/lib/growth/apiAuth";
 import { growthApiError } from "@/lib/growth/apiError";
 import { articleStageOf, isNotionPageId } from "@/lib/growth/approve";
 import { defaultFetch, getPage, updatePageProps } from "@/lib/growth/notion";
@@ -42,7 +42,8 @@ function parseScheduledAt(value: unknown, nowMs: number): { iso: string | null }
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!verifyToken(request)) return unauthorized();
+  const auth = verifyPrivileged(request, "publish");
+  if (auth !== "authorized") return privilegedAuthFailure(auth, "publish", "認証に失敗しました");
 
   let body: unknown;
   try {

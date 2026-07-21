@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", () => ({
   createPage: vi.fn(),
   defaultFetch: vi.fn(),
@@ -21,8 +23,7 @@ const SECRET = "approve-secret-token";
 
 function postRequest(token: string | null, body: unknown): Request {
   const url = new URL("http://localhost/api/growth/proposals");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token), body: JSON.stringify(body) });
 }
 
 beforeEach(() => {

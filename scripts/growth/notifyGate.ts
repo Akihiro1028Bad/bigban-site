@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
-export type NotifyKind = "weekly" | "routine" | "failure";
+export type NotifyKind = "weekly" | "routine" | "failure" | "critical";
 export type NotifyLevel = "weekly-only" | "all";
 
 export const FAILURE_LOG_PATH = "data/growth-failures.log";
@@ -19,7 +19,7 @@ export function resolveNotifyLevel(env: Record<string, string | undefined>): Not
 }
 
 export function shouldPushLine(kind: NotifyKind, level: NotifyLevel): boolean {
-  return level === "all" || kind === "weekly";
+  return level === "all" || kind === "weekly" || kind === "critical";
 }
 
 function cleanField(value: string | number): string {

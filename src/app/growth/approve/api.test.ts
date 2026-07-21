@@ -21,6 +21,7 @@ import {
   OPS_URL,
   MODEL_SETTINGS_URL,
   PROPOSAL_ARTIFACT_URL,
+  SessionExpiredError,
 } from "./api";
 
 setupMswServer();
@@ -119,7 +120,7 @@ describe("fetchBoard", () => {
     await expect(fetchBoard("tok")).resolves.toEqual([{ id: "i1" }]);
   });
 
-  it("Authorization: Bearer ヘッダで token を送る", async () => {
+  it("Cookie認証用ヘッダを送りAuthorizationを付けない", async () => {
     let auth: string | null = null;
     server.use(
       http.get(BOARD_URL, ({ request }) => {
@@ -128,12 +129,13 @@ describe("fetchBoard", () => {
       })
     );
     await fetchBoard("mytoken");
-    expect(auth).toBe("Bearer mytoken");
+    expect(auth).toBeNull();
   });
 
-  it("401 は合言葉エラー", async () => {
+  it("401 は再ログイン遷移に使えるセッション切れエラー", async () => {
     server.use(http.get(BOARD_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
-    await expect(fetchBoard("tok")).rejects.toThrow(/合言葉が違います/);
+    await expect(fetchBoard("tok")).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(fetchBoard("tok")).rejects.toThrow(/セッションの有効期限/);
   });
 
   it("その他失敗は error 文言を使う", async () => {
@@ -173,7 +175,7 @@ describe("postDecision", () => {
 describe("postRevert", () => {
   const REVERT_URL = "/api/growth/approve/revert";
 
-  it("pageId で POST し Authorization ヘッダを送る", async () => {
+  it("pageId でPOSTしCookie認証用ヘッダを送る", async () => {
     let auth: string | null = null;
     let body: unknown;
     server.use(
@@ -185,7 +187,7 @@ describe("postRevert", () => {
     );
     await postRevert("tok", "i1");
     expect(body).toEqual({ pageId: "i1" });
-    expect(auth).toBe("Bearer tok");
+    expect(auth).toBeNull();
   });
 
   it("409 は段階エラー文言", async () => {
@@ -293,7 +295,7 @@ describe("fetchPrompts", () => {
     });
   });
 
-  it("Authorization: Bearer ヘッダで token を送る", async () => {
+  it("Cookie認証用ヘッダを送りAuthorizationを付けない", async () => {
     let auth: string | null = null;
     server.use(
       http.get(PROMPTS_URL, ({ request }) => {
@@ -302,12 +304,12 @@ describe("fetchPrompts", () => {
       })
     );
     await fetchPrompts("mytoken");
-    expect(auth).toBe("Bearer mytoken");
+    expect(auth).toBeNull();
   });
 
   it("401 は合言葉エラー", async () => {
     server.use(http.get(PROMPTS_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
-    await expect(fetchPrompts("tok")).rejects.toThrow(/合言葉が違います/);
+    await expect(fetchPrompts("tok")).rejects.toThrow(/セッションの有効期限/);
   });
 
   it("その他失敗は error 文言、無ければ既定文言", async () => {
@@ -336,7 +338,7 @@ describe("fetchOps", () => {
 
   it("401 は合言葉エラー、その他は error/既定文言", async () => {
     server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false }, { status: 401 })));
-    await expect(fetchOps("tok")).rejects.toThrow(/合言葉が違います/);
+    await expect(fetchOps("tok")).rejects.toThrow(/セッションの有効期限/);
     server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false, error: "OPS NG" }, { status: 500 })));
     await expect(fetchOps("tok")).rejects.toThrow("OPS NG");
     server.use(http.get(OPS_URL, () => HttpResponse.json({ success: false }, { status: 500 })));

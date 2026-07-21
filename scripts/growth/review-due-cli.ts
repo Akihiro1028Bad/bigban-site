@@ -26,11 +26,11 @@ import {
   type ReviewMilestone,
 } from "./review-due";
 import {
-  queryDataSource,
   updatePageProps,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const STATUS_PROP = "ステータス";
@@ -68,12 +68,11 @@ function hasDate(page: NotionPage, prop: string): boolean {
 
 /** 公開記事(ステータス=公開済み)のページを取得する。 */
 async function publishedPages(options: NotionApiOptions): Promise<NotionPage[]> {
-  const { pages } = await queryDataSource(
+  return queryAllDataSource(
     IDEA_DS,
-    { filter: { property: STATUS_PROP, select: { equals: PUBLISHED_STATUS } }, pageSize: 100 },
+    { filter: { property: STATUS_PROP, select: { equals: PUBLISHED_STATUS } } },
     options
   );
-  return pages;
 }
 
 /** microCMS 公開記事を contentId で引いて publishedAt を得る。失敗は null。 */

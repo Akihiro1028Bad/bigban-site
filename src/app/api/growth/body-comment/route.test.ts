@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageProps: vi.fn(), defaultFetch: vi.fn() };
@@ -23,8 +25,7 @@ const COMMENT = { blockIndex: 0, excerpt: "一文目です。", comment: "やわ
 
 function postReq(token: string | null, body: unknown, raw?: string): Request {
   const url = new URL("http://localhost/api/growth/body-comment");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: raw ?? JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token), body: raw ?? JSON.stringify(body) });
 }
 
 function page(opts: { commentStatus?: string; body?: string } = {}) {

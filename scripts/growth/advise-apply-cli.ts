@@ -34,11 +34,11 @@ import { reapStaleRows } from "./loopReaper";
 import { buildNoticeFlex } from "./notice-flex";
 import {
   getPage,
-  queryAllDataSource,
   updatePageProps,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const IDEA_DS = "5adab8b1-f182-4123-b963-9463a2580d4a"; // 記事ネタ案
 const REAP_REASON = "反映が15分以上完了しませんでした(PC再起動等の可能性)。もう一度依頼できます。";
@@ -72,7 +72,7 @@ function statusFilter(value: string): unknown {
 async function rowsByStatus(value: string, options: NotionApiOptions): Promise<AdviceApplyRow[]> {
   const pages = await queryAllDataSource(
     IDEA_DS,
-    { filter: statusFilter(value), pageSize: 100 },
+    { filter: statusFilter(value) },
     options
   );
   return pages.map(applyRowFromPage);

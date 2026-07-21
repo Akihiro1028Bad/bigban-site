@@ -4,11 +4,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // run.mjs は claude を spawn する薄い入口(カバレッジ対象外)。
 // GROWTH_DRYRUN の起動引数だけを subprocess 経由で検証する(#247)。
 const RUN = path.resolve("scripts/growth/run.mjs");
+const SUBPROCESS_TEST_TIMEOUT_MS = 30_000;
+
+vi.setConfig({ testTimeout: SUBPROCESS_TEST_TIMEOUT_MS });
 
 function dryRun(mode: string, env: Record<string, string> = {}): string {
   return execFileSync("node", [RUN, mode], {

@@ -6,7 +6,7 @@ import type { FormEvent } from "react";
 import { PROPOSAL_CATEGORIES } from "@/lib/growth/proposals";
 import type { Stage } from "@/lib/growth/stage";
 
-import { authHeaders } from "./authHeaders";
+import { sessionHeaders } from "./sessionHeaders";
 
 interface AddedDetail {
   label: string;
@@ -36,7 +36,7 @@ function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : "追加に失敗しました。";
 }
 
-export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
+export function AddProposalForm({ token: _token, onAdded }: AddProposalFormProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
@@ -55,7 +55,7 @@ export function AddProposalForm({ token, onAdded }: AddProposalFormProps) {
     try {
       const res = await fetch("/api/growth/proposals", {
         method: "POST",
-        headers: authHeaders(token, { "Content-Type": "application/json" }),
+        headers: sessionHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ name: trimmed, category, note }),
       });
       const json = await res.json();

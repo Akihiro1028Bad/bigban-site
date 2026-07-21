@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 // getPage だけを差し替え、draftBodyOf/ideaTitleOf 等は実物を使う(#95)。
 vi.mock("@/lib/growth/notion", async (orig) => ({
   ...(await orig<typeof import("@/lib/growth/notion")>()),
@@ -28,9 +30,8 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 function getRequest(token: string | null, pageId: string | null): Request {
   const url = new URL("http://localhost/api/growth/draft");
-  if (token !== null) url.searchParams.set("token", token);
   if (pageId !== null) url.searchParams.set("pageId", pageId);
-  return new Request(url, { method: "GET" });
+  return new Request(url, { method: "GET", headers: growthAuthHeaders(token) });
 }
 
 // #95: 本文ミラー(下書き本文HTML)＋タイトル案を持つ Notion ページ。
@@ -118,6 +119,33 @@ describe("GET /api/growth/draft", () => {
 
     const json = await (await GET(getRequest(null, PAGE_ID))).json();
     expect(json.draft.confirmedFacts).toEqual(["体験会は7月20日に開催します"]);
+  });
+
+  it("保存済みfact bindingメタデータを下書きへ含める", async () => {
+    const page = pageWithMirror("<p>参加費は600円。AIが作成した下書きです。</p>");
+    page.properties["根拠台帳"] = {
+      rich_text: [{
+        plain_text: [
+          "official-site | https://example.com | 参加費は500円",
+          "  ↳ fact-price [binding:v1;hash=fnv1a64:original] p#1 根拠「参加費は500円」 本文「参加費は500円」",
+        ].join("\n"),
+      }],
+    };
+    vi.mocked(getPage).mockResolvedValue(page);
+
+    const json = await (await GET(getRequest(null, PAGE_ID))).json();
+    expect(json.draft.factBinding).toEqual({
+      version: 1,
+      bodyHash: "fnv1a64:original",
+      referenceCount: 1,
+      isValid: true,
+      references: [{
+        factId: "fact-price",
+        excerpt: "参加費は500円",
+        container: "p",
+        containerIndex: 1,
+      }],
+    });
   });
 
   it("#H19: 公開記事 slug を /ja/news/<slug> パスにして knownNewsPaths に入れる(ja のみ)", async () => {

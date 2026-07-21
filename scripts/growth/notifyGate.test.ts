@@ -30,16 +30,18 @@ describe("resolveNotifyLevel", () => {
 });
 
 describe("shouldPushLine", () => {
-  it("weekly-only では weekly だけ送信する", () => {
+  it("weekly-only では weekly と critical timeout だけ送信する", () => {
     expect(shouldPushLine("weekly", "weekly-only")).toBe(true);
     expect(shouldPushLine("routine", "weekly-only")).toBe(false);
     expect(shouldPushLine("failure", "weekly-only")).toBe(false);
+    expect(shouldPushLine("critical", "weekly-only")).toBe(true);
   });
 
   it("all では全種別を送信する", () => {
     expect(shouldPushLine("weekly", "all")).toBe(true);
     expect(shouldPushLine("routine", "all")).toBe(true);
     expect(shouldPushLine("failure", "all")).toBe(true);
+    expect(shouldPushLine("critical", "all")).toBe(true);
   });
 });
 

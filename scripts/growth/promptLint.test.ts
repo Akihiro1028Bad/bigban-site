@@ -134,6 +134,7 @@ describe("下書き生成のフェーズ分離契約", () => {
     expect(research).toContain("`official-site`として出力");
     expect(research).toContain("公式確認できなければ出力しない");
     expect(research).toContain("原文のまま抜き出す");
+    expect(research).toContain("`name`・`confirmed`・`location`");
     expect(research).toContain("facility-context.json");
     expect(research).toContain("一次情報メモ");
     expect(research).toContain("任意項目も省略せず");
@@ -147,6 +148,9 @@ describe("下書き生成のフェーズ分離契約", () => {
     for (const forbidden of ["npm run", "microCMS", "LINE", "Notion", "WebSearch", "WebFetch", "Task"]) {
       expect(writer).not.toContain(forbidden);
     }
+    expect(writer).toContain("<!--FACT:fact-id-->");
+    expect(writer).toContain("句点・感嘆符・疑問符の直前");
+    expect(writer).toContain("`usedFactIds`は本文markerから抽出できるfact IDの集合と完全一致");
   });
 
   it("見出し契約は執筆プロンプトと決定的ゲートの両方で守る", () => {

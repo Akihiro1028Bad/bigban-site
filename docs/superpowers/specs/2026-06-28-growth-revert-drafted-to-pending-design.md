@@ -1,5 +1,7 @@
 # 下書き作成済みを承認待ち（提案中）に戻す「構成からやり直す」設計
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 - 日付: 2026-06-28
 - 対象: グロースループ承認画面（`src/app/growth/approve/`）＋承認 API（`src/app/api/growth/`）
 - 関連: 段階ガード #H9（`src/lib/growth/stageGuard.ts`）、下書きモード（`scripts/growth/prompts/drafts.md`）、修正ループ #40/#139B

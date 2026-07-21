@@ -121,7 +121,7 @@ describe("ProposalDetailBody", () => {
     expect(screen.getByText("Before/After 文言を確認する。")).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       "/api/growth/proposal-artifact?pageId=p1",
-      expect.objectContaining({ headers: { Authorization: "Bearer secret" } })
+      expect.objectContaining({ headers: { "X-Growth-Request": "1" } })
     );
   });
 

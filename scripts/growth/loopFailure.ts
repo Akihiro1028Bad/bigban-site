@@ -8,7 +8,7 @@
  * 「失敗を沈黙させない」を weekly と同水準にそろえる。
  */
 
-export type LoopFailureKind = "spawn-error" | "nonzero-exit";
+export type LoopFailureKind = "spawn-error" | "nonzero-exit" | "timeout";
 
 export interface LoopFailureInput {
   /** 実行モード(工程名)。 */
@@ -21,17 +21,23 @@ export interface LoopFailureInput {
   exitCode?: number;
   /** 原因の手掛かり(spawn エラーメッセージ等)。空なら省略。 */
   detail?: string;
+  timeoutMs?: number;
+  termSent?: boolean;
+  forceKilled?: boolean;
 }
 
 /** loop/実行モードの失敗 LINE 本文。工程名・原因・再開コマンドを必ず載せる。 */
 export function buildLoopFailureMessage(input: LoopFailureInput): string {
-  const head =
-    input.kind === "spawn-error"
+  const head = input.kind === "timeout"
+    ? `🚨 グロース ${input.mode} が timeout しました(exit 124・制限 ${input.timeoutMs ?? "?"}ms)。`
+    : input.kind === "spawn-error"
       ? `❌ グロース ${input.mode} の claude を起動できませんでした。`
       : `❌ グロース ${input.mode} が異常終了しました(exit ${input.exitCode ?? "?"})。`;
   const lines = [
     head,
-    "この工程が回らないと reap / 次の依頼処理が止まります。PATH / サブスクを確認してください。",
+    input.kind === "timeout"
+      ? `終了処理: ${input.termSent ? "SIGTERM 送信済み" : "SIGTERM 未送信"}${input.forceKilled ? "、猶予後に SIGKILL を使用" : ""}`
+      : "この工程が回らないと reap / 次の依頼処理が止まります。PATH / サブスクを確認してください。",
     `再開コマンド: ${input.resumeCommand}`,
   ];
   const detail = input.detail?.trim();

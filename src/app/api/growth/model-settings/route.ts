@@ -14,9 +14,9 @@ import {
 import {
   createPage,
   defaultFetch,
-  queryDataSource,
   updatePageProps,
 } from "@/lib/growth/notion";
+import { queryAllDataSource, queryFirstDataSource } from "@/lib/growth/notionRepository";
 
 export const runtime = "nodejs";
 
@@ -50,8 +50,8 @@ export async function GET(request: Request): Promise<Response> {
   if (!options) return fallbackResponse();
 
   try {
-    const result = await queryDataSource(dataSourceId(), { pageSize: 50 }, options);
-    const overrides = result.pages
+    const pages = await queryAllDataSource(dataSourceId(), {}, options);
+    const overrides = pages
       .map(modelSettingFromPage)
       .filter((setting) => setting !== null);
     return NextResponse.json({
@@ -81,19 +81,17 @@ export async function PUT(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await queryDataSource(
+    const existing = await queryFirstDataSource(
       dataSourceId(),
       {
         filter: {
           property: MODEL_SETTING_PROPS.phaseId,
           title: { equals: input.phaseId },
         },
-        pageSize: 2,
       },
       options,
     );
     const props = buildModelSettingProps(input);
-    const existing = result.pages[0];
     if (existing) {
       await updatePageProps(existing.id, props, options);
     } else {

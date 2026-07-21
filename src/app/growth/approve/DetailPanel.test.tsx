@@ -4,7 +4,7 @@
  * block チェックでの承認無効・公開済みバッジ・編集中バッジ・相談モードでも通常タブ維持(F7)・モバイル戻る を担保する。
  * Task 9 で本 file は exclude するため、主要分岐が壊れていないことの担保として残す。
  */
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -151,6 +151,36 @@ describe("DetailPanel(2段タブ)", () => {
     // 免責文なし本文＝AI免責文 block になる想定。
     setup({ stage: "draft_review" });
     expect(screen.getByRole("button", { name: /承認して公開予約|構成案を承認/ })).toBeDisabled();
+  });
+
+  it("保存済みbindingと本文hashが不一致なら承認ボタンを無効にする", () => {
+    const bodyHtml = "<h2>料金</h2><p>参加費は600円。AIが作成した下書きです。</p>";
+    const baseDraft = {
+      title: "t",
+      displayMode: "html" as const,
+      bodyHtml,
+      body: "参加費は600円。AIが作成した下書きです。",
+    };
+    setup({ draftState: { status: "ready", draft: baseDraft } });
+    expect(screen.getByRole("button", { name: /承認して公開予約/ })).toBeEnabled();
+
+    cleanup();
+    setup({
+      draftState: {
+        status: "ready",
+        draft: {
+          ...baseDraft,
+          factBinding: {
+            version: 1,
+            bodyHash: "fnv1a64:before-manual-edit",
+            referenceCount: 1,
+            isValid: true,
+          },
+        },
+      } as DraftState,
+    });
+    expect(screen.getByRole("button", { name: /承認して公開予約/ })).toBeDisabled();
+    expect(screen.getByText("公開不可の項目があります")).toBeInTheDocument();
   });
 
   it("published/scheduled は公開済みバッジで主操作を出さない", () => {

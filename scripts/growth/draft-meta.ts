@@ -9,6 +9,7 @@
  * 参照: 管理API `GET /api/v1/contents/{endpoint}/{contentId}` の `draftKey`。
  */
 
+import { externalApiErrorFromResponse } from "./externalApiError";
 import type { FetchFn } from "./http";
 
 export interface DraftMetaOptions {
@@ -36,10 +37,7 @@ export async function fetchDraftKey(
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(
-      `draftKey の取得に失敗しました (HTTP ${res.status}): ${text}`
-    );
+    throw externalApiErrorFromResponse("microcms.draft-key.get", res);
   }
 
   const json = (await res.json()) as { draftKey?: string | null };
@@ -63,8 +61,7 @@ export async function fetchContentSlug(
   });
 
   if (!res.ok) {
-    const body = (await res.text()).slice(0, 200);
-    throw new Error(`既存slugの取得に失敗しました (HTTP ${res.status}): ${body}`);
+    throw externalApiErrorFromResponse("microcms.content.slug.get", res);
   }
 
   const json = (await res.json()) as { slug?: unknown };
@@ -133,9 +130,7 @@ export async function fetchContentSummary(
   });
 
   if (!res.ok) {
-    // エラーボディは固定長に制限(機微情報の不用意な露出・ログ肥大を避ける)。
-    const body = (await res.text()).slice(0, 200);
-    throw new Error(`コンテンツ要約の取得に失敗しました (HTTP ${res.status}): ${body}`);
+    throw externalApiErrorFromResponse("microcms.content.summary.get", res);
   }
 
   const json = (await res.json()) as {

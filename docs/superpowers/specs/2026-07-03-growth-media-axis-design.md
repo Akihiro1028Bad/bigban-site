@@ -1,5 +1,7 @@
 # グロースループ 媒体軸(media axis)設計
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 **日付**: 2026-07-03 / **対象**: グロースループ Track 4 ①媒体軸
 **土台**: `scratchpad/growth-review/05-methodology-review.md` の案A(記事ネタ案に媒体軸を追加)＋改善案#3(ルーティングを行の媒体で出し分け)
 

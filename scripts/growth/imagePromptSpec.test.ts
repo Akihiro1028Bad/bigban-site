@@ -8,6 +8,12 @@ const draft = {
   payload: { title: "初心者向け記事", bodyHtml: "<p>本文</p>{{IMG:1}}" },
   eyecatchAction: "",
   images: [{ index: 1, style: "auto", description: "初心者向けの画像" }],
+  sourceLedger: [{
+    sourceType: "official-site",
+    source: "https://example.com/price",
+    confirmedFacts: ["参加費は500円"],
+    factReferences: [{ factId: "fact-price", excerpt: "参加費は500円", container: "p", containerIndex: 1 }],
+  }],
   notion: { pageId: "page-1", property: "ステータス", value: "下書き作成済み" },
 };
 
@@ -39,6 +45,7 @@ describe("画像プロンプト提案の安全な反映", () => {
     });
     expect(result.payload).toBe(draft.payload);
     expect(result.notion).toBe(draft.notion);
+    expect(result.sourceLedger).toBe(draft.sourceLedger);
   });
 
   it("元の本文画像indexを追加・削除・変更する提案を拒否する", () => {

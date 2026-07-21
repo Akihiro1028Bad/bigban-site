@@ -55,6 +55,9 @@ tsconfig.tsbuildinfo
 
 # playwright-mcp artifacts (screenshots, snapshots, logs)
 .playwright-mcp/
+playwright-report/
+test-results/
+blob-report/
 
 # local claude config & scratch
 .claude/

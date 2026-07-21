@@ -1,5 +1,7 @@
 # グロースループ プロンプト/ドキュメント再設計 修正方針
 
+**履歴資料**: この文書は作成時点の判断・名称・値を保存したもので、現行仕様の正典ではありません。施設の現況・正式開業日は `scripts/growth/facility-context.json`、現行の公開境界・コマンドは `docs/operations/growth/00-canon.md` を参照してください。
+
 - 起票日: 2026-06-28
 - ブランチ: `feature/growth-prompt-redesign`
 - 種別: 設計方針 → **実装決定済み**(下記)

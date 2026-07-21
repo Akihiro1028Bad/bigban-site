@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("next/server", async (orig) => ({
   ...(await orig<typeof import("next/server")>()),
   after: vi.fn((callback: () => unknown) => {
@@ -30,7 +32,7 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 function postRequest(token: string | null, body: unknown): Request {
   const url = new URL("http://localhost/api/growth/learning-log/reject");
-  const headers = token === null ? undefined : { authorization: `Bearer ${token}` };
+  const headers = growthAuthHeaders(token);
   return new Request(url, { method: "POST", headers, body: JSON.stringify(body) });
 }
 

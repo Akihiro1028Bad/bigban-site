@@ -22,11 +22,11 @@ import {
   PROPOSAL_REVIEW_MEMO_PROP,
 } from "./proposal-review-due";
 import {
-  queryDataSource,
   updatePageProps,
   type NotionApiOptions,
   type NotionPage,
 } from "./notion";
+import { queryAllDataSource } from "./notionRepository";
 
 const PROPOSAL_DS = "3503f4bc-b1c4-4927-91ce-7609a6c4e460"; // 施策提案
 const STATUS_PROP = "ステータス";
@@ -73,7 +73,7 @@ function proposalName(page: NotionPage): string {
 }
 
 async function reviewablePages(options: NotionApiOptions): Promise<NotionPage[]> {
-  const { pages } = await queryDataSource(PROPOSAL_DS, { pageSize: 100 }, options);
+  const pages = await queryAllDataSource(PROPOSAL_DS, {}, options);
   return pages.filter((p) => REVIEWABLE_STATUSES.includes(selectNameOf(p, STATUS_PROP)));
 }
 

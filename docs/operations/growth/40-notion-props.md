@@ -1,5 +1,9 @@
 # Notion「記事ネタ案」DB 必要プロパティ一覧
 
+## 根拠台帳の監査行（プロパティ追加なし）
+
+既存の `根拠台帳` rich_text に、情報源親行と fact 監査行を保存する。監査行は `  ↳ fact-id [公開前再確認:理由] H2 > p#2 「本文抜粋」` 形式。新しい Notion プロパティは不要で、`根拠台帳` が未追加の環境では従来のフォールバックにより本体更新を継続する。
+
 > 各ループは pull 型で Notion にプロパティを読み書きする。**事前追加が前提**だが、コードは**欠落耐性**(未追加でも沈黙落ちせず動く/報告する)。
 > data source 例: `5adab8b1-f182-4123-b963-9463a2580d4a`。詳細仕様は各ループの節([30-loops.md](30-loops.md) 等)。
 
@@ -76,19 +80,25 @@
 
 `成績データ` JSON は `measurementStatus` (`measured` / `path-unmatched` / `source-error`) と `ctaEventsMeasurementStatus` (`measured` / `partial` / `unmeasured`) を持つ。`ga4Measured` / `ctaEventsMeasured` は旧データ互換で併記する。旧 JSON は `ga4Measured=false` のみを `source-error`、それ以外を `measured` として安全側に読む。
 
-## 学習ループ(#221・週次「伸ばす学習」の入力)
+## 学習ループ(#221/#286・記事タイプ別の率/母数/観測条件)
 
-週次モードは `growth:existing` 出力末尾の「公開済み記事の成績サマリ(記事タイプ別)」を読み、成功が多い型を優先する。集計は**既存プロパティのみ**で行い新規追加は不要:
+週次モードは `growth:existing` 出力末尾の「公開済み記事の成績サマリ(記事タイプ別)」を読む。成功本数や成功率で自動順位付けせず、成功率・判定済み母数・未判定率・観測条件をセットで判断する。判定済み3本未満は「探索中」。集計は**既存プロパティのみ**で行い新規追加は不要:
 
 | プロパティ | 型 | 用途 |
 |---|---|---|
 | `記事タイプ` | select | 集計の軸(獲得/不安解消/資産/比較/イベント)。欠落は「タイプ未設定」に寄せる(黙って落とさない)。 |
 | `公開後判定` | select | 人が決めた公開後判定(未判定/成功/様子見/要改稿)。未設定は「未判定」として数える。 |
-| `成績データ` | text | `search.topQueries` から「勝ったクエリ」を抽出(空/不正でも壊れない)。 |
+| `成績データ` | text | GA4/GSC の観測条件と検索反応を集計(空/不正でも壊れない)。GA4 `source-error` はviews実測母数から除き、`path-unmatched` は実測0として含める。GSC `search` がある記事だけimpressions実測母数へ含める。 |
 | `却下理由` | rich_text | 記事ネタ案を却下/見送り/要改稿と判断した理由(人が記入)。`growth:existing` の出力が「避ける学習」の入力として却下/見送り/公開後判定=要改稿 の行に併記する(`existing.ts` の `ideaLines`)。**未追加でも欠落耐性で動く**(空なら理由なしでヘッダ行のみ)。 |
 | `一次情報メモ` | rich_text | スタッフが記入する、その記事で使える施設の一次観察・体験談(初回の人がつまずく所・当日の空気・実施済みイベントの事後ルポ 等)。執筆 AI は**ここに書かれた記述だけ**を体験談として使う(§16 供給ソース分離)。**未記入なら体験談は書かず確定事実で代替**(欠落耐性)。 |
 
-**欠落耐性**: いずれのプロパティも未設定・公開0本で空サマリになるだけで壊れない。集計対象は `ステータス`=`公開済み` の行のみ。`却下理由`・`一次情報メモ` も**任意・追記のみ**(冒頭注記どおりコードは欠落耐性)。
+**欠落耐性**: いずれのプロパティも未設定でも壊れない。公開0本でも既知5型を `published=0` / `sampleStatus=exploring` として出し、ゼロサンプルの探索候補を失わない。集計対象は `ステータス`=`公開済み` の行のみ。`却下理由`・`一次情報メモ` も**任意・追記のみ**(冒頭注記どおりコードは欠落耐性)。
+
+- `judged = success + watch + rewrite`。成功率は `success / judged`（小数第1位）で、未判定は分母に入れない。`judged=0` は未算出。
+- 未判定数と `unjudged / published`（小数第1位）を必ず併記する。固定順は 獲得→不安解消→資産→比較→イベント→タイプ未設定→未知値。
+- 観測条件は有効な公開後日数、重複排除した計測期間、views/impressions の合計と実測記事数。条件が揃わない型同士は直接比較せず、日数補正もしない。
+- 検索反応は同一クエリを合算し、100 impressions 以上かつ2 clicks以上を母数条件クリアとする。1click以上の未達は探索中、0clickは出さない。検索流入を予約成果や「勝ちクエリ」と呼ばない。
+- CTA成果は `ctaEventsMeasured=true` の記事だけを合算し、未計測は `null`、実測0は0。実予約はfreshな記事帰属値だけを成果へ含め、欠損・古い・施設全体のみは `null` と注記する。
 
 ## 確認済み情報源リストの永続化(任意)
 
@@ -174,3 +184,7 @@
 ## `成績データ` JSON拡張（#280 / #281）
 
 新規Notionプロパティは追加しない。既存 `成績データ` JSONへ `measurementStatus`、`ctaEventsMeasurementStatus`、互換用 `ga4Measured` / `ctaEventsMeasured`、`ctaEvents`（reservationClick / reserveEntryClick / lineClick / instagramClick / other）、`actualReservations` を保存する。実予約CSVのcurrent/prior収録範囲が不足する場合、`actualReservations.state=missing`、`reason=coverage_incomplete`、`coverage.current/prior` で各期間の収録可否を保持する。旧 `keyEvents` / `keyEventsMeasured` は読み取り専用の後方互換としてparseし、新規保存では生成しない。
+
+# 学習ログの部分成功種別
+
+Notion「学習ログ」DB の `種別` select に **`工程部分成功`** を手動で追加する。既存の `工程失敗` とは別集計され、`結果` は `リトライ`、`対象` は実行 mode として保存される。

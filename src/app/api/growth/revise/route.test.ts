@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { growthAuthHeaders } from "@/test/growthAuth";
+
 vi.mock("@/lib/growth/notion", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/growth/notion")>();
   return { ...actual, getPage: vi.fn(), updatePageProps: vi.fn(), defaultFetch: vi.fn() };
@@ -21,8 +23,7 @@ const PAGE_ID = "38099efa-346b-8122-9681-f4d2cc321a31";
 
 function postRequest(token: string | null, body: unknown): Request {
   const url = new URL("http://localhost/api/growth/revise");
-  if (token !== null) url.searchParams.set("token", token);
-  return new Request(url, { method: "POST", body: JSON.stringify(body) });
+  return new Request(url, { method: "POST", headers: growthAuthHeaders(token), body: JSON.stringify(body) });
 }
 
 function pageWithStatus(name?: string) {
@@ -145,7 +146,7 @@ describe("POST /api/growth/revise", () => {
 
   it("不正な JSON ボディは 400", async () => {
     const url = new URL("http://localhost/api/growth/revise");
-    const req = new Request(url, { method: "POST", body: "not json" });
+    const req = new Request(url, { method: "POST", headers: growthAuthHeaders(null), body: "not json" });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });

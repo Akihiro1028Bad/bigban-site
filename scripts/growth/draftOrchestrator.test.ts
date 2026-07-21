@@ -8,6 +8,7 @@ import {
   buildWriterInput,
   cleanupDraftWorkDirs,
   draftInputFromPage,
+  draftRunMode,
   prepareOutlineImages,
   parseValidatedWriterOutput,
   runDraftNotificationBestEffort,
@@ -18,14 +19,77 @@ import {
   stageCacheKey,
   validateWriterContract,
   workerLogTargetFields,
+  publishDraftRecoveryCommand,
+  matchesPublishCheckpointContext,
+  invalidatePublishResumeFiles,
+  shouldResumePublishSpec,
 } from "./draftOrchestrator";
-import type { ResearchPacket, WriterOutput } from "./draftPipeline";
+import type { ResearchPacket, ValidatedWriterOutput, WriterOutput } from "./draftPipeline";
 
 function page(properties: Record<string, unknown>): NotionPage {
   return { id: "page-1", url: "", properties };
 }
 
 describe("draftOrchestrator", () => {
+  it("checkpointと確定specが揃う場合だけ画像設計を飛ばして直接再開する", () => {
+    expect(shouldResumePublishSpec(true, true)).toBe(true);
+    expect(shouldResumePublishSpec(true, false)).toBe(false);
+    expect(shouldResumePublishSpec(false, true)).toBe(false);
+    expect(publishDraftRecoveryCommand("/state/publish-spec.json")).toBe("npm run growth:publish-draft -- /state/publish-spec.json");
+  });
+
+  it("部分成功の学習modeは実行モードを保持し未設定時だけdraftsへ戻す", () => {
+    expect(draftRunMode({ GROWTH_DRAFT_RUN_MODE: "drafts-auto" })).toBe("drafts-auto");
+    expect(draftRunMode({})).toBe("drafts");
+    expect(draftRunMode({ GROWTH_DRAFT_RUN_MODE: "" })).toBe("drafts");
+  });
+
+  it("checkpoint対象は再生成元・endpoint・Notion pageが全て一致する場合だけ復元する", () => {
+    const saved = { rebuildSourceId: "source-a", endpoint: "columns", notionPageId: "page-1" };
+    expect(matchesPublishCheckpointContext(saved, saved)).toBe(true);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, rebuildSourceId: "source-b" })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, endpoint: "news" })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, { ...saved, notionPageId: "page-2" })).toBe(false);
+    expect(matchesPublishCheckpointContext(null, saved)).toBe(false);
+  });
+
+  it("再生成元がクリア済みでも同じcontentIdがNotionに反映済みならcheckpointを維持する", () => {
+    const saved = { rebuildSourceId: "source-a", endpoint: "columns", notionPageId: "page-1" };
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+      notionContentId: "content-1",
+      checkpointContentId: "content-1",
+    })).toBe(true);
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+      notionContentId: "other-content",
+      checkpointContentId: "content-1",
+    })).toBe(false);
+    expect(matchesPublishCheckpointContext(saved, {
+      rebuildSourceId: "",
+      endpoint: "columns",
+      notionPageId: "page-1",
+    })).toBe(false);
+  });
+
+  it("quality/notion-contextゲート失敗時だけwriter・spec・checkpointをまとめて破棄する", () => {
+    const removed: string[] = [];
+    const files = ["writer.json", "publish-spec.json", "publish-checkpoint.json"];
+    expect(invalidatePublishResumeFiles("✗ quality-gate: invalid", files, {
+      exists: (file) => file !== "writer.json",
+      remove: (file) => removed.push(file),
+    })).toBe(true);
+    expect(removed).toEqual(["publish-spec.json", "publish-checkpoint.json"]);
+    expect(invalidatePublishResumeFiles("✗ create: timeout", files, {
+      exists: () => true,
+      remove: (file) => removed.push(file),
+    })).toBe(false);
+    expect(removed).toEqual(["publish-spec.json", "publish-checkpoint.json"]);
+  });
   it("一時作業ディレクトリを失敗の有無にかかわらず全て削除する", async () => {
     const calls: Array<{ directory: string; options: { recursive: true; force: true } }> = [];
     const remove = async (directory: string, options: { recursive: true; force: true }) => {
@@ -42,46 +106,49 @@ describe("draftOrchestrator", () => {
     ]);
   });
 
-  it("下書き投入後の通知失敗は処理を失敗にせず再送コマンドを警告する", () => {
+  it("下書き投入後の通知失敗はpartialでthrowせず再送コマンドを警告する", async () => {
     const warnings: string[] = [];
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
-      notify: () => {
+      notify: async () => {
         throw new Error("LINE API error");
       },
       warn: (message) => warnings.push(message),
-    })).toBe(false);
+    });
+    expect(result).toMatchObject({ outcome: "partial", failedStage: "line-notify", success: false });
     expect(warnings).toEqual([
       expect.stringContaining("npm run growth:notify-drafts -- /tmp/notify.json"),
     ]);
   });
 
-  it("下書き投入後の通知成功をそのまま成功として返す", () => {
+  it("下書き投入後の通知成功をsuccessとして返す", async () => {
     let notified = false;
     const warnings: string[] = [];
 
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
-      notify: () => {
+      notify: async () => {
         notified = true;
       },
       warn: (message) => warnings.push(message),
-    })).toBe(true);
+    });
+    expect(result).toMatchObject({ outcome: "success", success: true, completedStages: ["line-notify"] });
     expect(notified).toBe(true);
     expect(warnings).toEqual([]);
   });
 
-  it("通知処理がError以外をthrowしても警告へ変換する", () => {
+  it("通知処理がError以外をrejectしても警告へ変換する", async () => {
     const warnings: string[] = [];
     const thrownValue: unknown = "LINE unavailable";
 
-    expect(runDraftNotificationBestEffort({
+    const result = await runDraftNotificationBestEffort({
       notifyPath: "/tmp/notify.json",
       notify: () => {
-        throw thrownValue;
+        return Promise.reject(thrownValue);
       },
       warn: (message) => warnings.push(message),
-    })).toBe(false);
+    });
+    expect(result.outcome).toBe("partial");
     expect(warnings[0]).toContain("LINE unavailable");
   });
 
@@ -317,7 +384,7 @@ describe("draftOrchestrator", () => {
       version: 1,
       facts: [{
         id: "fact-1",
-        statement: "公式事実",
+        statement: "公式ページの案内",
         role: "detail",
         sourceType: "official-site",
         source: "https://example.jp/official",
@@ -330,7 +397,7 @@ describe("draftOrchestrator", () => {
     const base: WriterOutput = {
       slug: "ichikawa-guide",
       excerpt: "概要",
-      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式</a></p>{{IMG:1}}',
+      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式ページ</a><!--FACT:fact-1-->。</p>{{IMG:1}}',
       usedFactIds: ["fact-1"],
     };
 
@@ -339,8 +406,15 @@ describe("draftOrchestrator", () => {
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2><a href="https://invalid.example">未確認</a>{{IMG:1}}' }, research, outline)).toThrow(/確認済みでない/);
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2><a href="https://example.jp/official">1</a><a href="https://example.jp/official">2</a>{{IMG:1}}' }, research, outline)).toThrow(/重複/);
     expect(() => validateWriterContract({ ...base, bodyHtml: '<h2>場所</h2>{{IMG:2}}' }, research, outline)).toThrow(/プレースホルダー/);
-    expect(parseValidatedWriterOutput(base, research, outline)).toEqual(base);
-    expect(() => parseValidatedWriterOutput({ ...base, bodyHtml: '<h2>場所</h2>{{IMG:2}}' }, research, outline)).toThrow(/プレースホルダー/);
+    expect(parseValidatedWriterOutput(base, research, outline)).toMatchObject({
+      ...base,
+      bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式ページ</a>。</p>{{IMG:1}}',
+      factReferences: [{ factId: "fact-1", excerpt: "公式ページ", sectionPath: "場所" }],
+    });
+    expect(() => parseValidatedWriterOutput({
+      ...base,
+      bodyHtml: '<h2>場所</h2><p>公式ページ<!--FACT:fact-1-->。</p>{{IMG:2}}',
+    }, research, outline)).toThrow(/プレースホルダー/);
   });
 
   it("本文画像markerを構成案と同じ見出し配下にだけ配置できる", () => {
@@ -382,11 +456,22 @@ describe("draftOrchestrator", () => {
         publishedYear: undefined,
       }],
     };
-    const writer: WriterOutput = {
+    const writer: ValidatedWriterOutput = {
       slug: "ichikawa-guide",
       excerpt: "概要",
       bodyHtml: "<h2>場所</h2><p>本文</p>",
       usedFactIds: ["fact-1"],
+      factReferences: [{
+        factId: "fact-1",
+        excerpt: "公式事実",
+        sectionPath: "場所",
+        container: "p",
+        containerIndex: 1,
+        containerTextHash: "fnv1a64:container",
+        containerMatchCount: 1,
+        claimKinds: ["proper-noun"],
+      }],
+      binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const spec = assemblePublishSpec({
       input: {
@@ -417,18 +502,25 @@ describe("draftOrchestrator", () => {
         category: "compare",
       },
       eyecatchAction: "pending",
+      rebuildSourceId: "",
       notion: { pageId: "page-1", property: "ステータス", value: "下書き作成済み" },
-      sourceLedger: [{ source: "https://example.jp/official", confirmedFacts: ["公式事実"] }],
+      sourceLedger: [{
+        source: "https://example.jp/official",
+        confirmedFacts: ["公式事実"],
+        factReferences: [{ factId: "fact-1", excerpt: "公式事実", sectionPath: "場所", recheckBeforePublish: false }],
+      }],
     });
   });
 
   it("ニュース用specと分類なしのコラムspecを組み立てる", () => {
     const research: ResearchPacket = { version: 1, facts: [] };
-    const writer: WriterOutput = {
+    const writer: ValidatedWriterOutput = {
       slug: "news",
       excerpt: "概要",
       bodyHtml: "<p>本文</p>",
       usedFactIds: [],
+      factReferences: [],
+      binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const baseInput = {
       pageId: "page-1",

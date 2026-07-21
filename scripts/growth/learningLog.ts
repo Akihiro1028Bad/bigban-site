@@ -7,7 +7,7 @@ import type { TopLevelBlock } from "./decorate";
 import type { NotionApiOptions, NotionPage } from "./notion";
 
 // ── イベント種別・discriminated union(spec §3.4.3) ──
-export type LearningEventKind = "編集" | "採否" | "不採用" | "画像試行" | "工程失敗";
+export type LearningEventKind = "編集" | "採否" | "不採用" | "画像試行" | "工程失敗" | "工程部分成功";
 
 export const LEARNING_EVENT_KINDS: readonly LearningEventKind[] = [
   "編集",
@@ -15,6 +15,7 @@ export const LEARNING_EVENT_KINDS: readonly LearningEventKind[] = [
   "不採用",
   "画像試行",
   "工程失敗",
+  "工程部分成功",
 ];
 
 export type LearningImageResult = "成功" | "失敗" | "リトライ";
@@ -24,7 +25,8 @@ export type LearningEvent =
   | { kind: "採否"; pageId: string; title: string; aspect: string; before: string; after: string }
   | { kind: "不採用"; pageId: string; title: string; aspect: string; before: string; after: string }
   | { kind: "画像試行"; pageId: string; title: string; style: string; result: "成功" | "失敗"; attempt: number }
-  | { kind: "工程失敗"; mode: string; exitCode: number | null; detail: string };
+  | { kind: "工程失敗"; mode: string; exitCode: number | null; detail: string }
+  | { kind: "工程部分成功"; mode: string; failedStage: string; detail: string; resumeCommand: string };
 
 export const LearningEventSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -63,6 +65,13 @@ export const LearningEventSchema = z.discriminatedUnion("kind", [
     mode: z.string(),
     exitCode: z.number().nullable(),
     detail: z.string(),
+  }),
+  z.object({
+    kind: z.literal("工程部分成功"),
+    mode: z.string(),
+    failedStage: z.string(),
+    detail: z.string(),
+    resumeCommand: z.string(),
   }),
 ]);
 
@@ -299,12 +308,14 @@ export function buildLearningLogTitle(event: LearningEvent, editHeadline?: strin
   const title =
     event.kind === "工程失敗"
       ? `失敗: ${event.mode} 異常終了(exit ${event.exitCode ?? "?"})`
+      : event.kind === "工程部分成功"
+        ? `部分成功: ${event.mode} (${event.failedStage})`
       : buildArticleEventTitle(event, editHeadline);
   return title.slice(0, 60);
 }
 
 function buildArticleEventTitle(
-  event: Exclude<LearningEvent, { kind: "工程失敗" }>,
+  event: Exclude<LearningEvent, { kind: "工程失敗" | "工程部分成功" }>,
   editHeadline?: string
 ): string {
   const titleHead = articleTitleHead(event.title);
@@ -366,6 +377,14 @@ export function buildLearningLogProps(
         [LEARNING_LOG_PROPS.pageId]: { rich_text: [] },
         [LEARNING_LOG_PROPS.target]: { rich_text: chunkRichText(event.mode) },
         [LEARNING_LOG_PROPS.result]: { select: { name: "失敗" } },
+      };
+    case "工程部分成功":
+      return {
+        ...props,
+        [LEARNING_LOG_PROPS.articleTitle]: { rich_text: [] },
+        [LEARNING_LOG_PROPS.pageId]: { rich_text: [] },
+        [LEARNING_LOG_PROPS.target]: { rich_text: chunkRichText(event.mode) },
+        [LEARNING_LOG_PROPS.result]: { select: { name: "リトライ" } },
       };
   }
 }
@@ -440,6 +459,7 @@ export interface LearningLogSummary {
   rejectAspectHeatmap: Record<string, number>;
   imageRetryTop: { key: string; style: string; pageId: string; maxAttempt: number }[];
   failModeFrequency: Record<string, number>;
+  partialModeFrequency: Record<string, number>;
 }
 
 function emptyCountByKind(): Record<LearningEventKind | "その他", number> {
@@ -449,6 +469,7 @@ function emptyCountByKind(): Record<LearningEventKind | "その他", number> {
     不採用: 0,
     画像試行: 0,
     工程失敗: 0,
+    工程部分成功: 0,
     その他: 0,
   };
 }
@@ -489,6 +510,7 @@ export function summarizeLearningLog(
     { key: string; style: string; pageId: string; maxAttempt: number }
   >();
   const failModeFrequency: Record<string, number> = {};
+  const partialModeFrequency: Record<string, number> = {};
 
   for (const row of windowRows) {
     countByKind[row.kind] += 1;
@@ -512,6 +534,9 @@ export function summarizeLearningLog(
       case "工程失敗":
         incrementCount(failModeFrequency, targetOrUnknown(row.target));
         break;
+      case "工程部分成功":
+        incrementCount(partialModeFrequency, targetOrUnknown(row.target));
+        break;
       case "その他":
         break;
     }
@@ -528,6 +553,7 @@ export function summarizeLearningLog(
       .sort((a, b) => b.maxAttempt - a.maxAttempt)
       .slice(0, 10),
     failModeFrequency: sortFrequencyDesc(failModeFrequency),
+    partialModeFrequency: sortFrequencyDesc(partialModeFrequency),
   };
 }
 

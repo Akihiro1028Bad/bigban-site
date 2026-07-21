@@ -5,6 +5,7 @@ import {
   createDraft,
   patchDraft,
   publishContent,
+  readContentStatus,
   slugToContentId,
   resolveRetryConfig,
   ContentTimeoutError,
@@ -79,6 +80,10 @@ describe("slugToContentId", () => {
 });
 
 describe("createDraft（冪等 upsert: PUT→既存ならPATCH）", () => {
+  it("MicrocmsHttpError の既定値は already-exists ではない", () => {
+    expect(new MicrocmsHttpError("microcms.create", 500, "req-1").isAlreadyExists).toBe(false);
+  });
+
   it("slug由来IDで PUT し、作成された id を返す", async () => {
     const fetchFn = vi.fn<FetchFn>().mockResolvedValue(okId("my-slug"));
     const id = await createDraft(
@@ -256,9 +261,49 @@ describe("publishContent (#167)", () => {
       .mockResolvedValue({ ok: false, status: 403, json: async () => ({}), text: async () => "forbidden" } as Awaited<
         ReturnType<FetchFn>
       >);
-    await expect(
-      publishContent("news", "abc123", { serviceDomain: "d", apiKey: "k", fetchFn })
-    ).rejects.toThrow(/HTTP 403/);
+    const error = await publishContent("news", "abc123", {
+      serviceDomain: "d",
+      apiKey: "k",
+      fetchFn,
+    }).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/HTTP 403/);
+    expect((error as Error).message).not.toContain("forbidden");
+  });
+});
+
+describe("readContentStatus", () => {
+  it.each([
+    [{ status: ["PUBLISH"] }, "PUBLISH"],
+    [{ status: ["DRAFT"] }, "DRAFT"],
+    [{ status: ["ARCHIVE"] }, "UNKNOWN"],
+    [{}, "UNKNOWN"],
+    [null, "UNKNOWN"],
+    ["invalid", "UNKNOWN"],
+  ] as const)("Management API statusを判定する", async (body, expected) => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => body,
+      text: async () => "",
+    });
+    await expect(readContentStatus("news", "a b/c", { serviceDomain: "domain", apiKey: "secret", fetchFn })).resolves.toBe(expected);
+    expect(fetchFn.mock.calls[0][0]).toContain("/contents/news/a%20b%2Fc/status");
+    expect(fetchFn.mock.calls[0][1].method).toBe("GET");
+  });
+
+  it("失敗本文やAPIキーを例外へ含めず構造化エラーを返す", async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: new Headers({ "x-request-id": "req-status" }),
+      json: async () => ({}),
+      text: async () => "secret response body",
+    });
+    const error = await readContentStatus("news", "id", { serviceDomain: "domain", apiKey: "api-secret", fetchFn }).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ operation: "microcms.status.read", status: 403, requestId: "req-status" });
+    expect(JSON.stringify(error)).not.toContain("response body");
+    expect(JSON.stringify(error)).not.toContain("api-secret");
   });
 });
 

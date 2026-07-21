@@ -1,190 +1,94 @@
 // @vitest-environment node
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { acquireLock, releaseLock } from "./lockfile.mjs";
+import { acquireLock, heartbeatLock, readLock, releaseLock } from "./lockfile.mjs";
 
-describe("acquireLock", () => {
-  it("deps 未指定でも実ファイルで lock を取得できる", () => {
+describe("lease lock", () => {
+  it("pid・host・jobId・mode・時刻を持つ JSON lease を取得する", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "growth-lock-"));
     const lockPath = path.join(dir, "worker.lock");
-
     try {
-      expect(acquireLock(lockPath).acquired).toBe(true);
-      expect(readFileSync(lockPath, "utf8")).toBe(String(process.pid));
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("新規 lock を排他作成する", () => {
-    const mkdirSync = vi.fn();
-    const openSync = vi.fn().mockReturnValue(7);
-    const writeSync = vi.fn();
-    const closeSync = vi.fn();
-
-    expect(
-      acquireLock("/tmp/nested/test.lock", {
+      const acquired = acquireLock(lockPath, {
         pid: 456,
-        mkdirSync,
-        openSync,
-        writeSync,
-        closeSync,
-      }).acquired
-    ).toBe(true);
-
-    expect(mkdirSync).toHaveBeenCalledWith("/tmp/nested", { recursive: true });
-    expect(openSync).toHaveBeenCalledWith("/tmp/nested/test.lock", "wx");
-    expect(writeSync).toHaveBeenCalledWith(7, "456");
-    expect(closeSync).toHaveBeenCalledWith(7);
+        host: "worker-a",
+        jobId: "job-1",
+        mode: "drafts-auto",
+        nowMs: Date.parse("2026-07-15T00:00:00.000Z"),
+      });
+      expect(acquired.acquired).toBe(true);
+      expect(acquired.token).toEqual({ pid: 456, host: "worker-a", jobId: "job-1" });
+      expect(JSON.parse(readFileSync(lockPath, "utf8"))).toEqual({
+        version: 1,
+        pid: 456,
+        host: "worker-a",
+        jobId: "job-1",
+        mode: "drafts-auto",
+        acquiredAt: "2026-07-15T00:00:00.000Z",
+        lastHeartbeatAt: "2026-07-15T00:00:00.000Z",
+      });
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it("open の EEXIST 以外は再 throw する", () => {
-    const error = new Error("permission denied") as NodeJS.ErrnoException;
-    error.code = "EACCES";
-    expect(() =>
-      acquireLock("/tmp/test.lock", {
-        mkdirSync: vi.fn(),
-        openSync: vi.fn().mockImplementation(() => {
-          throw error;
-        }),
-      })
-    ).toThrow(error);
-  });
-
-  it("既存 lock が stat 前に消えたら再取得する", () => {
-    const openSync = vi.fn()
-      .mockImplementationOnce(() => {
-        const error = new Error("exists") as NodeJS.ErrnoException;
-        error.code = "EEXIST";
-        throw error;
-      })
-      .mockReturnValueOnce(9);
-    const statSync = vi.fn().mockImplementation(() => {
-      const error = new Error("missing") as NodeJS.ErrnoException;
-      error.code = "ENOENT";
-      throw error;
-    });
-    const writeSync = vi.fn();
-    const closeSync = vi.fn();
-
-    expect(
-      acquireLock("/tmp/test.lock", {
-        pid: 123,
-        nowMs: 1_000,
-        staleMs: 30_000,
-        mkdirSync: vi.fn(),
-        openSync,
-        writeSync,
-        closeSync,
-        statSync,
-        rmSync: vi.fn(),
-      }).acquired
-    ).toBe(true);
-    expect(openSync).toHaveBeenCalledTimes(2);
-    expect(writeSync).toHaveBeenCalledWith(9, "123");
-    expect(closeSync).toHaveBeenCalledWith(9);
-  });
-
-  it("stale でない既存 lock は取得しない", () => {
-    const openSync = vi.fn().mockImplementation(() => {
-      const error = new Error("exists") as NodeJS.ErrnoException;
-      error.code = "EEXIST";
-      throw error;
-    });
-
-    expect(
-      acquireLock("/tmp/test.lock", {
-        pid: 123,
-        nowMs: 10_000,
-        staleMs: 30_000,
-        mkdirSync: vi.fn(),
-        openSync,
-        writeSync: vi.fn(),
-        closeSync: vi.fn(),
-        statSync: vi.fn().mockReturnValue({ mtimeMs: 9_000 }),
-        readFileSync: vi.fn().mockReturnValue("456"),
-        kill: vi.fn(),
-        rmSync: vi.fn(),
-      }).acquired
-    ).toBe(false);
-  });
-
-  it("stat の ENOENT 以外は再 throw する", () => {
-    const openSync = vi.fn().mockImplementation(() => {
-      const error = new Error("exists") as NodeJS.ErrnoException;
-      error.code = "EEXIST";
-      throw error;
-    });
-    const statError = new Error("stat failed") as NodeJS.ErrnoException;
-    statError.code = "EACCES";
-
-    expect(() =>
-      acquireLock("/tmp/test.lock", {
-        mkdirSync: vi.fn(),
-        openSync,
-        statSync: vi.fn().mockImplementation(() => {
-          throw statError;
-        }),
-      })
-    ).toThrow(statError);
-  });
-
-  it("stale lock は削除して再取得する", () => {
-    const openSync = vi.fn()
-      .mockImplementationOnce(() => {
-        const error = new Error("exists") as NodeJS.ErrnoException;
-        error.code = "EEXIST";
-        throw error;
-      })
-      .mockReturnValueOnce(11);
-    const rmSync = vi.fn();
-
-    expect(
-      acquireLock("/tmp/test.lock", {
-        pid: 789,
-        nowMs: 100_000,
-        staleMs: 30_000,
-        mkdirSync: vi.fn(),
-        openSync,
-        writeSync: vi.fn(),
-        closeSync: vi.fn(),
-        statSync: vi.fn().mockReturnValue({ mtimeMs: 1_000 }),
-        readFileSync: vi.fn().mockReturnValue("456"),
-        kill: vi.fn(),
-        rmSync,
-      }).acquired
-    ).toBe(true);
-    expect(rmSync).toHaveBeenCalledWith("/tmp/test.lock", { force: true });
-    expect(openSync).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("releaseLock", () => {
-  it("deps 未指定でも実ファイルの lock を削除する", () => {
+  it("正しい token だけが heartbeat を更新できる", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "growth-lock-"));
     const lockPath = path.join(dir, "worker.lock");
-
     try {
-      expect(acquireLock(lockPath).acquired).toBe(true);
-      releaseLock(lockPath);
-      expect(acquireLock(lockPath).acquired).toBe(true);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
+      const acquired = acquireLock(lockPath, { host: "worker-a", jobId: "job-1", nowMs: 1_000 });
+      expect(heartbeatLock(lockPath, { ...acquired.token, nowMs: 2_000 })).toBe(true);
+      expect(readLock(lockPath)?.lease?.lastHeartbeatAt).toBe(new Date(2_000).toISOString());
+      expect(heartbeatLock(lockPath, { pid: process.pid, host: "worker-a", jobId: "old", nowMs: 3_000 })).toBe(false);
+      expect(readLock(lockPath)?.lease?.lastHeartbeatAt).toBe(new Date(2_000).toISOString());
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("pid・host・jobId が一致する token だけが解放できる", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-lock-"));
+    const lockPath = path.join(dir, "worker.lock");
+    try {
+      const acquired = acquireLock(lockPath, { host: "worker-a", jobId: "job-1" });
+      releaseLock(lockPath, { pid: process.pid, host: "worker-a", jobId: "old" });
+      expect(readLock(lockPath)?.lease).not.toBeNull();
+      releaseLock(lockPath, acquired.token ?? undefined);
+      expect(readLock(lockPath)?.isMissing).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("旧 PID 形式を読み取れる", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-lock-"));
+    const lockPath = path.join(dir, "worker.lock");
+    try {
+      writeFileSync(lockPath, "123");
+      expect(readLock(lockPath)).toMatchObject({ legacyPid: 123, lease: null, isMalformed: false });
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("missing・unreadable・malformedを区別し、JSON schemaを検証する", () => {
+    const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
+    expect(readLock("x", { readFileSync: () => { throw missing; } })).toMatchObject({ isMissing: true });
+    expect(readLock("x", { readFileSync: () => { throw Object.assign(new Error("no"), { code: "EACCES" }); } })).toMatchObject({ isUnreadable: true });
+    for (const value of ["{", "{}", JSON.stringify({ version: 2 }), "0", "-1", "999999999999999999999"]) {
+      expect(readLock("x", { readFileSync: () => value })).toMatchObject({ isMalformed: true });
     }
   });
 
-  it("lock ファイルを force 削除する", () => {
-    const rmSync = vi.fn();
-    releaseLock("/tmp/test.lock", {
-      pid: 123,
-      mkdirSync: vi.fn(),
-      readFileSync: vi.fn().mockReturnValue("123"),
-      rmSync,
-    });
-    expect(rmSync).toHaveBeenCalledWith("/tmp/test.lock", { force: true });
+  it("exclusive create の非競合エラーを再throwし、write失敗でもcloseする", () => {
+    expect(() => acquireLock("/tmp/x", { mkdirSync: vi.fn(), openSync: () => { throw Object.assign(new Error("no"), { code: "EACCES" }); } })).toThrow("no");
+    const closeSync = vi.fn();
+    expect(() => acquireLock("/tmp/x", { mkdirSync: vi.fn(), openSync: vi.fn(() => 1), writeSync: () => { throw new Error("write"); }, closeSync })).toThrow("write");
+    expect(closeSync).toHaveBeenCalledWith(1);
+  });
+
+  it("既定optionsでも取得し、tokenなしheartbeat/releaseは所有権を奪わない", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "growth-lock-default-"));
+    const lockPath = path.join(dir, "worker.lock");
+    try {
+      expect(acquireLock(lockPath).acquired).toBe(true);
+      expect(heartbeatLock(lockPath)).toBe(false);
+      expect(releaseLock(lockPath)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

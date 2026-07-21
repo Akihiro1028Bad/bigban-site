@@ -142,6 +142,7 @@ function mockFetchSequence(
 ) {
   const fn = vi.fn();
   const queue = [...responses];
+  let restoreAttempted = false;
   fn.mockImplementation((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/api/growth/ops")) {
@@ -151,6 +152,25 @@ function mockFetchSequence(
         status: 200,
         json: async () => ({ success: true, ops: EMPTY_OPS }),
         text: async () => JSON.stringify({ success: true, ops: EMPTY_OPS }),
+      });
+    }
+    if (url.includes("/api/growth/auth/session")) {
+      fn.mock.calls.pop();
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, expiresAt: Date.now() + 1_800_000 }),
+        text: async () => JSON.stringify({ success: true, expiresAt: Date.now() + 1_800_000 }),
+      });
+    }
+    if (flags.authEnabled && !restoreAttempted && url === "/api/growth/approve") {
+      restoreAttempted = true;
+      fn.mock.calls.pop();
+      return Promise.resolve({
+        ok: false,
+        status: 401,
+        json: async () => ({ success: false }),
+        text: async () => JSON.stringify({ success: false }),
       });
     }
     const r = queue.shift();
@@ -183,7 +203,7 @@ afterEach(() => {
 });
 
 async function login(pass: string = PASS): Promise<void> {
-  await userEvent.type(screen.getByLabelText("合言葉"), pass);
+  await userEvent.type(await screen.findByLabelText("合言葉"), pass);
   await userEvent.click(screen.getByRole("button", { name: "確認する" }));
 }
 

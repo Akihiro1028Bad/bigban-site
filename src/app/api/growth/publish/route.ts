@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 
-import { unauthorized, verifyToken } from "@/lib/growth/apiAuth";
+import { privilegedAuthFailure, verifyPrivileged } from "@/lib/growth/apiAuth";
 import {
   draftBodyOf,
   draftLinkOf,
@@ -24,15 +24,18 @@ import {
 import { removeAiDisclaimer } from "@/lib/growth/aiDisclaimer";
 import { hasPendingBodyImage } from "@/lib/growth/bodyImageInsert";
 import { BODY_REGEN_BUSY_STATUSES, bodyRegenRowFromPage } from "@/lib/growth/bodyImageRegen";
-import { patchDraft, publishContent } from "@/lib/growth/content";
+import { patchDraft, publishContent, readContentStatus } from "@/lib/growth/content";
 import { growthEndpoint } from "@/lib/growth/endpoint";
 import { REGEN_BUSY_STATUSES, regenRowFromPage } from "@/lib/growth/eyecatchRegen";
 import { knownArticlePathsForMedia } from "@/lib/growth/knownArticlePaths";
+import { buildGrowthOperationResult } from "@/lib/growth/operationOutcome";
 import { defaultFetch, getPage, type NotionPage, updatePageSelect } from "@/lib/growth/notion";
 import { publishGateReason, resolveGateArticleType } from "@/lib/growth/publishGate";
-import { confirmedFactsFromPage } from "@/lib/growth/sourceLedger";
+import { confirmedFactsFromPage, factBindingFromPage } from "@/lib/growth/sourceLedger";
 import { getColumnSlugs } from "@/lib/microcms/columnsQueries";
 import { getNewsSlugs } from "@/lib/microcms/queries";
+
+import type { GrowthStageEvent } from "@/lib/growth/operationOutcome";
 
 export const runtime = "nodejs";
 
@@ -82,7 +85,14 @@ function hasUnfinishedImageGeneration(page: NotionPage): boolean {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!verifyToken(request, true)) return unauthorized("公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。");
+  const auth = verifyPrivileged(request, "publish");
+  if (auth !== "authorized") {
+    return privilegedAuthFailure(
+      auth,
+      "publish",
+      "公開には認証が必要です(APPROVE_AUTH_ENABLED を有効化してください)。"
+    );
+  }
 
   let body: unknown;
   try {
@@ -91,7 +101,9 @@ export async function POST(request: Request): Promise<Response> {
     return badRequest("不正なリクエストです。");
   }
   const pageId = (body as { pageId?: unknown })?.pageId;
+  const resumeFrom = (body as { resumeFrom?: unknown })?.resumeFrom;
   if (!isNotionPageId(pageId)) return badRequest("不正な pageId です。");
+  if (resumeFrom !== undefined && resumeFrom !== "notion:status") return badRequest("不正な resumeFrom です。");
 
   const notionOpts = notionOptions();
   const microOpts = microcmsOptions();
@@ -100,9 +112,26 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ success: false, error: "サーバー設定エラー" }, { status: 500 });
   }
 
+  const events: GrowthStageEvent[] = [];
+  const completedStages: string[] = [];
+  const succeeded = (stage: string, externalIds: GrowthStageEvent["externalIds"]): void => {
+    completedStages.push(stage);
+    events.push({ stage, event: "succeeded", at: new Date().toISOString(), externalIds });
+  };
   try {
+    events.push({ stage: "notion:read", event: "started", at: new Date().toISOString() });
     const page = await getPage(pageId, notionOpts);
+    succeeded("notion:read", { notionPageId: pageId });
     // #SPEC-14: 既に公開済みなら冪等に 409。二重公開や、手直しした公開タイトルの再上書きを防ぐ。
+    if (articleStatusOf(page) === PUBLISHED_STATUS && resumeFrom === "notion:status") {
+      return NextResponse.json(buildGrowthOperationResult({
+        outcome: "success",
+        message: "Notion は既に公開済みです。",
+        completedStages,
+        events,
+        externalIds: { notionPageId: pageId },
+      }));
+    }
     if (articleStatusOf(page) === PUBLISHED_STATUS) {
       return NextResponse.json(
         { success: false, error: "この記事は既に公開済みです。" },
@@ -112,6 +141,37 @@ export async function POST(request: Request): Promise<Response> {
     const contentId = draftLinkOf(page).contentId;
     if (!contentId || !CONTENT_ID_RE.test(contentId)) {
       return badRequest("下書きがまだありません。下書き作成後に公開できます。");
+    }
+    const endpoint = growthEndpoint(mediaOf(page));
+    if (resumeFrom === "notion:status") {
+      events.push({ stage: "microcms:publish", event: "started", at: new Date().toISOString() });
+      const currentStatus = await readContentStatus(endpoint, contentId, microOpts);
+      if (currentStatus !== "PUBLISH") {
+        return NextResponse.json(buildGrowthOperationResult({
+          outcome: "manual-action-required",
+          message: "microCMS の公開済み状態を確認できないため、Notion は更新していません。microCMS 管理画面で状態を確認してください。",
+          completedStages,
+          failedStage: "microcms:publish",
+          events,
+          externalIds: { notionPageId: pageId, contentId },
+          recovery: { retryable: false, resumeFrom: "notion:status", manualAction: "microCMS 管理画面で公開状態を確認してください。" },
+        }), { status: 409 });
+      }
+      succeeded("microcms:publish", { contentId });
+      try {
+        events.push({ stage: "notion:status", event: "started", at: new Date().toISOString() });
+        await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+        succeeded("notion:status", { notionPageId: pageId });
+        return NextResponse.json(buildGrowthOperationResult({
+          outcome: "success",
+          message: "Notion ステータスを公開済みに同期しました。",
+          completedStages,
+          events,
+          externalIds: { notionPageId: pageId, contentId },
+        }));
+      } catch {
+        return partialNotionResponse(pageId, contentId, completedStages, events);
+      }
     }
     // 公開前検証: アイキャッチ必須・本文非空(中途半端な記事を公開しない)。
     if (!eyecatchUrlOf(page)) {
@@ -129,7 +189,6 @@ export async function POST(request: Request): Promise<Response> {
     // #media: 記事ごとの媒体(`媒体` select)から公開先を解決する。
     // ニュース → 常に news / コラム(既定・欠落)→ env(GROWTH_MICROCMS_ENDPOINT)従属。
     // draft ルート(growthArticleSegment)と一貫させ、env=columns でもニュース告知が壊れないようにする。
-    const endpoint = growthEndpoint(mediaOf(page));
     // #176: 公開直前に承認画面の正タイトル(Notion タイトル案)を microCMS 下書きへ最終同期する。
     // これで承認・編集したタイトルが公開記事に確実に反映される(AI 生成時のタイトルで公開しない)。
     // AI 免責注記は公開する microCMS 本文だけから除去する。Notion ミラーは下書き記録として残す。
@@ -149,7 +208,8 @@ export async function POST(request: Request): Promise<Response> {
       ideaTitleOf(page).trim(),
       resolveGateArticleType({}),
       knownNewsPaths,
-      confirmedFactsFromPage(page)
+      confirmedFactsFromPage(page),
+      factBindingFromPage(page),
     );
     if (gateReason) {
       return NextResponse.json(
@@ -167,27 +227,61 @@ export async function POST(request: Request): Promise<Response> {
       patch.bodyHtml = cleanBody;
     }
     if (Object.keys(patch).length > 0) {
+      events.push({ stage: "microcms:sync", event: "started", at: new Date().toISOString() });
       await patchDraft(endpoint, contentId, patch, contentOpts);
     }
+    succeeded("microcms:sync", { contentId });
+    events.push({ stage: "microcms:publish", event: "started", at: new Date().toISOString() });
     await publishContent(endpoint, contentId, microOpts);
+    succeeded("microcms:publish", { contentId });
     try {
+      events.push({ stage: "notion:status", event: "started", at: new Date().toISOString() });
       await updatePageSelect(pageId, STATUS_PROP, PUBLISHED_STATUS, notionOpts);
+      succeeded("notion:status", { notionPageId: pageId });
     } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          partial: "notion-status",
-          error: "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。",
-        },
-        { status: 207 }
-      );
+      return partialNotionResponse(pageId, contentId, completedStages, events);
     }
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "公開中にエラーが発生しました" },
-      { status: 502 }
-    );
+  } catch (error: unknown) {
+    const failedStage = events.at(-1)!.stage;
+    return NextResponse.json(buildGrowthOperationResult({
+      outcome: "retryable-failure",
+      message: "公開中にエラーが発生しました",
+      completedStages,
+      failedStage,
+      events,
+      error,
+      externalIds: { notionPageId: pageId },
+      recovery: { retryable: true, resumeFrom: failedStage },
+    }), { status: 502 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json(buildGrowthOperationResult({
+    outcome: "success",
+    message: "公開しました。",
+    completedStages,
+    events,
+    externalIds: { notionPageId: pageId },
+  }));
+}
+
+function partialNotionResponse(
+  pageId: string,
+  contentId: string,
+  completedStages: readonly string[],
+  events: readonly GrowthStageEvent[],
+): Response {
+  const message = "microCMS への公開は完了しましたが、Notion ステータス更新に失敗しました。手動で公開済みにしてください。";
+  return NextResponse.json(buildGrowthOperationResult({
+    outcome: "partial",
+    message,
+    completedStages,
+    failedStage: "notion:status",
+    events,
+    externalIds: { notionPageId: pageId, contentId },
+    recovery: {
+      retryable: true,
+      resumeFrom: "notion:status",
+      manualAction: "Notion の記事ネタ案でステータスを手動で公開済みにしてください。",
+    },
+  }), { status: 207 });
 }
