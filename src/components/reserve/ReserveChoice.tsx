@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
-import { trackCtaClick } from "@/lib/analytics/trackEvent";
+import { trackCtaClick, trackLabolaEntry } from "@/lib/analytics/trackEvent";
 import {
   RESERVE_URL,
   LABOLA_PICKLEBALL_URL,
@@ -12,6 +12,7 @@ import {
   LABOLA_SCHOOL_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
+import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
 
 interface ChoiceCard {
   periodKey: string;
@@ -20,6 +21,7 @@ interface ChoiceCard {
   ctaKey: string;
   href: string;
   location: string;
+  labolaEntryKind?: LabolaEntryKind;
 }
 
 // 7月分(RESERVA)と8月分(labola)はどちらも同等の選択肢のため同一スタイルで表示する。
@@ -40,6 +42,7 @@ const AUGUST_CARD: ChoiceCard = {
   ctaKey: "augCta",
   href: LABOLA_PICKLEBALL_URL,
   location: "reserve_choice_august",
+  labolaEntryKind: "rental",
 };
 
 const PICKLEBALL_CARDS: readonly ChoiceCard[] = [JULY_CARD, AUGUST_CARD];
@@ -53,6 +56,7 @@ const HYROX_AREA_CARD: ChoiceCard = {
   ctaKey: "hyroxAreaCta",
   href: LABOLA_HYROX_URL,
   location: "reserve_choice_hyrox_area",
+  labolaEntryKind: "rental",
 };
 
 const HYROX_LESSON_CARD: ChoiceCard = {
@@ -62,6 +66,7 @@ const HYROX_LESSON_CARD: ChoiceCard = {
   ctaKey: "lessonCta",
   href: LABOLA_SCHOOL_URL,
   location: "reserve_choice_hyrox_lesson",
+  labolaEntryKind: "program",
 };
 
 const HYROX_CARDS: readonly ChoiceCard[] = [HYROX_AREA_CARD, HYROX_LESSON_CARD];
@@ -95,7 +100,10 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
           <a
             href={card.href}
             {...EXTERNAL_LINK_PROPS}
-            onClick={() => trackCtaClick("reservation", card.location, t(card.ctaKey))}
+            onClick={() => {
+              trackCtaClick("reservation", card.location, t(card.ctaKey));
+              if (card.labolaEntryKind) trackLabolaEntry(card.labolaEntryKind);
+            }}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3.5 text-sm font-bold tracking-[0.15em] text-deep-black transition-all hover:gap-3 hover:bg-accent/90 sm:mt-8 sm:py-4"
           >
             {t(card.ctaKey)}

@@ -53,6 +53,19 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(goals).toContain("実予約");
   });
 
+  it("LaBOLA予約導線を参考値として施策・記事の選択に使う", () => {
+    expect(weekly).toContain("reservationFunnel");
+    expect(weekly).toContain("計測開始から7日未満");
+    expect(weekly).toContain("参考値");
+    expect(weekly).toContain("入力後の離脱");
+    expect(weekly).toContain("記事ではなく予約画面や操作説明");
+    expect(weekly).toContain("料金変更");
+    expect(weekly).toContain("セッション数");
+    expect(weekly).toContain("離脱人数・離脱率とは扱わない");
+    expect(weekly).toContain("entryMeasurementStatus=unavailable");
+    expect(weekly).toContain("流入0件とは扱わない");
+  });
+
   it("記事タイプを成功率・母数・未判定率・観測条件のセットで読む", () => {
     expect(weekly).toContain("成功率・判定済み母数・未判定率");
     expect(weekly).toContain("判定済み3本未満");

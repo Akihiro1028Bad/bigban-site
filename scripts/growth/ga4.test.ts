@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { fetchGa4, GA4_REPORTS, type Ga4ReportDef } from "./ga4";
+import { LABOLA_FUNNEL_EVENT_NAMES } from "./labolaFunnel";
 import type { FetchFn } from "./http";
 import type { GrowthConfig } from "./config";
 
@@ -31,6 +32,62 @@ function okResponse(body: unknown): ReturnType<FetchFn> {
 }
 
 describe("fetchGa4", () => {
+  it("既定レポートでLaBOLA予約導線をkey event設定に依存せず取得する", () => {
+    expect(GA4_REPORTS).toContainEqual({
+      key: "labolaFunnel",
+      dimensions: ["eventName"],
+      metrics: ["sessions"],
+      dimensionFilter: { fieldName: "eventName", values: LABOLA_FUNNEL_EVENT_NAMES },
+      limit: 100,
+      includePriorOnly: true,
+      measurementStartYmd: "2026-07-27",
+    });
+  });
+
+  it("LaBOLA計測初週は全段を計測開始日以降へ揃え、開始前の比較期間を問い合わせない", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const labolaReport = GA4_REPORTS.find((report) => report.key === "labolaFunnel");
+
+    await fetchGa4({
+      config,
+      accessToken: "t",
+      current: { start: "2026-07-27", end: "2026-08-02" },
+      prior: { start: "2026-07-20", end: "2026-07-26" },
+      fetchFn,
+      reports: [labolaReport!],
+    });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<{ dateRanges: Array<{ startDate: string; endDate: string }> }>;
+    };
+    expect(body.requests).toHaveLength(1);
+    expect(body.requests[0].dateRanges).toEqual([
+      { startDate: "2026-07-27", endDate: "2026-08-02" },
+    ]);
+  });
+
+  it("対象期間が計測開始日を跨ぐ場合は開始日まで切り詰める", async () => {
+    const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
+    const labolaReport = GA4_REPORTS.find((report) => report.key === "labolaFunnel");
+
+    await fetchGa4({
+      config,
+      accessToken: "t",
+      current: { start: "2026-07-20", end: "2026-08-02" },
+      prior: { start: "2026-07-06", end: "2026-07-19" },
+      fetchFn,
+      reports: [labolaReport!],
+    });
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body as string) as {
+      requests: Array<{ dateRanges: Array<{ startDate: string; endDate: string }> }>;
+    };
+    expect(body.requests).toHaveLength(1);
+    expect(body.requests[0].dateRanges).toEqual([
+      { startDate: "2026-07-27", endDate: "2026-08-02" },
+    ]);
+  });
+
   it("CTAレポートへeventNameとinListFilterを設定する", async () => {
     const fetchFn = vi.fn<FetchFn>().mockReturnValue(okResponse({ reports: [] }));
     const ctaReport = GA4_REPORTS.find((report) => report.key === "ctaEvents");

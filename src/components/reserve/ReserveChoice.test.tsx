@@ -11,8 +11,10 @@ import {
 import ReserveChoice from "./ReserveChoice";
 
 const trackCtaClick = vi.fn();
+const trackLabolaEntry = vi.fn();
 vi.mock("@/lib/analytics/trackEvent", () => ({
   trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+  trackLabolaEntry: (...args: unknown[]) => trackLabolaEntry(...args),
 }));
 
 describe("ReserveChoice", () => {
@@ -75,6 +77,7 @@ describe("ReserveChoice", () => {
 
   it("4種類の外部予約クリックを reservation_click として計測する", async () => {
     trackCtaClick.mockClear();
+    trackLabolaEntry.mockClear();
     renderWithIntl(<ReserveChoice />);
 
     await userEvent.click(screen.getByRole("link", { name: /7月末までの予約/ }));
@@ -106,6 +109,10 @@ describe("ReserveChoice", () => {
       "reserve_choice_hyrox_lesson",
       "レッスンの予約",
     );
+    expect(trackLabolaEntry).toHaveBeenNthCalledWith(1, "rental");
+    expect(trackLabolaEntry).toHaveBeenNthCalledWith(2, "rental");
+    expect(trackLabolaEntry).toHaveBeenNthCalledWith(3, "program");
+    expect(trackLabolaEntry).toHaveBeenCalledTimes(3);
   });
 
   it("ユーザー向け文言にシステム名（RESERVA / labola）を露出しない", () => {

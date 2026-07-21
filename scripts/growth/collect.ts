@@ -10,6 +10,8 @@ import type { DateRange } from "./period";
 import type { MergedRow } from "./transform";
 import { fetchGa4 } from "./ga4";
 import { fetchGsc } from "./gsc";
+import { summarizeLabolaFunnel } from "./labolaFunnel";
+import type { LabolaFunnelSummary } from "./labolaFunnel";
 
 type ReportMap = Record<string, MergedRow[]>;
 
@@ -33,6 +35,7 @@ export interface GrowthSnapshot {
   period: DateRange;
   priorPeriod: DateRange;
   ga4: ReportMap | null;
+  reservationFunnel: LabolaFunnelSummary | null;
   gsc: ReportMap | null;
   errors: { source: string; message: string }[];
 }
@@ -79,5 +82,9 @@ export async function collectGrowthData(
     errors.push({ source: "gsc", message: toMessage(error) });
   }
 
-  return { generatedAt, period: current, priorPeriod: prior, ga4, gsc, errors };
+  const reservationFunnel = ga4 === null
+    ? null
+    : summarizeLabolaFunnel({ period: current, rows: ga4.labolaFunnel ?? [] });
+
+  return { generatedAt, period: current, priorPeriod: prior, ga4, reservationFunnel, gsc, errors };
 }
