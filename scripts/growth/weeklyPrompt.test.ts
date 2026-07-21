@@ -60,6 +60,10 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(weekly).toContain("入力後の離脱");
     expect(weekly).toContain("記事ではなく予約画面や操作説明");
     expect(weekly).toContain("料金変更");
+    expect(weekly).toContain("セッション数");
+    expect(weekly).toContain("離脱人数・離脱率とは扱わない");
+    expect(weekly).toContain("entryMeasurementStatus=unavailable");
+    expect(weekly).toContain("流入0件とは扱わない");
   });
 
   it("記事タイプを成功率・母数・未判定率・観測条件のセットで読む", () => {

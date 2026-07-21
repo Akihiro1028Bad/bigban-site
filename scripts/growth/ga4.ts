@@ -15,7 +15,7 @@ import {
   type MergedRow,
 } from "./transform";
 import { CTA_EVENT_NAMES } from "./ctaEvents";
-import { LABOLA_FUNNEL_EVENT_NAMES } from "./labolaFunnel";
+import { LABOLA_FUNNEL_EVENT_NAMES, LABOLA_MEASUREMENT_START_YMD } from "./labolaFunnel";
 
 const GA4_ENDPOINT = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -43,6 +43,8 @@ export interface Ga4ReportDef {
   dimensionFilter?: { fieldName: string; values: readonly string[] };
   /** currentに無くpriorにだけある行をcurrent=0として保持する。 */
   includePriorOnly?: boolean;
+  /** 計測開始日前を問い合わせず、全段の観測期間を揃える。 */
+  measurementStartYmd?: string;
 }
 
 /** 既定で取得するレポート群(幅広く)。 */
@@ -87,11 +89,12 @@ export const GA4_REPORTS: Ga4ReportDef[] = [
   {
     key: "labolaFunnel",
     dimensions: ["eventName"],
-    // キーイベント登録に依存せず、タグの発火件数を参考値として取得する。
-    metrics: ["eventCount"],
+    // 再読込による多重発火を離脱として数えないよう、イベント発生セッションを集計する。
+    metrics: ["sessions"],
     dimensionFilter: { fieldName: "eventName", values: LABOLA_FUNNEL_EVENT_NAMES },
     limit: 100,
     includePriorOnly: true,
+    measurementStartYmd: LABOLA_MEASUREMENT_START_YMD,
   },
 ];
 
@@ -124,6 +127,16 @@ function buildRequest(def: Ga4ReportDef, range: DateRange) {
   return request;
 }
 
+function observableRange(def: Ga4ReportDef, range: DateRange): DateRange | null {
+  const measurementStart = def.measurementStartYmd;
+  if (!measurementStart) return range;
+  if (range.end < measurementStart) return null;
+  return {
+    start: range.start < measurementStart ? measurementStart : range.start,
+    end: range.end,
+  };
+}
+
 export async function fetchGa4(
   options: FetchGa4Options
 ): Promise<Record<string, MergedRow[]>> {
@@ -136,20 +149,29 @@ export async function fetchGa4(
     reports = GA4_REPORTS,
   } = options;
 
-  const requests = reports.flatMap((def) => [
-    buildRequest(def, current),
-    buildRequest(def, prior),
-  ]);
+  const requestSlots = reports.flatMap((def) => [current, prior].map((range) => {
+    const observable = observableRange(def, range);
+    return observable === null ? null : buildRequest(def, observable);
+  }));
+  const requests = requestSlots.filter((request): request is Record<string, unknown> => request !== null);
 
   const url = `${GA4_ENDPOINT}/properties/${config.ga4PropertyId}:batchRunReports`;
 
   // batchRunReports は最大5リクエスト/回のため分割して呼び、結果を順に連結する。
-  const allReports: Ga4Report[] = [];
+  const fetchedReports: Ga4Report[] = [];
   for (const batch of chunk(requests, MAX_BATCH_SIZE)) {
     const body = await postJson(url, accessToken, { requests: batch }, fetchFn);
     const reportsInBatch = (body as { reports?: Ga4Report[] }).reports ?? [];
-    allReports.push(...reportsInBatch);
+    fetchedReports.push(...reportsInBatch);
   }
+
+  let fetchedIndex = 0;
+  const allReports = requestSlots.map((request): Ga4Report => {
+    if (request === null) return {};
+    const report = fetchedReports[fetchedIndex] ?? {};
+    fetchedIndex += 1;
+    return report;
+  });
 
   const result: Record<string, MergedRow[]> = {};
   reports.forEach((def, index) => {

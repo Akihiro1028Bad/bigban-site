@@ -14,7 +14,10 @@
 
 import { sendGAEvent } from "@next/third-parties/google";
 
+import { LABOLA_ENTRY_EVENTS } from "@/lib/growth/labolaEvents";
+
 import { CTA_EVENTS, ctaEventParams, type CtaKey } from "./events";
+import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
 
 /** GoogleAnalytics(gtag.js)が初期化済みか。未初期化(非本番/SSR)では送らない。 */
 function isGaReady(): boolean {
@@ -28,4 +31,10 @@ function isGaReady(): boolean {
 export function trackCtaClick(key: CtaKey, location: string, label?: string): void {
   if (!isGaReady()) return;
   sendGAEvent("event", CTA_EVENTS[key], ctaEventParams(location, label));
+}
+
+/** LaBOLAへ進む通常予約・プログラム予約を、追加設定不要の専用イベントで送る。 */
+export function trackLabolaEntry(kind: LabolaEntryKind): void {
+  if (!isGaReady()) return;
+  sendGAEvent("event", LABOLA_ENTRY_EVENTS[kind]);
 }

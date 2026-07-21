@@ -12,8 +12,8 @@ const config: GrowthConfig = {
   googleRefreshToken: "token",
 };
 
-const current = { start: "2026-06-08", end: "2026-06-14" };
-const prior = { start: "2026-06-01", end: "2026-06-07" };
+const current = { start: "2026-07-27", end: "2026-08-02" };
+const prior = { start: "2026-07-20", end: "2026-07-26" };
 
 const baseArgs = {
   config,
@@ -29,9 +29,9 @@ describe("collectGrowthData", () => {
       fetchGa4: vi.fn().mockResolvedValue({
         summary: [{ keys: [], metrics: {} }],
         labolaFunnel: [
-          { keys: ["reservation_click"], metrics: { eventCount: { current: 8, prior: 0, deltaPct: null } } },
-          { keys: ["labola_step_input"], metrics: { eventCount: { current: 5, prior: 0, deltaPct: null } } },
-          { keys: ["labola_reserve_complete"], metrics: { eventCount: { current: 2, prior: 0, deltaPct: null } } },
+          { keys: ["labola_entry_rental"], metrics: { sessions: { current: 8, prior: 0, deltaPct: null } } },
+          { keys: ["labola_step_input"], metrics: { sessions: { current: 5, prior: 0, deltaPct: null } } },
+          { keys: ["labola_reserve_complete"], metrics: { sessions: { current: 2, prior: 0, deltaPct: null } } },
         ],
       }),
       fetchGsc: vi.fn().mockResolvedValue({ summary: [{ keys: [], metrics: {} }] }),
@@ -44,11 +44,11 @@ describe("collectGrowthData", () => {
     expect(result.priorPeriod).toEqual(prior);
     expect(result.ga4).toEqual(expect.objectContaining({ summary: [{ keys: [], metrics: {} }] }));
     expect(result.reservationFunnel).toMatchObject({
-      observedDays: 0,
-      isReferenceOnly: true,
+      observedDays: 7,
+      isReferenceOnly: false,
       siteToLabola: 8,
-      rental: { input: 5, complete: 2 },
-      program: { input: 0, complete: 0 },
+      rental: { siteToLabola: 8, input: 5, complete: 2 },
+      program: { siteToLabola: 0, input: 0, complete: 0 },
     });
     expect(result.gsc).toEqual({ summary: [{ keys: [], metrics: {} }] });
     expect(result.errors).toEqual([]);

@@ -1,24 +1,19 @@
 /** LaBOLA予約導線を週次提案で読むための最小集計。 */
 
-import { CTA_EVENTS } from "./ctaEvents";
+import {
+  LABOLA_ENTRY_EVENTS,
+  LABOLA_FUNNEL_EVENTS,
+  LABOLA_MEASUREMENT_START_YMD,
+} from "@/lib/growth/labolaEvents";
+
 import type { DateRange } from "./period";
 import type { MergedRow } from "./transform";
 
-export const LABOLA_MEASUREMENT_START_YMD = "2026-07-18";
-
-export const LABOLA_FUNNEL_EVENTS = {
-  rental: {
-    input: "labola_step_input",
-    complete: "labola_reserve_complete",
-  },
-  program: {
-    input: "labola_step_input_program",
-    complete: "labola_reserve_complete_program",
-  },
-} as const;
+export { LABOLA_ENTRY_EVENTS, LABOLA_FUNNEL_EVENTS, LABOLA_MEASUREMENT_START_YMD };
 
 export const LABOLA_FUNNEL_EVENT_NAMES = [
-  CTA_EVENTS.reservation,
+  LABOLA_ENTRY_EVENTS.rental,
+  LABOLA_ENTRY_EVENTS.program,
   LABOLA_FUNNEL_EVENTS.rental.input,
   LABOLA_FUNNEL_EVENTS.rental.complete,
   LABOLA_FUNNEL_EVENTS.program.input,
@@ -28,10 +23,11 @@ export const LABOLA_FUNNEL_EVENT_NAMES = [
 export interface LabolaFunnelSummary {
   measurementStartedOn: string;
   observedDays: number;
+  entryMeasurementStatus: "available" | "unavailable";
   isReferenceOnly: boolean;
-  siteToLabola: number;
-  rental: { input: number; complete: number };
-  program: { input: number; complete: number };
+  siteToLabola: number | null;
+  rental: { siteToLabola: number | null; input: number; complete: number };
+  program: { siteToLabola: number | null; input: number; complete: number };
 }
 
 function inclusiveDays(from: string, to: string): number {
@@ -39,9 +35,14 @@ function inclusiveDays(from: string, to: string): number {
   return Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / millisecondsPerDay) + 1;
 }
 
-function countOf(rows: readonly MergedRow[], eventName: string): number {
+function countOf(
+  rows: readonly MergedRow[],
+  eventName: string
+): number {
   return rows.reduce((total, row) => (
-    row.keys[0] === eventName ? total + (row.metrics.eventCount?.current ?? 0) : total
+    row.keys[0] === eventName
+      ? total + (row.metrics.sessions?.current ?? 0)
+      : total
   ), 0);
 }
 
@@ -53,17 +54,25 @@ export function summarizeLabolaFunnel(input: {
     ? input.period.start
     : LABOLA_MEASUREMENT_START_YMD;
   const observedDays = observedStart > input.period.end ? 0 : inclusiveDays(observedStart, input.period.end);
+  const rentalEntry = countOf(input.rows, LABOLA_ENTRY_EVENTS.rental);
+  const programEntry = countOf(input.rows, LABOLA_ENTRY_EVENTS.program);
+  const entryMeasurementStatus = observedDays === 0 ? "unavailable" : "available";
+  const isEntryObservable = entryMeasurementStatus === "available";
+  const siteToLabola = isEntryObservable ? rentalEntry + programEntry : null;
 
   return {
     measurementStartedOn: LABOLA_MEASUREMENT_START_YMD,
     observedDays,
+    entryMeasurementStatus,
     isReferenceOnly: observedDays < 7,
-    siteToLabola: countOf(input.rows, CTA_EVENTS.reservation),
+    siteToLabola,
     rental: {
+      siteToLabola: isEntryObservable ? rentalEntry : null,
       input: countOf(input.rows, LABOLA_FUNNEL_EVENTS.rental.input),
       complete: countOf(input.rows, LABOLA_FUNNEL_EVENTS.rental.complete),
     },
     program: {
+      siteToLabola: isEntryObservable ? programEntry : null,
       input: countOf(input.rows, LABOLA_FUNNEL_EVENTS.program.input),
       complete: countOf(input.rows, LABOLA_FUNNEL_EVENTS.program.complete),
     },
