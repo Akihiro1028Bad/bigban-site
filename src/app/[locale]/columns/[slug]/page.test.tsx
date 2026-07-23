@@ -11,6 +11,13 @@ const notFoundMock = vi.fn(() => {
 });
 const isCmsColumnsEnabledMock = vi.fn(() => true);
 
+function applyRootTitleTemplate(title: unknown): string {
+  if (typeof title !== "string") {
+    throw new Error("Page metadata title must be a string");
+  }
+  return `${title} | THE PICKLE BANG THEORY`;
+}
+
 vi.mock("@/lib/microcms/columnsQueries", () => ({
   getColumnDetail: (a: unknown) => getColumnDetailMock(a),
   getColumnByContentId: (a: unknown) => getColumnByContentIdMock(a),
@@ -175,16 +182,18 @@ describe("ColumnDetailPage", () => {
     expect(await generateStaticParams()).toEqual([]);
   });
 
-  it("generateMetadata: 公開版は title/excerpt", async () => {
+  it("generateMetadata: 日本語記事はルートtemplate適用後もブランド名が1回だけ", async () => {
     getColumnDetailMock.mockResolvedValue(
-      makeParsedColumnItem({ slug: "x", title: "T", excerpt: "E" }),
+      makeParsedColumnItem({ slug: "x", title: "日本語記事", excerpt: "E" }),
     );
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "ja", slug: "x" }),
       searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("T");
+    expect(applyRootTitleTemplate(meta.title)).toBe(
+      "日本語記事 | THE PICKLE BANG THEORY",
+    );
     expect(meta.description).toBe("E");
   });
 
@@ -200,10 +209,10 @@ describe("ColumnDetailPage", () => {
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
-  it("generateMetadata: en は対向 locale を ja で引く", async () => {
+  it("generateMetadata: 英語記事はルートtemplate適用後もブランド名が1回だけ", async () => {
     getColumnDetailMock
       .mockResolvedValueOnce(
-        makeParsedColumnItem({ slug: "x", locale: "en", title: "T" }),
+        makeParsedColumnItem({ slug: "x", locale: "en", title: "English article" }),
       )
       .mockResolvedValueOnce(null);
     const { generateMetadata } = await import("./page");
@@ -211,7 +220,9 @@ describe("ColumnDetailPage", () => {
       params: Promise.resolve({ locale: "en", slug: "x" }),
       searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("T");
+    expect(applyRootTitleTemplate(meta.title)).toBe(
+      "English article | THE PICKLE BANG THEORY",
+    );
     // 2回目の getColumnDetail は対向 locale=ja で呼ばれる。
     expect(getColumnDetailMock).toHaveBeenLastCalledWith({
       locale: "ja",
