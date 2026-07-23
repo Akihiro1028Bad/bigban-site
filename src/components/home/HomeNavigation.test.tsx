@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import HomeNavigation from "./HomeNavigation";
 import jaMessages from "../../../messages/ja.json";
@@ -137,16 +137,25 @@ describe("HomeNavigation", () => {
     expect(screen.queryByRole("link", { name: "コラム" })).not.toBeInTheDocument();
   });
 
-  it("showColumns=true でCOLUMNリンクをNEWSの直後に出す(ja=コラム)", () => {
+  it("showColumns=true でNEWS直後のヘッダーとモバイルメニューにCOLUMN／コラムを表示する", () => {
     renderWithIntl(<HomeNavigation showColumns />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
-    const columnLink = screen.getByRole("link", { name: "コラム" });
+    const columnLink = within(nav).getByRole("link", { name: "COLUMN" });
     expect(columnLink).toHaveAttribute("href", "/columns");
+    expect(columnLink).toHaveTextContent("コラム");
     expect(nav).toContainElement(columnLink);
     const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
     const newsIndex = links.findIndex((text) => text?.includes("NEWS"));
-    const columnsIndex = links.findIndex((text) => text?.includes("コラム"));
+    const columnsIndex = links.findIndex((text) => text?.includes("COLUMN"));
     expect(columnsIndex).toBe(newsIndex + 1);
+
+    fireEvent.click(screen.getByLabelText("メニューを開く"));
+    const dialog = screen.getByRole("dialog");
+    const mobileColumnLink = within(dialog).getByRole("link", {
+      name: "COLUMN",
+    });
+    expect(mobileColumnLink).toHaveAttribute("href", "/columns");
+    expect(mobileColumnLink).toHaveTextContent("コラム");
   });
 
   it("英語ロケールでは COLUMN ラベル", () => {
