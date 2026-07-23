@@ -371,6 +371,11 @@
     "viewAll": "すべてのニュースを見る",
     "railLabel": "最新ニュース"
   },
+  "HomeLatestNews": {
+    "title": "LATEST NEWS",
+    "viewAll": "すべてのニュースを見る",
+    "listLabel": "最新ニュース2件"
+  },
   "HomeColumns": {
     "title": "COLUMN",
     "titleJa": "コラム",
