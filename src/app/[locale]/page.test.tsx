@@ -18,8 +18,17 @@ vi.mock("@/components/home/HomeIntro", () => ({
 }));
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHero", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeConcept", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeFacility", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeConcept", () => ({
+  default: () => <div data-testid="home-concept" />,
+}));
+vi.mock("@/components/home/HomeLatestNews", () => ({
+  default: ({ locale }: { locale: string }) => (
+    <div data-testid="home-latest-news" data-locale={locale} />
+  ),
+}));
+vi.mock("@/components/home/HomeFacility", () => ({
+  default: () => <div data-testid="home-facility" />,
+}));
 vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHyroxPromo", () => ({
   default: () => <div data-testid="home-hyrox-promo" />,
@@ -143,6 +152,27 @@ describe("Home Page", () => {
       "data-locale",
       "en",
     );
+  });
+
+  it("HomeConcept直後かつHomeFacilityより前にHomeLatestNewsを配置する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    render(element);
+
+    const concept = screen.getByTestId("home-concept");
+    const latestNews = screen.getByTestId("home-latest-news");
+    const facility = screen.getByTestId("home-facility");
+    expect(latestNews).toHaveAttribute("data-locale", "ja");
+    expect(
+      concept.compareDocumentPosition(latestNews) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      latestNews.compareDocumentPosition(facility) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("不正 locale で notFound", async () => {
