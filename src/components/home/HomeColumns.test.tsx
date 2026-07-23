@@ -52,12 +52,14 @@ const dictionary: Record<"ja" | "en", Record<string, string>> = {
     titleJa: "コラム",
     subtitle: "ピックルボールをもっと楽しむための最新コラム",
     viewAll: "すべてのコラムを見る",
+    railLabel: "最新コラム",
   },
   en: {
     title: "COLUMN",
     titleJa: "Column",
     subtitle: "Latest columns to help you enjoy pickleball",
     viewAll: "VIEW ALL COLUMNS",
+    railLabel: "Latest columns",
   },
 };
 
@@ -200,5 +202,32 @@ describe("HomeColumns", () => {
       "home_columns_view_all",
       "columns",
     );
+  });
+
+  it("スマホは横スワイプ、md以上は3列で次のカードが見える幅にする", async () => {
+    getColumnsListMock.mockResolvedValueOnce({
+      contents: [
+        makeParsedColumnItem({
+          id: "1",
+          slug: "column-1",
+          title: "コラム1",
+        }),
+      ],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+    await renderHomeColumns("ja");
+
+    const rail = screen.getByRole("list", { name: "最新コラム" });
+    expect(rail.className).toContain("overflow-x-auto");
+    expect(rail.className).toContain("snap-x");
+    expect(rail.className).toContain("md:grid");
+    expect(rail.className).toContain("md:grid-cols-3");
+
+    const card = screen.getByRole("listitem");
+    expect(card.className).toContain("w-[82vw]");
+    expect(card.className).toContain("snap-start");
+    expect(card.className).toContain("md:w-auto");
   });
 });
