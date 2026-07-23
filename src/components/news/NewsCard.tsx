@@ -19,8 +19,8 @@ function formatDate(iso: string): { display: string; iso: string } {
   return { display: `${yyyy}.${mm}.${dd}`, iso: `${yyyy}-${mm}-${dd}` };
 }
 
-function buildHref(locale: Locale, slug: string): string {
-  return locale === "ja" ? `/news/${slug}` : `/en/news/${slug}`;
+function buildHref(slug: string): string {
+  return `/news/${slug}`;
 }
 
 export function NewsCard({ item, locale }: NewsCardProps) {
@@ -32,7 +32,7 @@ export function NewsCard({ item, locale }: NewsCardProps) {
 
   return (
     <TrackedLink
-      href={buildHref(locale, item.slug)}
+      href={buildHref(item.slug)}
       eventKey="contentClick"
       location="news_card"
       label={item.slug}

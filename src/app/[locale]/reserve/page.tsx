@@ -7,6 +7,7 @@ import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
+import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import ReserveHero from "@/components/reserve/ReserveHero";
 import ReserveChoice from "@/components/reserve/ReserveChoice";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
@@ -99,7 +100,7 @@ export default async function ReservePage({
       <StructuredData
         data={buildBreadcrumb(locale, [{ name: "Reserve", path: "/reserve" }])}
       />
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <ReserveHero />
       {reserveBody}
       <ReserveInfo />

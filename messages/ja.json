@@ -109,7 +109,7 @@
     "services": "SERVICES",
     "pricing": "PRICING",
     "news": "NEWS",
-    "columns": "コラム",
+    "columns": "COLUMN",
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
@@ -122,6 +122,7 @@
     "hyroxJa": "ハイロックス",
     "pricingJa": "料金",
     "newsJa": "ニュース",
+    "columnsJa": "コラム",
     "aboutJa": "私たちについて",
     "accessJa": "アクセス",
     "mainNav": "メインナビゲーション",
@@ -368,7 +369,21 @@
     "title": "NEWS",
     "titleJa": "ニュース",
     "subtitle": "最新のお知らせ・メディア掲載・イベント情報",
-    "viewAll": "すべてのニュースを見る"
+    "viewAll": "すべてのニュースを見る",
+    "railLabel": "最新ニュース"
+  },
+  "HomeLatestNews": {
+    "title": "最新ニュース",
+    "titleEn": "LATEST NEWS",
+    "viewAll": "すべてのニュースを見る",
+    "listLabel": "最新ニュース2件"
+  },
+  "HomeColumns": {
+    "title": "COLUMN",
+    "titleJa": "コラム",
+    "subtitle": "ピックルボールをもっと楽しむための最新コラム",
+    "viewAll": "すべてのコラムを見る",
+    "railLabel": "最新コラム"
   },
   "HomeAbout": {
     "title": "ABOUT US",

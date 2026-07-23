@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 const mockGetTranslations = vi.fn();
 
@@ -14,7 +14,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 // 子コンポーネントはモックして page.tsx 自身の分岐のみを検証する。
-vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeNavigation", () => ({
+  default: ({ showColumns }: { showColumns?: boolean }) => (
+    <nav data-testid="home-navigation" data-show-columns={showColumns} />
+  ),
+}));
+vi.mock("@/config/featureFlags", () => ({
+  isCmsColumnsEnabled: () => true,
+}));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveChoice", () => ({ default: () => null }));
@@ -89,6 +96,20 @@ describe("ReservePage", () => {
     });
     const { container } = render(element);
     expect(container).toBeTruthy();
+  });
+
+  it("コラム機能の表示設定をナビゲーションへ渡す", async () => {
+    const { default: ReservePage } = await import("./page");
+    const element = await ReservePage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
+    });
+    render(element);
+
+    expect(screen.getByTestId("home-navigation")).toHaveAttribute(
+      "data-show-columns",
+      "true",
+    );
   });
 
   it("不正な locale で notFound により描画されない（throw する）", async () => {

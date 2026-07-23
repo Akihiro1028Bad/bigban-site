@@ -17,15 +17,31 @@ vi.mock("@/components/home/HomeIntro", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeHero", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeConcept", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeFacility", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeHero", () => ({
+  default: () => <div data-testid="home-hero" />,
+}));
+vi.mock("@/components/home/HomeConcept", () => ({
+  default: () => <div data-testid="home-concept" />,
+}));
+vi.mock("@/components/home/HomeLatestNews", () => ({
+  default: ({ locale }: { locale: string }) => (
+    <div data-testid="home-latest-news" data-locale={locale} />
+  ),
+}));
+vi.mock("@/components/home/HomeFacility", () => ({
+  default: () => <div data-testid="home-facility" />,
+}));
 vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHyroxPromo", () => ({
   default: () => <div data-testid="home-hyrox-promo" />,
 }));
 vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeColumns", () => ({
+  default: ({ locale }: { locale: string }) => (
+    <div data-testid="home-columns" data-locale={locale} />
+  ),
+}));
 vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
@@ -125,6 +141,40 @@ describe("Home Page", () => {
     });
     render(element);
     expect(screen.getByTestId("home-hyrox-promo")).toBeInTheDocument();
+  });
+
+  it("HomeColumnsへlocaleを渡して描画する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    render(element);
+
+    expect(screen.getByTestId("home-columns")).toHaveAttribute(
+      "data-locale",
+      "en",
+    );
+  });
+
+  it("HomeHero直後かつHomeConceptより前にHomeLatestNewsを配置する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    render(element);
+
+    const hero = screen.getByTestId("home-hero");
+    const latestNews = screen.getByTestId("home-latest-news");
+    const concept = screen.getByTestId("home-concept");
+    expect(latestNews).toHaveAttribute("data-locale", "ja");
+    expect(
+      hero.compareDocumentPosition(latestNews) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      latestNews.compareDocumentPosition(concept) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("不正 locale で notFound", async () => {

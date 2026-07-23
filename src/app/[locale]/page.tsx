@@ -11,11 +11,13 @@ import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
 import HomeConcept from "@/components/home/HomeConcept";
+import HomeLatestNews from "@/components/home/HomeLatestNews";
 import HomeFacility from "@/components/home/HomeFacility";
 import HomeServices from "@/components/home/HomeServices";
 import HomeHyroxPromo from "@/components/home/HomeHyroxPromo";
 import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
+import HomeColumns from "@/components/home/HomeColumns";
 import HomeAbout from "@/components/home/HomeAbout";
 import HomeAccess from "@/components/home/HomeAccess";
 import HomeFooter from "@/components/home/HomeFooter";
@@ -76,6 +78,9 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
+        <Suspense fallback={null}>
+          <HomeLatestNews locale={locale} />
+        </Suspense>
         <HomeConcept />
         <HomeFacility />
         <HomeServices />
@@ -86,6 +91,9 @@ export default async function Home({ params }: HomePageProps) {
             HomeNews は失敗時/0件時に null を返すため fallback も null で問題ない。 */}
         <Suspense fallback={null}>
           <HomeNews locale={locale} />
+        </Suspense>
+        <Suspense fallback={null}>
+          <HomeColumns locale={locale} />
         </Suspense>
         <HomeAbout />
         <HomeAccess />
