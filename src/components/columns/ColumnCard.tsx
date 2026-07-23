@@ -24,8 +24,8 @@ function formatDate(iso: string): { display: string; iso: string } {
   return { display: `${yyyy}.${mm}.${dd}`, iso: `${yyyy}-${mm}-${dd}` };
 }
 
-function buildHref(locale: Locale, slug: string): string {
-  return locale === "ja" ? `/columns/${slug}` : `/en/columns/${slug}`;
+function buildHref(slug: string): string {
+  return `/columns/${slug}`;
 }
 
 export function ColumnCard({
@@ -42,7 +42,7 @@ export function ColumnCard({
 
   return (
     <TrackedLink
-      href={buildHref(locale, item.slug)}
+      href={buildHref(item.slug)}
       eventKey="contentClick"
       location={trackingLocation}
       label={item.slug}

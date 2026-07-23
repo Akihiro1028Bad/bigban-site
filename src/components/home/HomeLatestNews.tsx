@@ -27,8 +27,8 @@ function formatDate(iso: string): { display: string; iso: string } {
   };
 }
 
-function buildHref(locale: Locale, slug: string): string {
-  return locale === "ja" ? `/news/${slug}` : `/en/news/${slug}`;
+function buildHref(slug: string): string {
+  return `/news/${slug}`;
 }
 
 export default async function HomeLatestNews({
@@ -91,7 +91,7 @@ export default async function HomeLatestNews({
             return (
               <li key={item.id}>
                 <TrackedLink
-                  href={buildHref(locale, item.slug)}
+                  href={buildHref(item.slug)}
                   eventKey="contentClick"
                   location="home_latest_news"
                   label={item.slug}
