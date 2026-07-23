@@ -51,16 +51,23 @@ export default async function HomeColumns({ locale }: HomeColumnsProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <ul
+          aria-label={t("railLabel")}
+          className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-px-6 px-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:px-0 md:pb-0"
+        >
           {items.map((item) => (
-            <ColumnCard
+            <li
               key={item.id}
-              item={item}
-              locale={locale}
-              trackingLocation="home_column_card"
-            />
+              className="w-[82vw] max-w-sm flex-none snap-start md:w-auto md:max-w-none"
+            >
+              <ColumnCard
+                item={item}
+                locale={locale}
+                trackingLocation="home_column_card"
+              />
+            </li>
           ))}
-        </div>
+        </ul>
 
         <div className="mt-12 lg:mt-16 text-center">
           <TrackedLink

@@ -368,13 +368,15 @@
     "title": "NEWS",
     "titleJa": "ニュース",
     "subtitle": "最新のお知らせ・メディア掲載・イベント情報",
-    "viewAll": "すべてのニュースを見る"
+    "viewAll": "すべてのニュースを見る",
+    "railLabel": "最新ニュース"
   },
   "HomeColumns": {
     "title": "COLUMN",
     "titleJa": "コラム",
     "subtitle": "ピックルボールをもっと楽しむための最新コラム",
-    "viewAll": "すべてのコラムを見る"
+    "viewAll": "すべてのコラムを見る",
+    "railLabel": "最新コラム"
   },
   "HomeAbout": {
     "title": "ABOUT US",

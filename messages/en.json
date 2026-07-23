@@ -354,13 +354,15 @@
     "title": "NEWS",
     "titleJa": "News",
     "subtitle": "Latest announcements, media coverage, and event information",
-    "viewAll": "VIEW ALL NEWS"
+    "viewAll": "VIEW ALL NEWS",
+    "railLabel": "Latest news"
   },
   "HomeColumns": {
     "title": "COLUMN",
     "titleJa": "Column",
     "subtitle": "Latest columns to help you enjoy pickleball",
-    "viewAll": "VIEW ALL COLUMNS"
+    "viewAll": "VIEW ALL COLUMNS",
+    "railLabel": "Latest columns"
   },
   "HomeAbout": {
     "title": "ABOUT US",
