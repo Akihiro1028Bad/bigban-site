@@ -10,6 +10,7 @@ const notFoundMock = vi.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
 });
 const isCmsColumnsEnabledMock = vi.fn(() => true);
+const newsBodyRendererMock = vi.fn();
 
 function applyRootTitleTemplate(title: unknown): string {
   if (typeof title !== "string") {
@@ -33,7 +34,10 @@ vi.mock("@/config/featureFlags", () => ({
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 vi.mock("@/components/news/NewsBodyRenderer", () => ({
-  NewsBodyRenderer: () => <div data-testid="body" />,
+  NewsBodyRenderer: (props: unknown) => {
+    newsBodyRendererMock(props);
+    return <div data-testid="body" />;
+  },
 }));
 vi.mock("@/components/news/PreviewBanner", () => ({
   PreviewBanner: () => <div data-testid="preview-banner" />,
@@ -58,6 +62,7 @@ describe("ColumnDetailPage", () => {
     getColumnSlugsMock.mockReset();
     notFoundMock.mockClear();
     isCmsColumnsEnabledMock.mockReturnValue(true);
+    newsBodyRendererMock.mockClear();
   });
 
   it("公開版: タイトルとカテゴリチップ", async () => {
@@ -68,6 +73,9 @@ describe("ColumnDetailPage", () => {
     expect(screen.getByText("屋内の始め方")).toBeInTheDocument();
     expect(screen.getByText("はじめ方・体験")).toBeInTheDocument();
     expect(screen.queryByTestId("preview-banner")).not.toBeInTheDocument();
+    expect(newsBodyRendererMock).toHaveBeenCalledWith(
+      expect.objectContaining({ articleSlug: "x" }),
+    );
   });
 
   it("eyecatch/カテゴリ無し・publishedAt 無しでも本文を描画する(欠落耐性)", async () => {
