@@ -147,7 +147,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
                 activeSection === item.id ? "text-accent" : "text-text-gray"
               }`;
               const jaKey = `${item.id}Ja`;
-              const ja = t.has(jaKey) ? t(jaKey) : "";
+              const ja = t(jaKey);
               const label = (
                 <span className="flex flex-col items-center leading-tight">
                   <span>{t(item.id)}</span>
