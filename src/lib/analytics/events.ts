@@ -12,12 +12,56 @@ import { CTA_EVENTS } from "@/lib/growth/ctaEvents";
 
 export type CtaKey = keyof typeof CTA_EVENTS;
 
+export interface CtaEventContext {
+  articleSlug?: string;
+}
+
+const ARTICLE_SLUG_RE = /^[a-z0-9-]{1,100}$/;
+const PRODUCTION_SITE_HOST = "www.thepicklebang.com";
+const RESERVATION_SERVICE_HOSTS = new Set(["reserva.be", "yoyaku.labola.jp"]);
+const RESERVE_PATH_RE = /^\/(?:en\/)?reserve\/?$/;
+
 /**
  * クリック計測のパラメータを組み立てる。location=設置箇所(分析の切り口)、
  * label=任意の補助ラベル(記事タイトル等)。空の label は付けない。
  */
-export function ctaEventParams(location: string, label?: string): Record<string, string> {
-  return label ? { location, label } : { location };
+export function ctaEventParams(
+  location: string,
+  label?: string,
+  context?: CtaEventContext,
+): Record<string, string> {
+  return {
+    location,
+    ...(label ? { label } : {}),
+    ...(context?.articleSlug && ARTICLE_SLUG_RE.test(context.articleSlug)
+      ? { article_slug: context.articleSlug }
+      : {}),
+  };
+}
+
+/**
+ * サニタイズ済み記事本文のリンクを、既存CTAイベントへ分類する。
+ * URLやリンク文言は返さず、送信対象をイベント名だけに限定してPII混入を防ぐ。
+ */
+export function articleBodyCtaKey(
+  href: string,
+  pageOrigin: string,
+): "reserveEntry" | "reservation" | "externalLink" | null {
+  try {
+    const pageUrl = new URL(pageOrigin);
+    const url = new URL(href, pageUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+
+    const isOfficialSite =
+      url.hostname === pageUrl.hostname || url.hostname === PRODUCTION_SITE_HOST;
+    if (isOfficialSite) {
+      return RESERVE_PATH_RE.test(url.pathname) ? "reserveEntry" : null;
+    }
+    if (RESERVATION_SERVICE_HOSTS.has(url.hostname)) return "reservation";
+    return "externalLink";
+  } catch {
+    return null;
+  }
 }
 
 /**

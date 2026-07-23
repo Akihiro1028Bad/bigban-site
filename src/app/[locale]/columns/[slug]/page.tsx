@@ -198,6 +198,7 @@ export default async function ColumnDetailPage({
               body={item.body ?? ""}
               isFirstImageLcp={!item.eyecatch}
               locale={locale}
+              articleSlug={item.slug}
             />
           </div>
         </article>
