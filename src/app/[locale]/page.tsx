@@ -78,10 +78,10 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
-        <HomeConcept />
         <Suspense fallback={null}>
           <HomeLatestNews locale={locale} />
         </Suspense>
+        <HomeConcept />
         <HomeFacility />
         <HomeServices />
         <HomeHyroxPromo />

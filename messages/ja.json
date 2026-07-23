@@ -372,7 +372,8 @@
     "railLabel": "最新ニュース"
   },
   "HomeLatestNews": {
-    "title": "LATEST NEWS",
+    "title": "最新ニュース",
+    "titleEn": "LATEST NEWS",
     "viewAll": "すべてのニュースを見る",
     "listLabel": "最新ニュース2件"
   },

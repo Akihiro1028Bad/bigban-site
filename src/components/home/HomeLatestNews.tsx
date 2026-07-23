@@ -59,12 +59,17 @@ export default async function HomeLatestNews({
     >
       <div className="mx-auto max-w-7xl px-6 py-6 lg:px-12 lg:py-8">
         <div className="flex items-center justify-between gap-4">
-          <h2
-            id="home-latest-news-title"
-            className="font-serif text-sm font-black tracking-[0.2em] sm:text-base"
-          >
-            {t("title")}
-          </h2>
+          <div>
+            <h2
+              id="home-latest-news-title"
+              className="font-serif text-base font-black tracking-[0.12em] sm:text-lg"
+            >
+              {t("title")}
+            </h2>
+            <p className="mt-1 text-[9px] font-bold tracking-[0.2em] text-text-gray sm:text-[10px]">
+              {t("titleEn")}
+            </p>
+          </div>
           <TrackedLink
             href="/news"
             eventKey="contentClick"
