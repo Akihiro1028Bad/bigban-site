@@ -17,7 +17,9 @@ vi.mock("@/components/home/HomeIntro", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeHero", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeHero", () => ({
+  default: () => <div data-testid="home-hero" />,
+}));
 vi.mock("@/components/home/HomeConcept", () => ({
   default: () => <div data-testid="home-concept" />,
 }));
@@ -154,23 +156,23 @@ describe("Home Page", () => {
     );
   });
 
-  it("HomeConcept直後かつHomeFacilityより前にHomeLatestNewsを配置する", async () => {
+  it("HomeHero直後かつHomeConceptより前にHomeLatestNewsを配置する", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({
       params: Promise.resolve({ locale: "ja" }),
     });
     render(element);
 
-    const concept = screen.getByTestId("home-concept");
+    const hero = screen.getByTestId("home-hero");
     const latestNews = screen.getByTestId("home-latest-news");
-    const facility = screen.getByTestId("home-facility");
+    const concept = screen.getByTestId("home-concept");
     expect(latestNews).toHaveAttribute("data-locale", "ja");
     expect(
-      concept.compareDocumentPosition(latestNews) &
+      hero.compareDocumentPosition(latestNews) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      latestNews.compareDocumentPosition(facility) &
+      latestNews.compareDocumentPosition(concept) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });

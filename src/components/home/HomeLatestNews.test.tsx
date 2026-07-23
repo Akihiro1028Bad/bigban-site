@@ -34,12 +34,14 @@ vi.mock("@/i18n/navigation", () => ({
 
 const dictionary: Record<"ja" | "en", Record<string, string>> = {
   ja: {
-    title: "LATEST NEWS",
+    title: "最新ニュース",
+    titleEn: "LATEST NEWS",
     viewAll: "すべてのニュースを見る",
     listLabel: "最新ニュース2件",
   },
   en: {
-    title: "LATEST NEWS",
+    title: "Latest News",
+    titleEn: "LATEST NEWS",
     viewAll: "VIEW ALL NEWS",
     listLabel: "Two latest news items",
   },
@@ -136,6 +138,10 @@ describe("HomeLatestNews", () => {
     expect(screen.queryByText("ニュース3")).not.toBeInTheDocument();
     expect(screen.getByText("2026.07.23")).toBeInTheDocument();
     expect(screen.getByText("2026.07.18")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "最新ニュース" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("LATEST NEWS")).toBeInTheDocument();
     expect(container.querySelector("img")).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
