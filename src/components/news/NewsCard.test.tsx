@@ -27,7 +27,7 @@ describe("NewsCard", () => {
     expect(screen.getByText("メディア掲載")).toBeInTheDocument();
   });
 
-  it("locale=en で英語ラベル+/en prefix", () => {
+  it("locale=en で英語ラベルとLink用のロケール非依存URLを表示する", () => {
     render(
       <NewsCard
         item={makeParsedNewsItem({ slug: "sample", category: ["media"] })}
@@ -37,7 +37,7 @@ describe("NewsCard", () => {
     expect(screen.getByText("Media")).toBeInTheDocument();
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
-      "/en/news/sample",
+      "/news/sample",
     );
   });
 

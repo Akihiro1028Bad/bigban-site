@@ -18,13 +18,13 @@ describe("ColumnCard", () => {
     expect(screen.getByText("はじめ方・体験")).toBeInTheDocument();
   });
 
-  it("locale=en は nameEn を表示し /en/columns/ へリンクする", () => {
+  it("locale=en は nameEn を表示しLinkへロケール非依存URLを渡す", () => {
     const item = makeParsedColumnItem({ slug: "how-to", title: "T" });
     render(<ColumnCard item={item} locale="en" />);
     expect(screen.getByText("Getting Started")).toBeInTheDocument();
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
-      "/en/columns/how-to",
+      "/columns/how-to",
     );
   });
 

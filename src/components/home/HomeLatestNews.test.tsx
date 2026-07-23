@@ -170,7 +170,7 @@ describe("HomeLatestNews", () => {
     });
     expect(screen.getByRole("link", { name: /English News/ })).toHaveAttribute(
       "href",
-      "/en/news/english-news",
+      "/news/english-news",
     );
     expect(
       screen.getByRole("link", { name: "VIEW ALL NEWS" }),
