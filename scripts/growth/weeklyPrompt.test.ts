@@ -8,12 +8,18 @@ import { PROMPT_REGISTRY } from "./promptRegistry";
 
 const PROMPTS_DIR = path.resolve("scripts/growth/prompts");
 const RUNBOOK_PATH = path.resolve("docs/operations/growth-weekly-runbook.md");
+const OPERATOR_GUIDE_PATH = path.resolve("docs/operations/growth/10-operator-guide.md");
+const NOTION_PROPS_PATH = path.resolve("docs/operations/growth/40-notion-props.md");
+const KPI_TREE_PATH = path.resolve("docs/operations/growth/60-kpi-tree.md");
 
 describe("週次分析の予約率中心プロンプト", () => {
   const weekly = readFileSync(path.join(PROMPTS_DIR, "weekly.md"), "utf-8");
   const goals = readFileSync(path.join(PROMPTS_DIR, "shared/growth-goals.md"), "utf-8");
   const articleIdea = readFileSync(path.join(PROMPTS_DIR, "shared/article-idea.md"), "utf-8");
   const runbook = readFileSync(RUNBOOK_PATH, "utf-8");
+  const operatorGuide = readFileSync(OPERATOR_GUIDE_PATH, "utf-8");
+  const notionProps = readFileSync(NOTION_PROPS_PATH, "utf-8");
+  const kpiTree = readFileSync(KPI_TREE_PATH, "utf-8");
 
   it("週次プロンプトが共通の目標・分析基準を参照する", () => {
     expect(weekly).toContain("scripts/growth/prompts/shared/growth-goals.md");
@@ -51,6 +57,16 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(goals).toContain("reservation_click");
     expect(goals).toContain("reserve_entry_click");
     expect(goals).toContain("実予約");
+  });
+
+  it("予約件数の手入力を週次分析の入力として案内しない", () => {
+    expect(weekly).not.toContain("予約件数/LINE友だち数");
+    expect(weekly).not.toContain("同週のオーナー手入力");
+    expect(goals).not.toContain("または同週のオーナー手入力");
+    expect(operatorGuide).toContain("予約件数は手入力しない");
+    expect(notionProps).toContain("予約件数は手入力しない");
+    expect(kpiTree).toContain("予約件数は手入力しない");
+    expect(kpiTree).not.toContain("予約サービスCSVまたは同週手入力");
   });
 
   it("LaBOLA予約導線を参考値として施策・記事の選択に使う", () => {
