@@ -26,6 +26,11 @@ vi.mock("@/components/home/HomeHyroxPromo", () => ({
 }));
 vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeColumns", () => ({
+  default: ({ locale }: { locale: string }) => (
+    <div data-testid="home-columns" data-locale={locale} />
+  ),
+}));
 vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
@@ -125,6 +130,19 @@ describe("Home Page", () => {
     });
     render(element);
     expect(screen.getByTestId("home-hyrox-promo")).toBeInTheDocument();
+  });
+
+  it("HomeColumnsへlocaleを渡して描画する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    render(element);
+
+    expect(screen.getByTestId("home-columns")).toHaveAttribute(
+      "data-locale",
+      "en",
+    );
   });
 
   it("不正 locale で notFound", async () => {

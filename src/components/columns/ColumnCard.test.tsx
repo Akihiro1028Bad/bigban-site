@@ -44,6 +44,29 @@ describe("ColumnCard", () => {
     expect(trackCtaClick).toHaveBeenCalledWith("contentClick", "column_card", "tracked-column");
   });
 
+  it("呼び出し元が指定した計測locationを使う", async () => {
+    trackCtaClick.mockClear();
+    const item = makeParsedColumnItem({
+      slug: "home-column",
+      title: "ホーム掲載コラム",
+    });
+    render(
+      <ColumnCard
+        item={item}
+        locale="ja"
+        trackingLocation="home_column_card"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("link"));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_column_card",
+      "home-column",
+    );
+  });
+
   it("カテゴリ未設定でもタイトルは表示する(欠落耐性)", () => {
     const item = makeParsedColumnItem({ title: "無カテゴリ", category: null });
     render(<ColumnCard item={item} locale="ja" />);
