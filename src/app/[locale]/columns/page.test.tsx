@@ -15,6 +15,13 @@ const notFoundMock = vi.fn(() => {
 const isCmsColumnsEnabledMock = vi.fn(() => true);
 const routerPushMock = vi.fn();
 
+function applyRootTitleTemplate(title: unknown): string {
+  if (typeof title !== "string") {
+    throw new Error("Page metadata title must be a string");
+  }
+  return `${title} | THE PICKLE BANG THEORY`;
+}
+
 vi.mock("@/lib/microcms/columnsQueries", () => ({
   getColumnsList: (args: unknown) => getColumnsListMock(args),
   getColumnCategories: () => getColumnCategoriesMock(),
@@ -190,15 +197,19 @@ describe("ColumnsPage", () => {
     expect(generateStaticParams()).toEqual([]);
   });
 
-  it("generateMetadata: ja/en タイトル", async () => {
+  it("generateMetadata: ルートtemplate適用後もja/enのブランド名は1回だけ", async () => {
     const { generateMetadata } = await import("./page");
     const ja = await generateMetadata({
       params: Promise.resolve({ locale: "ja" }),
     });
-    expect(ja.title).toContain("コラム");
+    expect(applyRootTitleTemplate(ja.title)).toBe(
+      "コラム | THE PICKLE BANG THEORY",
+    );
     const en = await generateMetadata({
       params: Promise.resolve({ locale: "en" }),
     });
-    expect(en.title).toContain("Column");
+    expect(applyRootTitleTemplate(en.title)).toBe(
+      "Column | THE PICKLE BANG THEORY",
+    );
   });
 });

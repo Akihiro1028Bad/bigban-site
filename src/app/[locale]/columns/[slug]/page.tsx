@@ -93,7 +93,7 @@ export async function generateMetadata({
   if (!item) return {};
 
   const meta: Metadata = {
-    title: `${item.title} | THE PICKLE BANG THEORY`,
+    title: item.title,
     description: item.excerpt,
   };
 
