@@ -356,6 +356,12 @@
     "subtitle": "Latest announcements, media coverage, and event information",
     "viewAll": "VIEW ALL NEWS"
   },
+  "HomeColumns": {
+    "title": "COLUMN",
+    "titleJa": "Column",
+    "subtitle": "Latest columns to help you enjoy pickleball",
+    "viewAll": "VIEW ALL COLUMNS"
+  },
   "HomeAbout": {
     "title": "ABOUT US",
     "founderLabel": "FOUNDER & CEO",

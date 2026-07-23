@@ -370,6 +370,12 @@
     "subtitle": "最新のお知らせ・メディア掲載・イベント情報",
     "viewAll": "すべてのニュースを見る"
   },
+  "HomeColumns": {
+    "title": "COLUMN",
+    "titleJa": "コラム",
+    "subtitle": "ピックルボールをもっと楽しむための最新コラム",
+    "viewAll": "すべてのコラムを見る"
+  },
   "HomeAbout": {
     "title": "ABOUT US",
     "founderLabel": "FOUNDER & CEO",

@@ -16,6 +16,7 @@ import HomeServices from "@/components/home/HomeServices";
 import HomeHyroxPromo from "@/components/home/HomeHyroxPromo";
 import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
+import HomeColumns from "@/components/home/HomeColumns";
 import HomeAbout from "@/components/home/HomeAbout";
 import HomeAccess from "@/components/home/HomeAccess";
 import HomeFooter from "@/components/home/HomeFooter";
@@ -86,6 +87,9 @@ export default async function Home({ params }: HomePageProps) {
             HomeNews は失敗時/0件時に null を返すため fallback も null で問題ない。 */}
         <Suspense fallback={null}>
           <HomeNews locale={locale} />
+        </Suspense>
+        <Suspense fallback={null}>
+          <HomeColumns locale={locale} />
         </Suspense>
         <HomeAbout />
         <HomeAccess />
