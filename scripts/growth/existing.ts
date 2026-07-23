@@ -70,7 +70,6 @@ function numberValue(page: NotionPage, prop: string): number | null {
 
 /** オーナー週次手入力(改善案#4)。週次グロースレポート DB の任意 number プロパティ。 */
 const MANUAL_INPUT_PROPS = [
-  { prop: "予約件数", label: "予約件数" },
   { prop: "LINE友だち数", label: "LINE友だち数" },
   { prop: "IGフォロワー数", label: "IGフォロワー数" },
   { prop: "口コミ件数", label: "口コミ件数" },
@@ -108,7 +107,7 @@ function isCreatedReport(page: NotionPage): boolean {
 }
 
 /**
- * 対象週のレポート行群からオーナー手入力(予約/LINE/IG/口コミ)を1行ずつ抽出する。
+ * 対象週のレポート行群からオーナー手入力(LINE/IG/口コミ)を1行ずつ抽出する。
  * 複数行に散っていても最初に値が入っているものを採用(欠落耐性)。未入力の指標は含めない。
  */
 function manualInputLines(reportsForWeek: NotionPage[]): string[] {
@@ -308,12 +307,12 @@ export function summarizeExisting(input: ExistingInput): string {
   }
   lines.push("");
 
-  // #4: オーナー週次手入力(予約/LINE/IG/口コミ)。実 KPI に接地させる分析入力。
+  // #4: オーナー週次手入力(LINE/IG/口コミ)。実 KPI に接地させる分析入力。
   const manual = manualInputLines(reportsForWeek);
   lines.push(`## オーナー手入力(実 KPI・改善案#4)`);
   if (manual.length > 0) {
     lines.push(...manual);
-    lines.push(`(この実数を分析の成功指標の分母=実予約・SNS・口コミに使う。未入力の指標は推測しない)`);
+    lines.push(`(この実数を分析の成功指標の分母=SNS・口コミに使う。未入力の指標は推測しない)`);
   } else {
     lines.push(`手入力データなし(従来どおり GA4/GSC と Web 検索だけで分析。数字は推測しない)`);
   }

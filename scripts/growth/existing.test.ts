@@ -165,7 +165,7 @@ describe("summarizeExisting", () => {
       };
     }
 
-    it("手入力(予約/LINE/IG/口コミ)があれば手入力データ節に載せる", () => {
+    it("予約件数を無視し、SNS・口コミの手入力だけを手入力データ節に載せる", () => {
       const md = summarizeExisting({
         period,
         nowMs: fixedNowMs,
@@ -182,16 +182,17 @@ describe("summarizeExisting", () => {
         ideas: [],
       });
       expect(md).toContain("オーナー手入力");
-      expect(md).toContain("予約件数");
-      expect(md).toContain("42");
+      expect(md).not.toContain("予約件数");
+      expect(md).not.toContain("42");
       expect(md).toContain("LINE友だち数");
       expect(md).toContain("130");
       expect(md).toContain("IGフォロワー数");
       expect(md).toContain("口コミ件数");
       expect(md).toContain("4.6");
+      expect(md).not.toContain("分母=実予約");
     });
 
-    it("手入力だけの行(レポート本文なし)は『作成済み』に数えない(#4)", () => {
+    it("予約件数だけの行は手入力データにも作成済みレポートにも数えない", () => {
       const md = summarizeExisting({
         period,
         nowMs: fixedNowMs,
@@ -199,12 +200,11 @@ describe("summarizeExisting", () => {
         proposals: [],
         ideas: [],
       });
-      // 手入力はあるがレポート本文(title)は無いので、レポートは未作成として新規作成を促す。
       expect(md).toContain("未作成");
       expect(md).not.toContain("週次グロースレポート: 作成済み");
-      // それでも手入力の数字は分析に供給する。
-      expect(md).toContain("オーナー手入力");
-      expect(md).toContain("10");
+      expect(md).toContain("手入力データなし");
+      expect(md).not.toContain("予約件数");
+      expect(md).not.toContain("10");
     });
 
     it("手入力が無ければ『手入力データなし』で従来動作(欠落耐性)", () => {
