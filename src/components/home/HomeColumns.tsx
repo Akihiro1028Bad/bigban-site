@@ -1,41 +1,40 @@
 import { getTranslations } from "next-intl/server";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
-import { NewsCard } from "@/components/news/NewsCard";
-import { isCmsNewsEnabled } from "@/config/featureFlags";
-import { ABOUT_NEWS_LIMIT } from "@/constants/news";
-import { getNewsList } from "@/lib/microcms/queries";
-import type { NewsItem } from "@/lib/microcms/schema";
+import { ColumnCard } from "@/components/columns/ColumnCard";
+import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import { getColumnsList } from "@/lib/microcms/columnsQueries";
+import type { ColumnItem } from "@/lib/microcms/columnsSchema";
 
-interface HomeNewsProps {
+interface HomeColumnsProps {
   locale: "ja" | "en";
 }
 
-export default async function HomeNews({ locale }: HomeNewsProps) {
-  if (!isCmsNewsEnabled()) return null;
+const HOME_COLUMNS_LIMIT = 3;
 
-  let items: NewsItem[] = [];
+export default async function HomeColumns({ locale }: HomeColumnsProps) {
+  if (!isCmsColumnsEnabled()) return null;
+
+  let items: ColumnItem[] = [];
   try {
-    const list = await getNewsList({
+    const list = await getColumnsList({
       locale,
-      limit: ABOUT_NEWS_LIMIT,
+      limit: HOME_COLUMNS_LIMIT,
       offset: 0,
     });
     items = list.contents;
   } catch (error) {
-    // セクションは静かに非表示にしつつ、Vercel Function logs で原因追跡できるよう
-    // サーバーサイドにログを残す。
-    console.error("[HomeNews] microCMS fetch failed:", error);
+    console.error("[HomeColumns] microCMS fetch failed:", error);
     items = [];
   }
 
   if (items.length === 0) return null;
 
-  const t = await getTranslations({ locale, namespace: "HomeNews" });
+  const t = await getTranslations({ locale, namespace: "HomeColumns" });
 
   return (
     <section
-      id="news"
+      id="columns"
       className="bg-deep-black pt-8 lg:pt-16 pb-16 lg:pb-32 text-text-light"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
@@ -61,17 +60,21 @@ export default async function HomeNews({ locale }: HomeNewsProps) {
               key={item.id}
               className="w-[82vw] max-w-sm flex-none snap-start md:w-auto md:max-w-none"
             >
-              <NewsCard item={item} locale={locale} />
+              <ColumnCard
+                item={item}
+                locale={locale}
+                trackingLocation="home_column_card"
+              />
             </li>
           ))}
         </ul>
 
         <div className="mt-12 lg:mt-16 text-center">
           <TrackedLink
-            href="/news"
+            href="/columns"
             eventKey="contentClick"
-            location="home_news_view_all"
-            label="news"
+            location="home_columns_view_all"
+            label="columns"
             className="inline-block bg-accent text-deep-black px-8 py-3 text-xs sm:text-sm font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
           >
             {t("viewAll")}

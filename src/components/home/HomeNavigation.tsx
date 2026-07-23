@@ -118,10 +118,10 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
         isHyrox ? "top-0" : "top-[var(--promo-banner-h)]"
       } ${
         isNavVisible
-          ? "translate-y-0"
-          : isHyrox
-            ? "translate-y-0 md:-translate-y-full"
-            : "translate-y-0 md:-translate-y-[calc(100%+var(--promo-banner-h))]"
+           ? "translate-y-0"
+           : isHyrox
+             ? "translate-y-0 xl:-translate-y-full"
+             : "translate-y-0 xl:-translate-y-[calc(100%+var(--promo-banner-h))]"
       }`}
     >
       <div className="site-header-bg backdrop-blur-md bg-deep-black/80">
@@ -140,14 +140,14 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
           {/* Desktop: Nav links */}
           <nav
             aria-label={t("mainNav")}
-            className="hidden md:flex items-center gap-8"
+            className="hidden xl:flex items-center gap-8"
           >
             {navItems.map((item) => {
               const className = `text-sm uppercase tracking-widest transition-colors hover:text-text-light ${
                 activeSection === item.id ? "text-accent" : "text-text-gray"
               }`;
               const jaKey = `${item.id}Ja`;
-              const ja = t.has(jaKey) ? t(jaKey) : "";
+              const ja = t(jaKey);
               const label = (
                 <span className="flex flex-col items-center leading-tight">
                   <span>{t(item.id)}</span>
@@ -178,7 +178,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
           <Link
             href={reserveTo}
             onClick={() => trackCtaClick("reserveEntry", "home_nav_mobile", t("reserveJa"))}
-            className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black md:hidden"
+            className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black xl:hidden"
           >
             <span className="text-[11px] font-bold tracking-widest">
               {t("reserveJa")}
@@ -189,7 +189,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
           </Link>
 
           {/* Desktop: Right side */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden xl:flex items-center gap-4">
             <LanguageToggle
               isJa={isJa}
               onSwitch={handleSwitchLocale}
@@ -219,7 +219,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
       onClick={handleToggleMenu}
       labelOpen={t("openMenu")}
       labelClose={t("closeMenu")}
-      className={`fixed right-4 z-[70] md:hidden ${
+      className={`fixed right-4 z-[70] xl:hidden ${
         isHyrox ? "top-2.5" : "top-[calc(var(--promo-banner-h)+0.5rem)]"
       }`}
     />

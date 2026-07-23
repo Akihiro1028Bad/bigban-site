@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import HomeNavigation from "./HomeNavigation";
 import jaMessages from "../../../messages/ja.json";
@@ -137,16 +137,50 @@ describe("HomeNavigation", () => {
     expect(screen.queryByRole("link", { name: "コラム" })).not.toBeInTheDocument();
   });
 
-  it("showColumns=true でCOLUMNリンクをNEWSの直後に出す(ja=コラム)", () => {
+  it("showColumns=true でNEWS直後のヘッダーとモバイルメニューにCOLUMN／コラムを表示する", () => {
     renderWithIntl(<HomeNavigation showColumns />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
-    const columnLink = screen.getByRole("link", { name: "コラム" });
+    const columnLink = within(nav).getByRole("link", { name: "COLUMN" });
     expect(columnLink).toHaveAttribute("href", "/columns");
+    expect(columnLink).toHaveTextContent("コラム");
     expect(nav).toContainElement(columnLink);
     const links = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
     const newsIndex = links.findIndex((text) => text?.includes("NEWS"));
-    const columnsIndex = links.findIndex((text) => text?.includes("コラム"));
+    const columnsIndex = links.findIndex((text) => text?.includes("COLUMN"));
     expect(columnsIndex).toBe(newsIndex + 1);
+
+    fireEvent.click(screen.getByLabelText("メニューを開く"));
+    const dialog = screen.getByRole("dialog");
+    const mobileColumnLink = within(dialog).getByRole("link", {
+      name: "COLUMN",
+    });
+    expect(mobileColumnLink).toHaveAttribute("href", "/columns");
+    expect(mobileColumnLink).toHaveTextContent("コラム");
+  });
+
+  it("COLUMN表示時もタブレット幅ではモバイル導線を維持し、xlからデスクトップナビを表示する", () => {
+    renderWithIntl(<HomeNavigation showColumns />);
+
+    const nav = screen.getByRole("navigation", {
+      name: "メインナビゲーション",
+    });
+    expect(nav.className).toContain("hidden");
+    expect(nav.className).toContain("xl:flex");
+    expect(nav.className).not.toContain("md:flex");
+
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    const mobileReserve = reserveLinks.find((link) =>
+      link.className.includes("xl:hidden"),
+    );
+    expect(mobileReserve).toBeDefined();
+
+    const desktopReserve = reserveLinks.find((link) =>
+      link.parentElement?.className.includes("xl:flex"),
+    );
+    expect(desktopReserve).toBeDefined();
+
+    const menuToggle = screen.getByLabelText("メニューを開く");
+    expect(menuToggle.className).toContain("xl:hidden");
   });
 
   it("英語ロケールでは COLUMN ラベル", () => {
@@ -234,7 +268,7 @@ describe("HomeNavigation", () => {
     const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
     expect(reserveLinks.length).toBeGreaterThanOrEqual(2);
     const mobileReserve = reserveLinks.find((link) =>
-      link.className.includes("md:hidden")
+      link.className.includes("xl:hidden")
     );
     expect(mobileReserve).toBeDefined();
     expect(mobileReserve).toHaveAttribute("href", "/reserve");
@@ -301,7 +335,7 @@ describe("HomeNavigation", () => {
     const header = screen.getByRole("banner");
     Object.defineProperty(window, "scrollY", { value: 200, writable: true });
     fireEvent.scroll(window);
-    expect(header.className).toContain("md:-translate-y-full");
+    expect(header.className).toContain("xl:-translate-y-full");
     mockPathname = "/";
   });
 
@@ -334,7 +368,7 @@ describe("HomeNavigation", () => {
 
     Object.defineProperty(window, "scrollY", { value: 200, writable: true });
     fireEvent.scroll(window);
-    expect(header.className).toMatch(/md:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
+    expect(header.className).toMatch(/xl:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
   });
 
   it("スクロールアップでナビが再表示される", () => {
@@ -343,7 +377,7 @@ describe("HomeNavigation", () => {
 
     Object.defineProperty(window, "scrollY", { value: 200, writable: true });
     fireEvent.scroll(window);
-    expect(header.className).toMatch(/md:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
+    expect(header.className).toMatch(/xl:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
 
     Object.defineProperty(window, "scrollY", { value: 100, writable: true });
     fireEvent.scroll(window);
@@ -367,8 +401,8 @@ describe("HomeNavigation", () => {
     fireEvent.scroll(window);
 
     expect(header.className).toContain("translate-y-0");
-    expect(header.className).toMatch(/md:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
-    expect(header.className).not.toMatch(/(?<!md:)(?<!:)-translate-y-\[/);
+    expect(header.className).toMatch(/xl:-translate-y-\[calc\(100%\+var\(--promo-banner-h\)\)\]/);
+    expect(header.className).not.toMatch(/(?<!xl:)(?<!:)-translate-y-\[/);
   });
 
   it("ホームでロゴクリックするとページ最上部にスクロールする", () => {

@@ -1,5 +1,6 @@
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
+import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import HyroxHero from "@/components/hyrox/HyroxHero";
 import HyroxFacility from "@/components/hyrox/HyroxFacility";
 import HyroxServices from "@/components/hyrox/HyroxServices";
@@ -12,7 +13,7 @@ import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
 export default function HyroxContent() {
   return (
     <>
-      <HomeNavigation />
+      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main>
         <HyroxHero />
         <HyroxFacility />

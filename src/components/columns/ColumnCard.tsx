@@ -13,6 +13,7 @@ type Locale = "ja" | "en";
 interface ColumnCardProps {
   item: ColumnItem;
   locale: Locale;
+  trackingLocation?: string;
 }
 
 function formatDate(iso: string): { display: string; iso: string } {
@@ -23,11 +24,15 @@ function formatDate(iso: string): { display: string; iso: string } {
   return { display: `${yyyy}.${mm}.${dd}`, iso: `${yyyy}-${mm}-${dd}` };
 }
 
-function buildHref(locale: Locale, slug: string): string {
-  return locale === "ja" ? `/columns/${slug}` : `/en/columns/${slug}`;
+function buildHref(slug: string): string {
+  return `/columns/${slug}`;
 }
 
-export function ColumnCard({ item, locale }: ColumnCardProps) {
+export function ColumnCard({
+  item,
+  locale,
+  trackingLocation = "column_card",
+}: ColumnCardProps) {
   const category = item.category;
   const placeholderColor = category
     ? columnCategoryColor(category)
@@ -37,9 +42,9 @@ export function ColumnCard({ item, locale }: ColumnCardProps) {
 
   return (
     <TrackedLink
-      href={buildHref(locale, item.slug)}
+      href={buildHref(item.slug)}
       eventKey="contentClick"
-      location="column_card"
+      location={trackingLocation}
       label={item.slug}
       className="group block border border-text-gray/10 hover:border-accent/60 transition-colors"
     >

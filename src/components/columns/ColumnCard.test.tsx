@@ -18,13 +18,13 @@ describe("ColumnCard", () => {
     expect(screen.getByText("はじめ方・体験")).toBeInTheDocument();
   });
 
-  it("locale=en は nameEn を表示し /en/columns/ へリンクする", () => {
+  it("locale=en は nameEn を表示しLinkへロケール非依存URLを渡す", () => {
     const item = makeParsedColumnItem({ slug: "how-to", title: "T" });
     render(<ColumnCard item={item} locale="en" />);
     expect(screen.getByText("Getting Started")).toBeInTheDocument();
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
-      "/en/columns/how-to",
+      "/columns/how-to",
     );
   });
 
@@ -42,6 +42,29 @@ describe("ColumnCard", () => {
     await userEvent.click(screen.getByRole("link"));
 
     expect(trackCtaClick).toHaveBeenCalledWith("contentClick", "column_card", "tracked-column");
+  });
+
+  it("呼び出し元が指定した計測locationを使う", async () => {
+    trackCtaClick.mockClear();
+    const item = makeParsedColumnItem({
+      slug: "home-column",
+      title: "ホーム掲載コラム",
+    });
+    render(
+      <ColumnCard
+        item={item}
+        locale="ja"
+        trackingLocation="home_column_card"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("link"));
+
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_column_card",
+      "home-column",
+    );
   });
 
   it("カテゴリ未設定でもタイトルは表示する(欠落耐性)", () => {

@@ -22,12 +22,14 @@ const dictionary: Record<string, Record<string, string>> = {
     titleJa: "ニュース",
     subtitle: "最新のお知らせ・メディア掲載・イベント情報",
     viewAll: "すべてのニュースを見る",
+    railLabel: "最新ニュース",
   },
   en: {
     title: "NEWS",
     titleJa: "News",
     subtitle: "Latest announcements, media coverage, and event information",
     viewAll: "VIEW ALL NEWS",
+    railLabel: "Latest news",
   },
 };
 
@@ -171,5 +173,26 @@ describe("HomeNews", () => {
 
     const viewAll = screen.getByRole("link", { name: "VIEW ALL NEWS" });
     expect(viewAll).toHaveAttribute("href", "/news");
+  });
+
+  it("スマホは横スワイプ、md以上は3列で次のカードが見える幅にする", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [makeItem("1", "n-1", "ニュース1")],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+    await renderHomeNews("ja");
+
+    const rail = screen.getByRole("list", { name: "最新ニュース" });
+    expect(rail.className).toContain("overflow-x-auto");
+    expect(rail.className).toContain("snap-x");
+    expect(rail.className).toContain("md:grid");
+    expect(rail.className).toContain("md:grid-cols-3");
+
+    const card = screen.getByRole("listitem");
+    expect(card.className).toContain("w-[82vw]");
+    expect(card.className).toContain("snap-start");
+    expect(card.className).toContain("md:w-auto");
   });
 });

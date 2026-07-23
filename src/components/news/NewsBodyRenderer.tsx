@@ -1,6 +1,10 @@
+"use client";
+
 import { Fragment } from "react";
 
 import type { Locale } from "@/i18n/routing";
+import { articleBodyCtaKey } from "@/lib/analytics/events";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import {
   RICH_EDITOR_CONFIG,
   STRICT_HTML_CONFIG,
@@ -11,13 +15,18 @@ import type { NewsItem } from "@/lib/microcms/schema";
 import { InstagramEmbed } from "./embeds/InstagramEmbed";
 import { YouTubeEmbed } from "./embeds/YouTubeEmbed";
 
+import type { MouseEventHandler } from "react";
+
 interface NewsBodyRendererProps {
   displayMode: NewsItem["displayMode"];
   bodyHtml: string;
   body: string;
   isFirstImageLcp?: boolean;
   locale?: Locale;
+  articleSlug?: string;
 }
+
+const ARTICLE_BODY_CTA_LOCATION = "article_body_cta";
 
 // グロース承認画面のプレビュー(#proto)が本番と同一の本文スタイルを再利用するため export する。
 export const PROSE_CLASS = [
@@ -152,7 +161,10 @@ function renderEmbed(provider: string, id: string, key: number) {
   return <Component key={key} embedId={id} />;
 }
 
-function renderBody(safeHtml: string) {
+function renderBody(
+  safeHtml: string,
+  onClick?: MouseEventHandler<HTMLDivElement>,
+) {
   const processed = optimizeMicrocmsImages(wrapTablesForScroll(safeHtml));
   const segments = segmentBodyHtml(processed);
 
@@ -162,6 +174,7 @@ function renderBody(safeHtml: string) {
       <div
         data-testid="news-body"
         className={`news-body ${PROSE_CLASS}`}
+        onClick={onClick}
         dangerouslySetInnerHTML={{ __html: segments[0].html }}
       />
     );
@@ -171,7 +184,11 @@ function renderBody(safeHtml: string) {
   // contents (display: contents) で wrapper div を視覚的に透明化し、
   // prose の descendant selector に影響を与えない。
   return (
-    <div data-testid="news-body" className={`news-body ${PROSE_CLASS}`}>
+    <div
+      data-testid="news-body"
+      className={`news-body ${PROSE_CLASS}`}
+      onClick={onClick}
+    >
       {segments.map((seg, i) => {
         if (seg.kind === "html") {
           /* istanbul ignore next -- @preserve segmentBodyHtml は空 html セグメントを push しない設計のため到達不可 (防御的記述) */
@@ -210,11 +227,31 @@ export function NewsBodyRenderer({
   body,
   isFirstImageLcp = false,
   locale = "ja",
+  articleSlug,
 }: NewsBodyRendererProps) {
+  const handleBodyClick: MouseEventHandler<HTMLDivElement> | undefined =
+    articleSlug
+      ? (event) => {
+          const anchor = (event.target as Element).closest("a");
+          if (!anchor) return;
+          // 埋め込みフォールバックは TrackedLink 自身が計測するため委譲対象外。
+          if (anchor.closest('[data-testid="embed-shell"]')) return;
+
+          const href = anchor.getAttribute("href");
+          if (!href) return;
+          const eventKey = articleBodyCtaKey(href, window.location.origin);
+          if (!eventKey) return;
+          trackCtaClick(eventKey, ARTICLE_BODY_CTA_LOCATION, undefined, {
+            articleSlug,
+          });
+        }
+      : undefined;
+
   if (displayMode === "html") {
     if (bodyHtml.trim().length > 0) {
       return renderBody(
         sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+        handleBodyClick,
       );
     }
     if (body.trim().length > 0) {
@@ -223,6 +260,7 @@ export function NewsBodyRenderer({
       );
       return renderBody(
         sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+        handleBodyClick,
       );
     }
     return renderEmpty(locale);
@@ -231,11 +269,13 @@ export function NewsBodyRenderer({
   if (body.trim().length > 0) {
     return renderBody(
       sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+      handleBodyClick,
     );
   }
   if (bodyHtml.trim().length > 0) {
     return renderBody(
       sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+      handleBodyClick,
     );
   }
   return renderEmpty(locale);

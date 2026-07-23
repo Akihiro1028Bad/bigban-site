@@ -222,6 +222,7 @@ export default async function NewsDetailPage({
             body={item.body ?? ""}
             isFirstImageLcp={!item.eyecatch}
             locale={locale}
+            articleSlug={item.slug}
           />
         </div>
         {item.externalLink && (

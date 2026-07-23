@@ -44,10 +44,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const title =
-    locale === "ja"
-      ? "コラム | THE PICKLE BANG THEORY"
-      : "Column | THE PICKLE BANG THEORY";
+  const title = locale === "ja" ? "コラム" : "Column";
   const description =
     locale === "ja"
       ? "ピックルボールの始め方・ルール・上達・比較のコラム"

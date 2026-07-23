@@ -108,6 +108,7 @@
     "hyroxJa": "",
     "pricingJa": "",
     "newsJa": "",
+    "columnsJa": "",
     "aboutJa": "",
     "accessJa": "",
     "mainNav": "Main Navigation",
@@ -354,7 +355,21 @@
     "title": "NEWS",
     "titleJa": "News",
     "subtitle": "Latest announcements, media coverage, and event information",
-    "viewAll": "VIEW ALL NEWS"
+    "viewAll": "VIEW ALL NEWS",
+    "railLabel": "Latest news"
+  },
+  "HomeLatestNews": {
+    "title": "Latest News",
+    "titleEn": "LATEST NEWS",
+    "viewAll": "VIEW ALL NEWS",
+    "listLabel": "Two latest news items"
+  },
+  "HomeColumns": {
+    "title": "COLUMN",
+    "titleJa": "Column",
+    "subtitle": "Latest columns to help you enjoy pickleball",
+    "viewAll": "VIEW ALL COLUMNS",
+    "railLabel": "Latest columns"
   },
   "HomeAbout": {
     "title": "ABOUT US",

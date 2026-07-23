@@ -1,8 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 
 import { NewsBodyRenderer } from "./NewsBodyRenderer";
+
+const trackCtaClickMock = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClickMock(...args),
+}));
 
 const messages = {
   News: {
@@ -190,6 +196,175 @@ describe("NewsBodyRenderer", () => {
     expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  describe("記事本文CTA計測", () => {
+    it.each([
+      { locale: "ja" as const, label: "今すぐ予約する" },
+      { locale: "en" as const, label: "Book now" },
+    ])("$locale の公式予約リンクを記事slug付きで1回送信する", async ({ locale, label }) => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml={`<p><a href="https://www.thepicklebang.com/${locale === "en" ? "en/" : ""}reserve" class="cta"><strong>${label}</strong></a></p>`}
+          body=""
+          locale={locale}
+          articleSlug="fresh-pickleball-guide"
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("link", { name: label }));
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+      expect(trackCtaClickMock).toHaveBeenCalledWith(
+        "reserveEntry",
+        "article_body_cta",
+        undefined,
+        { articleSlug: "fresh-pickleball-guide" },
+      );
+    });
+
+    it("外部予約サービス直リンクを reservation として送信する", async () => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://yoyaku.labola.jp/r/shop/3473/event/school/">予約する</a>'
+          body=""
+          articleSlug="lesson-guide"
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("link", { name: "予約する" }));
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+      expect(trackCtaClickMock).toHaveBeenCalledWith(
+        "reservation",
+        "article_body_cta",
+        undefined,
+        { articleSlug: "lesson-guide" },
+      );
+    });
+
+    it("その他の外部リンクを externalLink として送信する", async () => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://example.com/info">外部情報</a>'
+          body=""
+          articleSlug="external-guide"
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("link", { name: "外部情報" }));
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+      expect(trackCtaClickMock).toHaveBeenCalledWith(
+        "externalLink",
+        "article_body_cta",
+        undefined,
+        { articleSlug: "external-guide" },
+      );
+    });
+
+    it("キーボードのEnterによるネイティブクリックも1回だけ送信する", async () => {
+      const user = userEvent.setup();
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://www.thepicklebang.com/reserve">予約する</a>'
+          body=""
+          articleSlug="keyboard-guide"
+        />,
+      );
+      const link = screen.getByRole("link", { name: "予約する" });
+      link.focus();
+
+      await user.keyboard("{Enter}");
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("リンク内の子要素をクリックしても二重発火しない", async () => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://www.thepicklebang.com/reserve"><strong>予約する</strong></a>'
+          body=""
+          articleSlug="nested-guide"
+        />,
+      );
+
+      await userEvent.click(screen.getByText("予約する"));
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("リンク文言・URLに含まれる個人情報を送信しない", async () => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://example.com/?email=user@example.com">user@example.com / 090-1234-5678</a>'
+          body=""
+          articleSlug="privacy-guide"
+        />,
+      );
+
+      await userEvent.click(
+        screen.getByRole("link", { name: /user@example\.com/ }),
+      );
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(trackCtaClickMock.mock.calls)).not.toContain(
+        "user@example.com",
+      );
+      expect(JSON.stringify(trackCtaClickMock.mock.calls)).not.toContain(
+        "090-1234-5678",
+      );
+    });
+
+    it("slug未指定のプレビューでは送信しない", async () => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml='<a href="https://www.thepicklebang.com/reserve">予約する</a>'
+          body=""
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("link", { name: "予約する" }));
+
+      expect(trackCtaClickMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { html: "<p>本文だけ</p>", name: "本文だけ" },
+      { html: "<a>リンク先なし</a>", name: "リンク先なし" },
+      {
+        html: '<a href="https://www.thepicklebang.com/about">施設情報</a>',
+        name: "施設情報",
+      },
+    ])("計測対象外の本文要素 $name では送信しない", async ({ html, name }) => {
+      trackCtaClickMock.mockClear();
+      render(
+        <NewsBodyRenderer
+          displayMode="html"
+          bodyHtml={html}
+          body=""
+          articleSlug="ignored-guide"
+        />,
+      );
+
+      await userEvent.click(screen.getByText(name));
+
+      expect(trackCtaClickMock).not.toHaveBeenCalled();
+    });
+  });
+
   it("displayMode=html フォールバック: bodyHtml 空でも body があれば rich で表示", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { container } = render(
@@ -250,6 +425,31 @@ describe("NewsBodyRenderer", () => {
       // 周辺の <p> は維持
       expect(screen.getByText("動画はこちら。")).toBeInTheDocument();
       expect(screen.getByText("続きの本文。")).toBeInTheDocument();
+    });
+
+    it("埋め込みフォールバックは既存の計測だけが1回発火する", async () => {
+      trackCtaClickMock.mockClear();
+      const user = userEvent.setup();
+      const html = `<a class="embed" data-embed-provider="youtube" data-embed-id="dQw4w9WgXcQ">YouTube で見る</a>`;
+      render(
+        withIntl(
+          <NewsBodyRenderer
+            displayMode="html"
+            bodyHtml={html}
+            body=""
+            articleSlug="video-guide"
+          />,
+        ),
+      );
+
+      await user.click(screen.getByTestId("embed-fallback-link"));
+
+      expect(trackCtaClickMock).toHaveBeenCalledTimes(1);
+      expect(trackCtaClickMock).toHaveBeenCalledWith(
+        "externalLink",
+        "embed_fallback",
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      );
     });
 
     it("属性順序が逆 (data-embed-id が先) でも置換される", () => {

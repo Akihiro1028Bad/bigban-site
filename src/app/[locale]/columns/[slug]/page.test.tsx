@@ -10,6 +10,14 @@ const notFoundMock = vi.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
 });
 const isCmsColumnsEnabledMock = vi.fn(() => true);
+const newsBodyRendererMock = vi.fn();
+
+function applyRootTitleTemplate(title: unknown): string {
+  if (typeof title !== "string") {
+    throw new Error("Page metadata title must be a string");
+  }
+  return `${title} | THE PICKLE BANG THEORY`;
+}
 
 vi.mock("@/lib/microcms/columnsQueries", () => ({
   getColumnDetail: (a: unknown) => getColumnDetailMock(a),
@@ -26,7 +34,10 @@ vi.mock("@/config/featureFlags", () => ({
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 vi.mock("@/components/news/NewsBodyRenderer", () => ({
-  NewsBodyRenderer: () => <div data-testid="body" />,
+  NewsBodyRenderer: (props: unknown) => {
+    newsBodyRendererMock(props);
+    return <div data-testid="body" />;
+  },
 }));
 vi.mock("@/components/news/PreviewBanner", () => ({
   PreviewBanner: () => <div data-testid="preview-banner" />,
@@ -51,6 +62,7 @@ describe("ColumnDetailPage", () => {
     getColumnSlugsMock.mockReset();
     notFoundMock.mockClear();
     isCmsColumnsEnabledMock.mockReturnValue(true);
+    newsBodyRendererMock.mockClear();
   });
 
   it("公開版: タイトルとカテゴリチップ", async () => {
@@ -61,6 +73,9 @@ describe("ColumnDetailPage", () => {
     expect(screen.getByText("屋内の始め方")).toBeInTheDocument();
     expect(screen.getByText("はじめ方・体験")).toBeInTheDocument();
     expect(screen.queryByTestId("preview-banner")).not.toBeInTheDocument();
+    expect(newsBodyRendererMock).toHaveBeenCalledWith(
+      expect.objectContaining({ articleSlug: "x" }),
+    );
   });
 
   it("eyecatch/カテゴリ無し・publishedAt 無しでも本文を描画する(欠落耐性)", async () => {
@@ -175,16 +190,18 @@ describe("ColumnDetailPage", () => {
     expect(await generateStaticParams()).toEqual([]);
   });
 
-  it("generateMetadata: 公開版は title/excerpt", async () => {
+  it("generateMetadata: 日本語記事はルートtemplate適用後もブランド名が1回だけ", async () => {
     getColumnDetailMock.mockResolvedValue(
-      makeParsedColumnItem({ slug: "x", title: "T", excerpt: "E" }),
+      makeParsedColumnItem({ slug: "x", title: "日本語記事", excerpt: "E" }),
     );
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "ja", slug: "x" }),
       searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("T");
+    expect(applyRootTitleTemplate(meta.title)).toBe(
+      "日本語記事 | THE PICKLE BANG THEORY",
+    );
     expect(meta.description).toBe("E");
   });
 
@@ -200,10 +217,10 @@ describe("ColumnDetailPage", () => {
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
-  it("generateMetadata: en は対向 locale を ja で引く", async () => {
+  it("generateMetadata: 英語記事はルートtemplate適用後もブランド名が1回だけ", async () => {
     getColumnDetailMock
       .mockResolvedValueOnce(
-        makeParsedColumnItem({ slug: "x", locale: "en", title: "T" }),
+        makeParsedColumnItem({ slug: "x", locale: "en", title: "English article" }),
       )
       .mockResolvedValueOnce(null);
     const { generateMetadata } = await import("./page");
@@ -211,7 +228,9 @@ describe("ColumnDetailPage", () => {
       params: Promise.resolve({ locale: "en", slug: "x" }),
       searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("T");
+    expect(applyRootTitleTemplate(meta.title)).toBe(
+      "English article | THE PICKLE BANG THEORY",
+    );
     // 2回目の getColumnDetail は対向 locale=ja で呼ばれる。
     expect(getColumnDetailMock).toHaveBeenLastCalledWith({
       locale: "ja",

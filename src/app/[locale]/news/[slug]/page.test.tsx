@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { makeParsedNewsItem as makeNewsItem } from "../../../../../__mocks__/microcms-fixtures";
 
 const getNewsDetailMock = vi.fn();
@@ -10,6 +11,7 @@ const notFoundMock = vi.fn(() => {
 });
 const isCmsNewsEnabledMock = vi.fn(() => true);
 const routerPushMock = vi.fn();
+const trackCtaClickMock = vi.fn();
 
 vi.mock("@/lib/microcms/queries", () => ({
   getNewsDetail: (args: unknown) => getNewsDetailMock(args),
@@ -37,6 +39,9 @@ vi.mock("@/components/home/HomeNavigation", () => ({
 vi.mock("@/components/home/HomeFooter", () => ({
   default: () => null,
 }));
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClickMock(...args),
+}));
 
 async function renderPage(
   params: { locale: string; slug: string },
@@ -57,6 +62,27 @@ describe("NewsDetailPage", () => {
     getNewsSlugsMock.mockReset();
     notFoundMock.mockClear();
     isCmsNewsEnabledMock.mockReturnValue(true);
+    trackCtaClickMock.mockClear();
+  });
+
+  it("記事slugを本文CTA計測へ渡す", async () => {
+    getNewsDetailMock.mockResolvedValue(
+      makeNewsItem({
+        slug: "news-cta-guide",
+        bodyHtml:
+          '<p><a href="https://www.thepicklebang.com/reserve">予約する</a></p>',
+      }),
+    );
+    await renderPage({ locale: "ja", slug: "news-cta-guide" });
+
+    await userEvent.click(screen.getByRole("link", { name: "予約する" }));
+
+    expect(trackCtaClickMock).toHaveBeenCalledWith(
+      "reserveEntry",
+      "article_body_cta",
+      undefined,
+      { articleSlug: "news-cta-guide" },
+    );
   });
 
   it("記事+JSON-LD描画", async () => {
