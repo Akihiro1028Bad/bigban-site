@@ -19,6 +19,11 @@ build/
 .env.test.local
 .env.production.local
 
+# editor swap files (.env 編集中のスワップに本番シークレットが残るため)
+*.swp
+*.swo
+*~
+
 # debug
 npm-debug.log*
 yarn-debug.log*
