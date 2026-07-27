@@ -33,13 +33,13 @@ headless agent(承認画面「AIモデル」の工程別設定に応じて Claud
 | 工程 | 推奨プロバイダー / モデル | 推論強度 |
 |---|---|---|
 | 週次分析・提案 | Codex / `gpt-5.6-sol` | `xhigh` |
-| 記事下書き生成 | Claude / `claude-opus-4-8` | `high` |
+| 記事下書き生成 | Claude / `claude-opus-5` | `high` |
 | 施策成果物化 | Codex / `gpt-5.5` | `high` |
-| 構成案・タイトル修正 | Claude / `claude-opus-4-8` | `high` |
+| 構成案・タイトル修正 | Claude / `claude-opus-5` | `high` |
 | 画像プロンプト設計（初回・再生成共通） | Codex / `gpt-5.6-sol` | `high` |
-| 記事アドバイス | Claude / `claude-opus-4-8` | `high` |
+| 記事アドバイス | Claude / `claude-opus-5` | `high` |
 | 装飾提案 | Codex / `gpt-5.5` | `medium` |
-| アドバイス反映・本文コメント修正 | Claude / `claude-opus-4-8` | `high` |
+| アドバイス反映・本文コメント修正 | Claude / `claude-opus-5` | `high` |
 
 全AI工程で承認画面の工程別設定をそのまま使い、プロバイダー・モデル・推論強度は環境変数で上書きしない。Notionが一時的に読めない場合はコード内推奨値へフォールバックする。
 

@@ -180,6 +180,8 @@
    ```
    > **確認**: ログインは Mac と同一アカウントで。Claude 工程で使う Notion 連携（`mcp__claude_ai_Notion`）はアカウントに紐づくため、同じアカウントなら Windows でも使えます。
 
+   > **バージョン要件**: Claude 工程の既定モデル `claude-opus-5` は **Claude Code v2.1.219 以降**が必要です（Sonnet 5 は v2.1.197 以降）。`claude --version` が古い場合は `claude update` で更新してください。更新できない場合は承認画面 `AIモデル` で `claude-opus-4-8` へ一時的に戻します。
+
    Codex:
    ```powershell
    codex --version
@@ -348,7 +350,7 @@ npm run growth:fetch
 $env:GROWTH_DRYRUN=1; npm run growth:weekly; Remove-Item Env:\GROWTH_DRYRUN
 ```
 
-> **確認**: `[dry-run] ... claude -p --permission-mode default --allowedTools ...` と、続けて `[dry-run] then: npm run growth:notify-line ...` の 2 行が表示されれば **週次の DRYRUN 疎通 OK（初期構築の完了条件クリア）**。
+> **確認**: `[dry-run] ... codex -a never exec --sandbox danger-full-access ... --model gpt-5.6-sol ...` と、続けて `[dry-run] then: npm run growth:notify-line ...` の 2 行が表示されれば **週次の DRYRUN 疎通 OK（初期構築の完了条件クリア）**。週次の既定は Codex なので `claude -p` ではなく `codex ... exec` が出るのが正常です（承認画面 `AIモデル` で週次を Claude にしている場合は `claude -p ...` になります）。
 > ※ 最新取り込み（`git pull --ff-only`）は weekly モードだけが対象です。weekly でも `GROWTH_DRYRUN=1` や `GROWTH_SKIP_PULL=1` のときは、動作確認を壊さないため pull をスキップします。
 
 Codex 工程の dry-run（事前に承認画面 `AIモデル` で対象工程をCodexに設定）:

@@ -233,18 +233,18 @@ function draftOrchestratorEnv() {
 
 const FALLBACK_MODEL_SETTINGS = {
   weekly: { provider: "codex", model: "gpt-5.6-sol", effort: "xhigh" },
-  drafts: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
-  "drafts-auto": { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  drafts: { provider: "claude", model: "claude-opus-5", effort: "high" },
+  "drafts-auto": { provider: "claude", model: "claude-opus-5", effort: "high" },
   initiatives: { provider: "codex", model: "gpt-5.5", effort: "high" },
   "initiatives-auto": { provider: "codex", model: "gpt-5.5", effort: "high" },
-  revise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  revise: { provider: "claude", model: "claude-opus-5", effort: "high" },
   "image-prompt": { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
   regen: { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
   "regen-body": { provider: "codex", model: "gpt-5.6-sol", effort: "high" },
-  advise: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  advise: { provider: "claude", model: "claude-opus-5", effort: "high" },
   decorate: { provider: "codex", model: "gpt-5.5", effort: "medium" },
-  apply: { provider: "claude", model: "claude-opus-4-8", effort: "high" },
-  "comment-revise": { provider: "claude", model: "claude-opus-4-8", effort: "high" },
+  apply: { provider: "claude", model: "claude-opus-5", effort: "high" },
+  "comment-revise": { provider: "claude", model: "claude-opus-5", effort: "high" },
 };
 
 async function resolveSharedModelSetting() {
