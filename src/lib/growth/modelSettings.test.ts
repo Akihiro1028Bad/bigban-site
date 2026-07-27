@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MODEL_CATALOG,
   MODEL_PHASES,
   buildModelSettingProps,
   mergeModelSettings,
@@ -33,7 +34,7 @@ describe("工程別AIモデル設定", () => {
     expect(MODEL_PHASES.find((phase) => phase.id === "draft-write")).toMatchObject({
       label: "記事執筆",
       provider: "claude",
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       effort: "high",
     });
     expect(MODEL_PHASES.find((phase) => phase.id === "initiatives")).toMatchObject({
@@ -47,6 +48,40 @@ describe("工程別AIモデル設定", () => {
       effort: "high",
       modes: ["image-prompt", "regen", "regen-body"],
     });
+  });
+
+  it("カタログはClaude Opus 5を選択でき、旧世代のOpus 4.8も残す", () => {
+    expect(MODEL_CATALOG.find((item) => item.id === "claude-opus-5")).toMatchObject({
+      provider: "claude",
+      label: "Claude Opus 5",
+    });
+    expect(MODEL_CATALOG.find((item) => item.id === "claude-opus-4-8")).toMatchObject({
+      provider: "claude",
+    });
+  });
+
+  it.each(["draft-write", "revise", "advise", "apply", "comment-revise"])(
+    "Claude工程 %s の既定はOpus 5 / high",
+    (phaseId) => {
+      expect(MODEL_PHASES.find((phase) => phase.id === phaseId)).toMatchObject({
+        provider: "claude",
+        model: "claude-opus-5",
+        effort: "high",
+      });
+    },
+  );
+
+  it("既定モデルはカタログとプロバイダー・推論強度の検証を通る", () => {
+    for (const phase of MODEL_PHASES) {
+      expect(() =>
+        parseModelSettingInput({
+          phaseId: phase.id,
+          provider: phase.provider,
+          model: phase.model,
+          effort: phase.effort,
+        }),
+      ).not.toThrow();
+    }
   });
 
   it("autoモードは手動工程と設定を共有する", () => {

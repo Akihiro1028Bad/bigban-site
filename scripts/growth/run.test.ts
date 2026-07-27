@@ -183,10 +183,20 @@ describe("run.mjs dry-run の --model(#247)", () => {
     ).toContain("codex -a never exec");
   });
 
-  it("記事アドバイスは既定で Claude Opus 4.8 / high を使う", () => {
+  it.each(["revise", "advise", "apply", "comment-revise"])(
+    "Claude工程 %s は既定で Opus 5 / high を使う",
+    (mode) => {
+      const out = dryRun(mode);
+      expect(out).toContain("claude -p");
+      expect(out).toContain("--model claude-opus-5");
+      expect(out).toContain("--effort high");
+    },
+  );
+
+  it("記事アドバイスは既定で Claude Opus 5 / high を使う", () => {
     const out = dryRun("advise");
     expect(out).toContain("claude -p");
-    expect(out).toContain("--model claude-opus-4-8");
+    expect(out).toContain("--model claude-opus-5");
     expect(out).toContain("--effort high");
     expect(out).toContain("--allowedTools");
     expect(out).toContain("mcp__claude_ai_Notion");
@@ -251,7 +261,7 @@ describe("run.mjs dry-run の --model(#247)", () => {
   it("advise はアドバイスプロンプトと --model を付ける(#146)", () => {
     const out = dryRun("advise");
     expect(out).toContain("advise.md");
-    expect(out).toContain("--model claude-opus-4-8");
+    expect(out).toContain("--model claude-opus-5");
   });
 
   it("initiatives は既定で Codex GPT-5.5 / high を使う", () => {
@@ -445,7 +455,7 @@ describe("run.mjs の工程別モデル設定", () => {
     });
 
     expect(out).toContain("claude -p");
-    expect(out).toContain("--model claude-opus-4-8");
+    expect(out).toContain("--model claude-opus-5");
     expect(out).toContain("--effort high");
   });
 
