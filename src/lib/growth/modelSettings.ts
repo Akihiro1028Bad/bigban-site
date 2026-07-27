@@ -71,10 +71,16 @@ export const MODEL_CATALOG: readonly ModelCatalogItem[] = [
     note: "最も要求の高い長時間推論・エージェント処理向け。",
   },
   {
+    id: "claude-opus-5",
+    provider: "claude",
+    label: "Claude Opus 5",
+    note: "文章品質、編集判断、長い文脈の維持に強い現行の主力。",
+  },
+  {
     id: "claude-opus-4-8",
     provider: "claude",
     label: "Claude Opus 4.8",
-    note: "文章品質、編集判断、長い文脈の維持に強い。",
+    note: "旧世代のOpus。挙動を戻したい場合の退避先。",
   },
   {
     id: "claude-sonnet-5",
@@ -145,7 +151,7 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     description: "確認済み事実と承認済み構成案だけから本文を1回で書く。",
     modes: ["drafts", "drafts-auto", "draft-write"],
     provider: "claude",
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     effort: "high",
   },
   {
@@ -163,7 +169,7 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     description: "行コメントやタイトル指示を読み、元案と比較できる修正案を作る。",
     modes: ["revise"],
     provider: "claude",
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     effort: "high",
   },
   {
@@ -181,7 +187,7 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     description: "文体・構成・根拠・CTAを読み、編集者視点の改善案を出す。",
     modes: ["advise"],
     provider: "claude",
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     effort: "high",
   },
   {
@@ -199,7 +205,7 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     description: "採用された改善案に対応する本文箇所だけを書き換える。",
     modes: ["apply"],
     provider: "claude",
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     effort: "high",
   },
   {
@@ -208,7 +214,7 @@ export const MODEL_PHASES: readonly ModelPhaseDefault[] = [
     description: "本文コメントを受け、対象ブロックだけを文脈に沿って修正する。",
     modes: ["comment-revise"],
     provider: "claude",
-    model: "claude-opus-4-8",
+    model: "claude-opus-5",
     effort: "high",
   },
 ] as const;
