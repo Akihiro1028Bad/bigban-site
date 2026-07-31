@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 
 import jaMessages from "../../../messages/ja.json";
+import enMessages from "../../../messages/en.json";
 
 import HomeContributors from "./HomeContributors";
 
@@ -22,6 +23,14 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
 function renderSection() {
   return render(
     <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      <HomeContributors />
+    </NextIntlClientProvider>,
+  );
+}
+
+function renderSectionEn() {
+  return render(
+    <NextIntlClientProvider locale="en" messages={enMessages}>
       <HomeContributors />
     </NextIntlClientProvider>,
   );
@@ -73,6 +82,14 @@ describe("HomeContributors", () => {
     const link = screen.getByRole("link", { name: /支援者のご紹介を見る/ });
     expect(link).toHaveAttribute("href", "/contributors");
     expect(link.className).not.toContain("bg-accent");
+  });
+
+  it("英語では日本語サブラベルを出さない(kickerJa が空)", () => {
+    renderSectionEn();
+
+    expect(screen.getByText("CROWDFUNDING")).toBeInTheDocument();
+    // en の kickerJa は空文字。空の span を描かないことを保証する。
+    expect(screen.getByText("CROWDFUNDING").querySelector("span")).toBeNull();
   });
 
   it("CTA クリックで計測イベントを送る", () => {
