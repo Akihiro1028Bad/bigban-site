@@ -50,7 +50,7 @@ export default async function ContributorsPage({ params }: ContributorsPageProps
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const breadcrumbName = locale === "ja" ? "支援者ウォール" : "Contributors";
+  const breadcrumbName = locale === "ja" ? "クラウドファンディング支援者" : "Contributors";
 
   return (
     <>

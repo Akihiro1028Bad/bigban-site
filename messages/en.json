@@ -59,7 +59,7 @@
     },
     "contributors": {
       "title": "Contributors",
-      "description": "Meet the supporters who made the launch of THE PICKLE BANG THEORY possible.",
+      "description": "Introducing the backers who chose the web listing reward in our crowdfunding campaign.",
       "keywords": [
         "contributors",
         "crowdfunding",
@@ -577,10 +577,18 @@
       "hoursValue": "6:00 – 23:00"
     }
   },
+  "HomeContributors": {
+    "kicker": "CROWDFUNDING",
+    "kickerJa": "",
+    "title": "CONTRIBUTORS",
+    "titleJa": "Crowdfunding Supporters",
+    "description": "Many people supported us through our crowdfunding campaign. Those who chose the web listing reward are introduced on a dedicated page.",
+    "cta": "View the contributors"
+  },
   "Contributors": {
     "title": "CONTRIBUTORS",
     "titleJa": "Crowdfunding Supporters",
-    "lede": "THE PICKLE BANG THEORY began with these people. Their names are engraved on the wall inside the facility, and will remain there for as long as this place stands."
+    "lede": "Many people supported THE PICKLE BANG THEORY through our crowdfunding campaign. This page introduces those who chose the web listing reward. Their names will remain here for as long as this place stands."
   },
   "Tokushoho": {
     "heading": "Specified Commercial Transactions Act",

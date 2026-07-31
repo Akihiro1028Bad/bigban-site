@@ -73,7 +73,7 @@ describe("ContributorsPage", () => {
     await ContributorsPage({ params: Promise.resolve({ locale: "ja" }) });
 
     expect(buildBreadcrumb).toHaveBeenCalledWith("ja", [
-      { name: "支援者ウォール", path: "/contributors" },
+      { name: "クラウドファンディング支援者", path: "/contributors" },
     ]);
   });
 
