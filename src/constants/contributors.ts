@@ -136,7 +136,7 @@ export const CONTRIBUTORS: readonly Contributor[] = [
   {
     id: "akihisa-kawamoto",
     tier: "small",
-    name: "AKIHISA KAWAMOTO",
+    name: "川本晃久",
     url: "https://www.akika-enterprises.com/",
   },
   {
@@ -147,21 +147,22 @@ export const CONTRIBUTORS: readonly Contributor[] = [
     // 備考: 数ヶ月以内にロゴ変更予定。差し替え前提。
   },
   { id: "pkuru", tier: "small", name: "pkuru.com" },
-  { id: "takehiko-toyoda", tier: "small", name: "豊田 毅彦" },
-  { id: "tomotaka-endo", tier: "small", name: "遠藤 共峻" },
+  { id: "takehiko-toyoda", tier: "small", name: "豊田　毅彦" },
+  { id: "tomotaka-endo", tier: "small", name: "遠藤共峻" },
   { id: "suzuko-k", tier: "small", name: "Suzuko K." },
   { id: "eiichiro-nemoto", tier: "small", name: "根本英一郎" },
   {
     id: "takehiko-iwanaga",
     tier: "small",
-    name: "岩永武彦",
-    // 備考: 長い掲載名が可なら「岩永武彦(栃木県喜連川)」を希望。
+    name: "岩永武彦(栃木県喜連川)",
+    // 備考: 「長くて良いなら『岩永武彦(栃木県喜連川)』、長いのがNGなら『岩永武彦』」。
+    // 本ページに文字数制限は無いため希望どおり長い方を採用。
   },
   { id: "yasunori-matsudaira", tier: "small", name: "松平泰紀" },
   {
     id: "masayoshi-ono",
     tier: "small",
-    name: "小野 正善",
+    name: "小野　正善",
     // 備考欄にリターン説明文がそのまま貼られている。掲載名不明。
   },
 ] as const;
