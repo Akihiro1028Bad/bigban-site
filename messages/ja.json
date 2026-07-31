@@ -68,6 +68,17 @@
         "RST Agency"
       ]
     },
+    "contributors": {
+      "title": "クラウドファンディング支援者",
+      "description": "クラウドファンディングでウェブ掲載のリターンを選んでくださった皆さまをご紹介します。",
+      "keywords": [
+        "支援者",
+        "クラウドファンディング",
+        "THE PICKLE BANG THEORY",
+        "ピックルボール",
+        "市川"
+      ]
+    },
     "teaser": {
       "keywords": [
         "ピックルボール",
@@ -426,6 +437,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
+    "contributors": "クラウドファンディング支援者",
     "address": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -578,6 +590,19 @@
       "addressValue": "千葉県市川市八幡2-16-6 八幡ハタビル 6階",
       "hoursValue": "6:00 – 23:00"
     }
+  },
+  "HomeContributors": {
+    "kicker": "CROWDFUNDING",
+    "kickerJa": "クラウドファンディング",
+    "title": "CONTRIBUTORS",
+    "titleJa": "クラウドファンディング支援者",
+    "description": "クラウドファンディングでは、数多くの方に支援していただきました。そのうちウェブ掲載のリターンを選んでくださった皆さまを、専用ページでご紹介しています。",
+    "cta": "支援者のご紹介を見る"
+  },
+  "Contributors": {
+    "title": "CONTRIBUTORS",
+    "titleJa": "クラウドファンディング支援者",
+    "lede": "クラウドファンディングでは、数多くの方に THE PICKLE BANG THEORY を支援していただきました。このページでは、そのうちウェブ掲載のリターンを選んでくださった皆さまをご紹介します。この場所が続く限り、掲載を続けます。"
   },
   "Tokushoho": {
     "heading": "特定商取引法に基づく表記",

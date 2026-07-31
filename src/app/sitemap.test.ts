@@ -16,17 +16,18 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ5つ + ニュース一覧1つ = 6エントリ（slugなし時）", async () => {
+  it("静的ページ6つ + ニュース一覧1つ = 7エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(6);
+    expect(entries).toHaveLength(7);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
     expect(urls).toContain(`${PROD_URL}/reserve`);
     expect(urls).toContain(`${PROD_URL}/hyrox`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
+    expect(urls).toContain(`${PROD_URL}/contributors`);
     expect(urls).toContain(`${PROD_URL}/news`);
   });
 

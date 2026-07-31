@@ -43,6 +43,7 @@ vi.mock("@/components/home/HomeColumns", () => ({
   ),
 }));
 vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeContributors", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 

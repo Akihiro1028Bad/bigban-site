@@ -154,6 +154,17 @@ describe("HomeFooter", () => {
     expect(link).toHaveAttribute("href", "/tokushoho");
   });
 
+  it("クラウドファンディング支援者ページへのリンクを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: "クラウドファンディング支援者" });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/contributors");
+  });
+
   it("フッターに HYROX ページへのリンクがある", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

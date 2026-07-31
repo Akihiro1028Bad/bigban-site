@@ -326,8 +326,10 @@ describe("AboutContent 05 NEWS (CMS integration)", () => {
   it("newsItems=[] (flag OFF / fetch失敗時) は旧ハードコード表示", async () => {
     const { default: AboutContentReloaded } = await import("./AboutContent");
     renderWithIntl(<AboutContentReloaded newsItems={[]} locale="ja" />);
+    // フッターの「クラウドファンディング支援者」リンクと衝突しないよう、
+    // 旧ハードコードのニュース見出しを完全一致で指定する。
     expect(
-      screen.getByText(/クラウドファンディング/),
+      screen.getByText("クラウドファンディング実施中！"),
     ).toBeInTheDocument();
   });
 
