@@ -58,8 +58,9 @@ export const CONTRIBUTORS: readonly Contributor[] = [
     id: "yanesen-lab",
     tier: "large",
     name: "谷根千ラボ東京",
+    url: "https://yanesenmeow.buyshop.jp/",
     logo: LOGO_YANESEN,
-    // 備考: 掲載の実務連絡先が別メールに指定されている。リンク先URL未確定。
+    // 備考: 掲載の実務連絡先は yanesenlab_sato@gmail.com に指定されている。
   },
   {
     id: "pickle-peak",
