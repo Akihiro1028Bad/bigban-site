@@ -99,6 +99,12 @@ export default function HomeFooter() {
             >
               {tFooter("tokushoho")}
             </Link>
+            <Link
+              href="/contributors"
+              className="text-xs text-text-gray hover:text-text-light transition-colors"
+            >
+              {tFooter("contributors")}
+            </Link>
           </div>
           <p className="text-xs text-text-gray">
             {tFooter("address")}
