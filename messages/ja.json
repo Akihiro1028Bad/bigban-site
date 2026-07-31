@@ -68,6 +68,17 @@
         "RST Agency"
       ]
     },
+    "contributors": {
+      "title": "支援者ウォール",
+      "description": "THE PICKLE BANG THEORY の立ち上げを支えてくださった支援者の皆さまをご紹介します。",
+      "keywords": [
+        "支援者",
+        "クラウドファンディング",
+        "THE PICKLE BANG THEORY",
+        "ピックルボール",
+        "市川"
+      ]
+    },
     "teaser": {
       "keywords": [
         "ピックルボール",
@@ -426,6 +437,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
+    "contributors": "支援者ウォール",
     "address": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -578,6 +590,11 @@
       "addressValue": "千葉県市川市八幡2-16-6 八幡ハタビル 6階",
       "hoursValue": "6:00 – 23:00"
     }
+  },
+  "Contributors": {
+    "title": "CONTRIBUTORS",
+    "titleJa": "支援者ウォール",
+    "lede": "THE PICKLE BANG THEORY は、この方々の手で始まりました。お名前は店内のウォールに刻まれ、この場所が続く限り残ります。"
   },
   "Tokushoho": {
     "heading": "特定商取引法に基づく表記",
