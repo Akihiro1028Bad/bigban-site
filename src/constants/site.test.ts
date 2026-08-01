@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   LABOLA_CALENDAR_BASE,
   LABOLA_CALENDAR_TABS,
-  RESERVE_URL,
+  LABOLA_HYROX_URL,
+  LABOLA_PICKLEBALL_URL,
   buildLabolaCalendarSrc,
   reserveHref,
   resolveCalendarTabKey,
@@ -42,8 +43,14 @@ describe("labola calendar constants", () => {
     expect(reserveHref("hyrox")).toBe("/reserve?tab=hyrox");
   });
 
-  it("RESERVE_URL は外部予約サービス(RESERVA)のURL", () => {
-    expect(RESERVE_URL).toBe("https://reserva.be/tpbt");
+  it("予約導線の labola URL は日付を含まず常に現在の週を初期表示する", () => {
+    // 週を固定すると時間経過で過去の週が初期表示になるため、日付セグメントを持たせない。
+    expect(LABOLA_PICKLEBALL_URL).toBe(
+      `https://yoyaku.labola.jp/r/shop/3473/calendar_week/?&tab_name=${encodeURIComponent("ピックルボールコート")}`,
+    );
+    expect(LABOLA_HYROX_URL).toBe(
+      "https://yoyaku.labola.jp/r/shop/3473/calendar_week/?&tab_name=H%20Y%20R%20O%20X",
+    );
   });
 
   it("resolveCalendarTabKey は有効なキーをそのまま返す", () => {

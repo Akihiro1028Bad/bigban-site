@@ -325,7 +325,7 @@ bat. Leave clean negative space on one side for text. No text, no logos.
   - 施設について: `/ja/about`
   - トップ: `/ja`
   - お問い合わせ(トップ内アンカー): `/#contact`(独立した `/contact` ページは無い)
-- **予約導線は内部の予約案内ページ /reserve**(`https://www.thepicklebang.com/reserve`)を使う(RESERVA/labola の切替を /reserve が吸収する)。
+- **予約導線は内部の予約案内ページ /reserve**(`https://www.thepicklebang.com/reserve`)を使う(予約サービスの変更を /reserve が吸収するため、外部予約サービスへ直リンクしない)。
 - **リンク先が実在しない場合は張らない**(壊れた内部リンクを作らない)。
 
 ### 記事末の CTA(#218)
