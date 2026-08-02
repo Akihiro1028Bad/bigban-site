@@ -6,7 +6,6 @@ import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
 import { trackCtaClick, trackLabolaEntry } from "@/lib/analytics/trackEvent";
 import {
-  RESERVE_URL,
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
@@ -15,42 +14,35 @@ import {
 import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
 
 interface ChoiceCard {
-  periodKey: string;
+  tagKey: string;
   labelKey: string;
   descKey: string;
   ctaKey: string;
   href: string;
   location: string;
-  labolaEntryKind?: LabolaEntryKind;
+  // 予約先は labola に一本化済みのため、全カードが専用流入イベントを伴う。
+  labolaEntryKind: LabolaEntryKind;
 }
 
-// 7月分(RESERVA)と8月分(labola)はどちらも同等の選択肢のため同一スタイルで表示する。
-// 8月になったら JULY_CARD（7月までの予約=RESERVA）を PICKLEBALL_CARDS から削除する。
-const JULY_CARD: ChoiceCard = {
-  periodKey: "julyPeriod",
-  labelKey: "julyLabel",
-  descKey: "julyDesc",
-  ctaKey: "julyCta",
-  href: RESERVE_URL,
-  location: "reserve_choice_july",
-};
-
-const AUGUST_CARD: ChoiceCard = {
-  periodKey: "augPeriod",
-  labelKey: "augLabel",
-  descKey: "augDesc",
-  ctaKey: "augCta",
+// 旧予約システム(RESERVA)からの移行は完了済みで、予約先は labola に一本化されている。
+// location は移行期(8月以降カード)の値を維持する。GA4 の reservation_click を
+// 移行前後で連続した系列として見るため、意図的に改名していない。
+const COURT_CARD: ChoiceCard = {
+  tagKey: "courtTag",
+  labelKey: "courtLabel",
+  descKey: "courtDesc",
+  ctaKey: "courtCta",
   href: LABOLA_PICKLEBALL_URL,
   location: "reserve_choice_august",
   labolaEntryKind: "rental",
 };
 
-const PICKLEBALL_CARDS: readonly ChoiceCard[] = [JULY_CARD, AUGUST_CARD];
+const PICKLEBALL_CARDS: readonly ChoiceCard[] = [COURT_CARD];
 
 // HYROX は「エリア利用（枠貸し）」と「レッスン / クラス」の2カテゴリに分ける。
 // レッスン/クラスは現状 HYROX のみのため HYROX セクション内に内包する。
 const HYROX_AREA_CARD: ChoiceCard = {
-  periodKey: "hyroxAreaTag",
+  tagKey: "hyroxAreaTag",
   labelKey: "hyroxAreaLabel",
   descKey: "hyroxAreaDesc",
   ctaKey: "hyroxAreaCta",
@@ -60,7 +52,7 @@ const HYROX_AREA_CARD: ChoiceCard = {
 };
 
 const HYROX_LESSON_CARD: ChoiceCard = {
-  periodKey: "lessonKicker",
+  tagKey: "lessonKicker",
   labelKey: "lessonHeading",
   descKey: "lessonDesc",
   ctaKey: "lessonCta",
@@ -71,12 +63,17 @@ const HYROX_LESSON_CARD: ChoiceCard = {
 
 const HYROX_CARDS: readonly ChoiceCard[] = [HYROX_AREA_CARD, HYROX_LESSON_CARD];
 
-// カード2枚を並べる共通グリッド（ピックル／HYROX で共用）。
+// カードを並べる共通グリッド（ピックル／HYROX で共用）。
 function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
   const t = useTranslations("Reserve.choice");
+  // 1枚のときに2カラムのままだと左半分へ寄って崩れるため、中央寄せの1カラムにする。
+  const layoutClassName =
+    cards.length === 1
+      ? "mx-auto max-w-xl grid-cols-1"
+      : "grid-cols-1 md:grid-cols-2";
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:gap-8">
+    <div className={`grid gap-4 sm:gap-6 lg:gap-8 ${layoutClassName}`}>
       {cards.map((card, i) => (
         <motion.div
           key={card.ctaKey}
@@ -87,10 +84,10 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
           transition={{ duration: 1.0, delay: i * 0.12, ease: EASE }}
         >
           <p className="text-[10px] tracking-[0.25em] text-accent">
-            {t(card.periodKey)}
+            {t(card.tagKey)}
           </p>
-          {/* font-serif(Orbitron) は数字 7/8 が角張って読みづらいため、
-              数字を含む見出しは font-sans(Inter/Noto Sans JP) で統一する。 */}
+          {/* font-serif(Orbitron) のフォントスタックには和文フォントが無いため、
+              和文を含む見出しは font-sans(Inter/Noto Sans JP) で統一する。 */}
           <h3 className="mt-2 font-sans text-xl font-black tracking-wide text-text-light sm:mt-3 sm:text-2xl lg:text-3xl">
             {t(card.labelKey)}
           </h3>
@@ -102,7 +99,7 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
             {...EXTERNAL_LINK_PROPS}
             onClick={() => {
               trackCtaClick("reservation", card.location, t(card.ctaKey));
-              if (card.labolaEntryKind) trackLabolaEntry(card.labolaEntryKind);
+              trackLabolaEntry(card.labolaEntryKind);
             }}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3.5 text-sm font-bold tracking-[0.15em] text-deep-black transition-all hover:gap-3 hover:bg-accent/90 sm:mt-8 sm:py-4"
           >
@@ -156,11 +153,10 @@ export default function ReserveChoice() {
     <section className="bg-deep-black pb-16 lg:pb-24">
       <div className="mx-auto max-w-5xl px-6 lg:px-12">
         {/* ===== ピックルボールコート ===== */}
-        {/* 移行案内は7月/8月の予約先が分かれるピックルのみに紐づく */}
         <SectionHeading
           kickerKey="pickleballKicker"
           headingKey="pickleballHeading"
-          descKey="notice"
+          descKey="pickleballDesc"
         />
         <ChoiceCardGrid cards={PICKLEBALL_CARDS} />
 

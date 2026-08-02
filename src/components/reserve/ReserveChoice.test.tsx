@@ -3,7 +3,6 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import {
-  RESERVE_URL,
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
@@ -18,9 +17,9 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
 }));
 
 describe("ReserveChoice", () => {
-  it("利用月で予約先が分かれる案内文を表示する", () => {
+  it("ピックルボールコートの予約案内文を表示する", () => {
     renderWithIntl(<ReserveChoice />);
-    expect(screen.getByText(/予約サイトが異なります/)).toBeInTheDocument();
+    expect(screen.getByText(/空き状況の確認とご予約/)).toBeInTheDocument();
   });
 
   it("ピックルボールコート・HYROXエリア のセクション見出しを表示する", () => {
@@ -43,17 +42,9 @@ describe("ReserveChoice", () => {
     ).toBeInTheDocument();
   });
 
-  it("ピックル7月末までの予約は RESERVA へ外部リンクする", () => {
+  it("コートの予約は labola（ピックルタブ）へ外部リンクする", () => {
     renderWithIntl(<ReserveChoice />);
-    const link = screen.getByRole("link", { name: /7月末までの予約/ });
-    expect(link).toHaveAttribute("href", RESERVE_URL);
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  });
-
-  it("ピックル8月以降の予約は labola（ピックルタブ）へ外部リンクする", () => {
-    renderWithIntl(<ReserveChoice />);
-    const link = screen.getByRole("link", { name: /8月以降の予約/ });
+    const link = screen.getByRole("link", { name: /コートの予約/ });
     expect(link).toHaveAttribute("href", LABOLA_PICKLEBALL_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -75,36 +66,39 @@ describe("ReserveChoice", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("4種類の外部予約クリックを reservation_click として計測する", async () => {
+  it("移行前の予約先(RESERVA)への導線を残さない", () => {
+    renderWithIntl(<ReserveChoice />);
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(3);
+    for (const link of links) {
+      expect(link.getAttribute("href")).not.toMatch(/reserva\.be/);
+    }
+  });
+
+  it("3種類の外部予約クリックを reservation_click として計測する", async () => {
     trackCtaClick.mockClear();
     trackLabolaEntry.mockClear();
     renderWithIntl(<ReserveChoice />);
 
-    await userEvent.click(screen.getByRole("link", { name: /7月末までの予約/ }));
-    await userEvent.click(screen.getByRole("link", { name: /8月以降の予約/ }));
+    await userEvent.click(screen.getByRole("link", { name: /コートの予約/ }));
     await userEvent.click(screen.getByRole("link", { name: /エリアの予約/ }));
     await userEvent.click(screen.getByRole("link", { name: /レッスンの予約/ }));
 
+    // location はGA4の計測連続性のため移行前の値を維持する。
     expect(trackCtaClick).toHaveBeenNthCalledWith(
       1,
       "reservation",
-      "reserve_choice_july",
-      "7月末までの予約",
+      "reserve_choice_august",
+      "コートの予約",
     );
     expect(trackCtaClick).toHaveBeenNthCalledWith(
       2,
-      "reservation",
-      "reserve_choice_august",
-      "8月以降の予約",
-    );
-    expect(trackCtaClick).toHaveBeenNthCalledWith(
-      3,
       "reservation",
       "reserve_choice_hyrox_area",
       "エリアの予約",
     );
     expect(trackCtaClick).toHaveBeenNthCalledWith(
-      4,
+      3,
       "reservation",
       "reserve_choice_hyrox_lesson",
       "レッスンの予約",

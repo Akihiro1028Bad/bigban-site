@@ -255,7 +255,7 @@ data source `collection://27d6794f-4133-4cd4-9407-491d95c1b82b` に1行(1ペー�
 4. 反映には数時間〜1日かかる。反映後、GA4 Data API の `keyEvents` 指標に値が入り、週次計測ループが取り込む。
 5. 成功指標「予約クリック◯件/月」は、この予約クリック key event の月次合計で読む。
 
-> 注: 予約導線は内部の予約案内ページ `/reserve`(`https://www.thepicklebang.com/reserve`)に集約済み(旧: 外部 RESERVA 直リンク。RESERVA→labola 切替を /reserve ページが吸収するため内部化)。/reserve ページ内の RESERVA/labola ボタン自体は `src/app/[locale]/reserve/` が持ち、`RESERVE_URL`(`src/constants/site.ts` = 外部 reserva.be)はそこで使う。GA4 側の key event 指定(上記の /reserve `page_view`)だけが未了の人手作業。LINE / Instagram は従来どおり外部リンク。
+> 注: 予約導線は内部の予約案内ページ `/reserve`(`https://www.thepicklebang.com/reserve`)に集約済み(旧: 外部 RESERVA 直リンク。予約システム切替を /reserve ページが吸収するため内部化)。RESERVA→labola の移行は 2026-08 に完了し、予約先は labola に一本化された。/reserve ページ内の予約ボタン自体は `src/app/[locale]/reserve/` が持ち、遷移先 URL(`LABOLA_PICKLEBALL_URL` / `LABOLA_HYROX_URL` / `LABOLA_SCHOOL_URL`・`src/constants/site.ts`)はそこで使う。GA4 側の key event 指定(上記の /reserve `page_view`)だけが未了の人手作業。LINE / Instagram は従来どおり外部リンク。
 
 ## slug汚染の回復（セルフヒール・#26）
 

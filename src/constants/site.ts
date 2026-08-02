@@ -12,32 +12,28 @@ export const OG_IMAGE = {
   alt: "THE PICKLE BANG THEORY",
 } as const;
 
-// 7月までのご予約（現行 RESERVA）。2026年8月のご利用分から labola へ移行する。
-export const RESERVE_URL = "https://reserva.be/tpbt";
-
 // labola 予約 URL を組み立てる。tabName は labola 管理画面のカテゴリ名と完全一致。
 const LABOLA_SHOP_BASE = "https://yoyaku.labola.jp/r/shop/3473";
-// 週指定ビュー（weekStartPath 例 "2026/7/27" の週を初期表示）。
-function labolaWeekUrl(weekStartPath: string, tabName: string): string {
-  return `${LABOLA_SHOP_BASE}/calendar_week/${weekStartPath}/?tab_name=${encodeURIComponent(tabName)}`;
-}
-// ピックルボールコートの8月以降のご予約（labola・ピックルタブ・7/27 週=8/1 を含む週）。
-export const LABOLA_PICKLEBALL_URL = labolaWeekUrl(
-  "2026/7/27",
-  "ピックルボールコート",
-);
-
-// HYROX のご予約（labola・HYROX タブ・日付なし＝現在の週を表示）。
+// 週表示ビュー（日付なし＝閲覧時点の週を初期表示）。
+// 週を固定すると時間経過で過去の週が開いてしまうため、日付セグメントは持たせない。
 // labola が日付未指定時に生成する形式（?& 区切り）をそのまま採用。
-export const LABOLA_HYROX_URL =
-  "https://yoyaku.labola.jp/r/shop/3473/calendar_week/?&tab_name=H%20Y%20R%20O%20X";
+function labolaCurrentWeekUrl(tabName: string): string {
+  return `${LABOLA_SHOP_BASE}/calendar_week/?&tab_name=${encodeURIComponent(tabName)}`;
+}
+
+// ピックルボールコートのご予約（labola・ピックルタブ）。
+export const LABOLA_PICKLEBALL_URL =
+  labolaCurrentWeekUrl("ピックルボールコート");
+
+// HYROX のご予約（labola・HYROX タブ）。
+export const LABOLA_HYROX_URL = labolaCurrentWeekUrl("H Y R O X");
 
 // レッスン / クラスのご予約（labola・スクール予約）。
 // コート/HYROX の calendar_week（枠貸し）とは別系統の event/school パス。
 export const LABOLA_SCHOOL_URL =
   "https://yoyaku.labola.jp/r/shop/3473/event/school/";
 
-// 内部予約案内ページのパス（next-intl Link 用）。7月=RESERVA / 8月以降=labola の二択を案内する。
+// 内部予約案内ページのパス（next-intl Link 用）。予約カテゴリごとの labola 導線を案内する。
 export const RESERVE_PATH = "/reserve";
 
 // labola 予約カレンダー (shop 3473, 一日表示) の埋め込みベース URL。
