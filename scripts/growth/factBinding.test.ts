@@ -399,6 +399,42 @@ describe("validateAndStripFactBindings", () => {
     )).toThrow(/fact marker/);
   });
 
+  // 列見出しの語(時間帯・区分 等)は fact の文面に現れないことが多い。値が時刻・金額などで
+  // fact に裏付けられるセルまで見出しの字面一致を要求すると、正しい料金表が書けなくなる
+  // (2026-08-03 06:30 の失敗)。値だけで内容が特定できるセルは見出し照合を免除する。
+  describe("表セルの列見出し照合", () => {
+    const priceFact = fact(
+      "fact-price",
+      "コートレンタル料金は1面1時間あたり、平日6:00-9:00が4,980円、平日9:00-17:00が5,980円、平日17:00-23:00が7,980円、土日祝6:00-23:00が7,980円",
+    );
+
+    it.each(["時間帯", "区分"])("値がfactに裏付けられたセルは、列見出し「%s」がfactに無くても通る", (header) => {
+      expect(() => validate(
+        `<table><tr><th>${header}</th><th>料金</th></tr><tr><td>平日6:00-9:00<!--FACT:fact-price--></td><td>4,980円<!--FACT:fact-price--></td></tr></table>`,
+        [priceFact],
+      )).not.toThrow();
+    });
+
+    it("値がfactと食い違うセルは列見出しに関わらず拒否する", () => {
+      expect(() => validate(
+        '<table><tr><th>時間帯</th></tr><tr><td>平日6:00-10:00<!--FACT:fact-price--></td></tr></table>',
+        [priceFact],
+      )).toThrow(/一致しません/);
+    });
+
+    it("値だけでは内容を特定できない一般語セルは、列見出しの裏付けを引き続き要求する", () => {
+      const indoorFact = fact("fact-indoor", "施設Aは屋内コートあり");
+      expect(() => validate(
+        "<table><tr><th>屋内コート</th></tr><tr><td>あり<!--FACT:fact-indoor--></td></tr></table>",
+        [indoorFact],
+      )).not.toThrow();
+      expect(() => validate(
+        "<table><tr><th>駐車場</th></tr><tr><td>あり<!--FACT:fact-indoor--></td></tr></table>",
+        [indoorFact],
+      )).toThrow(/一致しません/);
+    });
+  });
+
   it.each([
     ["タグ外", "<p>料金は500円。</p><!--FACT:fact-price-->"],
     ["見出し", "<h2>料金500円<!--FACT:fact-price--></h2>"],
