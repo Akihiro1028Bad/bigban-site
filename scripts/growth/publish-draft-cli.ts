@@ -132,6 +132,8 @@ interface DraftSpec {
   notion?: { pageId: string; property: string; value: string };
   /** 根拠台帳(#根拠台帳)。読者非公開・監査用に Notion 行へ保存する(任意・欠落耐性)。 */
   sourceLedger?: unknown;
+  /** 値カバレッジ検証の非ブロック警告(#fact-coverage L3)。台帳末尾へ併記する(任意・欠落耐性)。 */
+  coverageWarnings?: unknown;
 }
 
 /** best-effort で LINE に通知する(送れなくても失敗にしない=沈黙させない補助)。 */
@@ -500,7 +502,7 @@ async function main(): Promise<void> {
         // 「根拠台帳」プロパティ未追加でも本体保存は成功させる(欠落耐性=台帳抜きでリトライ)。
         const ledgerResult = await updatePagePropsWithLedgerFallback({
           baseProps,
-          ledgerProps: buildSourceLedgerProps(ledgerEntries),
+          ledgerProps: buildSourceLedgerProps(ledgerEntries, spec.coverageWarnings),
           update: (props) => updatePageProps(notion.pageId, props, notionOpts),
         });
         if (ledgerResult.warning) {

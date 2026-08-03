@@ -10,6 +10,7 @@ import {
   factBindingFromRenderedText,
   hasReferenceEligibleSource,
   parseSourceLedger,
+  renderCoverageWarnings,
   renderSourceLedgerText,
   SOURCE_LEDGER_PROP,
   updatePagePropsWithLedgerFallback,
@@ -386,6 +387,41 @@ describe("hasReferenceEligibleSource", () => {
   });
 });
 
+describe("renderCoverageWarnings", () => {
+  const warning = {
+    kind: "unverified-facility-noun",
+    text: "船橋市総合体育館",
+    excerpt: "船橋市総合体育館を使えます",
+  };
+
+  it("捏造の疑いを1行1件で整形し、改行はエスケープする", () => {
+    expect(renderCoverageWarnings([warning, { ...warning, text: "西船橋駅", excerpt: "西船橋駅\nから近い" }])).toBe([
+      "⚠ 要確認(捏造の疑い): 船橋市総合体育館 本文「船橋市総合体育館を使えます」",
+      "⚠ 要確認(捏造の疑い): 西船橋駅 本文「西船橋駅\\nから近い」",
+    ].join("\n"));
+  });
+
+  it("欠落・不正な値は行にせず、投入を落とさない", () => {
+    expect(renderCoverageWarnings(undefined)).toBe("");
+    expect(renderCoverageWarnings([])).toBe("");
+    expect(renderCoverageWarnings([{ text: "", excerpt: "" }, null, warning])).toBe(
+      "⚠ 要確認(捏造の疑い): 船橋市総合体育館 本文「船橋市総合体育館を使えます」",
+    );
+  });
+
+  it("警告行は台帳の解析で安全に無視される", () => {
+    const rendered = [
+      renderSourceLedgerText([{ ...validEntry, factReferences: [auditReference] }]),
+      renderCoverageWarnings([warning]),
+    ].join("\n");
+
+    expect(confirmedFactsFromRenderedText(rendered)).toEqual(validEntry.confirmedFacts);
+    expect(factBindingFromRenderedText(rendered)).toMatchObject({ referenceCount: 1, isValid: true });
+    expect(parseSourceLedger([validEntry, warning]).entries).toEqual([validEntry]);
+    expect(parseSourceLedger([validEntry, warning]).warnings).toHaveLength(1);
+  });
+});
+
 describe("buildSourceLedgerProps", () => {
   it("根拠台帳プロパティを rich_text 形式で組み立てる", () => {
     const props = buildSourceLedgerProps([validEntry]);
@@ -399,6 +435,23 @@ describe("buildSourceLedgerProps", () => {
   it("空配列は rich_text を空にする(プロパティを空欄化)", () => {
     expect(buildSourceLedgerProps([])).toEqual({
       [SOURCE_LEDGER_PROP]: { rich_text: [] },
+    });
+  });
+
+  it("値カバレッジ警告を台帳本体の末尾へ併記する", () => {
+    const warnings = [{ kind: "unverified-facility-noun", text: "西船橋駅", excerpt: "西船橋駅から近い" }];
+
+    expect(buildSourceLedgerProps([validEntry], warnings)).toEqual({
+      [SOURCE_LEDGER_PROP]: {
+        rich_text: [{
+          text: {
+            content: `${renderSourceLedgerText([validEntry])}\n${renderCoverageWarnings(warnings)}`,
+          },
+        }],
+      },
+    });
+    expect(buildSourceLedgerProps([], warnings)).toEqual({
+      [SOURCE_LEDGER_PROP]: { rich_text: [{ text: { content: renderCoverageWarnings(warnings) } }] },
     });
   });
 });
