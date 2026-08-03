@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelPhaseSetting } from "../../src/lib/growth/modelSettings";
 
 import { buildDraftAgentInvocation, draftPhaseExecutionLabel, resolveDraftPhaseSetting, type DraftAiPhase, type DraftPhaseSetting } from "./draftAgent";
-import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, invalidatePublishResumeFiles, parseValidatedWriterOutput, prepareOutlineImages, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
+import { assemblePublishSpec, buildFacilityResearchContext, buildWriterInput, buildWriterRepairPrompt, cleanupDraftWorkDirs, draftInputFromPage, draftRunMode, invalidatePublishResumeFiles, parseValidatedWriterOutput, prepareOutlineImages, produceValidWriterOutput, publishedContentId, resolveDraftGenerationScope, runDraftNotificationBestEffort, selectRelevantFacilityContext, shouldResumePublishSpec, stageCacheKey, workerLogTargetFields } from "./draftOrchestrator";
 import type { DraftGenerationMarker } from "./draftOrchestrator";
 import { parseResearchPacket, RESEARCH_OUTPUT_JSON_SCHEMA, validateResearchPacketSources, type ResearchPacket, type ValidatedWriterOutput } from "./draftPipeline";
 import { parseFacilityContextData } from "./facility-context";
@@ -409,10 +409,36 @@ async function main(): Promise<void> {
       const wasCached = parsed !== null;
       const logId = await startPhaseLog(target.pageId, "draft-write", setting);
       try {
-        if (value === null) value = await runAgent({ phase: "draft-write", setting, prompt: `${promptWrite}\n\n<input_json>\n${JSON.stringify(writerInput)}\n</input_json>`, schema: writerSchema, workDir: writerWorkDir });
-        const writer = parsed ?? parseValidatedWriterOutput(value, research, prepared.outline);
-        if (!wasCached) saveCache(writerPath, writerKey, value);
-        await finishPhaseLog(logId, target.pageId, "draft-write", setting, "success", wasCached ? "cache hit" : "AI completed");
+        let writer: ValidatedWriterOutput;
+        let repairCount = 0;
+        if (parsed) {
+          writer = parsed;
+        } else {
+          const writerInputJson = JSON.stringify(writerInput);
+          const produced = await produceValidWriterOutput({
+            invokeWriter: async () => runAgent({ phase: "draft-write", setting, prompt: `${promptWrite}\n\n<input_json>\n${writerInputJson}\n</input_json>`, schema: writerSchema, workDir: writerWorkDir }),
+            invokeRepair: async (previousValue, errorMessage) => runAgent({
+              phase: "draft-write",
+              setting,
+              prompt: buildWriterRepairPrompt({
+                basePrompt: promptWrite,
+                writerInputJson,
+                previousOutputJson: JSON.stringify(previousValue),
+                errorMessage,
+              }),
+              schema: writerSchema,
+              workDir: writerWorkDir,
+            }),
+            validate: (candidate) => parseValidatedWriterOutput(candidate, research, prepared.outline),
+            isInfrastructureError: (error) => error instanceof ProcessExecutionError,
+          });
+          value = produced.value;
+          writer = produced.writer;
+          repairCount = produced.repairCount;
+          saveCache(writerPath, writerKey, value);
+        }
+        const detail = wasCached ? "cache hit" : repairCount > 0 ? `AI completed (repairs=${repairCount})` : "AI completed";
+        await finishPhaseLog(logId, target.pageId, "draft-write", setting, "success", detail);
         return { writer, research };
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
