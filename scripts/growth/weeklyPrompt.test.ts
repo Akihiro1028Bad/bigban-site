@@ -113,6 +113,19 @@ describe("週次分析の予約率中心プロンプト", () => {
     expect(weekly).toContain("全型が探索中");
   });
 
+  it("立ち上げ期の床が観測待ちを理由にした新規0件を防ぐ", () => {
+    const canonicalContracts = [weekly, articleIdea, goals, runbook];
+    for (const contract of canonicalContracts) {
+      expect(contract).toContain("立ち上げ期の床");
+      expect(contract).toContain("6本未満");
+      expect(contract).toContain("まだ試していない記事タイプ");
+      expect(contract).toContain("本命1件");
+    }
+    expect(weekly).toContain("却下・クローズを除く");
+    expect(weekly).toContain("新規0件にしない");
+    expect(weekly).toContain("引き続き出さない");
+  });
+
   it("承認画面のプロンプトタブで分析基準を参考資料として表示する", () => {
     expect(PROMPT_REGISTRY).toContainEqual(
       expect.objectContaining({

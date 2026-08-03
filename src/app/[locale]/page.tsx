@@ -19,6 +19,7 @@ import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
 import HomeColumns from "@/components/home/HomeColumns";
 import HomeAbout from "@/components/home/HomeAbout";
+import HomeContributors from "@/components/home/HomeContributors";
 import HomeAccess from "@/components/home/HomeAccess";
 import HomeFooter from "@/components/home/HomeFooter";
 
@@ -96,6 +97,7 @@ export default async function Home({ params }: HomePageProps) {
           <HomeColumns locale={locale} />
         </Suspense>
         <HomeAbout />
+        <HomeContributors />
         <HomeAccess />
         <HomeFooter />
       </main>

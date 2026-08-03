@@ -57,6 +57,17 @@
         "RST Agency"
       ]
     },
+    "contributors": {
+      "title": "Contributors",
+      "description": "Introducing the backers who chose the web listing reward in our crowdfunding campaign.",
+      "keywords": [
+        "contributors",
+        "crowdfunding",
+        "THE PICKLE BANG THEORY",
+        "pickleball",
+        "Ichikawa"
+      ]
+    },
     "teaser": {
       "keywords": [
         "pickleball",
@@ -127,7 +138,9 @@
   "PromoBanner": {
     "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
-    "ariaLabel": "30% off court campaign. Go to reservation page"
+    "textPbtClub": "🎉 PBT CLUB IS HERE | ~30% OFF court fees",
+    "ariaLabel": "30% off court campaign. Go to reservation page",
+    "ariaLabelPbtClub": "PBT CLUB membership, about 30% off court fees. Go to reservation page"
   },
   "Reserve": {
     "hero": {
@@ -135,17 +148,13 @@
       "subtitle": "Book a Court"
     },
     "choice": {
-      "notice": "We're currently switching booking systems. The booking site depends on the month of your visit, so please choose based on your reservation date.",
       "pickleballKicker": "PICKLEBALL COURT",
       "pickleballHeading": "Pickleball Court",
-      "julyLabel": "Bookings through July",
-      "julyPeriod": "Through July 2026",
-      "julyDesc": "For visits through July 2026.",
-      "julyCta": "Book through July",
-      "augLabel": "Bookings from August",
-      "augPeriod": "From August 2026",
-      "augDesc": "For visits from August 2026 onward.",
-      "augCta": "Book from August",
+      "pickleballDesc": "Check availability and book a court here.",
+      "courtTag": "COURT RENTAL",
+      "courtLabel": "Court Rental",
+      "courtDesc": "Book the pickleball court rental here.",
+      "courtCta": "Book a court",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROX Area",
       "hyroxDesc": "Book an area rental or a lesson / class.",
@@ -412,6 +421,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "Specified Commercial Transactions Act",
+    "contributors": "Contributors",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba 272-0021",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -564,6 +574,19 @@
       "addressValue": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
       "hoursValue": "6:00 – 23:00"
     }
+  },
+  "HomeContributors": {
+    "kicker": "CROWDFUNDING",
+    "kickerJa": "",
+    "title": "CONTRIBUTORS",
+    "titleJa": "Crowdfunding Supporters",
+    "description": "Many people supported us through our crowdfunding campaign. Those who chose the web listing reward are introduced on a dedicated page.",
+    "cta": "View the contributors"
+  },
+  "Contributors": {
+    "title": "CONTRIBUTORS",
+    "titleJa": "Crowdfunding Supporters",
+    "lede": "Many people supported THE PICKLE BANG THEORY through our crowdfunding campaign. This page introduces those who chose the web listing reward. Their names will remain here for as long as this place stands."
   },
   "Tokushoho": {
     "heading": "Specified Commercial Transactions Act",

@@ -107,7 +107,7 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
 
   const isJa = locale === "ja";
   const isHyrox = pathname === "/hyrox";
-  // 予約導線は内部の予約案内ページ(/reserve)。7月=RESERVA / 8月以降=labola の二択を案内する。
+  // 予約導線は内部の予約案内ページ(/reserve)。予約カテゴリごとの labola 導線を案内する。
   const reserveTo = RESERVE_PATH;
 
   return (

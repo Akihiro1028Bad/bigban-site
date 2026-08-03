@@ -68,6 +68,17 @@
         "RST Agency"
       ]
     },
+    "contributors": {
+      "title": "クラウドファンディング支援者",
+      "description": "クラウドファンディングでウェブ掲載のリターンを選んでくださった皆さまをご紹介します。",
+      "keywords": [
+        "支援者",
+        "クラウドファンディング",
+        "THE PICKLE BANG THEORY",
+        "ピックルボール",
+        "市川"
+      ]
+    },
     "teaser": {
       "keywords": [
         "ピックルボール",
@@ -141,7 +152,9 @@
   "PromoBanner": {
     "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
-    "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します"
+    "textPbtClub": "🎉 PBT CLUB会員スタート｜コート利用料が約30%OFF",
+    "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します",
+    "ariaLabelPbtClub": "PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します"
   },
   "Reserve": {
     "hero": {
@@ -149,17 +162,13 @@
       "subtitle": "コート予約"
     },
     "choice": {
-      "notice": "現在、予約システムの切り替えを行っております。ご利用になる月によって予約サイトが異なりますので、予約日を基準にお選びください。",
       "pickleballKicker": "PICKLEBALL COURT",
       "pickleballHeading": "ピックルボールコート",
-      "julyLabel": "〜7月のご予約",
-      "julyPeriod": "〜2026年7月",
-      "julyDesc": "2026年7月までのご利用分はこちらから。",
-      "julyCta": "7月末までの予約",
-      "augLabel": "8月以降のご予約",
-      "augPeriod": "2026年8月〜",
-      "augDesc": "2026年8月以降のご利用分はこちらから。",
-      "augCta": "8月以降の予約",
+      "pickleballDesc": "コートの空き状況の確認とご予約はこちらから。",
+      "courtTag": "COURT RENTAL",
+      "courtLabel": "コート利用",
+      "courtDesc": "ピックルボールコートの枠貸し予約はこちらから。",
+      "courtCta": "コートの予約",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROXエリア",
       "hyroxDesc": "エリア利用とレッスン／クラス、それぞれご予約いただけます。",
@@ -426,6 +435,7 @@
   "HomeFooter": {
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
+    "contributors": "クラウドファンディング支援者",
     "address": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -578,6 +588,19 @@
       "addressValue": "千葉県市川市八幡2-16-6 八幡ハタビル 6階",
       "hoursValue": "6:00 – 23:00"
     }
+  },
+  "HomeContributors": {
+    "kicker": "CROWDFUNDING",
+    "kickerJa": "クラウドファンディング",
+    "title": "CONTRIBUTORS",
+    "titleJa": "クラウドファンディング支援者",
+    "description": "クラウドファンディングでは、数多くの方に支援していただきました。そのうちウェブ掲載のリターンを選んでくださった皆さまを、専用ページでご紹介しています。",
+    "cta": "支援者のご紹介を見る"
+  },
+  "Contributors": {
+    "title": "CONTRIBUTORS",
+    "titleJa": "クラウドファンディング支援者",
+    "lede": "クラウドファンディングでは、数多くの方に THE PICKLE BANG THEORY を支援していただきました。このページでは、そのうちウェブ掲載のリターンを選んでくださった皆さまをご紹介します。この場所が続く限り、掲載を続けます。"
   },
   "Tokushoho": {
     "heading": "特定商取引法に基づく表記",
