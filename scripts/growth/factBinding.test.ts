@@ -415,9 +415,33 @@ describe("validateAndStripFactBindings", () => {
     expect(() => validate("<p>日本ピックルボール協会<!--FACT:fact-org-->。</p>", [fact("fact-org", "競技団体", "日本ピックルボール協会")])).not.toThrow();
     expect(() => validate("<p>HYROX<!--FACT:fact-brand-->。</p>", [fact("fact-brand", "HYROX向け設備")])).not.toThrow();
     expect(() => validate("<p>市川体育館を利用できます。</p>", [], [])).toThrow(/fact marker/);
-    expect(() => validate("<p>別の体育館<!--FACT:fact-brand-->。</p>", [fact("fact-brand", "HYROX向け設備")])).toThrow(/支えて|一致/);
-    expect(() => validate("<p>XHYROXQ<!--FACT:fact-brand-->。</p>", [fact("fact-brand", "HYROX向け設備")])).toThrow(/判定できません|一致/);
-    expect(() => validate("<p>説明<!--FACT:fact-brand-->。</p>", [fact("fact-brand", "HYROX向け設備")])).toThrow(/判定できません/);
+    // 英数字に挟まれた部分一致はブランド言及ではないので、根拠を求めない
+    expect(() => validate("<p>XHYROXQという語を紹介します。</p>", [fact("fact-brand", "HYROX向け設備")], [])).not.toThrow();
+  });
+
+  // 裏取り対象(数値・日付・施設名など)を含まない文は marker なしでも書ける。そこに marker が付いた場合、
+  // 照合対象が無いのでエラーにせず台帳にだけ残す。エラーにすると「markerが足りない」修復と
+  // 「markerが余計」エラーが往復して収束しない(2026-08-03 の失敗ループ)。
+  describe("裏取り対象を含まない文へのfact marker", () => {
+    const mapFact = fact("fact-map", "施設マップは各施設への問い合わせを案内している", "千葉県ピックルボール協会");
+    const mapHtml = "<p>同マップは、掲載施設について空き状況や利用可否を各施設へ問い合わせるよう案内しています<!--FACT:fact-map-->。</p>";
+
+    it("エラーにせず、claimKindsを空にした参照として台帳に残す", () => {
+      const result = validate(mapHtml, [mapFact]);
+
+      expect(result.references).toHaveLength(1);
+      expect(result.references[0].factId).toBe("fact-map");
+      expect(result.references[0].claimKinds).toEqual([]);
+      expect(result.cleanBodyHtml).not.toContain("FACT:");
+    });
+
+    it("markerを付けない場合も従来どおり書ける", () => {
+      expect(() => validate(mapHtml.replace("<!--FACT:fact-map-->", ""), [mapFact], [])).not.toThrow();
+    });
+
+    it("usedFactIdsとのID集合一致は従来どおり要求する", () => {
+      expect(() => validate(mapHtml, [mapFact], [])).toThrow(/一致しません/);
+    });
   });
 
   it("AIという語やhref・画像URLは走査しない", () => {
