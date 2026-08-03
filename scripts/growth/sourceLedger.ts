@@ -355,15 +355,45 @@ export function renderSourceLedgerText(entries: readonly SourceLedgerEntry[]): s
   return entries.map(renderEntry).join("\n");
 }
 
+const coverageWarningSchema = z.object({
+  text: z.string().min(1),
+  excerpt: z.string().min(1),
+});
+
+/**
+ * 値カバレッジ検証の非ブロック警告(捏造の疑い)を台帳末尾の行へ整形する(#fact-coverage L3)。
+ * 欠落耐性: 形の合わない項目は黙って落とさず、単に行にしない(投入は落とさない)。
+ */
+export function renderCoverageWarnings(warnings: unknown): string {
+  if (!Array.isArray(warnings)) return "";
+  return warnings
+    .flatMap((warning) => {
+      const parsed = coverageWarningSchema.safeParse(warning);
+      if (!parsed.success) return [];
+      return [`⚠ 要確認(捏造の疑い): ${parsed.data.text} 本文「${escapeAuditText(parsed.data.excerpt)}」`];
+    })
+    .join("\n");
+}
+
+function ledgerTextWithWarnings(
+  entries: readonly SourceLedgerEntry[],
+  warnings: unknown,
+): string {
+  const ledger = renderSourceLedgerText(entries);
+  const warningText = renderCoverageWarnings(warnings);
+  return [ledger, warningText].filter(Boolean).join("\n");
+}
+
 /**
  * 台帳を Notion の rich_text プロパティへ書き込む形に組み立てる。
  * chunkRichText が 2000 文字分割を担う。空配列は [] でプロパティを空欄化する。
  */
 export function buildSourceLedgerProps(
-  entries: readonly SourceLedgerEntry[]
+  entries: readonly SourceLedgerEntry[],
+  coverageWarnings: unknown = [],
 ): Record<string, unknown> {
   return {
-    [SOURCE_LEDGER_PROP]: { rich_text: chunkRichText(renderSourceLedgerText(entries)) },
+    [SOURCE_LEDGER_PROP]: { rich_text: chunkRichText(ledgerTextWithWarnings(entries, coverageWarnings)) },
   };
 }
 

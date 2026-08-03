@@ -1,3 +1,14 @@
+/**
+ * 値カバレッジ方式の fact 検証(marker 廃止版)。
+ *
+ * ブロック判定は「本文に書かれた値(金額・時刻・日付・数量・統計・健康断定)が
+ * fact 全体の和集合に存在するか」だけで行い、帰属(どの文がどの fact か)は検証しない。
+ * 台帳は機械の逆引きで生成し、言語理解が要る判定(捏造施設名の疑い)は warnings に降格する。
+ *
+ * 設計: .superpowers/sdd/task-fc-1.md。旧実装 factBinding.ts からの移植で、
+ * marker 走査・配置検査・usedFactIds 整合・表の列見出し照合は持ち込まない。
+ */
+
 import { Parser } from "htmlparser2";
 
 import {
@@ -28,10 +39,17 @@ export interface FactReference {
   claimKinds: FactClaimKind[];
 }
 
-export interface ValidatedFactBindings {
+export interface FactCoverageWarning {
+  /** 将来種別が増える前提の union。 */
+  kind: "unverified-facility-noun";
+  text: string;
+  excerpt: string;
+}
+
+export interface ValidatedFactCoverage {
   cleanBodyHtml: string;
-  usedFactIds: string[];
   references: FactReference[];
+  warnings: FactCoverageWarning[];
   binding: {
     version: number;
     bodyHash: string;
@@ -41,6 +59,8 @@ export interface ValidatedFactBindings {
 interface Atom {
   kind: FactClaimKind;
   canonical: string;
+  /** エラーメッセージへ出す本文の字面(NFKC 正規化後)。 */
+  text: string;
   start: number;
   end: number;
 }
@@ -50,28 +70,11 @@ interface FactSupport {
   normalizedText: string;
 }
 
-interface BoundRange {
-  start: number;
-  end: number;
-}
-
 interface ContainerState {
   name: FactReference["container"];
   index: number;
   text: string;
-  ranges: BoundRange[];
   sectionPath: string;
-  tableHeader?: string;
-}
-
-interface MarkerRecord {
-  start: number;
-  end: number;
-  ids: string[];
-  excerpt: string;
-  sectionPath: string;
-  container: ContainerState;
-  atoms: Atom[];
 }
 
 const CONTAINERS = new Set<FactReference["container"]>(["p", "li", "th", "td"]);
@@ -85,6 +88,7 @@ const HEALTH_PATTERNS = [
 const STATISTIC_WORDS = /最安|最高|最低|最大|最小|最多|最短|No\.?\s*1|平均|中央値|割合|調査では/gi;
 const EXCLUDED_PROPER_NOUNS = new Set(["AI"]);
 const NUMBER_SOURCE = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)`;
+const BARE_NUMBER_PREFIX = "number:";
 const FACILITY_SUFFIX_SOURCE = String.raw`(?:駅|体育館|クラブ|協会|連盟)`;
 const FACILITY_NOUN_PATTERN = new RegExp(`[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}${FACILITY_SUFFIX_SOURCE}`, "g");
 const FACILITY_SUFFIX_TAIL = new RegExp(`${FACILITY_SUFFIX_SOURCE}$`);
@@ -93,6 +97,17 @@ const FACILITY_PARTICLE_SPLIT = /[のはをがにでとへ]|より|から/;
 const GENERIC_FACILITY_PREFIXES = new Set([
   "地域", "地元", "近隣", "近所", "周辺", "市内", "都内", "県内", "沿線", "複数", "一般", "民間", "公営",
 ]);
+const FACT_MARKER_PATTERN = /<!--\s*FACT:[\s\S]*?-->/g;
+const SENTENCE_TERMINATORS = new Set(["。", "！", "？", "!", "?"]);
+const CLAIM_KIND_LABELS: Record<FactClaimKind, string> = {
+  price: "金額",
+  time: "時刻",
+  date: "日付",
+  quantity: "数量",
+  statistic: "統計",
+  health: "健康",
+  "proper-noun": "名称",
+};
 
 function normalized(value: string): string {
   return value
@@ -112,7 +127,13 @@ function pushMatches(
 ): void {
   for (const match of text.matchAll(pattern)) {
     const start = match.index;
-    atoms.push({ kind, canonical: canonical(match), start, end: start + match[0].length });
+    atoms.push({
+      kind,
+      canonical: canonical(match),
+      text: match[0],
+      start,
+      end: start + match[0].length,
+    });
   }
 }
 
@@ -123,8 +144,6 @@ function pushMatches(
  * - 接尾辞だけが残るもの(「沿線の駅」→「駅」)
  * - 前置きに活用や助詞が残る句(「地域で活動するクラブ」)。施設名の前置きは地名・組織名で、ひらがなを含まない
  * - 特定の施設を指さない一般修飾語(「地域クラブ」)
- *
- * 一般名詞を施設名と誤判定すると、その語を含む一般論が根拠なしには書けなくなる(#fact-marker 誤検知)。
  */
 function facilityProperNoun(matchText: string): string | null {
   const segments = matchText.split(FACILITY_PARTICLE_SPLIT).filter(Boolean);
@@ -134,6 +153,24 @@ function facilityProperNoun(matchText: string): string | null {
   if (/[ぁ-ん]/.test(prefix)) return null;
   if (GENERIC_FACILITY_PREFIXES.has(prefix)) return null;
   return noun;
+}
+
+interface FacilityNoun {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** 本文から施設系固有名詞を位置付きで拾う(warnings 生成用・ブロック判定には使わない)。 */
+function facilityProperNouns(value: string): FacilityNoun[] {
+  const nouns: FacilityNoun[] = [];
+  for (const match of value.matchAll(FACILITY_NOUN_PATTERN)) {
+    const noun = facilityProperNoun(match[0]);
+    if (noun === null) continue;
+    const start = match.index + match[0].lastIndexOf(noun);
+    nouns.push({ text: noun, start, end: start + noun.length });
+  }
+  return nouns;
 }
 
 function knownProperNouns(facts: readonly ResearchFact[]): string[] {
@@ -146,10 +183,7 @@ function knownProperNouns(facts: readonly ResearchFact[]): string[] {
         nouns.add(token[0]);
       }
     }
-    for (const match of statement.matchAll(FACILITY_NOUN_PATTERN)) {
-      const noun = facilityProperNoun(match[0]);
-      if (noun !== null) nouns.add(noun);
-    }
+    for (const noun of facilityProperNouns(statement)) nouns.add(noun.text);
   }
   return [...nouns].filter((noun) => noun.length > 0).sort((a, b) => b.length - a.length);
 }
@@ -174,14 +208,23 @@ function canonicalClock(match: string): string {
   return `clock:${hour}:${Number(numbers[1] ?? 0)}`;
 }
 
-function pushJapaneseProperNouns(atoms: Atom[], value: string): void {
-  for (const match of value.matchAll(FACILITY_NOUN_PATTERN)) {
-    const noun = facilityProperNoun(match[0]);
-    if (noun === null) continue;
-    const relativeStart = match[0].lastIndexOf(noun);
-    const start = match.index + relativeStart;
-    atoms.push({ kind: "proper-noun", canonical: normalized(noun), start, end: start + noun.length });
+/**
+ * 他アトムに覆われた冗長アトムか。
+ * - 日付の一部を数量として二重計上しない(「2026年4月17日」の「17日」)
+ * - 表セルの裸数値は、時刻・金額などの上位アトムに含まれるなら二重計上しない
+ *   (エラーメッセージを「値1つにつき1件」に保つため)
+ */
+function isCoveredByOtherAtom(atom: Atom, atoms: readonly Atom[]): boolean {
+  if (atom.kind === "quantity") {
+    return atoms.some((other) => other.kind === "date" && atom.start >= other.start && atom.end <= other.end);
   }
+  if (atom.canonical.startsWith(BARE_NUMBER_PREFIX)) {
+    return atoms.some((other) =>
+      !other.canonical.startsWith(BARE_NUMBER_PREFIX)
+      && atom.start >= other.start
+      && atom.end <= other.end);
+  }
+  return false;
 }
 
 function extractAtoms(text: string, facts: readonly ResearchFact[], isTableCell = false): Atom[] {
@@ -207,7 +250,7 @@ function extractAtoms(text: string, facts: readonly ResearchFact[], isTableCell 
   pushMatches(atoms, value, new RegExp(`${NUMBER_SOURCE}\\s*(?:時間|分|秒)`, "g"), "time", (match) => `duration:${normalized(match[0])}`);
   pushMatches(atoms, value, new RegExp(`(?<![\\d,])${NUMBER_SOURCE}\\s*(?:%|％|割|人|名|件|面|本|台|回|km|m|kg|g|日|週|か月|年|月|分|秒|倍|位)`, "gi"), "quantity", (match) => normalized(match[0]));
   pushMatches(atoms, value, STATISTIC_WORDS, "statistic");
-  if (isTableCell) pushMatches(atoms, value, new RegExp(NUMBER_SOURCE, "g"), "statistic", (match) => `number:${numeric(match[0])}`);
+  if (isTableCell) pushMatches(atoms, value, new RegExp(NUMBER_SOURCE, "g"), "statistic", (match) => `${BARE_NUMBER_PREFIX}${numeric(match[0])}`);
   for (const pattern of HEALTH_PATTERNS) pushMatches(atoms, value, pattern, "health");
   for (const noun of knownProperNouns(facts)) {
     let offset = 0;
@@ -218,29 +261,23 @@ function extractAtoms(text: string, facts: readonly ResearchFact[], isTableCell 
       const after = value[start + noun.length] ?? "";
       const isAsciiName = /^[A-Za-z0-9 ]+$/.test(noun);
       if (!isAsciiName || (!/[A-Za-z0-9]/.test(before) && !/[A-Za-z0-9]/.test(after))) {
-        atoms.push({ kind: "proper-noun", canonical: normalized(noun), start, end: start + noun.length });
+        atoms.push({
+          kind: "proper-noun",
+          canonical: normalized(noun),
+          text: noun,
+          start,
+          end: start + noun.length,
+        });
       }
       offset = start + noun.length;
     }
   }
-  pushJapaneseProperNouns(atoms, value);
   const unique = new Map<string, Atom>();
   for (const atom of atoms) {
-    const isDatePart = atom.kind === "quantity"
-      && atoms.some((candidate) => candidate.kind === "date" && atom.start >= candidate.start && atom.end <= candidate.end);
-    if (!isDatePart) unique.set(`${atom.kind}\u0000${atom.canonical}\u0000${atom.start}\u0000${atom.end}`, atom);
+    if (isCoveredByOtherAtom(atom, atoms)) continue;
+    unique.set(`${atom.kind}\u0000${atom.canonical}\u0000${atom.start}\u0000${atom.end}`, atom);
   }
   return [...unique.values()].sort((a, b) => a.start - b.start || a.end - b.end);
-}
-
-function supportForFact(fact: ResearchFact, facts: readonly ResearchFact[]): FactSupport {
-  const value = `${fact.statement} ${fact.sourceLabel ?? ""}`;
-  const supported = new Set(extractAtoms(value, facts).flatMap((atom) => supportKeys(atom)));
-  for (const match of value.normalize("NFKC").matchAll(new RegExp(NUMBER_SOURCE, "g"))) {
-    supported.add(`statistic:number:${numeric(match[0])}`);
-  }
-  if (fact.publishedYear !== undefined) supported.add(`date:year:${fact.publishedYear}`);
-  return { keys: supported, normalizedText: normalized(value) };
 }
 
 function atomKey(atom: Atom): string {
@@ -256,16 +293,28 @@ function supportKeys(atom: Atom): string[] {
   return keys;
 }
 
-function isAtomSupported(atom: Atom, supported: FactSupport): boolean {
-  if (atom.canonical.startsWith("table:")) {
-    // 値は時刻(6:00-9:00 等)で ":" を含むため、区切りには ":" を使わない。
-    const body = atom.canonical.slice("table:".length);
-    const separator = body.indexOf(" ");
-    const header = body.slice(0, separator);
-    const value = body.slice(separator + 1);
-    return supported.normalizedText.includes(value)
-      && (header.length === 0 || supported.normalizedText.includes(header));
+function supportForFact(fact: ResearchFact, facts: readonly ResearchFact[]): FactSupport {
+  const value = `${fact.statement} ${fact.sourceLabel ?? ""}`;
+  const supported = new Set(extractAtoms(value, facts).flatMap((atom) => supportKeys(atom)));
+  for (const match of value.normalize("NFKC").matchAll(new RegExp(NUMBER_SOURCE, "g"))) {
+    supported.add(`statistic:${BARE_NUMBER_PREFIX}${numeric(match[0])}`);
   }
+  if (fact.publishedYear !== undefined) supported.add(`date:year:${fact.publishedYear}`);
+  return { keys: supported, normalizedText: normalized(value) };
+}
+
+function unionSupport(facts: readonly ResearchFact[]): FactSupport {
+  const keys = new Set<string>();
+  const texts: string[] = [];
+  for (const fact of facts) {
+    const support = supportForFact(fact, facts);
+    for (const key of support.keys) keys.add(key);
+    texts.push(support.normalizedText);
+  }
+  return { keys, normalizedText: texts.join("\u0000") };
+}
+
+function isAtomSupported(atom: Atom, supported: FactSupport): boolean {
   return supportKeys(atom).some((key) => supported.keys.has(key));
 }
 
@@ -273,104 +322,32 @@ function sectionPath(headings: readonly string[]): string {
   return headings.filter(Boolean).join(" > ");
 }
 
-function tableClaimAtom(value: string, header: string | undefined): Atom | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  if (/^[A-Za-z]$/.test(trimmed)) return undefined;
-  return {
-    kind: "statistic",
-    canonical: `table:${normalized(header ?? "")} ${normalized(trimmed)}`,
-    start: 0,
-    end: value.length,
-  };
-}
-
-function atomsForContainerText(
-  text: string,
-  container: ContainerState,
-  facts: readonly ResearchFact[],
-): Atom[] {
-  const atoms = extractAtoms(text, facts, container.name === "td" || container.name === "th");
-  if (container.name === "td") {
-    // 時刻・金額などの通常アトムを含むセルは、値そのものが fact と照合されるため
-    // 列見出しの字面一致を要求しない。「時間帯」「区分」のような自然な見出し語は
-    // fact の文面に現れず、正しい料金表が書けなくなる(2026-08-03 06:30 の失敗)。
-    // 「あり」「可能」のような一般語だけのセルは、列見出しの裏付けを引き続き要求する。
-    const isValueAnchored = extractAtoms(text, facts, false).length > 0;
-    const tableAtom = tableClaimAtom(text, isValueAnchored ? undefined : container.tableHeader);
-    if (tableAtom) atoms.push(tableAtom);
-  }
-  return atoms;
-}
-
 function lastSentenceStart(value: string): number {
   const indices = [value.lastIndexOf("。"), value.lastIndexOf("！"), value.lastIndexOf("？"), value.lastIndexOf("!"), value.lastIndexOf("?")];
   return Math.max(...indices) + 1;
 }
 
-function assertMarkerPlacement(bodyHtml: string, marker: MarkerRecord): void {
-  const after = bodyHtml.slice(marker.end + 1);
-  if (marker.container.name === "td" || marker.container.name === "th") {
-    if (!new RegExp(`^\\s*</${marker.container.name}\\s*>`, "i").test(after)) {
-      throw new Error("fact markerは表セル終端直前に置いてください");
-    }
-    return;
+function sentenceEnd(value: string, from: number): number {
+  for (let index = from; index < value.length; index += 1) {
+    if (SENTENCE_TERMINATORS.has(value[index])) return index;
   }
-  if (!/^[。！？!?]/.test(after)) {
-    throw new Error("fact markerは主張文の句読点直前に置いてください");
-  }
+  return value.length;
 }
 
-function assertIdSets(markerIds: readonly string[], usedFactIds: readonly string[]): void {
-  if (new Set(usedFactIds).size !== usedFactIds.length) throw new Error("usedFactIdsに重複があります");
-  const markerSet = [...new Set(markerIds)].sort();
-  const usedSet = [...new Set(usedFactIds)].sort();
-  if (markerSet.join("\u0000") !== usedSet.join("\u0000")) {
-    throw new Error("本文markerのfact ID集合とusedFactIdsが一致しません");
-  }
+/** 一致箇所を含む1文を切り出す。表セルはセル全文を抜粋にする。 */
+function excerptAt(container: ContainerState, value: string, start: number, end: number): string {
+  if (container.name === "td" || container.name === "th") return value.trim();
+  return value.slice(lastSentenceStart(value.slice(0, start)), sentenceEnd(value, end)).trim();
 }
 
-const FACT_MARKER_COMMENT_SOURCE = String.raw`<!--\s*FACT:[\s\S]*?-->`;
-const FACT_MARKERS_AFTER_PUNCTUATION = new RegExp(
-  `([。！？!?])\\s*(${FACT_MARKER_COMMENT_SOURCE}(?:\\s*${FACT_MARKER_COMMENT_SOURCE})*)`,
-  "g",
-);
-
-export function normalizeFactMarkerPlacement(bodyHtml: string): string {
-  return bodyHtml.replace(
-    FACT_MARKERS_AFTER_PUNCTUATION,
-    (matched, punctuation: string, markerGroup: string, offset: number) => {
-      const followingHtml = bodyHtml.slice(offset + matched.length);
-      if (/^\s*<\/(?:td|th)\s*>/i.test(followingHtml)) return matched;
-
-      const markers = markerGroup.match(new RegExp(FACT_MARKER_COMMENT_SOURCE, "g"))!;
-      return `${markers.join("")}${punctuation}`;
-    },
-  );
-}
-
-export function validateAndStripFactBindings(params: {
-  bodyHtml: string;
-  usedFactIds: readonly string[];
-  facts: readonly ResearchFact[];
-}): ValidatedFactBindings {
-  const { facts, usedFactIds } = params;
-  const bodyHtml = normalizeFactMarkerPlacement(params.bodyHtml);
-  const factsById = new Map(facts.map((fact) => [fact.id, fact]));
+function scanContainers(bodyHtml: string): ContainerState[] {
   const headings: string[] = [];
-  const tagStack: string[] = [];
   const headingTexts: string[] = [];
   const containers: ContainerState[] = [];
   const containerStack: ContainerState[] = [];
   const containerCounts: Record<FactReference["container"], number> = { p: 0, li: 0, th: 0, td: 0 };
-  const markers: MarkerRecord[] = [];
-  let tableHeaders: string[] | undefined;
-  let tableColumn = 0;
   const parser = new Parser({
     onopentag(name) {
-      tagStack.push(name);
-      if (name === "table") tableHeaders = [];
-      if (name === "tr") tableColumn = 0;
       if (name === "h2" || name === "h3") headingTexts.push("");
       if (CONTAINERS.has(name as FactReference["container"])) {
         const containerName = name as FactReference["container"];
@@ -378,9 +355,7 @@ export function validateAndStripFactBindings(params: {
           name: containerName,
           index: ++containerCounts[containerName],
           text: "",
-          ranges: [],
           sectionPath: sectionPath(headings),
-          ...(containerName === "td" && tableHeaders ? { tableHeader: tableHeaders[tableColumn] } : {}),
         };
         containers.push(container);
         containerStack.push(container);
@@ -388,38 +363,12 @@ export function validateAndStripFactBindings(params: {
     },
     ontext(text) {
       if (headingTexts.length > 0) headingTexts[headingTexts.length - 1] += text;
-      const container = containerStack[containerStack.length - 1];
+      const container = containerStack.at(-1);
       if (container) {
         container.text += text;
       } else if (headingTexts.length === 0 && text.replace(/\{\{IMG:\d+\}\}/g, "").trim()) {
         throw new Error("見出し以外の可視テキストがp/li/th/td container外にあります");
       }
-    },
-    oncomment(data) {
-      if (!data.startsWith("FACT:")) return;
-      const match = /^FACT:(fact-[a-z0-9-]+(?:,fact-[a-z0-9-]+)*)$/i.exec(data);
-      if (!match) throw new Error(`fact marker形式が不正です: ${data}`);
-      if (tagStack.some((name) => name === "h2" || name === "h3")) throw new Error("見出し内にfact markerは置けません");
-      const container = containerStack[containerStack.length - 1];
-      if (!container) throw new Error("fact markerはp/li/th/td内に置いてください");
-      const claimStart = lastSentenceStart(container.text);
-      const excerpt = container.text.slice(claimStart).trim();
-      if (!excerpt) throw new Error("空の主張にfact markerは置けません");
-      const ids = match[1].split(",");
-      if (new Set(ids).size !== ids.length) throw new Error("同一marker内のfact IDが重複しています");
-      const atoms = atomsForContainerText(excerpt, container, facts);
-      const marker: MarkerRecord = {
-        start: parser.startIndex,
-        end: parser.endIndex,
-        ids,
-        excerpt,
-        sectionPath: container.sectionPath,
-        container,
-        atoms,
-      };
-      assertMarkerPlacement(bodyHtml, marker);
-      container.ranges.push({ start: claimStart, end: container.text.length });
-      markers.push(marker);
     },
     onclosetag(name) {
       if (name === "h2" || name === "h3") {
@@ -427,89 +376,133 @@ export function validateAndStripFactBindings(params: {
         if (name === "h2") headings.splice(0, headings.length, text);
         else headings.splice(1, headings.length - 1, text);
       }
-      if (CONTAINERS.has(name as FactReference["container"])) {
-        const container = containerStack.pop();
-        if (container && tableHeaders && (name === "th" || name === "td")) {
-          if (name === "th" && tableHeaders[tableColumn] === undefined) tableHeaders[tableColumn] = container.text.trim();
-          tableColumn += 1;
-        }
-      }
-      if (name === "table") tableHeaders = undefined;
-      tagStack.pop();
+      if (CONTAINERS.has(name as FactReference["container"])) containerStack.pop();
     },
   }, { decodeEntities: true, lowerCaseTags: true });
-
   parser.end(bodyHtml);
-  const factSyntaxCount = bodyHtml.match(/<!--\s*FACT(?::|\b)/gi)?.length ?? 0;
-  if (factSyntaxCount !== markers.length || /<!--FACT:[\s\S]*$/.test(bodyHtml.slice(markers.at(-1)?.end !== undefined ? markers.at(-1)!.end + 1 : 0))) {
-    throw new Error("不完全または不正なfact markerがあります");
-  }
+  return containers;
+}
 
-  const markerIds = markers.flatMap((marker) => marker.ids);
-  assertIdSets(markerIds, usedFactIds);
-  for (const id of markerIds) {
-    if (!factsById.has(id)) throw new Error(`未知のfact IDです: ${id}`);
-  }
+function containerAtoms(container: ContainerState, facts: readonly ResearchFact[]): Atom[] {
+  return extractAtoms(container.text, facts, container.name === "td" || container.name === "th");
+}
 
+/** L1: 本文の値が fact 全体の和集合に無ければ、全違反を1メッセージで列挙して throw する。 */
+function assertValuesAreCovered(
+  containers: readonly ContainerState[],
+  facts: readonly ResearchFact[],
+  union: FactSupport,
+): void {
+  const violations = new Map<string, Atom>();
   for (const container of containers) {
-    const atoms = atomsForContainerText(container.text, container, facts);
-    const unbound = atoms.filter((atom) => !container.ranges.some((range) => atom.start >= range.start && atom.end <= range.end));
-    if (unbound.length > 0) throw new Error(`fact markerのない必須主張があります: ${container.text.trim()}`);
+    for (const atom of containerAtoms(container, facts)) {
+      if (atom.kind === "proper-noun") continue;
+      if (isAtomSupported(atom, union)) continue;
+      violations.set(`${atom.kind}\u0000${atom.text}`, atom);
+    }
   }
+  if (violations.size === 0) return;
+  const listed = [...violations.values()]
+    .map((atom) => `${atom.text}(${CLAIM_KIND_LABELS[atom.kind]})`)
+    .join(" / ");
+  throw new Error(`根拠のない値があります: ${listed}`);
+}
 
-  const references: FactReference[] = [];
-  for (const marker of markers) {
-    // 裏取り対象を含まない文への marker は照合しようがないので、内容照合を飛ばして台帳にだけ残す。
-    // エラーにすると「marker が足りない」修復と「marker が余計」エラーが往復して収束しない。
-    // marker の有無で公開できる本文は変わらない(アトム0の文は marker なしでも書ける)ため、検証は緩まない。
-    const hasAtoms = marker.atoms.length > 0;
-    const supportByFact = new Map<string, FactSupport>();
-    for (const id of marker.ids) {
-      const targetFact = factsById.get(id)!;
-      supportByFact.set(id, supportForFact(targetFact, facts));
-    }
-    for (const atom of marker.atoms) {
-      if (![...supportByFact.values()].some((supported) => isAtomSupported(atom, supported))) {
-        throw new Error(`主張とfact内容が一致しません: ${marker.excerpt}`);
+function containerMatchCount(
+  containers: readonly ContainerState[],
+  container: ContainerState,
+): number {
+  const hash = bindingContainerTextHash(container.text);
+  return containers.filter(
+    (candidate) =>
+      candidate.name === container.name
+      && candidate.sectionPath === container.sectionPath
+      && bindingContainerTextHash(candidate.text) === hash,
+  ).length;
+}
+
+/** L2: fact の値アトムが本文のどこに現れるかを逆引きして台帳を組む。 */
+function buildReferences(
+  containers: readonly ContainerState[],
+  facts: readonly ResearchFact[],
+): FactReference[] {
+  const references = new Map<string, FactReference>();
+  for (const container of containers) {
+    const value = container.text.normalize("NFKC");
+    const atoms = containerAtoms(container, facts);
+    for (const fact of facts) {
+      const support = supportForFact(fact, facts);
+      for (const atom of atoms) {
+        if (!isAtomSupported(atom, support)) continue;
+        const excerpt = excerptAt(container, value, atom.start, atom.end);
+        const key = `${fact.id}\u0000${container.name}\u0000${container.index}\u0000${excerpt}`;
+        const current = references.get(key);
+        if (current) {
+          if (!current.claimKinds.includes(atom.kind)) current.claimKinds.push(atom.kind);
+          continue;
+        }
+        references.set(key, {
+          factId: fact.id,
+          excerpt,
+          sectionPath: container.sectionPath,
+          container: container.name,
+          containerIndex: container.index,
+          containerTextHash: bindingContainerTextHash(container.text),
+          containerMatchCount: containerMatchCount(containers, container),
+          claimKinds: [atom.kind],
+        });
       }
     }
-    for (const id of marker.ids) {
-      const supported = supportByFact.get(id)!;
-      if (hasAtoms && !marker.atoms.some((atom) => isAtomSupported(atom, supported))) {
-        throw new Error(`指定factが主張を支えていません: ${id}`);
-      }
-      references.push({
-        factId: id,
-        excerpt: marker.excerpt,
-        sectionPath: marker.sectionPath,
-        container: marker.container.name,
-        containerIndex: marker.container.index,
-        containerTextHash: bindingContainerTextHash(marker.container.text),
-        containerMatchCount: containers.filter(
-          (container) =>
-            container.name === marker.container.name
-            && container.sectionPath === marker.container.sectionPath
-            && bindingContainerTextHash(container.text) === bindingContainerTextHash(marker.container.text),
-        ).length,
-        claimKinds: [...new Set(marker.atoms.map((atom) => atom.kind))],
+  }
+  return [...references.values()];
+}
+
+/** L3: fact に無い施設系固有名詞を非ブロックの警告として報告する。 */
+function collectWarnings(
+  containers: readonly ContainerState[],
+  union: FactSupport,
+): FactCoverageWarning[] {
+  const warnings = new Map<string, FactCoverageWarning>();
+  for (const container of containers) {
+    const value = container.text.normalize("NFKC");
+    for (const noun of facilityProperNouns(value)) {
+      if (union.normalizedText.includes(normalized(noun.text))) continue;
+      const excerpt = excerptAt(container, value, noun.start, noun.end);
+      warnings.set(`${noun.text}\u0000${excerpt}`, {
+        kind: "unverified-facility-noun",
+        text: noun.text,
+        excerpt,
       });
     }
   }
+  return [...warnings.values()];
+}
 
-  let cleanBodyHtml = bodyHtml;
-  for (const marker of [...markers].sort((a, b) => b.start - a.start)) {
-    cleanBodyHtml = cleanBodyHtml.slice(0, marker.start) + cleanBodyHtml.slice(marker.end + 1);
-  }
+export function validateFactCoverage(params: {
+  bodyHtml: string;
+  facts: readonly ResearchFact[];
+}): ValidatedFactCoverage {
+  const { facts } = params;
+  // 旧キャッシュ・移行期の防御。marker は判定に使わないので無条件に落とす。
+  const cleanBodyHtml = params.bodyHtml.replace(FACT_MARKER_PATTERN, "");
+  const containers = scanContainers(cleanBodyHtml);
+  const union = unionSupport(facts);
+  assertValuesAreCovered(containers, facts, union);
   return {
     cleanBodyHtml,
-    usedFactIds: [...usedFactIds],
-    references,
+    references: buildReferences(containers, facts),
+    warnings: collectWarnings(containers, union),
     binding: {
       version: FACT_BINDING_VERSION,
       bodyHash: bindingBodyHash(cleanBodyHtml),
     },
   };
 }
+
+/*
+ * 公開前の再確認判定(旧 factBinding.ts から移設・実装は不変)。
+ * 台帳の各参照について、可変情報(料金・営業時間 等)や doNotWrite に触れる主張を人の確認対象として印を付ける。
+ */
 
 const RECHECK_RULES: ReadonlyArray<{ reason: string; pattern: RegExp }> = [
   { reason: "料金", pattern: /料金|価格|月額|入会金|参加費|有料|無料|割引|キャンペーン|クーポン/ },

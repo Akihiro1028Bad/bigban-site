@@ -269,16 +269,20 @@ describe("draftPipeline structured contracts", () => {
     ).not.toHaveProperty("publishedYear");
   });
 
-  it("WriterOutputを検証し未確認fact idを拒否する", () => {
+  it("WriterOutputはスキーマだけを検証し、usedFactIdsの申告内容は問わない", () => {
     const writer = {
       slug: "pickleball-ichikawa",
       excerpt: "市川市でプレーできる場所を比較します。",
       bodyHtml: "<h2>場所</h2><p>本文</p>",
       usedFactIds: ["fact-option"],
     };
-    expect(parseWriterOutput(writer, parseResearchPacket(research))).toEqual(writer);
-    expect(() => parseWriterOutput({ ...writer, usedFactIds: ["missing"] }, parseResearchPacket(research))).toThrow(/missing/);
-    expect(() => parseWriterOutput({ ...writer, usedFactIds: ["fact-option", "fact-option"] }, parseResearchPacket(research))).toThrow(/重複/);
+    expect(parseWriterOutput(writer)).toEqual(writer);
+    // 使用 fact は本文と fact の値照合から逆引きするため、申告の未確認IDや重複では落とさない。
+    expect(parseWriterOutput({ ...writer, usedFactIds: ["missing", "missing"] })).toMatchObject({
+      usedFactIds: ["missing", "missing"],
+    });
+    expect(parseWriterOutput({ slug: "a", excerpt: "b", bodyHtml: "<p>c</p>" })).toMatchObject({ usedFactIds: [] });
+    expect(() => parseWriterOutput({ ...writer, slug: "Invalid Slug" })).toThrow();
   });
 
   it("使用したfact idだけから既存sourceLedger形式を生成する", () => {
@@ -334,13 +338,13 @@ describe("draftPipeline structured contracts", () => {
     })]);
   });
 
-  it("確認済み公式URLと固定CTA以外の外部リンクを検出する", () => {
+  it("確認済み公式URLと固定CTA以外の外部リンクを検出する(official-site factは全て許可)", () => {
     const html = [
       '<a href="https://pickleball-chiba.com/lp/ichikawa/">公式</a>',
       '<a href="https://www.thepicklebang.com/reserve">予約</a>',
       '<a href="https://example.com/matome">まとめ</a>',
     ].join("");
-    expect(externalLinksOutsideFacts(html, parseResearchPacket(research), ["fact-option"])).toEqual([
+    expect(externalLinksOutsideFacts(html, parseResearchPacket(research))).toEqual([
       "https://example.com/matome",
     ]);
   });
@@ -373,7 +377,7 @@ describe("draftPipeline structured contracts", () => {
       '<a href="mailto:info@example.jp">メール</a>',
       '<a href="tel:0471234567">電話</a>',
     ].join("");
-    expect(externalLinksOutsideFacts(html, parseResearchPacket(research), [])).toEqual([
+    expect(externalLinksOutsideFacts(html, parseResearchPacket(research))).toEqual([
       "https://example.jp/spaced",
       "https://example.jp/unquoted",
       "https://example.jp/upper",

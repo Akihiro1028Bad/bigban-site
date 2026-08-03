@@ -527,17 +527,19 @@ describe("draftOrchestrator", () => {
       basePrompt: "BASE PROMPT FULL TEXT",
       writerInputJson: '{"title":"入力"}',
       previousOutputJson: '{"bodyHtml":"前回"}',
-      errorMessage: "marker位置が不正です",
+      errorMessage: "根拠のない値があります: 4,500円(金額)",
     });
 
     expect(prompt).toContain("BASE PROMPT FULL TEXT");
     expect(prompt).toContain('<input_json>\n{"title":"入力"}\n</input_json>');
     expect(prompt).toContain('<previous_output_json>\n{"bodyHtml":"前回"}\n</previous_output_json>');
-    expect(prompt).toContain("<validation_error>\nmarker位置が不正です\n</validation_error>");
+    expect(prompt).toContain("<validation_error>\n根拠のない値があります: 4,500円(金額)\n</validation_error>");
     expect(prompt).toContain("前回出力は機械検証に失敗した。検証エラーに該当する箇所だけを修正し、同じJSONスキーマで完全な出力を返す。");
-    expect(prompt).toContain("修正方針: ①その主張を支えるfactが入力にあるなら");
-    expect(prompt).toContain("②支えるfactが無いなら");
-    expect(prompt).toContain("エラーと無関係な部分は変更しない。`usedFactIds` は修正後の本文markerのfact ID集合と完全一致させる。");
+    expect(prompt).toContain("修正方針: ①その値・情報が fact にあるなら、fact のとおりの数値・表記に直す。");
+    expect(prompt).toContain("②fact に無い金額・時刻・日付・数量・施設名は本文に書かない");
+    expect(prompt).toContain("エラーと無関係な部分は変更しない。");
+    expect(prompt).not.toContain("marker");
+    expect(prompt).not.toContain("usedFactIds");
   });
 
   it("Writer出力をキャッシュ可能にする前にリンクと画像markerを検証する", () => {
@@ -571,7 +573,27 @@ describe("draftOrchestrator", () => {
       ...base,
       bodyHtml: '<h2>場所</h2><p><a href="https://example.jp/official">公式ページ</a>。</p>{{IMG:1}}',
       factReferences: [{ factId: "fact-1", excerpt: "公式ページ", sectionPath: "場所" }],
+      coverageWarnings: [],
     });
+    // usedFactIds は writer の申告ではなく、逆引きした references から導出する。
+    expect(parseValidatedWriterOutput({ ...base, usedFactIds: ["fact-1", "fact-unknown"] }, research, outline))
+      .toMatchObject({ usedFactIds: ["fact-1"] });
+    expect(parseValidatedWriterOutput({ ...base, usedFactIds: [] }, research, outline))
+      .toMatchObject({ usedFactIds: ["fact-1"] });
+    // fact に無い値は marker の有無に関わらず block する。
+    expect(() => parseValidatedWriterOutput({
+      ...base,
+      bodyHtml: "<h2>場所</h2><p>参加費は4,500円です。</p>{{IMG:1}}",
+    }, research, outline)).toThrow(/根拠のない値があります/);
+    // fact に無い施設名は block せず warnings に載せる。
+    expect(parseValidatedWriterOutput({
+      ...base,
+      bodyHtml: "<h2>場所</h2><p>船橋市総合体育館を使えます。</p>{{IMG:1}}",
+    }, research, outline).coverageWarnings).toEqual([{
+      kind: "unverified-facility-noun",
+      text: "船橋市総合体育館",
+      excerpt: "船橋市総合体育館を使えます",
+    }]);
     expect(() => parseValidatedWriterOutput({
       ...base,
       bodyHtml: '<h2>場所</h2><p>公式ページ<!--FACT:fact-1-->。</p>{{IMG:2}}',
@@ -632,6 +654,7 @@ describe("draftOrchestrator", () => {
         containerMatchCount: 1,
         claimKinds: ["proper-noun"],
       }],
+      coverageWarnings: [],
       binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const spec = assemblePublishSpec({
@@ -681,6 +704,7 @@ describe("draftOrchestrator", () => {
       bodyHtml: "<p>本文</p>",
       usedFactIds: [],
       factReferences: [],
+      coverageWarnings: [],
       binding: { version: 1, bodyHash: "fnv1a64:test" },
     };
     const baseInput = {

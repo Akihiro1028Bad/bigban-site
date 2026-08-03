@@ -148,9 +148,10 @@ describe("下書き生成のフェーズ分離契約", () => {
     for (const forbidden of ["npm run", "microCMS", "LINE", "Notion", "WebSearch", "WebFetch", "Task"]) {
       expect(writer).not.toContain(forbidden);
     }
-    expect(writer).toContain("<!--FACT:fact-id-->");
-    expect(writer).toContain("句点・感嘆符・疑問符の直前");
-    expect(writer).toContain("`usedFactIds`は本文markerから抽出できるfact IDの集合と完全一致");
+    expect(writer).toContain("factにある情報だけを書く");
+    expect(writer).toContain("factに無い金額、時刻、日付、数量、施設名、統計、健康効果は本文に書かない");
+    expect(writer).toContain("概略表現に言い換えるか、その文を削る");
+    expect(writer).not.toContain("<!--FACT:");
   });
 
   it("見出し契約は執筆プロンプトと決定的ゲートの両方で守る", () => {
