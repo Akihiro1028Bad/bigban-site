@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { resolveColumnCategoryId } from "./columnCategory";
 import { placeholderIndices } from "./body-image";
 import { buildSourceLedgerFromUsedFacts, duplicateExternalLinks, externalLinksOutsideFacts, parseWriterOutput, RESERVE_URL } from "./draftPipeline";
-import { recheckReasonForFactReference, validateAndStripFactBindings } from "./factBinding";
+import { recheckReasonForFactReference } from "./factBinding";
+import { validateFactCoverage } from "./factCoverage";
 import { resolveFacilityPhase } from "./facility-context";
 import { rebuildSourceIdOf } from "./rebuildDraft";
 import { buildGrowthOperationResult } from "./operationOutcome";
@@ -179,8 +180,8 @@ ${params.errorMessage}
 </validation_error>
 
 前回出力は機械検証に失敗した。検証エラーに該当する箇所だけを修正し、同じJSONスキーマで完全な出力を返す。
-修正方針: ①その主張を支えるfactが入力にあるなら、markerを規則どおりの位置(句読点の直前・表セルはセル終端直前)に付ける。②支えるfactが無いなら、その数値・固有名詞・断定を含まない表現に書き直すか、その文を削る。
-エラーと無関係な部分は変更しない。\`usedFactIds\` は修正後の本文markerのfact ID集合と完全一致させる。`;
+修正方針: ①その値・情報が fact にあるなら、fact のとおりの数値・表記に直す。②fact に無い金額・時刻・日付・数量・施設名は本文に書かない(その語を含まない概略表現に言い換えるか、その文を削る)。
+エラーと無関係な部分は変更しない。`;
 }
 
 export const WRITER_REPAIR_MAX = 2;
@@ -312,7 +313,7 @@ export function validateWriterContract(
   research: ResearchPacket,
   preparedOutline: string,
 ): void {
-  const unexpectedLinks = externalLinksOutsideFacts(writer.bodyHtml, research, writer.usedFactIds);
+  const unexpectedLinks = externalLinksOutsideFacts(writer.bodyHtml, research);
   if (unexpectedLinks.length > 0) {
     throw new Error(`確認済みでない外部リンクがあります: ${unexpectedLinks.join(", ")}`);
   }
@@ -337,17 +338,16 @@ export function parseValidatedWriterOutput(
   research: ResearchPacket,
   preparedOutline: string,
 ): ValidatedWriterOutput {
-  const raw = parseWriterOutput(value, research);
-  const bindings = validateAndStripFactBindings({
-    bodyHtml: raw.bodyHtml,
-    usedFactIds: raw.usedFactIds,
-    facts: research.facts,
-  });
+  const raw = parseWriterOutput(value);
+  const coverage = validateFactCoverage({ bodyHtml: raw.bodyHtml, facts: research.facts });
   const writer: ValidatedWriterOutput = {
     ...raw,
-    bodyHtml: bindings.cleanBodyHtml,
-    factReferences: bindings.references,
-    binding: bindings.binding,
+    bodyHtml: coverage.cleanBodyHtml,
+    // 使用 fact は writer の申告ではなく、機械逆引きした台帳から導出する。
+    usedFactIds: [...new Set(coverage.references.map((reference) => reference.factId))],
+    factReferences: coverage.references,
+    coverageWarnings: coverage.warnings,
+    binding: coverage.binding,
   };
   validateWriterContract(writer, research, preparedOutline);
   return writer;
@@ -562,6 +562,8 @@ export function assemblePublishSpec(params: {
       (statement, excerpt) => recheckReasonForFactReference(statement, excerpt, doNotWrite),
       writer.binding,
     ),
+    // 非ブロックの要確認事項。台帳の末尾へ併記して人が公開前に確認する(#fact-coverage L3)。
+    coverageWarnings: writer.coverageWarnings,
     notion: { pageId: input.pageId, property: "ステータス", value: "下書き作成済み" },
   };
 }

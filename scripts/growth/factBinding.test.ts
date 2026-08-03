@@ -219,9 +219,29 @@ describe("bindingReferencesMatchBody", () => {
     )).toBe(false);
   });
 
-  it("束縛後に追加された英字固有名詞の主張を拒否する", () => {
+  // 値カバレッジ方式(#fact-coverage)では固有名詞だけの文は reference を持たないのが正常なので、
+  // 残余テキストの掃引は crisp な値主張だけを見る。固有名詞の有無ではブロックしない。
+  it("束縛後に追加された固有名詞だけの主張は拒否しない", () => {
+    const references = [{
+      factId: "fact-fee",
+      excerpt: "参加費は500円です",
+      container: "p" as const,
+      containerIndex: 1,
+    }];
+
     expect(bindingReferencesMatchBody(
       "<p>参加費は500円です</p><p>DUPRは公式レーティングです</p>",
+      references,
+    )).toBe(true);
+    expect(bindingReferencesMatchBody(
+      "<p>参加費は500円です</p><p>体育館や地域クラブでの活動が中心です</p>",
+      references,
+    )).toBe(true);
+  });
+
+  it("固有名詞に数値主張が加われば拒否する", () => {
+    expect(bindingReferencesMatchBody(
+      "<p>参加費は500円です</p><p>DUPRは1000人が利用しています</p>",
       [{ factId: "fact-fee", excerpt: "参加費は500円です", container: "p", containerIndex: 1 }],
     )).toBe(false);
   });
@@ -244,11 +264,11 @@ describe("bindingReferencesMatchBody", () => {
     )).toBe(false);
   });
 
-  it("助詞を省略した英字固有名詞の主張も拒否する", () => {
+  it("助詞を省略した英字固有名詞の主張も拒否しない", () => {
     expect(bindingReferencesMatchBody(
       "<p>参加費は500円です</p><p>DUPR公式レーティングです</p>",
       [{ factId: "fact-fee", excerpt: "参加費は500円です", container: "p", containerIndex: 1 }],
-    )).toBe(false);
+    )).toBe(true);
   });
 
   it("ブロック外に追加された可視テキストの主張を拒否する", () => {

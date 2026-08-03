@@ -2,7 +2,7 @@ import { Parser } from "htmlparser2";
 import { z } from "zod";
 
 import type { SourceLedgerEntry } from "./sourceLedger";
-import type { FactReference } from "./factBinding";
+import type { FactCoverageWarning, FactReference } from "./factCoverage";
 import type { FactBindingMetadata } from "./factBindingMetadata";
 
 export const RESERVE_URL = "https://www.thepicklebang.com/reserve";
@@ -117,6 +117,8 @@ export type WriterOutput = z.infer<typeof writerOutputSchema>;
 export interface ValidatedWriterOutput extends Omit<WriterOutput, "bodyHtml"> {
   bodyHtml: string;
   factReferences: FactReference[];
+  /** 非ブロックの要確認事項(捏造の疑いがある施設名など)。台帳へ併記する。 */
+  coverageWarnings: FactCoverageWarning[];
   binding: FactBindingMetadata;
 }
 
@@ -180,13 +182,13 @@ export function validateResearchPacketSources(
   return packet;
 }
 
-export function parseWriterOutput(value: unknown, research: ResearchPacket): WriterOutput {
-  const output = writerOutputSchema.parse(value);
-  const available = new Set(research.facts.map((fact) => fact.id));
-  const missing = output.usedFactIds.filter((id) => !available.has(id));
-  if (missing.length > 0) throw new Error(`未確認のfact idです: ${missing.join(", ")}`);
-  if (new Set(output.usedFactIds).size !== output.usedFactIds.length) throw new Error("usedFactIdsに重複があります");
-  return output;
+/**
+ * Writer 出力のスキーマ検証だけを行う。
+ * `usedFactIds` は旧キャッシュ互換のため受理するが値は使わない
+ * (使用 fact は本文と fact の値照合から機械的に逆引きする=#fact-coverage)。
+ */
+export function parseWriterOutput(value: unknown): WriterOutput {
+  return writerOutputSchema.parse(value);
 }
 
 export function buildSourceLedgerFromUsedFacts(
@@ -276,16 +278,19 @@ export function duplicateExternalLinks(html: string): string[] {
   return [...duplicates];
 }
 
+/**
+ * 確認済み公式URLと固定CTA以外の外部リンクを返す。
+ * 許可リストは「全 official-site fact の source」。marker 廃止で使用 fact の申告が無くなったため、
+ * 本文が実際に参照した fact の絞り込みは行わない(リンク先はいずれも確認済み公式情報源)。
+ */
 export function externalLinksOutsideFacts(
   html: string,
   research: ResearchPacket,
-  usedFactIds: readonly string[],
 ): string[] {
-  const used = new Set(usedFactIds);
   const allowed = new Set([
     RESERVE_URL,
     ...research.facts
-      .filter((fact) => used.has(fact.id) && fact.sourceType === "official-site")
+      .filter((fact) => fact.sourceType === "official-site")
       .map((fact) => fact.source),
   ]);
   return [...new Set(externalLinks(html).filter((href) => !allowed.has(href)))];
