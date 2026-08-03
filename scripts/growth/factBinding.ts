@@ -258,7 +258,11 @@ function supportKeys(atom: Atom): string[] {
 
 function isAtomSupported(atom: Atom, supported: FactSupport): boolean {
   if (atom.canonical.startsWith("table:")) {
-    const [, header, value] = atom.canonical.split(":");
+    // 値は時刻(6:00-9:00 等)で ":" を含むため、区切りには ":" を使わない。
+    const body = atom.canonical.slice("table:".length);
+    const separator = body.indexOf(" ");
+    const header = body.slice(0, separator);
+    const value = body.slice(separator + 1);
     return supported.normalizedText.includes(value)
       && (header.length === 0 || supported.normalizedText.includes(header));
   }
@@ -275,7 +279,7 @@ function tableClaimAtom(value: string, header: string | undefined): Atom | undef
   if (/^[A-Za-z]$/.test(trimmed)) return undefined;
   return {
     kind: "statistic",
-    canonical: `table:${normalized(header ?? "")}:${normalized(trimmed)}`,
+    canonical: `table:${normalized(header ?? "")} ${normalized(trimmed)}`,
     start: 0,
     end: value.length,
   };
@@ -288,7 +292,12 @@ function atomsForContainerText(
 ): Atom[] {
   const atoms = extractAtoms(text, facts, container.name === "td" || container.name === "th");
   if (container.name === "td") {
-    const tableAtom = tableClaimAtom(text, container.tableHeader);
+    // 時刻・金額などの通常アトムを含むセルは、値そのものが fact と照合されるため
+    // 列見出しの字面一致を要求しない。「時間帯」「区分」のような自然な見出し語は
+    // fact の文面に現れず、正しい料金表が書けなくなる(2026-08-03 06:30 の失敗)。
+    // 「あり」「可能」のような一般語だけのセルは、列見出しの裏付けを引き続き要求する。
+    const isValueAnchored = extractAtoms(text, facts, false).length > 0;
+    const tableAtom = tableClaimAtom(text, isValueAnchored ? undefined : container.tableHeader);
     if (tableAtom) atoms.push(tableAtom);
   }
   return atoms;
