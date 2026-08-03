@@ -498,3 +498,50 @@ export function validateFactCoverage(params: {
     },
   };
 }
+
+/*
+ * 公開前の再確認判定(旧 factBinding.ts から移設・実装は不変)。
+ * 台帳の各参照について、可変情報(料金・営業時間 等)や doNotWrite に触れる主張を人の確認対象として印を付ける。
+ */
+
+const RECHECK_RULES: ReadonlyArray<{ reason: string; pattern: RegExp }> = [
+  { reason: "料金", pattern: /料金|価格|月額|入会金|参加費|有料|無料|割引|キャンペーン|クーポン/ },
+  { reason: "営業時間", pattern: /営業時間|営業日|定休日|\d{1,2}:\d{2}/ },
+  { reason: "イベント日時", pattern: /イベント|体験会|大会|開催日|開催時刻/ },
+  { reason: "定員", pattern: /定員|\d+\s*(?:人|名)/ },
+  { reason: "予約サービス名", pattern: /予約サービス|予約システム/ },
+  { reason: "利用可否", pattern: /利用(?:でき|可能|不可|可否)|貸出|レンタル|予約/ },
+  { reason: "現在の肩書き", pattern: /代表|館長|社長|会長|コーチ|肩書き/ },
+  { reason: "比較優位", pattern: /国内最大|最高|最多|最安|No\.?\s*1/ },
+];
+
+const DO_NOT_WRITE_TOPICS: ReadonlyArray<{
+  reason: string;
+  canonicalPattern: RegExp;
+  claimPattern: RegExp;
+}> = [
+  { reason: "料金", canonicalPattern: /キャンペーン|割引率|クーポンコード/, claimPattern: /キャンペーン|割引|クーポン|期間限定/ },
+  { reason: "予約サービス名", canonicalPattern: /予約先|RESERVA|LaBOLA/, claimPattern: /予約(?:先|サービス|システム)|RESERVA|LaBOLA/ },
+  { reason: "イベント日時", canonicalPattern: /イベント|体験会|出演者/, claimPattern: /イベント|体験会|クリニック|レッスン|大会|開催|出演者|参加料金|参加費|定員/ },
+  { reason: "利用可否", canonicalPattern: /ラウンジ/, claimPattern: /ラウンジ/ },
+  { reason: "営業時間", canonicalPattern: /24時間営業/, claimPattern: /24\s*時間|営業時間/ },
+  { reason: "比較優位", canonicalPattern: /国内最大|比較根拠|優位表現/, claimPattern: /国内最大|最大規模|最高|最多|最安|No\.?\s*1/ },
+  { reason: "料金", canonicalPattern: /会員制度|月額料金|貸切料金|法人利用料金/, claimPattern: /会員制度|月額|貸切料金|法人利用料金/ },
+  { reason: "現在の肩書き", canonicalPattern: /肩書き|実績/, claimPattern: /肩書き|代表|館長|社長|会長|コーチ|監督|選手の実績/ },
+];
+
+export function recheckReasonForFactReference(
+  statement: string,
+  excerpt: string,
+  doNotWrite: readonly string[],
+): string | undefined {
+  const target = `${statement} ${excerpt}`.normalize("NFKC");
+  for (const rule of RECHECK_RULES) {
+    if (rule.pattern.test(target)) return rule.reason;
+  }
+  const canonical = doNotWrite.join("\n").normalize("NFKC");
+  for (const topic of DO_NOT_WRITE_TOPICS) {
+    if (topic.canonicalPattern.test(canonical) && topic.claimPattern.test(target)) return topic.reason;
+  }
+  return undefined;
+}
