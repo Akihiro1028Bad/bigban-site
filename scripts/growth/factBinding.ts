@@ -85,6 +85,14 @@ const HEALTH_PATTERNS = [
 const STATISTIC_WORDS = /最安|最高|最低|最大|最小|最多|最短|No\.?\s*1|平均|中央値|割合|調査では/gi;
 const EXCLUDED_PROPER_NOUNS = new Set(["AI"]);
 const NUMBER_SOURCE = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)`;
+const FACILITY_SUFFIX_SOURCE = String.raw`(?:駅|体育館|クラブ|協会|連盟)`;
+const FACILITY_NOUN_PATTERN = new RegExp(`[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}${FACILITY_SUFFIX_SOURCE}`, "g");
+const FACILITY_SUFFIX_TAIL = new RegExp(`${FACILITY_SUFFIX_SOURCE}$`);
+const FACILITY_PARTICLE_SPLIT = /[のはをがにでとへ]|より|から/;
+/** 特定の施設を指さない修飾語。「地域クラブ」を施設名として扱わないために使う。 */
+const GENERIC_FACILITY_PREFIXES = new Set([
+  "地域", "地元", "近隣", "近所", "周辺", "市内", "都内", "県内", "沿線", "複数", "一般", "民間", "公営",
+]);
 
 function normalized(value: string): string {
   return value
@@ -108,6 +116,26 @@ function pushMatches(
   }
 }
 
+/**
+ * 施設系接尾辞を含む語から施設名だけを取り出す。一般名詞なら null。
+ *
+ * 助詞で前置きを落としたうえで(「近くの本八幡駅」→「本八幡駅」)、次は施設名として扱わない。
+ * - 接尾辞だけが残るもの(「沿線の駅」→「駅」)
+ * - 前置きに活用や助詞が残る句(「地域で活動するクラブ」)。施設名の前置きは地名・組織名で、ひらがなを含まない
+ * - 特定の施設を指さない一般修飾語(「地域クラブ」)
+ *
+ * 一般名詞を施設名と誤判定すると、その語を含む一般論が根拠なしには書けなくなる(#fact-marker 誤検知)。
+ */
+function facilityProperNoun(matchText: string): string | null {
+  const segments = matchText.split(FACILITY_PARTICLE_SPLIT).filter(Boolean);
+  const noun = segments.at(-1)!;
+  const prefix = noun.replace(FACILITY_SUFFIX_TAIL, "");
+  if (prefix === "") return null;
+  if (/[ぁ-ん]/.test(prefix)) return null;
+  if (GENERIC_FACILITY_PREFIXES.has(prefix)) return null;
+  return noun;
+}
+
 function knownProperNouns(facts: readonly ResearchFact[]): string[] {
   const nouns = new Set<string>();
   for (const fact of facts) {
@@ -118,10 +146,9 @@ function knownProperNouns(facts: readonly ResearchFact[]): string[] {
         nouns.add(token[0]);
       }
     }
-    for (const match of statement.matchAll(/[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}(?:駅|体育館|クラブ|協会|連盟)/g)) {
-      const segments = match[0].split(/[のはをがにでとへ]|より|から/).filter(Boolean);
-      const noun = segments.at(-1)!;
-      nouns.add(noun);
+    for (const match of statement.matchAll(FACILITY_NOUN_PATTERN)) {
+      const noun = facilityProperNoun(match[0]);
+      if (noun !== null) nouns.add(noun);
     }
   }
   return [...nouns].filter((noun) => noun.length > 0).sort((a, b) => b.length - a.length);
@@ -148,9 +175,9 @@ function canonicalClock(match: string): string {
 }
 
 function pushJapaneseProperNouns(atoms: Atom[], value: string): void {
-  for (const match of value.matchAll(/[一-龯々ぁ-んァ-ヶーA-Za-z0-9]{2,}(?:駅|体育館|クラブ|協会|連盟)/g)) {
-    const segments = match[0].split(/[のはをがにでとへ]|より|から/).filter(Boolean);
-    const noun = segments.at(-1)!;
+  for (const match of value.matchAll(FACILITY_NOUN_PATTERN)) {
+    const noun = facilityProperNoun(match[0]);
+    if (noun === null) continue;
     const relativeStart = match[0].lastIndexOf(noun);
     const start = match.index + relativeStart;
     atoms.push({ kind: "proper-noun", canonical: normalized(noun), start, end: start + noun.length });
