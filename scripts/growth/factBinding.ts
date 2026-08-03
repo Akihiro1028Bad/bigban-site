@@ -450,7 +450,10 @@ export function validateAndStripFactBindings(params: {
 
   const references: FactReference[] = [];
   for (const marker of markers) {
-    if (marker.atoms.length === 0) throw new Error(`fact markerの主張をfactが支えているか判定できません: ${marker.excerpt}`);
+    // 裏取り対象を含まない文への marker は照合しようがないので、内容照合を飛ばして台帳にだけ残す。
+    // エラーにすると「marker が足りない」修復と「marker が余計」エラーが往復して収束しない。
+    // marker の有無で公開できる本文は変わらない(アトム0の文は marker なしでも書ける)ため、検証は緩まない。
+    const hasAtoms = marker.atoms.length > 0;
     const supportByFact = new Map<string, FactSupport>();
     for (const id of marker.ids) {
       const targetFact = factsById.get(id)!;
@@ -463,7 +466,7 @@ export function validateAndStripFactBindings(params: {
     }
     for (const id of marker.ids) {
       const supported = supportByFact.get(id)!;
-      if (!marker.atoms.some((atom) => isAtomSupported(atom, supported))) {
+      if (hasAtoms && !marker.atoms.some((atom) => isAtomSupported(atom, supported))) {
         throw new Error(`指定factが主張を支えていません: ${id}`);
       }
       references.push({
