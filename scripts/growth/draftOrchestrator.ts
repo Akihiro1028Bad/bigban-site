@@ -158,6 +158,58 @@ export function buildWriterInput(
   };
 }
 
+export function buildWriterRepairPrompt(params: {
+  basePrompt: string;
+  writerInputJson: string;
+  previousOutputJson: string;
+  errorMessage: string;
+}): string {
+  return `${params.basePrompt}
+
+<input_json>
+${params.writerInputJson}
+</input_json>
+
+<previous_output_json>
+${params.previousOutputJson}
+</previous_output_json>
+
+<validation_error>
+${params.errorMessage}
+</validation_error>
+
+前回出力は機械検証に失敗した。検証エラーに該当する箇所だけを修正し、同じJSONスキーマで完全な出力を返す。
+修正方針: ①その主張を支えるfactが入力にあるなら、markerを規則どおりの位置(句読点の直前・表セルはセル終端直前)に付ける。②支えるfactが無いなら、その数値・固有名詞・断定を含まない表現に書き直すか、その文を削る。
+エラーと無関係な部分は変更しない。\`usedFactIds\` は修正後の本文markerのfact ID集合と完全一致させる。`;
+}
+
+export const WRITER_REPAIR_MAX = 2;
+
+export async function produceValidWriterOutput<T>(params: {
+  invokeWriter: () => Promise<unknown>;
+  invokeRepair: (previousValue: unknown, errorMessage: string) => Promise<unknown>;
+  validate: (value: unknown) => T;
+  isInfrastructureError: (error: unknown) => boolean;
+  maxRepairs?: number;
+}): Promise<{ value: unknown; writer: T; repairCount: number }> {
+  const maxRepairs = params.maxRepairs ?? WRITER_REPAIR_MAX;
+  let value = await params.invokeWriter();
+  let lastErrorMessage = "";
+
+  for (let repairCount = 0; repairCount <= maxRepairs; repairCount += 1) {
+    try {
+      return { value, writer: params.validate(value), repairCount };
+    } catch (error: unknown) {
+      if (params.isInfrastructureError(error)) throw error;
+      lastErrorMessage = error instanceof Error ? error.message : String(error);
+      if (repairCount === maxRepairs) break;
+      value = await params.invokeRepair(value, lastErrorMessage);
+    }
+  }
+
+  throw new Error(`修復${maxRepairs}回試行後も検証に失敗: ${lastErrorMessage}`);
+}
+
 function textItems(property: unknown, key: "title" | "rich_text"): string {
   if (!property || typeof property !== "object") return "";
   const items = (property as Record<string, unknown>)[key];

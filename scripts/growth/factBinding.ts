@@ -294,12 +294,32 @@ function assertIdSets(markerIds: readonly string[], usedFactIds: readonly string
   }
 }
 
+const FACT_MARKER_COMMENT_SOURCE = String.raw`<!--\s*FACT:[\s\S]*?-->`;
+const FACT_MARKERS_AFTER_PUNCTUATION = new RegExp(
+  `([。！？!?])\\s*(${FACT_MARKER_COMMENT_SOURCE}(?:\\s*${FACT_MARKER_COMMENT_SOURCE})*)`,
+  "g",
+);
+
+export function normalizeFactMarkerPlacement(bodyHtml: string): string {
+  return bodyHtml.replace(
+    FACT_MARKERS_AFTER_PUNCTUATION,
+    (matched, punctuation: string, markerGroup: string, offset: number) => {
+      const followingHtml = bodyHtml.slice(offset + matched.length);
+      if (/^\s*<\/(?:td|th)\s*>/i.test(followingHtml)) return matched;
+
+      const markers = markerGroup.match(new RegExp(FACT_MARKER_COMMENT_SOURCE, "g"))!;
+      return `${markers.join("")}${punctuation}`;
+    },
+  );
+}
+
 export function validateAndStripFactBindings(params: {
   bodyHtml: string;
   usedFactIds: readonly string[];
   facts: readonly ResearchFact[];
 }): ValidatedFactBindings {
-  const { bodyHtml, facts, usedFactIds } = params;
+  const { facts, usedFactIds } = params;
+  const bodyHtml = normalizeFactMarkerPlacement(params.bodyHtml);
   const factsById = new Map(facts.map((fact) => [fact.id, fact]));
   const headings: string[] = [];
   const tagStack: string[] = [];
