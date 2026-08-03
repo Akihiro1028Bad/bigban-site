@@ -18,6 +18,7 @@ vi.mock("@/i18n/navigation", () => ({
 // JST の境界をまたぐ表示切替を検証するため、テスト内でシステム時刻を固定する。
 const MAY_JST = new Date("2026-05-29T03:00:00Z"); // JST 5/29 → 5月キャンペーン
 const JUNE_JST = new Date("2026-06-05T03:00:00Z"); // JST 6/5 → 6月キャンペーン
+const AUGUST_JST = new Date("2026-08-03T03:00:00Z"); // JST 8/3 → PBT CLUB 会員
 
 function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
   const messages = locale === "ja" ? jaMessages : enMessages;
@@ -67,6 +68,41 @@ describe("PromoBanner", () => {
     renderWithIntl(<PromoBanner />, "en");
     expect(screen.getByText(/CAMPFIRE30/)).toBeInTheDocument();
     expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
+  });
+
+  it("JST 8/1以降は失効した CAMPFIRE30 を出さず PBT CLUB 文言へ切り替わる", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AUGUST_JST);
+    renderWithIntl(<PromoBanner />, "ja");
+    expect(screen.getByText(/PBT CLUB会員スタート/)).toBeInTheDocument();
+    expect(screen.getByText(/約30%OFF/)).toBeInTheDocument();
+    expect(screen.queryByText(/CAMPFIRE30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/7\/31/)).not.toBeInTheDocument();
+  });
+
+  it("英語ロケールでも JST 8/1以降は PBT CLUB 文言へ切り替わる", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AUGUST_JST);
+    renderWithIntl(<PromoBanner />, "en");
+    expect(screen.getByText(/PBT CLUB/)).toBeInTheDocument();
+    expect(screen.queryByText(/CAMPFIRE30/)).not.toBeInTheDocument();
+  });
+
+  it("PBT CLUB 期間中は aria-label も会員制度の内容に切り替わる", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AUGUST_JST);
+    renderWithIntl(<PromoBanner />, "ja");
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "aria-label",
+      "PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します",
+    );
+  });
+
+  it("PBT CLUB 期間中も予約案内ページ(/reserve)にリンクする", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AUGUST_JST);
+    renderWithIntl(<PromoBanner />, "ja");
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/reserve");
   });
 
   it("予約案内ページ(/reserve)にリンクする", () => {
