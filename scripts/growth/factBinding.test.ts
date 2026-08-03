@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  normalizeFactMarkerPlacement,
   recheckReasonForFactReference,
   validateAndStripFactBindings,
 } from "./factBinding";
@@ -30,6 +31,50 @@ function fact(id: string, statement: string, sourceLabel?: string): ResearchFact
 function validate(bodyHtml: string, facts: ResearchFact[], usedFactIds = facts.map(({ id }) => id)) {
   return validateAndStripFactBindings({ bodyHtml, facts, usedFactIds });
 }
+
+describe("normalizeFactMarkerPlacement", () => {
+  it("連続markerを順序を保って句点の直前へ移動する", () => {
+    expect(normalizeFactMarkerPlacement(
+      "<p>料金は500円。 <!--FACT:fact-price--><!--FACT:fact-tax-->税込です。</p>",
+    )).toBe("<p>料金は500円<!--FACT:fact-price--><!--FACT:fact-tax-->。税込です。</p>");
+  });
+
+  it("句読点とmarker間およびmarker間の空白・改行を除去して移動する", () => {
+    expect(normalizeFactMarkerPlacement(
+      "<p>料金は500円。 \n<!--FACT:fact-price-->\n  <!-- FACT:fact-tax-->税込です。</p>",
+    )).toBe("<p>料金は500円<!--FACT:fact-price--><!-- FACT:fact-tax-->。税込です。</p>");
+  });
+
+  it.each(["！", "？", "!", "?"])("%sの後ろのmarkerを直前へ移動する", (punctuation) => {
+    expect(normalizeFactMarkerPlacement(
+      `<p>料金は500円${punctuation}<!--FACT:fact-price--></p>`,
+    )).toBe(`<p>料金は500円<!--FACT:fact-price-->${punctuation}</p>`);
+  });
+
+  it("正しい位置のmarkerを変えず、2回適用しても同一になる", () => {
+    const bodyHtml = "<p>料金は500円<!--FACT:fact-price-->。</p>";
+    const normalized = normalizeFactMarkerPlacement(bodyHtml);
+
+    expect(normalized).toBe(bodyHtml);
+    expect(normalizeFactMarkerPlacement(normalized)).toBe(normalized);
+  });
+
+  it("段落中間の句点後markerを直前の文へ付ける", () => {
+    expect(normalizeFactMarkerPlacement(
+      "<p>料金は500円。<!--FACT:fact-price-->次は税込です。</p>",
+    )).toBe("<p>料金は500円<!--FACT:fact-price-->。次は税込です。</p>");
+  });
+
+  it("表セル終端直前のmarkerを変えない", () => {
+    const bodyHtml = "<table><tr><td>料金は500円。<!--FACT:fact-price--></td></tr></table>";
+    expect(normalizeFactMarkerPlacement(bodyHtml)).toBe(bodyHtml);
+  });
+
+  it("FACT以外のHTMLコメントを移動しない", () => {
+    const bodyHtml = "<p>説明です。<!--IMG:1-->補足です。<!-- note --></p>";
+    expect(normalizeFactMarkerPlacement(bodyHtml)).toBe(bodyHtml);
+  });
+});
 
 describe("bindingReferencesMatchBody", () => {
   it("HTML entity・空白を正規化してfact抜粋を照合する", () => {
@@ -182,6 +227,13 @@ describe("bindingReferencesMatchBody", () => {
 });
 
 describe("validateAndStripFactBindings", () => {
+  it("句点の後ろのmarkerを正規化して検証し、markerだけを除去する", () => {
+    expect(validate(
+      "<p>料金は500円。<!--FACT:fact-price--></p>",
+      [fact("fact-price", "料金は500円")],
+    ).cleanBodyHtml).toBe("<p>料金は500円。</p>");
+  });
+
   it("直前の1文を見出し経路と位置付きで束縛し、markerだけを除去する", () => {
     const bodyHtml = "<h2>料金 &amp; 利用</h2><p>説明です。参加費は4,980円<!--FACT:fact-price-->。</p>{{IMG:1}}";
     expect(validate(bodyHtml, [fact("fact-price", "参加費は4980 円")])).toEqual({
@@ -311,7 +363,6 @@ describe("validateAndStripFactBindings", () => {
     ["タグ外", "<p>料金は500円。</p><!--FACT:fact-price-->"],
     ["見出し", "<h2>料金500円<!--FACT:fact-price--></h2>"],
     ["空主張", "<p><!--FACT:fact-price-->。</p>"],
-    ["句点後", "<p>料金は500円。<!--FACT:fact-price--></p>"],
     ["不正ID", "<p>料金は500円<!--FACT:price-->。</p>"],
     ["不完全", "<p>料金は500円<!--FACT:fact-price</p>"],
     ["先頭空白", "<p>料金は500円<!-- FACT:fact-price-->。</p>"],

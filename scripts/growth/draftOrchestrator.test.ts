@@ -5,12 +5,14 @@ import type { NotionPage } from "./notion";
 import {
   assemblePublishSpec,
   buildFacilityResearchContext,
+  buildWriterRepairPrompt,
   buildWriterInput,
   cleanupDraftWorkDirs,
   draftInputFromPage,
   draftRunMode,
   prepareOutlineImages,
   parseValidatedWriterOutput,
+  produceValidWriterOutput,
   runDraftNotificationBestEffort,
   publishedContentId,
   resolveDraftGenerationScope,
@@ -23,6 +25,7 @@ import {
   matchesPublishCheckpointContext,
   invalidatePublishResumeFiles,
   shouldResumePublishSpec,
+  WRITER_REPAIR_MAX,
 } from "./draftOrchestrator";
 import type { ResearchPacket, ValidatedWriterOutput, WriterOutput } from "./draftPipeline";
 
@@ -377,6 +380,164 @@ describe("draftOrchestrator", () => {
   it("publish-draft出力から下書きIDを必須で取り出す", () => {
     expect(publishedContentId("created contentId=column-123\n")).toBe("column-123");
     expect(() => publishedContentId("created without id")).toThrow(/contentId/);
+  });
+
+  it("Writer初回出力がvalidなら修復せず返す", async () => {
+    const raw = { status: "valid" };
+    let repairCalls = 0;
+
+    await expect(produceValidWriterOutput({
+      invokeWriter: async () => raw,
+      invokeRepair: async () => {
+        repairCalls += 1;
+        return raw;
+      },
+      validate: (value) => ({ validated: value }),
+      isInfrastructureError: () => false,
+    })).resolves.toEqual({ value: raw, writer: { validated: raw }, repairCount: 0 });
+    expect(repairCalls).toBe(0);
+  });
+
+  it("Writer初回検証エラーのraw値とメッセージを渡して1回で修復する", async () => {
+    const initialRaw = { status: "invalid" };
+    const repairedRaw = { status: "valid" };
+    const repairInputs: Array<{ value: unknown; message: string }> = [];
+
+    const result = await produceValidWriterOutput({
+      invokeWriter: async () => initialRaw,
+      invokeRepair: async (value, message) => {
+        repairInputs.push({ value, message });
+        return repairedRaw;
+      },
+      validate: (value) => {
+        if (value === initialRaw) throw new Error("marker位置が不正です");
+        return { validated: value };
+      },
+      isInfrastructureError: () => false,
+    });
+
+    expect(repairInputs).toEqual([{ value: initialRaw, message: "marker位置が不正です" }]);
+    expect(result).toEqual({ value: repairedRaw, writer: { validated: repairedRaw }, repairCount: 1 });
+  });
+
+  it("Writer検証が2回失敗しても修復2回目で成功する", async () => {
+    const values = [{ attempt: 1 }, { attempt: 2 }, { attempt: 3 }];
+    let repairCalls = 0;
+
+    const result = await produceValidWriterOutput({
+      invokeWriter: async () => values[0],
+      invokeRepair: async () => values[++repairCalls],
+      validate: (value) => {
+        if (value !== values[2]) throw new Error(`invalid ${String((value as { attempt: number }).attempt)}`);
+        return "validated";
+      },
+      isInfrastructureError: () => false,
+    });
+
+    expect(result).toEqual({ value: values[2], writer: "validated", repairCount: 2 });
+  });
+
+  it("Writer修復上限まで全て検証エラーなら最後のエラーを付けてthrowする", async () => {
+    let repairCalls = 0;
+
+    await expect(produceValidWriterOutput({
+      invokeWriter: async () => ({ attempt: 1 }),
+      invokeRepair: async () => ({ attempt: ++repairCalls + 1 }),
+      validate: (value) => {
+        throw new Error(`invalid ${(value as { attempt: number }).attempt}`);
+      },
+      isInfrastructureError: () => false,
+      maxRepairs: 2,
+    })).rejects.toThrow("修復2回試行後も検証に失敗: invalid 3");
+    expect(repairCalls).toBe(2);
+  });
+
+  it("インフラエラーは修復せず同一オブジェクトをrethrowする", async () => {
+    const infrastructureError = new Error("process timeout");
+    let repairCalls = 0;
+    const promise = produceValidWriterOutput({
+      invokeWriter: async () => ({ status: "invalid" }),
+      invokeRepair: async () => {
+        repairCalls += 1;
+        return {};
+      },
+      validate: () => {
+        throw infrastructureError;
+      },
+      isInfrastructureError: (error) => error === infrastructureError,
+    });
+
+    await expect(promise).rejects.toBe(infrastructureError);
+    expect(repairCalls).toBe(0);
+  });
+
+  it("Writer修復呼び出し自体のエラーはそのまま伝播する", async () => {
+    const repairError = new Error("repair process failed");
+    const promise = produceValidWriterOutput({
+      invokeWriter: async () => ({ status: "invalid" }),
+      invokeRepair: async () => {
+        throw repairError;
+      },
+      validate: () => {
+        throw new Error("validation failed");
+      },
+      isInfrastructureError: () => false,
+    });
+
+    await expect(promise).rejects.toBe(repairError);
+  });
+
+  it("Writer初回呼び出し自体のエラーはそのまま伝播する", async () => {
+    const writerError = new Error("writer process failed");
+    const promise = produceValidWriterOutput({
+      invokeWriter: async () => {
+        throw writerError;
+      },
+      invokeRepair: async () => ({}),
+      validate: () => "validated",
+      isInfrastructureError: () => false,
+    });
+
+    await expect(promise).rejects.toBe(writerError);
+  });
+
+  it("Writer修復回数の既定値はWRITER_REPAIR_MAXの2回", async () => {
+    let repairCalls = 0;
+    let validationCalls = 0;
+
+    expect(WRITER_REPAIR_MAX).toBe(2);
+    await expect(produceValidWriterOutput({
+      invokeWriter: async () => ({}),
+      invokeRepair: async () => {
+        repairCalls += 1;
+        return {};
+      },
+      validate: () => {
+        validationCalls += 1;
+        if (validationCalls === 3) throw "last invalid";
+        throw new Error("invalid");
+      },
+      isInfrastructureError: () => false,
+    })).rejects.toThrow("修復2回試行後も検証に失敗: last invalid");
+    expect(repairCalls).toBe(WRITER_REPAIR_MAX);
+  });
+
+  it("Writer修復プロンプトへ元指示・入力・前回出力・検証エラー・修正方針を含める", () => {
+    const prompt = buildWriterRepairPrompt({
+      basePrompt: "BASE PROMPT FULL TEXT",
+      writerInputJson: '{"title":"入力"}',
+      previousOutputJson: '{"bodyHtml":"前回"}',
+      errorMessage: "marker位置が不正です",
+    });
+
+    expect(prompt).toContain("BASE PROMPT FULL TEXT");
+    expect(prompt).toContain('<input_json>\n{"title":"入力"}\n</input_json>');
+    expect(prompt).toContain('<previous_output_json>\n{"bodyHtml":"前回"}\n</previous_output_json>');
+    expect(prompt).toContain("<validation_error>\nmarker位置が不正です\n</validation_error>");
+    expect(prompt).toContain("前回出力は機械検証に失敗した。検証エラーに該当する箇所だけを修正し、同じJSONスキーマで完全な出力を返す。");
+    expect(prompt).toContain("修正方針: ①その主張を支えるfactが入力にあるなら");
+    expect(prompt).toContain("②支えるfactが無いなら");
+    expect(prompt).toContain("エラーと無関係な部分は変更しない。`usedFactIds` は修正後の本文markerのfact ID集合と完全一致させる。");
   });
 
   it("Writer出力をキャッシュ可能にする前にリンクと画像markerを検証する", () => {
