@@ -138,7 +138,9 @@
   "PromoBanner": {
     "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
-    "ariaLabel": "30% off court campaign. Go to reservation page"
+    "textPbtClub": "🎉 PBT CLUB IS HERE | ~30% OFF court fees",
+    "ariaLabel": "30% off court campaign. Go to reservation page",
+    "ariaLabelPbtClub": "PBT CLUB membership, about 30% off court fees. Go to reservation page"
   },
   "Reserve": {
     "hero": {

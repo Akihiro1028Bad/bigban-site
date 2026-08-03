@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isJunePromoActive, isHyroxCampaignActive } from "./promoSchedule";
+import {
+  getPromoBannerPhase,
+  isJunePromoActive,
+  isHyroxCampaignActive,
+} from "./promoSchedule";
 
 describe("isJunePromoActive", () => {
   it("JST 5/31 23:59:59 はまだ非アクティブ (5月キャンペーン)", () => {
@@ -23,6 +27,47 @@ describe("isJunePromoActive", () => {
 
   it("5月より前 (4月) は非アクティブ", () => {
     expect(isJunePromoActive(new Date("2026-04-10T00:00:00Z"))).toBe(false);
+  });
+
+  // この関数はクラファンポップアップの「終了済み」判定にも使われている。
+  // バナーの文言切替に終了境界が入っても、こちらは true のままでなければならない
+  // (8月以降にクラファンポップアップが復活してしまうため)。
+  it("8月以降もアクティブのまま (クラファン終了判定を兼ねるため)", () => {
+    expect(isJunePromoActive(new Date("2026-08-03T03:00:00Z"))).toBe(true);
+  });
+});
+
+describe("getPromoBannerPhase", () => {
+  it("JST 5/31 23:59:59 は may (PBTOPEN30)", () => {
+    // 2026-05-31T23:59:59 JST = 2026-05-31T14:59:59Z
+    expect(getPromoBannerPhase(new Date("2026-05-31T14:59:59Z"))).toBe("may");
+  });
+
+  it("JST 6/1 00:00:00 ちょうどで june (CAMPFIRE30) へ切り替わる", () => {
+    // 2026-06-01T00:00:00 JST = 2026-05-31T15:00:00Z
+    expect(getPromoBannerPhase(new Date("2026-05-31T15:00:00Z"))).toBe("june");
+  });
+
+  it("JST 7/31 23:59:59 はまだ june (CAMPFIRE30 は 7/31 まで有効)", () => {
+    // 2026-07-31T23:59:59 JST = 2026-07-31T14:59:59Z
+    expect(getPromoBannerPhase(new Date("2026-07-31T14:59:59Z"))).toBe("june");
+  });
+
+  it("JST 8/1 00:00:00 ちょうどで pbtClub (PBT CLUB 会員) へ切り替わる", () => {
+    // 2026-08-01T00:00:00 JST = 2026-07-31T15:00:00Z
+    expect(getPromoBannerPhase(new Date("2026-07-31T15:00:00Z"))).toBe(
+      "pbtClub",
+    );
+  });
+
+  it("8月以降 (JST 8/20) は pbtClub のまま", () => {
+    expect(getPromoBannerPhase(new Date("2026-08-20T03:00:00Z"))).toBe(
+      "pbtClub",
+    );
+  });
+
+  it("引数省略時は現在時刻で判定する", () => {
+    expect(["may", "june", "pbtClub"]).toContain(getPromoBannerPhase());
   });
 });
 
