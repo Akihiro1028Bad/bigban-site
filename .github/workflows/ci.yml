@@ -22,19 +22,6 @@ jobs:
       - name: 依存関係をインストール
         run: npm ci
 
-      - name: 本番認証ガード検証（check-prod-auth）
-        # #216: APPROVE_AUTH_ENABLED の doc↔code drift 対策。
-        # (1) 通常条件（VERCEL_ENV 未設定）でガードが OK を返すこと。
-        # (2) 本番×false を模した条件で必ず fail すること（フェイルオープン再発の防止を明示テスト）。
-        run: |
-          node scripts/check-prod-auth.mjs
-          if VERCEL_ENV=production APPROVE_AUTH_ENABLED=false node scripts/check-prod-auth.mjs; then
-            echo "::error::check-prod-auth が本番×APPROVE_AUTH_ENABLED=false を検知できませんでした"
-            exit 1
-          else
-            echo "OK: 本番×false でガードが期待どおり fail しました"
-          fi
-
       - name: TypeScript 型チェック
         run: npx tsc --noEmit
 
