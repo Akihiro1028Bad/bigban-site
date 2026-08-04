@@ -6,6 +6,7 @@ import {
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
+  TENNISBEAR_EVENTS_URL,
 } from "@/constants/site";
 import ReserveChoice from "./ReserveChoice";
 
@@ -66,10 +67,42 @@ describe("ReserveChoice", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("ピックルセクションにイベント / スクールのカードを表示する", () => {
+    renderWithIntl(<ReserveChoice />);
+    expect(
+      screen.getByRole("heading", { name: "イベント / スクール" }),
+    ).toBeInTheDocument();
+  });
+
+  it("イベント / スクールの申込は主催イベント一覧へ外部リンクする", () => {
+    renderWithIntl(<ReserveChoice />);
+    const link = screen.getByRole("link", { name: /イベントの申込/ });
+    expect(link).toHaveAttribute("href", TENNISBEAR_EVENTS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("イベント / スクールは reservation_click のみで labola 流入イベントを送らない", async () => {
+    trackCtaClick.mockClear();
+    trackLabolaEntry.mockClear();
+    renderWithIntl(<ReserveChoice />);
+
+    await userEvent.click(screen.getByRole("link", { name: /イベントの申込/ }));
+
+    expect(trackCtaClick).toHaveBeenCalledTimes(1);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reservation",
+      "reserve_choice_pickle_event",
+      "イベントの申込",
+    );
+    // 遷移先が labola ではないため、ファネル集計を汚さないよう送信しない。
+    expect(trackLabolaEntry).not.toHaveBeenCalled();
+  });
+
   it("移行前の予約先(RESERVA)への導線を残さない", () => {
     renderWithIntl(<ReserveChoice />);
     const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(3);
+    expect(links).toHaveLength(4);
     for (const link of links) {
       expect(link.getAttribute("href")).not.toMatch(/reserva\.be/);
     }

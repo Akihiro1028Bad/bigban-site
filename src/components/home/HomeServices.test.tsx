@@ -150,7 +150,7 @@ describe("HomeServices", () => {
     const link = ctaButton.closest("a");
     expect(link).toHaveAttribute(
       "href",
-      "https://www.tennisbear.net/user/148195/organized-event"
+      "https://www.tennisbear.net/pickleball/circle/36659/events"
     );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");

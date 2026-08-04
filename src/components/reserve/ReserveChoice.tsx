@@ -9,6 +9,7 @@ import {
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
+  TENNISBEAR_EVENTS_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
 import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
@@ -20,8 +21,10 @@ interface ChoiceCard {
   ctaKey: string;
   href: string;
   location: string;
-  // 予約先は labola に一本化済みのため、全カードが専用流入イベントを伴う。
-  labolaEntryKind: LabolaEntryKind;
+  // labola へ進むカードだけが専用流入イベントを伴う。
+  // イベント/スクール申込は遷移先が labola ではないため未指定
+  // (指定すると labola のファネル集計に無関係な流入が混ざる)。
+  labolaEntryKind?: LabolaEntryKind;
 }
 
 // 旧予約システム(RESERVA)からの移行は完了済みで、予約先は labola に一本化されている。
@@ -37,7 +40,17 @@ const COURT_CARD: ChoiceCard = {
   labolaEntryKind: "rental",
 };
 
-const PICKLEBALL_CARDS: readonly ChoiceCard[] = [COURT_CARD];
+// 早朝ピックルボール等の主催イベント / スクールの申込。枠貸しの labola とは別導線。
+const PICKLE_EVENT_CARD: ChoiceCard = {
+  tagKey: "pickleEventTag",
+  labelKey: "pickleEventLabel",
+  descKey: "pickleEventDesc",
+  ctaKey: "pickleEventCta",
+  href: TENNISBEAR_EVENTS_URL,
+  location: "reserve_choice_pickle_event",
+};
+
+const PICKLEBALL_CARDS: readonly ChoiceCard[] = [COURT_CARD, PICKLE_EVENT_CARD];
 
 // HYROX は「エリア利用（枠貸し）」と「レッスン / クラス」の2カテゴリに分ける。
 // レッスン/クラスは現状 HYROX のみのため HYROX セクション内に内包する。
@@ -66,14 +79,11 @@ const HYROX_CARDS: readonly ChoiceCard[] = [HYROX_AREA_CARD, HYROX_LESSON_CARD];
 // カードを並べる共通グリッド（ピックル／HYROX で共用）。
 function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
   const t = useTranslations("Reserve.choice");
-  // 1枚のときに2カラムのままだと左半分へ寄って崩れるため、中央寄せの1カラムにする。
-  const layoutClassName =
-    cards.length === 1
-      ? "mx-auto max-w-xl grid-cols-1"
-      : "grid-cols-1 md:grid-cols-2";
 
+  // ピックル／HYROX とも2枚構成。1枚に戻す場合は左寄せで崩れるため、
+  // ここに中央寄せ1カラムの分岐を復活させること。
   return (
-    <div className={`grid gap-4 sm:gap-6 lg:gap-8 ${layoutClassName}`}>
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:gap-8">
       {cards.map((card, i) => (
         <motion.div
           key={card.ctaKey}
@@ -99,7 +109,7 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
             {...EXTERNAL_LINK_PROPS}
             onClick={() => {
               trackCtaClick("reservation", card.location, t(card.ctaKey));
-              trackLabolaEntry(card.labolaEntryKind);
+              if (card.labolaEntryKind) trackLabolaEntry(card.labolaEntryKind);
             }}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3.5 text-sm font-bold tracking-[0.15em] text-deep-black transition-all hover:gap-3 hover:bg-accent/90 sm:mt-8 sm:py-4"
           >
