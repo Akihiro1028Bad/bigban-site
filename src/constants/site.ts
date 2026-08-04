@@ -76,8 +76,12 @@ export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 export const CAMPFIRE_URL =
   "https://camp-fire.jp/projects/926247/view?utm_campaign=cp_po_share_c_msg_mypage_projects_show";
 
+// 主催イベント（早朝ピックルボール等）の申込先。
+// 主催者ユーザーページ (/user/148195/organized-event) ではなくサークルページを使う。
+// 施設名がページタイトルになり公式サイトからの遷移として自然で、
+// かつ参加者数（例 14人/16人）が表示され参加検討の材料になるため。
 export const TENNISBEAR_EVENTS_URL =
-  "https://www.tennisbear.net/user/148195/organized-event";
+  "https://www.tennisbear.net/pickleball/circle/36659/events";
 
 export const EXTERNAL_LINK_PROPS = {
   target: "_blank",
