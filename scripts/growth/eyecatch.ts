@@ -6,7 +6,7 @@
  * シーンを生成する。固定スタイル(フラット・宇宙背景・ブランド配色)は
  * `buildEyecatchPrompt` に集約し、記事ごとに変わるのは「行為(action)」だけ。
  *
- * 文体・配色の正典は growth-article-style.md §9。fetch / readFile は注入可能。
+ * 配色・作画方針は STYLE_BASE / CHARACTER_PREFIX が正典。fetch / readFile は注入可能。
  */
 
 import { NO_TABLE_TENNIS, PICKLEBALL_ANCHOR } from "./body-image";

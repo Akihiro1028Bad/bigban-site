@@ -7,7 +7,7 @@
  *
  * 既定の参照画像は scripts/growth/assets/mascot-alien.png(同梱)。
  * --action を渡すと buildEyecatchPrompt で固定スタイルと合成する。
- * 文体・配色の正典は growth-article-style.md §9。
+ * 配色・作画方針は eyecatch.ts / body-image.ts のプロンプト定数が正典。
  * 薄い配線のためテスト対象外(ロジックは eyecatch.ts でテスト済み)。
  */
 
