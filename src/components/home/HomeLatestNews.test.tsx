@@ -37,13 +37,13 @@ const dictionary: Record<"ja" | "en", Record<string, string>> = {
     title: "最新ニュース",
     titleEn: "LATEST NEWS",
     viewAll: "すべてのニュースを見る",
-    listLabel: "最新ニュース2件",
+    listLabel: "最新ニュース一覧",
   },
   en: {
     title: "Latest News",
     titleEn: "LATEST NEWS",
     viewAll: "VIEW ALL NEWS",
-    listLabel: "Two latest news items",
+    listLabel: "Latest news items",
   },
 };
 
@@ -99,7 +99,7 @@ describe("HomeLatestNews", () => {
     errorSpy.mockRestore();
   });
 
-  it("日本語の最新2件だけを画像なしのコンパクトな行で表示する", async () => {
+  it("日本語の最新3件だけを画像なしのコンパクトな行で表示する", async () => {
     getNewsListMock.mockResolvedValueOnce({
       contents: [
         makeParsedNewsItem({
@@ -119,9 +119,15 @@ describe("HomeLatestNews", () => {
           id: "3",
           slug: "news-3",
           title: "ニュース3",
+          publishedAt: "2026-07-10T00:00:00.000Z",
+        }),
+        makeParsedNewsItem({
+          id: "4",
+          slug: "news-4",
+          title: "ニュース4",
         }),
       ],
-      totalCount: 3,
+      totalCount: 4,
       offset: 0,
       limit: 3,
     });
@@ -135,14 +141,81 @@ describe("HomeLatestNews", () => {
     });
     expect(screen.getByText("ニュース1")).toBeInTheDocument();
     expect(screen.getByText("ニュース2")).toBeInTheDocument();
-    expect(screen.queryByText("ニュース3")).not.toBeInTheDocument();
+    expect(screen.getByText("ニュース3")).toBeInTheDocument();
+    expect(screen.queryByText("ニュース4")).not.toBeInTheDocument();
     expect(screen.getByText("2026.07.23")).toBeInTheDocument();
     expect(screen.getByText("2026.07.18")).toBeInTheDocument();
+    expect(screen.getByText("2026.07.10")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "最新ニュース" }),
     ).toBeInTheDocument();
     expect(screen.getByText("LATEST NEWS")).toBeInTheDocument();
     expect(container.querySelector("img")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("各行に先頭カテゴリのチップを日本語ラベルとカテゴリ色で表示する", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [
+        makeParsedNewsItem({
+          id: "1",
+          slug: "news-1",
+          title: "ニュース1",
+          category: ["event"],
+        }),
+        makeParsedNewsItem({
+          id: "2",
+          slug: "news-2",
+          title: "ニュース2",
+          category: ["notice"],
+        }),
+      ],
+      totalCount: 2,
+      offset: 0,
+      limit: 3,
+    });
+
+    await renderHomeLatestNews("ja");
+
+    const eventChip = screen.getByText("イベント情報");
+    expect(eventChip).toBeInTheDocument();
+    expect(eventChip).toHaveStyle({
+      color: "#FF6A3D",
+      borderColor: "#FF6A3D",
+    });
+    expect(screen.getByText("お知らせ")).toHaveStyle({ color: "#C8FF00" });
+  });
+
+  it("複数カテゴリでは先頭のみをチップ表示し、未知カテゴリではチップを出さない", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [
+        makeParsedNewsItem({
+          id: "1",
+          slug: "news-1",
+          title: "ニュース1",
+          category: ["campaign", "media"],
+        }),
+        // microCMS スキーマ上 category は min(1) のため通常起こらないが、
+        // 解決結果が空になったときにチップを出さない防御分岐を検証する。
+        {
+          ...makeParsedNewsItem({
+            id: "2",
+            slug: "news-2",
+            title: "ニュース2",
+          }),
+          category: [],
+        },
+      ],
+      totalCount: 2,
+      offset: 0,
+      limit: 3,
+    });
+
+    await renderHomeLatestNews("ja");
+
+    expect(screen.getByText("キャンペーン")).toBeInTheDocument();
+    expect(screen.queryByText("メディア掲載")).not.toBeInTheDocument();
+    expect(screen.queryByText("お知らせ")).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 
@@ -154,6 +227,7 @@ describe("HomeLatestNews", () => {
           locale: "en",
           slug: "english-news",
           title: "English News",
+          category: ["campaign"],
         }),
       ],
       totalCount: 1,
@@ -168,6 +242,8 @@ describe("HomeLatestNews", () => {
       limit: 3,
       offset: 0,
     });
+    expect(screen.getByText("Campaign")).toBeInTheDocument();
+    expect(screen.queryByText("キャンペーン")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /English News/ })).toHaveAttribute(
       "href",
       "/news/english-news",
