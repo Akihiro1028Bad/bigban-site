@@ -42,6 +42,16 @@ public/
 - Webhook URL (microCMS 管理画面で設定): `${SITE_URL}/api/revalidate`
 - プレビュー URL: `${SITE_URL}/api/draft/enable?secret=...&slug=...&draftKey=...&locale=ja|en`
 
+## 分析セッション (対話型・週次)
+
+> 分析の正本は毎週木曜の対話セッション。手順の正典: `docs/operations/interactive-analysis-runbook.md`
+
+- **起動**: 「週次分析やろう」→ `node scripts/analytics/query.mjs`(GA4/GSC/LINE、直近7日) + Labola 台帳の Notion MCP 集計。月初の週だけ `--days 28` で SEO・記事成績・月次確定を追加
+- **主KPI**: コート稼働率(概算: 有効予約×2h ÷ 3面×17h×日数)
+- **PII 厳守**: Labola 予約台帳・会員台帳は**SQL 集計値のみ**。氏名・住所・電話・生年月日・メールを会話・成果物に書き出さない
+- **ベースライン**: 予約システム移行(2026-08-03)前の台帳は不完全。需要トレンドは 2026年8月以降のデータだけで判断する
+- 台帳 `時間帯` は表記ゆれ(`～`/`-`/`〜`)があるため開始時刻で正規化する
+
 ## グロースループ記事生成 (headless)
 
 > 詳細は `docs/operations/growth/` に分割。常時はこの索引だけ読み、モードを動かす時に該当ファイルを開く。
