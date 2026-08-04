@@ -12,7 +12,7 @@ import {
   TENNISBEAR_EVENTS_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
-import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
+import type { LabolaEntryKind } from "@/lib/analytics/labolaEvents";
 
 interface ChoiceCard {
   tagKey: string;
