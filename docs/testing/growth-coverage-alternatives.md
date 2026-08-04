@@ -1,73 +1,11 @@
-# Growth coverage 除外の代替保証
+# coverage 除外と代替保証の対応表
 
-この表は `vitest.config.ts` のプロダクトコード除外と一対一で対応する。追加時は理由・保証先・保証種別・残存リスクを JSON 正典へ記録する。
+> vitest.config.ts の coverage.exclude と 1:1 で対応する。機械可読版は growth-coverage-alternatives.json。
 
-| path | 保証先 |
-|---|---|
-| `__mocks__/**` | `src/lib/microcms/queries.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/test/**` | `src/app/growth/approve/ApproveClient.test.tsx`<br>`src/app/growth/approve/api.test.ts` |
-| `src/lib/analytics/trackEvent.ts` | `src/lib/analytics/events.test.ts`<br>`src/components/analytics/TrackedLink.test.tsx` |
-| `src/app/growth/approve/providers.tsx` | `src/app/growth/approve/ApproveClient.test.tsx` |
-| `scripts/growth/cli.ts` | `scripts/growth/collect.test.ts`<br>`scripts/growth/snapshot.test.ts` |
-| `scripts/growth/trend-io.ts` | `scripts/growth/trend.test.ts` |
-| `scripts/growth/existing-cli.ts` | `scripts/growth/existing.test.ts` |
-| `scripts/growth/setup-token.ts` | `scripts/growth/auth.test.ts` |
-| `scripts/growth/upload-media.ts` | `scripts/growth/media.test.ts` |
-| `scripts/growth/draft-content.ts` | `scripts/growth/content.test.ts` |
-| `scripts/growth/facility-context-cli.ts` | `scripts/growth/facility-context.test.ts` |
-| `scripts/growth/notify-drafts.ts` | `scripts/growth/notify-drafts.test.ts` |
-| `scripts/growth/gen-eyecatch.ts` | `scripts/growth/eyecatch.test.ts` |
-| `scripts/growth/gen-body-image.ts` | `scripts/growth/body-image.test.ts` |
-| `scripts/growth/self-heal-cli.ts` | `scripts/growth/self-heal.test.ts` |
-| `scripts/growth/publish-draft-cli.ts` | `scripts/growth/content.test.ts`<br>`scripts/growth/pipeline.test.ts` |
-| `scripts/growth/draft-orchestrator-cli.ts` | `scripts/growth/draftOrchestrator.test.ts`<br>`scripts/growth/draftOrchestratorApplication.test.ts` |
-| `scripts/growth/knownArticlePaths.ts` | `scripts/growth/knownPaths.test.ts` |
-| `scripts/growth/notify-line.ts` | `scripts/growth/line.test.ts` |
-| `scripts/growth/revise-cli.ts` | `scripts/growth/revise.test.ts` |
-| `scripts/growth/eyecatch-regen-cli.ts` | `scripts/growth/eyecatch-regen.test.ts` |
-| `scripts/growth/body-image-regen-cli.ts` | `scripts/growth/body-image-regen.test.ts` |
-| `scripts/growth/advise-cli.ts` | `scripts/growth/advise.test.ts` |
-| `scripts/growth/decorate-cli.ts` | `scripts/growth/decorate.test.ts` |
-| `scripts/growth/advise-apply-cli.ts` | `scripts/growth/advise-apply.test.ts` |
-| `scripts/growth/comment-revise-cli.ts` | `scripts/growth/bodyComment.test.ts` |
-| `scripts/growth/daemon-cli.ts` | `scripts/growth/daemonSmoke.test.ts`<br>`scripts/growth/daemonSchedule.test.ts`<br>`scripts/growth/processControl.test.ts` |
-| `scripts/growth/metrics-cli.ts` | `scripts/growth/metrics.test.ts` |
-| `scripts/growth/learning-log-cli.ts` | `scripts/growth/learningLog.test.ts` |
-| `scripts/growth/publish-due-cli.ts` | `scripts/growth/publishDueApplication.test.ts`<br>`scripts/growth/publishGate.test.ts` |
-| `scripts/growth/review-due-cli.ts` | `scripts/growth/review-due.test.ts` |
-| `scripts/growth/proposal-review-due-cli.ts` | `scripts/growth/proposal-review-due.test.ts` |
-| `scripts/growth/notify-pull-fail-cli.ts` | `scripts/growth/loopFailure.test.ts` |
-| `scripts/growth/notify-loop-fail-cli.ts` | `scripts/growth/loopFailure.test.ts` |
-| `scripts/growth/stall-check-cli.ts` | `scripts/growth/stallDetection.test.ts`<br>`scripts/growth/stallNotify.test.ts` |
-| `scripts/growth/loop-state-cli.ts` | `scripts/growth/loopState.test.ts` |
-| `scripts/growth/prompt-lint-cli.ts` | `scripts/growth/promptLint.test.ts` |
-| `scripts/growth/article-eval-cli.ts` | `scripts/growth/articleEval.test.ts` |
-| `scripts/growth/column-category-cli.ts` | `scripts/growth/columnCategory.test.ts` |
-| `scripts/growth/worker-log-cli.ts` | `src/lib/growth/workerLog.test.ts` |
-| `scripts/growth/reconcile-cli.ts` | `src/lib/growth/reconcile.test.ts` |
-| `src/app/growth/approve/DraftEditor.tsx` | `src/app/growth/approve/draftEditorContent.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/DraftPreviewFrame.tsx` | `src/app/growth/approve/DraftPreviewFrame.test.tsx` |
-| `src/app/growth/approve/DraftEditWorkspace.tsx` | `src/app/growth/approve/draftWorkspace.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/CommandPalette.tsx` | `src/app/growth/approve/boardPrefs.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/consult/AdviceResultBody.tsx` | `src/app/growth/approve/consult/AdviceResultBody.test.tsx` |
-| `src/app/growth/approve/consult/SentenceFixBody.tsx` | `src/app/growth/approve/consult/SentenceFixBody.test.tsx` |
-| `src/app/growth/approve/consult/ReviseProposalBody.tsx` | `src/app/growth/approve/consult/ReviseProposalBody.test.tsx` |
-| `src/app/growth/approve/consult/CommentableBody.tsx` | `src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/consult/ConsultComposer.tsx` | `src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/consult/ConsultCard.tsx` | `src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/consult/ConsultDrawer.tsx` | `src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/hooks/useBodyCommentConsult.ts` | `src/app/growth/approve/hooks/useBodyCommentConsult.test.ts` |
-| `src/app/growth/approve/DetailPanel.tsx` | `src/app/growth/approve/DetailPanel.test.tsx` |
-| `src/app/growth/approve/DetailViews.tsx` | `src/app/growth/approve/DetailViews.test.tsx` |
-| `src/app/growth/approve/OutlineView.tsx` | `src/app/growth/approve/OutlineView.test.tsx` |
-| `src/app/growth/approve/QualityChecklist.tsx` | `src/app/growth/approve/QualityChecklist.test.tsx` |
-| `src/app/growth/approve/DevicePreview.tsx` | `src/app/growth/approve/DevicePreview.test.tsx` |
-| `src/app/growth/approve/ProposalView.tsx` | `src/app/growth/approve/ProposalView.test.tsx` |
-| `src/app/growth/approve/ProposalDetailBody.tsx` | `src/app/growth/approve/ProposalDetailBody.test.tsx` |
-| `src/app/growth/approve/ProposalFormModal.tsx` | `src/lib/growth/proposalForm.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/SchedulePicker.tsx` | `src/app/growth/approve/SchedulePicker.test.tsx` |
-| `src/app/growth/approve/MediaLibraryModal.tsx` | `src/app/growth/approve/MediaLibraryModal.test.tsx` |
-| `src/app/growth/approve/BodyImageRegenModal.tsx` | `src/app/growth/approve/bodyRegenRequest.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/BodyImageInsertModal.tsx` | `scripts/growth/body-image-insert.test.ts`<br>`src/app/growth/approve/ApproveClient.test.tsx` |
-| `src/app/growth/approve/ArtboardView.tsx` | `src/app/growth/approve/ArtboardView.test.tsx` |
-| `src/app/growth/approve/OpsView.tsx` | `src/lib/growth/workerLog.test.ts`<br>`src/app/growth/approve/DashboardView.test.tsx` |
+| 除外 path | 代替保証 | 種別 | 残存リスク |
+|---|---|---|---|
+| `__mocks__/**` | `src/lib/microcms/queries.test.ts`<br>`src/components/home/HomeFacility.test.tsx` | integration-test | 実環境固有の結線はCI外 |
+| `src/lib/analytics/trackEvent.ts` | `src/lib/analytics/events.test.ts`<br>`src/components/analytics/TrackedLink.test.tsx` | integration-test | 実環境固有の結線はCI外 |
+| `scripts/growth/upload-media.ts` | `scripts/growth/media.test.ts` | alternative-test | 実環境固有の結線はCI外 |
+| `scripts/growth/gen-eyecatch.ts` | `scripts/growth/eyecatch.test.ts` | alternative-test | 実環境固有の結線はCI外 |
+| `scripts/growth/gen-body-image.ts` | `scripts/growth/body-image.test.ts` | alternative-test | 実環境固有の結線はCI外 |
