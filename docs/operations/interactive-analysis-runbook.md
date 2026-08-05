@@ -20,7 +20,6 @@
 | GA4 / Search Console | `node scripts/analytics/query.mjs`(`.env.local` の OAuth) | 読み取り専用 |
 | Labola 予約台帳・会員台帳 | Notion MCP の SQL クエリ | 会話では個票も可。**成果物には個人を残さない**(下記ルール) |
 | microCMS | microCMS MCP | 記事の公開状況 |
-| LINE 友だち数 | query.mjs に同居(通知用トークン流用) | ベストエフォート |
 | freee | freee MCP(要認可) | 認可後、月初アジェンダに売上を追加 |
 | IG フォロワー・Google 口コミ | オーナーが口頭で共有 | 自動化しない(月1・1分) |
 

@@ -226,31 +226,6 @@ async function main() {
       );
   }
 
-  // --- LINE 友だち数(ベストエフォート・失敗しても他の集計は成立) ---
-  if (env.LINE_CHANNEL_ACCESS_TOKEN) {
-    try {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 1);
-      const yyyymmdd = isoDate(d).replaceAll("-", "");
-      const res = await fetch(`https://api.line.me/v2/bot/insight/followers?date=${yyyymmdd}`, {
-        headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === "ready") {
-          console.log(`\n## LINE 友だち数(${yyyymmdd}時点)`);
-          console.log(`フォロワー ${data.followers} / 有効リーチ ${data.targetedReaches} / ブロック ${data.blocks}`);
-        } else {
-          console.log(`\n## LINE 友だち数: 集計未確定(status=${data.status})`);
-        }
-      } else {
-        console.log(`\n## LINE 友だち数: 取得失敗(${res.status})`);
-      }
-    } catch (e) {
-      console.log(`\n## LINE 友だち数: 取得失敗(${e.message})`);
-    }
-  }
-
   console.log(
     "\n(Labola 予約台帳・会員台帳の集計は Notion MCP で対話中に実行する。個票は出力しない — runbook 参照)"
   );
