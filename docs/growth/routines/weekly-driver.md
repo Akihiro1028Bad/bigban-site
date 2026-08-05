@@ -205,10 +205,10 @@ Referral が前週比 +30% を超えていたら「新しい流入元が発生�
 ```sql
 SELECT url, "Title", "Tags", "date:Date:start" AS 日付
 FROM "collection://46e2f82a-f465-44be-986e-2b12208abeb2"
-WHERE "date:Date:start" >= '<7日前>' ORDER BY 3 DESC
+WHERE "date:Date:start" >= '<7日前>' ORDER BY 4 DESC
 ```
 
-ヒットしたページを fetch して読み、**当施設の施策に転用できる項目だけ**を出典日付つきで抽出する（最大3行）。
+ヒットしたページを fetch し、各ページ末尾の **`## 施策の種` テーブルだけを収穫する**（morning-brief.md との契約フォーマット。列: タグ / 種 / 当施設への転用案 / 出典）。テーブルが無い旧形式のページのみ本文から転用可能な項目を抽出する。7日分から有望なもの最大3行に圧縮する。
 DB が見つからない場合は Notion 検索で `Morning Business Brief` を探す。0件なら「直近7日分なし」と1行書いて R2 へ進む。
 
 ### R2. 国内ピックルボール
@@ -469,7 +469,7 @@ node scripts/analytics/query.mjs --days 28
 
 Web 検索で、**千葉県（特に市川・船橋・本八幡周辺）と都内**の「新規オープン/閉鎖したピックルボールコート・インドア施設」「ピックルボール関連のメディア露出・大会・イベント告知」「HYROX 関連の大会・提携ジムの動き」を調べる。検索して分かった事実だけ書き、推測は「推測」と明示する。
 
-**Morning Business Brief（`collection://46e2f82a-f465-44be-986e-2b12208abeb2`）の直近1ヶ月分も参照してよい**（週次 R1 は7日窓のため、月次では取りこぼした分を拾い直せる）。`Tags` に `HYROX` / `Competition` / `Pickleball` が付いたページを優先して読む。
+**Morning Business Brief（`collection://46e2f82a-f465-44be-986e-2b12208abeb2`）の直近1ヶ月分も参照してよい**（週次 R1 は7日窓のため、月次では取りこぼした分を拾い直せる）。`Tags` に `HYROX` / `Competition`（=競合ウォッチ） / `Pickleball` が付いたページを優先して読む。
 出力は「競合の動き」2行以内 + 「便乗できるネタ」1〜2件。
 
 ### M-3. 記事の月間ラインナップ
