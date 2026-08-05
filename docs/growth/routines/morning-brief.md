@@ -158,6 +158,7 @@ curl -sL -m 15 https://www.instagram.com/thepicklebangtheory/ | grep -o 'content
 
 当施設が今日投稿するとしたらのアイデアを **1〜3件**、`テーマ + フック1行` の形で書く。**台本・ハッシュタグ・撮影指示までは書かない**（それは対話でやる）。
 5-b の型か、1〜4 で見つけた話題に乗る形が望ましい。**料金・未確定の日程を含むアイデアは出さない。**
+イベント集客系のアイデアの誘導先は **TennisBear のサークルページ**（https://www.tennisbear.net/pickleball/circle/36659/events ）が正規チャネル（予約サイトの Labola ではない）。
 
 ### 6. 異業種の集客・リテンション（毎朝最低1件・必須）
 
