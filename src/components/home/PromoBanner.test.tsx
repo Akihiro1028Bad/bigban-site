@@ -74,7 +74,7 @@ describe("PromoBanner", () => {
     vi.useFakeTimers();
     vi.setSystemTime(AUGUST_JST);
     renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByText(/PBT CLUB会員スタート/)).toBeInTheDocument();
+    expect(screen.getByText(/猛暑は涼しい屋内コートで/)).toBeInTheDocument();
     expect(screen.getByText(/約30%OFF/)).toBeInTheDocument();
     expect(screen.queryByText(/CAMPFIRE30/)).not.toBeInTheDocument();
     expect(screen.queryByText(/7\/31/)).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("PromoBanner", () => {
     renderWithIntl(<PromoBanner />, "ja");
     expect(screen.getByRole("link")).toHaveAttribute(
       "aria-label",
-      "PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します",
+      "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します",
     );
   });
 
