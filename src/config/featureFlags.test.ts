@@ -65,36 +65,3 @@ describe("isCmsColumnsEnabled", () => {
     expect(isCmsColumnsEnabled()).toBe(false);
   });
 });
-
-describe("APPROVE_AUTH_ENABLED (フェイルセーフ: 既定ON)", () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("未設定なら有効(true)=フェイルセーフ(本番で認証が外れない)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "");
-    const { APPROVE_AUTH_ENABLED } = await import("./featureFlags");
-    expect(APPROVE_AUTH_ENABLED).toBe(true);
-  });
-
-  it("'false' のときだけ無効(dev 用に明示的に外す)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "false");
-    const { APPROVE_AUTH_ENABLED } = await import("./featureFlags");
-    expect(APPROVE_AUTH_ENABLED).toBe(false);
-  });
-
-  it("'true' で有効", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "true");
-    const { APPROVE_AUTH_ENABLED } = await import("./featureFlags");
-    expect(APPROVE_AUTH_ENABLED).toBe(true);
-  });
-
-  it("想定外の値は有効(明示 false 以外はON=フェイルセーフ)", async () => {
-    vi.stubEnv("APPROVE_AUTH_ENABLED", "yes");
-    const { APPROVE_AUTH_ENABLED } = await import("./featureFlags");
-    expect(APPROVE_AUTH_ENABLED).toBe(true);
-  });
-});

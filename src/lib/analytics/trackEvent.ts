@@ -14,7 +14,7 @@
 
 import { sendGAEvent } from "@next/third-parties/google";
 
-import { LABOLA_ENTRY_EVENTS } from "@/lib/growth/labolaEvents";
+import { LABOLA_ENTRY_EVENTS } from "@/lib/analytics/labolaEvents";
 
 import {
   CTA_EVENTS,
@@ -22,7 +22,7 @@ import {
   type CtaEventContext,
   type CtaKey,
 } from "./events";
-import type { LabolaEntryKind } from "@/lib/growth/labolaEvents";
+import type { LabolaEntryKind } from "@/lib/analytics/labolaEvents";
 
 /** GoogleAnalytics(gtag.js)が初期化済みか。未初期化(非本番/SSR)では送らない。 */
 function isGaReady(): boolean {

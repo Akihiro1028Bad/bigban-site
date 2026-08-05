@@ -21,14 +21,8 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
-    url: `http://127.0.0.1:${port}/growth/approve`,
+    url: `http://127.0.0.1:${port}/ja`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: {
-      ...process.env,
-      APPROVE_AUTH_ENABLED: "true",
-      APPROVE_PASSPHRASE: "e2e-only-passphrase",
-      APPROVE_SESSION_SECRET: "e2e-only-session-secret-at-least-32-characters",
-    },
   },
 });

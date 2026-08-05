@@ -42,30 +42,15 @@ public/
 - Webhook URL (microCMS 管理画面で設定): `${SITE_URL}/api/revalidate`
 - プレビュー URL: `${SITE_URL}/api/draft/enable?secret=...&slug=...&draftKey=...&locale=ja|en`
 
-## グロースループ記事生成 (headless)
+## 記事の対話運用 (コラム・ニュース)
 
-> 詳細は `docs/operations/growth/` に分割。常時はこの索引だけ読み、モードを動かす時に該当ファイルを開く。
+> 旧・ヘッドレスグロースループは 2026-08-04 に廃止(経緯: docs/reviews/2026-08-04-growth-and-site-review.md、復元: archive/growth-loop-v1 ブランチ)。記事はすべて Claude との対話で作る。
 
-**正典の優先順位**: `scripts/growth/facility-context.json`(施設の前提・書いてはいけない未確定項目の単一ソース) > `docs/operations/growth-article-style.md`(文体・構成・NG) > `docs/operations/growth-weekly-runbook.md`(運用手順)。
-
-**絶対禁止(全モード)**: AIの自律判断だけで本番公開しない / git push・commit しない(`run.mjs` の `DISALLOW`) / 未確定情報(料金・正確な所要分 等。列挙の正典は `scripts/growth/facility-context.json` の `doNotWrite`)を断定しない / 失敗を沈黙させない(工程名・再開コマンド出力＋LINE通知・冪等再開)。即時公開と予約公開は、再認証した人間が公開権限を付与した場合だけ行う。
-
-**実行**: 自宅 PC の headless agent(`scripts/growth/run.mjs`)。承認画面 `AIモデル` の工程別設定に応じて Claude Code CLI / Codex CLI を選ぶ。動作確認は `GROWTH_DRYRUN=1`。
-
-**設計の共通原則**: pull型(承認画面=Vercel は通常のAI依頼を Notion に書き、重い処理は常時稼働PCのループが拾う) / 公開は再認証した人間の明示操作に限定 / 純ロジック分離(`scripts/growth/*.ts`＋`src/lib/growth/*` 再エクスポート・CLI/run.mjs/gen-* はカバレッジ除外) / 欠落耐性 / 段階ガード(#H9)。
-
-**セキュリティ**: `MICROCMS_API_KEY` は **server-only**(`NEXT_PUBLIC_` 禁止)。⚠️ 本番公開前に `APPROVE_AUTH_ENABLED` を必ず ON。横断ハードニングは #7。
-
-**分割ドキュメント**:
-- 正典・絶対禁止・実行モード一覧: `docs/operations/growth/00-canon.md`
-- 初期構築ガイド(人間向け・環境立ち上げ〜空実行): `docs/operations/growth/01-setup-guide.md`
-- 日常運用ガイド(人間向け・週次サイクル通し): `docs/operations/growth/10-operator-guide.md`
-- 下書きモード(本文画像 #59 / 手動リッチ編集 #72): `docs/operations/growth/20-draft.md`
-- pull型 AIループ(修正 #40・画像再生成 #144/#156・メディア #142/#143/#145・advise #146・decorate #147・apply #165・comment-revise #182): `docs/operations/growth/30-loops.md`
-- 公開キュー #H23/#H24・計測ループ #C4: `docs/operations/growth/50-publish-metrics.md`
-- Notion「記事ネタ案」必要プロパティ一覧: `docs/operations/growth/40-notion-props.md`
-- セルフチューニング(SI1 学習ログ): `docs/operations/growth/70-self-tuning.md`
-- プロンプト/ドキュメント再設計の方針: `docs/superpowers/plans/2026-06-28-growth-prompt-redesign-plan.md`
+- **執筆フロー**: 対話で構成案→本文→画像(`npm run growth:gen-eyecatch` / `growth:gen-body-image` → `growth:upload-media`)→ microCMS MCP で **DRAFT 投入**。
+- **公開は人間のみ**: プレビューをオーナーが確認し、microCMS 管理画面(予約公開含む)または対話での明示指示で公開する。AI が自律判断で公開しない。
+- **未確定情報を断定しない**: 料金・正確な所要分・未確定の日時は書かず「最新情報をご確認ください」と促す。営業時間 6:00-23:00・コート3面・デコターフは公表済みの確定事実。
+- **体験談はオーナー提供の一次情報だけ**を使う。なければ確定事実で書く。
+- ネタのストックは Notion「記事ネタ案」DB(手動カンバン運用)。
 
 ## Development Process — TDD
 

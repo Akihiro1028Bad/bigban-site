@@ -7,7 +7,7 @@
  *
  * buildBodyImagePrompt でスタイル別のフルプロンプトを組み、generateImage で生成する。
  * 参照画像(宇宙人マスコット)は mascot のときだけ付与する(publish-draft の本文画像生成と同方針)。
- * 文体・配色の正典は growth-article-style.md §9。
+ * 配色・作画方針は eyecatch.ts / body-image.ts のプロンプト定数が正典。
  * 薄い配線のためテスト対象外(ロジックは body-image.ts でテスト済み)。
  */
 

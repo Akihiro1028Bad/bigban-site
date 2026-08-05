@@ -136,20 +136,14 @@ describe("middleware", () => {
       expect(await runsMiddleware("/en/news")).toBe(true);
     });
 
-    it("/draft-frame は i18n ミドルウェアの対象外(#102)", async () => {
-      // iframe プレビュールートが locale 付きへ書き換えられ 404 になる事象の回帰防止。
-      expect(await runsMiddleware("/draft-frame")).toBe(false);
-    });
-
     it("/contributors は [locale] 配下の通常ページなのでミドルウェアを通す", async () => {
       // 支援者ウォール。matcher から除外すると /ja へのリライトが効かず 404 になる。
       expect(await runsMiddleware("/contributors")).toBe(true);
       expect(await runsMiddleware("/en/contributors")).toBe(true);
     });
 
-    it("既存の除外(/growth/approve, /api/...)も対象外のまま", async () => {
-      expect(await runsMiddleware("/growth/approve")).toBe(false);
-      expect(await runsMiddleware("/api/growth/draft")).toBe(false);
+    it("/api 配下はミドルウェアの対象外のまま", async () => {
+      expect(await runsMiddleware("/api/revalidate")).toBe(false);
     });
   });
 });

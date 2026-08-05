@@ -32,12 +32,9 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // locale 非依存のルートは i18n ルーティング対象外にする:
-  //   - growth       … 管理ページ(/growth/approve)
-  //   - draft-frame  … 下書きライブプレビュー iframe(route group (growth-preview)・URL=/draft-frame, #102)
-  // どちらも app 直下(=[locale] 配下ではない)ため、ここで除外しないと /ja/... へ
-  // 書き換えられて 404 になる。(growth-preview) 配下にルートを増やす場合も同様に追記すること。
+  // locale 非依存のルート(api・静的アセット)は i18n ルーティング対象外にする。
+  // app 直下(=[locale] 配下ではない)のルートを増やす場合はここに追記すること。
   matcher: [
-    "/((?!api|growth|draft-frame|_next/static|_next/image|favicon.ico|images|logos|.*\\..*).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|images|logos|.*\\..*).*)",
   ],
 };
