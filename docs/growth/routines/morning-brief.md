@@ -136,7 +136,13 @@ Web 検索で、**日本国内**の動きを調べる（最大4行）。見る�
 
 #### 5-a. 自アカウントの実測（毎朝必ず記録・省略禁止）
 
-https://www.instagram.com/thepicklebangtheory/ を WebFetch で取得し、**フォロワー数**をページのメタ情報（og:description / meta description の `N Followers, N Following` 表記）から読み取る。
+**まず curl で取得する**（2026-08-05 疎通診断: curl は 200 で成功・WebFetch は 429 になりやすい）:
+
+```bash
+curl -sL -m 15 https://www.instagram.com/thepicklebangtheory/ | grep -o 'content="[^"]*Followers[^"]*"' | head -1
+```
+
+メタ情報（og:description / meta description の `N Followers, N Following` 表記）から**フォロワー数**を読み取る。curl で取れなければ WebFetch を1回だけ試す（429 が返ったらリトライしない）。
 
 - 出力に **`フォロワー: N,NNN人（前日比 +N / ±0 / -N）`** の形で必ず1行書く。
 - 前日値は手順0で読んだ前日 Brief から取る。前日 Brief がない・前日値が書かれていない場合は `（前日比: 前日値なし）` と書く。**前日比を推測で埋めない。**
