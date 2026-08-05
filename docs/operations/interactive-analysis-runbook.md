@@ -20,6 +20,7 @@
 | GA4 / Search Console | `node scripts/analytics/query.mjs`(`.env.local` の OAuth) | 読み取り専用 |
 | Labola 予約台帳・会員台帳 | Notion MCP の SQL クエリ | 会話では個票も可。**成果物には個人を残さない**(下記ルール) |
 | microCMS | microCMS MCP | 記事の公開状況 |
+| Labola 公開カレンダー | WebFetch: https://yoyaku.labola.jp/r/shop/3473/calendar_week/ | ログイン不要。当日から7日間の空き枠・イベント参加状況が読める |
 | freee | freee MCP(要認可) | 認可後、月初アジェンダに売上を追加 |
 | IG フォロワー・Google 口コミ | オーナーが口頭で共有 | 自動化しない(月1・1分) |
 
@@ -61,7 +62,7 @@ node scripts/analytics/query.mjs --days 28  # 月初(28日窓 + SEO詳細)
 ```
 
 - **WIP は同時2件まで**。しかも別指標・別ページ面に限る(同じ面で2本走らせると帰属が壊れる)。
-- **成功指標は大カウンタ4つから選ぶ**: `reservation_click` / `reserve_entry_click` / 実予約件数 / 対象ページ PV。
+- **成功指標は大カウンタ5つから選ぶ**: `reservation_click` / `reserve_entry_click` / 実予約件数 / 対象ページ PV / HYROX 枠実予約（週平均10件未満のあいだは判定ウィンドウ最短4週）。
   提案時に**イベント名・閾値・検証日**まで確定させる。決まらない施策は起票しない。
 - 流入規模から、2週間で検出できる変化は **±10〜15% が下限**。判定ウィンドウは最短2週。
   下限未満の差は「引き分け(検出できず)」であって「効かなかった」ではない。
