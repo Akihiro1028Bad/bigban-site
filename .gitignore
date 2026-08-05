@@ -75,3 +75,6 @@ data/
 
 # growth loop: ステージ用一時ファイル・revise の lockfile / 実行カウント(管理外)
 /.growth-tmp/
+
+# AI生成画像の作業ファイル(microCMSへアップロード済み。リポジトリに含めない)
+public/images/news/

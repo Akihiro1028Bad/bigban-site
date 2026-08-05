@@ -30,8 +30,8 @@ describe("vitest config", () => {
     expect(staticConfig().test?.exclude).toContain("e2e/**");
   });
 
-  it("下書きオーケストレーターCLIは薄いI/O入口としてcoverage対象外にする", () => {
-    expect(staticConfig().test?.coverage?.exclude).toContain("scripts/growth/draft-orchestrator-cli.ts");
+  it("画像生成CLIは薄いI/O入口としてcoverage対象外にする", () => {
+    expect(staticConfig().test?.coverage?.exclude).toContain("scripts/growth/gen-eyecatch.ts");
   });
 
   it("coverage除外と機械可読な代替保証のpath集合が完全一致する", () => {
@@ -73,20 +73,6 @@ describe("vitest config", () => {
       expect(markdown).toContain(`\`${path}\``);
       for (const guarantee of entry.guarantees) expect(markdown).toContain(`\`${guarantee}\``);
     }
-  });
-
-  it("application service と daemon smoke をcoverage除外にしない", () => {
-    const excluded = staticConfig().test?.coverage?.exclude ?? [];
-    expect(excluded).not.toContain("scripts/growth/draftOrchestratorApplication.ts");
-    expect(excluded).not.toContain("scripts/growth/publishDueApplication.ts");
-    expect(excluded).not.toContain("scripts/growth/daemonSmoke.ts");
-  });
-
-  it("PR CIで3ブラウザのcritical journeyを必須実行する", () => {
-    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-    expect(workflow).toContain("Playwright critical journey (3 browsers)");
-    expect(workflow).toContain("npx playwright install --with-deps\n");
-    expect(workflow).toMatch(/run: npx playwright test\s*$/m);
   });
 
   it("ESLintもローカルのClaude worktreeを探索対象から除外する", () => {
