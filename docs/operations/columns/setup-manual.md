@@ -1,7 +1,7 @@
 # コラム CMS(columns / column-categories)microCMS 管理画面セットアップ手順
 
 - 対象: microCMS 管理画面を操作する運用担当者(非エンジニア向け)
-- 関連設計: `docs/superpowers/specs/2026-07-02-columns-cms-separation-design.md`(§4 / §4.1 / §4.2 / §8)
+- 関連設計: 旧設計書は削除済み(git履歴: docs/superpowers/specs/2026-07-02-columns-cms-separation-design.md)
 - この手順で使う JSON:
   - `docs/operations/columns/column-categories-api-schema.json`(カテゴリマスタ)
   - `docs/operations/columns/columns-api-schema.json`(コラム本体)

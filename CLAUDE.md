@@ -33,10 +33,8 @@ public/
 
 ## ニュース CMS (microCMS)
 
-- 設計書: `docs/superpowers/specs/2026-04-19-news-cms-integration-design.md`
-- 実装計画: `docs/superpowers/plans/2026-04-19-news-cms-integration.md`
-- 運用マニュアル: `docs/operations/news-admin-manual.md`
-- AI 生成プロンプト: `docs/operations/ai-news-prompt.md`
+- 運用マニュアル: `docs/operations/news-admin-manual.md`(公開・予約公開の管理画面手順)
+- コラムの入稿フィールド定義: `docs/operations/columns/`(APIスキーマJSON)
 - Feature Flag: `USE_CMS_NEWS=true` で有効化、未設定/false で旧ハードコード表示
 - 環境変数は `.env.example` の `MICROCMS_*` セクションを参照
 - Webhook URL (microCMS 管理画面で設定): `${SITE_URL}/api/revalidate`
