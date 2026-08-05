@@ -52,6 +52,16 @@ public/
 - **体験談はオーナー提供の一次情報だけ**を使う。なければ確定事実で書く。
 - ネタのストックは Notion「記事ネタ案」DB(手動カンバン運用)。
 
+## グロースコパイロット (定期ルーチン)
+
+> 設計書(正典): `docs/superpowers/specs/2026-08-05-growth-copilot-design.md` / 運用資産: `docs/growth/`(playbook・seasonal・routines・setup)
+
+- 分析と施策提案は「クラウドルーチン(下ごしらえ)+ 対話(判断・実行)」の二層。週次の正典は `docs/operations/interactive-analysis-runbook.md`。
+- **ガードレール**: ブランチ `growth/*`・PR タイトル `proposal:`・**draft PR のまま自分でマージしない**・diff 150行以内・CI green 必須。
+- 触れてよいのは**許可リストの面のみ**(バナー / 既存セクションの文言・表示 / 既存コンポーネントの variant)。新規ページ・依存追加・env・API・公開系・microCMS は禁止。
+- **マージと公開は必ず人間**。記事・ニュースはルーチンでは書かず、brief をネタ案 DB に置いて執筆は対話で行う。
+- **アカウント例外**: クラウドルーチンの draft PR は**オーナーの GitHub 認可(GitHub App)**で作成される。下記 Push Account 規約は**ローカル対話での push にのみ適用**する。
+
 ## Development Process — TDD
 
 Red -> Green -> Refactor cycle is mandatory for all development.
@@ -194,6 +204,7 @@ Blank line between each group. No circular imports.
   - `gh auth status` → active account must be `ttmakhr1028ai-art`.
   - If not, switch first: `gh auth switch --user ttmakhr1028ai-art`.
 - If the AI account is unavailable or lacks access, STOP and report — do not silently fall back to another account.
+- **例外**: クラウドルーチンが作る draft PR は GitHub App(オーナー認可)で作成される。この規約はローカル対話での push にのみ適用する。
 
 ### Branches
 
