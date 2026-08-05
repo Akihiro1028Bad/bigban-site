@@ -11,13 +11,21 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 function loadEnv() {
-  const text = readFileSync(join(ROOT, ".env.local"), "utf8");
-  return Object.fromEntries(
-    text
-      .split("\n")
-      .filter((l) => l.includes("=") && !l.startsWith("#"))
-      .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).trim()])
-  );
+  // ローカルは .env.local を正、クラウド(ルーチン実行)は .env.local が無いため
+  // process.env(claude.ai の env secrets)へフォールバックする。
+  let fileEnv = {};
+  try {
+    const text = readFileSync(join(ROOT, ".env.local"), "utf8");
+    fileEnv = Object.fromEntries(
+      text
+        .split("\n")
+        .filter((l) => l.includes("=") && !l.startsWith("#"))
+        .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).trim()])
+    );
+  } catch {
+    // .env.local なし(クラウド実行)。process.env だけで動かす。
+  }
+  return { ...process.env, ...fileEnv };
 }
 
 function parseArgs(argv) {
@@ -26,7 +34,14 @@ function parseArgs(argv) {
   if (!Number.isInteger(days) || days < 1 || days > 90) {
     throw new Error("--days は 1〜90 の整数で指定してください");
   }
-  return { days };
+  // 前期を「直前のN日」ではなく「K日前にずらした同幅」にする(K>=N)。
+  // 例: --days 1 --prev-offset 7 で「昨日 vs 前週同曜日」。日次ウォッチの誤報防止用。
+  const j = argv.indexOf("--prev-offset");
+  const prevOffset = j >= 0 ? Number(argv[j + 1]) : days;
+  if (!Number.isInteger(prevOffset) || prevOffset < days || prevOffset > 90) {
+    throw new Error("--prev-offset は days 以上 90 以下の整数で指定してください");
+  }
+  return { days, prevOffset };
 }
 
 function isoDate(d) {
@@ -34,15 +49,15 @@ function isoDate(d) {
 }
 
 /** 前日を終端に、今期・前期の日付レンジを作る(GA4/GSC は当日データが不完全なため) */
-function ranges(days) {
+function ranges(days, prevOffset = days) {
   const end = new Date();
   end.setUTCDate(end.getUTCDate() - 1);
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - (days - 1));
-  const prevEnd = new Date(start);
-  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
-  const prevStart = new Date(prevEnd);
-  prevStart.setUTCDate(prevStart.getUTCDate() - (days - 1));
+  const prevStart = new Date(start);
+  prevStart.setUTCDate(prevStart.getUTCDate() - prevOffset);
+  const prevEnd = new Date(end);
+  prevEnd.setUTCDate(prevEnd.getUTCDate() - prevOffset);
   return {
     cur: { startDate: isoDate(start), endDate: isoDate(end) },
     prv: { startDate: isoDate(prevStart), endDate: isoDate(prevEnd) },
@@ -85,11 +100,11 @@ const CTA_EVENTS = [
 const BRAND_QUERY = /ピックル.?バン|pickle\s*bang|pbt|セオリー|rst\s*agency/i;
 
 async function main() {
-  const { days } = parseArgs(process.argv.slice(2));
+  const { days, prevOffset } = parseArgs(process.argv.slice(2));
   const env = loadEnv();
   const token = await accessToken(env);
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-  const { cur, prv } = ranges(days);
+  const { cur, prv } = ranges(days, prevOffset);
   const isMonthly = days >= 28;
 
   const ga4 = async (body) => {
