@@ -138,9 +138,9 @@
   "PromoBanner": {
     "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
     "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
-    "textPbtClub": "🎉 PBT CLUB IS HERE | ~30% OFF court fees",
+    "textPbtClub": "🎉 Beat the heat on our indoor courts | ~30% OFF with PBT CLUB",
     "ariaLabel": "30% off court campaign. Go to reservation page",
-    "ariaLabelPbtClub": "PBT CLUB membership, about 30% off court fees. Go to reservation page"
+    "ariaLabelPbtClub": "Beat the heat on our indoor courts. About 30% off court fees with PBT CLUB. Go to reservation page"
   },
   "Reserve": {
     "hero": {
@@ -157,7 +157,7 @@
       "courtCta": "Book a court",
       "pickleEventTag": "EVENT / SCHOOL",
       "pickleEventLabel": "Events / School",
-      "pickleEventDesc": "Apply for our early-morning sessions, events and school programs here.",
+      "pickleEventDesc": "Play in the cool early morning — apply for our early-morning pickleball, events and school programs here.",
       "pickleEventCta": "Apply for an event",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROX Area",

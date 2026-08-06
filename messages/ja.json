@@ -152,9 +152,9 @@
   "PromoBanner": {
     "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
     "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
-    "textPbtClub": "🎉 PBT CLUB会員スタート｜コート利用料が約30%OFF",
+    "textPbtClub": "🎉 猛暑は涼しい屋内コートで｜PBT CLUB会員で約30%OFF",
     "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します",
-    "ariaLabelPbtClub": "PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します"
+    "ariaLabelPbtClub": "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します"
   },
   "Reserve": {
     "hero": {
@@ -171,7 +171,7 @@
       "courtCta": "コートの予約",
       "pickleEventTag": "EVENT / SCHOOL",
       "pickleEventLabel": "イベント / スクール",
-      "pickleEventDesc": "早朝ピックルボールなどの主催イベント・スクールへのお申し込みはこちらから。",
+      "pickleEventDesc": "涼しい早朝にプレーできる早朝ピックルボールなど、主催イベント・スクールへのお申し込みはこちらから。",
       "pickleEventCta": "イベントの申込",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROXエリア",
