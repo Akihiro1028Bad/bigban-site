@@ -94,15 +94,18 @@ describe("PromoBanner", () => {
     renderWithIntl(<PromoBanner />, "ja");
     expect(screen.getByRole("link")).toHaveAttribute(
       "aria-label",
-      "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。予約ページへ移動します",
+      "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。ニュース記事へ移動します",
     );
   });
 
-  it("PBT CLUB 期間中も予約案内ページ(/reserve)にリンクする", () => {
+  it("PBT CLUB 期間中は会員制度のニュース記事にリンクする", () => {
     vi.useFakeTimers();
     vi.setSystemTime(AUGUST_JST);
     renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByRole("link")).toHaveAttribute("href", "/reserve");
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      "/news/pbt-club-membership",
+    );
   });
 
   it("予約案内ページ(/reserve)にリンクする", () => {
