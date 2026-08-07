@@ -83,11 +83,8 @@ TZ=Asia/Tokyo date +%F   # 当日（YYYY-MM-DD）。以降「今日」はこの�
 
 **前日の Brief を読む**（重複排除とフォロワー前日比のために必須）:
 
-```sql
-SELECT url, "Title", "date:Date:start" AS 日付
-FROM "collection://46e2f82a-f465-44be-986e-2b12208abeb2"
-WHERE "date:Date:start" >= '<3日前>' ORDER BY "date:Date:start" DESC
-```
+Notion 検索で `Morning Business Brief` を引き、**直近3日ぶん**（タイトルが `YYYY-MM-DD Morning Business Brief` 形式）を探す。
+> SQL（`query_data_sources`）はワークスペースの利用上限に達しているため使わない（2026-08-07 確定）。検索かビュー読み取りで取る。
 
 ヒットしたページのうち**最新1件**を fetch して読み、次の2つを頭に入れてから調査に入る:
 
