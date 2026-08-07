@@ -48,9 +48,19 @@ function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
-/** 前日を終端に、今期・前期の日付レンジを作る(GA4/GSC は当日データが不完全なため) */
+/** JST(UTC+9)のカレンダー日付を表す Date を返す(以降 getUTC 系と isoDate が JST の日付を読む) */
+function nowInJst() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000);
+}
+
+/**
+ * JST の前日を終端に、今期・前期の日付レンジを作る。
+ * GA4/GSC は当日データが不完全なため終端は前日。
+ * 基準を JST に揃えるのは、朝の実行時刻(JST 08-09時 = UTC 前日 23-24時)に
+ * UTC 基準だと「一昨日」を見てしまうため(2026-08-06 日次ウォッチが検出)。
+ */
 function ranges(days, prevOffset = days) {
-  const end = new Date();
+  const end = nowInJst();
   end.setUTCDate(end.getUTCDate() - 1);
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - (days - 1));
