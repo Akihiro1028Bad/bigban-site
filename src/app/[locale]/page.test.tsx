@@ -35,9 +35,6 @@ vi.mock("@/components/home/HomeFacility", () => ({
   default: () => <div data-testid="home-facility" />,
 }));
 vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeHyroxPromo", () => ({
-  default: () => <div data-testid="home-hyrox-promo" />,
-}));
 vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeColumns", () => ({
@@ -138,13 +135,13 @@ describe("Home Page", () => {
     expect(container).toBeTruthy();
   });
 
-  it("HYROX 誘導カードを描画する", async () => {
+  it("HYROX 誘導カードは描画しない（SERVICES の解説リンクへ一本化）", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({
       params: Promise.resolve({ locale: "ja" }),
     });
     render(element);
-    expect(screen.getByTestId("home-hyrox-promo")).toBeInTheDocument();
+    expect(screen.queryByTestId("home-hyrox-promo")).not.toBeInTheDocument();
   });
 
   it("HomeColumnsへlocaleを渡して描画する", async () => {

@@ -94,6 +94,19 @@ describe("HomePricing", () => {
     ).toBeInTheDocument();
   });
 
+  it("HYROXエリアが同一料金である注記を表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByText(
+        "HYROXエリアレンタルも同一料金です（4名まで／5名目以降は1名につき+¥1,000）"
+      )
+    ).toBeInTheDocument();
+  });
+
   it("貸切・法人利用の案内とリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
