@@ -319,7 +319,7 @@
     "images": {
       "court": "プロ仕様DecoTurfピックルボールコート",
       "training": "ピックルボールコートに併設されたトレーニングエリア",
-      "trainingEquipment": "トレーニングエリアに並ぶスキーエルグとローイングマシン"
+      "trainingSled": "HYROXトレーニング用スレッド"
     },
     "carousel": {
       "regionLabel": "施設画像カルーセル",

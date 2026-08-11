@@ -174,19 +174,28 @@ describe("HomeFacility", () => {
     expect(srcs.some((src) => src.includes("comingsoon"))).toBe(false);
   });
 
-  it("コート実写1枚とトレーニングエリア実写2枚を表示する", () => {
+  it("コート全景、加工済みトレーニング全景、HYROXスレッドを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFacility />
       </NextIntlClientProvider>
     );
-    const srcs = Array.from(document.querySelectorAll("img")).map(
-      (img) => img.getAttribute("src") ?? ""
-    );
-    expect(srcs.filter((src) => src.includes("rental.webp"))).toHaveLength(1);
+
     expect(
-      srcs.filter((src) => /hyrox(%2F|\/)facility-\d/.test(src))
-    ).toHaveLength(2);
+      screen.getByAltText("プロ仕様DecoTurfピックルボールコート")
+    ).toHaveAttribute("src", expect.stringContaining("rental.webp"));
+    expect(
+      screen.getByAltText("ピックルボールコートに併設されたトレーニングエリア")
+    ).toHaveAttribute(
+      "src",
+      expect.stringContaining("facility-1-enhanced.webp")
+    );
+    expect(
+      screen.getByAltText("HYROXトレーニング用スレッド")
+    ).toHaveAttribute(
+      "src",
+      expect.stringContaining("facility-5-enhanced.webp")
+    );
   });
 
   it("FACILITY タイトルを表示する", () => {
