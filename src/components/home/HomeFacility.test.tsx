@@ -162,6 +162,33 @@ describe("HomeFacility", () => {
     );
   });
 
+  it("カルーセルにプレースホルダー画像を使わない", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+    const srcs = Array.from(document.querySelectorAll("img")).map(
+      (img) => img.getAttribute("src") ?? ""
+    );
+    expect(srcs.some((src) => src.includes("comingsoon"))).toBe(false);
+  });
+
+  it("コート実写1枚とトレーニングエリア実写2枚を表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+    const srcs = Array.from(document.querySelectorAll("img")).map(
+      (img) => img.getAttribute("src") ?? ""
+    );
+    expect(srcs.filter((src) => src.includes("rental.webp"))).toHaveLength(1);
+    expect(
+      srcs.filter((src) => /hyrox(%2F|\/)facility-\d/.test(src))
+    ).toHaveLength(2);
+  });
+
   it("FACILITY タイトルを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

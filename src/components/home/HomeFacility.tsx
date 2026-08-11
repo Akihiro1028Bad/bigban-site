@@ -12,9 +12,9 @@ import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 const FACILITY_IMAGES = [
-  { src: "/images/facility.webp", altKey: "court" as const },
-  { src: "/images/comingsoon.jpg", altKey: "training" as const },
-  { src: "/images/comingsoon.jpg", altKey: "lounge" as const },
+  { src: "/images/rental.webp", altKey: "court" as const },
+  { src: "/images/hyrox/facility-1.jpg", altKey: "training" as const },
+  { src: "/images/hyrox/facility-2.jpg", altKey: "trainingEquipment" as const },
 ];
 
 const FEATURE_KEYS = [
