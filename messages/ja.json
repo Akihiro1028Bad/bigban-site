@@ -262,8 +262,10 @@
   },
   "HomeLead": {
     "kicker": "ABOUT THE FACILITY",
-    "body": "<strong>THE PICKLE BANG THEORY（ザ ピックルバン セオリー）</strong>は、千葉県市川市・本八幡駅から徒歩1分の屋内ピックルボール施設です。国際大会でも使われる DecoTurf のハードコート3面を、早朝6:00から23:00まで。空調完備の全天候型で、天気や季節に左右されずプレーできます。",
-    "bodyHyrox": "HYROX公式トレーニングジムの認定を受けたトレーニングエリアも併設しています。"
+    "deck": "<strong>THE PICKLE BANG THEORY（ザ ピックルバン セオリー）</strong>は、<nb>千葉県市川市</nb>・<nb>本八幡駅</nb>から<nb>徒歩1分</nb>の<nb>屋内ピックルボール施設です。</nb>",
+    "body": "国際大会でも使われる DecoTurf のハードコート3面を、早朝6:00から23:00まで。空調完備の全天候型で、天気や季節に左右されずプレーできます。",
+    "bodyHyrox": "HYROX公式トレーニングジムの認定を受けたトレーニングエリアも併設しています。",
+    "sideLabel": "施設について"
   },
   "HomeConcept": {
     "title": "CONCEPT",

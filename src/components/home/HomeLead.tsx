@@ -21,25 +21,40 @@ export default function HomeLead() {
     <section className="bg-deep-black text-text-light">
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-12 lg:py-20">
         <motion.div
-          className="max-w-2xl"
+          className="flex gap-5 sm:gap-8"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-120px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <p className="text-[10px] uppercase tracking-[0.3em] text-text-gray">
-            {t("kicker")}
-          </p>
-          <p className="mt-5 text-sm leading-[2.2] text-text-light/90 sm:text-base">
-            {t.rich("body", {
-              strong: (chunks) => (
-                <strong className="font-semibold text-text-light">{chunks}</strong>
-              ),
-            })}
-          </p>
-          <p className="mt-4 text-sm leading-[2.2] text-text-light/90 sm:text-base">
-            {t("bodyHyrox")}
-          </p>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-text-gray">
+              {t("kicker")}
+            </p>
+            <p className="mt-5 max-w-3xl text-lg font-medium leading-[1.9] text-text-light sm:text-2xl">
+              {t.rich("deck", {
+                strong: (chunks) => (
+                  <strong className="font-semibold text-text-light">{chunks}</strong>
+                ),
+                nb: (chunks) => <span className="whitespace-nowrap">{chunks}</span>,
+              })}
+            </p>
+            <p className="mt-6 max-w-2xl text-sm leading-[2.2] text-text-light/90 sm:text-base">
+              {t("body")}
+            </p>
+            <p className="mt-4 max-w-2xl text-sm leading-[2.2] text-text-light/90 sm:text-base">
+              {t("bodyHyrox")}
+            </p>
+          </div>
+          {/* スパイン: 本文ブロックの高さいっぱいに走るヘアラインと、その上端に乗る縦書きラベル。 */}
+          <div className="self-stretch border-l border-text-gray/20 pl-3">
+            <span
+              className="whitespace-nowrap text-[11px] tracking-[0.4em] text-text-gray/60"
+              style={{ writingMode: "vertical-rl" }}
+            >
+              {t("sideLabel")}
+            </span>
+          </div>
         </motion.div>
       </div>
     </section>

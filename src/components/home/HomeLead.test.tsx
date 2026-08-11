@@ -14,21 +14,23 @@ function renderWithIntl(ui: ReactElement) {
   );
 }
 
-/** メッセージのリッチテキストタグを除いた、描画される本文を得る。 */
+/** メッセージのリッチテキストタグ（strong / nb）を除いた、描画される本文を得る。 */
 function plainText(message: string): string {
-  return message.replace(/<\/?strong>/g, "");
+  return message.replace(/<\/?(?:strong|nb)>/g, "");
 }
 
 describe("HomeLead", () => {
-  it("施設を説明するリード文を本文として表示する", () => {
+  it("施設を説明するデッキ（第1文）を本文として表示する", () => {
     const { container } = renderWithIntl(<HomeLead />);
     const section = container.querySelector("section");
-    expect(section?.textContent).toContain(plainText(jaMessages.HomeLead.body));
+    expect(section?.textContent).toContain(plainText(jaMessages.HomeLead.deck));
   });
 
   it("meta description を裏付ける確定情報を含む", () => {
     renderWithIntl(<HomeLead />);
-    const body = `${jaMessages.HomeLead.body}${jaMessages.HomeLead.bodyHyrox}`;
+    const body = plainText(
+      `${jaMessages.HomeLead.deck}${jaMessages.HomeLead.body}${jaMessages.HomeLead.bodyHyrox}`
+    );
     // 検索スニペット対策として、description と同じ事実が本文側にあることを担保する。
     for (const fact of ["本八幡駅", "徒歩1分", "DecoTurf", "6:00", "23:00", "HYROX"]) {
       expect(body).toContain(fact);
@@ -41,18 +43,37 @@ describe("HomeLead", () => {
     expect(strong?.textContent).toContain("THE PICKLE BANG THEORY");
   });
 
-  it("HYROX の説明を本文とは別の段落で表示する", () => {
+  it("デッキ・本文・HYROX の説明をそれぞれ別の段落で表示する", () => {
     const { container } = renderWithIntl(<HomeLead />);
     const paragraphs = Array.from(container.querySelectorAll("p"));
-    const hyroxParagraph = paragraphs.find((p) =>
-      p.textContent?.includes(jaMessages.HomeLead.bodyHyrox)
+    const deckParagraph = paragraphs.find((p) =>
+      p.textContent?.includes(plainText(jaMessages.HomeLead.deck))
     );
     const bodyParagraph = paragraphs.find((p) =>
       p.textContent?.includes(plainText(jaMessages.HomeLead.body))
     );
-    expect(hyroxParagraph).toBeDefined();
+    const hyroxParagraph = paragraphs.find((p) =>
+      p.textContent?.includes(jaMessages.HomeLead.bodyHyrox)
+    );
+    expect(deckParagraph).toBeDefined();
     expect(bodyParagraph).toBeDefined();
-    expect(hyroxParagraph).not.toBe(bodyParagraph);
+    expect(hyroxParagraph).toBeDefined();
+    expect(deckParagraph).not.toBe(bodyParagraph);
+    expect(bodyParagraph).not.toBe(hyroxParagraph);
+  });
+
+  it("スパインの縦書きラベルを全ブレークポイントで表示する", () => {
+    renderWithIntl(<HomeLead />);
+    const label = screen.getByText(jaMessages.HomeLead.sideLabel);
+    expect(label).toBeInTheDocument();
+
+    // hidden / sr-only で消していないことを、ラベル自身と祖先までさかのぼって担保する。
+    let node: HTMLElement | null = label;
+    while (node) {
+      expect(node.className).not.toContain("hidden");
+      expect(node.className).not.toContain("sr-only");
+      node = node.parentElement;
+    }
   });
 
   it("キッカーを表示する", () => {
