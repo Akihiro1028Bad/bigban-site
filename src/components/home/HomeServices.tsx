@@ -9,6 +9,21 @@ import { EASE } from "@/constants/motion";
 import { RESERVE_PATH, reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
+import type { ReactNode } from "react";
+
+/**
+ * カード見出しの折り返し制御タグ。
+ *
+ * word-break: keep-all に頼ると iOS Safari で見出しが切れる。Safari は keep-all
+ * のとき「・」を改行機会として扱わないため、「オープンプレー・練習会・体験会・大会」が
+ * 1行のまま 329px に伸び、カードの overflow-hidden に切り取られていた（本番で発生）。
+ * 通常の折り返しに戻したうえで、語のまとまりだけを nb で保護する。中黒は span の
+ * 外に置いてあり、そこがどのブラウザでも共通の改行機会になる。
+ */
+const RICH_TAGS = {
+  nb: (chunks: ReactNode) => <span className="whitespace-nowrap">{chunks}</span>,
+} as const;
+
 /**
  * SERVICES に並べるのは「実際に予約できる商品」だけで、/reserve の選択カードと
  * 1対1で対応させる。かつて存在した 03 トレーニングプログラム・04 大会&リーグは、
@@ -92,10 +107,10 @@ function ServiceCardGrid({ cards }: { cards: readonly ServiceCard[] }) {
                 見出し階層は h2 SERVICES > h3 グループ > h4 商品。 */}
             {/* 24px への拡大は lg から。sm〜md はカード幅が狭く、24px だと
                 「オープンプレー・練習会・体験会・大会」が語中で分断される。
-                break-keep で折り返しを「・」に限定し、text-balance で2行の長さを
-                揃える（無しだと 390〜1024px で「大会」だけが2行目に残る）。 */}
-            <h4 className="mt-2 text-balance break-keep font-sans text-xl font-black tracking-wide text-text-light lg:text-2xl">
-              {t(`${card.key}.titleJa`)}
+                折り返し位置の制御は break-keep ではなく nb（RICH_TAGS 参照）で行う。
+                text-balance は対応ブラウザで2行の長さを揃えるだけの上乗せ。 */}
+            <h4 className="mt-2 text-balance font-sans text-xl font-black tracking-wide text-text-light lg:text-2xl">
+              {t.rich(`${card.key}.titleJa`, RICH_TAGS)}
             </h4>
             <p className="mt-3 flex-1 text-sm leading-relaxed text-text-gray">
               {t(`${card.key}.description`)}
