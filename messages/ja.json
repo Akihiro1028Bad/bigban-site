@@ -345,28 +345,28 @@
     "hyroxLead": "HYROXは、ランと8種目のワークアウトで競う世界規模のフィットネスレース。はじめての方は体験会から、慣れた方はエリアを時間単位で。",
     "hyroxAbout": "HYROXエリアについて詳しく見る",
     "courtRental": {
-      "titleJa": "コートレンタル",
+      "titleJa": "<nb>コートレンタル</nb>",
       "titleEn": "COURT RENTAL",
       "description": "国際大会でも使われる DecoTurf のハードコートを1時間単位で。無人チェックインで、早朝6:00から23:00まで利用できます。",
       "cta": "コートを予約する",
       "imageAlt": "屋内ピックルボールコート"
     },
     "pickleEvent": {
-      "titleJa": "オープンプレー・練習会・体験会・大会",
+      "titleJa": "<nb>オープンプレー</nb>・<nb>練習会</nb>・<nb>体験会</nb>・<nb>大会</nb>",
       "titleEn": "OPEN PLAY, CLINICS & TOURNAMENTS",
       "description": "一人での参加も歓迎。主催のオープンプレーやレベル別の練習会・レッスン、ピックルボールが初めての方向けの体験会のほか、大会も開催しています。",
       "cta": "イベント・大会を見る",
       "imageAlt": "屋内コートでピックルボールをプレーする参加者たち"
     },
     "hyroxArea": {
-      "titleJa": "HYROXエリアレンタル",
+      "titleJa": "HYROX<nb>エリアレンタル</nb>",
       "titleEn": "HYROX AREA RENTAL",
       "description": "HYROX公式8種目に対応した器具を備えたトレーニングエリアを、時間単位でレンタル。自分のペースで自由にトレーニングできます。",
       "cta": "エリアを予約する",
       "imageAlt": "スキーエルゴ・ローイングマシン・そりが並ぶHYROXトレーニングエリアの全景"
     },
     "hyroxClass": {
-      "titleJa": "HYROXクラス・体験会",
+      "titleJa": "HYROX<nb>クラス</nb>・<nb>体験会</nb>",
       "titleEn": "HYROX CLASS & TRIAL",
       "description": "コーチが8種目の動きを一から案内する体験会と、レベルに合わせた少人数制のグループクラス。一人でも、初めてでも参加できます。",
       "cta": "クラス・体験会を見る",
