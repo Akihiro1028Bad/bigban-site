@@ -187,6 +187,31 @@ async function main() {
   console.log("\n## GA4 CTAイベント(今期)");
   for (const r of ev.rows ?? []) console.log(`${r.dimensionValues[0].value}  ${r.metricValues[0].value}回`);
 
+  // --- GA4: CTA設置箇所別(customEvent:location) ---
+  // どのCTAが効いているかを設置箇所の粒度で見る。"(not set)" は gtag 初期化前のクリック等で
+  // 発生するが規模の把握に必要なのでそのまま出す。
+  const evLoc = await ga4({
+    dateRanges: [cur],
+    dimensions: [{ name: "eventName" }, { name: "customEvent:location" }],
+    metrics: [{ name: "eventCount" }],
+    dimensionFilter: { filter: { fieldName: "eventName", inListFilter: { values: CTA_EVENTS } } },
+    orderBys: [{ metric: { metricName: "eventCount" }, desc: true }],
+    limit: 60,
+  });
+  // イベント名でグループ化(行は eventCount 降順なので各グループ内も降順のまま)
+  const byEvent = new Map();
+  for (const r of evLoc.rows ?? []) {
+    const name = r.dimensionValues[0].value;
+    if (!byEvent.has(name)) byEvent.set(name, []);
+    byEvent.get(name).push({ location: r.dimensionValues[1].value, count: +r.metricValues[0].value });
+  }
+  console.log("\n## GA4 CTA設置箇所別(今期)");
+  for (const [name, locs] of byEvent) {
+    console.log(`${name}`);
+    for (const l of locs.slice(0, 8)) console.log(`  ${l.location}  ${l.count}回`);
+    if (locs.length > 8) console.log(`  …他${locs.length - 8}件`);
+  }
+
   const funnel = await ga4({
     dateRanges: [cur],
     dimensions: [{ name: "pagePath" }],
