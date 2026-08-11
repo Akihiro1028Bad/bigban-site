@@ -53,7 +53,7 @@ describe("HomeLead", () => {
       p.textContent?.includes(plainText(jaMessages.HomeLead.body))
     );
     const hyroxParagraph = paragraphs.find((p) =>
-      p.textContent?.includes(jaMessages.HomeLead.bodyHyrox)
+      p.textContent?.includes(plainText(jaMessages.HomeLead.bodyHyrox))
     );
     expect(deckParagraph).toBeDefined();
     expect(bodyParagraph).toBeDefined();
@@ -73,6 +73,24 @@ describe("HomeLead", () => {
       expect(node.className).not.toContain("hidden");
       expect(node.className).not.toContain("sr-only");
       node = node.parentElement;
+    }
+  });
+
+  it("本文・HYROX 段落の nb タグを折り返し禁止スパンとして描画する", () => {
+    const { container } = renderWithIntl(<HomeLead />);
+    const nowrapTexts = Array.from(
+      container.querySelectorAll("span.whitespace-nowrap")
+    ).map((span) => span.textContent);
+
+    // 実測で語中分断が起きた語だけを nb で守っている（表示テキストは変えない）。
+    for (const phrase of [
+      "ハードコート",
+      "空調完備",
+      "全天候型",
+      "プレーできます。",
+      "トレーニングエリア",
+    ]) {
+      expect(nowrapTexts).toContain(phrase);
     }
   });
 
