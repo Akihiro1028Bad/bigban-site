@@ -99,7 +99,7 @@ export default async function Home({ params }: HomePageProps) {
         <HomeAbout />
         <HomeContributors />
         <HomeAccess />
-        <HomeFooter />
+        <HomeFooter showColumns={isCmsColumnsEnabled()} />
       </main>
     </HomeIntro>
   );
