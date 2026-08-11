@@ -126,4 +126,43 @@ describe("HomePricing", () => {
     await userEvent.click(link!);
     expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
   });
+
+  it("料金表の下に予約案内ページ(/reserve)へのCTAを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const cta = screen.getByRole("link", { name: "コートを予約する" });
+    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).not.toHaveAttribute("target", "_blank");
+  });
+
+  it("予約CTAクリックで reserveEntry を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const cta = screen.getByRole("link", { name: "コートを予約する" });
+    cta.addEventListener("click", (event) => event.preventDefault());
+    await userEvent.click(cta);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      "home_pricing_reserve",
+      "コートを予約する"
+    );
+  });
+
+  it("貸切・法人利用のお問い合わせリンクは維持される", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    expect(
+      document.querySelector('a[href="/about#contact"]')
+    ).toBeInTheDocument();
+  });
 });
