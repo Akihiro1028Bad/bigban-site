@@ -21,7 +21,7 @@ export default function HomeLead() {
     <section className="bg-deep-black text-text-light">
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-12 lg:py-20">
         <motion.div
-          className="max-w-3xl"
+          className="max-w-2xl"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-120px" }}
@@ -31,7 +31,14 @@ export default function HomeLead() {
             {t("kicker")}
           </p>
           <p className="mt-5 text-sm leading-[2.2] text-text-light/90 sm:text-base">
-            {t("body")}
+            {t.rich("body", {
+              strong: (chunks) => (
+                <strong className="font-semibold text-text-light">{chunks}</strong>
+              ),
+            })}
+          </p>
+          <p className="mt-4 text-sm leading-[2.2] text-text-light/90 sm:text-base">
+            {t("bodyHyrox")}
           </p>
         </motion.div>
       </div>
