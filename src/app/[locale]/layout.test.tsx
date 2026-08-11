@@ -156,10 +156,11 @@ describe("generateMetadata", () => {
         alt: "THE PICKLE BANG THEORY",
       },
     ]);
-    expect(metadata.twitter).toMatchObject({
-      card: "summary_large_image",
-      images: ["http://localhost:3000/opengraph-image.png"],
-    });
+    // twitter.images は敢えて指定しない。指定すると Next.js の自動補完が止まり、
+    // 記事の opengraph-image が og:image を上書きしても twitter:image が
+    // 共通ロゴのまま残ってしまう (X でアイキャッチが出ない)。
+    expect(metadata.twitter).toMatchObject({ card: "summary_large_image" });
+    expect(metadata.twitter).not.toHaveProperty("images");
     expect(mockGetTranslations).toHaveBeenCalledWith({
       locale: "ja",
       namespace: "Metadata",
