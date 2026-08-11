@@ -73,9 +73,6 @@ export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
 export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 
-export const CAMPFIRE_URL =
-  "https://camp-fire.jp/projects/926247/view?utm_campaign=cp_po_share_c_msg_mypage_projects_show";
-
 // 主催イベント（早朝ピックルボール等）の申込先。
 // 主催者ユーザーページ (/user/148195/organized-event) ではなくサークルページを使う。
 // 施設名がページタイトルになり公式サイトからの遷移として自然で、

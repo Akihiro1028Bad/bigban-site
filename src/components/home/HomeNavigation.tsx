@@ -5,40 +5,13 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
-import { useCrowdfundingPopup } from "@/hooks/useCrowdfundingPopup";
 import { RESERVE_PATH } from "@/constants/site";
-import { NAV_ITEMS, SECTION_IDS } from "@/constants/navigation";
+import { SECTION_IDS, navItemsFor } from "@/constants/navigation";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
-import CrowdfundingPopup from "./CrowdfundingPopup";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
 import MenuToggleButton from "./MenuToggleButton";
 import LanguageToggle from "./LanguageToggle";
-
-interface NavItem {
-  id: string;
-  kind: "anchor" | "page";
-  href: string;
-}
-
-const NAV_ITEMS_BASE: readonly NavItem[] = NAV_ITEMS;
-
-/** COLUMN リンク(コラム分離 P1⑦)。USE_CMS_COLUMNS 有効時のみ NEWS の直後に挿入する。 */
-const COLUMNS_NAV_ITEM: NavItem = { id: "columns", kind: "page", href: "/columns" };
-
-/**
- * NEWS の直後に COLUMN リンクを差し込んだ配列を返す(showColumns 有効時のみ)。
- * 既定(false)は現行の 7 項目のまま = USE_CMS_COLUMNS 未有効デプロイと整合。
- */
-function navItemsFor(showColumns: boolean): readonly NavItem[] {
-  if (!showColumns) return NAV_ITEMS_BASE;
-  const newsIdx = NAV_ITEMS_BASE.findIndex((item) => item.id === "news");
-  return [
-    ...NAV_ITEMS_BASE.slice(0, newsIdx + 1),
-    COLUMNS_NAV_ITEM,
-    ...NAV_ITEMS_BASE.slice(newsIdx + 1),
-  ];
-}
 
 interface HomeNavigationProps {
   /** コラム機能(USE_CMS_COLUMNS)有効時に COLUMN リンクを出す。既定 false=非表示。 */
@@ -54,7 +27,6 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
   const router = useRouter();
   const activeSection = useActiveSection(SECTION_IDS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isOpen: isCrowdfundingOpen, closePopup } = useCrowdfundingPopup();
 
   const handleLogoClick = useCallback(
     (e: React.MouseEvent) => {
@@ -235,8 +207,6 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
       reserveHref={reserveTo}
       navItems={navItems}
     />
-
-    <CrowdfundingPopup isOpen={isCrowdfundingOpen} onClose={closePopup} />
     </>
   );
 }

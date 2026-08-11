@@ -125,14 +125,13 @@ describe("HomeFacility", () => {
     expect(screen.getByText("ショーコート1面に変更可能")).toBeInTheDocument();
   });
 
-  it("ラウンジスペースに準備中の注記を表示する", () => {
+  it("開業前提の「準備中」注記を表示しない", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFacility />
       </NextIntlClientProvider>
     );
-    const notes = screen.getAllByText("準備中");
-    expect(notes).toHaveLength(1);
+    expect(screen.queryByText("準備中")).not.toBeInTheDocument();
   });
 
   it("trainingArea 機能が /hyrox へリンクしている", () => {

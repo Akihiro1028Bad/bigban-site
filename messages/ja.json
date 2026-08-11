@@ -99,7 +99,7 @@
     },
     "hyrox": {
       "title": "HYROX トレーニングエリア",
-      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアがオープン。",
+      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY は本格トレーニングエリアを併設。",
       "keywords": [
         "HYROX",
         "ハイロックス",
@@ -150,10 +150,7 @@
     "priceNote": "この期間の料金はキャンペーン特別価格です。"
   },
   "PromoBanner": {
-    "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
-    "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
     "textPbtClub": "🎉 猛暑は涼しい屋内コートで｜PBT CLUB会員で約30%OFF",
-    "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します",
     "ariaLabelPbtClub": "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。ニュース記事へ移動します"
   },
   "Reserve": {
@@ -313,8 +310,7 @@
       "vendingMachine": "自動販売機",
       "rentalEquipment": "レンタル用具あり",
       "unmannedCheckin": "無人チェックイン対応",
-      "showCourt": "ショーコート1面に変更可能",
-      "preparing": "準備中"
+      "showCourt": "ショーコート1面に変更可能"
     },
     "images": {
       "court": "プロ仕様DecoTurfピックルボールコート",
@@ -561,12 +557,7 @@
       }
     },
     "news": {
-      "title": "ニュース",
-      "crowdfundingHeadline": "クラウドファンディング実施中！",
-      "crowdfundingBody": "THE PICKLE BANG THEORYを一緒に育て上げてくれる方、盛り上げてくれる方を募集しています。皆さまのご支援をお待ちしております。",
-      "crowdfundingLink": "CAMP-FIRE",
-      "body": "クロスミントン世界王者・西村昭彦 本八幡駅徒歩1分に都市型ピックルボール施設『THE PICKLE BANG THEORY』2026年春オープン",
-      "prTimes": "PR TIMES"
+      "title": "ニュース"
     },
     "contact": {
       "getInTouch": "GET IN TOUCH",
@@ -642,15 +633,6 @@
   },
   "Common": {
     "logoAlt": "THE PICKLE BANG THEORY"
-  },
-  "CrowdfundingPopup": {
-    "headline": "クラファン実施中！",
-    "subheadline": "PBTを一緒に育て上げてくれる方、盛り上げてくれる方を募集します",
-    "bonus": "6月も30%OFF🔥さらに割引も！",
-    "cta": "CAMP-FIREで支援する",
-    "ctaAriaLabel": "CAMP-FIREのクラウドファンディングページを開く（新しいタブ）",
-    "close": "閉じる",
-    "imageAlt": "THE PICKLE BANG THEORY クラウドファンディング"
   },
   "Columns": {
     "heading": "コラム"
@@ -902,7 +884,7 @@
     "title": "HYROX",
     "titleJa": "ハイロックス",
     "tagline": "走る。鍛える。挑戦する。",
-    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY にオープン。",
+    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。THE PICKLE BANG THEORY は本格トレーニングエリアを併設。",
     "cta": "詳しく見る",
     "imageAlt": "HYROXのサンドバッグを担ぐ女性アスリート"
   }

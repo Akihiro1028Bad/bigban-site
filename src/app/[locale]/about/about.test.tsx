@@ -131,13 +131,17 @@ describe("AboutPage", () => {
   it("ニュースセクションを表示する", () => {
     renderWithIntl(<AboutPage />);
     expect(screen.getByRole("heading", { name: "ニュース" })).toBeInTheDocument();
-    expect(screen.getByText("クラウドファンディング実施中！")).toBeInTheDocument();
-    const campfireLink = screen.getByRole("link", { name: /CAMP-FIRE/ });
-    expect(campfireLink).toHaveAttribute(
-      "href",
-      "https://camp-fire.jp/projects/926247/view?utm_campaign=cp_po_share_c_msg_mypage_projects_show"
-    );
-    expect(screen.getByText("PR TIMES")).toBeInTheDocument();
+  });
+
+  it("開業前のクラウドファンディング募集・オープン予告を表示しない", () => {
+    renderWithIntl(<AboutPage />);
+    expect(
+      screen.queryByText("クラウドファンディング実施中！")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /CAMP-FIRE/ })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("PR TIMES")).not.toBeInTheDocument();
   });
 
   it("コンタクトフォームを表示する", () => {
@@ -323,14 +327,15 @@ describe("AboutContent 05 NEWS (CMS integration)", () => {
     ).toHaveAttribute("href", "/news");
   });
 
-  it("newsItems=[] (flag OFF / fetch失敗時) は旧ハードコード表示", async () => {
+  it("newsItems=[] (fetch失敗時) は記事を出さず開業前の旧表示も出さない", async () => {
     const { default: AboutContentReloaded } = await import("./AboutContent");
     renderWithIntl(<AboutContentReloaded newsItems={[]} locale="ja" />);
-    // フッターの「クラウドファンディング支援者」リンクと衝突しないよう、
-    // 旧ハードコードのニュース見出しを完全一致で指定する。
     expect(
-      screen.getByText("クラウドファンディング実施中！"),
-    ).toBeInTheDocument();
+      screen.queryByText("クラウドファンディング実施中！"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("すべてのニュースを見る"),
+    ).not.toBeInTheDocument();
   });
 
   it("eyecatch がある記事は画像を表示する", async () => {

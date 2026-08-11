@@ -88,7 +88,7 @@
     },
     "hyrox": {
       "title": "HYROX Training Area",
-      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is now open at THE PICKLE BANG THEORY in Motoyawata.",
+      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. THE PICKLE BANG THEORY in Motoyawata has a dedicated training area on site.",
       "keywords": [
         "HYROX",
         "HYROX Japan",
@@ -136,10 +136,7 @@
     "priceNote": "The rates during this period are special campaign prices."
   },
   "PromoBanner": {
-    "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
-    "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
     "textPbtClub": "🎉 Beat the heat on our indoor courts | ~30% OFF with PBT CLUB",
-    "ariaLabel": "30% off court campaign. Go to reservation page",
     "ariaLabelPbtClub": "Beat the heat on our indoor courts. About 30% off court fees with PBT CLUB. Go to the news article"
   },
   "Reserve": {
@@ -299,8 +296,7 @@
       "vendingMachine": "Vending Machines",
       "rentalEquipment": "Equipment Rental Available",
       "unmannedCheckin": "Unmanned Check-in",
-      "showCourt": "Convertible to 1 Show Court",
-      "preparing": "Coming Soon"
+      "showCourt": "Convertible to 1 Show Court"
     },
     "images": {
       "court": "Pro-spec DecoTurf pickleball court",
@@ -547,12 +543,7 @@
       }
     },
     "news": {
-      "title": "News",
-      "crowdfundingHeadline": "Crowdfunding Now Live!",
-      "crowdfundingBody": "We're looking for people who want to help build and energize THE PICKLE BANG THEORY. We look forward to your support.",
-      "crowdfundingLink": "CAMP-FIRE",
-      "body": "Crossminton World Champion Akihiko Nishimura to open urban pickleball facility 'THE PICKLE BANG THEORY' 1 min from Motoyawata Station in spring 2026",
-      "prTimes": "PR TIMES"
+      "title": "News"
     },
     "contact": {
       "getInTouch": "GET IN TOUCH",
@@ -628,15 +619,6 @@
   },
   "Common": {
     "logoAlt": "THE PICKLE BANG THEORY"
-  },
-  "CrowdfundingPopup": {
-    "headline": "Crowdfunding Now Live!",
-    "subheadline": "We're looking for people to help us grow and rally behind PBT",
-    "bonus": "30% OFF in June 🔥 plus extra discounts!",
-    "cta": "Support on CAMP-FIRE",
-    "ctaAriaLabel": "Open CAMP-FIRE crowdfunding page (new tab)",
-    "close": "Close",
-    "imageAlt": "THE PICKLE BANG THEORY Crowdfunding"
   },
   "Columns": {
     "heading": "COLUMN"
@@ -888,7 +870,7 @@
     "title": "HYROX",
     "titleJa": "The World Series of Fitness Racing",
     "tagline": "Run. Train. Challenge.",
-    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area is now open at THE PICKLE BANG THEORY.",
+    "description": "HYROX — the global fitness race of running and eight workouts. THE PICKLE BANG THEORY has a dedicated training area on site.",
     "cta": "DISCOVER HYROX",
     "imageAlt": "Female athlete carrying a HYROX sandbag"
   }
