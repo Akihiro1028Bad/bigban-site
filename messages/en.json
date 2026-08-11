@@ -126,7 +126,7 @@
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
     "mobileMenuAria": "Mobile menu",
-    "menuAccess": "1 min from Motoyawata Sta. · Open 24h",
+    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00-23:00",
     "instagramAria": "THE PICKLE BANG THEORY on Instagram",
     "followUs": "Follow us"
   },
@@ -245,6 +245,13 @@
     "cta": "RESERVE A COURT",
     "scroll": "SCROLL",
     "heroImageAlt": "Three DecoTurf pickleball courts at THE PICKLE BANG THEORY"
+  },
+  "HomeLead": {
+    "kicker": "ABOUT THE FACILITY",
+    "deck": "<strong>THE PICKLE BANG THEORY</strong> is an indoor pickleball facility in Ichikawa, Chiba, a one-minute walk from <nb>Motoyawata Station</nb>.",
+    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 to 23:00. The venue is fully air-conditioned, so you can play whatever the weather or season.",
+    "bodyHyrox": "It also houses a training area certified as an official HYROX training gym.",
+    "sideLabel": "Our Facility"
   },
   "HomeConcept": {
     "title": "CONCEPT",

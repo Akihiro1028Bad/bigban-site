@@ -14,8 +14,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const { error } = await resend.contacts.create({ email });
+  const apiKey = process.env.RESEND_API_KEY;
+  // 登録者は配信対象セグメントに紐づける。未設定だとブロードキャストの
+  // 宛先に入らないため、設定漏れは 500 で表面化させる。
+  const segmentId = process.env.RESEND_SEGMENT_ID;
+
+  if (!apiKey || !segmentId) {
+    return NextResponse.json(
+      { success: false, error: "サーバー設定エラー" },
+      { status: 500 },
+    );
+  }
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.contacts.create({
+    email,
+    segments: [{ id: segmentId }],
+  });
 
   if (error) {
     return NextResponse.json(
