@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import CourtPriceTable from "@/components/pricing/CourtPriceTable";
 import { EASE } from "@/constants/motion";
+import { RESERVE_PATH } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
@@ -79,6 +80,25 @@ export default function HomePricing() {
               {t("pleaseContact")}
             </p>
           </div>
+        </motion.div>
+
+        {/* 料金を確認した直後に予約へ進めるようにする主要導線 */}
+        <motion.div
+          className="mt-10 text-center"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-150px" }}
+          transition={{ duration: 1.0, delay: 0.4, ease: EASE }}
+        >
+          <Link
+            href={RESERVE_PATH}
+            onClick={() =>
+              trackCtaClick("reserveEntry", "home_pricing_reserve", t("reserveCta"))
+            }
+            className="inline-block bg-accent text-deep-black px-8 py-3 text-sm font-bold tracking-widest hover:bg-accent/90 transition-colors"
+          >
+            {t("reserveCta")}
+          </Link>
         </motion.div>
       </div>
     </section>
