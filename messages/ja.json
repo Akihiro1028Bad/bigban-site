@@ -318,8 +318,7 @@
     },
     "images": {
       "court": "プロ仕様DecoTurfピックルボールコート",
-      "training": "ピックルボールコートに併設されたトレーニングエリア",
-      "trainingSled": "HYROXトレーニング用スレッド"
+      "training": "ピックルボールコートに併設されたトレーニングエリア"
     },
     "carousel": {
       "regionLabel": "施設画像カルーセル",

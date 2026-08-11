@@ -174,8 +174,8 @@ describe("HomeFacility", () => {
     expect(srcs.some((src) => src.includes("comingsoon"))).toBe(false);
   });
 
-  it("コート全景、加工済みトレーニング全景、HYROXスレッドを表示する", () => {
-    render(
+  it("コート全景と加工済みトレーニング全景の2枚を表示する", () => {
+    const { container } = render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFacility />
       </NextIntlClientProvider>
@@ -191,11 +191,8 @@ describe("HomeFacility", () => {
       expect.stringContaining("facility-1-enhanced.webp")
     );
     expect(
-      screen.getByAltText("HYROXトレーニング用スレッド")
-    ).toHaveAttribute(
-      "src",
-      expect.stringContaining("facility-5-enhanced.webp")
-    );
+      container.querySelectorAll('[aria-roledescription="slide"]')
+    ).toHaveLength(2);
   });
 
   it("FACILITY タイトルを表示する", () => {
@@ -233,7 +230,7 @@ describe("HomeFacility", () => {
       </NextIntlClientProvider>
     );
     const dots = screen.getAllByRole("button", { name: /画像.*を表示/ });
-    expect(dots).toHaveLength(3);
+    expect(dots).toHaveLength(2);
   });
 
   it("全施設画像をレンダリングする", () => {
@@ -243,7 +240,7 @@ describe("HomeFacility", () => {
       </NextIntlClientProvider>
     );
     const images = screen.getAllByRole("img");
-    expect(images.length).toBeGreaterThanOrEqual(3);
+    expect(images.length).toBeGreaterThanOrEqual(2);
   });
 
   it("ドットクリックでscrollToが呼ばれる", () => {

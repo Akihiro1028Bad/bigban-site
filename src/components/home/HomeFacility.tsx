@@ -14,7 +14,6 @@ import { trackCtaClick } from "@/lib/analytics/trackEvent";
 const FACILITY_IMAGES = [
   { src: "/images/rental.webp", altKey: "court" as const },
   { src: "/images/hyrox/facility-1-enhanced.webp", altKey: "training" as const },
-  { src: "/images/hyrox/facility-5-enhanced.webp", altKey: "trainingSled" as const },
 ];
 
 const FEATURE_KEYS = [
