@@ -29,6 +29,11 @@ function renderJa() {
   );
 }
 
+/** 折り返し制御タグ（nb）を除いた、実際に描画される文字列を得る。 */
+function plainText(message: string): string {
+  return message.replace(/<\/?nb>/g, "");
+}
+
 describe("HomeServices", () => {
   it('セクションID "services" を持つ', () => {
     renderJa();
@@ -43,19 +48,25 @@ describe("HomeServices", () => {
 
   it("ピックルボール / HYROX の2グループ見出しを表示する", () => {
     renderJa();
-    expect(screen.getByText("PICKLEBALL")).toBeInTheDocument();
+    // グループ見出しは h3、商品名は h4。カード見出しにも "HYROX" の文字列が
+    // 現れるため、レベルで特定する。
+    expect(
+      screen.getByRole("heading", { level: 3, name: "PICKLEBALL" })
+    ).toBeInTheDocument();
     expect(screen.getByText("ピックルボール")).toBeInTheDocument();
-    expect(screen.getByText("HYROX")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "HYROX" })
+    ).toBeInTheDocument();
     expect(screen.getByText("ハイロックス")).toBeInTheDocument();
   });
 
   it("予約できる4商品をカードとして表示する", () => {
     renderJa();
     const titles = [
-      jaMessages.HomeServices.courtRental.titleJa,
-      jaMessages.HomeServices.pickleEvent.titleJa,
-      jaMessages.HomeServices.hyroxArea.titleJa,
-      jaMessages.HomeServices.hyroxClass.titleJa,
+      plainText(jaMessages.HomeServices.courtRental.titleJa),
+      plainText(jaMessages.HomeServices.pickleEvent.titleJa),
+      plainText(jaMessages.HomeServices.hyroxArea.titleJa),
+      plainText(jaMessages.HomeServices.hyroxClass.titleJa),
     ];
     for (const title of titles) {
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
@@ -71,10 +82,10 @@ describe("HomeServices", () => {
       </NextIntlClientProvider>
     );
     const titles = [
-      enMessages.HomeServices.courtRental.titleJa,
-      enMessages.HomeServices.pickleEvent.titleJa,
-      enMessages.HomeServices.hyroxArea.titleJa,
-      enMessages.HomeServices.hyroxClass.titleJa,
+      plainText(enMessages.HomeServices.courtRental.titleJa),
+      plainText(enMessages.HomeServices.pickleEvent.titleJa),
+      plainText(enMessages.HomeServices.hyroxArea.titleJa),
+      plainText(enMessages.HomeServices.hyroxClass.titleJa),
     ];
     for (const title of titles) {
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
@@ -103,10 +114,10 @@ describe("HomeServices", () => {
         ?.querySelector("[data-service-cta]")
         ?.getAttribute("href");
 
-    expect(hrefOf(jaMessages.HomeServices.courtRental.titleJa)).toBe(
+    expect(hrefOf(plainText(jaMessages.HomeServices.courtRental.titleJa))).toBe(
       "/reserve?tab=pickleball"
     );
-    expect(hrefOf(jaMessages.HomeServices.hyroxArea.titleJa)).toBe(
+    expect(hrefOf(plainText(jaMessages.HomeServices.hyroxArea.titleJa))).toBe(
       "/reserve?tab=hyrox"
     );
   });
@@ -125,10 +136,10 @@ describe("HomeServices", () => {
     };
 
     const m = jaMessages.HomeServices;
-    await clickCta(m.courtRental.titleJa);
-    await clickCta(m.pickleEvent.titleJa);
-    await clickCta(m.hyroxArea.titleJa);
-    await clickCta(m.hyroxClass.titleJa);
+    await clickCta(plainText(m.courtRental.titleJa));
+    await clickCta(plainText(m.pickleEvent.titleJa));
+    await clickCta(plainText(m.hyroxArea.titleJa));
+    await clickCta(plainText(m.hyroxClass.titleJa));
 
     // location は GA4 の集計軸。既存の home_services_court は継続性のため改名しない。
     expect(trackCtaClick.mock.calls).toEqual([
@@ -139,14 +150,27 @@ describe("HomeServices", () => {
     ]);
   });
 
-  it("カード見出しを語中で分断させない", () => {
+  it("カード見出しに break-keep を付けない（iOS Safari で見出しが切れる）", () => {
     renderJa();
-    // jsdom はレイアウトを持たないため、折り返し制御の指定自体を担保する。
-    // 実測（320〜1440px）では「オープンプレー・/練習会・体験会・大会」と
-    // 中黒で折り返し、2行の長さも揃う。
+    // iOS Safari は word-break: keep-all のとき「・」で改行しない。
+    // 「オープンプレー・練習会・体験会・大会」が 1 行のまま 329px に伸び、
+    // カードの overflow-hidden に切り取られて「大会」が欠けた（本番で発生）。
+    // 折り返し位置は nb（whitespace-nowrap）で制御し、break-keep には頼らない。
     for (const heading of document.querySelectorAll("[data-service-card] h4")) {
-      expect(heading.className).toContain("break-keep");
-      expect(heading.className).toContain("text-balance");
+      expect(heading.className).not.toContain("break-keep");
+    }
+  });
+
+  it("カード見出しの語をnbで囲み、語中での分断を防ぐ", () => {
+    const { container } = renderJa();
+    const nowrapTexts = Array.from(
+      container.querySelectorAll("[data-service-card] h4 span.whitespace-nowrap")
+    ).map((span) => span.textContent);
+
+    // 中黒は span の外に置き、そこだけが改行機会になる。
+    // 最長の nb は「オープンプレー」(7文字) で、320px でも 1 行に収まる。
+    for (const phrase of ["オープンプレー", "練習会", "体験会", "大会"]) {
+      expect(nowrapTexts).toContain(phrase);
     }
   });
 
