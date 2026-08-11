@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
@@ -9,6 +9,12 @@ import { useMagneticButton } from "@/hooks/useMagneticButton";
 import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
+// 開業前は他会場の大会写真 /images/hero.jpg を使っていた。差し戻す場合は
+// この2枚と HomeHero.heroImageAlt を元に戻す(hero.jpg は public に残してある)。
+// 縦長ビューポートでは横構図がほぼ帯にクロップされるため、専用の縦カットへ切り替える。
+const HERO_IMAGE_DESKTOP = { src: "/images/facility.webp", width: 1537, height: 1023 };
+const HERO_IMAGE_MOBILE = { src: "/images/facility-mobile.webp", width: 941, height: 1672 };
+const HERO_DESKTOP_MEDIA = "(min-width: 768px)";
 
 export default function HomeHero() {
   const t = useTranslations("HomeHero");
@@ -21,18 +27,29 @@ export default function HomeHero() {
     { text: t("headline3"), isAccent: false },
   ];
 
+  const heroImageCommon = {
+    alt: t("heroImageAlt"),
+    sizes: "100vw",
+    priority: true,
+  };
+  const {
+    props: { srcSet: heroDesktopSrcSet },
+  } = getImageProps({ ...heroImageCommon, ...HERO_IMAGE_DESKTOP });
+  const {
+    props: heroMobileProps,
+  } = getImageProps({ ...heroImageCommon, ...HERO_IMAGE_MOBILE });
+
   return (
     <section className="relative bg-deep-black overflow-hidden pt-[calc(60px+var(--promo-banner-h))] md:pt-[calc(100px+var(--promo-banner-h))]">
-      {/* Full-width 16:9 background image */}
+      {/* Full-bleed background: 縦長は縦カット、md 以上は横カット */}
       <div className="relative aspect-[16/9] min-h-[calc(100vh-100px)] w-full">
-        <Image
-          src="/images/hero.jpg"
-          alt={t("heroImageAlt")}
-          fill
-          sizes="100vw"
-          className="object-cover"
-          priority
-        />
+        <picture>
+          <source media={HERO_DESKTOP_MEDIA} srcSet={heroDesktopSrcSet} />
+          <img
+            {...heroMobileProps}
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        </picture>
         <div className="absolute inset-0 bg-black/50" />
 
         {/* Blue ambient glow */}

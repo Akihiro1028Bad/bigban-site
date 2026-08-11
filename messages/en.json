@@ -247,7 +247,7 @@
     "tagline": "FROM A SMALL DINK TO A BIG MOVEMENT",
     "cta": "RESERVE A COURT",
     "scroll": "SCROLL",
-    "heroImageAlt": "Pickleball player in action"
+    "heroImageAlt": "Three DecoTurf pickleball courts at THE PICKLE BANG THEORY"
   },
   "HomeConcept": {
     "title": "CONCEPT",
@@ -303,9 +303,8 @@
       "preparing": "Coming Soon"
     },
     "images": {
-      "court": "Aerial view of pro-spec DecoTurf pickleball court",
-      "training": "On-site training area",
-      "lounge": "Lounge space inside the facility"
+      "court": "Pro-spec DecoTurf pickleball court",
+      "training": "Training area adjoining the pickleball courts"
     },
     "carousel": {
       "regionLabel": "Facility images carousel",
