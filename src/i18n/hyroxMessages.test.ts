@@ -32,10 +32,16 @@ describe("HYROX i18n messages", () => {
     }
   });
 
-  it("ja と en の HyroxPage / HomeHyroxPromo のキー構造が一致する", () => {
+  it("ja と en の HyroxPage のキー構造が一致する", () => {
     const jaObj = ja as Record<string, unknown>;
     const enObj = en as Record<string, unknown>;
     expect(keysOf(enObj.HyroxPage)).toEqual(keysOf(jaObj.HyroxPage));
-    expect(keysOf(enObj.HomeHyroxPromo)).toEqual(keysOf(jaObj.HomeHyroxPromo));
+  });
+
+  it("撤去した HomeHyroxPromo のメッセージを残さない", () => {
+    // ホームの HYROX 誘導はフルワイドカードから SERVICES 内の一行リンクへ集約した。
+    // 未使用の名前空間が残ると、次に触る人が生きている面だと誤解する。
+    expect(ja).not.toHaveProperty("HomeHyroxPromo");
+    expect(en).not.toHaveProperty("HomeHyroxPromo");
   });
 });

@@ -15,7 +15,6 @@ import HomeConcept from "@/components/home/HomeConcept";
 import HomeLatestNews from "@/components/home/HomeLatestNews";
 import HomeFacility from "@/components/home/HomeFacility";
 import HomeServices from "@/components/home/HomeServices";
-import HomeHyroxPromo from "@/components/home/HomeHyroxPromo";
 import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
 import HomeColumns from "@/components/home/HomeColumns";
@@ -87,7 +86,6 @@ export default async function Home({ params }: HomePageProps) {
         <HomeConcept />
         <HomeFacility />
         <HomeServices />
-        <HomeHyroxPromo />
         <HomePricing />
         {/* Suspense で囲むことで microCMS フェッチが遅くても
             HomeAbout 以降のセクションが先にストリーミングされる。

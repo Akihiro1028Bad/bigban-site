@@ -24,6 +24,15 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
+  it("コートレンタル料金の回答に HYROX エリアの同一料金を明記する", () => {
+    renderWithIntl(<ReserveFaq />);
+    expect(
+      screen.getByText(
+        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。HYROXエリアの利用料も同額です（4名まで／5名目以降は1名につき+¥1,000）。",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("FAQPage 構造化データ(JSON-LD)を出力する", () => {
     const { container } = renderWithIntl(<ReserveFaq />);
     const script = container.querySelector(

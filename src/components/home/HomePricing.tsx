@@ -69,6 +69,12 @@ export default function HomePricing() {
           <div className="flex items-start gap-3">
             <span className="text-accent text-xs mt-0.5">▸</span>
             <p className="text-text-gray text-sm">
+              {t("hyroxRateNote")}
+            </p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-accent text-xs mt-0.5">▸</span>
+            <p className="text-text-gray text-sm">
               {t("privateFacilityNote")}
               <Link
                 href="/about#contact"

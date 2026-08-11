@@ -49,6 +49,9 @@ yarn-error.log*
 # original design assets (large .ai files)
 nouhin/
 
+# 変換前の素材置き場。配信するのは public/ に置いた最適化済みファイルだけ。
+assets/
+
 # test coverage
 coverage/
 
