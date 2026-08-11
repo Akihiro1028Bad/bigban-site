@@ -260,6 +260,10 @@
     "scroll": "SCROLL",
     "heroImageAlt": "THE PICKLE BANG THEORYの3面DecoTurfピックルボールコート"
   },
+  "HomeLead": {
+    "kicker": "ABOUT THE FACILITY",
+    "body": "THE PICKLE BANG THEORY（ザ ピックルバン セオリー）は、千葉県市川市・本八幡駅から徒歩1分の屋内ピックルボール専用施設です。国際大会でも使われる DecoTurf のハードコート3面を、早朝6:00から23:00まで。空調完備の全天候型で、天気や季節に左右されずプレーできます。"
+  },
   "HomeConcept": {
     "title": "CONCEPT",
     "imageAlt": "ビッグバン — 宇宙の誕生",
@@ -270,6 +274,30 @@
     "description2": "THE PICKLE BANG THEORYは、“ピックルボールのビッグバン”が生まれる場所を目指しています。",
     "catchcopy": "小さなディンクから、大きなムーブメントへ。",
     "titleJa": "コンセプト"
+  },
+  "HomeBeginners": {
+    "title": "GET STARTED",
+    "titleJa": "はじめての方へ",
+    "lead": "ピックルボールが初めてでも大丈夫です。ラケットスポーツの経験がなくても、はじめの一歩から順に進められます。",
+    "step01": {
+      "number": "01",
+      "title": "レッスンで基礎から",
+      "description": "少人数制のコーチングクラスで、ルールと基本の打ち方から学べます。おひとりでの参加も歓迎です。",
+      "cta": "レッスンを予約する"
+    },
+    "step02": {
+      "number": "02",
+      "title": "コートを借りてプレー",
+      "description": "基本を覚えたら、仲間とコートを時間貸しで。早朝6:00から深夜23:00まで、無人チェックインで利用できます。",
+      "cta": "コートを予約する"
+    },
+    "step03": {
+      "number": "03",
+      "title": "イベントで仲間と出会う",
+      "description": "主催イベントや大会に参加すれば、プレー仲間が広がります。おひとりで参加できる会もあります。",
+      "cta": "イベントを見る"
+    },
+    "note": "パドルはレンタルできます（1本 ¥500・1コートにつき6本まで）。シューズはコートを傷めないノーマーキングソールのものをご持参ください。"
   },
   "HomeFacility": {
     "title": "FACILITY",

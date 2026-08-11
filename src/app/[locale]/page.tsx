@@ -10,7 +10,9 @@ import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
+import HomeLead from "@/components/home/HomeLead";
 import HomeConcept from "@/components/home/HomeConcept";
+import HomeBeginners from "@/components/home/HomeBeginners";
 import HomeLatestNews from "@/components/home/HomeLatestNews";
 import HomeFacility from "@/components/home/HomeFacility";
 import HomeServices from "@/components/home/HomeServices";
@@ -79,10 +81,12 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
+        <HomeLead />
         <Suspense fallback={null}>
           <HomeLatestNews locale={locale} />
         </Suspense>
         <HomeConcept />
+        <HomeBeginners />
         <HomeFacility />
         <HomeServices />
         <HomeHyroxPromo />
