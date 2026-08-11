@@ -10,11 +10,11 @@ import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
+import HomeLead from "@/components/home/HomeLead";
 import HomeConcept from "@/components/home/HomeConcept";
 import HomeLatestNews from "@/components/home/HomeLatestNews";
 import HomeFacility from "@/components/home/HomeFacility";
 import HomeServices from "@/components/home/HomeServices";
-import HomeHyroxPromo from "@/components/home/HomeHyroxPromo";
 import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
 import HomeColumns from "@/components/home/HomeColumns";
@@ -79,13 +79,13 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
+        <HomeLead />
         <Suspense fallback={null}>
           <HomeLatestNews locale={locale} />
         </Suspense>
         <HomeConcept />
         <HomeFacility />
         <HomeServices />
-        <HomeHyroxPromo />
         <HomePricing />
         {/* Suspense で囲むことで microCMS フェッチが遅くても
             HomeAbout 以降のセクションが先にストリーミングされる。
@@ -99,7 +99,7 @@ export default async function Home({ params }: HomePageProps) {
         <HomeAbout />
         <HomeContributors />
         <HomeAccess />
-        <HomeFooter />
+        <HomeFooter showColumns={isCmsColumnsEnabled()} />
       </main>
     </HomeIntro>
   );

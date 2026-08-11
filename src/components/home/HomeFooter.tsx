@@ -4,11 +4,17 @@ import { useCallback } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
-import { NAV_ITEMS } from "@/constants/navigation";
+import { navItemsFor } from "@/constants/navigation";
 
 import FooterNewsletter from "./FooterNewsletter";
 
-export default function HomeFooter() {
+interface HomeFooterProps {
+  /** コラム機能(USE_CMS_COLUMNS)有効時に COLUMN リンクを出す。既定 false=非表示。 */
+  showColumns?: boolean;
+}
+
+export default function HomeFooter({ showColumns = false }: HomeFooterProps) {
+  const navItems = navItemsFor(showColumns);
   const t = useTranslations("Navigation");
   const tFooter = useTranslations("HomeFooter");
   const tCommon = useTranslations("Common");
@@ -54,7 +60,7 @@ export default function HomeFooter() {
 
           {/* Center: Nav links */}
           <nav className="flex flex-wrap gap-x-6 gap-y-3 justify-center lg:justify-center">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const ja = t(`${item.id}Ja`);
               const className =
                 "flex flex-col items-center leading-tight text-sm tracking-[0.15em] text-text-gray hover:text-text-light transition-colors";

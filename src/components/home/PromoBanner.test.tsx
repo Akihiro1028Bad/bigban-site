@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import PromoBanner from "./PromoBanner";
@@ -15,11 +15,6 @@ vi.mock("@/i18n/navigation", () => ({
   ),
 }));
 
-// JST の境界をまたぐ表示切替を検証するため、テスト内でシステム時刻を固定する。
-const MAY_JST = new Date("2026-05-29T03:00:00Z"); // JST 5/29 → 5月キャンペーン
-const JUNE_JST = new Date("2026-06-05T03:00:00Z"); // JST 6/5 → 6月キャンペーン
-const AUGUST_JST = new Date("2026-08-03T03:00:00Z"); // JST 8/3 → PBT CLUB 会員
-
 function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
   const messages = locale === "ja" ? jaMessages : enMessages;
   return render(
@@ -29,102 +24,33 @@ function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
   );
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("PromoBanner", () => {
-  it("5/31までは日本語の5月キャンペーン文言(PBTOPEN30)を表示する", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(MAY_JST);
+  it("PBT CLUB 会員制度の文言を表示する", () => {
     renderWithIntl(<PromoBanner />, "ja");
     expect(
-      screen.getByText(/🈹️ コート30%OFFキャンペーン中/),
+      screen.getByText(jaMessages.PromoBanner.textPbtClub)
     ).toBeInTheDocument();
-    expect(screen.getByText(/PBTOPEN30/)).toBeInTheDocument();
-    expect(screen.getByText(/5\/31/)).toBeInTheDocument();
   });
 
-  it("英語ロケールでも5月キャンペーン文言を表示する", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(MAY_JST);
+  it("英語ロケールでも PBT CLUB の文言を表示する", () => {
     renderWithIntl(<PromoBanner />, "en");
-    expect(screen.getByText(/🈹️ 30% OFF CAMPAIGN/)).toBeInTheDocument();
-    expect(screen.getByText(/PBTOPEN30/)).toBeInTheDocument();
+    expect(
+      screen.getByText(enMessages.PromoBanner.textPbtClub)
+    ).toBeInTheDocument();
   });
 
-  it("JST 6/1以降は6月キャンペーン文言(CAMPFIRE30 / 7\\31まで)へ切り替わる", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(JUNE_JST);
-    renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByText(/CAMPFIRE30/)).toBeInTheDocument();
-    expect(screen.getByText(/7\/31/)).toBeInTheDocument();
-    expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
-  });
-
-  it("英語ロケールでも6月キャンペーン文言(CAMPFIRE30)へ切り替わる", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(JUNE_JST);
-    renderWithIntl(<PromoBanner />, "en");
-    expect(screen.getByText(/CAMPFIRE30/)).toBeInTheDocument();
-    expect(screen.queryByText(/PBTOPEN30/)).not.toBeInTheDocument();
-  });
-
-  it("JST 8/1以降は失効した CAMPFIRE30 を出さず PBT CLUB 文言へ切り替わる", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(AUGUST_JST);
-    renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByText(/猛暑は涼しい屋内コートで/)).toBeInTheDocument();
-    expect(screen.getByText(/約30%OFF/)).toBeInTheDocument();
-    expect(screen.queryByText(/CAMPFIRE30/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/7\/31/)).not.toBeInTheDocument();
-  });
-
-  it("英語ロケールでも JST 8/1以降は PBT CLUB 文言へ切り替わる", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(AUGUST_JST);
-    renderWithIntl(<PromoBanner />, "en");
-    expect(screen.getByText(/PBT CLUB/)).toBeInTheDocument();
-    expect(screen.queryByText(/CAMPFIRE30/)).not.toBeInTheDocument();
-  });
-
-  it("PBT CLUB 期間中は aria-label も会員制度の内容に切り替わる", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(AUGUST_JST);
-    renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "aria-label",
-      "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。ニュース記事へ移動します",
-    );
-  });
-
-  it("PBT CLUB 期間中は会員制度のニュース記事にリンクする", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(AUGUST_JST);
-    renderWithIntl(<PromoBanner />, "ja");
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "/news/pbt-club-membership",
-    );
-  });
-
-  it("予約案内ページ(/reserve)にリンクする", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(MAY_JST);
+  it("会員制度のニュース記事にリンクする", () => {
     renderWithIntl(<PromoBanner />, "ja");
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/reserve");
+    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
     expect(link).not.toHaveAttribute("target", "_blank");
   });
 
-  it("exposes an accessible label describing the link destination", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(MAY_JST);
+  it("リンク先を説明する aria-label を持つ", () => {
     renderWithIntl(<PromoBanner />, "ja");
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute(
+    expect(screen.getByRole("link")).toHaveAttribute(
       "aria-label",
-      "コート30%OFFキャンペーン。予約ページへ移動します",
+      jaMessages.PromoBanner.ariaLabelPbtClub
     );
   });
 });

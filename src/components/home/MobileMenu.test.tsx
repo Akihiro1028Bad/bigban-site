@@ -267,7 +267,9 @@ describe("MobileMenu", () => {
 
   it("英語ロケールではアクセス情報が英語になる", () => {
     renderMenu({ locale: "en", isJa: false });
-    expect(screen.getByText("1 min from Motoyawata Sta. · Open 24h")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 min from Motoyawata Sta. · Open 6:00-23:00")
+    ).toBeInTheDocument();
   });
 
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---

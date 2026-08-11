@@ -71,9 +71,11 @@ export async function generateMetadata({
       locale: locale === "ja" ? "ja_JP" : "en_US",
       images: [OG_IMAGE],
     },
+    // images は指定しない。指定すると Next.js の自動補完 (twitter.images ←
+    // openGraph.images) が止まり、記事の opengraph-image が og:image を上書きしても
+    // twitter:image が共通ロゴのまま残る。未指定なら og:image に追従する。
     twitter: {
       card: "summary_large_image",
-      images: [OG_IMAGE.url],
     },
     robots: {
       index: true,

@@ -12,21 +12,20 @@ import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 const FACILITY_IMAGES = [
-  { src: "/images/facility.webp", altKey: "court" as const },
-  { src: "/images/comingsoon.jpg", altKey: "training" as const },
-  { src: "/images/comingsoon.jpg", altKey: "lounge" as const },
+  { src: "/images/rental.webp", altKey: "court" as const },
+  { src: "/images/hyrox/facility-1-enhanced.webp", altKey: "training" as const },
 ];
 
 const FEATURE_KEYS = [
-  { key: "trainingArea" as const, hasNote: true },
-  { key: "lounge" as const, hasNote: true },
-  { key: "changingRooms" as const, hasNote: false },
-  { key: "airConditioning" as const, hasNote: false },
-  { key: "vendingMachine" as const, hasNote: false },
-  { key: "rentalEquipment" as const, hasNote: false },
-  { key: "unmannedCheckin" as const, hasNote: false },
-  { key: "showCourt" as const, hasNote: false },
-];
+  "trainingArea",
+  "lounge",
+  "changingRooms",
+  "airConditioning",
+  "vendingMachine",
+  "rentalEquipment",
+  "unmannedCheckin",
+  "showCourt",
+] as const;
 
 
 export default function HomeFacility() {
@@ -254,9 +253,9 @@ export default function HomeFacility() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.0, delay: 0.2, ease: EASE }}
         >
-          {FEATURE_KEYS.map((feature, i) => (
+          {FEATURE_KEYS.map((featureKey, i) => (
             <motion.div
-              key={feature.key}
+              key={featureKey}
               className="break-inside-avoid border-l-2 border-accent/15 pl-4 py-3 mb-1 transition-colors duration-300 hover:border-accent/50"
               initial={{ opacity: 0, x: -12 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -267,26 +266,19 @@ export default function HomeFacility() {
                 ease: EASE,
               }}
             >
-              {feature.key === "trainingArea" ? (
+              {featureKey === "trainingArea" ? (
                 <Link
                   href="/hyrox"
                   onClick={() => trackCtaClick("contentClick", "home_facility_hyrox", "hyrox")}
                   className="text-text-light text-sm lg:text-base hover:text-accent transition-colors"
                 >
-                  {t(`features.${feature.key}`)}
+                  {t(`features.${featureKey}`)}
                   <span className="text-accent/60 text-xs ml-2 tracking-wider">→</span>
                 </Link>
               ) : (
-                <>
-                  <span className="text-text-light text-sm lg:text-base">
-                    {t(`features.${feature.key}`)}
-                  </span>
-                  {feature.hasNote && (
-                    <span className="text-accent/60 text-xs ml-2 tracking-wider">
-                      {t("features.preparing")}
-                    </span>
-                  )}
-                </>
+                <span className="text-text-light text-sm lg:text-base">
+                  {t(`features.${featureKey}`)}
+                </span>
               )}
             </motion.div>
           ))}

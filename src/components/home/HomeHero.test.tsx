@@ -85,8 +85,29 @@ describe("HomeHero", () => {
 
   it("ヒーロー写真を表示する", () => {
     renderWithProvider(<HomeHero />);
-    const img = screen.getByAltText(/ピックルボールをプレーする選手/);
+    const img = screen.getByAltText(
+      jaMessages.HomeHero.heroImageAlt
+    );
     expect(img).toBeInTheDocument();
+  });
+
+  it("ヒーロー背景に自施設の実写を使い、既定は縦構図にする", () => {
+    renderWithProvider(<HomeHero />);
+    const src = decodeURIComponent(
+      screen.getByAltText(jaMessages.HomeHero.heroImageAlt).getAttribute("src") ??
+        ""
+    );
+    expect(src).not.toContain("hero.jpg");
+    expect(src).toContain("/images/facility-mobile.webp");
+  });
+
+  it("デスクトップ幅では横構図の画像に切り替える", () => {
+    const { container } = renderWithProvider(<HomeHero />);
+    const source = container.querySelector("picture > source");
+    expect(source?.getAttribute("media")).toBe("(min-width: 768px)");
+    expect(decodeURIComponent(source?.getAttribute("srcset") ?? "")).toContain(
+      "/images/facility.webp"
+    );
   });
 
   it("ヘッダー＋バナー分のパディングが設定されている", () => {

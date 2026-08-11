@@ -88,7 +88,7 @@
     },
     "hyrox": {
       "title": "HYROX Training Area",
-      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. A dedicated training area is now open at THE PICKLE BANG THEORY in Motoyawata.",
+      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. THE PICKLE BANG THEORY in Motoyawata has a dedicated training area on site.",
       "keywords": [
         "HYROX",
         "HYROX Japan",
@@ -126,7 +126,7 @@
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
     "mobileMenuAria": "Mobile menu",
-    "menuAccess": "1 min from Motoyawata Sta. · Open 24h",
+    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00-23:00",
     "instagramAria": "THE PICKLE BANG THEORY on Instagram",
     "followUs": "Follow us"
   },
@@ -136,10 +136,7 @@
     "priceNote": "The rates during this period are special campaign prices."
   },
   "PromoBanner": {
-    "text": "🈹️ 30% OFF CAMPAIGN【PBTOPEN30】(until 5/31)",
-    "textJune": "🈹️ 30% OFF CAMPAIGN【CAMPFIRE30】(until 7/31)",
     "textPbtClub": "🎉 Beat the heat on our indoor courts | ~30% OFF with PBT CLUB",
-    "ariaLabel": "30% off court campaign. Go to reservation page",
     "ariaLabelPbtClub": "Beat the heat on our indoor courts. About 30% off court fees with PBT CLUB. Go to the news article"
   },
   "Reserve": {
@@ -157,7 +154,7 @@
       "courtCta": "Book a court",
       "pickleEventTag": "EVENT / SCHOOL",
       "pickleEventLabel": "Events / School",
-      "pickleEventDesc": "Play in the cool early morning — apply for our early-morning pickleball, events and school programs here.",
+      "pickleEventDesc": "Apply here for open play, practice sessions, trial sessions and tournaments — including early-morning pickleball, played in the cool of the day.",
       "pickleEventCta": "Apply for an event",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROX Area",
@@ -168,7 +165,7 @@
       "hyroxAreaCta": "Book the area",
       "lessonKicker": "LESSON / CLASS",
       "lessonHeading": "Lessons / Classes",
-      "lessonDesc": "Book HYROX small-group coaching classes here.",
+      "lessonDesc": "Book HYROX small-group coaching classes and trial sessions here.",
       "lessonCta": "Book a lesson"
     },
     "steps": {
@@ -223,7 +220,7 @@
         },
         {
           "question": "How much is court rental?",
-          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week."
+          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate (up to 4 people; +¥1,000 per additional person)."
         },
         {
           "question": "Where are you located?",
@@ -247,7 +244,14 @@
     "tagline": "FROM A SMALL DINK TO A BIG MOVEMENT",
     "cta": "RESERVE A COURT",
     "scroll": "SCROLL",
-    "heroImageAlt": "Pickleball player in action"
+    "heroImageAlt": "Three DecoTurf pickleball courts at THE PICKLE BANG THEORY"
+  },
+  "HomeLead": {
+    "kicker": "ABOUT THE FACILITY",
+    "deck": "<strong>THE PICKLE BANG THEORY</strong> is an indoor pickleball facility in Ichikawa, Chiba, a one-minute walk from <nb>Motoyawata Station</nb>.",
+    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 to 23:00. The venue is fully air-conditioned, so you can play whatever the weather or season.",
+    "bodyHyrox": "It also houses a training area certified as an official HYROX training gym.",
+    "sideLabel": "Our Facility"
   },
   "HomeConcept": {
     "title": "CONCEPT",
@@ -299,13 +303,11 @@
       "vendingMachine": "Vending Machines",
       "rentalEquipment": "Equipment Rental Available",
       "unmannedCheckin": "Unmanned Check-in",
-      "showCourt": "Convertible to 1 Show Court",
-      "preparing": "Coming Soon"
+      "showCourt": "Convertible to 1 Show Court"
     },
     "images": {
-      "court": "Aerial view of pro-spec DecoTurf pickleball court",
-      "training": "On-site training area",
-      "lounge": "Lounge space inside the facility"
+      "court": "Pro-spec DecoTurf pickleball court",
+      "training": "Training area adjoining the pickleball courts"
     },
     "carousel": {
       "regionLabel": "Facility images carousel",
@@ -321,34 +323,43 @@
   },
   "HomeServices": {
     "title": "SERVICES",
-    "service01": {
+    "pickleballGroup": "PICKLEBALL",
+    "pickleballGroupJa": "Pickleball",
+    "pickleballLead": "New to pickleball? Start with a trial or practice session. Courts are available by the hour.",
+    "hyroxGroup": "HYROX",
+    "hyroxGroupJa": "Hyrox",
+    "hyroxLead": "HYROX is a global fitness race combining running with eight workouts. Start with a trial session, or rent the area by the hour.",
+    "hyroxAbout": "Learn about the HYROX area",
+    "courtRental": {
       "titleJa": "Court Rental",
       "titleEn": "COURT RENTAL",
-      "description": "Hourly court rentals with unmanned check-in for easy booking. Available from 6:00 AM to 11:00 PM.",
-      "cta": "RESERVE"
+      "description": "Book a DecoTurf hard court — the surface used at international tournaments — by the hour. Unmanned check-in, open from 6:00 AM to 11:00 PM.",
+      "cta": "Book a court",
+      "imageAlt": "Indoor pickleball court"
     },
-    "service02": {
-      "titleJa": "Lessons & Clinics",
-      "titleEn": "LESSONS & CLINICS",
-      "description": "Direct coaching from top players. Level-based programs for beginners to advanced players. Special clinics with international top players coming soon.",
-      "cta": "BOOK A LESSON"
+    "pickleEvent": {
+      "titleJa": "Open Play, Clinics & Tournaments",
+      "titleEn": "OPEN PLAY, CLINICS & TOURNAMENTS",
+      "description": "Solo players welcome. Join our open play sessions, level-based practice sessions and lessons, a trial session if pickleball is new to you, or one of our tournaments.",
+      "cta": "See all events",
+      "imageAlt": "Players enjoying pickleball on the indoor courts"
     },
-    "service03": {
-      "titleJa": "Training Program",
-      "titleEn": "TRAINING",
-      "description": "Pickleball enhancement programs incorporating physical training. Conditioning at the on-site training area. Improve your game from the ground up."
+    "hyroxArea": {
+      "titleJa": "HYROX Area Rental",
+      "titleEn": "HYROX AREA RENTAL",
+      "description": "Rent the training area by the hour, equipped for all eight official HYROX stations. Train freely at your own pace.",
+      "cta": "Book the area",
+      "imageAlt": "The full HYROX training area with ski ergs, rowing machines and sleds"
     },
-    "service04": {
-      "titleJa": "Tournaments & Leagues",
-      "titleEn": "TOURNAMENTS & LEAGUES",
-      "description": "Regular original tournaments and leagues. From prize-money tournaments to league matches for all skill levels."
+    "hyroxClass": {
+      "titleJa": "HYROX Class & Trial",
+      "titleEn": "HYROX CLASS & TRIAL",
+      "description": "A trial session where a coach walks you through all eight stations, plus small-group classes matched to your level. Come alone, come new.",
+      "cta": "See classes & trials",
+      "imageAlt": "A coach briefing participants in the HYROX training area"
     },
-    "service05": {
-      "titleJa": "Events",
-      "titleEn": "EVENTS",
-      "description": "Convert to a single show court for professional spectating events. Also available as a venue for cross-industry collaborations and promotional events.",
-      "cta": "VIEW EVENTS"
-    },
+    "notePaddle": "Paddle rental ¥500 each (up to 6 per court)",
+    "noteShoes": "Non-marking sole shoes are required on court. Please bring your own — shoe rental is not available.",
     "titleJa": "Services & Plans"
   },
   "HomePricing": {
@@ -359,10 +370,12 @@
     "weekday": "Weekday",
     "weekend": "Weekend / Holiday",
     "rentalPaddleNote": "Rental paddles ¥500 each (up to 6 per court). Rental shoes are not available.",
+    "hyroxRateNote": "The HYROX training area rents at the same rates (up to 4 people; +¥1,000 per additional person)",
     "privateFacilityNote": "For full facility private bookings including training area and lounge, or corporate use, please",
     "contactUs": "contact us",
     "pleaseContact": ".",
-    "titleJa": "Pricing Plans"
+    "titleJa": "Pricing Plans",
+    "reserveCta": "RESERVE A COURT"
   },
   "HomeNews": {
     "title": "NEWS",
@@ -548,12 +561,7 @@
       }
     },
     "news": {
-      "title": "News",
-      "crowdfundingHeadline": "Crowdfunding Now Live!",
-      "crowdfundingBody": "We're looking for people who want to help build and energize THE PICKLE BANG THEORY. We look forward to your support.",
-      "crowdfundingLink": "CAMP-FIRE",
-      "body": "Crossminton World Champion Akihiko Nishimura to open urban pickleball facility 'THE PICKLE BANG THEORY' 1 min from Motoyawata Station in spring 2026",
-      "prTimes": "PR TIMES"
+      "title": "News"
     },
     "contact": {
       "getInTouch": "GET IN TOUCH",
@@ -629,15 +637,6 @@
   },
   "Common": {
     "logoAlt": "THE PICKLE BANG THEORY"
-  },
-  "CrowdfundingPopup": {
-    "headline": "Crowdfunding Now Live!",
-    "subheadline": "We're looking for people to help us grow and rally behind PBT",
-    "bonus": "30% OFF in June 🔥 plus extra discounts!",
-    "cta": "Support on CAMP-FIRE",
-    "ctaAriaLabel": "Open CAMP-FIRE crowdfunding page (new tab)",
-    "close": "Close",
-    "imageAlt": "THE PICKLE BANG THEORY Crowdfunding"
   },
   "Columns": {
     "heading": "COLUMN"
@@ -882,15 +881,5 @@
       "cta": "Discover Pickleball",
       "courtImageAlt": "Pickleball courts at THE PICKLE BANG THEORY"
     }
-  },
-  "HomeHyroxPromo": {
-    "kicker": "TRAINING AREA",
-    "kickerJa": "",
-    "title": "HYROX",
-    "titleJa": "The World Series of Fitness Racing",
-    "tagline": "Run. Train. Challenge.",
-    "description": "HYROX — the global fitness race of running and eight workouts. A dedicated training area is now open at THE PICKLE BANG THEORY.",
-    "cta": "DISCOVER HYROX",
-    "imageAlt": "Female athlete carrying a HYROX sandbag"
   }
 }

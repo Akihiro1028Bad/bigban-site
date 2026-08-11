@@ -99,7 +99,7 @@
     },
     "hyrox": {
       "title": "HYROX トレーニングエリア",
-      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY に本格トレーニングエリアがオープン。",
+      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY は本格トレーニングエリアを併設。",
       "keywords": [
         "HYROX",
         "ハイロックス",
@@ -150,10 +150,7 @@
     "priceNote": "この期間の料金はキャンペーン特別価格です。"
   },
   "PromoBanner": {
-    "text": "🈹️ コート30%OFFキャンペーン中【PBTOPEN30】(5/31ﾏﾃﾞ)",
-    "textJune": "🈹️ コート30%OFFキャンペーン中【CAMPFIRE30】(7/31ﾏﾃﾞ)",
     "textPbtClub": "🎉 猛暑は涼しい屋内コートで｜PBT CLUB会員で約30%OFF",
-    "ariaLabel": "コート30%OFFキャンペーン。予約ページへ移動します",
     "ariaLabelPbtClub": "猛暑は涼しい屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。ニュース記事へ移動します"
   },
   "Reserve": {
@@ -171,7 +168,7 @@
       "courtCta": "コートの予約",
       "pickleEventTag": "EVENT / SCHOOL",
       "pickleEventLabel": "イベント / スクール",
-      "pickleEventDesc": "涼しい早朝にプレーできる早朝ピックルボールなど、主催イベント・スクールへのお申し込みはこちらから。",
+      "pickleEventDesc": "オープンプレー・練習会・体験会・大会へのお申し込みはこちらから。涼しい早朝にプレーできる早朝ピックルボールも開催しています。",
       "pickleEventCta": "イベントの申込",
       "hyroxKicker": "HYROX AREA",
       "hyroxHeading": "HYROXエリア",
@@ -182,7 +179,7 @@
       "hyroxAreaCta": "エリアの予約",
       "lessonKicker": "LESSON / CLASS",
       "lessonHeading": "レッスン / クラス",
-      "lessonDesc": "少人数制コーチングクラスのご予約はこちらから。",
+      "lessonDesc": "少人数制コーチングクラス・体験会のご予約はこちらから。",
       "lessonCta": "レッスンの予約"
     },
     "steps": {
@@ -237,7 +234,7 @@
         },
         {
           "question": "コートレンタルの料金は？",
-          "answer": "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。"
+          "answer": "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。HYROXエリアの利用料も同額です（4名まで／5名目以降は1名につき+¥1,000）。"
         },
         {
           "question": "最寄り駅・アクセスは？",
@@ -261,7 +258,14 @@
     "tagline": "FROM A SMALL DINK TO A BIG MOVEMENT",
     "cta": "RESERVE A COURT",
     "scroll": "SCROLL",
-    "heroImageAlt": "ピックルボールをプレーする選手のアクションショット"
+    "heroImageAlt": "THE PICKLE BANG THEORYの3面DecoTurfピックルボールコート"
+  },
+  "HomeLead": {
+    "kicker": "ABOUT THE FACILITY",
+    "deck": "<strong>THE PICKLE BANG THEORY（ザ ピックルバン セオリー）</strong>は、<nb>千葉県</nb><nb>市川市</nb>・<nb>本八幡駅</nb>から<nb>徒歩1分の</nb><nb>屋内ピックルボール施設です。</nb>",
+    "body": "国際大会でも使われる DecoTurf の<nb>ハードコート</nb>3面を、早朝6:00から<nb>23:00まで。</nb><nb>空調完備</nb>の<nb>全天候型</nb>で、天気や季節に<nb>左右されず</nb><nb>プレーできます。</nb>",
+    "bodyHyrox": "HYROX公式トレーニングジムの認定を受けた<nb>トレーニングエリア</nb>も<nb>併設しています。</nb>",
+    "sideLabel": "施設について"
   },
   "HomeConcept": {
     "title": "CONCEPT",
@@ -313,13 +317,11 @@
       "vendingMachine": "自動販売機",
       "rentalEquipment": "レンタル用具あり",
       "unmannedCheckin": "無人チェックイン対応",
-      "showCourt": "ショーコート1面に変更可能",
-      "preparing": "準備中"
+      "showCourt": "ショーコート1面に変更可能"
     },
     "images": {
-      "court": "プロ仕様DecoTurfピックルボールコートの俯瞰",
-      "training": "併設トレーニングエリア",
-      "lounge": "施設内のラウンジスペース"
+      "court": "プロ仕様DecoTurfピックルボールコート",
+      "training": "ピックルボールコートに併設されたトレーニングエリア"
     },
     "carousel": {
       "regionLabel": "施設画像カルーセル",
@@ -335,34 +337,43 @@
   },
   "HomeServices": {
     "title": "SERVICES",
-    "service01": {
+    "pickleballGroup": "PICKLEBALL",
+    "pickleballGroupJa": "ピックルボール",
+    "pickleballLead": "はじめての方は体験会・練習会から。コートは1時間単位で借りられます。",
+    "hyroxGroup": "HYROX",
+    "hyroxGroupJa": "ハイロックス",
+    "hyroxLead": "HYROXは、ランと8種目のワークアウトで競う世界規模のフィットネスレース。はじめての方は体験会から、慣れた方はエリアを時間単位で。",
+    "hyroxAbout": "HYROXエリアについて詳しく見る",
+    "courtRental": {
       "titleJa": "コートレンタル",
       "titleEn": "COURT RENTAL",
-      "description": "時間貸しのレンタルコート。無人チェックインで手軽に予約・利用可能。早朝6:00から深夜23:00まで。",
-      "cta": "RESERVE"
+      "description": "国際大会でも使われる DecoTurf のハードコートを1時間単位で。無人チェックインで、早朝6:00から23:00まで利用できます。",
+      "cta": "コートを予約する",
+      "imageAlt": "屋内ピックルボールコート"
     },
-    "service02": {
-      "titleJa": "レッスン & クリニック",
-      "titleEn": "LESSONS & CLINICS",
-      "description": "トップ選手による直接指導。レベル別プログラムで初心者から上級者まで対応。海外トッププレーヤーを招聘した特別クリニックも開催予定。",
-      "cta": "BOOK A LESSON"
+    "pickleEvent": {
+      "titleJa": "オープンプレー・練習会・体験会・大会",
+      "titleEn": "OPEN PLAY, CLINICS & TOURNAMENTS",
+      "description": "一人での参加も歓迎。主催のオープンプレーやレベル別の練習会・レッスン、ピックルボールが初めての方向けの体験会のほか、大会も開催しています。",
+      "cta": "イベント・大会を見る",
+      "imageAlt": "屋内コートでピックルボールをプレーする参加者たち"
     },
-    "service03": {
-      "titleJa": "トレーニングプログラム",
-      "titleEn": "TRAINING",
-      "description": "フィジカルトレーニングを取り入れたピックルボール強化プログラム。併設トレーニングエリアでコンディショニング。プレーの質を根本から高める。"
+    "hyroxArea": {
+      "titleJa": "HYROXエリアレンタル",
+      "titleEn": "HYROX AREA RENTAL",
+      "description": "HYROX公式8種目に対応した器具を備えたトレーニングエリアを、時間単位でレンタル。自分のペースで自由にトレーニングできます。",
+      "cta": "エリアを予約する",
+      "imageAlt": "スキーエルゴ・ローイングマシン・そりが並ぶHYROXトレーニングエリアの全景"
     },
-    "service04": {
-      "titleJa": "大会 & リーグ",
-      "titleEn": "TOURNAMENTS & LEAGUES",
-      "description": "オリジナル大会・リーグを定期開催。賞金付きトーナメントから幅広いレベルに対応したリーグ戦まで。"
+    "hyroxClass": {
+      "titleJa": "HYROXクラス・体験会",
+      "titleEn": "HYROX CLASS & TRIAL",
+      "description": "コーチが8種目の動きを一から案内する体験会と、レベルに合わせた少人数制のグループクラス。一人でも、初めてでも参加できます。",
+      "cta": "クラス・体験会を見る",
+      "imageAlt": "HYROXトレーニングエリアで参加者に説明するコーチ"
     },
-    "service05": {
-      "titleJa": "イベント",
-      "titleEn": "EVENTS",
-      "description": "1面ショーコートへのレイアウト変更で本格的な観戦イベントを実現。異業種コラボレーションやプロモーションイベントの会場としても。",
-      "cta": "VIEW EVENTS"
-    },
+    "notePaddle": "レンタルパドル 1本 ¥500（1コートにつき6本まで）",
+    "noteShoes": "コートでのプレーにはノーマーキングソールのシューズをご持参ください（貸出はございません）",
     "titleJa": "サービス・プラン"
   },
   "HomePricing": {
@@ -373,10 +384,12 @@
     "weekday": "平日",
     "weekend": "週末・祝日",
     "rentalPaddleNote": "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません",
+    "hyroxRateNote": "HYROXエリアレンタルも同一料金です（4名まで／5名目以降は1名につき+¥1,000）",
     "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切をご希望、法人利用ご希望の場合は",
     "contactUs": "お問い合わせ",
     "pleaseContact": "ください。",
-    "titleJa": "料金プラン"
+    "titleJa": "料金プラン",
+    "reserveCta": "コートを予約する"
   },
   "HomeNews": {
     "title": "NEWS",
@@ -562,12 +575,7 @@
       }
     },
     "news": {
-      "title": "ニュース",
-      "crowdfundingHeadline": "クラウドファンディング実施中！",
-      "crowdfundingBody": "THE PICKLE BANG THEORYを一緒に育て上げてくれる方、盛り上げてくれる方を募集しています。皆さまのご支援をお待ちしております。",
-      "crowdfundingLink": "CAMP-FIRE",
-      "body": "クロスミントン世界王者・西村昭彦 本八幡駅徒歩1分に都市型ピックルボール施設『THE PICKLE BANG THEORY』2026年春オープン",
-      "prTimes": "PR TIMES"
+      "title": "ニュース"
     },
     "contact": {
       "getInTouch": "GET IN TOUCH",
@@ -643,15 +651,6 @@
   },
   "Common": {
     "logoAlt": "THE PICKLE BANG THEORY"
-  },
-  "CrowdfundingPopup": {
-    "headline": "クラファン実施中！",
-    "subheadline": "PBTを一緒に育て上げてくれる方、盛り上げてくれる方を募集します",
-    "bonus": "6月も30%OFF🔥さらに割引も！",
-    "cta": "CAMP-FIREで支援する",
-    "ctaAriaLabel": "CAMP-FIREのクラウドファンディングページを開く（新しいタブ）",
-    "close": "閉じる",
-    "imageAlt": "THE PICKLE BANG THEORY クラウドファンディング"
   },
   "Columns": {
     "heading": "コラム"
@@ -896,15 +895,5 @@
       "cta": "ピックルボールを見る",
       "courtImageAlt": "THE PICKLE BANG THEORY のピックルボールコート"
     }
-  },
-  "HomeHyroxPromo": {
-    "kicker": "TRAINING AREA",
-    "kickerJa": "トレーニングエリア",
-    "title": "HYROX",
-    "titleJa": "ハイロックス",
-    "tagline": "走る。鍛える。挑戦する。",
-    "description": "ランと8種目のワークアウトで競う、世界規模のフィットネスレース。本格トレーニングエリアが、THE PICKLE BANG THEORY にオープン。",
-    "cta": "詳しく見る",
-    "imageAlt": "HYROXのサンドバッグを担ぐ女性アスリート"
   }
 }

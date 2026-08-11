@@ -125,14 +125,13 @@ describe("HomeFacility", () => {
     expect(screen.getByText("ショーコート1面に変更可能")).toBeInTheDocument();
   });
 
-  it("ラウンジスペースに準備中の注記を表示する", () => {
+  it("開業前提の「準備中」注記を表示しない", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFacility />
       </NextIntlClientProvider>
     );
-    const notes = screen.getAllByText("準備中");
-    expect(notes).toHaveLength(1);
+    expect(screen.queryByText("準備中")).not.toBeInTheDocument();
   });
 
   it("trainingArea 機能が /hyrox へリンクしている", () => {
@@ -160,6 +159,39 @@ describe("HomeFacility", () => {
       "home_facility_hyrox",
       "hyrox",
     );
+  });
+
+  it("カルーセルにプレースホルダー画像を使わない", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+    const srcs = Array.from(document.querySelectorAll("img")).map(
+      (img) => img.getAttribute("src") ?? ""
+    );
+    expect(srcs.some((src) => src.includes("comingsoon"))).toBe(false);
+  });
+
+  it("コート全景と加工済みトレーニング全景の2枚を表示する", () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFacility />
+      </NextIntlClientProvider>
+    );
+
+    expect(
+      screen.getByAltText("プロ仕様DecoTurfピックルボールコート")
+    ).toHaveAttribute("src", expect.stringContaining("rental.webp"));
+    expect(
+      screen.getByAltText("ピックルボールコートに併設されたトレーニングエリア")
+    ).toHaveAttribute(
+      "src",
+      expect.stringContaining("facility-1-enhanced.webp")
+    );
+    expect(
+      container.querySelectorAll('[aria-roledescription="slide"]')
+    ).toHaveLength(2);
   });
 
   it("FACILITY タイトルを表示する", () => {
@@ -197,7 +229,7 @@ describe("HomeFacility", () => {
       </NextIntlClientProvider>
     );
     const dots = screen.getAllByRole("button", { name: /画像.*を表示/ });
-    expect(dots).toHaveLength(3);
+    expect(dots).toHaveLength(2);
   });
 
   it("全施設画像をレンダリングする", () => {
@@ -207,7 +239,7 @@ describe("HomeFacility", () => {
       </NextIntlClientProvider>
     );
     const images = screen.getAllByRole("img");
-    expect(images.length).toBeGreaterThanOrEqual(3);
+    expect(images.length).toBeGreaterThanOrEqual(2);
   });
 
   it("ドットクリックでscrollToが呼ばれる", () => {

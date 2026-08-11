@@ -94,6 +94,19 @@ describe("HomePricing", () => {
     ).toBeInTheDocument();
   });
 
+  it("HYROXエリアが同一料金である注記を表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByText(
+        "HYROXエリアレンタルも同一料金です（4名まで／5名目以降は1名につき+¥1,000）"
+      )
+    ).toBeInTheDocument();
+  });
+
   it("貸切・法人利用の案内とリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -125,5 +138,44 @@ describe("HomePricing", () => {
     link?.addEventListener("click", (event) => event.preventDefault());
     await userEvent.click(link!);
     expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
+  });
+
+  it("料金表の下に予約案内ページ(/reserve)へのCTAを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const cta = screen.getByRole("link", { name: "コートを予約する" });
+    expect(cta).toHaveAttribute("href", "/reserve");
+    expect(cta).not.toHaveAttribute("target", "_blank");
+  });
+
+  it("予約CTAクリックで reserveEntry を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const cta = screen.getByRole("link", { name: "コートを予約する" });
+    cta.addEventListener("click", (event) => event.preventDefault());
+    await userEvent.click(cta);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      "home_pricing_reserve",
+      "コートを予約する"
+    );
+  });
+
+  it("貸切・法人利用のお問い合わせリンクは維持される", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    expect(
+      document.querySelector('a[href="/about#contact"]')
+    ).toBeInTheDocument();
   });
 });

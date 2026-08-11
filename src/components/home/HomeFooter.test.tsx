@@ -123,6 +123,25 @@ describe("HomeFooter", () => {
     }
   });
 
+  it("showColumns 有効時は NEWS の直後に COLUMN リンクを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter showColumns />
+      </NextIntlClientProvider>
+    );
+    const column = screen.getByRole("link", { name: "COLUMN" });
+    expect(column).toHaveAttribute("href", "/columns");
+  });
+
+  it("showColumns 未指定時は COLUMN リンクを表示しない", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByRole("link", { name: "COLUMN" })).not.toBeInTheDocument();
+  });
+
   it("コピーライトを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

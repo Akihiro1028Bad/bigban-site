@@ -20,6 +20,9 @@ vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHero", () => ({
   default: () => <div data-testid="home-hero" />,
 }));
+vi.mock("@/components/home/HomeLead", () => ({
+  default: () => <div data-testid="home-lead" />,
+}));
 vi.mock("@/components/home/HomeConcept", () => ({
   default: () => <div data-testid="home-concept" />,
 }));
@@ -32,9 +35,6 @@ vi.mock("@/components/home/HomeFacility", () => ({
   default: () => <div data-testid="home-facility" />,
 }));
 vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeHyroxPromo", () => ({
-  default: () => <div data-testid="home-hyrox-promo" />,
-}));
 vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeColumns", () => ({
@@ -135,13 +135,13 @@ describe("Home Page", () => {
     expect(container).toBeTruthy();
   });
 
-  it("HYROX 誘導カードを描画する", async () => {
+  it("HYROX 誘導カードは描画しない（SERVICES の解説リンクへ一本化）", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({
       params: Promise.resolve({ locale: "ja" }),
     });
     render(element);
-    expect(screen.getByTestId("home-hyrox-promo")).toBeInTheDocument();
+    expect(screen.queryByTestId("home-hyrox-promo")).not.toBeInTheDocument();
   });
 
   it("HomeColumnsへlocaleを渡して描画する", async () => {
@@ -155,6 +155,24 @@ describe("Home Page", () => {
       "data-locale",
       "en",
     );
+  });
+
+  it("HomeHero直後に施設リード文を配置する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const hero = screen.getByTestId("home-hero");
+    const lead = screen.getByTestId("home-lead");
+    const latestNews = screen.getByTestId("home-latest-news");
+    // 検索エンジンが最初に読む本文になるよう、他セクションより前に置く。
+    expect(
+      hero.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      lead.compareDocumentPosition(latestNews) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("HomeHero直後かつHomeConceptより前にHomeLatestNewsを配置する", async () => {
