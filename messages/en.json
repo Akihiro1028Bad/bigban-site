@@ -261,30 +261,6 @@
     "catchcopy": "From a small dink to a big movement.",
     "titleJa": "Concept"
   },
-  "HomeBeginners": {
-    "title": "GET STARTED",
-    "titleJa": "New to Pickleball",
-    "lead": "No experience needed. Even if you have never played a racket sport, you can start from the very first step.",
-    "step01": {
-      "number": "01",
-      "title": "Learn the basics in a lesson",
-      "description": "Small-group coaching classes cover the rules and fundamental strokes. Solo participants are welcome.",
-      "cta": "Book a lesson"
-    },
-    "step02": {
-      "number": "02",
-      "title": "Book a court and play",
-      "description": "Once you know the basics, rent a court by the hour with friends. Open 6:00–23:00 with unmanned check-in.",
-      "cta": "Reserve a court"
-    },
-    "step03": {
-      "number": "03",
-      "title": "Meet players at events",
-      "description": "Join our events and tournaments to grow your circle of playing partners. Some events welcome solo entries.",
-      "cta": "View events"
-    },
-    "note": "Paddles are available to rent (¥500 each, up to 6 per court). Please bring non-marking sole shoes to protect the court surface."
-  },
   "HomeFacility": {
     "title": "FACILITY",
     "keyNumbers": {

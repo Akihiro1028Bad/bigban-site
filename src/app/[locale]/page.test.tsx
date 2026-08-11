@@ -23,9 +23,6 @@ vi.mock("@/components/home/HomeHero", () => ({
 vi.mock("@/components/home/HomeLead", () => ({
   default: () => <div data-testid="home-lead" />,
 }));
-vi.mock("@/components/home/HomeBeginners", () => ({
-  default: () => <div data-testid="home-beginners" />,
-}));
 vi.mock("@/components/home/HomeConcept", () => ({
   default: () => <div data-testid="home-concept" />,
 }));
@@ -177,24 +174,6 @@ describe("Home Page", () => {
     ).toBeTruthy();
     expect(
       lead.compareDocumentPosition(latestNews) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("HomeConceptとHomeFacilityの間に「はじめての方へ」を配置する", async () => {
-    const { default: Home } = await import("./page");
-    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
-    render(element);
-
-    const concept = screen.getByTestId("home-concept");
-    const beginners = screen.getByTestId("home-beginners");
-    const facility = screen.getByTestId("home-facility");
-    expect(
-      concept.compareDocumentPosition(beginners) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      beginners.compareDocumentPosition(facility) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
