@@ -376,6 +376,24 @@
     "noteShoes": "コートでのプレーにはノーマーキングソールのシューズをご持参ください（貸出はございません）",
     "titleJa": "サービス・プラン"
   },
+  "HomeUsageFlow": {
+    "heading": "ご利用の流れ",
+    "headingEn": "HOW TO USE",
+    "steps": {
+      "reserve": {
+        "title": "オンラインで予約",
+        "description": "予約サイトから希望の日時を選んで予約します。コートは<nb>1時間単位で</nb>借りられます。"
+      },
+      "visit": {
+        "title": "そのまま入館",
+        "description": "本八幡駅から徒歩1分。予約時間になったら<nb>そのまま</nb><nb>入館できます。</nb>"
+      },
+      "play": {
+        "title": "プレー開始",
+        "description": "ノーマーキングソールのシューズをご持参ください。パドルはレンタル(1本 ¥500)もあります。"
+      }
+    }
+  },
   "HomePricing": {
     "title": "PRICING",
     "courtRental": "COURT RENTAL",

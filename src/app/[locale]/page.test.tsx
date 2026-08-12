@@ -34,8 +34,15 @@ vi.mock("@/components/home/HomeLatestNews", () => ({
 vi.mock("@/components/home/HomeFacility", () => ({
   default: () => <div data-testid="home-facility" />,
 }));
-vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
-vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeServices", () => ({
+  default: () => <div data-testid="home-services" />,
+}));
+vi.mock("@/components/home/HomeUsageFlow", () => ({
+  default: () => <div data-testid="home-usage-flow" />,
+}));
+vi.mock("@/components/home/HomePricing", () => ({
+  default: () => <div data-testid="home-pricing" />,
+}));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeColumns", () => ({
   default: ({ locale }: { locale: string }) => (
@@ -192,6 +199,25 @@ describe("Home Page", () => {
     ).toBeTruthy();
     expect(
       latestNews.compareDocumentPosition(concept) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("SERVICES と PRICING の間に HomeUsageFlow を配置する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const services = screen.getByTestId("home-services");
+    const usageFlow = screen.getByTestId("home-usage-flow");
+    const pricing = screen.getByTestId("home-pricing");
+    // 「何を予約するか」→「どう使うか」→「いくらか」の順で不安を潰す。
+    expect(
+      services.compareDocumentPosition(usageFlow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      usageFlow.compareDocumentPosition(pricing) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
