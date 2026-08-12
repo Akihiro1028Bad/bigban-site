@@ -43,6 +43,39 @@ describe("MenuToggleButton", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it("開いている時は枠線とアイコンをアクセント色にする", () => {
+    render(
+      <MenuToggleButton
+        isOpen
+        onClick={vi.fn()}
+        labelOpen="メニューを開く"
+        labelClose="メニューを閉じる"
+      />
+    );
+    const button = screen.getByRole("button", { name: "メニューを閉じる" });
+    // 開いている状態を色でも伝える(×アイコンのモーフだけに頼らない)。
+    expect(button.classList.contains("border-accent")).toBe(true);
+    expect(button.classList.contains("text-accent")).toBe(true);
+  });
+
+  it("閉じている時は控えめな枠線のままで、ホバーのアクセント化は残す", () => {
+    render(
+      <MenuToggleButton
+        isOpen={false}
+        onClick={vi.fn()}
+        labelOpen="メニューを開く"
+        labelClose="メニューを閉じる"
+      />
+    );
+    const button = screen.getByRole("button", { name: "メニューを開く" });
+    expect(button.classList.contains("border-accent")).toBe(false);
+    expect(button.classList.contains("text-accent")).toBe(false);
+    expect(button.classList.contains("border-white/15")).toBe(true);
+    expect(button.classList.contains("text-text-light")).toBe(true);
+    expect(button.classList.contains("hover:border-accent")).toBe(true);
+    expect(button.classList.contains("hover:text-accent")).toBe(true);
+  });
+
   it("追加の className を適用する", () => {
     render(
       <MenuToggleButton
