@@ -227,3 +227,24 @@ describe("HomePricing", () => {
     ).toBeInTheDocument();
   });
 });
+
+/** issue #404: 320px で見出しが枠(272px)を超えないよう、sm 未満だけ流体サイズにする。 */
+const FLUID_SECTION_HEADING = "text-[clamp(2rem,22vw_-_34.5px,3rem)]";
+
+describe("HomePricing の見出し級数", () => {
+  it("sm 未満は固定の text-5xl ではなく下限付きの流体サイズを使う", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const heading = screen.getByRole("heading", { level: 2, name: "PRICING" });
+    const classes = heading.className.split(/\s+/);
+
+    expect(classes).not.toContain("text-5xl");
+    expect(classes).toContain(FLUID_SECTION_HEADING);
+    expect(classes).toContain("leading-none");
+    expect(classes).toContain("sm:text-6xl");
+    expect(classes).toContain("lg:text-7xl");
+  });
+});

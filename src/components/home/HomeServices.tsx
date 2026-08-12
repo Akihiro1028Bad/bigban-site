@@ -225,7 +225,7 @@ export default function HomeServices() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-5xl font-black tracking-[0.15em] sm:text-6xl lg:text-7xl">
+          <h2 className="font-serif text-[clamp(2rem,22vw_-_34.5px,3rem)] leading-none font-black tracking-[0.15em] sm:text-6xl lg:text-7xl">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
