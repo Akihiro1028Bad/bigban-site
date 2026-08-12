@@ -78,6 +78,22 @@ describe("HomeColumns", () => {
     isCmsColumnsEnabledMock.mockReturnValue(true);
   });
 
+  it("下パディングを章の縦リズムに揃える（上は前セクションと一体で読ませるため詰めたまま）", async () => {
+    getColumnsListMock.mockResolvedValueOnce({
+      contents: [makeParsedColumnItem({ id: "c1", slug: "c-1" })],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+
+    const { container } = await renderHomeColumns();
+
+    const className = container.querySelector("section")?.className ?? "";
+    expect(className).toContain("pb-16");
+    expect(className).toContain("lg:pb-24");
+    expect(className).not.toContain("lg:pb-32");
+  });
+
   it("CMSフラグOFFでは取得せず何も描画しない", async () => {
     isCmsColumnsEnabledMock.mockReturnValue(false);
 
@@ -229,5 +245,35 @@ describe("HomeColumns", () => {
     expect(card.className).toContain("w-[82vw]");
     expect(card.className).toContain("snap-start");
     expect(card.className).toContain("md:w-auto");
+  });
+});
+
+/** issue #404: 320px で見出しが枠(272px)を超えないよう、sm 未満だけ流体サイズにする。 */
+const FLUID_SECTION_HEADING = "text-[clamp(2rem,22vw_-_34.5px,3rem)]";
+
+describe("HomeColumns の見出し級数", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isCmsColumnsEnabledMock.mockReturnValue(true);
+  });
+
+  it("sm 未満は固定の text-5xl ではなく下限付きの流体サイズを使う", async () => {
+    getColumnsListMock.mockResolvedValueOnce({
+      contents: [makeParsedColumnItem({ id: "c1", slug: "c-1" })],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+
+    await renderHomeColumns();
+
+    const heading = screen.getByRole("heading", { level: 2, name: "COLUMN" });
+    const classes = heading.className.split(/\s+/);
+
+    expect(classes).not.toContain("text-5xl");
+    expect(classes).toContain(FLUID_SECTION_HEADING);
+    expect(classes).toContain("leading-none");
+    expect(classes).toContain("sm:text-6xl");
+    expect(classes).toContain("lg:text-7xl");
   });
 });

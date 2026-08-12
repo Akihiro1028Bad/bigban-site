@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import SectionUnderline from "@/components/SectionUnderline";
 import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
@@ -15,7 +16,7 @@ export default function HomeAbout() {
   return (
     <section
       id="about"
-      className="relative py-24 lg:py-32 overflow-hidden"
+      className="relative py-16 lg:py-24 overflow-hidden"
       style={{
         background: "linear-gradient(to bottom, #0d0d1a, #0A0A0A)",
       }}
@@ -45,13 +46,13 @@ export default function HomeAbout() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-5xl sm:text-6xl lg:text-7xl font-black tracking-[0.15em] text-text-light">
+          <h2 className="font-serif text-[clamp(2rem,22vw_-_34.5px,3rem)] leading-none sm:text-6xl lg:text-7xl font-black tracking-[0.15em] text-text-light">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <SectionUnderline />
         </motion.div>
 
         {/* Photo + Text layout */}

@@ -5,7 +5,12 @@ import GoogleAnalyticsTag from "@/components/GoogleAnalyticsTag";
 import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import PreHydrationScripts from "@/components/PreHydrationScripts";
 import { notFound } from "next/navigation";
-import { Orbitron, Inter, Noto_Sans_JP } from "next/font/google";
+import {
+  Orbitron,
+  Inter,
+  Noto_Sans_JP,
+  Shippori_Mincho_B1,
+} from "next/font/google";
 import { routing } from "@/i18n/routing";
 import StructuredData from "@/components/StructuredData";
 import {
@@ -38,6 +43,16 @@ const inter = Inter({
 const notoSansJP = Noto_Sans_JP({
   subsets: ["latin"],
   variable: "--font-noto-sans-jp",
+  display: "swap",
+  preload: false,
+});
+
+// 和文明朝。CONCEPT の詩組みなど見出し級のアクセントに限定して使うため、
+// 実際に使う 800 だけを読み込み、和文サブセットは preload しない。
+const shipporiMinchoB1 = Shippori_Mincho_B1({
+  weight: ["800"],
+  subsets: ["latin"],
+  variable: "--font-shippori-mincho-b1",
   display: "swap",
   preload: false,
 });
@@ -115,7 +130,7 @@ export default async function LocaleLayout({
   return (
     <html
       lang={locale}
-      className={`${orbitron.variable} ${inter.variable} ${notoSansJP.variable}`}
+      className={`${orbitron.variable} ${inter.variable} ${notoSansJP.variable} ${shipporiMinchoB1.variable}`}
       suppressHydrationWarning
     >
       <body className="grain-overlay">

@@ -37,6 +37,14 @@ function renderSectionEn() {
 }
 
 describe("HomeContributors", () => {
+  it("内側コンテナが章の縦リズム py-16 lg:py-24 を持つ（主要セクション共通）", () => {
+    const { container } = renderSection();
+
+    const inner = container.querySelector("section > .max-w-7xl");
+    expect(inner?.className).toContain("py-16");
+    expect(inner?.className).toContain("lg:py-24");
+  });
+
   it("見出しを表示する", () => {
     renderSection();
 

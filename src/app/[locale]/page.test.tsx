@@ -20,9 +20,6 @@ vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHero", () => ({
   default: () => <div data-testid="home-hero" />,
 }));
-vi.mock("@/components/home/HomeLead", () => ({
-  default: () => <div data-testid="home-lead" />,
-}));
 vi.mock("@/components/home/HomeConcept", () => ({
   default: () => <div data-testid="home-concept" />,
 }));
@@ -34,8 +31,15 @@ vi.mock("@/components/home/HomeLatestNews", () => ({
 vi.mock("@/components/home/HomeFacility", () => ({
   default: () => <div data-testid="home-facility" />,
 }));
-vi.mock("@/components/home/HomeServices", () => ({ default: () => null }));
-vi.mock("@/components/home/HomePricing", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeServices", () => ({
+  default: () => <div data-testid="home-services" />,
+}));
+vi.mock("@/components/home/HomeUsageFlow", () => ({
+  default: () => <div data-testid="home-usage-flow" />,
+}));
+vi.mock("@/components/home/HomePricing", () => ({
+  default: () => <div data-testid="home-pricing" />,
+}));
 vi.mock("@/components/home/HomeNews", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeColumns", () => ({
   default: ({ locale }: { locale: string }) => (
@@ -46,6 +50,11 @@ vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeContributors", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
+vi.mock("@/components/SectionArcDivider", () => ({
+  default: ({ variant = "apex" }: { variant?: string }) => (
+    <div data-testid="section-arc-divider" data-variant={variant} />
+  ),
+}));
 
 describe("Home generateMetadata", () => {
   beforeEach(() => {
@@ -157,43 +166,85 @@ describe("Home Page", () => {
     );
   });
 
-  it("HomeHero直後に施設リード文を配置する", async () => {
+  it("HomeHero → HomeLatestNews → HomeFacility → HomeConcept の順に並べる", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
     render(element);
 
     const hero = screen.getByTestId("home-hero");
-    const lead = screen.getByTestId("home-lead");
     const latestNews = screen.getByTestId("home-latest-news");
-    // 検索エンジンが最初に読む本文になるよう、他セクションより前に置く。
-    expect(
-      hero.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      lead.compareDocumentPosition(latestNews) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("HomeHero直後かつHomeConceptより前にHomeLatestNewsを配置する", async () => {
-    const { default: Home } = await import("./page");
-    const element = await Home({
-      params: Promise.resolve({ locale: "ja" }),
-    });
-    render(element);
-
-    const hero = screen.getByTestId("home-hero");
-    const latestNews = screen.getByTestId("home-latest-news");
+    const facility = screen.getByTestId("home-facility");
     const concept = screen.getByTestId("home-concept");
     expect(latestNews).toHaveAttribute("data-locale", "ja");
+    // 最新ニュース帯はヒーロー直下。見出しとリンク数行だけの短い帯なので、
+    // FACILITY が「最初に読まれる本文」である優位は保たれる。
     expect(
       hero.compareDocumentPosition(latestNews) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      latestNews.compareDocumentPosition(concept) &
+      latestNews.compareDocumentPosition(facility) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(
+      facility.compareDocumentPosition(concept) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("SERVICES と PRICING の間に HomeUsageFlow を配置する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const services = screen.getByTestId("home-services");
+    const usageFlow = screen.getByTestId("home-usage-flow");
+    const pricing = screen.getByTestId("home-pricing");
+    // 「何を予約するか」→「どう使うか」→「いくらか」の順で不安を潰す。
+    expect(
+      services.compareDocumentPosition(usageFlow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      usageFlow.compareDocumentPosition(pricing) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("弧の区切りは主要セクションの境界 4 箇所だけに置き、山なりと落下を交互にする", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const dividers = screen.getAllByTestId("section-arc-divider");
+    // 全境界に入れると弧がうるさくなるので、章の切り替わりだけに絞る。
+    expect(dividers).toHaveLength(4);
+    expect(dividers.map((d) => d.getAttribute("data-variant"))).toEqual([
+      "apex",
+      "descent",
+      "apex",
+      "descent",
+    ]);
+  });
+
+  it("弧の区切りを FACILITY→CONCEPT / SERVICES→FLOW / PRICING の後ろへ挿入する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const [first, second, third] = screen.getAllByTestId("section-arc-divider");
+    const isBefore = (a: Element, b: Element) =>
+      Boolean(
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+
+    expect(isBefore(screen.getByTestId("home-facility"), first)).toBe(true);
+    expect(isBefore(first, screen.getByTestId("home-concept"))).toBe(true);
+
+    expect(isBefore(screen.getByTestId("home-services"), second)).toBe(true);
+    expect(isBefore(second, screen.getByTestId("home-usage-flow"))).toBe(true);
+
+    expect(isBefore(screen.getByTestId("home-pricing"), third)).toBe(true);
   });
 
   it("不正 locale で notFound", async () => {

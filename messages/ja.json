@@ -256,14 +256,14 @@
     "headline2": "ビッグバンが",
     "headline3": "ここから始まる。",
     "tagline": "FROM A SMALL DINK TO A BIG MOVEMENT",
-    "cta": "RESERVE A COURT",
+    "cta": "コートを予約する",
     "scroll": "SCROLL",
     "heroImageAlt": "THE PICKLE BANG THEORYの3面DecoTurfピックルボールコート"
   },
   "HomeLead": {
     "kicker": "ABOUT THE FACILITY",
-    "deck": "<strong>THE PICKLE BANG THEORY（ザ ピックルバン セオリー）</strong>は、<nb>千葉県</nb><nb>市川市</nb>・<nb>本八幡駅</nb>から<nb>徒歩1分の</nb><nb>屋内ピックルボール施設です。</nb>",
-    "body": "国際大会でも使われる DecoTurf の<nb>ハードコート</nb>3面を、早朝6:00から<nb>23:00まで。</nb><nb>空調完備</nb>の<nb>全天候型</nb>で、天気や季節に<nb>左右されず</nb><nb>プレーできます。</nb>",
+    "deck": "<strong>THE PICKLE BANG THEORY（<nb>ザ ピックルバン セオリー</nb>）</strong>は、<nb>千葉県市川市</nb>・<nb>本八幡駅</nb>から<nb>徒歩1分の</nb><nb>屋内ピックルボール施設です。</nb>",
+    "body": "国際大会でも使われる DecoTurf の<nb>ハードコート3面を、</nb><nb>早朝6:00から</nb><nb>23:00まで。</nb><nb>空調完備</nb>の<nb>全天候型</nb>で、<nb>天気や季節に</nb><nb>左右されず</nb><nb>プレーできます。</nb>",
     "bodyHyrox": "HYROX公式トレーニングジムの認定を受けた<nb>トレーニングエリア</nb>も<nb>併設しています。</nb>",
     "sideLabel": "施設について"
   },
@@ -279,61 +279,51 @@
     "titleJa": "コンセプト"
   },
   "HomeFacility": {
-    "title": "FACILITY",
-    "keyNumbers": {
-      "courts": {
-        "value": "3",
-        "labelEn": "COURTS",
-        "labelJa": "プロ仕様コート"
+    "sectionLabel": "施設について",
+    "zones": {
+      "court": {
+        "titleEn": "PICKLEBALL COURT",
+        "titleJa": "ピックルボールコート",
+        "imageAlt": "3面のプロ仕様DecoTurfピックルボールコートを俯瞰した施設全景",
+        "description": "3面のプロ仕様コート。<nb>サーフェス</nb>には世界最大級の<nb>ピックルボール大会</nb>やテニスの<nb>グランドスラム</nb>、<nb>オリンピック</nb>でも採用される <nb>DecoTurf(デコターフ)</nb>を採用しています。安定した<nb>バウンド</nb>と高い耐久性が特長で、レイアウト変更で1面の<nb>ショーコート</nb>としても使えます。"
       },
+      "training": {
+        "titleEn": "HYROX TRAINING AREA",
+        "titleJa": "HYROXトレーニングエリア",
+        "imageAlt": "HYROX公式8種目に対応した器具を備えたトレーニングエリア",
+        "description": "HYROX公式8種目に対応した器具を備えた<nb>トレーニングエリア</nb>を併設しています。コートと同じ<nb>フロア</nb>で、プレー前後の<nb>トレーニング</nb>や<nb>コンディショニング</nb>ができます。",
+        "linkLabel": "HYROXエリアについて詳しく見る"
+      }
+    },
+    "info": {
+      "headingEn": "INFORMATION",
+      "heading": "施設概要",
       "hours": {
-        "value": "6:00–23:00",
-        "labelEn": "HOURS",
-        "labelJa": "営業時間"
+        "label": "営業時間",
+        "value": "6:00–23:00"
       },
-      "station": {
-        "value": "1 min",
-        "labelEn": "FROM STATION",
-        "labelJa": "駅徒歩1分"
+      "access": {
+        "label": "アクセス",
+        "value": "<nb>本八幡駅 徒歩1分</nb>"
+      },
+      "environment": {
+        "label": "環境",
+        "value": "<nb>全天候型インドア</nb>・<nb>空調完備</nb>"
+      },
+      "equipment": {
+        "label": "設備",
+        "value": "<nb>ラウンジスペース</nb> / <nb>男女別更衣室</nb> / <nb>自動販売機</nb>"
+      },
+      "rental": {
+        "label": "レンタル",
+        "value": "パドル <nb>1本 ¥500</nb>(<nb>1コートにつき</nb><nb>6本まで)。</nb><nb>シューズ</nb>の貸出は<nb>ありません。</nb>"
+      },
+      "checkin": {
+        "label": "チェックイン",
+        "value": "無人対応"
       }
     },
-    "specs": {
-      "surface": {
-        "labelEn": "SURFACE",
-        "labelJa": "ハードコート DecoTurf（デコターフ）",
-        "description": "世界最大級の大会やオリンピックでも採用されている高性能サーフェス"
-      },
-      "type": {
-        "labelEn": "TYPE",
-        "labelJa": "全天候型インドア",
-        "description": "空調完備で年間を通じて快適なプレー環境"
-      }
-    },
-    "features": {
-      "trainingArea": "トレーニングエリア",
-      "lounge": "ラウンジスペース",
-      "changingRooms": "男女別更衣室",
-      "airConditioning": "空調完備",
-      "vendingMachine": "自動販売機",
-      "rentalEquipment": "レンタル用具あり",
-      "unmannedCheckin": "無人チェックイン対応",
-      "showCourt": "ショーコート1面に変更可能"
-    },
-    "images": {
-      "court": "プロ仕様DecoTurfピックルボールコート",
-      "training": "ピックルボールコートに併設されたトレーニングエリア"
-    },
-    "carousel": {
-      "regionLabel": "施設画像カルーセル",
-      "prev": "前の画像",
-      "next": "次の画像",
-      "showImage": "画像{index}を表示: {alt}"
-    },
-    "decoturf": {
-      "title": "DecoTurf（デコターフ）は、世界最大級のピックルボール大会やテニスのグランドスラム、オリンピックでも採用されているハードコートサーフェス。安定したバウンドと高い耐久性により、世界基準のプレー環境を提供します。",
-      "description": "THE PICKLE BANG THEORYでは、プレイヤーが「本気で上達できる環境」を追求し、このDecoTurf（デコターフ）を採用。技術向上・競技力向上にフォーカスした本格的なプレー環境を提供します。"
-    },
-    "titleJa": "施設・設備"
+    "reserveCta": "コートを予約する"
   },
   "HomeServices": {
     "title": "SERVICES",
@@ -376,6 +366,24 @@
     "noteShoes": "コートでのプレーにはノーマーキングソールのシューズをご持参ください（貸出はございません）",
     "titleJa": "サービス・プラン"
   },
+  "HomeUsageFlow": {
+    "heading": "ご利用の流れ",
+    "headingEn": "HOW TO USE",
+    "steps": {
+      "reserve": {
+        "title": "オンラインで予約",
+        "description": "予約サイトから希望の日時を選んで予約します。コートは<nb>1時間単位で</nb>借りられます。"
+      },
+      "visit": {
+        "title": "そのまま入館",
+        "description": "本八幡駅から徒歩1分。予約時間になったら<nb>そのまま</nb><nb>入館できます。</nb>"
+      },
+      "play": {
+        "title": "プレー開始",
+        "description": "ノーマーキングソールのシューズをご持参ください。パドルはレンタル(1本 ¥500)もあります。"
+      }
+    }
+  },
   "HomePricing": {
     "title": "PRICING",
     "courtRental": "COURT RENTAL",
@@ -383,6 +391,9 @@
     "timeSlot": "時間帯",
     "weekday": "平日",
     "weekend": "週末・祝日",
+    "memberLabel": "PBT CLUB会員",
+    "memberLegend": "会員価格は月額¥10,000（税込）の会員制度「PBT CLUB」の料金です。適用は月20時間まで。",
+    "memberDetailLink": "PBT CLUBについて詳しく見る",
     "rentalPaddleNote": "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません",
     "hyroxRateNote": "HYROXエリアレンタルも同一料金です（4名まで／5名目以降は1名につき+¥1,000）",
     "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切をご希望、法人利用ご希望の場合は",

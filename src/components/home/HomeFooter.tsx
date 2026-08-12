@@ -5,6 +5,13 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { navItemsFor } from "@/constants/navigation";
+import {
+  EXTERNAL_LINK_PROPS,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_URL,
+} from "@/constants/site";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 import FooterNewsletter from "./FooterNewsletter";
 
@@ -56,6 +63,18 @@ export default function HomeFooter({ showColumns = false }: HomeFooterProps) {
             <p className="mt-3 text-xs tracking-[0.2em] text-text-gray">
               {tFooter("brandJa")}
             </p>
+            <a
+              href={INSTAGRAM_URL}
+              {...EXTERNAL_LINK_PROPS}
+              onClick={() => trackCtaClick("instagram", "footer", "official")}
+              className="mt-4 inline-flex items-center gap-2 text-xs text-text-gray transition-colors hover:text-accent"
+            >
+              <InstagramIcon className="h-4 w-4 shrink-0" />
+              {/* 読み上げは「施設名の Instagram @ハンドル」。表示テキストを
+                  アクセシブルネームに含め、WCAG 2.5.3 (Label in Name) を満たす。 */}
+              <span className="sr-only">{t("instagramAria")}</span>
+              <span className="tracking-wide">{INSTAGRAM_HANDLE}</span>
+            </a>
           </div>
 
           {/* Center: Nav links */}

@@ -87,3 +87,28 @@ describe("ContributorsContent", () => {
     expect(screen.getByTestId("nav")).toBeInTheDocument();
   });
 });
+
+/**
+ * issue #404: CONTRIBUTORS は 12 文字あり、30px でも 320px の枠(272px)を超える。
+ * 見出しの最大級数がホームより一段小さいので、同じ比率の流体サイズを別値で当てる。
+ */
+const FLUID_PAGE_HEADING = "text-[clamp(1.25rem,11vw_-_11.25px,1.875rem)]";
+
+describe("ContributorsContent の見出し級数", () => {
+  it("sm 未満は固定の text-3xl ではなく下限付きの流体サイズを使う", () => {
+    render(<ContributorsContent />);
+
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "translated:title",
+    });
+    const classes = heading.className.split(/\s+/);
+
+    expect(classes).not.toContain("text-3xl");
+    expect(classes).toContain(FLUID_PAGE_HEADING);
+    // 旧 text-3xl の行間(1.2)を流体サイズでも維持する。
+    expect(classes).toContain("leading-[1.2]");
+    expect(classes).toContain("sm:text-4xl");
+    expect(classes).toContain("lg:text-5xl");
+  });
+});

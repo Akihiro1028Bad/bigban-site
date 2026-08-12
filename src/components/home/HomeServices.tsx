@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
 import { Link } from "@/i18n/navigation";
+import SectionUnderline from "@/components/SectionUnderline";
 import { EASE } from "@/constants/motion";
 import { RESERVE_PATH, reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
@@ -217,7 +218,7 @@ export default function HomeServices() {
     // 純黒 (#000) なので、わずかに浮くこの帯で「予約できるものの一覧」という
     // 章の切れ目を作る。サイト全体がダークパレットのため白帯にはしない。
     <section id="services" className="bg-off-white text-text-light">
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-12 lg:py-20">
+      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-12 lg:py-24">
         <motion.div
           className="mb-10 text-center lg:mb-14"
           initial={{ opacity: 0, y: 24 }}
@@ -225,13 +226,13 @@ export default function HomeServices() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-5xl font-black tracking-[0.15em] sm:text-6xl lg:text-7xl">
+          <h2 className="font-serif text-[clamp(2rem,22vw_-_34.5px,3rem)] leading-none font-black tracking-[0.15em] sm:text-6xl lg:text-7xl">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <SectionUnderline />
         </motion.div>
 
         <GroupHeading

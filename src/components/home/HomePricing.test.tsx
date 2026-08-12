@@ -29,6 +29,21 @@ describe("HomePricing", () => {
     expect(section).toBeInTheDocument();
   });
 
+  it("下パディングを章の縦リズムに揃える（上は FLOW と一体で読ませるため詰めたまま）", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const className = document.getElementById("pricing")?.className ?? "";
+    expect(className).toContain("pb-16");
+    expect(className).toContain("lg:pb-24");
+    expect(className).not.toContain("lg:pb-32");
+    // FLOW から続けて読ませる意図なので上は据え置き。
+    expect(className).toContain("pt-8");
+    expect(className).toContain("lg:pt-16");
+  });
+
   it("PRICINGタイトルを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -168,6 +183,39 @@ describe("HomePricing", () => {
     );
   });
 
+  it("PBT CLUB 会員価格を料金表に表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    // 3行 × 平日/週末の6セルすべてに「PBT CLUB会員」ラベル付きの価格が並ぶ。
+    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(6);
+    expect(screen.getByText("¥3,500")).toBeInTheDocument();
+    expect(screen.getByText("¥4,200")).toBeInTheDocument();
+    expect(screen.getAllByText("¥5,600")).toHaveLength(4);
+  });
+
+  it("PBT CLUB 詳細リンククリックで home_pricing_pbt_club を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", {
+      name: /PBT CLUBについて詳しく見る/,
+    });
+    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    link.addEventListener("click", (event) => event.preventDefault());
+    await userEvent.click(link);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_pricing_pbt_club",
+      "pbt-club"
+    );
+  });
+
   it("貸切・法人利用のお問い合わせリンクは維持される", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -177,5 +225,26 @@ describe("HomePricing", () => {
     expect(
       document.querySelector('a[href="/about#contact"]')
     ).toBeInTheDocument();
+  });
+});
+
+/** issue #404: 320px で見出しが枠(272px)を超えないよう、sm 未満だけ流体サイズにする。 */
+const FLUID_SECTION_HEADING = "text-[clamp(2rem,22vw_-_34.5px,3rem)]";
+
+describe("HomePricing の見出し級数", () => {
+  it("sm 未満は固定の text-5xl ではなく下限付きの流体サイズを使う", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const heading = screen.getByRole("heading", { level: 2, name: "PRICING" });
+    const classes = heading.className.split(/\s+/);
+
+    expect(classes).not.toContain("text-5xl");
+    expect(classes).toContain(FLUID_SECTION_HEADING);
+    expect(classes).toContain("leading-none");
+    expect(classes).toContain("sm:text-6xl");
+    expect(classes).toContain("lg:text-7xl");
   });
 });

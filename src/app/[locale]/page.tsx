@@ -4,17 +4,18 @@ import { notFound } from "next/navigation";
 import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
+import SectionArcDivider from "@/components/SectionArcDivider";
 import StructuredData from "@/components/StructuredData";
 import { buildServices } from "@/lib/structured-data";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
-import HomeLead from "@/components/home/HomeLead";
 import HomeConcept from "@/components/home/HomeConcept";
 import HomeLatestNews from "@/components/home/HomeLatestNews";
 import HomeFacility from "@/components/home/HomeFacility";
 import HomeServices from "@/components/home/HomeServices";
+import HomeUsageFlow from "@/components/home/HomeUsageFlow";
 import HomePricing from "@/components/home/HomePricing";
 import HomeNews from "@/components/home/HomeNews";
 import HomeColumns from "@/components/home/HomeColumns";
@@ -79,14 +80,25 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
-        <HomeLead />
+        {/* 最新の動きを一目で伝える帯。見出しとリンク数行だけの短い帯なので、
+            ヒーロー直下に置いても下の FACILITY の本文としての優位は損なわない。 */}
         <Suspense fallback={null}>
           <HomeLatestNews locale={locale} />
         </Suspense>
-        <HomeConcept />
+        {/* 施設の説明（旧 HomeLead のリード文を内包）。ヒーロー直下の最新ニュース帯を
+            除けば最初の本文であり、検索エンジンが最初に読む本文になるよう他の
+            解説セクションより前に置く。 */}
         <HomeFacility />
+        {/* 章の切り替わりだけに弧の区切りを置く。全境界に入れるとうるさくなるため、
+            施設の説明 → 世界観、機能 → 使い方、料金 → 読みもの、支援 → 来館という
+            4 つの転換点に絞っている。いずれも暗い背景同士の境界。 */}
+        <SectionArcDivider />
+        <HomeConcept />
         <HomeServices />
+        <SectionArcDivider variant="descent" />
+        <HomeUsageFlow />
         <HomePricing />
+        <SectionArcDivider />
         {/* Suspense で囲むことで microCMS フェッチが遅くても
             HomeAbout 以降のセクションが先にストリーミングされる。
             HomeNews は失敗時/0件時に null を返すため fallback も null で問題ない。 */}
@@ -98,6 +110,7 @@ export default async function Home({ params }: HomePageProps) {
         </Suspense>
         <HomeAbout />
         <HomeContributors />
+        <SectionArcDivider variant="descent" />
         <HomeAccess />
         <HomeFooter showColumns={isCmsColumnsEnabled()} />
       </main>

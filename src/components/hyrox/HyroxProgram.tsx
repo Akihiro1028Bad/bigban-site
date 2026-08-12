@@ -45,7 +45,10 @@ export default function HyroxProgram() {
         <HyroxCampaign />
 
         {/* ピックルボールコートと同一の料金テーブル（COURT_PRICES を共有） */}
-        <CourtPriceTable label={t("rateLabel")} />
+        <CourtPriceTable
+          label={t("rateLabel")}
+          pbtClubLocation="hyrox_program_pbt_club"
+        />
 
         {/* 注記 */}
         <motion.div

@@ -1,11 +1,21 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
+import { INSTAGRAM_URL } from "@/constants/site";
 
 import HomeFooter from "./HomeFooter";
 
 let mockPathname = "/";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
+
+afterEach(() => {
+  trackCtaClick.mockClear();
+});
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ href, children, ...props }: Record<string, unknown>) => (
@@ -192,6 +202,50 @@ describe("HomeFooter", () => {
     );
     const link = screen.getByRole("link", { name: "HYROX" });
     expect(link).toHaveAttribute("href", "/hyrox");
+  });
+
+  it("公式Instagramへのリンクを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: /Instagram/ });
+    expect(link).toHaveAttribute("href", INSTAGRAM_URL);
+  });
+
+  it("Instagramリンクは別タブで開き rel を持つ", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", { name: /Instagram/ });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("Instagramリンクに施設名を含むアクセシブルネームがある", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByRole("link", {
+        name: /THE PICKLE BANG THEORY の Instagram/,
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("Instagramクリックを footer として計測する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    fireEvent.click(screen.getByRole("link", { name: /Instagram/ }));
+    expect(trackCtaClick).toHaveBeenCalledWith("instagram", "footer", "official");
   });
 
   it("アクセントセパレーターを持つ", () => {
