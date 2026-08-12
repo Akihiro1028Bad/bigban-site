@@ -10,6 +10,9 @@
   --color-text-gray: #8A8A8A;
 
   --font-serif: "Orbitron", "Inter", sans-serif;
+  /* 和文明朝。CONCEPT の詩組みなど「宣言」の面だけに使う限定トークン。
+     next/font が発行する CSS 変数を参照するので、フォント名のハッシュに依存しない。 */
+  --font-mincho: var(--font-shippori-mincho-b1), "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-sans: "Inter", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Helvetica Neue", Arial, sans-serif;
 }
 
