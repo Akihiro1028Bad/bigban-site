@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { arcPathD, arcPoint, SECTION_ARCS } from "./sectionArc";
+import {
+  arcAngleDeg,
+  arcPathD,
+  arcPoint,
+  arcTangent,
+  SECTION_ARCS,
+} from "./sectionArc";
 
 import type { SectionArc } from "./sectionArc";
 
@@ -27,6 +33,31 @@ describe("arcPoint", () => {
 describe("arcPathD", () => {
   it("viewBox 0 0 100 100 前提の 2 次ベジェ path を組み立てる", () => {
     expect(arcPathD(ARC)).toBe("M 0 100 Q 50 0 100 100");
+  });
+});
+
+describe("arcTangent", () => {
+  it("t=0 は射出点から制御点への向き、t=1 は制御点から着地点への向きを返す", () => {
+    expect(arcTangent(ARC, 0)).toEqual({ x: 100, y: -200 });
+    expect(arcTangent(ARC, 1)).toEqual({ x: 100, y: 200 });
+  });
+});
+
+describe("arcAngleDeg", () => {
+  it("縦横が同倍率なら % 座標のままの角度になる", () => {
+    // 頂点(t=0.5)の接線は水平。
+    expect(arcAngleDeg(ARC, 0.5, 100, 100)).toBe(0);
+    // t=0 の接線 (100, -200) は上向き 63.4 度。
+    expect(arcAngleDeg(ARC, 0, 100, 100)).toBeCloseTo(-63.43, 2);
+  });
+
+  it("帯を横長に伸ばすほど角度は浅くなる（非等比の伸長を角度へ反映する）", () => {
+    // 弧は幅 100%・高さ 80-144px の帯へ非等比に伸びるので、
+    // % 座標のままの角度で回すと尾が弧から外れる。
+    const wide = arcAngleDeg(ARC, 0, 800, 100);
+    const square = arcAngleDeg(ARC, 0, 100, 100);
+    expect(Math.abs(wide)).toBeLessThan(Math.abs(square));
+    expect(wide).toBeCloseTo(-14.04, 2);
   });
 });
 
