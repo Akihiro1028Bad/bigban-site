@@ -1,304 +1,230 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { motion, useInView } from "framer-motion";
-import useEmblaCarousel from "embla-carousel-react";
-import Autoplay from "embla-carousel-autoplay";
+import { motion } from "framer-motion";
 
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
+import { reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
-const FACILITY_IMAGES = [
-  { src: "/images/rental.webp", altKey: "court" as const },
-  { src: "/images/hyrox/facility-1-enhanced.webp", altKey: "training" as const },
-];
+import type { ReactNode } from "react";
 
-const FEATURE_KEYS = [
-  "trainingArea",
-  "lounge",
-  "changingRooms",
-  "airConditioning",
-  "vendingMachine",
-  "rentalEquipment",
-  "unmannedCheckin",
-  "showCourt",
+/**
+ * リード文側のリッチテキストタグ。デッキ・本文・HYROX の3段落で共有する。
+ *
+ * 日本語は文字単位で折り返されるため、放っておくと「空調完/備」のように
+ * 語の途中で行が割れる。nb で囲った範囲だけ折り返しを禁止して、
+ * 実測で分断が起きた語を守る（表示テキストは一字も変えない）。
+ */
+const RICH_TAGS = {
+  strong: (chunks: ReactNode) => (
+    <strong className="font-semibold text-text-light">{chunks}</strong>
+  ),
+  nb: (chunks: ReactNode) => <span className="whitespace-nowrap">{chunks}</span>,
+} as const;
+
+/** 2ゾーン共通の画像サイズ指定(lg で 2 カラムに割れる)。 */
+const ZONE_IMAGE_SIZES = "(min-width: 1024px) 576px, 100vw";
+
+/** 極小の英語キッカー。和文見出しが主・英語が従という主従関係を保つ。 */
+const ZONE_KICKER_CLASS = "mt-6 text-[10px] tracking-[0.25em] text-text-gray";
+
+/** ゾーン見出し。施設概要(text-2xl)より一段小さく、2カラムに収める。 */
+const ZONE_HEADING_CLASS =
+  "mt-2 font-sans text-xl font-bold tracking-wide text-text-light sm:text-2xl";
+
+const ZONE_BODY_CLASS = "mt-4 text-sm leading-relaxed text-text-gray";
+
+/** ゾーン固有の事実は表に入れず、両ゾーンに共通する情報だけを並べる。 */
+const INFO_ROW_KEYS = [
+  "hours",
+  "access",
+  "environment",
+  "equipment",
+  "rental",
+  "checkin",
 ] as const;
 
-
+/**
+ * ホームの FACILITY セクション。
+ *
+ * 「施設について」のリード文（旧 HomeLead）と FACILITY セクションを統合した面。
+ * リード文は #380 の検索スニペット対策で入れた散文で、Google が meta description を
+ * 採らずフッター文字列をスニペットに使っていた問題への手当て。文言は HomeLead
+ * 名前空間のまま据え置き、隠しテキストにはせず読める本文としてここに置く。
+ *
+ * 本体はツインゾーン + 施設概要表。コートとトレーニングエリアを同サイズの写真・
+ * 同レベルの見出しで並べ、「ピックルボールとトレーニングの両方がある施設」だと
+ * 一目で分かるようにする。表には両ゾーンに共通する確定情報だけを残す。
+ */
 export default function HomeFacility() {
   const t = useTranslations("HomeFacility");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(carouselRef);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
-    Autoplay({ playOnInit: false, delay: 5000, stopOnInteraction: true, stopOnMouseEnter: true }),
-  ]);
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    const onSelect = () => {
-      setSelectedIndex(emblaApi.selectedScrollSnap());
-    };
-    emblaApi.on("select", onSelect);
-    onSelect();
-    return () => {
-      emblaApi.off("select", onSelect);
-    };
-  }, [emblaApi]);
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    const autoplay = emblaApi.plugins().autoplay;
-    if (isInView) {
-      autoplay.play();
-    } else {
-      autoplay.stop();
-    }
-  }, [isInView, emblaApi]);
-
-  const handleScrollTo = useCallback(
-    (index: number) => {
-      if (!emblaApi) return;
-      emblaApi.scrollTo(index);
-    },
-    [emblaApi]
-  );
-
-  const handleScrollPrev = useCallback(() => {
-    if (!emblaApi) return;
-    emblaApi.scrollPrev();
-  }, [emblaApi]);
-
-  const handleScrollNext = useCallback(() => {
-    if (!emblaApi) return;
-    emblaApi.scrollNext();
-  }, [emblaApi]);
-
-  const keyNumbers = [
-    { value: t("keyNumbers.courts.value"), labelEn: t("keyNumbers.courts.labelEn"), labelJa: t("keyNumbers.courts.labelJa") },
-    { value: t("keyNumbers.hours.value"), labelEn: t("keyNumbers.hours.labelEn"), labelJa: t("keyNumbers.hours.labelJa") },
-    { value: t("keyNumbers.station.value"), labelEn: t("keyNumbers.station.labelEn"), labelJa: t("keyNumbers.station.labelJa") },
-  ];
-
-  const primarySpecs = [
-    { labelEn: t("specs.surface.labelEn"), labelJa: t("specs.surface.labelJa"), description: t("specs.surface.description") },
-    { labelEn: t("specs.type.labelEn"), labelJa: t("specs.type.labelJa"), description: t("specs.type.description") },
-  ];
+  const tLead = useTranslations("HomeLead");
 
   return (
-    <section id="facility" className="bg-deep-black py-24 lg:py-32">
+    <section id="facility" className="bg-deep-black py-24 text-text-light lg:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* Section Title */}
         <motion.div
-          className="text-center mb-12 lg:mb-16"
+          className="mb-12 text-center lg:mb-16"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-5xl sm:text-6xl lg:text-7xl font-black tracking-[0.15em] text-text-light">
+          <h2 className="font-serif text-5xl font-black tracking-[0.15em] text-text-light sm:text-6xl lg:text-7xl">
             {t("title")}
           </h2>
-          <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
+          <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
         </motion.div>
 
-        {/* Key Numbers */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 mb-12 lg:mb-16">
-          {keyNumbers.map((item, i) => (
-            <motion.div
-              key={item.labelEn}
-              className={`flex flex-col items-center text-center py-6 sm:py-8${
-                i < keyNumbers.length - 1
-                  ? " sm:border-r sm:border-accent/20"
-                  : ""
-              }${i > 0 ? " border-t sm:border-t-0 border-text-gray/10" : ""}`}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-150px" }}
-              transition={{
-                duration: 1.1,
-                delay: i * 0.15,
-                ease: EASE,
-              }}
-            >
-              <span
-                className="font-serif text-text-light font-bold leading-none"
-                style={{ fontSize: "clamp(3.5rem, 7vw, 7rem)" }}
-              >
-                {item.value}
-              </span>
-              <span className="text-xs tracking-[0.25em] text-accent mt-4">
-                {item.labelEn}
-              </span>
-              <span className="text-sm text-text-gray mt-1">
-                {item.labelJa}
-              </span>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Facility Image Carousel — モバイルで edge-to-edge 表示するため、親 (mx-auto max-w-7xl px-6) の左右パディング(1.5rem × 2 = 3rem) を負マージンで打ち消す */}
+        {/* リード文プローズ。
+            単独セクションだった頃のキッカー "ABOUT THE FACILITY" と縦書きスパイン
+            「施設について」は、いずれもセクション見出し(FACILITY / 施設・設備)と
+            同じことを言うため描画しない。ラベルを外すとヘアラインだけが意味を失うので
+            スパインごと除去した。本文の文言は SEO 実験中のため一字も変えていない。 */}
         <motion.div
-          ref={carouselRef}
-          className="relative mb-16 w-[calc(100%+3rem)] sm:w-full -mx-6 sm:mx-0"
-          aria-roledescription="carousel"
-          aria-label={t("carousel.regionLabel")}
-          initial={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-150px" }}
-          transition={{ duration: 1.2, ease: EASE }}
+          viewport={{ once: true, margin: "-120px" }}
+          transition={{ duration: 1.1, ease: EASE }}
         >
-          <div className="overflow-hidden rounded-none sm:rounded-sm select-none" ref={emblaRef}>
-            <div className="flex">
-              {FACILITY_IMAGES.map((image, i) => (
-                <div
-                  key={image.altKey}
-                  role="group"
-                  aria-roledescription="slide"
-                  aria-label={`${i + 1} / ${FACILITY_IMAGES.length}`}
-                  className="relative aspect-[16/9] min-w-0 flex-[0_0_100%]"
-                >
-                  <Image
-                    src={image.src}
-                    alt={t(`images.${image.altKey}`)}
-                    fill
-                    sizes="(min-width: 1280px) 1216px, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Arrow Buttons */}
-          <button
-            type="button"
-            onClick={handleScrollPrev}
-            aria-label={t("carousel.prev")}
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-text-light hover:bg-black/60 transition-colors"
-          >
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={handleScrollNext}
-            aria-label={t("carousel.next")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-text-light hover:bg-black/60 transition-colors"
-          >
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-
-          {/* Dot Indicators */}
-          <div className="flex justify-center gap-3 mt-6">
-            {FACILITY_IMAGES.map((image, i) => (
-              <button
-                key={image.altKey}
-                type="button"
-                onClick={() => handleScrollTo(i)}
-                aria-label={t("carousel.showImage", { index: i + 1, alt: t(`images.${image.altKey}`) })}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  i === selectedIndex
-                    ? "bg-accent scale-125"
-                    : "bg-text-gray/30 hover:bg-text-gray/60"
-                }`}
-              />
-            ))}
-          </div>
+          {/* 大きい文字ほど行間は詰める。モバイルの 1.9 は行間が空きすぎて縦に伸びていた。 */}
+          <p className="max-w-3xl text-lg font-medium leading-[1.5] text-text-light sm:text-2xl sm:leading-[1.7]">
+            {tLead.rich("deck", RICH_TAGS)}
+          </p>
+          {/* 本文もモバイルは行間と段落間を詰める。行送りを詰めた分、段落間も同じ比率で縮める。 */}
+          <p className="mt-5 max-w-2xl text-sm leading-[1.9] text-text-light/90 sm:mt-6 sm:text-base sm:leading-[2.2]">
+            {tLead.rich("body", RICH_TAGS)}
+          </p>
+          <p className="mt-3 max-w-2xl text-sm leading-[1.9] text-text-light/90 sm:mt-4 sm:text-base sm:leading-[2.2]">
+            {tLead.rich("bodyHyrox", RICH_TAGS)}
+          </p>
         </motion.div>
 
-        {/* Primary Specs - Glow Header */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-12">
-          {primarySpecs.map((spec, i) => (
-            <motion.div
-              key={spec.labelEn}
-              className="relative bg-gradient-to-b from-accent/[0.07] to-transparent px-8 py-10"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-150px" }}
-              transition={{
-                duration: 1.1,
-                delay: i * 0.15,
-                ease: EASE,
-              }}
+        {/* ツインゾーン: 同サイズ写真 + 同レベル見出しで、2つのゾーンを同格に見せる。 */}
+        <div className="mt-12 grid grid-cols-1 gap-6 lg:mt-16 lg:grid-cols-2 lg:gap-8">
+          {/* ゾーン1: ピックルボールコート */}
+          <motion.div
+            className="min-w-0"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1.1, ease: EASE }}
+          >
+            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-sm">
+              <Image
+                src="/images/facility.webp"
+                alt={t("zones.court.imageAlt")}
+                fill
+                sizes={ZONE_IMAGE_SIZES}
+                className="object-cover"
+              />
+            </div>
+            <p className={ZONE_KICKER_CLASS}>{t("zones.court.titleEn")}</p>
+            <h3 className={ZONE_HEADING_CLASS}>{t("zones.court.titleJa")}</h3>
+            <p className={ZONE_BODY_CLASS}>
+              {t.rich("zones.court.description", RICH_TAGS)}
+            </p>
+          </motion.div>
+
+          {/* ゾーン2: HYROXトレーニングエリア */}
+          <motion.div
+            className="min-w-0"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1.1, delay: 0.1, ease: EASE }}
+          >
+            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-sm">
+              <Image
+                src="/images/hyrox/facility-4.jpg"
+                alt={t("zones.training.imageAlt")}
+                fill
+                sizes={ZONE_IMAGE_SIZES}
+                className="object-cover"
+              />
+            </div>
+            <p className={ZONE_KICKER_CLASS}>{t("zones.training.titleEn")}</p>
+            <h3 className={ZONE_HEADING_CLASS}>{t("zones.training.titleJa")}</h3>
+            <p className={ZONE_BODY_CLASS}>
+              {t.rich("zones.training.description", RICH_TAGS)}
+            </p>
+            <Link
+              href="/hyrox"
+              onClick={() =>
+                trackCtaClick("contentClick", "home_facility_hyrox", "hyrox")
+              }
+              className="mt-4 inline-flex items-center gap-2 text-sm text-accent transition-all duration-300 hover:gap-3"
             >
-              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
-              <span className="text-[10px] tracking-[0.25em] text-accent block mb-3">
-                {spec.labelEn}
-              </span>
-              <span className="text-text-light text-lg lg:text-xl font-bold tracking-wide block mb-2">
-                {spec.labelJa}
-              </span>
-              <span className="text-text-gray text-xs lg:text-sm">
-                {spec.description}
-              </span>
-            </motion.div>
-          ))}
+              {t("zones.training.linkLabel")}
+              <span aria-hidden="true">&rarr;</span>
+            </Link>
+          </motion.div>
         </div>
 
-        {/* Secondary Features - Left Bar Lines */}
-        <motion.div
-          className="columns-2 gap-x-10"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true, margin: "-150px" }}
-          transition={{ duration: 1.0, delay: 0.2, ease: EASE }}
-        >
-          {FEATURE_KEYS.map((featureKey, i) => (
-            <motion.div
-              key={featureKey}
-              className="break-inside-avoid border-l-2 border-accent/15 pl-4 py-3 mb-1 transition-colors duration-300 hover:border-accent/50"
-              initial={{ opacity: 0, x: -12 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: "-150px" }}
-              transition={{
-                duration: 1.0,
-                delay: 0.1 + i * 0.06,
-                ease: EASE,
-              }}
-            >
-              {featureKey === "trainingArea" ? (
-                <Link
-                  href="/hyrox"
-                  onClick={() => trackCtaClick("contentClick", "home_facility_hyrox", "hyrox")}
-                  className="text-text-light text-sm lg:text-base hover:text-accent transition-colors"
-                >
-                  {t(`features.${featureKey}`)}
-                  <span className="text-accent/60 text-xs ml-2 tracking-wider">→</span>
-                </Link>
-              ) : (
-                <span className="text-text-light text-sm lg:text-base">
-                  {t(`features.${featureKey}`)}
-                </span>
-              )}
-            </motion.div>
-          ))}
-        </motion.div>
+        {/* 施設概要: 日本の会社概要ページの文法に合わせた2列の罫線表。 */}
+        <div className="mt-16 lg:mt-20">
+          <p className="text-[10px] tracking-[0.25em] text-text-gray">
+            {t("info.headingEn")}
+          </p>
+          <h3 className="mt-2 font-sans text-2xl font-bold tracking-wide text-text-light sm:text-3xl">
+            {t("info.heading")}
+          </h3>
+          <dl className="mt-6 border-t border-text-gray/15 lg:mt-8">
+            {INFO_ROW_KEYS.map((rowKey, i) => (
+              <motion.div
+                key={rowKey}
+                className="flex gap-4 border-b border-text-gray/15 py-4 sm:gap-8 sm:py-5"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.9, delay: i * 0.05, ease: EASE }}
+              >
+                {/* 項目名列は幅を固定して、行をまたいでも内容の左端が揃うようにする。 */}
+                <dt className="w-28 shrink-0 pt-0.5 text-sm text-text-gray sm:w-36">
+                  {t(`info.${rowKey}.label`)}
+                </dt>
+                <dd className="min-w-0 flex-1 text-sm leading-[1.9] text-text-light sm:text-base">
+                  {t.rich(`info.${rowKey}.value`, RICH_TAGS)}
+                </dd>
+              </motion.div>
+            ))}
+          </dl>
+        </div>
 
-        {/* DecoTurf Description */}
+        {/* 予約導線。
+            統合でこのセクションがヒーロー直後の最初の章になり、SERVICES の予約カード群
+            までは約3,000px 離れた。ここで納得した人がすぐ動けるよう、テキストリンクから
+            枠線ボタンに引き上げる。ベタ塗りは主要CTA(ヒーロー/ナビ/SERVICES/PRICING)に
+            温存し、枠線でその一段下という階層を保つ。 */}
         <motion.div
-          className="mt-16 lg:mt-20"
+          className="mt-16 text-center lg:mt-20"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <p className="text-text-light text-base sm:text-xl lg:text-2xl leading-relaxed font-semibold tracking-wide mb-6">
-            {t("decoturf.title")}
-          </p>
-          <div className="w-10 h-[2px] bg-accent mb-6" />
-          <p className="text-text-gray text-sm lg:text-base leading-loose">
-            {t("decoturf.description")}
-          </p>
+          <Link
+            href={reserveHref("pickleball")}
+            onClick={() =>
+              trackCtaClick("reserveEntry", "home_facility_reserve", t("reserveCta"))
+            }
+            className="group inline-flex items-center justify-center gap-1.5 border border-accent px-8 py-3.5 text-sm font-bold tracking-wider text-accent transition-colors hover:bg-accent hover:text-deep-black"
+          >
+            {t("reserveCta")}
+            <span
+              aria-hidden
+              className="text-base leading-none transition-transform group-hover:translate-x-0.5"
+            >
+              &rarr;
+            </span>
+          </Link>
         </motion.div>
       </div>
     </section>
