@@ -274,40 +274,76 @@ describe("MobileMenu", () => {
 
   // --- 夜空の続きとしてのパネル ---
 
-  it("右上のグローはブランドブルーの星雲にし、黄色(accent)で光らせない", () => {
+  function glowLayers(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-mobile-menu-glow="true"]'));
+  }
+
+  function starDots(): HTMLElement[] {
+    const stars = document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]');
+    return Array.from(stars?.children ?? []) as HTMLElement[];
+  }
+
+  it("グローはブランドブルーの星雲にし、黄色(accent)で光らせない", () => {
     renderMenu();
-    const glow = document.querySelector<HTMLElement>('[data-mobile-menu-glow="true"]');
-    expect(glow).not.toBeNull();
-    // CONCEPT の星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
-    expect(glow?.style.background).toMatch(/48,\s*110,\s*195/);
+    const glows = glowLayers();
+    // 1点光源だと平板なので、明るい星雲と控えめな星雲を2つ置いて奥行きを出す。
+    expect(glows.length).toBeGreaterThanOrEqual(2);
+    for (const glow of glows) {
+      // CONCEPT の星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
+      expect(glow.style.background).toMatch(/48,\s*110,\s*195/);
+    }
     const panel = document.querySelector('[data-mobile-menu-panel="true"]');
     expect(panel?.querySelector('[class*="bg-accent/"]')).toBeNull();
   });
 
+  it("主となる星雲はひと目で分かる濃さと大きさで置く", () => {
+    renderMenu();
+    const alphas = glowLayers().map((glow) => Number(/,\s*([\d.]+)\)/.exec(glow.style.background)?.[1]));
+    // 薄すぎると「夜空の続き」だと気づかれない。主星雲はしっかり濃く。
+    expect(Math.max(...alphas)).toBeGreaterThanOrEqual(0.3);
+    // 副星雲は主役を食わない濃さに留める。
+    expect(Math.min(...alphas)).toBeLessThan(Math.max(...alphas));
+    const [primary] = glowLayers();
+    expect(primary.className).toMatch(/h-64|h-72/);
+    expect(primary.className).toContain("blur-3xl");
+  });
+
+  it("パネルの地は星雲を洗い流さない濃さにする", () => {
+    renderMenu();
+    const panel = document.querySelector<HTMLElement>('[data-mobile-menu-panel="true"]');
+    // 背面が透けすぎると可読性が落ちるので、暗さは十分残したまま星雲を通す。
+    expect(panel?.className).toContain("bg-deep-black/70");
+    expect(panel?.className).toContain("backdrop-blur-2xl");
+  });
+
   it("グローと星は装飾なので支援技術から隠し、操作も妨げない", () => {
     renderMenu();
-    for (const selector of ['[data-mobile-menu-glow="true"]', '[data-mobile-menu-stars="true"]']) {
-      const layer = document.querySelector<HTMLElement>(selector);
+    const layers = [...glowLayers(), document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]')];
+    for (const layer of layers) {
       expect(layer).not.toBeNull();
       expect(layer).toHaveAttribute("aria-hidden", "true");
       expect(layer?.className).toContain("pointer-events-none");
     }
   });
 
-  it("パネルにうっすら星を敷くが、またたかせない", () => {
+  it("星は等級差をつけて敷き、またたかせない", () => {
     renderMenu();
-    const stars = document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]');
-    const dots = Array.from(stars?.children ?? []) as HTMLElement[];
-    expect(dots.length).toBeGreaterThanOrEqual(8);
-    for (const dot of dots) {
+    const dots = starDots();
+    // まばら過ぎると気づかれず、粒が揃うと「模様」に見える。数と等級差の両方を確保する。
+    expect(dots.length).toBeGreaterThanOrEqual(16);
+    const opacities = dots.map((dot) => Number(dot.style.opacity));
+    for (const [index, dot] of dots.entries()) {
       // 演出は控えめに。またたきアニメは持たせない。
       expect(dot.className).not.toMatch(/animate-|transition/);
-      const opacity = Number(dot.style.opacity);
-      expect(opacity).toBeGreaterThan(0);
-      expect(opacity).toBeLessThanOrEqual(0.5);
+      expect(opacities[index]).toBeGreaterThan(0);
+      // 星が主役になって項目の可読性を奪わない上限。
+      expect(opacities[index]).toBeLessThanOrEqual(0.7);
     }
-    // 一様な明るさに並べず、粒ごとに濃さを散らす。
-    expect(new Set(dots.map((dot) => dot.style.opacity)).size).toBeGreaterThan(1);
+    expect(Math.max(...opacities)).toBeGreaterThanOrEqual(0.6);
+    expect(new Set(opacities).size).toBeGreaterThan(2);
+    // 明るい星は粒も大きくして等級差を作る。
+    const bright = dots.filter((dot) => dot.style.width === "2px");
+    expect(bright.length).toBeGreaterThanOrEqual(2);
   });
 
   // --- 項目の区切りとタッチの手応え ---
