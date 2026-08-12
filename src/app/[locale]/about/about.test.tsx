@@ -151,8 +151,10 @@ describe("AboutPage", () => {
 
   it("Instagramリンクが設定されている", () => {
     renderWithIntl(<AboutPage />);
-    const igLink = screen.getByText("@thepicklebangtheory");
-    expect(igLink.closest("a")).toHaveAttribute(
+    // フッターにも公式Instagram導線があるため、CONTACT 側（ハンドルのみが
+    // アクセシブルネーム）に限定して検証する。
+    const igLink = screen.getByRole("link", { name: "@thepicklebangtheory" });
+    expect(igLink).toHaveAttribute(
       "href",
       "https://www.instagram.com/thepicklebangtheory"
     );

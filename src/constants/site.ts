@@ -71,6 +71,9 @@ export function resolveCalendarTabKey(
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
+// 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。
+export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
+
 export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 
 // 主催イベント（早朝ピックルボール等）の申込先。
