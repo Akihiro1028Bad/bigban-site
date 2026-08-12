@@ -66,6 +66,39 @@ function getFocusableElements(): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
 }
 
+// CONCEPT セクションの星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
+// 主星雲は右上。薄いと「夜空の続き」だと気づかれないため、しっかり濃く置く。
+const NEBULA_GLOW = "rgba(48, 110, 195, 0.35)";
+// 副星雲は左下。1点光源より奥行きが出るが、主役を食わない濃さに留める。
+const NEBULA_GLOW_SUB = "rgba(48, 110, 195, 0.2)";
+
+/**
+ * 夜空の粒。パネルを「サイトの宇宙の続き」として見せるための静かな点。
+ * またたかせず、明るさと粒の大きさ(等級)だけを散らして奥行きを出す。
+ * 一様に並べると「模様」に見えて気づかれないため、明るい星を数個混ぜる。
+ */
+const STARS = [
+  { top: "4%", left: "13%", size: 2, opacity: 0.65 },
+  { top: "9%", left: "45%", size: 1, opacity: 0.28 },
+  { top: "12%", left: "72%", size: 1.5, opacity: 0.4 },
+  { top: "18%", left: "27%", size: 1, opacity: 0.22 },
+  { top: "23%", left: "58%", size: 1, opacity: 0.32 },
+  { top: "27%", left: "86%", size: 1.5, opacity: 0.45 },
+  { top: "33%", left: "37%", size: 1, opacity: 0.24 },
+  { top: "38%", left: "16%", size: 2, opacity: 0.6 },
+  { top: "44%", left: "67%", size: 1, opacity: 0.3 },
+  { top: "49%", left: "91%", size: 1, opacity: 0.26 },
+  { top: "54%", left: "44%", size: 1.5, opacity: 0.42 },
+  { top: "59%", left: "22%", size: 1, opacity: 0.24 },
+  { top: "64%", left: "78%", size: 1.5, opacity: 0.38 },
+  { top: "70%", left: "52%", size: 1, opacity: 0.28 },
+  { top: "75%", left: "31%", size: 2, opacity: 0.62 },
+  { top: "80%", left: "88%", size: 1, opacity: 0.3 },
+  { top: "85%", left: "62%", size: 1.5, opacity: 0.44 },
+  { top: "90%", left: "18%", size: 1, opacity: 0.26 },
+  { top: "95%", left: "74%", size: 1, opacity: 0.34 },
+] as const;
+
 const LIST_VARIANTS = {
   hidden: {},
   show: { transition: { staggerChildren: 0.045, delayChildren: 0.18 } },
@@ -165,12 +198,41 @@ export default function MobileMenu({
             onDragEnd={(_, info) => {
               if (info.offset.x > 90 || info.velocity.x > 500) onClose();
             }}
-            className="relative flex h-full w-[86%] max-w-sm flex-col overflow-y-auto border-l border-white/10 bg-deep-black/80 backdrop-blur-2xl"
+            className="relative flex h-full w-[86%] max-w-sm flex-col overflow-y-auto border-l border-white/10 bg-deep-black/70 backdrop-blur-2xl"
           >
-            {/* 右上のアクセントグロー */}
+            {/* 夜空の粒（装飾） */}
             <div
               aria-hidden
-              className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/15 blur-3xl"
+              data-mobile-menu-stars="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+            >
+              {STARS.map((star) => (
+                <span
+                  key={`${star.top}-${star.left}`}
+                  className="absolute rounded-full bg-white"
+                  style={{
+                    top: star.top,
+                    left: star.left,
+                    width: `${star.size}px`,
+                    height: `${star.size}px`,
+                    opacity: star.opacity,
+                  }}
+                />
+              ))}
+            </div>
+            {/* 右上の主星雲（装飾） */}
+            <div
+              aria-hidden
+              data-mobile-menu-glow="true"
+              className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full blur-3xl"
+              style={{ background: NEBULA_GLOW }}
+            />
+            {/* 左下の副星雲（装飾）。奥行きを出すための2つ目の光源 */}
+            <div
+              aria-hidden
+              data-mobile-menu-glow="true"
+              className="pointer-events-none absolute bottom-16 -left-24 h-64 w-64 rounded-full blur-3xl"
+              style={{ background: NEBULA_GLOW_SUB }}
             />
             {/* スワイプで閉じるヒント（左端のつまみ） */}
             <div
@@ -194,7 +256,7 @@ export default function MobileMenu({
               variants={LIST_VARIANTS}
               initial="hidden"
               animate="show"
-              className="relative flex flex-1 flex-col gap-0.5 px-3 py-3"
+              className="relative flex flex-1 flex-col divide-y divide-white/10 px-3 py-3"
             >
               {navItems.map((nav) => {
                 const jaKey = `${nav.id}Ja`;
@@ -205,7 +267,7 @@ export default function MobileMenu({
                     <NavItemLink
                       item={nav}
                       onLinkClick={onLinkClick}
-                      className="group relative flex items-center justify-between overflow-hidden rounded-md px-4 py-3.5"
+                      className="group relative flex items-center justify-between overflow-hidden rounded-md px-4 py-3.5 active:bg-white/5"
                     >
                       {/* ホバー/アクティブの塗りバー */}
                       <span
@@ -267,6 +329,10 @@ export default function MobileMenu({
             </div>
 
             <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3">
+              {/* 予約を押す直前に、開いている時間を静かに添える */}
+              <p className="mb-2.5 text-center text-[11px] tracking-[0.18em] text-text-gray">
+                {t("menuHours")}
+              </p>
               <Link
                 href={reserveHref}
                 onClick={() => {
