@@ -38,7 +38,9 @@ export default function MenuToggleButton({
       onClick={onClick}
       aria-label={isOpen ? labelClose : labelOpen}
       aria-expanded={isOpen}
-      className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-deep-black/40 text-text-light backdrop-blur-md transition-colors hover:border-accent hover:text-accent ${className}`}
+      className={`flex h-10 w-10 items-center justify-center rounded-full border bg-deep-black/40 backdrop-blur-md transition-colors hover:border-accent hover:text-accent ${
+        isOpen ? "border-accent text-accent" : "border-white/15 text-text-light"
+      } ${className}`}
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <motion.line

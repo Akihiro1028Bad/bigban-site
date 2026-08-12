@@ -272,6 +272,124 @@ describe("MobileMenu", () => {
     ).toBeInTheDocument();
   });
 
+  // --- 夜空の続きとしてのパネル ---
+
+  function glowLayers(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-mobile-menu-glow="true"]'));
+  }
+
+  function starDots(): HTMLElement[] {
+    const stars = document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]');
+    return Array.from(stars?.children ?? []) as HTMLElement[];
+  }
+
+  it("グローはブランドブルーの星雲にし、黄色(accent)で光らせない", () => {
+    renderMenu();
+    const glows = glowLayers();
+    // 1点光源だと平板なので、明るい星雲と控えめな星雲を2つ置いて奥行きを出す。
+    expect(glows.length).toBeGreaterThanOrEqual(2);
+    for (const glow of glows) {
+      // CONCEPT の星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
+      expect(glow.style.background).toMatch(/48,\s*110,\s*195/);
+    }
+    const panel = document.querySelector('[data-mobile-menu-panel="true"]');
+    expect(panel?.querySelector('[class*="bg-accent/"]')).toBeNull();
+  });
+
+  it("主となる星雲はひと目で分かる濃さと大きさで置く", () => {
+    renderMenu();
+    const alphas = glowLayers().map((glow) => Number(/,\s*([\d.]+)\)/.exec(glow.style.background)?.[1]));
+    // 薄すぎると「夜空の続き」だと気づかれない。主星雲はしっかり濃く。
+    expect(Math.max(...alphas)).toBeGreaterThanOrEqual(0.3);
+    // 副星雲は主役を食わない濃さに留める。
+    expect(Math.min(...alphas)).toBeLessThan(Math.max(...alphas));
+    const [primary] = glowLayers();
+    expect(primary.className).toMatch(/h-64|h-72/);
+    expect(primary.className).toContain("blur-3xl");
+  });
+
+  it("パネルの地は星雲を洗い流さない濃さにする", () => {
+    renderMenu();
+    const panel = document.querySelector<HTMLElement>('[data-mobile-menu-panel="true"]');
+    // 背面が透けすぎると可読性が落ちるので、暗さは十分残したまま星雲を通す。
+    expect(panel?.className).toContain("bg-deep-black/70");
+    expect(panel?.className).toContain("backdrop-blur-2xl");
+  });
+
+  it("グローと星は装飾なので支援技術から隠し、操作も妨げない", () => {
+    renderMenu();
+    const layers = [...glowLayers(), document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]')];
+    for (const layer of layers) {
+      expect(layer).not.toBeNull();
+      expect(layer).toHaveAttribute("aria-hidden", "true");
+      expect(layer?.className).toContain("pointer-events-none");
+    }
+  });
+
+  it("星は等級差をつけて敷き、またたかせない", () => {
+    renderMenu();
+    const dots = starDots();
+    // まばら過ぎると気づかれず、粒が揃うと「模様」に見える。数と等級差の両方を確保する。
+    expect(dots.length).toBeGreaterThanOrEqual(16);
+    const opacities = dots.map((dot) => Number(dot.style.opacity));
+    for (const [index, dot] of dots.entries()) {
+      // 演出は控えめに。またたきアニメは持たせない。
+      expect(dot.className).not.toMatch(/animate-|transition/);
+      expect(opacities[index]).toBeGreaterThan(0);
+      // 星が主役になって項目の可読性を奪わない上限。
+      expect(opacities[index]).toBeLessThanOrEqual(0.7);
+    }
+    expect(Math.max(...opacities)).toBeGreaterThanOrEqual(0.6);
+    expect(new Set(opacities).size).toBeGreaterThan(2);
+    // 明るい星は粒も大きくして等級差を作る。
+    const bright = dots.filter((dot) => dot.style.width === "2px");
+    expect(bright.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // --- 項目の区切りとタッチの手応え ---
+
+  it("ナビ項目の「間」だけにヘアラインを引く", () => {
+    renderMenu();
+    const nav = screen.getByRole("dialog").querySelector("nav");
+    // divide-y は項目間だけに線を置く(先頭の上・末尾の下には引かれない)。
+    expect(nav?.className).toContain("divide-y");
+    expect(nav?.className).toContain("divide-white/10");
+    const rows = Array.from(nav?.children ?? []) as HTMLElement[];
+    expect(rows.length).toBe(NAV.length);
+    for (const row of rows) {
+      // 項目側に個別の枠線を持たせない(先頭・末尾に線が出てしまう)。
+      expect(row.className).not.toMatch(/border-/);
+    }
+    // 隙間を空けるとヘアラインが宙に浮くため、行同士は詰めて並べる。
+    expect(nav?.className).not.toMatch(/gap-/);
+  });
+
+  it("タッチでも手応えが出るよう、各項目に押下時の背景変化を持たせる", () => {
+    renderMenu();
+    for (const item of NAV) {
+      // 塗りバーと矢印は hover 依存でタッチでは出ないため、active: を別に用意する。
+      expect(screen.getByRole("link", { name: item.name }).className).toContain("active:bg-white/5");
+    }
+  });
+
+  // --- 予約CTA直上の営業時間 ---
+
+  it("予約CTAの直上に営業時間を添える", () => {
+    renderMenu();
+    const hours = screen.getByText("営業時間 6:00–23:00");
+    const reserve = screen.getByRole("link", { name: /RESERVE/ });
+    // 予約を押す直前に開いている時間が目に入るよう、CTA より前に置く。
+    expect(
+      hours.compareDocumentPosition(reserve) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(hours.className).toContain("text-text-gray");
+  });
+
+  it("英語ロケールでは営業時間も英語表記にする", () => {
+    renderMenu({ locale: "en", isJa: false });
+    expect(screen.getByText("OPEN DAILY 6:00–23:00")).toBeInTheDocument();
+  });
+
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---
 
   function panelFocusables(): HTMLElement[] {
