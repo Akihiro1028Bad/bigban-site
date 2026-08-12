@@ -5,6 +5,9 @@ vi.mock("next/font/google", () => ({
   Orbitron: vi.fn().mockReturnValue({ variable: "--font-orbitron" }),
   Inter: vi.fn().mockReturnValue({ variable: "--font-inter" }),
   Noto_Sans_JP: vi.fn().mockReturnValue({ variable: "--font-noto-sans-jp" }),
+  Shippori_Mincho_B1: vi
+    .fn()
+    .mockReturnValue({ variable: "--font-shippori-mincho-b1" }),
 }));
 
 const mockGetTranslations = vi.fn().mockResolvedValue(
@@ -115,6 +118,22 @@ describe("LocaleLayout", () => {
 
     expect(screen.getByText("english content")).toBeInTheDocument();
     expect(setRequestLocale).toHaveBeenCalledWith("en");
+  });
+
+  it("和文明朝(Shippori Mincho B1)の CSS 変数を html に適用する", async () => {
+    const { default: LocaleLayout } = await import("./layout");
+
+    render(
+      await LocaleLayout({
+        children: <p>mincho</p>,
+        params: Promise.resolve({ locale: "ja" }),
+      })
+    );
+
+    // React 19 は <html> を document 直下へホイストするため documentElement を見る。
+    expect(document.documentElement.className).toContain(
+      "--font-shippori-mincho-b1"
+    );
   });
 
   it("calls notFound for invalid locale", async () => {
