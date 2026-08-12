@@ -20,7 +20,7 @@ export default function HomeConcept() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-5xl sm:text-6xl lg:text-7xl font-black tracking-[0.15em]">
+          <h2 className="font-serif text-[clamp(2rem,22vw_-_34.5px,3rem)] leading-none sm:text-6xl lg:text-7xl font-black tracking-[0.15em]">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">

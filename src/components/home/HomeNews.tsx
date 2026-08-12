@@ -40,7 +40,7 @@ export default async function HomeNews({ locale }: HomeNewsProps) {
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <div className="text-center mb-12 lg:mb-16">
-          <h2 className="font-serif text-5xl sm:text-6xl lg:text-7xl font-black tracking-[0.15em]">
+          <h2 className="font-serif text-[clamp(2rem,22vw_-_34.5px,3rem)] leading-none sm:text-6xl lg:text-7xl font-black tracking-[0.15em]">
             {t("title")}
           </h2>
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">

@@ -89,7 +89,7 @@ export default function ContributorsContent({
       <HomeNavigation showColumns={showColumns} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))]">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-20 lg:py-32">
-          <h1 className="font-serif text-3xl font-black tracking-[0.15em] sm:text-4xl lg:text-5xl">
+          <h1 className="font-serif text-[clamp(1.25rem,11vw_-_11.25px,1.875rem)] leading-[1.2] font-black tracking-[0.15em] sm:text-4xl lg:text-5xl">
             {t("title")}
           </h1>
           <p className="mt-4 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
