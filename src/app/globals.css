@@ -59,11 +59,21 @@ html[data-browser="ios-safari"] .site-header-bg {
   -webkit-backdrop-filter: none;
 }
 
-/* セクション区切りの弧を流れる光点（流れ星）のグロー。
-   ハードコードした色ではなくアクセントトークンから作るので、パレット変更に追従する。 */
-.section-arc-star {
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 90%, transparent))
-    drop-shadow(0 0 22px color-mix(in srgb, var(--color-accent) 35%, transparent));
+/* セクション区切りの弧を流れる流れ星。
+   先端はほぼ白、尾へ向かって accent がわずかに混ざりながら透明へ消える。
+   彩度を落とすことで主張を抑え、光の筋として読ませる。
+   accent はトークンから color-mix するのでパレット変更に追従する。 */
+.section-arc-streak {
+  border-radius: 9999px;
+  background-image: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--color-accent) 30%, transparent) 55%,
+    color-mix(in srgb, white 60%, var(--color-accent)) 85%,
+    white 100%
+  );
+  /* 薄い光暈まで。強いグローは点として目立ちすぎるため使わない。 */
+  filter: drop-shadow(0 0 2px color-mix(in srgb, white 45%, transparent));
 }
 
 /* Grain overlay */

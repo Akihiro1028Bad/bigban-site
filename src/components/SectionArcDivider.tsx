@@ -1,15 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import {
-  motion,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from "framer-motion";
+import { motion, useReducedMotion, useScroll } from "framer-motion";
 
+import SectionArcStreak from "@/components/SectionArcStreak";
 import { EASE, revealInitial } from "@/constants/motion";
-import { arcPathD, arcPoint, SECTION_ARCS } from "@/lib/sectionArc";
+import { arcPathD, SECTION_ARCS } from "@/lib/sectionArc";
 
 import type { SectionArcVariant } from "@/lib/sectionArc";
 
@@ -19,14 +15,15 @@ interface SectionArcDividerProps {
 }
 
 /**
- * セクション区切り。水平線ではなく軌道の一部（大きな弧）を引き、その上を光点が流れる。
+ * セクション区切り。水平線ではなく軌道の一部（大きな弧）を引き、その上を流れ星が走る。
  *
  * - 弧: SVG pathLength 0→1 を 1.0s（whileInView, once）
- * - 光点: スクロール進捗に連動して弧の上を移動する
- * - reduced-motion: 弧は最初から全長表示、光点は頂点に静的表示
+ * - 流れ星: スクロール進捗に連動して弧を流れ、接線方向へ尾を引く
+ * - reduced-motion: 弧は最初から全長表示、流れ星は頂点に静的表示
  *
  * SVG は viewBox 0 0 100 100 + preserveAspectRatio="none" で帯いっぱいに引き伸ばす。
- * 光点だけは SVG の外の HTML 要素として % 配置し、非等比の伸長で楕円に潰れないようにする。
+ * 流れ星だけは SVG の外の HTML 要素として % 配置し、非等比の伸長で
+ * 太さや長さが歪まないようにする（角度の補正は SectionArcStreak 側で行う）。
  */
 export default function SectionArcDivider({
   variant = "apex",
@@ -36,15 +33,11 @@ export default function SectionArcDivider({
   const arc = SECTION_ARCS[variant];
   const d = arcPathD(arc);
 
+  // 帯が画面に入ってから抜けるまでを進捗 0→1 に対応させる。
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
   });
-
-  const left = useTransform(scrollYProgress, (t: number) => `${arcPoint(arc, t).x}%`);
-  const top = useTransform(scrollYProgress, (t: number) => `${arcPoint(arc, t).y}%`);
-
-  const apex = arcPoint(arc, 0.5);
 
   return (
     <div
@@ -82,14 +75,11 @@ export default function SectionArcDivider({
         />
       </svg>
 
-      {/* 弧を流れる光点（流れ星）。動くものだけがアクセント色。 */}
-      <motion.span
-        className="section-arc-star absolute block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
-        style={
-          prefersReducedMotion
-            ? { left: `${apex.x}%`, top: `${apex.y}%` }
-            : { left, top }
-        }
+      <SectionArcStreak
+        bandRef={ref}
+        arc={arc}
+        progress={scrollYProgress}
+        isStatic={Boolean(prefersReducedMotion)}
       />
     </div>
   );

@@ -35,6 +35,40 @@ export function arcPoint(arc: SectionArc, t: number): ArcPoint {
   };
 }
 
+/**
+ * 2 次ベジェの接線ベクトル B'(t)。t は 0-1。
+ *
+ * 前後 2 点の差分を取る代わりに導関数をそのまま使う（差分の極限そのものなので
+ * 誤差もサンプル幅の調整も要らない）。
+ */
+export function arcTangent(arc: SectionArc, t: number): ArcPoint {
+  const u = 1 - t;
+
+  return {
+    x: 2 * u * (arc.control.x - arc.from.x) + 2 * t * (arc.to.x - arc.control.x),
+    y: 2 * u * (arc.control.y - arc.from.y) + 2 * t * (arc.to.y - arc.control.y),
+  };
+}
+
+/**
+ * 実表示上の接線角度（度）。
+ *
+ * 弧の座標は % だが、区切り帯は幅と高さが別倍率で伸びる
+ * （幅は画面いっぱい・高さは 80-144px 固定）。% 座標のまま atan2 を取ると
+ * 角度が縦に誇張され、ストリークの尾が弧から外れて見える。
+ * 接線を実寸へ直してから角度を取ることでこれを防ぐ。
+ */
+export function arcAngleDeg(
+  arc: SectionArc,
+  t: number,
+  width: number,
+  height: number,
+): number {
+  const tangent = arcTangent(arc, t);
+
+  return (Math.atan2(tangent.y * height, tangent.x * width) * 180) / Math.PI;
+}
+
 /** SVG の path d 属性。viewBox 0 0 100 100 前提。 */
 export function arcPathD(arc: SectionArc): string {
   return `M ${arc.from.x} ${arc.from.y} Q ${arc.control.x} ${arc.control.y} ${arc.to.x} ${arc.to.y}`;
