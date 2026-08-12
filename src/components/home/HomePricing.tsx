@@ -15,7 +15,7 @@ export default function HomePricing() {
   return (
     <section
       id="pricing"
-      className="bg-deep-black pt-8 lg:pt-16 pb-16 lg:pb-32 text-text-light"
+      className="bg-deep-black pt-8 lg:pt-16 pb-16 lg:pb-24 text-text-light"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* Section Title */}

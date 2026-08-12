@@ -64,38 +64,29 @@ export default function HomeFacility() {
   const tLead = useTranslations("HomeLead");
 
   return (
-    <section id="facility" className="bg-deep-black py-24 text-text-light lg:py-32">
+    <section id="facility" className="bg-deep-black py-16 text-text-light lg:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
-        {/* Section Title */}
-        <motion.div
-          className="mb-12 text-center lg:mb-16"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-150px" }}
-          transition={{ duration: 1.1, ease: EASE }}
-        >
-          <h2 className="font-serif text-5xl font-black tracking-[0.15em] text-text-light sm:text-6xl lg:text-7xl">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
-            {t("titleJa")}
-          </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
-        </motion.div>
-
-        {/* リード文プローズ。
-            単独セクションだった頃のキッカー "ABOUT THE FACILITY" と縦書きスパイン
-            「施設について」は、いずれもセクション見出し(FACILITY / 施設・設備)と
-            同じことを言うため描画しない。ラベルを外すとヘアラインだけが意味を失うので
-            スパインごと除去した。本文の文言は SEO 実験中のため一字も変えていない。 */}
+        {/* 章開き + リード文プローズ。
+            リード文の冒頭は「THE PICKLE BANG THEORY は…」という自己紹介文なので、
+            その直前に施設名を名乗る大見出し(旧 FACILITY / 施設・設備)を置くと同じことを
+            二度言うことになる。章の始まりは大きな声ではなく、極小ラベル + ヘアライン +
+            余白という静かな印で示す。黄色のアクセントバーは大見出しの付属物だったので
+            持ち込まない。旧・単独セクション時代の縦書きスパインも復活させない。
+            本文の文言は SEO 実験中のため一字も変えていない。 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-120px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
+          {/* 見出しの実体は保ったまま級数だけ落とす（sr-only の飾り見出しにはしない）。
+              施設概要の英字キッカーと同じトーン。和文なのでトラッキングは一段緩める。 */}
+          <h2 className="text-[10px] tracking-[0.2em] text-text-gray">
+            {t("sectionLabel")}
+          </h2>
+          <div className="mt-3 h-px w-10 bg-text-gray/30" />
           {/* 大きい文字ほど行間は詰める。モバイルの 1.9 は行間が空きすぎて縦に伸びていた。 */}
-          <p className="max-w-3xl text-lg font-medium leading-[1.5] text-text-light sm:text-2xl sm:leading-[1.7]">
+          <p className="mt-6 max-w-3xl text-xl font-medium leading-[1.5] text-text-light sm:mt-8 sm:text-2xl sm:leading-[1.7]">
             {tLead.rich("deck", RICH_TAGS)}
           </p>
           {/* 本文もモバイルは行間と段落間を詰める。行送りを詰めた分、段落間も同じ比率で縮める。 */}

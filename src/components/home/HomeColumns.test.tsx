@@ -78,6 +78,22 @@ describe("HomeColumns", () => {
     isCmsColumnsEnabledMock.mockReturnValue(true);
   });
 
+  it("下パディングを章の縦リズムに揃える（上は前セクションと一体で読ませるため詰めたまま）", async () => {
+    getColumnsListMock.mockResolvedValueOnce({
+      contents: [makeParsedColumnItem({ id: "c1", slug: "c-1" })],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+
+    const { container } = await renderHomeColumns();
+
+    const className = container.querySelector("section")?.className ?? "";
+    expect(className).toContain("pb-16");
+    expect(className).toContain("lg:pb-24");
+    expect(className).not.toContain("lg:pb-32");
+  });
+
   it("CMSフラグOFFでは取得せず何も描画しない", async () => {
     isCmsColumnsEnabledMock.mockReturnValue(false);
 

@@ -15,6 +15,17 @@ describe("HomeConcept", () => {
     expect(section).toBeInTheDocument();
   });
 
+  it("章の縦リズム py-16 lg:py-24 を持つ（主要セクション共通）", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeConcept />
+      </NextIntlClientProvider>
+    );
+    const section = document.getElementById("concept");
+    expect(section?.className).toContain("py-16");
+    expect(section?.className).toContain("lg:py-24");
+  });
+
   it("CONCEPTタイトルを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

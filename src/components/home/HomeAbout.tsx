@@ -15,7 +15,7 @@ export default function HomeAbout() {
   return (
     <section
       id="about"
-      className="relative py-24 lg:py-32 overflow-hidden"
+      className="relative py-16 lg:py-24 overflow-hidden"
       style={{
         background: "linear-gradient(to bottom, #0d0d1a, #0A0A0A)",
       }}

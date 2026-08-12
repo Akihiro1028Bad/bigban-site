@@ -21,6 +21,17 @@ describe("HomeAccess", () => {
     expect(section).toBeInTheDocument();
   });
 
+  it("章の縦リズム py-16 lg:py-24 を持つ（主要セクション共通）", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeAccess />
+      </NextIntlClientProvider>
+    );
+    const section = document.getElementById("access");
+    expect(section?.className).toContain("py-16");
+    expect(section?.className).toContain("lg:py-24");
+  });
+
   it('iframe を表示する（title="THE PICKLE BANG THEORY 所在地"）', () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

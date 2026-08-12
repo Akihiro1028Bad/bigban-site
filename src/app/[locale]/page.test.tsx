@@ -161,26 +161,28 @@ describe("Home Page", () => {
     );
   });
 
-  it("HomeHero → HomeFacility → HomeLatestNews → HomeConcept の順に並べる", async () => {
+  it("HomeHero → HomeLatestNews → HomeFacility → HomeConcept の順に並べる", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
     render(element);
 
     const hero = screen.getByTestId("home-hero");
-    const facility = screen.getByTestId("home-facility");
     const latestNews = screen.getByTestId("home-latest-news");
+    const facility = screen.getByTestId("home-facility");
     const concept = screen.getByTestId("home-concept");
     expect(latestNews).toHaveAttribute("data-locale", "ja");
-    // 施設リード文が検索エンジンの最初に読む本文になるよう、他セクションより前に置く。
+    // 最新ニュース帯はヒーロー直下。見出しとリンク数行だけの短い帯なので、
+    // FACILITY が「最初に読まれる本文」である優位は保たれる。
     expect(
-      hero.compareDocumentPosition(facility) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      facility.compareDocumentPosition(latestNews) &
+      hero.compareDocumentPosition(latestNews) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      latestNews.compareDocumentPosition(concept) &
+      latestNews.compareDocumentPosition(facility) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      facility.compareDocumentPosition(concept) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });

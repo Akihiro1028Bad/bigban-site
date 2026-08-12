@@ -48,12 +48,70 @@ describe("HomeFacility", () => {
       );
     });
 
-    it("FACILITY タイトルと日本語サブタイトルを表示する", () => {
+    it("章の縦リズム py-16 lg:py-24 を持つ（主要セクション共通）", () => {
       renderJa();
-      expect(
-        screen.getByRole("heading", { level: 2, name: "FACILITY" })
-      ).toBeInTheDocument();
-      expect(screen.getByText("施設・設備")).toBeInTheDocument();
+      const className = document.getElementById("facility")?.className ?? "";
+      expect(className).toContain("py-16");
+      expect(className).toContain("lg:py-24");
+    });
+
+    it("大見出し FACILITY / 施設・設備 は描画しない", () => {
+      renderJa();
+      // このセクションの冒頭は自己紹介文（「THE PICKLE BANG THEORY は…」）。
+      // その直前に施設名を名乗る大見出しを置くと同じことを二度言うことになり、
+      // ヒーロー直後に巨大タイポが二連発する。章の始まりは静かな印で示す。
+      expect(screen.queryByText("FACILITY")).not.toBeInTheDocument();
+      expect(screen.queryByText("施設・設備")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("静かな章開き", () => {
+    it("章ラベル「施設について」を唯一の h2 として置く", () => {
+      const { container } = renderJa();
+      const headings2 = Array.from(container.querySelectorAll("h2"));
+      expect(headings2).toHaveLength(1);
+      expect(headings2[0]?.textContent).toBe("施設について");
+    });
+
+    it("章ラベルは極小のトーンで、大見出しの級数は使わない", () => {
+      const { container } = renderJa();
+      const label = container.querySelector("h2");
+      const classes = label?.className.split(/\s+/) ?? [];
+      // 施設概要の英字キッカーと同じ極小トーン。和文なのでトラッキングは一段緩める。
+      expect(classes).toContain("text-[10px]");
+      expect(classes).toContain("tracking-[0.2em]");
+      expect(classes).toContain("text-text-gray");
+      // 旧・大見出しのセリフ体巨大タイポは持ち込まない。
+      expect(label?.className).not.toContain("font-serif");
+      expect(label?.className).not.toContain("text-5xl");
+    });
+
+    it("章ラベルの直後に短いヘアラインを置く", () => {
+      const { container } = renderJa();
+      const hairline = container.querySelector("h2 + div");
+      const classes = hairline?.className.split(/\s+/) ?? [];
+      expect(classes).toContain("h-px");
+      expect(classes).toContain("w-10");
+    });
+
+    it("章開きに黄色のアクセントバーを置かない", () => {
+      const { container } = renderJa();
+      // bg-accent の帯は大見出しの付属物だった意匠。静かな章開きには持ち込まない。
+      const filled = Array.from(container.querySelectorAll("div")).filter(
+        (el) => el.className.split(/\s+/).includes("bg-accent")
+      );
+      expect(filled).toHaveLength(0);
+    });
+
+    it("章ラベル(h2)配下にゾーン・施設概要の h3 が続く", () => {
+      const { container } = renderJa();
+      const headings = Array.from(container.querySelectorAll("h2, h3"));
+      expect(headings[0]?.tagName).toBe("H2");
+      expect(headings.slice(1).map((h) => h.tagName)).toEqual([
+        "H3",
+        "H3",
+        "H3",
+      ]);
     });
   });
 
@@ -112,14 +170,10 @@ describe("HomeFacility", () => {
       expect(bodyParagraph).not.toBe(hyroxParagraph);
     });
 
-    it("縦書きスパインは描画しない（セクション見出しと重複するため）", () => {
+    it("縦書きスパインは描画しない（章ラベルが役目を引き継いだため）", () => {
       renderJa();
-      // 単独セクションだった頃の「施設について」は、統合後は見出し
-      // 「FACILITY / 施設・設備」と同じことを言うだけになった。
-      // ラベルを外すとヘアラインも意味を失うため、スパインごと除去している。
-      expect(
-        screen.queryByText(jaMessages.HomeLead.sideLabel)
-      ).not.toBeInTheDocument();
+      // 単独セクションだった頃の縦書きスパイン「施設について」は、
+      // 章開きの水平ラベル(h2)+ヘアラインに置き換わった。縦書きは残さない。
       expect(
         document.querySelector('#facility [style*="vertical-rl"]')
       ).toBeNull();
@@ -339,6 +393,12 @@ describe("HomeFacility", () => {
       expect(section?.textContent).toContain(
         plainText(enMessages.HomeLead.deck)
       );
+      expect(
+        screen.getByRole("heading", {
+          level: 2,
+          name: enMessages.HomeFacility.sectionLabel,
+        })
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("heading", {
           level: 3,

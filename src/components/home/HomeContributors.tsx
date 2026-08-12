@@ -24,7 +24,7 @@ export default function HomeContributors() {
 
   return (
     <section className="bg-deep-black text-text-light">
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-12 lg:py-16">
+      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-12 lg:py-24">
         <motion.div
           className="max-w-2xl border-t border-text-gray/20 pt-10"
           initial={{ opacity: 0, y: 20 }}

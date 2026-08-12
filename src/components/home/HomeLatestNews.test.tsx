@@ -62,6 +62,22 @@ describe("HomeLatestNews", () => {
     isCmsNewsEnabledMock.mockReturnValue(true);
   });
 
+  it("ヒーロー直下に置く帯として内側に py-8 lg:py-10 を持つ", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [makeParsedNewsItem({ id: "a", slug: "a" })],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+
+    const { container } = await renderHomeLatestNews();
+
+    // ヒーロー画像の下端に直接接する帯なので、元の py-6 lg:py-8 では窮屈になる。
+    const inner = container.querySelector("section > .max-w-7xl");
+    expect(inner?.className).toContain("py-8");
+    expect(inner?.className).toContain("lg:py-10");
+  });
+
   it("CMSフラグOFFでは取得せず何も描画しない", async () => {
     isCmsNewsEnabledMock.mockReturnValue(false);
 

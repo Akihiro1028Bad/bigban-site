@@ -279,7 +279,7 @@
     "titleJa": "コンセプト"
   },
   "HomeFacility": {
-    "title": "FACILITY",
+    "sectionLabel": "施設について",
     "zones": {
       "court": {
         "titleEn": "PICKLEBALL COURT",
@@ -323,8 +323,7 @@
         "value": "無人対応"
       }
     },
-    "reserveCta": "コートを予約する",
-    "titleJa": "施設・設備"
+    "reserveCta": "コートを予約する"
   },
   "HomeServices": {
     "title": "SERVICES",
