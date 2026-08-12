@@ -336,6 +336,24 @@ describe("MobileMenu", () => {
     }
   });
 
+  // --- 予約CTA直上の営業時間 ---
+
+  it("予約CTAの直上に営業時間を添える", () => {
+    renderMenu();
+    const hours = screen.getByText("営業時間 6:00–23:00");
+    const reserve = screen.getByRole("link", { name: /RESERVE/ });
+    // 予約を押す直前に開いている時間が目に入るよう、CTA より前に置く。
+    expect(
+      hours.compareDocumentPosition(reserve) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(hours.className).toContain("text-text-gray");
+  });
+
+  it("英語ロケールでは営業時間も英語表記にする", () => {
+    renderMenu({ locale: "en", isJa: false });
+    expect(screen.getByText("OPEN DAILY 6:00–23:00")).toBeInTheDocument();
+  });
+
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---
 
   function panelFocusables(): HTMLElement[] {
