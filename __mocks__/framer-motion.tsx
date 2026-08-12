@@ -64,11 +64,24 @@ function MotionConfig({
 }
 
 function useScroll() {
-  return { scrollY: { get: () => 0 } };
+  return { scrollY: { get: () => 0 }, scrollYProgress: { get: () => 0 } };
 }
 
-function useTransform(_value: unknown, _input: unknown, output: unknown[]) {
-  return output[0];
+/**
+ * 実 API と同じ 2 形態をサポートする。
+ *  - useTransform(value, input[], output[]) → output の先頭を返す
+ *  - useTransform(value, (latest) => ...)   → 進捗 0 の変換結果を返す
+ */
+function useTransform(
+  value: unknown,
+  inputOrTransformer: unknown,
+  output?: unknown[]
+) {
+  if (typeof inputOrTransformer === "function") {
+    const latest = (value as { get?: () => unknown })?.get?.() ?? 0;
+    return (inputOrTransformer as (latest: unknown) => unknown)(latest);
+  }
+  return output?.[0];
 }
 
 let mockUseInViewValue = false;

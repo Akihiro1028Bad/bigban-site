@@ -50,6 +50,11 @@ vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeContributors", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
+vi.mock("@/components/SectionArcDivider", () => ({
+  default: ({ variant = "apex" }: { variant?: string }) => (
+    <div data-testid="section-arc-divider" data-variant={variant} />
+  ),
+}));
 
 describe("Home generateMetadata", () => {
   beforeEach(() => {
@@ -204,6 +209,42 @@ describe("Home Page", () => {
       usageFlow.compareDocumentPosition(pricing) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("弧の区切りは主要セクションの境界 4 箇所だけに置き、山なりと落下を交互にする", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const dividers = screen.getAllByTestId("section-arc-divider");
+    // 全境界に入れると弧がうるさくなるので、章の切り替わりだけに絞る。
+    expect(dividers).toHaveLength(4);
+    expect(dividers.map((d) => d.getAttribute("data-variant"))).toEqual([
+      "apex",
+      "descent",
+      "apex",
+      "descent",
+    ]);
+  });
+
+  it("弧の区切りを FACILITY→CONCEPT / SERVICES→FLOW / PRICING の後ろへ挿入する", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const [first, second, third] = screen.getAllByTestId("section-arc-divider");
+    const isBefore = (a: Element, b: Element) =>
+      Boolean(
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+
+    expect(isBefore(screen.getByTestId("home-facility"), first)).toBe(true);
+    expect(isBefore(first, screen.getByTestId("home-concept"))).toBe(true);
+
+    expect(isBefore(screen.getByTestId("home-services"), second)).toBe(true);
+    expect(isBefore(second, screen.getByTestId("home-usage-flow"))).toBe(true);
+
+    expect(isBefore(screen.getByTestId("home-pricing"), third)).toBe(true);
   });
 
   it("不正 locale で notFound", async () => {

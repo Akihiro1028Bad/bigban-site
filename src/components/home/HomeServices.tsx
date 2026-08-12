@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
 import { Link } from "@/i18n/navigation";
+import SectionUnderline from "@/components/SectionUnderline";
 import { EASE } from "@/constants/motion";
 import { RESERVE_PATH, reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
@@ -231,7 +232,7 @@ export default function HomeServices() {
           <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <SectionUnderline />
         </motion.div>
 
         <GroupHeading

@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { NewsCard } from "@/components/news/NewsCard";
+import SectionUnderline from "@/components/SectionUnderline";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
 import { getNewsList } from "@/lib/microcms/queries";
@@ -46,7 +47,7 @@ export default async function HomeNews({ locale }: HomeNewsProps) {
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <SectionUnderline />
           <p className="mt-6 text-sm sm:text-base text-text-gray">
             {t("subtitle")}
           </p>

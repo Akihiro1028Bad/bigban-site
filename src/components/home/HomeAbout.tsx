@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import SectionUnderline from "@/components/SectionUnderline";
 import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
@@ -51,7 +52,7 @@ export default function HomeAbout() {
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <SectionUnderline />
         </motion.div>
 
         {/* Photo + Text layout */}

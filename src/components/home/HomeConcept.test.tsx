@@ -26,6 +26,20 @@ describe("HomeConcept", () => {
     expect(section?.className).toContain("lg:py-24");
   });
 
+  it("見出し下線は画面内で中央から伸びる SectionUnderline に置き換わっている", () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeConcept />
+      </NextIntlClientProvider>
+    );
+    // 色・太さ・幅は据え置き、scaleX の起点だけ中央に付く。
+    const underline = container.querySelector(".w-14");
+    const classes = underline?.className.split(/\s+/) ?? [];
+    expect(classes).toContain("bg-accent");
+    expect(classes).toContain("h-[3px]");
+    expect(classes).toContain("origin-center");
+  });
+
   it("CONCEPTタイトルを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
