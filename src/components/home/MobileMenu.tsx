@@ -66,6 +66,27 @@ function getFocusableElements(): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
 }
 
+// CONCEPT セクションの星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
+const NEBULA_GLOW = "rgba(48, 110, 195, 0.18)";
+
+/**
+ * 夜空の粒。パネルを「サイトの宇宙の続き」として見せるための静かな点。
+ * またたかせず、濃さだけを散らして奥行きを出す(項目の可読性を優先)。
+ */
+const STARS = [
+  { top: "5%", left: "13%", size: 1.5, opacity: 0.45 },
+  { top: "12%", left: "64%", size: 1, opacity: 0.28 },
+  { top: "20%", left: "33%", size: 1, opacity: 0.22 },
+  { top: "28%", left: "84%", size: 1.5, opacity: 0.35 },
+  { top: "37%", left: "19%", size: 1, opacity: 0.24 },
+  { top: "46%", left: "70%", size: 1, opacity: 0.3 },
+  { top: "55%", left: "44%", size: 1.5, opacity: 0.26 },
+  { top: "63%", left: "88%", size: 1, opacity: 0.34 },
+  { top: "72%", left: "25%", size: 1, opacity: 0.2 },
+  { top: "81%", left: "60%", size: 1.5, opacity: 0.38 },
+  { top: "91%", left: "16%", size: 1, opacity: 0.25 },
+] as const;
+
 const LIST_VARIANTS = {
   hidden: {},
   show: { transition: { staggerChildren: 0.045, delayChildren: 0.18 } },
@@ -167,10 +188,32 @@ export default function MobileMenu({
             }}
             className="relative flex h-full w-[86%] max-w-sm flex-col overflow-y-auto border-l border-white/10 bg-deep-black/80 backdrop-blur-2xl"
           >
-            {/* 右上のアクセントグロー */}
+            {/* 夜空の粒（装飾） */}
             <div
               aria-hidden
-              className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/15 blur-3xl"
+              data-mobile-menu-stars="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+            >
+              {STARS.map((star) => (
+                <span
+                  key={`${star.top}-${star.left}`}
+                  className="absolute rounded-full bg-white"
+                  style={{
+                    top: star.top,
+                    left: star.left,
+                    width: `${star.size}px`,
+                    height: `${star.size}px`,
+                    opacity: star.opacity,
+                  }}
+                />
+              ))}
+            </div>
+            {/* 右上の星雲グロー（装飾） */}
+            <div
+              aria-hidden
+              data-mobile-menu-glow="true"
+              className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl"
+              style={{ background: NEBULA_GLOW }}
             />
             {/* スワイプで閉じるヒント（左端のつまみ） */}
             <div
