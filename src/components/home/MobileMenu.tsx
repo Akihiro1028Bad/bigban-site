@@ -237,7 +237,7 @@ export default function MobileMenu({
               variants={LIST_VARIANTS}
               initial="hidden"
               animate="show"
-              className="relative flex flex-1 flex-col gap-0.5 px-3 py-3"
+              className="relative flex flex-1 flex-col divide-y divide-white/10 px-3 py-3"
             >
               {navItems.map((nav) => {
                 const jaKey = `${nav.id}Ja`;
@@ -248,7 +248,7 @@ export default function MobileMenu({
                     <NavItemLink
                       item={nav}
                       onLinkClick={onLinkClick}
-                      className="group relative flex items-center justify-between overflow-hidden rounded-md px-4 py-3.5"
+                      className="group relative flex items-center justify-between overflow-hidden rounded-md px-4 py-3.5 active:bg-white/5"
                     >
                       {/* ホバー/アクティブの塗りバー */}
                       <span
