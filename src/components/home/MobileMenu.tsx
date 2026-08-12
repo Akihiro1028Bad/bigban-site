@@ -310,6 +310,10 @@ export default function MobileMenu({
             </div>
 
             <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-3">
+              {/* 予約を押す直前に、開いている時間を静かに添える */}
+              <p className="mb-2.5 text-center text-[11px] tracking-[0.18em] text-text-gray">
+                {t("menuHours")}
+              </p>
               <Link
                 href={reserveHref}
                 onClick={() => {
