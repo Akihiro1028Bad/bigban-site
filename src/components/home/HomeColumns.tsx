@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { ColumnCard } from "@/components/columns/ColumnCard";
+import SectionUnderline from "@/components/SectionUnderline";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { getColumnsList } from "@/lib/microcms/columnsQueries";
 import type { ColumnItem } from "@/lib/microcms/columnsSchema";
@@ -45,7 +46,7 @@ export default async function HomeColumns({ locale }: HomeColumnsProps) {
           <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
             {t("titleJa")}
           </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <SectionUnderline />
           <p className="mt-6 text-sm sm:text-base text-text-gray">
             {t("subtitle")}
           </p>
