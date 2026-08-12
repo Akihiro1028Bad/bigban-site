@@ -272,6 +272,44 @@ describe("MobileMenu", () => {
     ).toBeInTheDocument();
   });
 
+  // --- 夜空の続きとしてのパネル ---
+
+  it("右上のグローはブランドブルーの星雲にし、黄色(accent)で光らせない", () => {
+    renderMenu();
+    const glow = document.querySelector<HTMLElement>('[data-mobile-menu-glow="true"]');
+    expect(glow).not.toBeNull();
+    // CONCEPT の星雲と同じ色言語(#306EC3)。黄色は動くものと CTA だけに残す。
+    expect(glow?.style.background).toMatch(/48,\s*110,\s*195/);
+    const panel = document.querySelector('[data-mobile-menu-panel="true"]');
+    expect(panel?.querySelector('[class*="bg-accent/"]')).toBeNull();
+  });
+
+  it("グローと星は装飾なので支援技術から隠し、操作も妨げない", () => {
+    renderMenu();
+    for (const selector of ['[data-mobile-menu-glow="true"]', '[data-mobile-menu-stars="true"]']) {
+      const layer = document.querySelector<HTMLElement>(selector);
+      expect(layer).not.toBeNull();
+      expect(layer).toHaveAttribute("aria-hidden", "true");
+      expect(layer?.className).toContain("pointer-events-none");
+    }
+  });
+
+  it("パネルにうっすら星を敷くが、またたかせない", () => {
+    renderMenu();
+    const stars = document.querySelector<HTMLElement>('[data-mobile-menu-stars="true"]');
+    const dots = Array.from(stars?.children ?? []) as HTMLElement[];
+    expect(dots.length).toBeGreaterThanOrEqual(8);
+    for (const dot of dots) {
+      // 演出は控えめに。またたきアニメは持たせない。
+      expect(dot.className).not.toMatch(/animate-|transition/);
+      const opacity = Number(dot.style.opacity);
+      expect(opacity).toBeGreaterThan(0);
+      expect(opacity).toBeLessThanOrEqual(0.5);
+    }
+    // 一様な明るさに並べず、粒ごとに濃さを散らす。
+    expect(new Set(dots.map((dot) => dot.style.opacity)).size).toBeGreaterThan(1);
+  });
+
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---
 
   function panelFocusables(): HTMLElement[] {
