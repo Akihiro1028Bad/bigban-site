@@ -30,15 +30,11 @@ describe("SectionArcDivider", () => {
     );
   });
 
-  it("SVG は非等比に引き伸ばして区切り帯いっぱいに弧を通す", () => {
+  it("SVG は非等比に引き伸ばしつつ、弧の線幅は太らせない", () => {
     const { container } = render(<SectionArcDivider />);
     const svg = container.querySelector("svg");
     expect(svg).toHaveAttribute("viewBox", "0 0 100 100");
     expect(svg).toHaveAttribute("preserveAspectRatio", "none");
-  });
-
-  it("弧は引き伸ばしても線幅が太らない（non-scaling-stroke）", () => {
-    const { container } = render(<SectionArcDivider />);
     for (const path of container.querySelectorAll("path")) {
       expect(path).toHaveAttribute("vector-effect", "non-scaling-stroke");
     }
@@ -69,16 +65,12 @@ describe("SectionArcDivider", () => {
     expect(star.style.top).toBe(`${apex.y}%`);
   });
 
-  it("装飾なので支援技術には露出せず、クリックも奪わない", () => {
+  it("装飾レイヤーとして、支援技術・クリック・横スクロールのいずれも邪魔しない", () => {
     const { container } = render(<SectionArcDivider />);
     const root = container.firstElementChild as HTMLElement;
     expect(root).toHaveAttribute("aria-hidden");
     expect(root.className).toContain("pointer-events-none");
-  });
-
-  it("横スクロールを起こさないよう区切り帯の外へはみ出さない", () => {
-    const { container } = render(<SectionArcDivider />);
-    const root = container.firstElementChild as HTMLElement;
+    // 帯からはみ出した光点が横スクロールを生まないよう切り落とす。
     expect(root.className.split(/\s+/)).toContain("overflow-hidden");
   });
 });
