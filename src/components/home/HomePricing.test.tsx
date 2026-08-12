@@ -168,6 +168,39 @@ describe("HomePricing", () => {
     );
   });
 
+  it("PBT CLUB 会員価格を料金表に表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    // 3行 × 平日/週末の6セルすべてに「PBT CLUB会員」ラベル付きの価格が並ぶ。
+    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(6);
+    expect(screen.getByText("¥3,500")).toBeInTheDocument();
+    expect(screen.getByText("¥4,200")).toBeInTheDocument();
+    expect(screen.getAllByText("¥5,600")).toHaveLength(4);
+  });
+
+  it("PBT CLUB 詳細リンククリックで home_pricing_pbt_club を計測する", async () => {
+    trackCtaClick.mockClear();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const link = screen.getByRole("link", {
+      name: /PBT CLUBについて詳しく見る/,
+    });
+    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    link.addEventListener("click", (event) => event.preventDefault());
+    await userEvent.click(link);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "home_pricing_pbt_club",
+      "pbt-club"
+    );
+  });
+
   it("貸切・法人利用のお問い合わせリンクは維持される", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
