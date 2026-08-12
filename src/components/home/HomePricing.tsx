@@ -50,7 +50,7 @@ export default function HomePricing() {
         </motion.div>
 
         {/* Court Rental Table */}
-        <CourtPriceTable />
+        <CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />
 
         {/* Footer notes */}
         <motion.div

@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import HyroxProgram from "./HyroxProgram";
+
+const trackCtaClick = vi.fn();
+vi.mock("@/lib/analytics/trackEvent", () => ({
+  trackCtaClick: (...args: unknown[]) => trackCtaClick(...args),
+}));
 
 describe("HyroxProgram", () => {
   it("PROGRAM 見出しを表示する", () => {
@@ -27,10 +33,38 @@ describe("HyroxProgram", () => {
     expect(screen.getByText(/\+¥1,000/)).toBeInTheDocument();
   });
 
-  it("旧料金（¥3,500／¥4,000／90分）は表示しない", () => {
+  it("旧料金（¥4,000／90分）は表示しない", () => {
     renderWithIntl(<HyroxProgram />);
-    expect(screen.queryByText("¥3,500")).not.toBeInTheDocument();
     expect(screen.queryByText("¥4,000")).not.toBeInTheDocument();
     expect(screen.queryByText("90分")).not.toBeInTheDocument();
+  });
+
+  it("¥3,500 は旧料金ではなく PBT CLUB 会員価格としてのみ表示する", () => {
+    renderWithIntl(<HyroxProgram />);
+    const amount = screen.getByText("¥3,500");
+    expect(amount.parentElement?.textContent).toContain("PBT CLUB会員");
+  });
+
+  it("ピックルと同じ PBT CLUB 会員価格を表示する", () => {
+    renderWithIntl(<HyroxProgram />);
+    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(6);
+    expect(screen.getByText("¥4,200")).toBeInTheDocument();
+    expect(screen.getAllByText("¥5,600")).toHaveLength(4);
+  });
+
+  it("PBT CLUB 詳細リンククリックで hyrox_program_pbt_club を計測する", async () => {
+    trackCtaClick.mockClear();
+    renderWithIntl(<HyroxProgram />);
+    const link = screen.getByRole("link", {
+      name: /PBT CLUBについて詳しく見る/,
+    });
+    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    link.addEventListener("click", (event) => event.preventDefault());
+    await userEvent.click(link);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "contentClick",
+      "hyrox_program_pbt_club",
+      "pbt-club"
+    );
   });
 });
