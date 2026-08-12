@@ -116,6 +116,15 @@ describe("HomeHero", () => {
     );
   });
 
+  it("写真の覆いを左→右のグラデーションにして右側の写真を活かす", () => {
+    const { container } = renderWithProvider(<HomeHero />);
+    const overlay = container.querySelector(".bg-gradient-to-r");
+    expect(overlay?.className).toContain("from-black/85");
+    // モバイルは縦構図でコピーが右側まで伸びるため、右端を暗いまま残す。
+    expect(overlay?.className).toContain("to-black/45");
+    expect(overlay?.className).toContain("md:to-black/30");
+  });
+
   it("ヘッダー＋バナー分のパディングが設定されている", () => {
     const { container } = renderWithProvider(<HomeHero />);
     const section = container.querySelector("section");

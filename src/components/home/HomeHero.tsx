@@ -50,7 +50,9 @@ export default function HomeHero() {
             className="absolute inset-0 h-full w-full object-cover object-center"
           />
         </picture>
-        <div className="absolute inset-0 bg-black/50" />
+        {/* 左端はコピーの可読性を優先して濃く、右へ向かって薄めて写真を活かす。
+            モバイルは縦構図でコピーが右側まで伸びるため、右端を暗いまま残す。 */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/45 md:via-black/60 md:to-black/30" />
 
         {/* Blue ambient glow */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
