@@ -61,9 +61,9 @@ describe("HomeHero", () => {
     ).toBeInTheDocument();
   });
 
-  it("CTAボタン（RESERVE A COURT）が予約案内ページ(/reserve)にリンクする", () => {
+  it("CTAボタン（コートを予約する）が予約案内ページ(/reserve)にリンクする", () => {
     renderWithProvider(<HomeHero />);
-    const cta = screen.getByRole("link", { name: /RESERVE A COURT/ });
+    const cta = screen.getByRole("link", { name: "コートを予約する" });
     expect(cta).toBeInTheDocument();
     expect(cta).toHaveAttribute("href", "/reserve");
     expect(cta).not.toHaveAttribute("target", "_blank");
@@ -73,9 +73,15 @@ describe("HomeHero", () => {
     trackCtaClick.mockClear();
     renderWithProvider(<HomeHero />);
 
-    await userEvent.click(screen.getByRole("link", { name: /RESERVE A COURT/ }));
+    await userEvent.click(
+      screen.getByRole("link", { name: "コートを予約する" })
+    );
 
-    expect(trackCtaClick).toHaveBeenCalledWith("reserveEntry", "home_hero", "RESERVE A COURT");
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      "home_hero",
+      "コートを予約する"
+    );
   });
 
   it("スクロールインジケーター（SCROLL）を表示する", () => {
