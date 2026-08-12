@@ -59,6 +59,13 @@ html[data-browser="ios-safari"] .site-header-bg {
   -webkit-backdrop-filter: none;
 }
 
+/* セクション区切りの弧を流れる光点（流れ星）のグロー。
+   ハードコードした色ではなくアクセントトークンから作るので、パレット変更に追従する。 */
+.section-arc-star {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 90%, transparent))
+    drop-shadow(0 0 22px color-mix(in srgb, var(--color-accent) 35%, transparent));
+}
+
 /* Grain overlay */
 .grain-overlay::after {
   content: "";
