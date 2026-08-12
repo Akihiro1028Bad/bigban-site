@@ -310,6 +310,32 @@ describe("MobileMenu", () => {
     expect(new Set(dots.map((dot) => dot.style.opacity)).size).toBeGreaterThan(1);
   });
 
+  // --- 項目の区切りとタッチの手応え ---
+
+  it("ナビ項目の「間」だけにヘアラインを引く", () => {
+    renderMenu();
+    const nav = screen.getByRole("dialog").querySelector("nav");
+    // divide-y は項目間だけに線を置く(先頭の上・末尾の下には引かれない)。
+    expect(nav?.className).toContain("divide-y");
+    expect(nav?.className).toContain("divide-white/10");
+    const rows = Array.from(nav?.children ?? []) as HTMLElement[];
+    expect(rows.length).toBe(NAV.length);
+    for (const row of rows) {
+      // 項目側に個別の枠線を持たせない(先頭・末尾に線が出てしまう)。
+      expect(row.className).not.toMatch(/border-/);
+    }
+    // 隙間を空けるとヘアラインが宙に浮くため、行同士は詰めて並べる。
+    expect(nav?.className).not.toMatch(/gap-/);
+  });
+
+  it("タッチでも手応えが出るよう、各項目に押下時の背景変化を持たせる", () => {
+    renderMenu();
+    for (const item of NAV) {
+      // 塗りバーと矢印は hover 依存でタッチでは出ないため、active: を別に用意する。
+      expect(screen.getByRole("link", { name: item.name }).className).toContain("active:bg-white/5");
+    }
+  });
+
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---
 
   function panelFocusables(): HTMLElement[] {
