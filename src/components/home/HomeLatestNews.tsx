@@ -59,7 +59,7 @@ export default async function HomeLatestNews({
       aria-labelledby="home-latest-news-title"
       className="border-y border-text-gray/20 bg-deep-black text-text-light"
     >
-      <div className="mx-auto max-w-7xl px-6 py-6 lg:px-12 lg:py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 lg:px-12 lg:py-10">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2

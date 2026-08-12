@@ -79,12 +79,15 @@ export default async function Home({ params }: HomePageProps) {
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
         <HomeHero />
-        {/* 施設の説明（旧 HomeLead のリード文を内包）。検索エンジンが最初に読む
-            本文になるよう、他セクションより前に置く。 */}
-        <HomeFacility />
+        {/* 最新の動きを一目で伝える帯。見出しとリンク数行だけの短い帯なので、
+            ヒーロー直下に置いても下の FACILITY の本文としての優位は損なわない。 */}
         <Suspense fallback={null}>
           <HomeLatestNews locale={locale} />
         </Suspense>
+        {/* 施設の説明（旧 HomeLead のリード文を内包）。ヒーロー直下の最新ニュース帯を
+            除けば最初の本文であり、検索エンジンが最初に読む本文になるよう他の
+            解説セクションより前に置く。 */}
+        <HomeFacility />
         <HomeConcept />
         <HomeServices />
         <HomeUsageFlow />

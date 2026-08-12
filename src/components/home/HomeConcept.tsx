@@ -10,7 +10,7 @@ export default function HomeConcept() {
   const t = useTranslations("HomeConcept");
 
   return (
-    <section id="concept" className="bg-off-white text-text-dark py-24 lg:py-32">
+    <section id="concept" className="bg-off-white text-text-dark py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* Section Title */}
         <motion.div

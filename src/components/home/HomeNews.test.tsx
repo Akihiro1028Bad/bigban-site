@@ -87,6 +87,21 @@ describe("HomeNews", () => {
     isCmsNewsEnabledMock.mockReturnValue(true);
   });
 
+  it("下パディングを章の縦リズムに揃える（上は PRICING と一体で読ませるため詰めたまま）", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [makeItem("1", "n-1", "ニュース1")],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+    const { container } = await renderHomeNews("ja");
+
+    const className = container.querySelector("section")?.className ?? "";
+    expect(className).toContain("pb-16");
+    expect(className).toContain("lg:pb-24");
+    expect(className).not.toContain("lg:pb-32");
+  });
+
   it("CMS フラグ OFF のときは何も描画しない", async () => {
     isCmsNewsEnabledMock.mockReturnValue(false);
     const { container } = await renderHomeNews("ja");

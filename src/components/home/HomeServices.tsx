@@ -217,7 +217,7 @@ export default function HomeServices() {
     // 純黒 (#000) なので、わずかに浮くこの帯で「予約できるものの一覧」という
     // 章の切れ目を作る。サイト全体がダークパレットのため白帯にはしない。
     <section id="services" className="bg-off-white text-text-light">
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-12 lg:py-20">
+      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-12 lg:py-24">
         <motion.div
           className="mb-10 text-center lg:mb-14"
           initial={{ opacity: 0, y: 24 }}

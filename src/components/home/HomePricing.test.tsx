@@ -29,6 +29,21 @@ describe("HomePricing", () => {
     expect(section).toBeInTheDocument();
   });
 
+  it("下パディングを章の縦リズムに揃える（上は FLOW と一体で読ませるため詰めたまま）", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomePricing />
+      </NextIntlClientProvider>
+    );
+    const className = document.getElementById("pricing")?.className ?? "";
+    expect(className).toContain("pb-16");
+    expect(className).toContain("lg:pb-24");
+    expect(className).not.toContain("lg:pb-32");
+    // FLOW から続けて読ませる意図なので上は据え置き。
+    expect(className).toContain("pt-8");
+    expect(className).toContain("lg:pt-16");
+  });
+
   it("PRICINGタイトルを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

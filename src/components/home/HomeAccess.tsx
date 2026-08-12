@@ -18,7 +18,7 @@ export default function HomeAccess() {
   const t = useTranslations("HomeAccess");
 
   return (
-    <section id="access" className="bg-off-white text-text-dark py-24 lg:py-32">
+    <section id="access" className="bg-off-white text-text-dark py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         {/* Google Maps */}
         <motion.div

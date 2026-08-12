@@ -265,7 +265,7 @@
     "titleJa": "Concept"
   },
   "HomeFacility": {
-    "title": "FACILITY",
+    "sectionLabel": "About the Facility",
     "zones": {
       "court": {
         "titleEn": "PICKLEBALL COURT",
@@ -309,8 +309,7 @@
         "value": "Unmanned"
       }
     },
-    "reserveCta": "Book a court",
-    "titleJa": "Facility & Equipment"
+    "reserveCta": "Book a court"
   },
   "HomeServices": {
     "title": "SERVICES",
