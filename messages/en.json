@@ -353,6 +353,24 @@
     "noteShoes": "Non-marking sole shoes are required on court. Please bring your own — shoe rental is not available.",
     "titleJa": "Services & Plans"
   },
+  "HomeUsageFlow": {
+    "heading": "How to Use",
+    "headingEn": "HOW TO USE",
+    "steps": {
+      "reserve": {
+        "title": "Book Online",
+        "description": "Pick your date and time on our booking site. Courts are rented by the hour."
+      },
+      "visit": {
+        "title": "Walk Right In",
+        "description": "One minute on foot from Motoyawata Station. Just walk in at your booked time."
+      },
+      "play": {
+        "title": "Start Playing",
+        "description": "Bring shoes with non-marking soles. Rental paddles are available (¥500 each)."
+      }
+    }
+  },
   "HomePricing": {
     "title": "PRICING",
     "courtRental": "COURT RENTAL",
