@@ -266,59 +266,50 @@
   },
   "HomeFacility": {
     "title": "FACILITY",
-    "keyNumbers": {
-      "courts": {
-        "value": "3",
-        "labelEn": "COURTS",
-        "labelJa": "Pro-spec Courts"
+    "zones": {
+      "court": {
+        "titleEn": "PICKLEBALL COURT",
+        "titleJa": "Pickleball Courts",
+        "imageAlt": "Overview of three pro-spec DecoTurf pickleball courts",
+        "description": "Three pro-spec courts. The surface is DecoTurf, used at the world's largest pickleball tournaments, tennis Grand Slams, and the Olympics. It is known for consistent bounce and outstanding durability, and the layout can be changed to a single show court."
       },
+      "training": {
+        "titleEn": "HYROX TRAINING AREA",
+        "titleJa": "HYROX Training Area",
+        "imageAlt": "Training area equipped for the eight official HYROX stations",
+        "description": "An adjoining training area equipped for the eight official HYROX stations. It is on the same floor as the courts, so you can train and condition before or after play.",
+        "linkLabel": "Learn more about the HYROX area"
+      }
+    },
+    "info": {
+      "headingEn": "INFORMATION",
+      "heading": "Facility Information",
       "hours": {
-        "value": "6:00–23:00",
-        "labelEn": "HOURS",
-        "labelJa": "Operating Hours"
+        "label": "Hours",
+        "value": "6:00–23:00"
       },
-      "station": {
-        "value": "1 min",
-        "labelEn": "FROM STATION",
-        "labelJa": "1 Min Walk"
+      "access": {
+        "label": "Access",
+        "value": "1-minute walk from Motoyawata Station"
+      },
+      "environment": {
+        "label": "Environment",
+        "value": "All-weather indoor, fully air-conditioned"
+      },
+      "equipment": {
+        "label": "Amenities",
+        "value": "Lounge space / Separate changing rooms / Vending machines"
+      },
+      "rental": {
+        "label": "Rentals",
+        "value": "Paddles ¥500 each (up to 6 per court). Shoes are not available for rent."
+      },
+      "checkin": {
+        "label": "Check-in",
+        "value": "Unmanned"
       }
     },
-    "specs": {
-      "surface": {
-        "labelEn": "SURFACE",
-        "labelJa": "Hard Court DecoTurf",
-        "description": "High-performance surface used at the world's largest tournaments and the Olympics"
-      },
-      "type": {
-        "labelEn": "TYPE",
-        "labelJa": "All-Weather Indoor",
-        "description": "Climate-controlled for comfortable play year-round"
-      }
-    },
-    "features": {
-      "trainingArea": "Training Area",
-      "lounge": "Lounge Space",
-      "changingRooms": "Separate Changing Rooms",
-      "airConditioning": "Full Air Conditioning",
-      "vendingMachine": "Vending Machines",
-      "rentalEquipment": "Equipment Rental Available",
-      "unmannedCheckin": "Unmanned Check-in",
-      "showCourt": "Convertible to 1 Show Court"
-    },
-    "images": {
-      "court": "Pro-spec DecoTurf pickleball court",
-      "training": "Training area adjoining the pickleball courts"
-    },
-    "carousel": {
-      "regionLabel": "Facility images carousel",
-      "prev": "Previous image",
-      "next": "Next image",
-      "showImage": "Show image {index}: {alt}"
-    },
-    "decoturf": {
-      "title": "DecoTurf is a hard court surface used at the world's largest pickleball tournaments, tennis Grand Slams, and the Olympics. It delivers consistent bounce and outstanding durability for a world-class playing environment.",
-      "description": "At THE PICKLE BANG THEORY, we adopted DecoTurf in pursuit of an environment where players can seriously improve. We provide an authentic playing environment focused on skill development and competitive advancement."
-    },
+    "reserveCta": "Book a court",
     "titleJa": "Facility & Equipment"
   },
   "HomeServices": {
