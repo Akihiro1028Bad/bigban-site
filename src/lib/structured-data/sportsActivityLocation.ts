@@ -1,4 +1,11 @@
-import { SITE_URL, RESERVE_PATH } from "@/constants/site";
+import {
+  SITE_URL,
+  RESERVE_PATH,
+  INSTAGRAM_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  LABOLA_SHOP_URL,
+  TENNISBEAR_EVENTS_URL,
+} from "@/constants/site";
 
 export interface LocationFeatureSpecification {
   "@type": "LocationFeatureSpecification";
@@ -73,6 +80,15 @@ const DESCRIPTION =
 
 const SLOGAN = "小さなディンクから、大きなムーブメントへ。";
 
+// 施設の同一性シグナル。公式サイト・GBP・labola・テニスベアが同一実体である
+// ことを申告し、ナレッジパネル / ローカルパックでの実体解決を助ける。
+const SAME_AS = [
+  INSTAGRAM_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  LABOLA_SHOP_URL,
+  TENNISBEAR_EVENTS_URL,
+] as const;
+
 export function buildSportsActivityLocation(
   _locale: string
 ): SportsActivityLocationSchema {
@@ -117,7 +133,7 @@ export function buildSportsActivityLocation(
         closes: "23:00",
       },
     ],
-    sameAs: ["https://www.instagram.com/thepicklebangtheory"],
+    sameAs: [...SAME_AS],
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
     potentialAction: {
       "@type": "ReserveAction",

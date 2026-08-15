@@ -33,6 +33,10 @@ export const LABOLA_HYROX_URL = labolaCurrentWeekUrl("H Y R O X");
 export const LABOLA_SCHOOL_URL =
   "https://yoyaku.labola.jp/r/shop/3473/event/school/";
 
+// labola 店舗トップ。予約導線ではなく、構造化データ (sameAs) で
+// 施設の同一性を示す外部プロフィールとして参照する。
+export const LABOLA_SHOP_URL = `${LABOLA_SHOP_BASE}/`;
+
 // 内部予約案内ページのパス（next-intl Link 用）。予約カテゴリごとの labola 導線を案内する。
 export const RESERVE_PATH = "/reserve";
 
@@ -70,6 +74,11 @@ export function resolveCalendarTabKey(
 }
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
+
+// Google ビジネスプロフィール。短縮 URL (maps.app.goo.gl) はリダイレクトを
+// 挟むため、place ID (CID 0x549a3cfe8f3710f4) を 10 進展開した正規形を使う。
+export const GOOGLE_BUSINESS_PROFILE_URL =
+  "https://www.google.com/maps?cid=6096252109621498100";
 
 // 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。
 export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
