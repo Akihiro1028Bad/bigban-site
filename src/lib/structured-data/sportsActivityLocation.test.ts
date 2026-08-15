@@ -126,6 +126,20 @@ describe("buildSportsActivityLocation", () => {
     );
   });
 
+  it("sameAs にGBP・labola・テニスベアの外部プロフィールを束ねる", async () => {
+    const { buildSportsActivityLocation } = await import(
+      "./sportsActivityLocation"
+    );
+    const schema = buildSportsActivityLocation("ja");
+
+    expect(schema.sameAs).toEqual([
+      "https://www.instagram.com/thepicklebangtheory",
+      "https://www.google.com/maps?cid=6096252109621498100",
+      "https://yoyaku.labola.jp/r/shop/3473/",
+      "https://www.tennisbear.net/pickleball/circle/36659/events",
+    ]);
+  });
+
   it("parentOrganizationで運営会社と連結する", async () => {
     const { buildSportsActivityLocation } = await import(
       "./sportsActivityLocation"
