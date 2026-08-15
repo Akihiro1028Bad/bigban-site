@@ -79,11 +79,28 @@ describe("buildPageOpenGraph", () => {
     expect(og).not.toHaveProperty("modifiedTime");
   });
 
-  it('images:"file" は images キー自体を出さない', () => {
+  it("shouldUseFileImage は images キー自体を出さない", () => {
     // Next の mergeStaticMetadata は「ページが images を持たないとき」だけ
     // opengraph-image.tsx のファイル規約を適用する。記事アイキャッチを
     // 活かすため、キーごと出さない必要がある。
-    const og = buildPageOpenGraph({ ...base, locale: "ja", images: "file" });
+    const og = buildPageOpenGraph({
+      ...base,
+      locale: "ja",
+      shouldUseFileImage: true,
+    });
+    expect(og).not.toHaveProperty("images");
+  });
+
+  it("shouldUseFileImage と images は同時に渡せない (型で禁止)", () => {
+    // @ts-expect-error ファイル規約に委ねる指定と明示画像は両立しない。
+    // この呼び出しが型エラーでなくなったら判別ユニオンが壊れている
+    // (文字列センチネルに戻すと Next の画像型が string を含むため潰れる)。
+    const og = buildPageOpenGraph({
+      ...base,
+      locale: "ja",
+      shouldUseFileImage: true,
+      images: [{ url: "http://localhost:3000/x.jpg" }],
+    });
     expect(og).not.toHaveProperty("images");
   });
 });

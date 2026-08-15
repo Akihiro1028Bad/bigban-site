@@ -14,26 +14,82 @@ import { globSync, readFileSync } from "node:fs";
  */
 const PAGE_FILES = globSync("src/app/**/page.tsx").sort();
 
-function pagesMatching(pattern: RegExp): string[] {
-  return PAGE_FILES.filter((file) => pattern.test(readFileSync(file, "utf-8")));
+/**
+ * `openGraph:` / `meta.openGraph =` の右辺の先頭トークンを拾う。
+ * 先読みだけで書くと `\s*` のバックトラックで素通りするため、
+ * 右辺を捕捉して明示的に判定する。
+ */
+const OPEN_GRAPH_ASSIGNMENT = /openGraph\s*[:=]\s*([A-Za-z_$][\w$]*\s*\(|\{)/g;
+
+/** ヘルパを通さず openGraph を組み立てていれば true。 */
+function hasDirectOpenGraph(src: string): boolean {
+  return [...src.matchAll(OPEN_GRAPH_ASSIGNMENT)].some(
+    (m) => !m[1].startsWith("buildPageOpenGraph"),
+  );
 }
+
+/** ページ側で twitter を組み立てていれば true。 */
+function hasPageTwitter(src: string): boolean {
+  return /twitter\s*[:=]\s*\{/.test(src);
+}
+
+function readPage(file: string): string {
+  return readFileSync(file, "utf-8");
+}
+
+describe("規約チェッカ自体の検出力", () => {
+  // 検出できない正規表現は無害に見えて全ページを素通りさせる。
+  // 実際に一度そのバグを踏んだため、検出側にもテストを置く。
+  it("プロパティ形の直書きを検出する", () => {
+    expect(hasDirectOpenGraph("  openGraph: {\n    type: 'website',\n  },")).toBe(
+      true,
+    );
+  });
+
+  it("代入形の直書きを検出する", () => {
+    expect(hasDirectOpenGraph("  meta.openGraph = { url };")).toBe(true);
+  });
+
+  it("別関数の戻り値を入れる形も検出する", () => {
+    expect(hasDirectOpenGraph("  openGraph: buildSomethingElse({}),")).toBe(
+      true,
+    );
+  });
+
+  it("buildPageOpenGraph 経由は検出しない", () => {
+    expect(hasDirectOpenGraph("  openGraph: buildPageOpenGraph({ url }),")).toBe(
+      false,
+    );
+    expect(
+      hasDirectOpenGraph("  meta.openGraph = buildPageOpenGraph({ url });"),
+    ).toBe(false);
+  });
+
+  it("twitter はプロパティ形・代入形の両方を検出する", () => {
+    expect(hasPageTwitter("  twitter: { card: 'x' },")).toBe(true);
+    expect(hasPageTwitter("  meta.twitter = { card: 'x' };")).toBe(true);
+    expect(hasPageTwitter("const TWITTER_URL = 'https://x.com';")).toBe(false);
+  });
+});
 
 describe("ページ側 openGraph の規約", () => {
   it("検査対象のページが存在する (glob が空振りしていない)", () => {
     expect(PAGE_FILES.length).toBeGreaterThan(0);
   });
 
-  it("openGraph をページで直接組み立てない (buildPageOpenGraph を使う)", () => {
+  it("openGraph は必ず buildPageOpenGraph の戻り値を入れる", () => {
     // 直接書くと type / siteName の再指定漏れと、title 明示による
     // og:title のブランド名落ちが再発する。
-    expect(pagesMatching(/^\s+openGraph: \{/m)).toEqual([]);
+    expect(PAGE_FILES.filter((f) => hasDirectOpenGraph(readPage(f)))).toEqual(
+      [],
+    );
   });
 
   it("generateMetadata を持つページは buildPageOpenGraph で openGraph を出す", () => {
     // 「直接書かない」だけだと openGraph を一切出さないページを見逃す。
     // その場合 layout の og には url が無いため og:url が欠落する。
     const missing = PAGE_FILES.filter((file) => {
-      const src = readFileSync(file, "utf-8");
+      const src = readPage(file);
       return (
         /export (?:async )?function generateMetadata/.test(src) &&
         !src.includes("buildPageOpenGraph")
@@ -45,6 +101,6 @@ describe("ページ側 openGraph の規約", () => {
   it("ページ側で twitter を設定しない", () => {
     // layout は twitter.images を意図的に未指定にしている (og:image への
     // 自動追従を止めないため)。ページ側で設定すると layout ごと置換される。
-    expect(pagesMatching(/^\s+twitter: \{/m)).toEqual([]);
+    expect(PAGE_FILES.filter((f) => hasPageTwitter(readPage(f)))).toEqual([]);
   });
 });
