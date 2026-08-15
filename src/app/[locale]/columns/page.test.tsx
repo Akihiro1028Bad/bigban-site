@@ -256,10 +256,21 @@ describe("ColumnsPage", () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "ja" }),
     });
-    expect(meta.openGraph?.title).toBe("コラム");
     expect(meta.openGraph?.url).toBe(`${SITE_URL}/columns`);
     expect(meta.openGraph?.locale).toBe("ja_JP");
     expect(meta.openGraph?.images).toEqual([OG_IMAGE]);
+  });
+
+  it("generateMetadata: openGraph に title/description を明示しない", async () => {
+    // 明示すると Next の inheritFromMetadata が働かず、og:title が
+    // template 適用前の裸のまま ("コラム") になりブランド名が落ちる。
+    // 未指定なら解決済み title ("コラム | THE PICKLE BANG THEORY") を継承する。
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(meta.openGraph).not.toHaveProperty("title");
+    expect(meta.openGraph).not.toHaveProperty("description");
   });
 
   it("generateMetadata: openGraph は layout 由来の type/siteName を落とさない", async () => {
@@ -280,7 +291,6 @@ describe("ColumnsPage", () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "en" }),
     });
-    expect(meta.openGraph?.title).toBe("Column");
     expect(meta.openGraph?.url).toBe(`${SITE_URL}/en/columns`);
     expect(meta.openGraph?.locale).toBe("en_US");
   });

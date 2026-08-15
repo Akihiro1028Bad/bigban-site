@@ -67,11 +67,12 @@ export async function generateMetadata({
     description,
     // ページ側の openGraph は layout の openGraph を「マージ」ではなく「置換」する。
     // type / siteName を再指定しないと og:type・og:site_name が消えるため明示する。
+    // 逆に title / description は明示しない。指定すると Next の継承
+    // (inheritFromMetadata) が止まり、og:title が template 適用前の裸の値に
+    // なってブランド名が落ちる。未指定なら解決済み title/description を継承する。
     openGraph: {
       type: "website",
       siteName: t("og.siteName"),
-      title,
-      description,
       url: canonicalUrl,
       locale: locale === "ja" ? "ja_JP" : "en_US",
       images: [OG_IMAGE],
