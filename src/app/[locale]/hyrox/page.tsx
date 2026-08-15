@@ -7,6 +7,7 @@ import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import { buildBreadcrumb, buildExerciseGym } from "@/lib/structured-data";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import HyroxContent from "./HyroxContent";
 
@@ -27,11 +28,10 @@ export async function generateMetadata({
     title: t("hyrox.title"),
     description: t("hyrox.description"),
     keywords,
-    openGraph: {
-      title: t("hyrox.title"),
-      description: t("hyrox.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
+      locale,
       images: [
         {
           url: `${SITE_URL}/images/hyrox/promo-card.jpg`,
@@ -40,11 +40,7 @@ export async function generateMetadata({
           alt: t("hyrox.title"),
         },
       ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [`${SITE_URL}/images/hyrox/promo-card.jpg`],
-    },
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

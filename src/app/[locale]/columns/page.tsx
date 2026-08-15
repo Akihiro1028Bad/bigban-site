@@ -10,9 +10,10 @@ import { ColumnCategoryTabs } from "@/components/columns/ColumnCategoryTabs";
 import { ColumnPagination } from "@/components/columns/ColumnPagination";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { COLUMN_PAGE_SIZE } from "@/constants/columns";
-import { OG_IMAGE, SITE_URL } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseLocale, routing } from "@/i18n/routing";
 import { columnsLabel } from "@/lib/columns/label";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnCategories,
   getColumnsList,
@@ -65,20 +66,11 @@ export async function generateMetadata({
   return {
     title,
     description,
-    // ページ側の openGraph は layout の openGraph を「マージ」ではなく「置換」する。
-    // type / siteName を再指定しないと og:type・og:site_name が消えるため明示する。
-    // 逆に title / description は明示しない。指定すると Next の継承
-    // (inheritFromMetadata) が止まり、og:title が template 適用前の裸の値に
-    // なってブランド名が落ちる。未指定なら解決済み title/description を継承する。
-    openGraph: {
-      type: "website",
+    openGraph: buildPageOpenGraph({
       siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
-    // twitter はあえて指定しない。layout が images 未指定で card だけを設定しており、
-    // ここで上書きすると twitter:image の og:image 追従が止まる。
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

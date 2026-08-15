@@ -17,7 +17,8 @@ import { parseLocale, routing } from "@/i18n/routing";
 import { getNewsList } from "@/lib/microcms/queries";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 // searchParams (?category=&page=) は generateStaticParams で静的生成された
 // ロケール別ページと矛盾するため、ページ全体を動的レンダリングに固定する。
@@ -51,6 +52,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Metadata" });
   const title = locale === "ja" ? "ニュース" : "News";
   const description =
     locale === "ja"
@@ -61,17 +63,11 @@ export async function generateMetadata({
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [OG_IMAGE.url],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {
