@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
+import { SITE_URL } from "@/constants/site";
+
 import { makeParsedColumnItem } from "../../../../../__mocks__/columns-fixtures";
 
 const getColumnDetailMock = vi.fn();
@@ -42,6 +44,18 @@ vi.mock("@/components/news/NewsBodyRenderer", () => ({
 vi.mock("@/components/news/PreviewBanner", () => ({
   PreviewBanner: () => <div data-testid="preview-banner" />,
 }));
+
+function readJsonLdAll(): Record<string, unknown>[] {
+  return Array.from(
+    document.querySelectorAll<HTMLScriptElement>(
+      'script[type="application/ld+json"]',
+    ),
+  ).map((s) => JSON.parse(s.textContent ?? "{}") as Record<string, unknown>);
+}
+
+function findJsonLd(type: string): Record<string, unknown> | undefined {
+  return readJsonLdAll().find((d) => d["@type"] === type);
+}
 
 async function renderPage(
   params: { locale: string; slug: string },
@@ -321,5 +335,70 @@ describe("ColumnDetailPage", () => {
       { contentId: "c-1", draftKey: "dk" },
     );
     expect(screen.getByText("公開版")).toBeInTheDocument();
+  });
+
+  it("公開版: Article JSON-LD を出力する (ja)", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "屋内の始め方" }),
+    );
+    await renderPage({ locale: "ja", slug: "x" });
+    const article = findJsonLd("Article");
+    expect(article).toBeDefined();
+    expect(article?.headline).toBe("屋内の始め方");
+    expect(article?.inLanguage).toBe("ja");
+    expect(article?.mainEntityOfPage).toEqual({
+      "@type": "WebPage",
+      "@id": `${SITE_URL}/columns/x`,
+    });
+  });
+
+  it("公開版: BreadcrumbList JSON-LD を出力する (ja)", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "屋内の始め方" }),
+    );
+    await renderPage({ locale: "ja", slug: "x" });
+    const bc = findJsonLd("BreadcrumbList");
+    expect(bc).toBeDefined();
+    const items = bc?.itemListElement as { name: string; item: string }[];
+    expect(items).toHaveLength(3);
+    expect(items[1]).toMatchObject({
+      name: "コラム",
+      item: `${SITE_URL}/columns`,
+    });
+    expect(items[2]).toMatchObject({
+      name: "屋内の始め方",
+      item: `${SITE_URL}/columns/x`,
+    });
+  });
+
+  it("公開版: en は JSON-LD の URL とラベルを英語側に切り替える", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "Indoor basics", locale: "en" }),
+    );
+    await renderPage({ locale: "en", slug: "x" });
+    expect(findJsonLd("Article")?.mainEntityOfPage).toEqual({
+      "@type": "WebPage",
+      "@id": `${SITE_URL}/en/columns/x`,
+    });
+    const items = findJsonLd("BreadcrumbList")?.itemListElement as {
+      name: string;
+      item: string;
+    }[];
+    expect(items[1]).toMatchObject({
+      name: "Column",
+      item: `${SITE_URL}/en/columns`,
+    });
+  });
+
+  it("プレビュー中は JSON-LD を出力しない (noindex と揃える)", async () => {
+    getColumnByContentIdMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "下書き", locale: "ja" }),
+    );
+    await renderPage(
+      { locale: "ja", slug: "x" },
+      { contentId: "c-1", draftKey: "dk" },
+    );
+    expect(screen.getByTestId("preview-banner")).toBeInTheDocument();
+    expect(readJsonLdAll()).toHaveLength(0);
   });
 });

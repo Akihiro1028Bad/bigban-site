@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
+import { OG_IMAGE, SITE_URL } from "@/constants/site";
+
 import {
   makeParsedColumnItem,
   makeParsedColumnCategory,
@@ -55,6 +57,13 @@ function listOf(items: ReturnType<typeof makeParsedColumnItem>[], total?: number
     offset: 0,
     limit: 12,
   };
+}
+
+function readJsonLd(): Record<string, unknown> {
+  const s = document.querySelector<HTMLScriptElement>(
+    'script[type="application/ld+json"]',
+  );
+  return JSON.parse(s?.textContent ?? "{}") as Record<string, unknown>;
 }
 
 async function renderPage(
@@ -211,5 +220,82 @@ describe("ColumnsPage", () => {
     expect(applyRootTitleTemplate(en.title)).toBe(
       "Column | THE PICKLE BANG THEORY",
     );
+  });
+
+  it("generateMetadata: ja は self canonical と hreflang を出力する", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/columns`);
+    expect(meta.alternates?.languages).toEqual({
+      ja: `${SITE_URL}/columns`,
+      en: `${SITE_URL}/en/columns`,
+      "x-default": `${SITE_URL}/columns`,
+    });
+  });
+
+  it("generateMetadata: en の canonical は /en/columns", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/en/columns`);
+  });
+
+  it("generateMetadata: openGraph にページ固有の title/url を出力する (ja)", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(meta.openGraph?.title).toBe("コラム");
+    expect(meta.openGraph?.url).toBe(`${SITE_URL}/columns`);
+    expect(meta.openGraph?.locale).toBe("ja_JP");
+    expect(meta.openGraph?.images).toEqual([OG_IMAGE]);
+  });
+
+  it("generateMetadata: openGraph は en で en_US と /en/columns", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    expect(meta.openGraph?.title).toBe("Column");
+    expect(meta.openGraph?.url).toBe(`${SITE_URL}/en/columns`);
+    expect(meta.openGraph?.locale).toBe("en_US");
+  });
+
+  it("generateMetadata: twitter は summary_large_image", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(meta.twitter?.card).toBe("summary_large_image");
+    expect(meta.twitter?.images).toEqual([OG_IMAGE.url]);
+  });
+
+  it("BreadcrumbList JSON-LD を出力する (ja)", async () => {
+    getColumnsListMock.mockResolvedValue(listOf([]));
+    await renderPage({ locale: "ja" });
+    const d = readJsonLd();
+    expect(d["@type"]).toBe("BreadcrumbList");
+    const items = d.itemListElement as { name: string; item: string }[];
+    expect(items).toHaveLength(2);
+    expect(items[1]).toMatchObject({
+      name: "コラム",
+      item: `${SITE_URL}/columns`,
+    });
+  });
+
+  it("BreadcrumbList JSON-LD は en でラベルとURLを切り替える", async () => {
+    getColumnsListMock.mockResolvedValue(listOf([]));
+    await renderPage({ locale: "en" });
+    const items = readJsonLd().itemListElement as {
+      name: string;
+      item: string;
+    }[];
+    expect(items[1]).toMatchObject({
+      name: "Column",
+      item: `${SITE_URL}/en/columns`,
+    });
   });
 });
