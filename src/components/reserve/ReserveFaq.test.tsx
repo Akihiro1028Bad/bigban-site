@@ -24,11 +24,29 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
-  it("コートレンタル料金の回答に HYROX エリアの同一料金を明記する", () => {
+  it("コートレンタル料金の回答に会員価格と HYROX エリアの同一料金を明記する", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。HYROXエリアの利用料も同額です（4名まで／5名目以降は1名につき+¥1,000）。",
+        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。月額¥10,000（税込）の会員制度「PBT CLUB」の会員価格なら ¥3,500〜¥5,600（月20時間まで）。HYROXエリアの利用料も同額です（4名まで／5名目以降は1名につき+¥1,000）。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("予約方法の回答が現行の4つの予約先を案内する", () => {
+    renderWithIntl(<ReserveFaq />);
+    expect(
+      screen.getByText(
+        "コート利用・イベント/スクール・HYROXエリア・レッスン/クラスの中から、ご利用内容に合うものをお選びください。日時の指定とお申し込みは、予約システムのページで行えます。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("支払い方法の回答がクレジットカードと PayPay を案内する", () => {
+    renderWithIntl(<ReserveFaq />);
+    expect(
+      screen.getByText(
+        "クレジットカード・PayPay がご利用いただけます。",
       ),
     ).toBeInTheDocument();
   });

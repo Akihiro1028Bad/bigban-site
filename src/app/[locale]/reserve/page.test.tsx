@@ -27,7 +27,12 @@ vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveChoice", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveCalendar", () => ({ default: () => null }));
-vi.mock("@/components/reserve/ReserveInfo", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveInfo", () => ({
+  default: () => <section data-testid="reserve-info" />,
+}));
+vi.mock("@/components/reserve/ReserveFaq", () => ({
+  default: () => <section data-testid="reserve-faq" />,
+}));
 
 function buildMockT() {
   return ((key: string) => `translated:${key}`) as unknown as (
@@ -110,6 +115,21 @@ describe("ReservePage", () => {
       "data-show-columns",
       "true",
     );
+  });
+
+  it("FAQ を ReserveInfo の後に掲出する", async () => {
+    const { default: ReservePage } = await import("./page");
+    const element = await ReservePage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
+    });
+    render(element);
+
+    const info = screen.getByTestId("reserve-info");
+    const faq = screen.getByTestId("reserve-faq");
+    expect(
+      info.compareDocumentPosition(faq) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("不正な locale で notFound により描画されない（throw する）", async () => {
