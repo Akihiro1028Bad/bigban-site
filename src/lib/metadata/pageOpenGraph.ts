@@ -11,8 +11,21 @@ interface PageOpenGraphOptions {
   url: string;
   /** アプリのロケール。og:locale へ変換する。 */
   locale: string;
-  /** 省略時は共通 OGP 画像。ページ固有画像があるときだけ渡す。 */
-  images?: OpenGraphImages;
+  /** 既定は "website"。記事面 (news / columns 詳細) は "article"。 */
+  type?: "website" | "article";
+  /** type="article" のときの公開日時 (ISO8601)。 */
+  publishedTime?: string;
+  /** type="article" のときの更新日時 (ISO8601)。 */
+  modifiedTime?: string;
+  /**
+   * 省略時は共通 OGP 画像。ページ固有画像があるときは配列を渡す。
+   *
+   * `"file"` を渡すと images キー自体を出力しない。Next の
+   * `mergeStaticMetadata` は「ページが images を持たないとき」だけ
+   * `opengraph-image.tsx` のファイル規約を適用するため、記事アイキャッチを
+   * og:image に出したい面ではキーごと出さない必要がある。
+   */
+  images?: OpenGraphImages | "file";
 }
 
 /**
@@ -36,13 +49,25 @@ export function buildPageOpenGraph({
   siteName,
   url,
   locale,
+  type = "website",
+  publishedTime,
+  modifiedTime,
   images,
 }: PageOpenGraphOptions): Metadata["openGraph"] {
-  return {
-    type: "website",
+  const base = {
     siteName,
     url,
     locale: locale === "ja" ? "ja_JP" : "en_US",
-    images: images ?? [OG_IMAGE],
+    // "file" のときはキーごと落とす (ファイル規約の画像を活かすため)。
+    ...(images === "file" ? {} : { images: images ?? [OG_IMAGE] }),
   };
+  if (type === "article") {
+    return {
+      ...base,
+      type,
+      ...(publishedTime ? { publishedTime } : {}),
+      ...(modifiedTime ? { modifiedTime } : {}),
+    };
+  }
+  return { ...base, type };
 }

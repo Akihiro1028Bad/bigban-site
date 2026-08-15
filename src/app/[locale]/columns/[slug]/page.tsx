@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 
 import HomeFooter from "@/components/home/HomeFooter";
@@ -18,6 +18,7 @@ import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
 import { columnsLabel } from "@/lib/columns/label";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnByContentId,
   getColumnDetail,
@@ -107,6 +108,19 @@ export async function generateMetadata({
   }
 
   // OGP: 公開版のみ (プレビューは noindex)。対向 locale が存在すれば alternates。
+  // images は渡さない ("file")。opengraph-image.tsx が記事アイキャッチを返すため、
+  // ここで images を持つとファイル規約が適用されず共通ロゴに退化する。
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+  meta.openGraph = buildPageOpenGraph({
+    siteName: t("og.siteName"),
+    url: buildColumnUrl(locale, slug),
+    locale,
+    type: "article",
+    publishedTime: item.publishedAt ?? item.createdAt,
+    modifiedTime: item.updatedAt,
+    images: "file",
+  });
+
   const otherLocale: Locale = locale === "ja" ? "en" : "ja";
   const other = await getColumnDetail({ locale: otherLocale, slug });
   meta.alternates = {
