@@ -37,7 +37,7 @@ describe("ReserveFaq", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "コート利用・イベント/スクール・HYROXエリア・レッスン/クラスの中から、ご利用内容に合うものをお選びください。日時の指定とお申し込みは、予約システムのページで行えます。",
+        "コート利用・イベント/スクール・HYROXエリア・レッスン/クラスの中から、ご利用内容に合うものをお選びください。お申し込みは、それぞれの予約ページで行えます。",
       ),
     ).toBeInTheDocument();
   });

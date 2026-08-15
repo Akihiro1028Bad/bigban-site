@@ -129,7 +129,7 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    paymentAccepted: "Cash, Credit Card",
+    paymentAccepted: "Credit Card, PayPay",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
     description: DESCRIPTION,

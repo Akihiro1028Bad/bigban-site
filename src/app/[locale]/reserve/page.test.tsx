@@ -22,7 +22,9 @@ vi.mock("@/components/home/HomeNavigation", () => ({
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: () => true,
 }));
-vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeFooter", () => ({
+  default: () => <footer data-testid="home-footer" />,
+}));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveChoice", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
@@ -127,8 +129,13 @@ describe("ReservePage", () => {
 
     const info = screen.getByTestId("reserve-info");
     const faq = screen.getByTestId("reserve-faq");
+    const footer = screen.getByTestId("home-footer");
     expect(
       info.compareDocumentPosition(faq) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // フッターより後ろへ落ちる回帰を防ぐため、前後どちらの境界も固定する。
+    expect(
+      faq.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
