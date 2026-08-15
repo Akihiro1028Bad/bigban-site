@@ -12,6 +12,7 @@ import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { COLUMN_PAGE_SIZE } from "@/constants/columns";
 import { OG_IMAGE, SITE_URL } from "@/constants/site";
 import { parseLocale, routing } from "@/i18n/routing";
+import { columnsLabel } from "@/lib/columns/label";
 import {
   getColumnCategories,
   getColumnsList,
@@ -41,11 +42,6 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
-/** コラム面のロケール別ラベル (メタ title と breadcrumb で共用)。 */
-function columnsLabel(locale: string): string {
-  return locale === "ja" ? "コラム" : "Column";
-}
-
 /** コラム一覧の絶対 URL。ja はロケールプレフィックス無し。 */
 function columnsIndexUrl(locale: string): string {
   return locale === "ja" ? `${SITE_URL}/columns` : `${SITE_URL}/en/columns`;
@@ -57,6 +53,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Metadata" });
   const title = columnsLabel(locale);
   const description =
     locale === "ja"
@@ -68,17 +65,19 @@ export async function generateMetadata({
   return {
     title,
     description,
+    // ページ側の openGraph は layout の openGraph を「マージ」ではなく「置換」する。
+    // type / siteName を再指定しないと og:type・og:site_name が消えるため明示する。
     openGraph: {
+      type: "website",
+      siteName: t("og.siteName"),
       title,
       description,
       url: canonicalUrl,
       locale: locale === "ja" ? "ja_JP" : "en_US",
       images: [OG_IMAGE],
     },
-    twitter: {
-      card: "summary_large_image",
-      images: [OG_IMAGE.url],
-    },
+    // twitter はあえて指定しない。layout が images 未指定で card だけを設定しており、
+    // ここで上書きすると twitter:image の og:image 追従が止まる。
     alternates: {
       canonical: canonicalUrl,
       languages: {

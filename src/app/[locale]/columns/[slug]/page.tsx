@@ -17,6 +17,7 @@ import {
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
+import { columnsLabel } from "@/lib/columns/label";
 import {
   getColumnByContentId,
   getColumnDetail,
@@ -163,7 +164,7 @@ export default async function ColumnDetailPage({
           />
           <StructuredData
             data={buildBreadcrumb(locale, [
-              { name: locale === "ja" ? "コラム" : "Column", path: "/columns" },
+              { name: columnsLabel(locale), path: "/columns" },
               { name: item.title, path: `/columns/${item.slug}` },
             ])}
           />

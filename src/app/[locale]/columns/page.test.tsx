@@ -42,7 +42,15 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 vi.mock("next-intl/server", () => ({
   setRequestLocale: vi.fn(),
-  getTranslations: async () => (k: string) => (k === "heading" ? "コラム" : k),
+  // 本文は getTranslations("Columns")、メタは
+  // getTranslations({ locale, namespace: "Metadata" }) を使うため呼び分ける。
+  getTranslations: async (arg?: unknown) => {
+    if (typeof arg === "object" && arg !== null) {
+      return (k: string) =>
+        k === "og.siteName" ? "THE PICKLE BANG THEORY" : k;
+    }
+    return (k: string) => (k === "heading" ? "コラム" : k);
+  },
 }));
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: isCmsColumnsEnabledMock,
@@ -254,6 +262,19 @@ describe("ColumnsPage", () => {
     expect(meta.openGraph?.images).toEqual([OG_IMAGE]);
   });
 
+  it("generateMetadata: openGraph は layout 由来の type/siteName を落とさない", async () => {
+    // ページ側 openGraph は layout の openGraph を「マージ」ではなく「置換」する。
+    // 再指定しないと og:type / og:site_name が消える。
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(meta.openGraph).toMatchObject({
+      type: "website",
+      siteName: "THE PICKLE BANG THEORY",
+    });
+  });
+
   it("generateMetadata: openGraph は en で en_US と /en/columns", async () => {
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({
@@ -264,15 +285,15 @@ describe("ColumnsPage", () => {
     expect(meta.openGraph?.locale).toBe("en_US");
   });
 
-  it("generateMetadata: twitter は summary_large_image", async () => {
+  it("generateMetadata: twitter はページ側で上書きしない (layout の設定を活かす)", async () => {
+    // layout は twitter.images を意図的に未指定にしている
+    // (og:image への自動追従を止めないため)。ページ側で twitter を
+    // 設定すると layout の twitter ごと置換され、その意図が壊れる。
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "ja" }),
     });
-    expect(meta.twitter).toMatchObject({
-      card: "summary_large_image",
-      images: [OG_IMAGE.url],
-    });
+    expect(meta.twitter).toBeUndefined();
   });
 
   it("BreadcrumbList JSON-LD を出力する (ja)", async () => {
