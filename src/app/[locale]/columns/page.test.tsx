@@ -269,8 +269,10 @@ describe("ColumnsPage", () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ locale: "ja" }),
     });
-    expect(meta.twitter?.card).toBe("summary_large_image");
-    expect(meta.twitter?.images).toEqual([OG_IMAGE.url]);
+    expect(meta.twitter).toMatchObject({
+      card: "summary_large_image",
+      images: [OG_IMAGE.url],
+    });
   });
 
   it("BreadcrumbList JSON-LD を出力する (ja)", async () => {

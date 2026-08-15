@@ -6,6 +6,8 @@ import type { Metadata } from "next";
 
 import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
+import StructuredData from "@/components/StructuredData";
+import { ArticleJsonLd } from "@/components/ArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
 import {
@@ -20,6 +22,7 @@ import {
   getColumnDetail,
   getColumnSlugs,
 } from "@/lib/microcms/columnsQueries";
+import { buildBreadcrumb } from "@/lib/structured-data";
 import type { ColumnItem } from "@/lib/microcms/columnsSchema";
 
 // 画面プレビュー (?draftKey=&contentId=) が searchParams を使うため、
@@ -149,6 +152,23 @@ export default async function ColumnDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
+      {/* 構造化データは公開版のみ。プレビューは noindex のため出力しない。 */}
+      {!previewItem && (
+        <>
+          <ArticleJsonLd
+            item={item}
+            locale={locale}
+            schemaType="Article"
+            pathSegment="columns"
+          />
+          <StructuredData
+            data={buildBreadcrumb(locale, [
+              { name: locale === "ja" ? "コラム" : "Column", path: "/columns" },
+              { name: item.title, path: `/columns/${item.slug}` },
+            ])}
+          />
+        </>
+      )}
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
