@@ -29,7 +29,11 @@ vi.mock("@/lib/microcms/columnsQueries", () => ({
 vi.mock("next/navigation", () => ({
   notFound: () => notFoundMock(),
 }));
-vi.mock("next-intl/server", () => ({ setRequestLocale: vi.fn() }));
+vi.mock("next-intl/server", () => ({
+  setRequestLocale: vi.fn(),
+  getTranslations: async () => (k: string) =>
+    k === "og.siteName" ? "THE PICKLE BANG THEORY" : k,
+}));
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: isCmsColumnsEnabledMock,
 }));
@@ -388,6 +392,72 @@ describe("ColumnDetailPage", () => {
       name: "Column",
       item: `${SITE_URL}/en/columns`,
     });
+  });
+
+  it("generateMetadata: 公開版は og:url と type=article を出す", async () => {
+    getColumnDetailMock.mockImplementation(async ({ locale }: { locale: string }) =>
+      locale === "ja"
+        ? makeParsedColumnItem({
+            slug: "x",
+            publishedAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-02T00:00:00.000Z",
+          })
+        : null,
+    );
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).toMatchObject({
+      type: "article",
+      url: `${SITE_URL}/columns/x`,
+      publishedTime: "2026-04-01T00:00:00.000Z",
+      modifiedTime: "2026-04-02T00:00:00.000Z",
+    });
+  });
+
+  it("generateMetadata: openGraph に images を出さない (記事アイキャッチを活かす)", async () => {
+    // images を持つと Next が opengraph-image.tsx のファイル規約を
+    // 適用しなくなり、og:image が共通ロゴに退化する。
+    getColumnDetailMock.mockResolvedValue(makeParsedColumnItem({ slug: "x" }));
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).not.toHaveProperty("images");
+  });
+
+  it("generateMetadata: publishedAt 無しは createdAt を publishedTime に使う", async () => {
+    const base = makeParsedColumnItem({
+      slug: "x",
+      createdAt: "2026-02-02T00:00:00.000Z",
+    });
+    const { publishedAt: _p, ...rest } = base;
+    void _p;
+    getColumnDetailMock.mockResolvedValue(rest);
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).toMatchObject({
+      publishedTime: "2026-02-02T00:00:00.000Z",
+    });
+  });
+
+  it("generateMetadata: プレビューは openGraph を出さない", async () => {
+    getColumnByContentIdMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", locale: "ja" }),
+    );
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({ contentId: "c-1", draftKey: "dk" }),
+    });
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(meta.openGraph).toBeUndefined();
   });
 
   it("プレビュー中は JSON-LD を出力しない (noindex と揃える)", async () => {

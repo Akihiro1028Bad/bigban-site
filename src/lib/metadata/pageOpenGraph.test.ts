@@ -51,4 +51,39 @@ describe("buildPageOpenGraph", () => {
       buildPageOpenGraph({ ...base, locale: "ja", images: custom })?.images,
     ).toEqual(custom);
   });
+
+  it("type 未指定は website", () => {
+    expect(buildPageOpenGraph({ ...base, locale: "ja" })).toMatchObject({
+      type: "website",
+    });
+  });
+
+  it("記事面は type=article と日時を出せる", () => {
+    const og = buildPageOpenGraph({
+      ...base,
+      locale: "ja",
+      type: "article",
+      publishedTime: "2026-04-01T00:00:00.000Z",
+      modifiedTime: "2026-04-02T00:00:00.000Z",
+    });
+    expect(og).toMatchObject({
+      type: "article",
+      publishedTime: "2026-04-01T00:00:00.000Z",
+      modifiedTime: "2026-04-02T00:00:00.000Z",
+    });
+  });
+
+  it("type=article で日時未指定なら日時キーを出さない", () => {
+    const og = buildPageOpenGraph({ ...base, locale: "ja", type: "article" });
+    expect(og).not.toHaveProperty("publishedTime");
+    expect(og).not.toHaveProperty("modifiedTime");
+  });
+
+  it('images:"file" は images キー自体を出さない', () => {
+    // Next の mergeStaticMetadata は「ページが images を持たないとき」だけ
+    // opengraph-image.tsx のファイル規約を適用する。記事アイキャッチを
+    // 活かすため、キーごと出さない必要がある。
+    const og = buildPageOpenGraph({ ...base, locale: "ja", images: "file" });
+    expect(og).not.toHaveProperty("images");
+  });
 });

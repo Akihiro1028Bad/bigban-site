@@ -29,6 +29,19 @@ describe("ページ側 openGraph の規約", () => {
     expect(pagesMatching(/^\s+openGraph: \{/m)).toEqual([]);
   });
 
+  it("generateMetadata を持つページは buildPageOpenGraph で openGraph を出す", () => {
+    // 「直接書かない」だけだと openGraph を一切出さないページを見逃す。
+    // その場合 layout の og には url が無いため og:url が欠落する。
+    const missing = PAGE_FILES.filter((file) => {
+      const src = readFileSync(file, "utf-8");
+      return (
+        /export (?:async )?function generateMetadata/.test(src) &&
+        !src.includes("buildPageOpenGraph")
+      );
+    });
+    expect(missing).toEqual([]);
+  });
+
   it("ページ側で twitter を設定しない", () => {
     // layout は twitter.images を意図的に未指定にしている (og:image への
     // 自動追従を止めないため)。ページ側で設定すると layout ごと置換される。
