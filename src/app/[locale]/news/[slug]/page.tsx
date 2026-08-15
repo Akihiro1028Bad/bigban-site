@@ -116,7 +116,7 @@ export async function generateMetadata({
   // microCMS レスポンスは ISR タグ (`news-${slug}-${locale}`) でキャッシュされるため、
   // cold start を除けば実コストは無視できる。
   if (!previewItem) {
-    // images は渡さない ("file")。opengraph-image.tsx が記事アイキャッチを返すため、
+    // 画像はファイル規約に委ねる。opengraph-image.tsx が記事アイキャッチを返すため、
     // ここで images を持つとファイル規約が適用されず共通ロゴに退化する。
     const t = await getTranslations({ locale, namespace: "Metadata" });
     meta.openGraph = buildPageOpenGraph({
@@ -126,7 +126,7 @@ export async function generateMetadata({
       type: "article",
       publishedTime: item.publishedAt ?? item.createdAt,
       modifiedTime: item.updatedAt,
-      images: "file",
+      shouldUseFileImage: true,
     });
 
     const otherLocale: Locale = locale === "ja" ? "en" : "ja";

@@ -108,7 +108,7 @@ export async function generateMetadata({
   }
 
   // OGP: 公開版のみ (プレビューは noindex)。対向 locale が存在すれば alternates。
-  // images は渡さない ("file")。opengraph-image.tsx が記事アイキャッチを返すため、
+  // 画像はファイル規約に委ねる。opengraph-image.tsx が記事アイキャッチを返すため、
   // ここで images を持つとファイル規約が適用されず共通ロゴに退化する。
   const t = await getTranslations({ locale, namespace: "Metadata" });
   meta.openGraph = buildPageOpenGraph({
@@ -118,7 +118,7 @@ export async function generateMetadata({
     type: "article",
     publishedTime: item.publishedAt ?? item.createdAt,
     modifiedTime: item.updatedAt,
-    images: "file",
+    shouldUseFileImage: true,
   });
 
   const otherLocale: Locale = locale === "ja" ? "en" : "ja";

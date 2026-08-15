@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 type OpenGraphImages = NonNullable<Metadata["openGraph"]>["images"];
 
-interface PageOpenGraphOptions {
+interface PageOpenGraphBase {
   /** `Metadata.og.siteName` の値 (layout と同じもの)。 */
   siteName: string;
   /** ページの自己参照 URL。 */
@@ -17,16 +17,31 @@ interface PageOpenGraphOptions {
   publishedTime?: string;
   /** type="article" のときの更新日時 (ISO8601)。 */
   modifiedTime?: string;
-  /**
-   * 省略時は共通 OGP 画像。ページ固有画像があるときは配列を渡す。
-   *
-   * `"file"` を渡すと images キー自体を出力しない。Next の
-   * `mergeStaticMetadata` は「ページが images を持たないとき」だけ
-   * `opengraph-image.tsx` のファイル規約を適用するため、記事アイキャッチを
-   * og:image に出したい面ではキーごと出さない必要がある。
-   */
-  images?: OpenGraphImages | "file";
 }
+
+/**
+ * 画像の指定方法は排他。文字列センチネルにすると Next の画像型が string を
+ * 含むため union が潰れ、タイプミスが型エラーにならず 404 の og:image を
+ * 出しつつファイル規約も殺す、という最悪の組み合わせになる。
+ */
+type PageOpenGraphImages =
+  | {
+      /**
+       * images キー自体を出力しない。Next の `mergeStaticMetadata` は
+       * 「ページが images を持たないとき」だけ `opengraph-image.tsx` の
+       * ファイル規約を適用するため、記事アイキャッチを og:image に出したい面で
+       * 指定する。
+       */
+      shouldUseFileImage: true;
+      images?: never;
+    }
+  | {
+      shouldUseFileImage?: false;
+      /** 省略時は共通 OGP 画像。ページ固有画像があるときだけ渡す。 */
+      images?: OpenGraphImages;
+    };
+
+type PageOpenGraphOptions = PageOpenGraphBase & PageOpenGraphImages;
 
 /**
  * ページ側の openGraph ブロックを組み立てる。
@@ -52,14 +67,15 @@ export function buildPageOpenGraph({
   type = "website",
   publishedTime,
   modifiedTime,
+  shouldUseFileImage,
   images,
 }: PageOpenGraphOptions): Metadata["openGraph"] {
   const base = {
     siteName,
     url,
     locale: locale === "ja" ? "ja_JP" : "en_US",
-    // "file" のときはキーごと落とす (ファイル規約の画像を活かすため)。
-    ...(images === "file" ? {} : { images: images ?? [OG_IMAGE] }),
+    // ファイル規約に委ねるときはキーごと落とす。
+    ...(shouldUseFileImage ? {} : { images: images ?? [OG_IMAGE] }),
   };
   if (type === "article") {
     return {
