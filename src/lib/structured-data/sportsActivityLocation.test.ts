@@ -136,7 +136,7 @@ describe("buildSportsActivityLocation", () => {
       "https://www.instagram.com/thepicklebangtheory",
       "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7",
       "https://yoyaku.labola.jp/r/shop/3473/",
-      "https://www.tennisbear.net/pickleball/circle/36659",
+      "https://www.tennisbear.net/pickleball/circle/36659/events",
     ]);
   });
 
