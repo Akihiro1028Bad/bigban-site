@@ -635,7 +635,7 @@
     "delivery": "Delivery",
     "deliveryValue": "Same-day delivery",
     "paymentMethod": "Payment Method",
-    "paymentMethodValue": "Bank transfer or credit card",
+    "paymentMethodValue": "Bank transfer, credit card, or PayPay",
     "paymentTiming": "Payment Timing",
     "paymentTimingValue": "Immediate",
     "cardPayment": "Card Payment",

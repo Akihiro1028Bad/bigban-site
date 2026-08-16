@@ -130,13 +130,15 @@ describe("ReservePage", () => {
     const info = screen.getByTestId("reserve-info");
     const faq = screen.getByTestId("reserve-faq");
     const footer = screen.getByTestId("home-footer");
-    expect(
-      info.compareDocumentPosition(faq) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    // FOLLOWING ビットは CONTAINED_BY と同時に立つため、入れ子化を
+    // 兄弟の前後関係と取り違えないようマスク全体を突き合わせる。
+    expect(info.compareDocumentPosition(faq)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     // フッターより後ろへ落ちる回帰を防ぐため、前後どちらの境界も固定する。
-    expect(
-      faq.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(faq.compareDocumentPosition(footer)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("不正な locale で notFound により描画されない（throw する）", async () => {
