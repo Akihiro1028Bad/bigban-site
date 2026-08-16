@@ -14,10 +14,12 @@ import {
   type NewsCategoryId,
 } from "@/constants/news";
 import { parseLocale, routing } from "@/i18n/routing";
+import { newsLabel } from "@/lib/news/label";
 import { getNewsList } from "@/lib/microcms/queries";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 // searchParams (?category=&page=) は generateStaticParams で静的生成された
 // ロケール別ページと矛盾するため、ページ全体を動的レンダリングに固定する。
@@ -51,7 +53,8 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const title = locale === "ja" ? "ニュース" : "News";
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+  const title = newsLabel(locale);
   const description =
     locale === "ja"
       ? "最新のお知らせ・メディア掲載・イベント情報"
@@ -61,17 +64,11 @@ export async function generateMetadata({
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [OG_IMAGE.url],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {
@@ -123,7 +120,9 @@ export default async function NewsPage({
   return (
     <>
       <StructuredData
-        data={buildBreadcrumb(locale, [{ name: "News", path: "/news" }])}
+        data={buildBreadcrumb(locale, [
+          { name: newsLabel(locale), path: "/news" },
+        ])}
       />
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">

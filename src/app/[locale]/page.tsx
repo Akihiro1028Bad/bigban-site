@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import SectionArcDivider from "@/components/SectionArcDivider";
@@ -23,6 +23,7 @@ import HomeAbout from "@/components/home/HomeAbout";
 import HomeContributors from "@/components/home/HomeContributors";
 import HomeAccess from "@/components/home/HomeAccess";
 import HomeFooter from "@/components/home/HomeFooter";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import type { Metadata } from "next";
 
@@ -50,13 +51,11 @@ export async function generateMetadata({
     title: { absolute: t("home.title") },
     description: t("home.description"),
     keywords,
-    openGraph: {
-      title: t("home.title"),
-      description: t("home.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

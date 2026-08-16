@@ -1,10 +1,11 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
 import TokushohoContent from "./TokushohoContent";
 import StructuredData from "@/components/StructuredData";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { buildBreadcrumb } from "@/lib/structured-data";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import type { Metadata } from "next";
 
@@ -27,13 +28,11 @@ export async function generateMetadata({
     title: t("tokushoho.title"),
     description: t("tokushoho.description"),
     keywords,
-    openGraph: {
-      title: t("tokushoho.title"),
-      description: t("tokushoho.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

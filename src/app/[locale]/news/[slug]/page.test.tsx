@@ -24,7 +24,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push: routerPushMock }),
 }));
-vi.mock("next-intl/server", () => ({ setRequestLocale: vi.fn() }));
+vi.mock("next-intl/server", () => ({
+  setRequestLocale: vi.fn(),
+  getTranslations: async () => (k: string) =>
+    k === "og.siteName" ? "THE PICKLE BANG THEORY" : k,
+}));
 vi.mock("next-intl", () => ({
   hasLocale: (_l: readonly string[], v: string) =>
     v === "ja" || v === "en",
@@ -402,6 +406,96 @@ describe("NewsDetailPage", () => {
       });
       expect(meta.robots).toEqual({ index: false, follow: false });
       expect(meta.alternates?.languages).toBeUndefined();
+    });
+
+    it("preview 中は openGraph を出さない", async () => {
+      getNewsByContentIdMock.mockResolvedValue(
+        makeNewsItem({ slug: "x", title: "T", excerpt: "E" }),
+      );
+      const { generateMetadata } = await import("./page");
+      const meta = await generateMetadata({
+        params: Promise.resolve({ locale: "ja", slug: "x" }),
+        searchParams: Promise.resolve({
+          contentId: "g-abc",
+          draftKey: "dk-1",
+        }),
+      });
+      expect(meta.openGraph).toBeUndefined();
+    });
+
+    it("preview 中は JSON-LD を出力しない (columns と揃える)", async () => {
+      getNewsByContentIdMock.mockResolvedValue(
+        makeNewsItem({ slug: "x", title: "下書き", excerpt: "E" }),
+      );
+      await renderPage(
+        { locale: "ja", slug: "x" },
+        { contentId: "g-abc", draftKey: "dk-1" },
+      );
+      expect(
+        document.querySelectorAll('script[type="application/ld+json"]'),
+      ).toHaveLength(0);
+    });
+  });
+
+  describe("openGraph", () => {
+    it("公開版は og:url と type=article を出す", async () => {
+      getNewsDetailMock.mockImplementation(
+        async ({ locale }: { locale: string }) =>
+          locale === "ja"
+            ? makeNewsItem({
+                slug: "x",
+                title: "T",
+                excerpt: "E",
+                publishedAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-02T00:00:00.000Z",
+              })
+            : null,
+      );
+      const { generateMetadata } = await import("./page");
+      const meta = await generateMetadata({
+        params: Promise.resolve({ locale: "ja", slug: "x" }),
+        searchParams: Promise.resolve({}),
+      });
+      expect(meta.openGraph).toMatchObject({
+        type: "article",
+        url: "http://localhost:3000/news/x",
+        publishedTime: "2026-04-01T00:00:00.000Z",
+        modifiedTime: "2026-04-02T00:00:00.000Z",
+      });
+    });
+
+    it("publishedAt 無しは createdAt を publishedTime に使う", async () => {
+      getNewsDetailMock.mockImplementation(async () => {
+        const base = makeNewsItem({
+          slug: "x",
+          title: "T",
+          excerpt: "E",
+          createdAt: "2026-02-02T00:00:00.000Z",
+        });
+        const { publishedAt: _p, ...rest } = base;
+        void _p;
+        return rest;
+      });
+      const { generateMetadata } = await import("./page");
+      const meta = await generateMetadata({
+        params: Promise.resolve({ locale: "ja", slug: "x" }),
+        searchParams: Promise.resolve({}),
+      });
+      expect(meta.openGraph).toMatchObject({
+        publishedTime: "2026-02-02T00:00:00.000Z",
+      });
+    });
+
+    it("openGraph に images を出さない (記事アイキャッチを活かす)", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({ slug: "x", title: "T", excerpt: "E" }),
+      );
+      const { generateMetadata } = await import("./page");
+      const meta = await generateMetadata({
+        params: Promise.resolve({ locale: "ja", slug: "x" }),
+        searchParams: Promise.resolve({}),
+      });
+      expect(meta.openGraph).not.toHaveProperty("images");
     });
   });
 });

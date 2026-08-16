@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { SITE_URL, OG_IMAGE, resolveCalendarTabKey } from "@/constants/site";
+import { SITE_URL, resolveCalendarTabKey } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
@@ -14,6 +14,7 @@ import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
 import ReserveInfo from "@/components/reserve/ReserveInfo";
 import ReserveFaq from "@/components/reserve/ReserveFaq";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import type { Metadata } from "next";
 
@@ -54,17 +55,11 @@ export async function generateMetadata({
   return {
     title: t("reserve.title"),
     description: t("reserve.description"),
-    openGraph: {
-      title: t("reserve.title"),
-      description: t("reserve.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [OG_IMAGE.url],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

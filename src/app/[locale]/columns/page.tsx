@@ -4,16 +4,21 @@ import type { Metadata } from "next";
 
 import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
+import StructuredData from "@/components/StructuredData";
 import { ColumnCard } from "@/components/columns/ColumnCard";
 import { ColumnCategoryTabs } from "@/components/columns/ColumnCategoryTabs";
 import { ColumnPagination } from "@/components/columns/ColumnPagination";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { COLUMN_PAGE_SIZE } from "@/constants/columns";
+import { SITE_URL } from "@/constants/site";
 import { parseLocale, routing } from "@/i18n/routing";
+import { columnsLabel } from "@/lib/columns/label";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnCategories,
   getColumnsList,
 } from "@/lib/microcms/columnsQueries";
+import { buildBreadcrumb } from "@/lib/structured-data";
 
 // searchParams (?category=&page=) が generateStaticParams と矛盾するため
 // ページ全体を動的レンダリングに固定する (news 踏襲)。データ層は microCMS
@@ -38,18 +43,43 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+/** コラム一覧の絶対 URL。ja はロケールプレフィックス無し。 */
+function columnsIndexUrl(locale: string): string {
+  return locale === "ja" ? `${SITE_URL}/columns` : `${SITE_URL}/en/columns`;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const title = locale === "ja" ? "コラム" : "Column";
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+  const title = columnsLabel(locale);
   const description =
     locale === "ja"
       ? "ピックルボールの始め方・ルール・上達・比較のコラム"
       : "Columns on getting started, rules, skills, and comparisons in pickleball";
-  return { title, description };
+  // canonical は news 一覧と同様、?category= / ?page= を含めない自己参照 URL。
+  // 絞り込み・ページ送りはすべて一覧 1 ページ目に正規化する。
+  const canonicalUrl = columnsIndexUrl(locale);
+  return {
+    title,
+    description,
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
+      url: canonicalUrl,
+      locale,
+    }),
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        ja: `${SITE_URL}/columns`,
+        en: `${SITE_URL}/en/columns`,
+        "x-default": `${SITE_URL}/columns`,
+      },
+    },
+  };
 }
 
 export default async function ColumnsPage({
@@ -91,6 +121,11 @@ export default async function ColumnsPage({
 
   return (
     <>
+      <StructuredData
+        data={buildBreadcrumb(locale, [
+          { name: columnsLabel(locale), path: "/columns" },
+        ])}
+      />
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-12 py-8 lg:py-12">

@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 
 import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
+import StructuredData from "@/components/StructuredData";
+import { ArticleJsonLd } from "@/components/ArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
 import {
@@ -15,11 +17,14 @@ import {
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
+import { columnsLabel } from "@/lib/columns/label";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnByContentId,
   getColumnDetail,
   getColumnSlugs,
 } from "@/lib/microcms/columnsQueries";
+import { buildBreadcrumb } from "@/lib/structured-data";
 import type { ColumnItem } from "@/lib/microcms/columnsSchema";
 
 // 画面プレビュー (?draftKey=&contentId=) が searchParams を使うため、
@@ -103,6 +108,19 @@ export async function generateMetadata({
   }
 
   // OGP: 公開版のみ (プレビューは noindex)。対向 locale が存在すれば alternates。
+  // 画像はファイル規約に委ねる。opengraph-image.tsx が記事アイキャッチを返すため、
+  // ここで images を持つとファイル規約が適用されず共通ロゴに退化する。
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+  meta.openGraph = buildPageOpenGraph({
+    siteName: t("og.siteName"),
+    url: buildColumnUrl(locale, slug),
+    locale,
+    type: "article",
+    publishedTime: item.publishedAt ?? item.createdAt,
+    modifiedTime: item.updatedAt,
+    shouldUseFileImage: true,
+  });
+
   const otherLocale: Locale = locale === "ja" ? "en" : "ja";
   const other = await getColumnDetail({ locale: otherLocale, slug });
   meta.alternates = {
@@ -149,6 +167,23 @@ export default async function ColumnDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
+      {/* 構造化データは公開版のみ。プレビューは noindex のため出力しない。 */}
+      {!previewItem && (
+        <>
+          <ArticleJsonLd
+            item={item}
+            locale={locale}
+            schemaType="Article"
+            pathSegment="columns"
+          />
+          <StructuredData
+            data={buildBreadcrumb(locale, [
+              { name: columnsLabel(locale), path: "/columns" },
+              { name: item.title, path: `/columns/${item.slug}` },
+            ])}
+          />
+        </>
+      )}
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
