@@ -33,6 +33,10 @@ export const LABOLA_HYROX_URL = labolaCurrentWeekUrl("H Y R O X");
 export const LABOLA_SCHOOL_URL =
   "https://yoyaku.labola.jp/r/shop/3473/event/school/";
 
+// labola 店舗トップ。予約導線ではなく、構造化データ (sameAs) で
+// 施設の同一性を示す外部プロフィールとして参照する。
+export const LABOLA_SHOP_URL = `${LABOLA_SHOP_BASE}/`;
+
 // 内部予約案内ページのパス（next-intl Link 用）。予約カテゴリごとの labola 導線を案内する。
 export const RESERVE_PATH = "/reserve";
 
@@ -76,10 +80,21 @@ export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
 
 export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 
+// Google ビジネスプロフィール。表示リンク (HomeAccess / TeaserContent) と
+// 構造化データの sameAs で同一の値を参照し、掲載情報の変更時に片方だけ
+// 古くなるのを防ぐ。
+export const GOOGLE_BUSINESS_PROFILE_URL =
+  "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7";
+
 // 主催イベント（早朝ピックルボール等）の申込先。
 // 主催者ユーザーページ (/user/148195/organized-event) ではなくサークルページを使う。
 // 施設名がページタイトルになり公式サイトからの遷移として自然で、
 // かつ参加者数（例 14人/16人）が表示され参加検討の材料になるため。
+//
+// 構造化データの sameAs もこの URL を共用する。サークルのベースパス
+// (/circle/36659) は 404 で、テニスベア上で施設に到達できる URL がここしか
+// ないため。転換率都合でこの値を貼り替えるときは、CTA の遷移先だけでなく
+// sameAs の同一性シグナルも一緒に動く点に注意する。
 export const TENNISBEAR_EVENTS_URL =
   "https://www.tennisbear.net/pickleball/circle/36659/events";
 
