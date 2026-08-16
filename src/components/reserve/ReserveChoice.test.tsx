@@ -6,7 +6,6 @@ import {
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
-  TENNISBEAR_EVENTS_URL,
 } from "@/constants/site";
 import ReserveChoice from "./ReserveChoice";
 
@@ -77,7 +76,12 @@ describe("ReserveChoice", () => {
   it("イベント / スクールの申込は主催イベント一覧へ外部リンクする", () => {
     renderWithIntl(<ReserveChoice />);
     const link = screen.getByRole("link", { name: /イベントの申込/ });
-    expect(link).toHaveAttribute("href", TENNISBEAR_EVENTS_URL);
+    // 定数同士の比較だと、構造化データ都合で TENNISBEAR_CIRCLE_URL を
+    // 貼り替えたときに CTA の遷移先が黙って変わる。実 URL で固定する。
+    expect(link).toHaveAttribute(
+      "href",
+      "https://www.tennisbear.net/pickleball/circle/36659/events",
+    );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
