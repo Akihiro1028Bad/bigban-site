@@ -73,6 +73,17 @@ describe("buildPageOpenGraph", () => {
     });
   });
 
+  it("type=article を書かずに日時だけ渡せない (型で禁止)", () => {
+    // 基底に日時を置くと type の書き忘れで og:type と日時を静かに落とす。
+    // @ts-expect-error 日時は type="article" のときだけ受け付ける。
+    const og = buildPageOpenGraph({
+      ...base,
+      locale: "ja",
+      publishedTime: "2026-04-01T00:00:00.000Z",
+    });
+    expect(og).toMatchObject({ type: "website" });
+  });
+
   it("type=article で日時未指定なら日時キーを出さない", () => {
     const og = buildPageOpenGraph({ ...base, locale: "ja", type: "article" });
     expect(og).not.toHaveProperty("publishedTime");

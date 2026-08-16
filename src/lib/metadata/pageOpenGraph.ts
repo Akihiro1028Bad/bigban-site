@@ -11,13 +11,27 @@ interface PageOpenGraphBase {
   url: string;
   /** アプリのロケール。og:locale へ変換する。 */
   locale: string;
-  /** 既定は "website"。記事面 (news / columns 詳細) は "article"。 */
-  type?: "website" | "article";
-  /** type="article" のときの公開日時 (ISO8601)。 */
-  publishedTime?: string;
-  /** type="article" のときの更新日時 (ISO8601)。 */
-  modifiedTime?: string;
 }
+
+/**
+ * 日時は記事面でのみ意味を持つ。基底に置くと `type: "article"` を書き忘れた
+ * まま日時だけ渡してもコンパイルが通り、og:type と日時の両方を静かに落とす。
+ */
+type PageOpenGraphType =
+  | {
+      /** 既定は "website"。 */
+      type?: "website";
+      publishedTime?: never;
+      modifiedTime?: never;
+    }
+  | {
+      /** 記事面 (news / columns 詳細)。 */
+      type: "article";
+      /** 公開日時 (ISO8601)。 */
+      publishedTime?: string;
+      /** 更新日時 (ISO8601)。 */
+      modifiedTime?: string;
+    };
 
 /**
  * 画像の指定方法は排他。文字列センチネルにすると Next の画像型が string を
@@ -41,7 +55,9 @@ type PageOpenGraphImages =
       images?: OpenGraphImages;
     };
 
-type PageOpenGraphOptions = PageOpenGraphBase & PageOpenGraphImages;
+type PageOpenGraphOptions = PageOpenGraphBase &
+  PageOpenGraphType &
+  PageOpenGraphImages;
 
 /**
  * ページ側の openGraph ブロックを組み立てる。

@@ -45,9 +45,14 @@ function hasHelperOpenGraph(src: string): boolean {
   return openGraphAssignments(src).some((value) => value === HELPER);
 }
 
-/** ページ側で twitter を組み立てていれば true。 */
+/**
+ * ページ側で twitter に触れていれば true。
+ * 右辺の形は問わない。`twitter: tw` のような変数経由を見逃すと、
+ * twitter:image の og:image 追従が静かに壊れるため。
+ * ページが twitter に触れる正当な理由は現状ないので、広めに倒す。
+ */
 function hasPageTwitter(src: string): boolean {
-  return /twitter\s*[:=]\s*\{/.test(src);
+  return /twitter\s*[:=]/.test(src);
 }
 
 function readPage(file: string): string {
@@ -98,9 +103,11 @@ describe("規約チェッカ自体の検出力", () => {
     ).toBe(true);
   });
 
-  it("twitter はプロパティ形・代入形の両方を検出する", () => {
+  it("twitter はプロパティ形・代入形・変数経由をすべて検出する", () => {
     expect(hasPageTwitter("  twitter: { card: 'x' },")).toBe(true);
     expect(hasPageTwitter("  meta.twitter = { card: 'x' };")).toBe(true);
+    // 変数経由を見逃すと twitter:image の追従が静かに壊れる。
+    expect(hasPageTwitter("  twitter: tw,")).toBe(true);
     expect(hasPageTwitter("const TWITTER_URL = 'https://x.com';")).toBe(false);
   });
 });
