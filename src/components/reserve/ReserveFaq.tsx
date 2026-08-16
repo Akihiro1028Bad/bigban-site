@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import StructuredData from "@/components/StructuredData";
 import { buildFaqPage, type FaqItem } from "@/lib/structured-data";
@@ -21,6 +21,7 @@ function isFaqItem(value: unknown): value is FaqItem {
 
 export default function ReserveFaq() {
   const t = useTranslations("Reserve.faq");
+  const shouldReduceMotion = useReducedMotion();
   const rawItems = t.raw("items");
   const items: FaqItem[] = Array.isArray(rawItems)
     ? rawItems.filter(isFaqItem)
@@ -32,7 +33,7 @@ export default function ReserveFaq() {
           設問リストだけ読みやすい幅(max-w-3xl)に絞る。 */}
       <motion.div
         className="mx-auto max-w-7xl px-6 lg:px-12"
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 24 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-120px" }}
         transition={{ duration: 1.0, ease: EASE }}

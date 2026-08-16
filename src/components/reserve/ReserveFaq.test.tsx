@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { setMockReducedMotion } from "../../../__mocks__/framer-motion";
 import { COURT_PRICES } from "@/constants/pricing";
 import ReserveFaq from "./ReserveFaq";
 import jaMessages from "../../../messages/ja.json";
@@ -49,6 +50,17 @@ function priceRange(pick: (row: (typeof COURT_PRICES)[number]) => string[]) {
 }
 
 describe("ReserveFaq", () => {
+  beforeEach(() => {
+    setMockReducedMotion(false);
+  });
+
+  it("reduced-motion でも見出しと設問を静的に表示する", () => {
+    setMockReducedMotion(true);
+    renderWithIntl(<ReserveFaq />);
+    expect(screen.getByText("よくある質問")).toBeInTheDocument();
+    expect(screen.getByText("営業時間は？")).toBeInTheDocument();
+  });
+
   it("見出しと質問・回答を表示する", () => {
     renderWithIntl(<ReserveFaq />);
     expect(screen.getByText("よくある質問")).toBeInTheDocument();
