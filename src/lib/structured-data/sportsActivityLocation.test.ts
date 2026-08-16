@@ -193,13 +193,15 @@ describe("buildSportsActivityLocation", () => {
     expect(names).toContain("無人チェックイン");
   });
 
-  it("hasMapにGBP掲載ページを指す", async () => {
+  it("hasMapにGoogle Maps URLを含む", async () => {
     const { buildSportsActivityLocation } = await import(
       "./sportsActivityLocation"
     );
     const schema = buildSportsActivityLocation("ja");
 
-    expect(schema.hasMap).toBe("https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7");
+    expect(schema.hasMap).toMatch(/^https:\/\/www\.google\.com\/maps/);
+    expect(schema.hasMap).toContain("35.7239695");
+    expect(schema.hasMap).toContain("139.9317222");
   });
 
   it("paymentAcceptedとcurrenciesAcceptedを含む", async () => {
