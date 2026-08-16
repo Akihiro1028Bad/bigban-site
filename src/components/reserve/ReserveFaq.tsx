@@ -3,9 +3,8 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import StructuredData from "@/components/StructuredData";
+import { EASE, revealInitial } from "@/constants/motion";
 import { buildFaqPage, type FaqItem } from "@/lib/structured-data";
-
-const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 /** t.raw は unknown を返すため、要素の形までシステム境界として検証する。 */
 function isFaqItem(value: unknown): value is FaqItem {
@@ -21,7 +20,7 @@ function isFaqItem(value: unknown): value is FaqItem {
 
 export default function ReserveFaq() {
   const t = useTranslations("Reserve.faq");
-  const shouldReduceMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedMotion();
   const rawItems = t.raw("items");
   const items: FaqItem[] = Array.isArray(rawItems)
     ? rawItems.filter(isFaqItem)
@@ -33,7 +32,7 @@ export default function ReserveFaq() {
           設問リストだけ読みやすい幅(max-w-3xl)に絞る。 */}
       <motion.div
         className="mx-auto max-w-7xl px-6 lg:px-12"
-        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 24 }}
+        initial={revealInitial(prefersReducedMotion, { opacity: 0, y: 24 })}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-120px" }}
         transition={{ duration: 1.0, ease: EASE }}

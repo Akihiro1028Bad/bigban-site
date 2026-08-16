@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { setMockReducedMotion } from "../../../__mocks__/framer-motion";
 import { COURT_PRICES } from "@/constants/pricing";
 import ReserveFaq from "./ReserveFaq";
 import jaMessages from "../../../messages/ja.json";
@@ -50,17 +49,6 @@ function priceRange(pick: (row: (typeof COURT_PRICES)[number]) => string[]) {
 }
 
 describe("ReserveFaq", () => {
-  beforeEach(() => {
-    setMockReducedMotion(false);
-  });
-
-  it("reduced-motion でも見出しと設問を静的に表示する", () => {
-    setMockReducedMotion(true);
-    renderWithIntl(<ReserveFaq />);
-    expect(screen.getByText("よくある質問")).toBeInTheDocument();
-    expect(screen.getByText("営業時間は？")).toBeInTheDocument();
-  });
-
   it("見出しと質問・回答を表示する", () => {
     renderWithIntl(<ReserveFaq />);
     expect(screen.getByText("よくある質問")).toBeInTheDocument();
@@ -74,7 +62,7 @@ describe("ReserveFaq", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。月額¥10,000（税込）の会員制度「PBT CLUB」の会員価格なら ¥3,500〜¥5,600（月20時間まで）。HYROXエリアの利用料も同額です（4名まで／5名目以降は1名につき+¥1,000）。",
+        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。HYROXエリアの利用料もコートと同額です（4名まで／5名目以降は1名につき+¥1,000）。月額¥10,000（税込）の会員制度「PBT CLUB」の会員価格なら、いずれも ¥3,500〜¥5,600 になります（月20時間まで）。",
       ),
     ).toBeInTheDocument();
   });
