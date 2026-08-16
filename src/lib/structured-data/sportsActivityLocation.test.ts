@@ -134,7 +134,7 @@ describe("buildSportsActivityLocation", () => {
 
     expect(schema.sameAs).toEqual([
       "https://www.instagram.com/thepicklebangtheory",
-      "https://www.google.com/maps?cid=6096252109621498100",
+      "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7",
       "https://yoyaku.labola.jp/r/shop/3473/",
       "https://www.tennisbear.net/pickleball/circle/36659/events",
     ]);
