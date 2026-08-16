@@ -4,7 +4,7 @@ import {
   INSTAGRAM_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
   LABOLA_SHOP_URL,
-  TENNISBEAR_EVENTS_URL,
+  TENNISBEAR_CIRCLE_URL,
 } from "@/constants/site";
 
 export interface LocationFeatureSpecification {
@@ -80,13 +80,14 @@ const DESCRIPTION =
 
 const SLOGAN = "小さなディンクから、大きなムーブメントへ。";
 
-// 施設の同一性シグナル。公式サイト・GBP・labola・テニスベアが同一実体である
+// 施設の同一性シグナル。ここに並ぶ外部プロフィールが本サイトと同一実体である
 // ことを申告し、ナレッジパネル / ローカルパックでの実体解決を助ける。
+// 自サイトの URL は url / @id で示すため含めない。
 const SAME_AS = [
   INSTAGRAM_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
   LABOLA_SHOP_URL,
-  TENNISBEAR_EVENTS_URL,
+  TENNISBEAR_CIRCLE_URL,
 ] as const;
 
 export function buildSportsActivityLocation(

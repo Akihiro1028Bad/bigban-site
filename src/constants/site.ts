@@ -86,12 +86,17 @@ export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
 
 export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 
+// 施設が主催するテニスベアサークルのプロフィール。構造化データ (sameAs) で
+// 施設の同一性を示す外部プロフィールとして参照する。
+export const TENNISBEAR_CIRCLE_URL =
+  "https://www.tennisbear.net/pickleball/circle/36659";
+
 // 主催イベント（早朝ピックルボール等）の申込先。
 // 主催者ユーザーページ (/user/148195/organized-event) ではなくサークルページを使う。
 // 施設名がページタイトルになり公式サイトからの遷移として自然で、
 // かつ参加者数（例 14人/16人）が表示され参加検討の材料になるため。
-export const TENNISBEAR_EVENTS_URL =
-  "https://www.tennisbear.net/pickleball/circle/36659/events";
+// 転換率都合で貼り替わり得るため、sameAs は TENNISBEAR_CIRCLE_URL を使う。
+export const TENNISBEAR_EVENTS_URL = `${TENNISBEAR_CIRCLE_URL}/events`;
 
 export const EXTERNAL_LINK_PROPS = {
   target: "_blank",
