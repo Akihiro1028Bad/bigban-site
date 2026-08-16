@@ -51,6 +51,15 @@ export function ArticleJsonLd({
     dateModified: item.updatedAt,
     inLanguage: locale,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    // author は Article / NewsArticle の必須フィールド。無いと
+    // "Missing field 'author'" でリッチリザルト対象外になる。
+    // 記事は施設として公開しているため組織を著者にする。個人名での
+    // E-E-A-T 強化は執筆者ページ (#430) の整備と合わせて判断する。
+    author: {
+      "@type": "Organization",
+      name: "THE PICKLE BANG THEORY",
+      url: SITE_URL,
+    },
     publisher: {
       "@type": "Organization",
       name: "THE PICKLE BANG THEORY",

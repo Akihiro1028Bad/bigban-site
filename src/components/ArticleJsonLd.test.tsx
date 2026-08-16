@@ -85,6 +85,24 @@ describe("ArticleJsonLd", () => {
     });
   });
 
+  it("author を出す (Article の必須フィールド)", () => {
+    // author が無いと Rich Results Test で "Missing field 'author'" になり
+    // Article のリッチリザルト対象外になる。
+    render(
+      <ArticleJsonLd
+        item={makeParsedColumnItem()}
+        locale="ja"
+        schemaType="Article"
+        pathSegment="columns"
+      />,
+    );
+    expect(readJsonLd().author).toEqual({
+      "@type": "Organization",
+      name: "THE PICKLE BANG THEORY",
+      url: SITE_URL,
+    });
+  });
+
   it("publishedAt 無しは createdAt を datePublished に使う", () => {
     const base = makeParsedColumnItem({
       createdAt: "2026-02-02T00:00:00.000Z",
