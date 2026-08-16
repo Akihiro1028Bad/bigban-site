@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 
 import { useCountdown } from "@/hooks/useCountdown";
+import { GOOGLE_BUSINESS_PROFILE_URL } from "@/constants/site";
 
 import { EmailSignup } from "./EmailSignup";
 
@@ -169,7 +170,7 @@ export function TeaserContent({ logoSrc }: TeaserContentProps) {
       >
         <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-x-8 gap-y-2 md:gap-x-12">
           {[
-            { label: "LOCATION", value: "本八幡駅 徒歩1分", href: "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7" },
+            { label: "LOCATION", value: "本八幡駅 徒歩1分", href: GOOGLE_BUSINESS_PROFILE_URL },
             { label: "COURTS", value: "プロ仕様ハードコート 3面" },
             { label: "OPEN", value: "6:00 – 23:00" },
             { label: "FOUNDER", value: "西村昭彦", href: "https://www.instagram.com/akihiko.rst" },

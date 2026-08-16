@@ -75,10 +75,11 @@ export function resolveCalendarTabKey(
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
-// Google ビジネスプロフィール。短縮 URL (maps.app.goo.gl) はリダイレクトを
-// 挟むため、place ID (CID 0x549a3cfe8f3710f4) を 10 進展開した正規形を使う。
+// Google ビジネスプロフィール。表示リンク (HomeAccess / TeaserContent) と
+// 構造化データの sameAs で同一の値を参照し、掲載情報の変更時に片方だけ
+// 古くなるのを防ぐ。
 export const GOOGLE_BUSINESS_PROFILE_URL =
-  "https://www.google.com/maps?cid=6096252109621498100";
+  "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7";
 
 // 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。
 export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
