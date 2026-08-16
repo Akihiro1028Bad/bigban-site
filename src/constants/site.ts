@@ -75,16 +75,16 @@ export function resolveCalendarTabKey(
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
+// 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。
+export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
+
+export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
+
 // Google ビジネスプロフィール。表示リンク (HomeAccess / TeaserContent) と
 // 構造化データの sameAs で同一の値を参照し、掲載情報の変更時に片方だけ
 // 古くなるのを防ぐ。
 export const GOOGLE_BUSINESS_PROFILE_URL =
   "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7";
-
-// 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。
-export const INSTAGRAM_HANDLE = "@thepicklebangtheory";
-
-export const COACH_INSTAGRAM_URL = "https://www.instagram.com/tac_monk/";
 
 // 施設が主催するテニスベアサークルのプロフィール。構造化データ (sameAs) で
 // 施設の同一性を示す外部プロフィールとして参照する。
