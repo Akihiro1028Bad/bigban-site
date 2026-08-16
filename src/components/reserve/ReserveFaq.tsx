@@ -4,12 +4,18 @@ import { useTranslations } from "next-intl";
 import StructuredData from "@/components/StructuredData";
 import { buildFaqPage, type FaqItem } from "@/lib/structured-data";
 
+/** t.raw は unknown を返すため、要素の形までシステム境界として検証する。 */
+function isFaqItem(value: unknown): value is FaqItem {
+  if (typeof value !== "object" || value === null) return false;
+  const { question, answer } = value as Record<string, unknown>;
+  return typeof question === "string" && typeof answer === "string";
+}
+
 export default function ReserveFaq() {
   const t = useTranslations("Reserve.faq");
-  // t.raw は unknown を返すため、システム境界として配列であることを検証する。
   const rawItems = t.raw("items");
   const items: FaqItem[] = Array.isArray(rawItems)
-    ? (rawItems as FaqItem[])
+    ? rawItems.filter(isFaqItem)
     : [];
 
   return (

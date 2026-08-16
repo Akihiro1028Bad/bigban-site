@@ -130,6 +130,26 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
+  it("question/answer が揃わない要素を捨てて描画と JSON-LD から除く", () => {
+    const broken = structuredClone(jaMessages);
+    (broken.Reserve.faq as unknown as { items: unknown }).items = [
+      { question: "有効な質問", answer: "有効な回答" },
+      "文字列だけの要素",
+      null,
+      { question: "回答が無い質問" },
+      { question: 42, answer: "質問が文字列でない" },
+    ];
+    const { container } = renderWithIntl(<ReserveFaq />, { messages: broken });
+
+    expect(screen.getByText("有効な質問")).toBeInTheDocument();
+    expect(screen.queryByText("回答が無い質問")).not.toBeInTheDocument();
+
+    const json = container.querySelector('script[type="application/ld+json"]')
+      ?.textContent ?? "";
+    expect(json).toContain("有効な質問");
+    expect(json).not.toContain("回答が無い質問");
+  });
+
   it("FAQPage 構造化データ(JSON-LD)を出力する", () => {
     const { container } = renderWithIntl(<ReserveFaq />);
     const script = container.querySelector(
