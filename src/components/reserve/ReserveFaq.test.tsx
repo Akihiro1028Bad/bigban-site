@@ -182,5 +182,7 @@ describe("ReserveFaq", () => {
     expect(
       container.querySelector('script[type="application/ld+json"]'),
     ).toBeNull();
+    // 設問が無いのに枠線だけが残ると、見出しの下に意味のない罫線が2本出る。
+    expect(container.querySelector(".border-y")).toBeNull();
   });
 });
