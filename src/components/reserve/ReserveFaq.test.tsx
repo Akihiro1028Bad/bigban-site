@@ -28,6 +28,15 @@ function formatAmount(amount: number): string {
   return `¥${amount.toLocaleString("en-US")}`;
 }
 
+/** 会費と適用上限(¥10,000 / 20時間)を HomePricing の凡例から取り出す。 */
+function membershipFacts(): string[] {
+  const legend = jaMessages.HomePricing.memberLegend;
+  const fee = legend.match(/¥[\d,]+/)?.[0];
+  const hours = legend.match(/月(\d+)時間/)?.[1];
+  if (!fee || !hours) throw new Error("memberLegend から会費/上限を読めない");
+  return [fee, hours];
+}
+
 function priceRange(pick: (row: (typeof COURT_PRICES)[number]) => string[]) {
   const amounts = COURT_PRICES.flatMap(pick).map(toAmount);
   return {
@@ -73,26 +82,32 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
-  it("料金の回答が COURT_PRICES のレンジと一致する", () => {
-    renderWithIntl(<ReserveFaq />);
-    const standard = priceRange((row) => [row.weekday, row.weekend]);
-    const member = priceRange((row) => [row.weekdayMember, row.weekendMember]);
-    const answer = screen.getByText(/1時間あたり/).textContent ?? "";
+  it.each([
+    { locale: "ja", messages: jaMessages as unknown, match: /1時間あたり/ },
+    { locale: "en", messages: enMessages as unknown, match: /per hour/ },
+  ])(
+    "$locale の料金の回答が COURT_PRICES と会員制度の表記に一致する",
+    ({ locale, messages, match }) => {
+      renderWithIntl(<ReserveFaq />, { messages, locale });
+      const standard = priceRange((row) => [row.weekday, row.weekend]);
+      const member = priceRange((row) => [row.weekdayMember, row.weekendMember]);
+      const answer = screen.getByText(match).textContent ?? "";
 
-    expect(answer).toContain(`${standard.min}〜${standard.max}`);
-    expect(answer).toContain(`${member.min}〜${member.max}`);
-  });
+      for (const price of [standard.min, standard.max, member.min, member.max]) {
+        expect(answer).toContain(price);
+      }
+      // 会費と適用上限は HomePricing の凡例が正。FAQ 側の数字がずれたら落とす。
+      for (const fact of membershipFacts()) {
+        expect(answer).toContain(fact);
+      }
+    },
+  );
 
-  it("英語ロケールで更新した3問の回答を表示する", () => {
+  it("英語ロケールで更新した予約方法・支払い方法の回答を表示する", () => {
     renderWithIntl(<ReserveFaq />, { messages: enMessages, locale: "en" });
     expect(
       screen.getByText(
         "Choose the option that matches what you'd like to do — court rental, events and school sessions, the HYROX area, or lessons and classes. You'll complete your booking on the reservation page for that option.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. With PBT CLUB membership (¥10,000/month, tax included), it's ¥3,500 to ¥5,600 for up to 20 hours a month. The HYROX area is the same rate (up to 4 people; +¥1,000 per additional person).",
       ),
     ).toBeInTheDocument();
     expect(

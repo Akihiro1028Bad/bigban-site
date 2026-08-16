@@ -196,7 +196,7 @@ describe("buildSportsActivityLocation", () => {
     );
     const schema = buildSportsActivityLocation("ja");
 
-    expect(schema.paymentAccepted).toBe("Credit Card, PayPay");
+    expect(schema.paymentAccepted).toBe("Credit Card, PayPay, Bank Transfer");
     expect(schema.currenciesAccepted).toBe("JPY");
   });
 

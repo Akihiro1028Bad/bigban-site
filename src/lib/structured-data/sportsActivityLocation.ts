@@ -129,7 +129,8 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    paymentAccepted: "Credit Card, PayPay",
+    // 特商法ページ(Tokushoho.paymentMethodValue)の法定表示と同じ3種を並べる。
+    paymentAccepted: "Credit Card, PayPay, Bank Transfer",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
     description: DESCRIPTION,
