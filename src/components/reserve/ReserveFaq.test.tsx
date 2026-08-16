@@ -138,16 +138,26 @@ describe("ReserveFaq", () => {
       null,
       { question: "回答が無い質問" },
       { question: 42, answer: "質問が文字列でない" },
+      { question: "", answer: "質問が空文字" },
+      { question: "回答が空白のみ", answer: "   " },
     ];
     const { container } = renderWithIntl(<ReserveFaq />, { messages: broken });
 
     expect(screen.getByText("有効な質問")).toBeInTheDocument();
     expect(screen.queryByText("回答が無い質問")).not.toBeInTheDocument();
+    expect(screen.queryByText("回答が空白のみ")).not.toBeInTheDocument();
 
     const json = container.querySelector('script[type="application/ld+json"]')
       ?.textContent ?? "";
     expect(json).toContain("有効な質問");
     expect(json).not.toContain("回答が無い質問");
+    expect(json).not.toContain("質問が空文字");
+  });
+
+  it("英語の会員価格が1時間あたりの料金だと分かる表記になっている", () => {
+    renderWithIntl(<ReserveFaq />, { messages: enMessages, locale: "en" });
+    const answer = screen.getByText(/per hour/).textContent ?? "";
+    expect(answer).toMatch(/¥3,500 to ¥5,600 per hour/);
   });
 
   it("FAQPage 構造化データ(JSON-LD)を出力する", () => {

@@ -8,7 +8,12 @@ import { buildFaqPage, type FaqItem } from "@/lib/structured-data";
 function isFaqItem(value: unknown): value is FaqItem {
   if (typeof value !== "object" || value === null) return false;
   const { question, answer } = value as Record<string, unknown>;
-  return typeof question === "string" && typeof answer === "string";
+  return (
+    typeof question === "string" &&
+    question.trim() !== "" &&
+    typeof answer === "string" &&
+    answer.trim() !== ""
+  );
 }
 
 export default function ReserveFaq() {
