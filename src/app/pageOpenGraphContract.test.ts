@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /**
  * ページ側 openGraph の規約テスト。
@@ -11,6 +12,13 @@ import { globSync, readFileSync } from "node:fs";
  * ソースを直接検査することで、**将来追加されるページも自動的に対象**になる。
  * 個別ページのモックが不要で、規約違反をレビュー前に落とせる。
  * openGraph 自体の中身は pageOpenGraph.test.ts で検証する。
+ *
+ * ⚠️ これは AST 解析ではなく正規表現による近似チェックである。
+ * 精度と網羅性は両立しないため、**偽陽性側に倒す**方針を採る
+ * (通ってしまうより、無関係な記述で落ちて人が見直す方が安い)。
+ * 例えば twitter の検査はコメントや無関係なデータにも反応しうるが、
+ * 落ちたときのメッセージから対象ファイルは分かる。
+ * 逆に、狙って回避する書き方 (動的な代入など) までは防げない。
  */
 const PAGE_FILES = globSync("src/app/**/page.tsx").sort();
 
@@ -130,12 +138,35 @@ describe("ページ側 openGraph の規約", () => {
     // その場合 layout の og には url が無いため og:url が欠落する。
     const missing = PAGE_FILES.filter((file) => {
       const src = readPage(file);
-      return (
-        /export (?:async )?function generateMetadata/.test(src) &&
-        !hasHelperOpenGraph(src)
-      );
+      // 関数宣言形と const 代入形の両方を拾う。
+      const declaresMetadata =
+        /export (?:async )?function generateMetadata/.test(src) ||
+        /export const generateMetadata\s*[:=]/.test(src);
+      return declaresMetadata && !hasHelperOpenGraph(src);
     });
     expect(missing).toEqual([]);
+  });
+
+  it("shouldUseFileImage を使うページは同じ階層に opengraph-image を持つ", () => {
+    // shouldUseFileImage は images キーを落として Next のファイル規約に
+    // 委ねる指定。規約ファイルが無いと og:image / twitter:image が
+    // 丸ごと消えるが、ヘルパ単体では検出できないためここで担保する。
+    // ルートに [locale] / [slug] を含むため glob は使えない
+    // (ブラケットが文字クラスとして解釈される)。存在確認で判定する。
+    const OG_IMAGE_FILES = [
+      "opengraph-image.tsx",
+      "opengraph-image.ts",
+      "opengraph-image.jsx",
+      "opengraph-image.js",
+      "opengraph-image.png",
+      "opengraph-image.jpg",
+    ];
+    const broken = PAGE_FILES.filter((file) => {
+      if (!readPage(file).includes("shouldUseFileImage")) return false;
+      const dir = dirname(file);
+      return !OG_IMAGE_FILES.some((name) => existsSync(join(dir, name)));
+    });
+    expect(broken).toEqual([]);
   });
 
   it("ページ側で twitter を設定しない", () => {

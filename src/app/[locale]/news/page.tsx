@@ -14,6 +14,7 @@ import {
   type NewsCategoryId,
 } from "@/constants/news";
 import { parseLocale, routing } from "@/i18n/routing";
+import { newsLabel } from "@/lib/news/label";
 import { getNewsList } from "@/lib/microcms/queries";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
@@ -53,7 +54,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Metadata" });
-  const title = locale === "ja" ? "ニュース" : "News";
+  const title = newsLabel(locale);
   const description =
     locale === "ja"
       ? "最新のお知らせ・メディア掲載・イベント情報"
@@ -119,7 +120,9 @@ export default async function NewsPage({
   return (
     <>
       <StructuredData
-        data={buildBreadcrumb(locale, [{ name: "News", path: "/news" }])}
+        data={buildBreadcrumb(locale, [
+          { name: newsLabel(locale), path: "/news" },
+        ])}
       />
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">

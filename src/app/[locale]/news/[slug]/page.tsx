@@ -12,6 +12,7 @@ import { TrackedLink } from "@/components/analytics/TrackedLink";
 import StructuredData from "@/components/StructuredData";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
+import { newsLabel } from "@/lib/news/label";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
 import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
 import { EXTERNAL_LINK_PROPS, SITE_URL } from "@/constants/site";
@@ -184,7 +185,7 @@ export default async function NewsDetailPage({
           <NewsArticleJsonLd item={item} locale={locale} />
           <StructuredData
             data={buildBreadcrumb(locale, [
-              { name: "News", path: "/news" },
+              { name: newsLabel(locale), path: "/news" },
               { name: item.title, path: `/news/${item.slug}` },
             ])}
           />
