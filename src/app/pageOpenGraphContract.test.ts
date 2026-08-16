@@ -21,11 +21,28 @@ const PAGE_FILES = globSync("src/app/**/page.tsx").sort();
  */
 const OPEN_GRAPH_ASSIGNMENT = /openGraph\s*[:=]\s*([A-Za-z_$][\w$]*\s*\(|\{)/g;
 
+const HELPER = "buildPageOpenGraph";
+
+/**
+ * openGraph 代入の右辺を正規化して返す。
+ * 関数呼び出しなら関数名、オブジェクトリテラルなら "{"。
+ */
+function openGraphAssignments(src: string): string[] {
+  return [...src.matchAll(OPEN_GRAPH_ASSIGNMENT)].map((m) =>
+    m[1].replace(/\s*\($/, ""),
+  );
+}
+
 /** ヘルパを通さず openGraph を組み立てていれば true。 */
 function hasDirectOpenGraph(src: string): boolean {
-  return [...src.matchAll(OPEN_GRAPH_ASSIGNMENT)].some(
-    (m) => !m[1].startsWith("buildPageOpenGraph"),
-  );
+  // 前方一致だと buildPageOpenGraphLegacy などを取り逃がすため完全一致で見る。
+  return openGraphAssignments(src).some((value) => value !== HELPER);
+}
+
+/** ヘルパの戻り値を実際に openGraph へ入れていれば true。 */
+function hasHelperOpenGraph(src: string): boolean {
+  // import 行だけで通らないよう、代入の右辺そのものを見る。
+  return openGraphAssignments(src).some((value) => value === HELPER);
 }
 
 /** ページ側で twitter を組み立てていれば true。 */
@@ -65,6 +82,22 @@ describe("規約チェッカ自体の検出力", () => {
     ).toBe(false);
   });
 
+  it("名前が前方一致するだけの別関数は検出する", () => {
+    expect(
+      hasDirectOpenGraph("  openGraph: buildPageOpenGraphLegacy({ url }),"),
+    ).toBe(true);
+  });
+
+  it("import しただけで openGraph に入れていなければ使用とみなさない", () => {
+    const importOnly =
+      'import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";\n' +
+      "export async function generateMetadata() {\n  return { title: 'T' };\n}";
+    expect(hasHelperOpenGraph(importOnly)).toBe(false);
+    expect(
+      hasHelperOpenGraph("  openGraph: buildPageOpenGraph({ url }),"),
+    ).toBe(true);
+  });
+
   it("twitter はプロパティ形・代入形の両方を検出する", () => {
     expect(hasPageTwitter("  twitter: { card: 'x' },")).toBe(true);
     expect(hasPageTwitter("  meta.twitter = { card: 'x' };")).toBe(true);
@@ -92,7 +125,7 @@ describe("ページ側 openGraph の規約", () => {
       const src = readPage(file);
       return (
         /export (?:async )?function generateMetadata/.test(src) &&
-        !src.includes("buildPageOpenGraph")
+        !hasHelperOpenGraph(src)
       );
     });
     expect(missing).toEqual([]);
