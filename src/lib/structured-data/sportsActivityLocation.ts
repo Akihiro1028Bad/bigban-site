@@ -4,7 +4,7 @@ import {
   INSTAGRAM_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
   LABOLA_SHOP_URL,
-  TENNISBEAR_CIRCLE_URL,
+  TENNISBEAR_EVENTS_URL,
 } from "@/constants/site";
 
 export interface LocationFeatureSpecification {
@@ -87,7 +87,7 @@ const SAME_AS = [
   INSTAGRAM_URL,
   GOOGLE_BUSINESS_PROFILE_URL,
   LABOLA_SHOP_URL,
-  TENNISBEAR_CIRCLE_URL,
+  TENNISBEAR_EVENTS_URL,
 ] as const;
 
 export function buildSportsActivityLocation(
