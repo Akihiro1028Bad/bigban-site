@@ -37,7 +37,7 @@ export default function ReserveFaq() {
         </div>
       </div>
 
-      <StructuredData data={buildFaqPage(items)} />
+      {items.length > 0 && <StructuredData data={buildFaqPage(items)} />}
     </section>
   );
 }

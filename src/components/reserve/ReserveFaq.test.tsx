@@ -28,12 +28,15 @@ function formatAmount(amount: number): string {
   return `¥${amount.toLocaleString("en-US")}`;
 }
 
-/** 会費と適用上限(¥10,000 / 20時間)を HomePricing の凡例から取り出す。 */
-function membershipFacts(): string[] {
-  const legend = jaMessages.HomePricing.memberLegend;
+/**
+ * 会費と適用上限を、同じロケールの HomePricing 凡例から取り出す。
+ * 上限は「20時間」「20 hours」まで含めて照合し、単なる数字の一致で
+ * 通ってしまわないようにする。
+ */
+function membershipFacts(legend: string, hoursPattern: RegExp): string[] {
   const fee = legend.match(/¥[\d,]+/)?.[0];
-  const hours = legend.match(/月(\d+)時間/)?.[1];
-  if (!fee || !hours) throw new Error("memberLegend から会費/上限を読めない");
+  const hours = legend.match(hoursPattern)?.[0];
+  if (!fee || !hours) throw new Error(`memberLegend から会費/上限を読めない: ${legend}`);
   return [fee, hours];
 }
 
@@ -83,11 +86,23 @@ describe("ReserveFaq", () => {
   });
 
   it.each([
-    { locale: "ja", messages: jaMessages as unknown, match: /1時間あたり/ },
-    { locale: "en", messages: enMessages as unknown, match: /per hour/ },
+    {
+      locale: "ja",
+      messages: jaMessages as unknown,
+      match: /1時間あたり/,
+      legend: jaMessages.HomePricing.memberLegend,
+      hoursPattern: /\d+時間/,
+    },
+    {
+      locale: "en",
+      messages: enMessages as unknown,
+      match: /per hour/,
+      legend: enMessages.HomePricing.memberLegend,
+      hoursPattern: /\d+ hours/,
+    },
   ])(
     "$locale の料金の回答が COURT_PRICES と会員制度の表記に一致する",
-    ({ locale, messages, match }) => {
+    ({ locale, messages, match, legend, hoursPattern }) => {
       renderWithIntl(<ReserveFaq />, { messages, locale });
       const standard = priceRange((row) => [row.weekday, row.weekend]);
       const member = priceRange((row) => [row.weekdayMember, row.weekendMember]);
@@ -97,7 +112,7 @@ describe("ReserveFaq", () => {
         expect(answer).toContain(price);
       }
       // 会費と適用上限は HomePricing の凡例が正。FAQ 側の数字がずれたら落とす。
-      for (const fact of membershipFacts()) {
+      for (const fact of membershipFacts(legend, hoursPattern)) {
         expect(answer).toContain(fact);
       }
     },
@@ -130,8 +145,12 @@ describe("ReserveFaq", () => {
     (
       broken.Reserve.faq as unknown as { items: unknown }
     ).items = "not-an-array";
-    renderWithIntl(<ReserveFaq />, { messages: broken });
+    const { container } = renderWithIntl(<ReserveFaq />, { messages: broken });
     expect(screen.getByText("よくある質問")).toBeInTheDocument();
     expect(screen.queryByText("営業時間は？")).not.toBeInTheDocument();
+    // 空の mainEntity を持つ FAQPage を publish するくらいなら出さない。
+    expect(
+      container.querySelector('script[type="application/ld+json"]'),
+    ).toBeNull();
   });
 });

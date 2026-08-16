@@ -129,8 +129,9 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    // 特商法ページ(Tokushoho.paymentMethodValue)の法定表示と同じ3種を並べる。
-    paymentAccepted: "Credit Card, PayPay, Bank Transfer",
+    // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページの
+    // 銀行振込は RST Agency の通信販売条件であり、来場者の決済手段ではない。
+    paymentAccepted: "Credit Card, PayPay",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
     description: DESCRIPTION,
