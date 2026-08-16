@@ -129,7 +129,10 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    paymentAccepted: "Cash, Credit Card",
+    // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページは
+    // 銀行振込を含む3種を法定表示しているが、あちらは請求・振込を伴う取引も
+    // 含む網羅列挙なので、施設情報としてはここに載せない。
+    paymentAccepted: "Credit Card, PayPay",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
     description: DESCRIPTION,
