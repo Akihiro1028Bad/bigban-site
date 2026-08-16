@@ -80,7 +80,7 @@ describe("ReserveFaq", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "クレジットカード・PayPay がご利用いただけます。",
+        "現地でのお支払いは、クレジットカード・PayPay がご利用いただけます。",
       ),
     ).toBeInTheDocument();
   });
@@ -126,7 +126,7 @@ describe("ReserveFaq", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Credit cards and PayPay are accepted."),
+      screen.getByText("On-site payments can be made by credit card or PayPay."),
     ).toBeInTheDocument();
   });
 
