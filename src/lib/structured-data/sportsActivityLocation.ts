@@ -145,7 +145,7 @@ export function buildSportsActivityLocation(
       name,
       value: true,
     })),
-    hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
+    hasMap: GOOGLE_BUSINESS_PROFILE_URL,
     paymentAccepted: "Cash, Credit Card",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
