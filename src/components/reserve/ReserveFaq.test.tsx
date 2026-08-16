@@ -1,17 +1,39 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { COURT_PRICES } from "@/constants/pricing";
 import ReserveFaq from "./ReserveFaq";
 import jaMessages from "../../../messages/ja.json";
+import enMessages from "../../../messages/en.json";
 
 import type { ReactElement } from "react";
 
-function renderWithIntl(ui: ReactElement, messages: unknown = jaMessages) {
+function renderWithIntl(
+  ui: ReactElement,
+  { messages = jaMessages as unknown, locale = "ja" } = {},
+) {
   return render(
-    <NextIntlClientProvider locale="ja" messages={messages as never}>
+    <NextIntlClientProvider locale={locale} messages={messages as never}>
       {ui}
     </NextIntlClientProvider>,
   );
+}
+
+/** "¥4,980" → 4980。料金表の表記から数値レンジを導くための変換。 */
+function toAmount(price: string): number {
+  return Number(price.replace(/[^0-9]/g, ""));
+}
+
+function formatAmount(amount: number): string {
+  return `¥${amount.toLocaleString("en-US")}`;
+}
+
+function priceRange(pick: (row: (typeof COURT_PRICES)[number]) => string[]) {
+  const amounts = COURT_PRICES.flatMap(pick).map(toAmount);
+  return {
+    min: formatAmount(Math.min(...amounts)),
+    max: formatAmount(Math.max(...amounts)),
+  };
 }
 
 describe("ReserveFaq", () => {
@@ -51,6 +73,33 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
+  it("料金の回答が COURT_PRICES のレンジと一致する", () => {
+    renderWithIntl(<ReserveFaq />);
+    const standard = priceRange((row) => [row.weekday, row.weekend]);
+    const member = priceRange((row) => [row.weekdayMember, row.weekendMember]);
+    const answer = screen.getByText(/1時間あたり/).textContent ?? "";
+
+    expect(answer).toContain(`${standard.min}〜${standard.max}`);
+    expect(answer).toContain(`${member.min}〜${member.max}`);
+  });
+
+  it("英語ロケールで更新した3問の回答を表示する", () => {
+    renderWithIntl(<ReserveFaq />, { messages: enMessages, locale: "en" });
+    expect(
+      screen.getByText(
+        "Choose the option that matches what you'd like to do — court rental, events and school sessions, the HYROX area, or lessons and classes. You'll complete your booking on the reservation page for that option.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. With PBT CLUB membership (¥10,000/month, tax included), it's ¥3,500 to ¥5,600 for up to 20 hours a month. The HYROX area is the same rate (up to 4 people; +¥1,000 per additional person).",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Credit cards and PayPay are accepted."),
+    ).toBeInTheDocument();
+  });
+
   it("FAQPage 構造化データ(JSON-LD)を出力する", () => {
     const { container } = renderWithIntl(<ReserveFaq />);
     const script = container.querySelector(
@@ -66,7 +115,7 @@ describe("ReserveFaq", () => {
     (
       broken.Reserve.faq as unknown as { items: unknown }
     ).items = "not-an-array";
-    renderWithIntl(<ReserveFaq />, broken);
+    renderWithIntl(<ReserveFaq />, { messages: broken });
     expect(screen.getByText("よくある質問")).toBeInTheDocument();
     expect(screen.queryByText("営業時間は？")).not.toBeInTheDocument();
   });
