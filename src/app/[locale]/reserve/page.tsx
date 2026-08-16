@@ -25,6 +25,11 @@ import type { Metadata } from "next";
  *
  * labola 本番運用に切り替えたら、このフラグを false に戻すだけで既存ページに復元される。
  * （埋め込み版のコード・タブ解決ロジックはこのファイルにそのまま残してある）
+ *
+ * ⚠️ false に戻す際は、案内ページ前提の文言も併せて戻すこと:
+ * `Reserve.faq.items[1]`（4つの予約先から選ぶ案内）と
+ * `Metadata.reserve.description`（予約案内ページ）はこのフラグの外にあり、
+ * 埋め込み版に戻すとページに無い導線を説明したままになる。
  */
 const RESERVE_GUIDANCE_MODE = true;
 

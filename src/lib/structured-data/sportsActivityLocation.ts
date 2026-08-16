@@ -129,8 +129,9 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページの
-    // 銀行振込は RST Agency の通信販売条件であり、来場者の決済手段ではない。
+    // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページは
+    // 銀行振込を含む3種を法定表示しているが、あちらは請求・振込を伴う取引も
+    // 含む網羅列挙なので、施設情報としてはここに載せない。
     paymentAccepted: "Credit Card, PayPay",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
