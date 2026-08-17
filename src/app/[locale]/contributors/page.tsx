@@ -3,9 +3,10 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import StructuredData from "@/components/StructuredData";
 import ContributorsContent from "@/components/contributors/ContributorsContent";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
 import { buildBreadcrumb } from "@/lib/structured-data";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import type { Metadata } from "next";
 
@@ -28,13 +29,11 @@ export async function generateMetadata({
     title: t("contributors.title"),
     description: t("contributors.description"),
     keywords,
-    openGraph: {
-      title: t("contributors.title"),
-      description: t("contributors.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

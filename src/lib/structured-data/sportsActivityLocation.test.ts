@@ -126,6 +126,20 @@ describe("buildSportsActivityLocation", () => {
     );
   });
 
+  it("sameAs にGBP・labola・テニスベアの外部プロフィールを束ねる", async () => {
+    const { buildSportsActivityLocation } = await import(
+      "./sportsActivityLocation"
+    );
+    const schema = buildSportsActivityLocation("ja");
+
+    expect(schema.sameAs).toEqual([
+      "https://www.instagram.com/thepicklebangtheory",
+      "https://maps.app.goo.gl/Hjm2wMkZ6SXVoJKq7",
+      "https://yoyaku.labola.jp/r/shop/3473/",
+      "https://www.tennisbear.net/pickleball/circle/36659/events",
+    ]);
+  });
+
   it("parentOrganizationで運営会社と連結する", async () => {
     const { buildSportsActivityLocation } = await import(
       "./sportsActivityLocation"
@@ -196,7 +210,7 @@ describe("buildSportsActivityLocation", () => {
     );
     const schema = buildSportsActivityLocation("ja");
 
-    expect(schema.paymentAccepted).toBe("Cash, Credit Card");
+    expect(schema.paymentAccepted).toBe("Credit Card, PayPay");
     expect(schema.currenciesAccepted).toBe("JPY");
   });
 

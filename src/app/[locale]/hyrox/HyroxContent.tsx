@@ -11,14 +11,16 @@ import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
 
 export default function HyroxContent() {
+  const showColumns = isCmsColumnsEnabled();
+
   return (
     <>
-      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+      <HomeNavigation showColumns={showColumns} />
       <main>
         <HyroxHero />
         <HyroxFacility />
         <HyroxServices />
-        <HyroxIntro />
+        <HyroxIntro showColumnLink={showColumns} />
         <HyroxFilm />
         <HyroxCoach />
         <HyroxProgram />

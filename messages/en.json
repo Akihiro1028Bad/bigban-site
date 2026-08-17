@@ -81,7 +81,7 @@
     },
     "reserve": {
       "title": "Reservation",
-      "description": "Book a court at THE PICKLE BANG THEORY. Pick your time and reserve online in seconds. 1 min from Motoyawata Station, open 6:00–23:00."
+      "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00–23:00."
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
@@ -217,11 +217,11 @@
         },
         {
           "question": "How do I make a reservation?",
-          "answer": "Choose your preferred date and time on the reservation page to book a court or the HYROX area online."
+          "answer": "Choose the option that matches what you'd like to do — court rental, events and school sessions, the HYROX area, or lessons and classes. You'll complete your booking on the reservation page for that option."
         },
         {
           "question": "How much is court rental?",
-          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate (up to 4 people; +¥1,000 per additional person)."
+          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate as the courts (up to 4 people; +¥1,000 per additional person). With PBT CLUB membership (¥10,000/month, tax included), both come to ¥3,500 to ¥5,600 per hour for up to 20 hours a month."
         },
         {
           "question": "Where are you located?",
@@ -233,7 +233,7 @@
         },
         {
           "question": "What payment methods do you accept?",
-          "answer": "Cash and credit cards are accepted."
+          "answer": "On-site payments can be made by credit card or PayPay."
         }
       ]
     }
@@ -635,7 +635,7 @@
     "delivery": "Delivery",
     "deliveryValue": "Same-day delivery",
     "paymentMethod": "Payment Method",
-    "paymentMethodValue": "Bank transfer or credit card",
+    "paymentMethodValue": "Bank transfer, credit card, or PayPay",
     "paymentTiming": "Payment Timing",
     "paymentTimingValue": "Immediate",
     "cardPayment": "Card Payment",
@@ -773,7 +773,8 @@
     "whatIs": {
       "title": "WHAT IS HYROX",
       "titleJa": "About HYROX",
-      "lead": "HYROX is a fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard."
+      "lead": "HYROX is a fitness race: eight rounds that alternate a 1km run with one functional workout. You run 8km in total while completing eight stations — a pure test of endurance where everyone from beginners to elite athletes races to the same standard.",
+      "columnLink": "Read our beginner's guide to HYROX — rules, the 8 stations, and how to start"
     },
     "film": {
       "kicker": "OFFICIAL FILM"

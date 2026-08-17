@@ -22,12 +22,19 @@ vi.mock("@/components/home/HomeNavigation", () => ({
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: () => true,
 }));
-vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
+vi.mock("@/components/home/HomeFooter", () => ({
+  default: () => <footer data-testid="home-footer" />,
+}));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveChoice", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveCalendar", () => ({ default: () => null }));
-vi.mock("@/components/reserve/ReserveInfo", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveInfo", () => ({
+  default: () => <section data-testid="reserve-info" />,
+}));
+vi.mock("@/components/reserve/ReserveFaq", () => ({
+  default: () => <section data-testid="reserve-faq" />,
+}));
 
 function buildMockT() {
   return ((key: string) => `translated:${key}`) as unknown as (
@@ -109,6 +116,28 @@ describe("ReservePage", () => {
     expect(screen.getByTestId("home-navigation")).toHaveAttribute(
       "data-show-columns",
       "true",
+    );
+  });
+
+  it("FAQ を ReserveInfo の後に掲出する", async () => {
+    const { default: ReservePage } = await import("./page");
+    const element = await ReservePage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
+    });
+    render(element);
+
+    const info = screen.getByTestId("reserve-info");
+    const faq = screen.getByTestId("reserve-faq");
+    const footer = screen.getByTestId("home-footer");
+    // FOLLOWING ビットは CONTAINED_BY と同時に立つため、入れ子化を
+    // 兄弟の前後関係と取り違えないようマスク全体を突き合わせる。
+    expect(info.compareDocumentPosition(faq)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // フッターより後ろへ落ちる回帰を防ぐため、前後どちらの境界も固定する。
+    expect(faq.compareDocumentPosition(footer)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
   });
 

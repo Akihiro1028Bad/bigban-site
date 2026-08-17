@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import TeaserPage from "./TeaserPage";
 
@@ -25,13 +26,11 @@ export async function generateMetadata({
     description: t("home.description"),
     keywords,
     robots: { index: false, follow: false },
-    openGraph: {
-      title: t("home.title"),
-      description: t("home.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

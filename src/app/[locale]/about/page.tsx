@@ -5,11 +5,12 @@ import type { Metadata } from "next";
 import StructuredData from "@/components/StructuredData";
 import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
-import { SITE_URL, OG_IMAGE } from "@/constants/site";
+import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
 import { getNewsList } from "@/lib/microcms/queries";
 import { buildBreadcrumb } from "@/lib/structured-data";
+import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import type { NewsItem } from "@/lib/microcms/schema";
 
 import AboutContent from "./AboutContent";
@@ -39,13 +40,11 @@ export async function generateMetadata({
     title: t("about.title"),
     description: t("about.description"),
     keywords,
-    openGraph: {
-      title: t("about.title"),
-      description: t("about.description"),
+    openGraph: buildPageOpenGraph({
+      siteName: t("og.siteName"),
       url: canonicalUrl,
-      locale: locale === "ja" ? "ja_JP" : "en_US",
-      images: [OG_IMAGE],
-    },
+      locale,
+    }),
     alternates: {
       canonical: canonicalUrl,
       languages: {

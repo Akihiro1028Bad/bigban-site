@@ -1,4 +1,11 @@
-import { SITE_URL, RESERVE_PATH } from "@/constants/site";
+import {
+  SITE_URL,
+  RESERVE_PATH,
+  INSTAGRAM_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  LABOLA_SHOP_URL,
+  TENNISBEAR_EVENTS_URL,
+} from "@/constants/site";
 
 export interface LocationFeatureSpecification {
   "@type": "LocationFeatureSpecification";
@@ -73,6 +80,16 @@ const DESCRIPTION =
 
 const SLOGAN = "小さなディンクから、大きなムーブメントへ。";
 
+// 施設の同一性シグナル。ここに並ぶ外部プロフィールが本サイトと同一実体である
+// ことを申告し、ナレッジパネル / ローカルパックでの実体解決を助ける。
+// 自サイトの URL は url / @id で示すため含めない。
+const SAME_AS = [
+  INSTAGRAM_URL,
+  GOOGLE_BUSINESS_PROFILE_URL,
+  LABOLA_SHOP_URL,
+  TENNISBEAR_EVENTS_URL,
+] as const;
+
 export function buildSportsActivityLocation(
   _locale: string
 ): SportsActivityLocationSchema {
@@ -117,7 +134,7 @@ export function buildSportsActivityLocation(
         closes: "23:00",
       },
     ],
-    sameAs: ["https://www.instagram.com/thepicklebangtheory"],
+    sameAs: [...SAME_AS],
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
     potentialAction: {
       "@type": "ReserveAction",
@@ -129,7 +146,10 @@ export function buildSportsActivityLocation(
       value: true,
     })),
     hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
-    paymentAccepted: "Cash, Credit Card",
+    // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページは
+    // 銀行振込を含む3種を法定表示しているが、あちらは請求・振込を伴う取引も
+    // 含む網羅列挙なので、施設情報としてはここに載せない。
+    paymentAccepted: "Credit Card, PayPay",
     currenciesAccepted: "JPY",
     alternateName: [...ALTERNATE_NAMES],
     description: DESCRIPTION,

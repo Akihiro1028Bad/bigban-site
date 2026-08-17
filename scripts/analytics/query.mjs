@@ -6,7 +6,9 @@
 // 運用手順: docs/operations/interactive-analysis-runbook.md
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { CTA_EVENTS } from "./ctaEvents.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -94,18 +96,6 @@ function fmtDelta(cur, prev) {
   const pct = Math.round(((cur - prev) / prev) * 100);
   return `${pct >= 0 ? "+" : ""}${pct}%`;
 }
-
-// 正典: scripts/growth/ctaEvents.ts と同じイベント名(値の重複定義を避けるため主要CTAのみ)
-const CTA_EVENTS = [
-  "reservation_click",
-  "reserve_entry_click",
-  "line_click",
-  "instagram_click",
-  "access_click",
-  "price_click",
-  "contact_submit",
-  "news_cta_click",
-];
 
 const BRAND_QUERY = /ピックル.?バン|pickle\s*bang|pbt|セオリー|rst\s*agency/i;
 
@@ -266,7 +256,10 @@ async function main() {
   );
 }
 
-main().catch((e) => {
-  console.error(`分析スクリプト失敗: ${e.message}`);
-  process.exit(1);
-});
+// import されても副作用が出ないよう、直接実行時のみ main() を走らせる。
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(`分析スクリプト失敗: ${e.message}`);
+    process.exit(1);
+  });
+}

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
+import { SITE_URL } from "@/constants/site";
+
 import { makeParsedColumnItem } from "../../../../../__mocks__/columns-fixtures";
 
 const getColumnDetailMock = vi.fn();
@@ -27,7 +29,11 @@ vi.mock("@/lib/microcms/columnsQueries", () => ({
 vi.mock("next/navigation", () => ({
   notFound: () => notFoundMock(),
 }));
-vi.mock("next-intl/server", () => ({ setRequestLocale: vi.fn() }));
+vi.mock("next-intl/server", () => ({
+  setRequestLocale: vi.fn(),
+  getTranslations: async () => (k: string) =>
+    k === "og.siteName" ? "THE PICKLE BANG THEORY" : k,
+}));
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: isCmsColumnsEnabledMock,
 }));
@@ -42,6 +48,18 @@ vi.mock("@/components/news/NewsBodyRenderer", () => ({
 vi.mock("@/components/news/PreviewBanner", () => ({
   PreviewBanner: () => <div data-testid="preview-banner" />,
 }));
+
+function readJsonLdAll(): Record<string, unknown>[] {
+  return Array.from(
+    document.querySelectorAll<HTMLScriptElement>(
+      'script[type="application/ld+json"]',
+    ),
+  ).map((s) => JSON.parse(s.textContent ?? "{}") as Record<string, unknown>);
+}
+
+function findJsonLd(type: string): Record<string, unknown> | undefined {
+  return readJsonLdAll().find((d) => d["@type"] === type);
+}
 
 async function renderPage(
   params: { locale: string; slug: string },
@@ -321,5 +339,136 @@ describe("ColumnDetailPage", () => {
       { contentId: "c-1", draftKey: "dk" },
     );
     expect(screen.getByText("公開版")).toBeInTheDocument();
+  });
+
+  it("公開版: Article JSON-LD を出力する (ja)", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "屋内の始め方" }),
+    );
+    await renderPage({ locale: "ja", slug: "x" });
+    const article = findJsonLd("Article");
+    expect(article).toBeDefined();
+    expect(article?.headline).toBe("屋内の始め方");
+    expect(article?.inLanguage).toBe("ja");
+    expect(article?.mainEntityOfPage).toEqual({
+      "@type": "WebPage",
+      "@id": `${SITE_URL}/columns/x`,
+    });
+  });
+
+  it("公開版: BreadcrumbList JSON-LD を出力する (ja)", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "屋内の始め方" }),
+    );
+    await renderPage({ locale: "ja", slug: "x" });
+    const bc = findJsonLd("BreadcrumbList");
+    expect(bc).toBeDefined();
+    const items = bc?.itemListElement as { name: string; item: string }[];
+    expect(items).toHaveLength(3);
+    expect(items[1]).toMatchObject({
+      name: "コラム",
+      item: `${SITE_URL}/columns`,
+    });
+    expect(items[2]).toMatchObject({
+      name: "屋内の始め方",
+      item: `${SITE_URL}/columns/x`,
+    });
+  });
+
+  it("公開版: en は JSON-LD の URL とラベルを英語側に切り替える", async () => {
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "Indoor basics", locale: "en" }),
+    );
+    await renderPage({ locale: "en", slug: "x" });
+    expect(findJsonLd("Article")?.mainEntityOfPage).toEqual({
+      "@type": "WebPage",
+      "@id": `${SITE_URL}/en/columns/x`,
+    });
+    const items = findJsonLd("BreadcrumbList")?.itemListElement as {
+      name: string;
+      item: string;
+    }[];
+    expect(items[1]).toMatchObject({
+      name: "Column",
+      item: `${SITE_URL}/en/columns`,
+    });
+  });
+
+  it("generateMetadata: 公開版は og:url と type=article を出す", async () => {
+    getColumnDetailMock.mockImplementation(async ({ locale }: { locale: string }) =>
+      locale === "ja"
+        ? makeParsedColumnItem({
+            slug: "x",
+            publishedAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-02T00:00:00.000Z",
+          })
+        : null,
+    );
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).toMatchObject({
+      type: "article",
+      url: `${SITE_URL}/columns/x`,
+      publishedTime: "2026-04-01T00:00:00.000Z",
+      modifiedTime: "2026-04-02T00:00:00.000Z",
+    });
+  });
+
+  it("generateMetadata: openGraph に images を出さない (記事アイキャッチを活かす)", async () => {
+    // images を持つと Next が opengraph-image.tsx のファイル規約を
+    // 適用しなくなり、og:image が共通ロゴに退化する。
+    getColumnDetailMock.mockResolvedValue(makeParsedColumnItem({ slug: "x" }));
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).not.toHaveProperty("images");
+  });
+
+  it("generateMetadata: publishedAt 無しは createdAt を publishedTime に使う", async () => {
+    const base = makeParsedColumnItem({
+      slug: "x",
+      createdAt: "2026-02-02T00:00:00.000Z",
+    });
+    const { publishedAt: _p, ...rest } = base;
+    void _p;
+    getColumnDetailMock.mockResolvedValue(rest);
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(meta.openGraph).toMatchObject({
+      publishedTime: "2026-02-02T00:00:00.000Z",
+    });
+  });
+
+  it("generateMetadata: プレビューは openGraph を出さない", async () => {
+    getColumnByContentIdMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", locale: "ja" }),
+    );
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: "ja", slug: "x" }),
+      searchParams: Promise.resolve({ contentId: "c-1", draftKey: "dk" }),
+    });
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(meta.openGraph).toBeUndefined();
+  });
+
+  it("プレビュー中は JSON-LD を出力しない (noindex と揃える)", async () => {
+    getColumnByContentIdMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "x", title: "下書き", locale: "ja" }),
+    );
+    await renderPage(
+      { locale: "ja", slug: "x" },
+      { contentId: "c-1", draftKey: "dk" },
+    );
+    expect(screen.getByTestId("preview-banner")).toBeInTheDocument();
+    expect(readJsonLdAll()).toHaveLength(0);
   });
 });
