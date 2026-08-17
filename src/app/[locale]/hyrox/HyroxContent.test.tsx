@@ -46,4 +46,11 @@ describe("HyroxContent", () => {
     expect(screen.getByTestId("footer")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "HYROX" })).toBeInTheDocument();
   });
+
+  it("コラム CMS 有効時、入門コラムへの内部リンクを描画する", () => {
+    renderWithIntl(<HyroxContent />);
+    expect(
+      screen.getByRole("link", { name: /ハイロックスとは/ }),
+    ).toHaveAttribute("href", "/columns/hyrox-beginners-guide");
+  });
 });
