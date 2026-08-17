@@ -1,7 +1,11 @@
 # ニュース原稿: PPT クロブルドン 開催告知
 
 出典: テニスベアのイベントページ（オーナー提供テキスト）。
-microCMS MCP 未接続のセッションで作成したため、**本ファイルの内容をそのまま microCMS の各フィールドに貼り付ける**か、MCP 接続済みセッションで投入する。
+
+**投入先: 本番環境 (prod / service ID `thepicklebang`)**
+作成後の管理画面 URL: https://thepicklebang.microcms.io/apis/news/ppt-kuroburudon
+
+microCMS MCP 未接続のセッションで作成したため、**本ファイルの内容をそのまま microCMS の各フィールドに貼り付ける**か、`microcms-prod` MCP 接続済みのローカルセッションで投入する。
 
 ## 未確定 / 要差し込み項目
 
