@@ -30,10 +30,10 @@ export default function HomeHyroxPromo() {
             className="object-cover object-[60%_30%] transition-transform duration-[1200ms] ease-out group-hover:scale-105 md:object-[70%_center]"
           />
           {/* モバイル: 下方向のスクリム（写真を見せつつ下部の文字を読みやすく） */}
-          <div className="absolute inset-0 bg-gradient-to-t from-deep-black from-30% via-deep-black/80 to-deep-black/25 md:hidden" />
-          {/* PC: 左重心のグラデーション */}
-          <div className="absolute inset-0 hidden bg-gradient-to-r from-deep-black via-deep-black/70 to-deep-black/20 md:block" />
-          <div className="absolute inset-0 hidden bg-gradient-to-t from-deep-black/80 to-transparent md:block" />
+          <div className="absolute inset-0 bg-gradient-to-t from-deep-black/75 from-10% via-deep-black/20 to-transparent md:hidden" />
+          {/* PC: 左重心のグラデーション（テキスト周りだけ最小限に沈め、被写体は見せる） */}
+          <div className="absolute inset-0 hidden bg-gradient-to-r from-deep-black/65 via-deep-black/10 via-40% to-transparent md:block" />
+          <div className="absolute inset-0 hidden bg-gradient-to-t from-deep-black/25 to-transparent md:block" />
           {/* アクセントのトップライン */}
           <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
 
