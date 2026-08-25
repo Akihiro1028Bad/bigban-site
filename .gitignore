@@ -38,7 +38,12 @@ yarn-error.log*
 .idea/
 
 # local assistant app settings
-.claude/
+# NOTE: この2行はセット。`.claude/*` を `.claude/` に戻すと否定パターンが
+#       エラーにならず静かに無効化され、skills が追跡対象から外れる。
+#       skills はクラウドセッション(claude.ai/code・スマホ)が読み込むためコミットする。
+#       このリポジトリは public なので、置くスキルは公開前提で判断すること。
+.claude/*
+!.claude/skills/
 
 # turbopack
 .turbo/
@@ -68,7 +73,7 @@ test-results/
 blob-report/
 
 # local claude config & scratch
-.claude/
+# (.claude の除外/再包含は上部の "local assistant app settings" に集約)
 
 # local secrets (OAuth client, credentials — never commit)
 secrets/
@@ -81,3 +86,6 @@ data/
 
 # AI生成画像の作業ファイル(microCMSへアップロード済み。リポジトリに含めない)
 public/images/news/
+
+# 画像処理などの作業用スクラッチ(中間ファイルが数百MBになるため追跡しない)
+/tmp/

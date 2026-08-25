@@ -1,7 +1,9 @@
-# 朝のリサーチブリーフ（クラウドルーチン用プロンプト）
+# 朝のリサーチブリーフ（ローカル日次タスク用プロンプト・正本）
 
-> このファイルの本文全体が、毎朝 08:00 JST に実行されるクラウドルーチン「Morning research briefing」のプロンプトです。
+> このファイルの本文全体が、毎朝 08:00 JST に実行されるローカル日次タスク「morning-brief」のプロンプトの正本です。
+> タスク本体（`~/.claude/scheduled-tasks/morning-brief/SKILL.md`）はこのファイルへのポインタであり、手順はすべてここに書く（二重管理しない）。
 > 実行するセッションは会話の文脈を持ちません。必要な前提はすべてここに書いてあります。
+> 2026-08-11 にクラウドルーチンからローカルへ移行（クラウドでは Web 検索と Instagram 実測が失敗するため）。Mac が起動していない朝は走らない。生存確認は Notion の当日ページ有無で行う。
 > 設計の正典: `docs/superpowers/specs/2026-08-05-growth-copilot-design.md` §5（週次 R1 の供給側）
 > 収穫側の契約: `docs/growth/routines/weekly-driver.md` 「Step R / R1. Morning Business Brief の収穫」
 
@@ -37,12 +39,14 @@
 
 ## 使えるもの / 使えないもの
 
-| 使える | 使えない（依存する指示を実行しない） |
+ローカル実行なので技術的にはリポジトリ・microCMS MCP・画像生成 CLI にも手が届くが、**役割分離のため使わない**。このルーチンの権限は「リサーチと Notion 保存」の範囲に固定する。
+
+| 使える | 使わない（できるが、やらない。依存する指示も実行しない） |
 |---|---|
-| Web 検索 | microCMS MCP（記事の読み書き・投入・公開） |
-| WebFetch（公開ページの取得） | 画像生成 CLI（`npm run growth:*`。ローカル専用） |
+| Web 検索 | microCMS MCP（記事の読み書き・投入・公開は対話の担当） |
+| WebFetch / `curl`（公開ページの取得） | 画像生成 CLI（`npm run growth:*` は対話の担当） |
 | Notion コネクタ（下記 DB の読み書き） | LINE 配信 |
-| — | リポジトリの書き込み・`git`・`gh`・PR 作成 |
+| リポジトリの**読み取り**（この正本を読むためだけ） | リポジトリの書き込み・`git`・`gh`・PR 作成 |
 | — | 本番デプロイ・環境変数の変更 |
 | — | GA4 / Search Console（`query.mjs` は週次の担当） |
 
@@ -133,7 +137,7 @@ Web 検索で、**日本国内**の動きを調べる（最大4行）。見る�
 
 #### 5-a. 自アカウントの実測（毎朝必ず記録・省略禁止）
 
-**まず curl で取得する**（2026-08-05 疎通診断: curl は 200 で成功・WebFetch は 429 になりやすい）:
+**まず curl で取得する**（ローカル実行の第一手。2026-08-05 疎通診断: curl は 200 で成功・WebFetch は 429 になりやすい）:
 
 ```bash
 curl -sL -m 15 https://www.instagram.com/thepicklebangtheory/ | grep -o 'content="[^"]*Followers[^"]*"' | head -1

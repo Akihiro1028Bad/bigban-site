@@ -3,6 +3,22 @@
     "figma": {
       "command": "npx",
       "args": ["-y", "@anthropic-ai/figma-mcp-server@latest"]
+    },
+    "microcms-dev": {
+      "command": "npx",
+      "args": ["-y", "microcms-mcp-server@0.11.0"],
+      "env": {
+        "MICROCMS_SERVICE_ID": "${MICROCMS_DEV_SERVICE_ID}",
+        "MICROCMS_API_KEY": "${MICROCMS_DEV_API_KEY}"
+      }
+    },
+    "microcms-prod": {
+      "command": "npx",
+      "args": ["-y", "microcms-mcp-server@0.11.0"],
+      "env": {
+        "MICROCMS_SERVICE_ID": "${MICROCMS_PROD_SERVICE_ID}",
+        "MICROCMS_API_KEY": "${MICROCMS_PROD_API_KEY}"
+      }
     }
   }
 }
