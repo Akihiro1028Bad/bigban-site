@@ -8,6 +8,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  buildArticleRows,
+  formatArticleRow,
+  formatDelta as fmtDelta,
+  isBrandQuery,
+  sumEntrySessions,
+} from "./articleMetrics.mjs";
 import { CTA_EVENTS } from "./ctaEvents.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -91,13 +98,25 @@ async function accessToken(env) {
   return (await res.json()).access_token;
 }
 
-function fmtDelta(cur, prev) {
-  if (!prev) return "new";
-  const pct = Math.round(((cur - prev) / prev) * 100);
-  return `${pct >= 0 ? "+" : ""}${pct}%`;
-}
+/** GA4 の記事系ページを絞り込む OR フィルタ(pagePath が columns / news を含む)。 */
+const ARTICLE_PAGE_FILTER = {
+  orGroup: {
+    expressions: [
+      { filter: { fieldName: "pagePath", stringFilter: { matchType: "CONTAINS", value: "/columns/" } } },
+      { filter: { fieldName: "pagePath", stringFilter: { matchType: "CONTAINS", value: "/news/" } } },
+    ],
+  },
+};
 
-const BRAND_QUERY = /ピックル.?バン|pickle\s*bang|pbt|セオリー|rst\s*agency/i;
+/** GA4 レポートの行を Map(ディメンション値 → メトリクス値)に畳む。 */
+function rowsToMap(report, { dimensionIndex = 0, metricIndex = 0 } = {}) {
+  const result = new Map();
+  for (const row of report.rows ?? []) {
+    const key = row.dimensionValues[dimensionIndex].value;
+    result.set(key, (result.get(key) ?? 0) + +row.metricValues[metricIndex].value);
+  }
+  return result;
+}
 
 async function main() {
   const { days, prevOffset } = parseArgs(process.argv.slice(2));
@@ -227,7 +246,7 @@ async function main() {
       );
   }
   const missed = rows
-    .filter((r) => !BRAND_QUERY.test(r.keys[0]) && r.impressions > (isMonthly ? 30 : 10) && r.ctr < 0.15)
+    .filter((r) => !isBrandQuery(r.keys[0]) && r.impressions > (isMonthly ? 30 : 10) && r.ctr < 0.15)
     .slice(0, 12);
   console.log(`\n## GSC 取りこぼし候補(非指名・表示あり・CTR<15%)`);
   for (const r of missed)
@@ -235,20 +254,85 @@ async function main() {
       `"${r.keys[0]}"  表示${r.impressions} クリック${r.clicks} CTR${(r.ctr * 100).toFixed(0)}% 順位${r.position.toFixed(1)}`
     );
 
+  // --- 記事成績(主指標=入口セッション) ---
+  // GSC は Yahoo 経由の記事流入(実測で約1/4)が写らないため、主指標は GA4 の入口セッション。
+  // 週次は全体の1行だけ、月初は記事1本1行の明細を出す。
+  const [landing, landingPrev] = await Promise.all(
+    [cur, prv].map((d) =>
+      ga4({
+        dateRanges: [d],
+        dimensions: [{ name: "landingPagePlusQueryString" }],
+        metrics: [{ name: "sessions" }],
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+        limit: 250,
+      })
+    )
+  );
+  const entry = rowsToMap(landing);
+  const entryPrev = rowsToMap(landingPrev);
+  const entryTotal = sumEntrySessions(entry);
+  console.log(
+    `\n## 記事の入口セッション合計  ${entryTotal} (${fmtDelta(entryTotal, sumEntrySessions(entryPrev))})`
+  );
+
   if (isMonthly) {
-    const articles = await gsc({
-      ...cur,
-      dimensions: ["page", "query"],
-      dimensionFilterGroups: [
-        { filters: [{ dimension: "page", operator: "contains", expression: "/columns/" }] },
-      ],
-      rowLimit: 20,
+    const [articlePv, articleCta, articleGsc] = await Promise.all([
+      ga4({
+        dateRanges: [cur],
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "screenPageViews" }],
+        dimensionFilter: ARTICLE_PAGE_FILTER,
+        limit: 250,
+      }),
+      ga4({
+        dateRanges: [cur],
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "eventCount" }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              ARTICLE_PAGE_FILTER,
+              { filter: { fieldName: "eventName", inListFilter: { values: CTA_EVENTS } } },
+            ],
+          },
+        },
+        limit: 250,
+      }),
+      // 旧「GSC コラム記事別クエリ」を置換。/columns/ だけだと /news/ 配下の SEO 記事
+      // (例: hyrox-official-training-gym)が丸ごと欠落するため正規表現に広げる。
+      gsc({
+        ...cur,
+        dimensions: ["page", "query"],
+        dimensionFilterGroups: [
+          {
+            filters: [
+              { dimension: "page", operator: "includingRegex", expression: "/(columns|news)/" },
+            ],
+          },
+        ],
+        rowLimit: 500,
+      }),
+    ]);
+
+    const articleRows = buildArticleRows({
+      entry,
+      entryPrev,
+      pageViews: rowsToMap(articlePv),
+      ctaCounts: rowsToMap(articleCta),
+      gscRows: (articleGsc.rows ?? []).map((r) => ({
+        page: r.keys[0],
+        query: r.keys[1],
+        impressions: r.impressions,
+        clicks: r.clicks,
+        position: r.position,
+      })),
     });
-    console.log("\n## GSC コラム記事別クエリ(月初のみ)");
-    for (const r of articles.rows ?? [])
-      console.log(
-        `${r.keys[0].replace(/^https?:\/\/[^/]+/, "")}  "${r.keys[1]}"  表示${r.impressions} クリック${r.clicks} 順位${r.position.toFixed(1)}`
-      );
+
+    console.log("\n## 記事成績(月初のみ・入口セッション降順)");
+    console.log(
+      "(CTA率の分母は PV。入口セッション分母だと回遊で読まれる告知系記事が100%超になるため。GSC は指名クエリ除外後)"
+    );
+    for (const row of articleRows) console.log(formatArticleRow(row));
   }
 
   console.log(
