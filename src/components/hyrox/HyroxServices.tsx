@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
-import { RESERVE_PATH } from "@/constants/site";
+import { reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 
@@ -95,7 +95,7 @@ export default function HyroxServices() {
                 </p>
                 {/* 予約案内ページ(/reserve)へ誘導 */}
                 <Link
-                  href={RESERVE_PATH}
+                  href={reserveHref("hyrox")}
                   onClick={() => trackCtaClick("reserveEntry", `hyrox_services_${item.key}`, t("reserveCta"))}
                   aria-label={`${item.titleEn} ${t("reserveCta")}`}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 border border-accent/30 px-5 py-3 text-accent transition-colors hover:bg-accent hover:text-deep-black"
