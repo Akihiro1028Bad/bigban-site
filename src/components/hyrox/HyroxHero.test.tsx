@@ -2,7 +2,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
-import { RESERVE_PATH } from "@/constants/site";
 import HyroxHero from "./HyroxHero";
 
 import type React from "react";
@@ -34,7 +33,7 @@ describe("HyroxHero", () => {
   it("予約ボタンが予約案内ページ（/reserve）へ内部リンクする", () => {
     renderWithIntl(<HyroxHero />);
     const link = screen.getByRole("link", { name: "今すぐ予約" });
-    expect(link).toHaveAttribute("href", RESERVE_PATH);
+    expect(link).toHaveAttribute("href", "/reserve?tab=hyrox");
   });
 
   it("予約ボタンのクリックで予約入口を計測する", async () => {

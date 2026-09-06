@@ -26,7 +26,9 @@ vi.mock("@/components/home/HomeFooter", () => ({
   default: () => <footer data-testid="home-footer" />,
 }));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
-vi.mock("@/components/reserve/ReserveChoice", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveChoice", () => ({
+  default: ({ initialTab }: { initialTab?: string }) => <section aria-label={`予約案内:${initialTab}`} />,
+}));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveCalendar", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveInfo", () => ({
@@ -95,6 +97,12 @@ describe("ReservePage generateMetadata", () => {
 });
 
 describe("ReservePage", () => {
+  it.each(["ja", "en"])("%s でHYROXの指定を予約案内へ渡す", async (locale) => {
+    const { default: ReservePage } = await import("./page");
+    render(await ReservePage({ params: Promise.resolve({ locale }), searchParams: Promise.resolve({ tab: "hyrox" }) }));
+    expect(screen.getByRole("region", { name: "予約案内:hyrox" })).toBeInTheDocument();
+  });
+
   it("locale を設定し予約案内ページを描画する", async () => {
     const { default: ReservePage } = await import("./page");
     const element = await ReservePage({
