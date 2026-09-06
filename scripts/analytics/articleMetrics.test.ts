@@ -150,6 +150,13 @@ describe("buildArticleRows", () => {
     ],
   };
 
+  it("前期だけ存在する記事をゼロ件・前期比マイナス100%で残す", () => {
+    const rows = buildArticleRows({ entry: new Map(), entryPrev: new Map([["/columns/lost?utm_source=test", 50]]), pageViews: new Map(), ctaCounts: new Map(), gscRows: [] });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ path: "/columns/lost", entrySessions: 0, prevEntrySessions: 50 });
+    expect(formatArticleRow(rows[0])).toContain("入口S=0 (-100%)");
+  });
+
   it("入口セッションの降順で並べる", () => {
     const rows = buildArticleRows(base);
     expect(rows.map((r) => r.path)).toEqual([
@@ -311,7 +318,7 @@ describe("formatArticleRow", () => {
       brandImpressions: 0,
     });
     expect(line).toBe(
-      "/columns/funabashi  入口S=137 (+37%)  PV=202  CTA=24 (12%)  GSC非指名: 表示297 クリック55 順位2.9",
+      "/columns/funabashi  入口S=137 (+37%)  PV=202  CTA=24 (100PVあたり12回)  GSC非指名: 表示297 クリック55 順位2.9",
     );
   });
 
@@ -376,6 +383,6 @@ describe("formatArticleRow", () => {
       gscPosition: null,
       brandImpressions: 0,
     });
-    expect(line).toContain("CTA=0 (-)");
+    expect(line).toContain("CTA=0 (100PVあたり-)");
   });
 });
