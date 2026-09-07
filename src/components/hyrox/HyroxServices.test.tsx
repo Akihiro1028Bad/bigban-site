@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
-import { RESERVE_PATH } from "@/constants/site";
 import HyroxServices from "./HyroxServices";
 import jaMessages from "../../../messages/ja.json";
 
@@ -46,7 +45,7 @@ describe("HyroxServices", () => {
     const links = screen.getAllByRole("link", { name: /予約する/ });
     expect(links).toHaveLength(3);
     for (const link of links) {
-      expect(link).toHaveAttribute("href", RESERVE_PATH);
+      expect(link).toHaveAttribute("href", "/reserve?tab=hyrox");
     }
   });
 

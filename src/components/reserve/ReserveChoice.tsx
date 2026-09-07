@@ -12,6 +12,7 @@ import {
   TENNISBEAR_EVENTS_URL,
   EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
+import type { LabolaCalendarTabKey } from "@/constants/site";
 import type { LabolaEntryKind } from "@/lib/analytics/labolaEvents";
 
 interface ChoiceCard {
@@ -158,30 +159,28 @@ function SectionHeading({
   );
 }
 
-export default function ReserveChoice() {
+interface ReserveChoiceProps {
+  initialTab?: LabolaCalendarTabKey;
+}
+
+export default function ReserveChoice({ initialTab = "pickleball" }: ReserveChoiceProps) {
+  const groups = initialTab === "hyrox"
+    ? ["hyrox", "pickleball"] as const
+    : ["pickleball", "hyrox"] as const;
   return (
     <section className="bg-deep-black pb-16 lg:pb-24">
       <div className="mx-auto max-w-5xl px-6 lg:px-12">
-        {/* ===== ピックルボールコート ===== */}
-        <SectionHeading
-          kickerKey="pickleballKicker"
-          headingKey="pickleballHeading"
-          descKey="pickleballDesc"
-        />
-        <ChoiceCardGrid cards={PICKLEBALL_CARDS} />
-
-        {/* ===== セクション区切り ===== */}
-        <div className="my-12 border-t border-text-gray/15 sm:my-16" />
-
-        {/* ===== HYROXエリア（エリア利用 / レッスン・クラス） ===== */}
-        <SectionHeading
-          kickerKey="hyroxKicker"
-          headingKey="hyroxHeading"
-          descKey="hyroxDesc"
-        />
-        {/* オープン記念＆千葉大会応援キャンペーン告知（期間外は自動非表示） */}
-        <HyroxCampaign />
-        <ChoiceCardGrid cards={HYROX_CARDS} />
+        {groups.map((group, index) => (
+          <div key={group} className={index === 0 ? "" : "mt-12 border-t border-text-gray/15 pt-12 sm:mt-16 sm:pt-16"}>
+            <SectionHeading
+              kickerKey={`${group}Kicker`}
+              headingKey={`${group}Heading`}
+              descKey={`${group}Desc`}
+            />
+            {group === "hyrox" && <HyroxCampaign />}
+            <ChoiceCardGrid cards={group === "hyrox" ? HYROX_CARDS : PICKLEBALL_CARDS} />
+          </div>
+        ))}
       </div>
     </section>
   );
