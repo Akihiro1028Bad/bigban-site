@@ -80,7 +80,7 @@ export default async function ReservePage({
   if (!locale) notFound();
   setRequestLocale(locale);
 
-  // 埋め込み版（RESERVE_GUIDANCE_MODE=false 時）で使うタブ初期値。
+  // 案内版・埋め込み版の両方で、流入元の予約カテゴリを保持する。
   const { tab } = await searchParams;
   const initialTab = resolveCalendarTabKey(tab);
 
@@ -88,7 +88,7 @@ export default async function ReservePage({
   // ロールバック用に残す意図的な dead branch なのでカバレッジ計測から除外する。
   /* istanbul ignore next -- @preserve ロールバック用フラグ分岐: 埋め込み版(false)側は到達不可 */
   const reserveBody = RESERVE_GUIDANCE_MODE ? (
-    <ReserveChoice />
+    <ReserveChoice initialTab={initialTab} />
   ) : (
     <>
       <ReserveSteps />

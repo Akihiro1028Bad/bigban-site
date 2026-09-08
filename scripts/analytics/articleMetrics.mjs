@@ -94,6 +94,7 @@ export function buildArticleRows({ entry, entryPrev, pageViews, ctaCounts, gscRo
 
   const paths = new Set([
     ...entryByPath.keys(),
+    ...prevByPath.keys(),
     ...pvByPath.keys(),
     ...ctaByPath.keys(),
     ...gscByPath.keys(),
@@ -123,11 +124,11 @@ export function buildArticleRows({ entry, entryPrev, pageViews, ctaCounts, gscRo
 
 export function formatArticleRow(row) {
   const delta = formatDelta(row.entrySessions, row.prevEntrySessions);
-  const rate = row.ctaRate === null ? "-" : `${Math.round(row.ctaRate * 100)}%`;
+  const rate = row.ctaRate === null ? "-" : `${Math.round(row.ctaRate * 100)}回`;
   const gsc =
     row.gscImpressions > 0
       ? `表示${row.gscImpressions} クリック${row.gscClicks} 順位${row.gscPosition.toFixed(1)}`
       : "表示なし";
   const brand = row.brandImpressions > 0 ? `  指名表示${row.brandImpressions}` : "";
-  return `${row.path}  入口S=${row.entrySessions} (${delta})  PV=${row.pageViews}  CTA=${row.ctaCount} (${rate})  GSC非指名: ${gsc}${brand}`;
+  return `${row.path}  入口S=${row.entrySessions} (${delta})  PV=${row.pageViews}  CTA=${row.ctaCount} (100PVあたり${rate})  GSC非指名: ${gsc}${brand}`;
 }

@@ -16,6 +16,7 @@ import {
   sumEntrySessions,
 } from "./articleMetrics.mjs";
 import { CTA_EVENTS } from "./ctaEvents.mjs";
+import { collectMonitoring, formatMonitoring } from "./monitoring.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -50,7 +51,10 @@ function parseArgs(argv) {
   if (!Number.isInteger(prevOffset) || prevOffset < days || prevOffset > 90) {
     throw new Error("--prev-offset は days 以上 90 以下の整数で指定してください");
   }
-  return { days, prevOffset };
+  const monitorOnly = argv.includes("--monitor-only");
+  const json = argv.includes("--json");
+  if (json && !monitorOnly) throw new Error("--json は --monitor-only と併用してください");
+  return { days, prevOffset, monitorOnly, json };
 }
 
 function isoDate(d) {
@@ -87,6 +91,7 @@ async function accessToken(env) {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    signal: AbortSignal.timeout(15000),
     body: new URLSearchParams({
       client_id: env.GROWTH_GOOGLE_CLIENT_ID,
       client_secret: env.GROWTH_GOOGLE_CLIENT_SECRET,
@@ -119,17 +124,24 @@ function rowsToMap(report, { dimensionIndex = 0, metricIndex = 0 } = {}) {
 }
 
 async function main() {
-  const { days, prevOffset } = parseArgs(process.argv.slice(2));
+  const { days, prevOffset, monitorOnly, json } = parseArgs(process.argv.slice(2));
   const env = loadEnv();
   const token = await accessToken(env);
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const { cur, prv } = ranges(days, prevOffset);
   const isMonthly = days >= 28;
 
+  if (monitorOnly) {
+    const report = await collectMonitoring({ token, propertyId: env.GROWTH_GA4_PROPERTY_ID, cur, prv });
+    console.log(json ? JSON.stringify(report) : formatMonitoring(report));
+    if (report.metrics.some((metric) => metric.current === null || metric.previous === null)) process.exitCode = 1;
+    return;
+  }
+
   const ga4 = async (body) => {
     const res = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${env.GROWTH_GA4_PROPERTY_ID}:runReport`,
-      { method: "POST", headers: auth, body: JSON.stringify(body) }
+      { method: "POST", headers: auth, body: JSON.stringify(body), signal: AbortSignal.timeout(15000) }
     );
     if (!res.ok) throw new Error(`GA4 失敗: ${res.status} ${(await res.text()).slice(0, 200)}`);
     return res.json();
@@ -137,13 +149,18 @@ async function main() {
   const gsc = async (body) => {
     const res = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(env.GROWTH_GSC_SITE_URL)}/searchAnalytics/query`,
-      { method: "POST", headers: auth, body: JSON.stringify(body) }
+      { method: "POST", headers: auth, body: JSON.stringify(body), signal: AbortSignal.timeout(15000) }
     );
     if (!res.ok) throw new Error(`GSC 失敗: ${res.status} ${(await res.text()).slice(0, 200)}`);
     return res.json();
   };
 
   console.log(`# 分析スナップショット (${cur.startDate}〜${cur.endDate} / 前期 ${prv.startDate}〜${prv.endDate})`);
+
+  // 日次監視は上位ページや任意レポートの成否に依存させない。
+  const monitoring = await collectMonitoring({ token, propertyId: env.GROWTH_GA4_PROPERTY_ID, cur, prv });
+  console.log("\n## GA4 監視対象・CTAイベント(今期・前期の直接比較)");
+  console.log(formatMonitoring(monitoring));
 
   // --- GA4: ページ別PV(前期比) ---
   const [pages, pagesPrev] = await Promise.all(
@@ -185,17 +202,6 @@ async function main() {
     console.log(`${k}  ${s} (${fmtDelta(s, prevCh.get(k) ?? 0)})`);
   }
 
-  // --- GA4: CTAイベント + 予約ファネル ---
-  const ev = await ga4({
-    dateRanges: [cur],
-    dimensions: [{ name: "eventName" }],
-    metrics: [{ name: "eventCount" }],
-    dimensionFilter: { filter: { fieldName: "eventName", inListFilter: { values: CTA_EVENTS } } },
-    limit: 20,
-  });
-  console.log("\n## GA4 CTAイベント(今期)");
-  for (const r of ev.rows ?? []) console.log(`${r.dimensionValues[0].value}  ${r.metricValues[0].value}回`);
-
   // --- GA4: CTA設置箇所別(customEvent:location) ---
   // どのCTAが効いているかを設置箇所の粒度で見る。"(not set)" は gtag 初期化前のクリック等で
   // 発生するが規模の把握に必要なのでそのまま出す。
@@ -230,7 +236,7 @@ async function main() {
     limit: 10,
   });
   if ((funnel.rows ?? []).length > 0) {
-    console.log("\n## 予約ファネル(labola経由ページのPV)");
+    console.log("\n## 予約ページ別PV(参考値・同一セッションの通過率ではない)");
     for (const r of funnel.rows ?? [])
       console.log(`${r.dimensionValues[0].value}  PV=${r.metricValues[0].value}`);
   }
@@ -330,7 +336,7 @@ async function main() {
 
     console.log("\n## 記事成績(月初のみ・入口セッション降順)");
     console.log(
-      "(CTA率の分母は PV。入口セッション分母だと回遊で読まれる告知系記事が100%超になるため。GSC は指名クエリ除外後)"
+      "(CTAは一般クリックを含む100PVあたりの回数。予約転換率ではない。GSCは指名クエリ除外後・取得範囲内の参考値)"
     );
     for (const row of articleRows) console.log(formatArticleRow(row));
   }

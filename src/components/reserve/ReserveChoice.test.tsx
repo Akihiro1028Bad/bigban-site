@@ -17,6 +17,15 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
 }));
 
 describe("ReserveChoice", () => {
+  it.each(["hyrox", "pickleball"] as const)("%s の目的を先頭の案内に保持する", (initialTab) => {
+    renderWithIntl(<ReserveChoice initialTab={initialTab} />);
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
+      initialTab === "hyrox" ? "HYROXエリア" : "ピックルボールコート",
+    );
+    expect(screen.getAllByRole("link")[0]).toHaveAttribute("href",
+      initialTab === "hyrox" ? LABOLA_HYROX_URL : LABOLA_PICKLEBALL_URL);
+  });
+
   it("ピックルボールコートの予約案内文を表示する", () => {
     renderWithIntl(<ReserveChoice />);
     expect(screen.getByText(/空き状況の確認とご予約/)).toBeInTheDocument();
