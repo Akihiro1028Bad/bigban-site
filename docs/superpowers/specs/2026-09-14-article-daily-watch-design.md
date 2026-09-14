@@ -134,7 +134,7 @@
 ### 4.4 判定の入力（純関数の契約）
 
 ```
-buildArticleWindows(ga4Rows, today)            → Map<path, {yesterday, sameWeekdayLastWeek, last7, prev7}>
+buildArticleWindows(rows, windows)             → Map<path, {yesterday, sameWeekdayLastWeek, last7, prev7}>
 detectEntryFlags(entry, publishedAt, today)    → G1/G2/G3 の flags（除外条件を含む）
 extractArticleUrls(sitemapXml, origin)         → path[]（上限50、超過は {paths, overflow} で返す）
 parseArticleHtml(html)                         → { datePublished, dateModified, mainText }
