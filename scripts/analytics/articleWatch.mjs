@@ -83,3 +83,16 @@ export function detectEntryFlags(entry, publishedAt, today) {
   }
   return flags;
 }
+
+const ARTICLE_URL = /^\/(?:en\/)?(?:columns|news)\/[^/]+$/;
+
+/** sitemap から記事詳細のパスを拾う(一覧ページ・別オリジンは除外。上限は設計書 §4.2)。 */
+export function extractArticleUrls(xml, origin) {
+  const paths = [];
+  for (const [, url] of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) {
+    if (!url.startsWith(origin)) continue;
+    const path = url.slice(origin.length).replace(/\/$/, "");
+    if (ARTICLE_URL.test(path) && !paths.includes(path)) paths.push(path);
+  }
+  return { paths: paths.slice(0, THRESHOLDS.maxArticles), overflow: paths.slice(THRESHOLDS.maxArticles) };
+}

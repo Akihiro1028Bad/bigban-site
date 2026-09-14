@@ -1,7 +1,9 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { addDays, buildArticleWindows, computeWindows, daysBetween, detectEntryFlags, THRESHOLDS } from "./articleWatch.mjs";
+import { addDays, buildArticleWindows, computeWindows, daysBetween, detectEntryFlags, extractArticleUrls, THRESHOLDS } from "./articleWatch.mjs";
 
 describe("日付ユーティリティ", () => {
   it("日数を加減し、月またぎも扱う", () => {
@@ -88,5 +90,21 @@ describe("G 判定(流入急変)", () => {
     ]);
     expect(detectEntryFlags({ yesterday: null, sameWeekdayLastWeek: null, last7: 300, prev7: 70 }, null, today)).toHaveLength(1);
     expect(detectEntryFlags(null, null, today)).toEqual([]);
+  });
+});
+
+describe("sitemap 解析", () => {
+  const xml = readFileSync("scripts/analytics/fixtures/article-watch/sitemap.xml", "utf8");
+  it("記事の詳細 URL だけを、末尾スラッシュを落とし重複を除いて拾う", () => {
+    expect(extractArticleUrls(xml, "https://example.test")).toEqual({
+      paths: ["/columns/steady", "/columns/spike", "/news/expired-event", "/en/news/expired-event"],
+      overflow: [],
+    });
+  });
+  it("上限50本を超えた分は overflow に分ける", () => {
+    const many = Array.from({ length: 52 }, (_, i) => `<url><loc>https://example.test/columns/a${i}</loc></url>`).join("");
+    const { paths, overflow } = extractArticleUrls(`<urlset>${many}</urlset>`, "https://example.test");
+    expect(paths).toHaveLength(50);
+    expect(overflow).toEqual(["/columns/a50", "/columns/a51"]);
   });
 });
