@@ -48,12 +48,14 @@
 | 記号 | 条件 | 深刻度 |
 |---|---|---|
 | G1 | 直近7日 vs 前7日が ±40% 超、かつ前7日が **30 セッション以上** | 中 |
-| G2 | 昨日 vs 前週同曜日が ±60% 超、かつ前週同曜日が **20 以上** | 中（祝日と重なる週は「祝日ずれの可能性」を1行添える。既存Bと同じ） |
+| G2 | 昨日 vs 前週同曜日が ±60% 超、かつ前週同曜日が **20 以上** | 中。**速報**（GA4 の前日値は 09:00 時点で未確定のことがある）。手順1の `--days 1 --prev-offset 7` のサイト全体の前日値も同程度に落ちていれば「データ未確定による見かけの変動の可能性が高い」と1行添えて深刻度を下げる。祝日と重なる週は「祝日ずれの可能性」を1行添える（既存Bと同じ） |
 | G3 | 前7日が30以上あった記事の直近7日が **0** | 高（I の結果と突き合わせて書く） |
 
 - 公開14日未満の記事は G の対象外（立ち上がりの急増は正常）。`publishedAt` が取れない記事は除外を適用せず対象に残す。
 - 下限（30 / 20）を置く理由: 週13前後の記事（市川ガイド）は1日の揺れで ±60% を超えるため。2026-09-13 の実測では G1 に当たるのは告知（41→618）、参加費（380→653）、入門（71→33）の3件で、いずれも説明が必要な変動だった。
 - 窓の終端は JST の前日（`query.mjs` の `ranges()` と同じ基準）。
+
+同じ記事に G1 と G2 が逆方向で同時に付いた場合（例: 直近7日は増、昨日は減）は、7日の信号（G1）を主に書き、昨日の値は「速報・未確定」として添える。両方を独立の異常として並べない。
 
 ### 3.2 H. 期限切れの表現（本番 HTML）
 
@@ -118,7 +120,7 @@
   articles: [{
     path: "/columns/hyrox-beginners-guide", locale: "ja"|"en",
     publishedAt: "2026-08-10"|null, dateModified: "2026-09-13"|null,
-    entry: { yesterday, sameWeekdayLastWeek, last7, prev7 },   // GA4 失敗時はすべて null
+    entry: { yesterday, sameWeekdayLastWeek, last7, prev7 },   // GA4 失敗時は entry 自体が null
     http:  { status: 200|number|null, retried: boolean, observed: "ok"|"error"|"unreachable" },
     flags: [{ code: "G1", severity: "中", detail: { last7, prev7, deltaPercent } }, ...]
   }],
@@ -155,6 +157,8 @@ node scripts/analytics/watchArticles.mjs --json
 
 - `alerts` が空 → 記事については何も書かない（沈黙のまま）。
 - `sources` のいずれかが `ok:false` → その項目は「取得不可」と明記し、当該判定を保留する（0 と読まない）。GA4 だけ失敗なら H/I は通常どおり判定する。
+- `sources.sitemap.ok` が false → `error` を読む。「上限超過で未取得: …」なら記事50本までは判定済みなので通常どおり扱い、末尾に「記事が50本を超えたため一部未監視（要: `THRESHOLDS.maxArticles` の引き上げ）」と1行添える。それ以外（取得失敗）は「記事ウォッチは sitemap 取得不可のため未実施（理由）」と1行。
+- `sources.sitemap.error` は `ok` が true でも読む。「GA4 にあり sitemap に無い記事: …」が入っていれば、そのパスを「■ 検知」に `S) <path>: 流入があるのに sitemap に無い（削除・noindex・多言語ページの可能性）` として1行載せる（深刻度 低。EN ページ `/en/columns/…` は 2026-09-14 時点で sitemap 未掲載が既知のため、`/en/` で始まるパスは載せない）。
 - スクリプト自体が起動できない → 既存のフォールバックと同じ扱い（他の異常があればその通知の末尾に「記事ウォッチが実行できなかった（理由）」を1行、なければ3営業日続いた場合だけ1通）。
 - 既存 F が発火した日は、I を「トップと同じ原因の可能性」として1行に畳む。
 
@@ -219,7 +223,7 @@ TDD で純関数から書く。カバレッジは CI の閾値（100%）を満�
 |---|---|---|---|
 | ① | クラウドルーチンで `node` と `curl`（外向き HTTPS）が使える | 既存の日次ウォッチが `query.mjs` と `curl` を使っている | 使えない場合は既存フォールバックと同じ（3営業日続いたら1通） |
 | ② | 本番の記事ページに JSON-LD（columns: Article、news: NewsArticle）があり `datePublished`/`dateModified` を持つ | 2026-09-13 に `src/app/[locale]/columns/[slug]/page.tsx` と `NewsArticleJsonLd.tsx` で実装を確認。値の有無は実装時に本番 HTML で確認する | 取れない記事は G の除外と H2 を判定しない（§3） |
-| ③ | sitemap に記事の詳細 URL が ja/en とも載っている | 実装時に本番 sitemap で確認 | 載っていない記事は監視対象外。GA4 に現れてサイトマップに無い記事は `sources.sitemap.error` に列挙 |
+| ③ | sitemap に記事の詳細 URL が ja/en とも載っている | 実装時に本番 sitemap で確認 | 載っていない記事は監視対象外。GA4 に現れてサイトマップに無い記事は `sources.sitemap.error` に列挙。sitemap に無く GA4 に流入がある記事はそれ自体を信号（S）として通知する |
 | ④ | 記事本文が `<main>` の中にある | 実装時に確認 | 無ければ `<article>`、それも無ければ `<body>`（バナー混入のリスクを `sources.html.error` に注記） |
 
 ## 8. 成功条件（8週後に判定）
