@@ -61,3 +61,25 @@ export function buildArticleWindows(rows, windows) {
   }
   return result;
 }
+
+const pct = (cur, prev) => ((cur - prev) / prev) * 100;
+
+/** 設計書 §3.1。公開14日未満は対象外。null の値を使う判定はその判定だけ飛ばす。 */
+export function detectEntryFlags(entry, publishedAt, today) {
+  if (!entry) return [];
+  if (publishedAt && daysBetween(publishedAt, today) < THRESHOLDS.newArticleDays) return [];
+  const flags = [];
+  const { yesterday, sameWeekdayLastWeek, last7, prev7 } = entry;
+  if (last7 !== null && prev7 !== null && prev7 >= THRESHOLDS.g3MinPrev7 && last7 === 0) {
+    flags.push({ code: "G3", severity: "高", detail: { last7, prev7 } });
+  } else if (last7 !== null && prev7 !== null && prev7 >= THRESHOLDS.g1MinPrev7 && Math.abs(pct(last7, prev7)) > THRESHOLDS.g1Percent) {
+    flags.push({ code: "G1", severity: "中", detail: { last7, prev7, deltaPercent: Math.round(pct(last7, prev7)) } });
+  }
+  if (
+    yesterday !== null && sameWeekdayLastWeek !== null &&
+    sameWeekdayLastWeek >= THRESHOLDS.g2MinPrev && Math.abs(pct(yesterday, sameWeekdayLastWeek)) > THRESHOLDS.g2Percent
+  ) {
+    flags.push({ code: "G2", severity: "中", detail: { yesterday, sameWeekdayLastWeek, deltaPercent: Math.round(pct(yesterday, sameWeekdayLastWeek)) } });
+  }
+  return flags;
+}
