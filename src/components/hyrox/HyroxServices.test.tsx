@@ -63,6 +63,15 @@ describe("HyroxServices", () => {
     expect(trackCtaClick).toHaveBeenNthCalledWith(3, "reserveEntry", "hyrox_services_group", "予約する");
   });
 
+  it("体験カードは持ち物（シューズ・ウェア）を案内し、「手ぶら」と書かない", () => {
+    // 体験会はレンタルなし・ランニングシューズ持参のため、「手ぶら」表記は実態と矛盾する。
+    renderWithIntl(<HyroxServices />);
+    const trialCard = screen.getByText("TRIAL").closest("article");
+    expect(trialCard).not.toBeNull();
+    expect(trialCard).not.toHaveTextContent("手ぶら");
+    expect(trialCard).toHaveTextContent("ランニングシューズ");
+  });
+
   it("items が配列でない場合も見出しを描画する（フォールバック）", () => {
     const broken = structuredClone(jaMessages);
     (
