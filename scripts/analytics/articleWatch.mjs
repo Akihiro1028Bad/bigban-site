@@ -186,7 +186,7 @@ export function buildArticle({ path, entry, http, html, today }) {
 
 /**
  * 設計書 §4.3 の出力。alerts は深刻度順(最優先→高→中→低)、同順位はパス順。
- * @param {{ today: string, windows: ReturnType<typeof computeWindows>, sources: Record<string, { ok: boolean, error: string | null }>, articles: ReturnType<typeof buildArticle>[] }} input
+ * @param {{ today: string, windows: ReturnType<typeof computeWindows>, sources: Record<string, { ok: boolean, error: string | null, [key: string]: unknown }>, articles: ReturnType<typeof buildArticle>[] }} input
  */
 export function buildReport({ today, windows, sources, articles }) {
   const alerts = articles
