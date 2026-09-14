@@ -168,3 +168,41 @@ export function detectTextFlags(path, parsed, today) {
 export function detectHttpFlag(http) {
   return http.observed === "error" ? { code: "I", severity: "最優先", detail: { status: http.status } } : null;
 }
+
+const SEVERITY_RANK = { 最優先: 0, 高: 1, 中: 2, 低: 3 };
+
+/** 1記事ぶんの取得結果を判定込みの行にする。html が無い(取得失敗)記事は H を判定しない。 */
+export function buildArticle({ path, entry, http, html, today }) {
+  const parsed = html === null ? null : parseArticleHtml(html);
+  const publishedAt = parsed?.datePublished ?? null;
+  const httpFlag = detectHttpFlag(http);
+  const flags = [
+    ...detectEntryFlags(entry, publishedAt, today),
+    ...detectTextFlags(path, parsed, today),
+    ...(httpFlag ? [httpFlag] : []),
+  ];
+  return { path, locale: path.startsWith("/en/") ? "en" : "ja", publishedAt, dateModified: parsed?.dateModified ?? null, entry, http, flags };
+}
+
+/**
+ * 設計書 §4.3 の出力。alerts は深刻度順(最優先→高→中→低)、同順位はパス順。
+ * @param {{ today: string, windows: ReturnType<typeof computeWindows>, sources: Record<string, { ok: boolean, error: string | null }>, articles: ReturnType<typeof buildArticle>[] }} input
+ */
+export function buildReport({ today, windows, sources, articles }) {
+  const alerts = articles
+    .flatMap((a) => a.flags.map((f) => ({ code: f.code, path: a.path, severity: f.severity, detail: f.detail })))
+    .sort((x, y) => SEVERITY_RANK[x.severity] - SEVERITY_RANK[y.severity] || x.path.localeCompare(y.path));
+  return { today, windows, sources, articles, alerts };
+}
+
+/**
+ * 人が読む1行/項目の要約(--json なしのとき)。
+ * @param {ReturnType<typeof buildReport>} report
+ */
+export function formatReport(report) {
+  const lines = [`# 記事ウォッチ ${report.today}`];
+  for (const [name, source] of Object.entries(report.sources)) lines.push(`${name}: ${source.ok ? "ok" : `取得不可 (${source.error})`}`);
+  if (report.alerts.length === 0) lines.push("alerts: なし");
+  for (const a of report.alerts) lines.push(`${a.code}) ${a.path.replace(/^\//, "")} [${a.severity}] ${JSON.stringify(a.detail)}`);
+  return lines.join("\n");
+}

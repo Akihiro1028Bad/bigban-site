@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { addDays, buildArticleWindows, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectTextFlags, extractArticleUrls, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
+import { addDays, buildArticle, buildArticleWindows, buildReport, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectTextFlags, extractArticleUrls, formatReport, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
 
 describe("日付ユーティリティ", () => {
   it("日数を加減し、月またぎも扱う", () => {
@@ -167,5 +167,38 @@ describe("I 判定(死活)", () => {
     expect(detectHttpFlag({ status: 500, observed: "error" })).toEqual({ code: "I", severity: "最優先", detail: { status: 500 } });
     expect(detectHttpFlag({ status: null, observed: "unreachable" })).toBeNull();
     expect(detectHttpFlag({ status: 200, observed: "ok" })).toBeNull();
+  });
+});
+
+describe("レポート", () => {
+  const today = "2026-09-14";
+  const windows = computeWindows(today);
+  const html = readFileSync("scripts/analytics/fixtures/article-watch/news-expired.html", "utf8");
+  const ok = { status: 200, retried: false, observed: "ok" as const };
+  it("記事1本を組み立て、locale と日付を付け、G/H/I を集める", () => {
+    const article = buildArticle({ path: "/en/news/expired-event", entry: { yesterday: 0, sameWeekdayLastWeek: 0, last7: 0, prev7: 0 }, http: ok, html, today });
+    expect(article).toMatchObject({ locale: "en", publishedAt: "2026-07-01", dateModified: "2026-07-01" });
+    expect(article.flags.map((f) => f.code)).toEqual(["H1", "H2"]);
+    const dead = buildArticle({ path: "/columns/steady", entry: null, http: { status: 500, retried: true, observed: "error" }, html: null, today });
+    expect(dead).toMatchObject({ locale: "ja", publishedAt: null, dateModified: null, entry: null });
+    expect(dead.flags).toEqual([{ code: "I", severity: "最優先", detail: { status: 500 } }]);
+  });
+  it("alerts を深刻度順→パス順に平坦化し、テキストに整形する", () => {
+    const sources = { ga4: { ok: true, error: null }, sitemap: { ok: true, count: 2, error: null }, html: { ok: false, fetched: 1, error: "unreachable: /columns/z" } };
+    const articles = [
+      buildArticle({ path: "/news/expired-event", entry: { yesterday: 1, sameWeekdayLastWeek: 1, last7: 7, prev7: 7 }, http: ok, html, today }),
+      buildArticle({ path: "/columns/steady", entry: { yesterday: 30, sameWeekdayLastWeek: 30, last7: 70, prev7: 70 }, http: { status: 503, retried: true, observed: "error" }, html: null, today }),
+    ];
+    const report = buildReport({ today, windows, sources, articles });
+    expect(report.alerts.map((a) => `${a.code}:${a.path}`)).toEqual(["I:/columns/steady", "H1:/news/expired-event", "H2:/news/expired-event"]);
+    const text = formatReport(report);
+    expect(text).toContain("html: 取得不可 (unreachable: /columns/z)");
+    expect(text).toContain("I) columns/steady [最優先]");
+    expect(formatReport(buildReport({ today, windows, sources, articles: [] }))).toContain("alerts: なし");
+  });
+  it("同じ深刻度の alerts はパス順に並ぶ", () => {
+    const dead = (path: string) => buildArticle({ path, entry: null, http: { status: 500, retried: true, observed: "error" }, html: null, today });
+    const report = buildReport({ today, windows, sources: {}, articles: [dead("/columns/z"), dead("/columns/a")] });
+    expect(report.alerts.map((a) => a.path)).toEqual(["/columns/a", "/columns/z"]);
   });
 });
