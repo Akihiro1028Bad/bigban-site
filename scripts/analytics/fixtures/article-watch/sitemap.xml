@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.test/</loc></url>
+  <url><loc>https://example.test/columns</loc></url>
+  <url><loc>https://example.test/news/</loc></url>
+  <url><loc>https://example.test/columns/steady</loc></url>
+  <url><loc>https://example.test/columns/spike/</loc></url>
+  <url><loc>https://example.test/news/expired-event</loc></url>
+  <url><loc>https://example.test/en/news/expired-event</loc></url>
+  <url><loc>https://example.test/columns/steady</loc></url>
+  <url><loc>https://other.test/columns/elsewhere</loc></url>
+</urlset>
