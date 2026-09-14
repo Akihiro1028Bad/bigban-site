@@ -137,3 +137,34 @@ export function parseArticleHtml(html) {
   const mainText = stripTags((main ?? article)?.[0] ?? html);
   return { datePublished, dateModified, mainText, scope };
 }
+
+const H1_PHRASES = ["募集中", "受付中", "開催します", "開催予定"];
+const H2_PHRASES = ["まもなく", "近日公開", "近日中", "追って"];
+const NEWS_PATH = /^\/(?:en\/)?news\//;
+const FULL_DATE = /(\d{4})年(\d{1,2})月(\d{1,2})日/g;
+
+/** 設計書 §3.2。H1 はニュースのみ。年のない日付は使わない。dateModified が無い H2 は判定しない。 */
+export function detectTextFlags(path, parsed, today) {
+  if (!parsed) return [];
+  const flags = [];
+  const text = parsed.mainText;
+  if (NEWS_PATH.test(path)) {
+    const phrase = H1_PHRASES.find((p) => text.includes(p));
+    const dates = [...text.matchAll(FULL_DATE)].map(([, y, m, d]) => `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`).sort();
+    const eventDate = dates.at(-1);
+    if (phrase && eventDate && eventDate < today) flags.push({ code: "H1", severity: "中", detail: { phrase, eventDate } });
+  }
+  const pending = H2_PHRASES.find((p) => text.includes(p));
+  if (pending && parsed.dateModified) {
+    const daysSinceModified = daysBetween(parsed.dateModified, today);
+    if (daysSinceModified > THRESHOLDS.h2StaleDays) {
+      flags.push({ code: "H2", severity: "低", detail: { phrase: pending, dateModified: parsed.dateModified, daysSinceModified } });
+    }
+  }
+  return flags;
+}
+
+/** 設計書 §3.3。再試行後も 200 以外が続いた場合だけ。接続不能(unreachable)は観測不能として付けない。 */
+export function detectHttpFlag(http) {
+  return http.observed === "error" ? { code: "I", severity: "最優先", detail: { status: http.status } } : null;
+}
