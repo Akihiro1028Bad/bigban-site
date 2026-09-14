@@ -96,3 +96,44 @@ export function extractArticleUrls(xml, origin) {
   }
   return { paths: paths.slice(0, THRESHOLDS.maxArticles), overflow: paths.slice(THRESHOLDS.maxArticles) };
 }
+
+const JST_OFFSET_MS = 9 * 3_600_000;
+
+function toJstDate(value) {
+  if (typeof value !== "string") return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : new Date(t + JST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function stripTags(fragment) {
+  return fragment
+    .replace(/<script[\s\S]*?<\/script>/g, " ")
+    .replace(/<style[\s\S]*?<\/style>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** 設計書 §3.2・§7④。Article / NewsArticle の JSON-LD から日付を、<main>(無ければ <article>、無ければ body 全体)から本文を取る。 */
+export function parseArticleHtml(html) {
+  let datePublished = null;
+  let dateModified = null;
+  for (const [, json] of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch {
+      continue;
+    }
+    if (data["@type"] === "Article" || data["@type"] === "NewsArticle") {
+      datePublished = toJstDate(data.datePublished);
+      dateModified = toJstDate(data.dateModified);
+      break;
+    }
+  }
+  const main = html.match(/<main[\s>][\s\S]*?<\/main>/);
+  const article = main ? null : html.match(/<article[\s>][\s\S]*?<\/article>/);
+  const scope = main ? "main" : article ? "article" : "body";
+  const mainText = stripTags((main ?? article)?.[0] ?? html);
+  return { datePublished, dateModified, mainText, scope };
+}

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { addDays, buildArticleWindows, computeWindows, daysBetween, detectEntryFlags, extractArticleUrls, THRESHOLDS } from "./articleWatch.mjs";
+import { addDays, buildArticleWindows, computeWindows, daysBetween, detectEntryFlags, extractArticleUrls, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
 
 describe("日付ユーティリティ", () => {
   it("日数を加減し、月またぎも扱う", () => {
@@ -106,5 +106,31 @@ describe("sitemap 解析", () => {
     const { paths, overflow } = extractArticleUrls(`<urlset>${many}</urlset>`, "https://example.test");
     expect(paths).toHaveLength(50);
     expect(overflow).toEqual(["/columns/a50", "/columns/a51"]);
+  });
+});
+
+describe("HTML 解析", () => {
+  const html = readFileSync("scripts/analytics/fixtures/article-watch/news-expired.html", "utf8");
+  it("NewsArticle の JSON-LD から JST の公開日・更新日を取り、main の中だけを本文にする", () => {
+    const parsed = parseArticleHtml(html);
+    expect(parsed.datePublished).toBe("2026-07-01");
+    expect(parsed.dateModified).toBe("2026-07-01");
+    expect(parsed.scope).toBe("main");
+    expect(parsed.mainText).toContain("2026年8月23日(日)に開催します。参加受付中です。");
+    expect(parsed.mainText).not.toContain("まもなく新キャンペーン");
+    expect(parsed.mainText).not.toContain("window.__x");
+  });
+  it("Article でも取れ、壊れた JSON-LD と無関係な型は読み飛ばす", () => {
+    const parsed = parseArticleHtml(
+      '<script type="application/ld+json">{broken</script><script type="application/ld+json">{"@type":"WebSite"}</script>' +
+      '<script type="application/ld+json">{"@type":"Article","datePublished":"2026-08-10T02:24:37.078Z","dateModified":"not a date"}</script><main>x</main>',
+    );
+    expect(parsed).toMatchObject({ datePublished: "2026-08-10", dateModified: null });
+    expect(parseArticleHtml('<script type="application/ld+json">{"@type":"NewsArticle","datePublished":"2026-08-10T02:24:37.078Z"}</script><main>x</main>'))
+      .toMatchObject({ datePublished: "2026-08-10", dateModified: null });
+  });
+  it("main が無ければ article、それも無ければ body 全体を本文にする", () => {
+    expect(parseArticleHtml("<body><article>本文だけ</article><footer>脚</footer></body>")).toMatchObject({ scope: "article", mainText: "本文だけ" });
+    expect(parseArticleHtml("<body><p>全部</p></body>")).toMatchObject({ scope: "body", mainText: "全部", datePublished: null, dateModified: null });
   });
 });
