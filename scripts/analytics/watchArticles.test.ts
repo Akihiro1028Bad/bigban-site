@@ -23,7 +23,7 @@ interface Alert { code: string; path: string; severity: string; detail: Record<s
 interface Report {
   today: string;
   sources: { ga4: { ok: boolean; error: string | null }; sitemap: { ok: boolean; count: number; error: string | null }; html: { ok: boolean; fetched: number; error: string | null } };
-  articles: { path: string; entry: Record<string, number | null> | null; http: { status: number | null; retried: boolean; observed: string } }[];
+  articles: { path: string; inSitemap: boolean; entry: Record<string, number | null> | null; http: { status: number | null; retried: boolean; observed: string } }[];
   alerts: Alert[];
 }
 
@@ -85,6 +85,47 @@ describe("記事ウォッチ CLI(実 API を叩かず MSW で再現)", () => {
     expect(report.articles.find((a) => a.path === "/columns/steady")?.http).toEqual({ status: null, retried: true, observed: "unreachable" });
     expect(codes(report)).not.toContain("I:/columns/steady");
     expect(report.sources.html).toMatchObject({ ok: false, error: expect.stringContaining("unreachable: /columns/steady") });
+  });
+  it("ソフト404(200 だが記事本文が無い): I を最優先で付ける", async () => {
+    const { stdout } = await run(["--json"], "soft404");
+    const report = JSON.parse(stdout) as Report;
+    expect(report.articles.find((a) => a.path === "/columns/steady")?.http).toEqual({ status: 200, retried: false, observed: "ok" });
+    expect(report.alerts[0]).toEqual({ code: "I", path: "/columns/steady", severity: "最優先", detail: { status: 200, reason: "記事本文なし（ソフト404）" } });
+  });
+  it("sitemap に無く流入がある記事: S を付け、流入の多い順に上限10本で切り、超過は sitemap.error に回す", async () => {
+    const { stdout } = await run(["--json"], "unlisted");
+    const report = JSON.parse(stdout) as Report;
+    expect(report.alerts.find((a) => a.path === "/columns/ghost-article")).toEqual({
+      code: "S", path: "/columns/ghost-article", severity: "中", detail: { last7: 35, prev7: 35, page: "missing", status: 200 },
+    });
+    expect(report.alerts.find((a) => a.path === "/columns/ghost-01")).toMatchObject({ code: "S", severity: "低", detail: { page: "ok" } });
+    expect(report.articles.find((a) => a.path === "/columns/ghost-article")?.inSitemap).toBe(false);
+    // 流入(直近7日 + 前7日)の降順・同数はパス昇順。GA4 の応答順やパス順だけでは決まらないことを固定する。
+    expect(report.articles.filter((a) => !a.inSitemap).map((a) => a.path)).toEqual([
+      "/columns/ghost-article", "/columns/ghost-01", "/columns/ghost-02", "/columns/ghost-03", "/columns/ghost-04",
+      "/columns/ghost-05", "/columns/ghost-06", "/columns/ghost-07", "/columns/ghost-08", "/columns/ghost-09",
+    ]);
+    expect(report.sources.sitemap.error).toBe("sitemap 外の記事が10本を超えたため未確認: /columns/ghost-10, /columns/ghost-11, /columns/aaa-low3");
+    expect(report.sources.html).toEqual({ ok: true, fetched: 4, error: null });
+  });
+  it("S の候補から /en/・記事 URL の形でないパス・流入3未満を外す", async () => {
+    const { stdout } = await run(["--json"], "unlisted");
+    const report = JSON.parse(stdout) as Report;
+    const unlisted = report.articles.filter((a) => !a.inSitemap).map((a) => a.path);
+    expect(report.alerts.some((a) => a.path.startsWith("/en/"))).toBe(false);
+    expect([...unlisted, report.sources.sitemap.error]).not.toContain("/columns/deep/path");
+    // 合計2セッションの aaa-low2 はどこにも出ず、ちょうど3の aaa-low3 は候補に入る(超過分として error に載る)。
+    expect(report.sources.sitemap.error).not.toContain("/columns/aaa-low2");
+    expect(report.alerts.some((a) => a.path === "/columns/aaa-low2")).toBe(false);
+    expect(report.sources.sitemap.error).toContain("/columns/aaa-low3");
+  });
+  it("sitemap の上限を超えた記事は sitemap 外とみなさない(S を付けない)", async () => {
+    const { stdout } = await run(["--json"], "overflow").catch((e: { stdout: string }) => e);
+    const report = JSON.parse(stdout) as Report;
+    expect(report.sources.sitemap).toMatchObject({ ok: false, count: 50 });
+    expect(report.sources.sitemap.error).toContain("上限超過で未取得: /columns/of-50, /columns/of-51");
+    expect(report.alerts.some((a) => a.code === "S")).toBe(false);
+    expect(report.articles.every((a) => a.inSitemap)).toBe(true);
   });
   it("不正な引数は API を呼ぶ前に拒否する(同じオプションは後勝ち)", async () => {
     await expect(run(["--retry-wait-ms", "abc"])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining("--retry-wait-ms") });

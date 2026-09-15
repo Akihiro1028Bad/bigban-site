@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { addDays, buildArticle, buildArticleWindows, buildReport, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectTextFlags, extractArticleUrls, formatReport, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
+import { addDays, ARTICLE_URL, buildArticle, buildArticleWindows, buildReport, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectSitemapFlag, detectTextFlags, extractArticleUrls, formatReport, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
 
 describe("日付ユーティリティ", () => {
   it("日数を加減し、月またぎも扱う", () => {
@@ -47,7 +47,7 @@ describe("GA4 行の記事別集計", () => {
     expect(map.get("/columns/a")).toEqual({ yesterday: 0, sameWeekdayLastWeek: 0, last7: 0, prev7: 0 });
   });
   it("閾値は設計書の値を持つ", () => {
-    expect(THRESHOLDS).toEqual({ g1MinPrev7: 30, g1Percent: 40, g2MinPrev: 20, g2Percent: 60, g3MinPrev7: 30, newArticleDays: 14, h2StaleDays: 14, maxArticles: 50 });
+    expect(THRESHOLDS).toEqual({ g1MinPrev7: 30, g1Percent: 40, g2MinPrev: 20, g2Percent: 60, g3MinPrev7: 30, newArticleDays: 14, h2StaleDays: 14, maxArticles: 50, maxUnlisted: 10, sMinSessions: 3 });
   });
 });
 
@@ -101,6 +101,14 @@ describe("sitemap 解析", () => {
       overflow: [],
     });
   });
+  it("記事 URL の形(ARTICLE_URL)は locale 付き1階層の slug だけを認める", () => {
+    expect(ARTICLE_URL.test("/columns/a")).toBe(true);
+    expect(ARTICLE_URL.test("/news/a")).toBe(true);
+    expect(ARTICLE_URL.test("/en/columns/a")).toBe(true);
+    expect(ARTICLE_URL.test("/columns/a/b")).toBe(false);
+    expect(ARTICLE_URL.test("/columns")).toBe(false);
+    expect(ARTICLE_URL.test("/ja/columns/a")).toBe(false);
+  });
   it("上限50本を超えた分は overflow に分ける", () => {
     const many = Array.from({ length: 52 }, (_, i) => `<url><loc>https://example.test/columns/a${i}</loc></url>`).join("");
     const { paths, overflow } = extractArticleUrls(`<urlset>${many}</urlset>`, "https://example.test");
@@ -143,6 +151,18 @@ describe("H 判定(期限切れ表現)", () => {
       { code: "H1", severity: "中", detail: { phrase: "受付中", eventDate: "2026-08-23" } },
     ]);
   });
+  it("H1 の対象語は「募集中」「受付中」「開催します」の3語で、「開催予定」は含めない", () => {
+    expect(detectTextFlags("/news/x", parsed("2026年8月23日(日)に開催予定です。"), today)).toEqual([]);
+    expect(detectTextFlags("/news/x", parsed("2026年8月23日(日)の参加者を募集中です。"), today)).toEqual([
+      { code: "H1", severity: "中", detail: { phrase: "募集中", eventDate: "2026-08-23" } },
+    ]);
+  });
+  it("本文に終了の断り書きがあれば H1 を判定しない(H2 は抑止しない)", () => {
+    expect(detectTextFlags("/news/x", parsed("このイベントは終了しました。2026年8月23日(日)に開催します。受付中"), today)).toEqual([]);
+    expect(detectTextFlags("/news/x", parsed("このイベントは終了いたしました。2026年8月23日に開催します。受付中。詳細は追って", "2026-08-01"), today)).toEqual([
+      { code: "H2", severity: "低", detail: { phrase: "追って", dateModified: "2026-08-01", daysSinceModified: 44 } },
+    ]);
+  });
   it("H1 は開催日が今日以降なら付けず、年のない日付は使わず、コラムには適用しない", () => {
     expect(detectTextFlags("/news/x", parsed("2026年9月26日(土)に開催します。受付中"), today)).toEqual([]);
     expect(detectTextFlags("/news/x", parsed("8月23日に開催します。受付中"), today)).toEqual([]);
@@ -163,10 +183,35 @@ describe("H 判定(期限切れ表現)", () => {
 });
 
 describe("I 判定(死活)", () => {
-  it("再試行後も 200 以外なら最優先、観測不能と 200 は付けない", () => {
-    expect(detectHttpFlag({ status: 500, observed: "error" })).toEqual({ code: "I", severity: "最優先", detail: { status: 500 } });
-    expect(detectHttpFlag({ status: null, observed: "unreachable" })).toBeNull();
-    expect(detectHttpFlag({ status: 200, observed: "ok" })).toBeNull();
+  const parsed = (scope: "main" | "article" | "body") => ({ datePublished: null, dateModified: null, mainText: "", scope });
+  it("再試行後も 200 以外なら最優先、観測不能と本文のある 200 は付けない", () => {
+    expect(detectHttpFlag({ status: 500, observed: "error" }, null)).toEqual({ code: "I", severity: "最優先", detail: { status: 500 } });
+    expect(detectHttpFlag({ status: null, observed: "unreachable" }, null)).toBeNull();
+    expect(detectHttpFlag({ status: 200, observed: "ok" }, parsed("main"))).toBeNull();
+  });
+  it("200 でも本文(main/article)が無ければソフト404 として最優先で付ける", () => {
+    expect(detectHttpFlag({ status: 200, observed: "ok" }, parsed("body"))).toEqual({
+      code: "I", severity: "最優先", detail: { status: 200, reason: "記事本文なし（ソフト404）" },
+    });
+  });
+});
+
+describe("S 判定(sitemap 外の流入記事)", () => {
+  const entry = { yesterday: 1, sameWeekdayLastWeek: 0, last7: 4, prev7: 2 };
+  const parsed = (scope: "main" | "article" | "body") => ({ datePublished: null, dateModified: null, mainText: "", scope });
+  it("記事として描画されていれば低、ソフト404 と非200 は中、接続不能は低", () => {
+    expect(detectSitemapFlag(entry, { status: 200, observed: "ok" }, parsed("main"))).toEqual({
+      code: "S", severity: "低", detail: { last7: 4, prev7: 2, page: "ok" },
+    });
+    expect(detectSitemapFlag(entry, { status: 200, observed: "ok" }, parsed("body"))).toEqual({
+      code: "S", severity: "中", detail: { last7: 4, prev7: 2, page: "missing", status: 200 },
+    });
+    expect(detectSitemapFlag(entry, { status: 404, observed: "error" }, null)).toEqual({
+      code: "S", severity: "中", detail: { last7: 4, prev7: 2, page: "missing", status: 404 },
+    });
+    expect(detectSitemapFlag(entry, { status: null, observed: "unreachable" }, null)).toEqual({
+      code: "S", severity: "低", detail: { last7: 4, prev7: 2, page: "unreachable" },
+    });
   });
 });
 
@@ -182,6 +227,19 @@ describe("レポート", () => {
     const dead = buildArticle({ path: "/columns/steady", entry: null, http: { status: 500, retried: true, observed: "error" }, html: null, today });
     expect(dead).toMatchObject({ locale: "ja", publishedAt: null, dateModified: null, entry: null });
     expect(dead.flags).toEqual([{ code: "I", severity: "最優先", detail: { status: 500 } }]);
+  });
+  it("sitemap 外の記事(inSitemap:false)は G/H/I を判定せず S だけを付ける", () => {
+    const entry = { yesterday: 0, sameWeekdayLastWeek: 0, last7: 3, prev7: 1 };
+    const ghost = buildArticle({ path: "/columns/ghost", entry, http: ok, html: "<body><header>THE PICKLE BANG THEORY</header></body>", today, inSitemap: false });
+    expect(ghost).toMatchObject({ inSitemap: false, locale: "ja" });
+    expect(ghost.flags).toEqual([{ code: "S", severity: "中", detail: { last7: 3, prev7: 1, page: "missing", status: 200 } }]);
+    const alive = buildArticle({ path: "/columns/ghost", entry, http: ok, html, today, inSitemap: false });
+    expect(alive.flags).toEqual([{ code: "S", severity: "低", detail: { last7: 3, prev7: 1, page: "ok" } }]);
+    const gone = buildArticle({ path: "/columns/ghost", entry, http: { status: null, retried: true, observed: "unreachable" as const }, html: null, today, inSitemap: false });
+    expect(gone.flags).toEqual([{ code: "S", severity: "低", detail: { last7: 3, prev7: 1, page: "unreachable" } }]);
+  });
+  it("sitemap の記事は inSitemap:true を既定にする", () => {
+    expect(buildArticle({ path: "/columns/steady", entry: null, http: ok, html: "<main>本文</main>", today })).toMatchObject({ inSitemap: true });
   });
   it("alerts を深刻度順→パス順に平坦化し、テキストに整形する", () => {
     const sources = { ga4: { ok: true, error: null }, sitemap: { ok: true, count: 2, error: null }, html: { ok: false, fetched: 1, error: "unreachable: /columns/z" } };

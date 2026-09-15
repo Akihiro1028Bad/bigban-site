@@ -12,6 +12,8 @@ export const THRESHOLDS = {
   newArticleDays: 14,
   h2StaleDays: 14,
   maxArticles: 50,
+  maxUnlisted: 10,
+  sMinSessions: 3,
 };
 
 const DAY_MS = 86_400_000;
@@ -84,7 +86,8 @@ export function detectEntryFlags(entry, publishedAt, today) {
   return flags;
 }
 
-const ARTICLE_URL = /^\/(?:en\/)?(?:columns|news)\/[^/]+$/;
+/** 記事詳細の URL の形。sitemap の抽出と S の候補（GA4 の入口パス）の両方で使う。 */
+export const ARTICLE_URL = /^\/(?:en\/)?(?:columns|news)\/[^/]+$/;
 
 /** sitemap から記事詳細のパスを拾う(一覧ページ・別オリジンは除外。上限は設計書 §4.2)。 */
 export function extractArticleUrls(xml, origin) {
@@ -138,17 +141,19 @@ export function parseArticleHtml(html) {
   return { datePublished, dateModified, mainText, scope };
 }
 
-const H1_PHRASES = ["募集中", "受付中", "開催します", "開催予定"];
+const H1_PHRASES = ["募集中", "受付中", "開催します"];
+// 開催済み告知の断り書き。これが本文にあれば H1 は判定しない(タイトルにも残る「開催します」を消せないため)。
+const CLOSED_PHRASES = ["終了しました", "終了いたしました"];
 const H2_PHRASES = ["まもなく", "近日公開", "近日中", "追って"];
 const NEWS_PATH = /^\/(?:en\/)?news\//;
 const FULL_DATE = /(\d{4})年(\d{1,2})月(\d{1,2})日/g;
 
-/** 設計書 §3.2。H1 はニュースのみ。年のない日付は使わない。dateModified が無い H2 は判定しない。 */
+/** 設計書 §3.2。H1 はニュースのみ、終了マーカーがあれば判定しない。年のない日付は使わない。dateModified が無い H2 は判定しない。 */
 export function detectTextFlags(path, parsed, today) {
   if (!parsed) return [];
   const flags = [];
   const text = parsed.mainText;
-  if (NEWS_PATH.test(path)) {
+  if (NEWS_PATH.test(path) && !CLOSED_PHRASES.some((p) => text.includes(p))) {
     const phrase = H1_PHRASES.find((p) => text.includes(p));
     const dates = [...text.matchAll(FULL_DATE)].map(([, y, m, d]) => `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`).sort();
     const eventDate = dates.at(-1);
@@ -164,24 +169,40 @@ export function detectTextFlags(path, parsed, today) {
   return flags;
 }
 
-/** 設計書 §3.3。再試行後も 200 以外が続いた場合だけ。接続不能(unreachable)は観測不能として付けない。 */
-export function detectHttpFlag(http) {
-  return http.observed === "error" ? { code: "I", severity: "最優先", detail: { status: http.status } } : null;
+/**
+ * 設計書 §3.3。再試行後も 200 以外が続いた場合と、200 でも記事本文が無い場合(ソフト404)。
+ * 接続不能(unreachable)は観測不能として付けない。`parsed` は `observed === "ok"` のとき必ず渡す。
+ */
+export function detectHttpFlag(http, parsed) {
+  if (http.observed === "error") return { code: "I", severity: "最優先", detail: { status: http.status } };
+  if (http.observed === "ok" && parsed.scope === "body") {
+    return { code: "I", severity: "最優先", detail: { status: 200, reason: "記事本文なし（ソフト404）" } };
+  }
+  return null;
+}
+
+/** 設計書 §3.4。sitemap に無いのに流入がある記事。ページが生きているかだけを添える。 */
+export function detectSitemapFlag(entry, http, parsed) {
+  const base = { last7: entry.last7, prev7: entry.prev7 };
+  if (http.observed === "unreachable") return { code: "S", severity: "低", detail: { ...base, page: "unreachable" } };
+  if (http.observed === "ok" && parsed.scope !== "body") return { code: "S", severity: "低", detail: { ...base, page: "ok" } };
+  return { code: "S", severity: "中", detail: { ...base, page: "missing", status: http.status } };
 }
 
 const SEVERITY_RANK = { 最優先: 0, 高: 1, 中: 2, 低: 3 };
 
-/** 1記事ぶんの取得結果を判定込みの行にする。html が無い(取得失敗)記事は H を判定しない。 */
-export function buildArticle({ path, entry, http, html, today }) {
+/**
+ * 1記事ぶんの取得結果を判定込みの行にする。html が無い(取得失敗)記事は H を判定しない。
+ * `inSitemap:false`(sitemap に無く GA4 に流入だけある記事)は監視対象外なので G/H/I を判定せず S だけを付ける。
+ */
+export function buildArticle({ path, entry, http, html, today, inSitemap = true }) {
   const parsed = html === null ? null : parseArticleHtml(html);
   const publishedAt = parsed?.datePublished ?? null;
-  const httpFlag = detectHttpFlag(http);
-  const flags = [
-    ...detectEntryFlags(entry, publishedAt, today),
-    ...detectTextFlags(path, parsed, today),
-    ...(httpFlag ? [httpFlag] : []),
-  ];
-  return { path, locale: path.startsWith("/en/") ? "en" : "ja", publishedAt, dateModified: parsed?.dateModified ?? null, entry, http, flags };
+  const httpFlag = inSitemap ? detectHttpFlag(http, parsed) : null;
+  const flags = inSitemap
+    ? [...detectEntryFlags(entry, publishedAt, today), ...detectTextFlags(path, parsed, today), ...(httpFlag ? [httpFlag] : [])]
+    : [detectSitemapFlag(entry, http, parsed)];
+  return { path, locale: path.startsWith("/en/") ? "en" : "ja", publishedAt, dateModified: parsed?.dateModified ?? null, entry, http, inSitemap, flags };
 }
 
 /**
