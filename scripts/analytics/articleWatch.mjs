@@ -138,17 +138,19 @@ export function parseArticleHtml(html) {
   return { datePublished, dateModified, mainText, scope };
 }
 
-const H1_PHRASES = ["募集中", "受付中", "開催します", "開催予定"];
+const H1_PHRASES = ["募集中", "受付中", "開催します"];
+// 開催済み告知の断り書き。これが本文にあれば H1 は判定しない(タイトルにも残る「開催します」を消せないため)。
+const CLOSED_PHRASES = ["終了しました", "終了いたしました"];
 const H2_PHRASES = ["まもなく", "近日公開", "近日中", "追って"];
 const NEWS_PATH = /^\/(?:en\/)?news\//;
 const FULL_DATE = /(\d{4})年(\d{1,2})月(\d{1,2})日/g;
 
-/** 設計書 §3.2。H1 はニュースのみ。年のない日付は使わない。dateModified が無い H2 は判定しない。 */
+/** 設計書 §3.2。H1 はニュースのみ、終了マーカーがあれば判定しない。年のない日付は使わない。dateModified が無い H2 は判定しない。 */
 export function detectTextFlags(path, parsed, today) {
   if (!parsed) return [];
   const flags = [];
   const text = parsed.mainText;
-  if (NEWS_PATH.test(path)) {
+  if (NEWS_PATH.test(path) && !CLOSED_PHRASES.some((p) => text.includes(p))) {
     const phrase = H1_PHRASES.find((p) => text.includes(p));
     const dates = [...text.matchAll(FULL_DATE)].map(([, y, m, d]) => `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`).sort();
     const eventDate = dates.at(-1);

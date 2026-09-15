@@ -143,6 +143,18 @@ describe("H 判定(期限切れ表現)", () => {
       { code: "H1", severity: "中", detail: { phrase: "受付中", eventDate: "2026-08-23" } },
     ]);
   });
+  it("H1 の対象語は「募集中」「受付中」「開催します」の3語で、「開催予定」は含めない", () => {
+    expect(detectTextFlags("/news/x", parsed("2026年8月23日(日)に開催予定です。"), today)).toEqual([]);
+    expect(detectTextFlags("/news/x", parsed("2026年8月23日(日)の参加者を募集中です。"), today)).toEqual([
+      { code: "H1", severity: "中", detail: { phrase: "募集中", eventDate: "2026-08-23" } },
+    ]);
+  });
+  it("本文に終了の断り書きがあれば H1 を判定しない(H2 は抑止しない)", () => {
+    expect(detectTextFlags("/news/x", parsed("このイベントは終了しました。2026年8月23日(日)に開催します。受付中"), today)).toEqual([]);
+    expect(detectTextFlags("/news/x", parsed("このイベントは終了いたしました。2026年8月23日に開催します。受付中。詳細は追って", "2026-08-01"), today)).toEqual([
+      { code: "H2", severity: "低", detail: { phrase: "追って", dateModified: "2026-08-01", daysSinceModified: 44 } },
+    ]);
+  });
   it("H1 は開催日が今日以降なら付けず、年のない日付は使わず、コラムには適用しない", () => {
     expect(detectTextFlags("/news/x", parsed("2026年9月26日(土)に開催します。受付中"), today)).toEqual([]);
     expect(detectTextFlags("/news/x", parsed("8月23日に開催します。受付中"), today)).toEqual([]);
