@@ -13,6 +13,7 @@ export const THRESHOLDS = {
   h2StaleDays: 14,
   maxArticles: 50,
   maxUnlisted: 10,
+  sMinSessions: 3,
 };
 
 const DAY_MS = 86_400_000;
@@ -85,7 +86,8 @@ export function detectEntryFlags(entry, publishedAt, today) {
   return flags;
 }
 
-const ARTICLE_URL = /^\/(?:en\/)?(?:columns|news)\/[^/]+$/;
+/** 記事詳細の URL の形。sitemap の抽出と S の候補（GA4 の入口パス）の両方で使う。 */
+export const ARTICLE_URL = /^\/(?:en\/)?(?:columns|news)\/[^/]+$/;
 
 /** sitemap から記事詳細のパスを拾う(一覧ページ・別オリジンは除外。上限は設計書 §4.2)。 */
 export function extractArticleUrls(xml, origin) {

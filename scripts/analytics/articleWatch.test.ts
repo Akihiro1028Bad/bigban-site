@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { addDays, buildArticle, buildArticleWindows, buildReport, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectSitemapFlag, detectTextFlags, extractArticleUrls, formatReport, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
+import { addDays, ARTICLE_URL, buildArticle, buildArticleWindows, buildReport, computeWindows, daysBetween, detectEntryFlags, detectHttpFlag, detectSitemapFlag, detectTextFlags, extractArticleUrls, formatReport, parseArticleHtml, THRESHOLDS } from "./articleWatch.mjs";
 
 describe("日付ユーティリティ", () => {
   it("日数を加減し、月またぎも扱う", () => {
@@ -47,7 +47,7 @@ describe("GA4 行の記事別集計", () => {
     expect(map.get("/columns/a")).toEqual({ yesterday: 0, sameWeekdayLastWeek: 0, last7: 0, prev7: 0 });
   });
   it("閾値は設計書の値を持つ", () => {
-    expect(THRESHOLDS).toEqual({ g1MinPrev7: 30, g1Percent: 40, g2MinPrev: 20, g2Percent: 60, g3MinPrev7: 30, newArticleDays: 14, h2StaleDays: 14, maxArticles: 50, maxUnlisted: 10 });
+    expect(THRESHOLDS).toEqual({ g1MinPrev7: 30, g1Percent: 40, g2MinPrev: 20, g2Percent: 60, g3MinPrev7: 30, newArticleDays: 14, h2StaleDays: 14, maxArticles: 50, maxUnlisted: 10, sMinSessions: 3 });
   });
 });
 
@@ -100,6 +100,14 @@ describe("sitemap 解析", () => {
       paths: ["/columns/steady", "/columns/spike", "/news/expired-event", "/en/news/expired-event"],
       overflow: [],
     });
+  });
+  it("記事 URL の形(ARTICLE_URL)は locale 付き1階層の slug だけを認める", () => {
+    expect(ARTICLE_URL.test("/columns/a")).toBe(true);
+    expect(ARTICLE_URL.test("/news/a")).toBe(true);
+    expect(ARTICLE_URL.test("/en/columns/a")).toBe(true);
+    expect(ARTICLE_URL.test("/columns/a/b")).toBe(false);
+    expect(ARTICLE_URL.test("/columns")).toBe(false);
+    expect(ARTICLE_URL.test("/ja/columns/a")).toBe(false);
   });
   it("上限50本を超えた分は overflow に分ける", () => {
     const many = Array.from({ length: 52 }, (_, i) => `<url><loc>https://example.test/columns/a${i}</loc></url>`).join("");

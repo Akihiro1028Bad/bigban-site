@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { buildArticle, buildArticleWindows, buildReport, computeWindows, extractArticleUrls, formatReport, THRESHOLDS } from "./articleWatch.mjs";
+import { ARTICLE_URL, buildArticle, buildArticleWindows, buildReport, computeWindows, extractArticleUrls, formatReport, THRESHOLDS } from "./articleWatch.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_SITE = "https://www.thepicklebang.com";
@@ -151,10 +151,19 @@ async function main() {
 
   const sitemapErrors = [sitemap.error, overflow.length ? `上限超過で未取得: ${overflow.join(", ")}` : null];
   // sitemap に無いのに流入がある記事(S の対象)。EN は sitemap 未掲載が既知なので黙って除く。
+  // 上限超過で未取得の記事(overflow)は sitemap には載っているので「sitemap 外」ではない。
+  // 候補はルートに存在する記事 URL の形(ARTICLE_URL)に限る(entryMap のキーは部分一致で入るため)。
+  // 1件の誤リンクや bot で鳴らさないよう、流入が sMinSessions 未満の記事は出さない。
   // sitemap を取れなかった日は「sitemap に無い」と言えないので S は出さない。
+  const listed = new Set([...paths, ...overflow]);
+  const sessions = (e) => e.last7 + e.prev7;
   const unlistedAll = entryMap === null || sitemap.xml === null
     ? []
-    : [...entryMap.entries()].filter(([path, e]) => !paths.includes(path) && e.last7 + e.prev7 > 0 && !path.startsWith("/en/")).map(([path]) => path);
+    : [...entryMap.entries()]
+      .filter(([path, e]) => !listed.has(path) && ARTICLE_URL.test(path) && !path.startsWith("/en/") && sessions(e) >= THRESHOLDS.sMinSessions)
+      // 上限で切るため、流入の多い順(同数はパス昇順)に並べてから先頭を取る。
+      .sort(([pathX, x], [pathY, y]) => sessions(y) - sessions(x) || pathX.localeCompare(pathY))
+      .map(([path]) => path);
   const unlisted = unlistedAll.slice(0, THRESHOLDS.maxUnlisted);
   if (unlistedAll.length > THRESHOLDS.maxUnlisted) {
     sitemapErrors.push(`sitemap 外の記事が${THRESHOLDS.maxUnlisted}本を超えたため未確認: ${unlistedAll.slice(THRESHOLDS.maxUnlisted).join(", ")}`);
