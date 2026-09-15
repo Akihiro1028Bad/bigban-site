@@ -21,7 +21,7 @@ node scripts/analytics/query.mjs --days 7 --monitor-only --json
 
 ## 記事の日次監視
 
-`node scripts/analytics/watchArticles.mjs --json` の `alerts` を読む。判定の閾値と条件（G1〜G3 の下限値、H1/H2 の語と日数、I の再試行）は `docs/superpowers/specs/2026-09-14-article-daily-watch-design.md` §3 を正典とし、プロンプト側で緩めたり厳しくしたりしない。`sources.*.ok` が false の項目は取得不可であり、当該判定は保留する（0 と読まない）。`unreachable` は観測不能で、死活と断定しない。記事の改稿判定・新規ネタは週次の記事レビュー（`2026-09-11-article-review-routine-design.md`）の担当で、日次では扱わない。
+`node scripts/analytics/watchArticles.mjs --json` の `alerts` を読む。判定の閾値と条件（G1〜G3 の下限値、H1/H2 の語と日数、I の再試行とソフト404、S の対象と上限）は `docs/superpowers/specs/2026-09-14-article-daily-watch-design.md` §3 を正典とし、プロンプト側で緩めたり厳しくしたりしない。`sources.*.ok` が false の項目は取得不可であり、当該判定は保留する（0 と読まない）。`unreachable` は観測不能で、死活と断定しない。記事の改稿判定・新規ネタは週次の記事レビュー（`2026-09-11-article-review-routine-design.md`）の担当で、日次では扱わない。
 
 ## 台帳の取得範囲
 
