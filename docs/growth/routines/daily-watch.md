@@ -123,7 +123,7 @@ node scripts/analytics/watchArticles.mjs --json
 
 - `sources.ga4.ok` が false → G は判定できない。「記事の入口セッションは取得不可（理由）」と明記し、H/I は通常どおり扱う。
 - `sources.sitemap.ok` が false → `error` を読む。「上限超過で未取得: …」なら記事50本までは判定済みなので通常どおり扱い、末尾に「記事が50本を超えたため一部未監視（要: `THRESHOLDS.maxArticles` の引き上げ）」と1行添える。それ以外（取得失敗）は「記事ウォッチは sitemap 取得不可のため未実施（理由）」と1行。
-- sitemap に無いのに流入がある記事は `alerts` に `S` として出る（下の判定表）。EN ページ `/en/columns/…` は sitemap 未掲載が既知のため S の対象外（スクリプト側で除外済み）。`sources.sitemap.error` に「sitemap 外の記事が10本を超えたため未確認: …」が入っていれば、その旨を1行添える。
+- `sources.sitemap.error` は `ok` が true でも読む（`maxUnlisted` 超過のメッセージは `ok` を false にしない）。sitemap に無いのに流入がある記事は `alerts` に `S` として出る（下の判定表）。EN ページ `/en/columns/…` は sitemap 未掲載が既知のため S の対象外（スクリプト側で除外済み）。`sources.sitemap.error` に「sitemap 外の記事が10本を超えたため未確認: …」が入っていれば、その旨を1行添える。
 - `sources.html.ok` が false で `error` に `unreachable:` がある → その記事は**観測不能**。死活とは断定せず「接続できなかった」と書く。
 - スクリプト自体が起動できない → 他の異常があればその通知の末尾に「記事ウォッチが実行できなかった（理由）」を1行。なければ3営業日続いた場合だけ1通。
 
@@ -137,7 +137,7 @@ node scripts/analytics/watchArticles.mjs --json
 | H1 | ニュースに「募集中／受付中／開催します」の3語のいずれかがあり、本文中で最も遅い開催日が昨日以前（本文に「終了しました／終了いたしました」があれば付かない） | 中。開催済みイベントが受付中のまま |
 | H2 | 本文に「まもなく／近日公開／近日中／追って」があり、最終更新から14日超 | 低 |
 | I | 記事ページが 30秒後の再試行でも HTTP 200 以外。**HTTP 200 でも記事本文が無ければ**同じく I（`detail.reason` が「記事本文なし（ソフト404）」。本番は存在しない slug でも 200 を返す） | 最優先。F が発火した日は「トップと同じ原因の可能性」として1行に畳む |
-| S | 流入（直近7日 + 前7日 > 0）があるのに sitemap に無い記事（削除・noindex・多言語ページの可能性）。`detail.page` が `ok`（ページは表示される）／`missing`（ソフト404・非200）／`unreachable` | 低。`page` が `missing` のときだけ 中 |
+| S | 流入（直近7日 + 前7日 が3以上）があるのに sitemap に無い記事（削除・noindex・多言語ページの可能性）。`detail.page` が `ok`（ページは表示される）／`missing`（ソフト404・非200）／`unreachable` | 低。`page` が `missing` のときだけ 中 |
 
 同じ記事に G1 と G2 が逆方向で同時に付いた場合（例: 直近7日は増、昨日は減）は、7日の信号（G1）を主に書き、昨日の値は「速報・未確定」として添える。両方を独立の異常として並べない。
 
@@ -189,11 +189,12 @@ node scripts/analytics/watchArticles.mjs --json
 記事の項目は「■ 検知」に記号付きで並べる。記事1本につき1行、パスは `columns/hyrox-beginners-guide` の形。
 
 ```
-⚠ 日次ウォッチ (9/14) — 記事2件の期限切れ表現
+⚠ 日次ウォッチ (9/14) — 記事3件の期限切れ表現・URL 不整合
 
 ■ 検知
 H1) news/picklerox-2026: 開催日 8/23 が過ぎているが「受付中」が残っている
 H2) news/hyrox-osaka-early-access-simulation: 「近日公開」が残ったまま最終更新から16日
+S) columns/hyrox-training-start-guide: 流入があるのに sitemap に無く、ページも表示されない（削除・URL誤り・ソフト404 の可能性）
 
 ■ 数字
 （G のときだけ: G1/G3 は 直近7日 / 前7日 / 変化率、G2 は 昨日 / 前週同曜日 / 変化率 を記事ごとに1行。G2 には「速報」を付ける）
@@ -205,6 +206,7 @@ H2) news/hyrox-osaka-early-access-simulation: 「近日公開」が残ったま�
 H) 該当記事の文言を更新するか、対話で「〇〇の期限切れ表現を直して」と依頼
 G) 急減なら記事 URL を開いて表示を確認。急増なら要因を一次情報で確かめる
 I) 記事 URL を開いて表示を確認
+S) microCMS に該当記事があるか確認。無ければリンク元（内部リンク・SNS・外部サイト）を探す
 ```
 
 原則:
