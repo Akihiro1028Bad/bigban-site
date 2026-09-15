@@ -63,10 +63,12 @@
 
 | 記号 | 条件 | 深刻度 |
 |---|---|---|
-| H1 | `/news/` の本文に「募集中」「受付中」「開催します」「開催予定」のいずれかがあり、本文中で最も遅い開催日（「YYYY年M月D日」形）が**昨日以前** | 中。開催済みイベントが受付中のまま |
+| H1 | `/news/` の本文に「募集中」「受付中」「開催します」のいずれかがあり、本文中で最も遅い開催日（「YYYY年M月D日」形）が**昨日以前**。ただし本文に終了マーカー（「終了しました」「終了いたしました」）があれば判定しない | 中。開催済みイベントが受付中のまま |
 | H2 | 本文に「まもなく」「近日公開」「近日中」「追って」のいずれかがあり、JSON-LD の `dateModified` が**14日超前** | 低。「まもなく販売開始」「プログラム詳細は近日公開」がこの型 |
 
 - H1 の「開催日」は「YYYY年M月D日」形の日付をすべて拾い、その最大値を使う。年のない「M月D日」は使わない（過去記事の「8月23日」を今年と誤読するため）。日付が1つも無ければ H1 は判定しない。
+- 「開催予定」は対象語に**入れない**（2026-09-15 の実測で、認定ニュースの「順次開催予定です」+ プレスリリース日で誤検知した）。
+- 終了マーカーによる抑止は、開催済み告知の「開催します」が**タイトル（h1）と本文の両方**にあり本文だけ直しても検知が止まらないため。運用は **開催済み告知の本文冒頭に「このイベントは終了しました。」を入れれば H1 が消える**（2026-09-15 決定）。終了マーカーは H2 には影響させない。
 - H2 で `dateModified` が取れない記事は判定しない（`null` を「古い」と読まない）。
 - 「◯月◯日確認」の経年は対象外（§1）。「未発表」「販売開始前」も対象外（名古屋2027 のように長期間正しく残る表現のため）。
 - H は状態を持たないため、直るまで毎日同じ1行で載る。うるさければプロンプト側で「木曜だけ載せる」に落とせるよう、スクリプトの出力は毎日出す。
@@ -76,9 +78,24 @@
 | 記号 | 条件 | 深刻度 |
 |---|---|---|
 | I | sitemap の記事 URL のうち、HTTP 200 以外が **30秒後の再試行でも続く** | 最優先。既存 F と同じ扱い |
+| I | HTTP 200 だが記事本文が無い（`<main>` も `<article>` も無い＝ソフト404） | 最優先。`detail.reason` に「記事本文なし（ソフト404）」 |
 
 - `000`（接続不能）は既存 F と同じく「観測不能」として区別し、死活と断定しない。
+- ソフト404 を足した理由: 本番は存在しない記事 slug でも **HTTP 200 で空のシェル**を返す（`loading.tsx` + ストリーミングの中で `notFound()` が呼ばれるため。2026-09-15 確認）。非200 だけを見る判定では記事の消失を検知できない。
 - 既存 F（トップの死活）が発火した日は、I を「トップと同じ原因の可能性」として1行に畳む（プロンプト側）。
+
+### 3.4 S. sitemap に無いのに流入がある記事
+
+| 記号 | 条件 | 深刻度 |
+|---|---|---|
+| S | GA4 に入口セッション（直近7日 + 前7日 > 0）があり、sitemap の記事 URL に無いパス。ページが記事として描画されていれば 低、ソフト404・非200 なら 中、接続不能なら 低 | 低〜中 |
+
+- `/en/` で始まるパスは対象外（EN 記事の sitemap 未掲載は既知。2026-09-14 時点）。
+- 上限は `THRESHOLDS.maxUnlisted = 10` 本。超えた分は取得せず `sources.sitemap.error` に「sitemap 外の記事が10本を超えたため未確認: …」として記録する。
+- これらのパスも記事 HTML を取得する（sitemap の記事と同じ再試行ルール）。ただし `sources.html` は**監視対象（sitemap の記事）の取得状況**だけを表し、sitemap 外の取得失敗は S の `detail.page` で表す。
+- 対象記事は監視対象外なので **G/H/I は判定せず S だけ**を付ける（`inSitemap:false`）。
+- sitemap 自体が取得できなかった日は「sitemap に無い」と言えないため S を出さない。
+- 実例: `/columns/hyrox-training-start-guide` が microCMS 本番に存在しないのに GA4 に入口セッションがある（2026-09-15 確認）。従来は `sources.sitemap.error` の文字列にしか出ず、プロンプトが文字列を読んで `S)` を組み立てる弱い運用だった。
 
 ## 4. スクリプトの仕様
 
@@ -122,11 +139,23 @@
     publishedAt: "2026-08-10"|null, dateModified: "2026-09-13"|null,
     entry: { yesterday, sameWeekdayLastWeek, last7, prev7 },   // GA4 失敗時は entry 自体が null
     http:  { status: 200|number|null, retried: boolean, observed: "ok"|"error"|"unreachable" },
+    inSitemap: true|false,                                     // false は sitemap 外の流入記事（S だけを付ける）
     flags: [{ code: "G1", severity: "中", detail: { last7, prev7, deltaPercent } }, ...]
   }],
   alerts: [{ code, path, severity, detail }]              // flags の平坦化。プロンプトはこれだけ読む
 }
 ```
+
+`flags` の `detail` の形:
+
+| code | detail |
+|---|---|
+| G1 / G3 | `{ last7, prev7, deltaPercent }`（G3 は `deltaPercent` なし） |
+| G2 | `{ yesterday, sameWeekdayLastWeek, deltaPercent }` |
+| H1 | `{ phrase, eventDate }` |
+| H2 | `{ phrase, dateModified, daysSinceModified }` |
+| I | `{ status }`（非200）/ `{ status: 200, reason: "記事本文なし（ソフト404）" }` |
+| S | `{ last7, prev7, page: "ok"\|"missing"\|"unreachable", status }`（`status` は `page:"missing"` のときだけ） |
 
 - 取得に失敗した値は `null` にし、0 で埋めない。条件に使う値が `null` の判定は**その判定だけを飛ばす**。
 - `sources` のどれかが `ok:false` なら、JSON は出したうえで終了コード1（共通契約「失敗を 0 にしない」。プロンプトは終了コードで出力を捨てず `sources` を読む）。
@@ -139,8 +168,13 @@
 buildArticleWindows(rows, windows)             → Map<path, {yesterday, sameWeekdayLastWeek, last7, prev7}>
 detectEntryFlags(entry, publishedAt, today)    → G1/G2/G3 の flags（除外条件を含む）
 extractArticleUrls(sitemapXml, origin)         → path[]（上限50、超過は {paths, overflow} で返す）
-parseArticleHtml(html)                         → { datePublished, dateModified, mainText }
-detectTextFlags(path, parsed, today)           → H1/H2 の flags
+parseArticleHtml(html)                         → { datePublished, dateModified, mainText, scope: "main"|"article"|"body" }
+detectTextFlags(path, parsed, today)           → H1/H2 の flags（終了マーカーがあれば H1 を判定しない）
+detectHttpFlag(http, parsed)                   → I の flag または null（非200、または 200 かつ scope が "body"）
+detectSitemapFlag(entry, http, parsed)         → S の flag（sitemap 外の流入記事）
+buildArticle({ path, entry, http, html, today, inSitemap })
+                                               → 1記事の行。inSitemap は既定 true。
+                                                 false のときは G/H/I を判定せず S だけを付ける
 ```
 
 `today` は JST の日付文字列で CLI から渡す（純関数は `Date.now()` を読まない）。
@@ -158,7 +192,7 @@ node scripts/analytics/watchArticles.mjs --json
 - `alerts` が空 → 記事については何も書かない（沈黙のまま）。
 - `sources` のいずれかが `ok:false` → その項目は「取得不可」と明記し、当該判定を保留する（0 と読まない）。GA4 だけ失敗なら H/I は通常どおり判定する。
 - `sources.sitemap.ok` が false → `error` を読む。「上限超過で未取得: …」なら記事50本までは判定済みなので通常どおり扱い、末尾に「記事が50本を超えたため一部未監視（要: `THRESHOLDS.maxArticles` の引き上げ）」と1行添える。それ以外（取得失敗）は「記事ウォッチは sitemap 取得不可のため未実施（理由）」と1行。
-- `sources.sitemap.error` は `ok` が true でも読む。「GA4 にあり sitemap に無い記事: …」が入っていれば、そのパスを「■ 検知」に `S) <path>: 流入があるのに sitemap に無い（削除・noindex・多言語ページの可能性）` として1行載せる（深刻度 低。EN ページ `/en/columns/…` は 2026-09-14 時点で sitemap 未掲載が既知のため、`/en/` で始まるパスは載せない）。
+- sitemap に無いのに流入がある記事は `alerts` の `S` として出る（§3.4）。EN ページは対象外（sitemap 未掲載が既知）。`sources.sitemap.error` に「sitemap 外の記事が10本を超えたため未確認: …」が入っていれば、その件数を1行添える。
 - スクリプト自体が起動できない → 既存のフォールバックと同じ扱い（他の異常があればその通知の末尾に「記事ウォッチが実行できなかった（理由）」を1行、なければ3営業日続いた場合だけ1通）。
 - 既存 F が発火した日は、I を「トップと同じ原因の可能性」として1行に畳む。
 
@@ -172,6 +206,7 @@ node scripts/analytics/watchArticles.mjs --json
 ■ 検知
 H1) news/picklerox-2026: 開催日 8/23 が過ぎているが「受付中」が残っている
 H2) news/hyrox-osaka-early-access-simulation: 「近日公開」が残ったまま最終更新から16日
+S) columns/hyrox-training-start-guide: 流入があるのに sitemap に無く、ページも表示されない（直近7日 4 / 前7日 6）
 
 ■ 数字
 （G のときだけ: 直近7日 / 前7日 / 変化率 を記事ごとに1行）
@@ -225,6 +260,7 @@ TDD で純関数から書く。カバレッジは CI の閾値（100%）を満�
 | ② | 本番の記事ページに JSON-LD（columns: Article、news: NewsArticle）があり `datePublished`/`dateModified` を持つ | 2026-09-13 に `src/app/[locale]/columns/[slug]/page.tsx` と `NewsArticleJsonLd.tsx` で実装を確認。値の有無は実装時に本番 HTML で確認する | 取れない記事は G の除外と H2 を判定しない（§3） |
 | ③ | sitemap に記事の詳細 URL が ja/en とも載っている | 実装時に本番 sitemap で確認 | 載っていない記事は監視対象外。GA4 に現れてサイトマップに無い記事は `sources.sitemap.error` に列挙。sitemap に無く GA4 に流入がある記事はそれ自体を信号（S）として通知する |
 | ④ | 記事本文が `<main>` の中にある | 実装時に確認 | 無ければ `<article>`、それも無ければ `<body>`（バナー混入のリスクを `sources.html.error` に注記） |
+| ⑤ | 存在しない記事 slug でも本番は **HTTP 200 で空のシェル**を返す（`<main>` も `<article>` も無い。`loading.tsx` + ストリーミングの中で `notFound()` が呼ばれるため） | 2026-09-15 に本番で確認 | 本番の挙動が変わって 404 を返すようになったら、非200 の I がそのまま拾う（ソフト404 の判定は空振りするだけで害はない） |
 
 ## 8. 成功条件（8週後に判定）
 
