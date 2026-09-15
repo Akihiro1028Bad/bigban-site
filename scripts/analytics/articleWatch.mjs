@@ -12,6 +12,7 @@ export const THRESHOLDS = {
   newArticleDays: 14,
   h2StaleDays: 14,
   maxArticles: 50,
+  maxUnlisted: 10,
 };
 
 const DAY_MS = 86_400_000;
@@ -166,24 +167,40 @@ export function detectTextFlags(path, parsed, today) {
   return flags;
 }
 
-/** 設計書 §3.3。再試行後も 200 以外が続いた場合だけ。接続不能(unreachable)は観測不能として付けない。 */
-export function detectHttpFlag(http) {
-  return http.observed === "error" ? { code: "I", severity: "最優先", detail: { status: http.status } } : null;
+/**
+ * 設計書 §3.3。再試行後も 200 以外が続いた場合と、200 でも記事本文が無い場合(ソフト404)。
+ * 接続不能(unreachable)は観測不能として付けない。`parsed` は `observed === "ok"` のとき必ず渡す。
+ */
+export function detectHttpFlag(http, parsed) {
+  if (http.observed === "error") return { code: "I", severity: "最優先", detail: { status: http.status } };
+  if (http.observed === "ok" && parsed.scope === "body") {
+    return { code: "I", severity: "最優先", detail: { status: 200, reason: "記事本文なし（ソフト404）" } };
+  }
+  return null;
+}
+
+/** 設計書 §3.4。sitemap に無いのに流入がある記事。ページが生きているかだけを添える。 */
+export function detectSitemapFlag(entry, http, parsed) {
+  const base = { last7: entry.last7, prev7: entry.prev7 };
+  if (http.observed === "unreachable") return { code: "S", severity: "低", detail: { ...base, page: "unreachable" } };
+  if (http.observed === "ok" && parsed.scope !== "body") return { code: "S", severity: "低", detail: { ...base, page: "ok" } };
+  return { code: "S", severity: "中", detail: { ...base, page: "missing", status: http.status } };
 }
 
 const SEVERITY_RANK = { 最優先: 0, 高: 1, 中: 2, 低: 3 };
 
-/** 1記事ぶんの取得結果を判定込みの行にする。html が無い(取得失敗)記事は H を判定しない。 */
-export function buildArticle({ path, entry, http, html, today }) {
+/**
+ * 1記事ぶんの取得結果を判定込みの行にする。html が無い(取得失敗)記事は H を判定しない。
+ * `inSitemap:false`(sitemap に無く GA4 に流入だけある記事)は監視対象外なので G/H/I を判定せず S だけを付ける。
+ */
+export function buildArticle({ path, entry, http, html, today, inSitemap = true }) {
   const parsed = html === null ? null : parseArticleHtml(html);
   const publishedAt = parsed?.datePublished ?? null;
-  const httpFlag = detectHttpFlag(http);
-  const flags = [
-    ...detectEntryFlags(entry, publishedAt, today),
-    ...detectTextFlags(path, parsed, today),
-    ...(httpFlag ? [httpFlag] : []),
-  ];
-  return { path, locale: path.startsWith("/en/") ? "en" : "ja", publishedAt, dateModified: parsed?.dateModified ?? null, entry, http, flags };
+  const httpFlag = inSitemap ? detectHttpFlag(http, parsed) : null;
+  const flags = inSitemap
+    ? [...detectEntryFlags(entry, publishedAt, today), ...detectTextFlags(path, parsed, today), ...(httpFlag ? [httpFlag] : [])]
+    : [detectSitemapFlag(entry, http, parsed)];
+  return { path, locale: path.startsWith("/en/") ? "en" : "ja", publishedAt, dateModified: parsed?.dateModified ?? null, entry, http, inSitemap, flags };
 }
 
 /**

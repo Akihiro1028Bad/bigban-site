@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { buildArticle, buildArticleWindows, buildReport, computeWindows, extractArticleUrls, formatReport } from "./articleWatch.mjs";
+import { buildArticle, buildArticleWindows, buildReport, computeWindows, extractArticleUrls, formatReport, THRESHOLDS } from "./articleWatch.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_SITE = "https://www.thepicklebang.com";
@@ -150,21 +150,31 @@ async function main() {
   const { paths, overflow } = sitemap.xml === null ? { paths: [], overflow: [] } : extractArticleUrls(sitemap.xml, site);
 
   const sitemapErrors = [sitemap.error, overflow.length ? `上限超過で未取得: ${overflow.join(", ")}` : null];
-  if (entryMap) {
-    const unlisted = [...entryMap.entries()].filter(([path, e]) => !paths.includes(path) && e.last7 + e.prev7 > 0).map(([path]) => path);
-    if (unlisted.length) sitemapErrors.push(`GA4 にあり sitemap に無い記事: ${unlisted.join(", ")}`);
+  // sitemap に無いのに流入がある記事(S の対象)。EN は sitemap 未掲載が既知なので黙って除く。
+  // sitemap を取れなかった日は「sitemap に無い」と言えないので S は出さない。
+  const unlistedAll = entryMap === null || sitemap.xml === null
+    ? []
+    : [...entryMap.entries()].filter(([path, e]) => !paths.includes(path) && e.last7 + e.prev7 > 0 && !path.startsWith("/en/")).map(([path]) => path);
+  const unlisted = unlistedAll.slice(0, THRESHOLDS.maxUnlisted);
+  if (unlistedAll.length > THRESHOLDS.maxUnlisted) {
+    sitemapErrors.push(`sitemap 外の記事が${THRESHOLDS.maxUnlisted}本を超えたため未確認: ${unlistedAll.slice(THRESHOLDS.maxUnlisted).join(", ")}`);
   }
 
-  const pages = await fetchPages(site, paths, retryWaitMs);
-  const htmlErrors = pages.flatMap((p, i) => (p.observed === "ok" ? [] : [`${p.observed}: ${paths[i]}`]));
+  // sitemap 外の記事も同じ再試行ルールで取りに行く(生きているか / ソフト404 かを S に添えるため)。
+  const watchPaths = [...paths, ...unlisted];
+  const pages = await fetchPages(site, watchPaths, retryWaitMs);
+  // sources.html は監視対象(sitemap の記事)の取得状況だけを表す。sitemap 外の取得失敗は S 側で表現する。
+  const sitemapPages = pages.slice(0, paths.length);
+  const htmlErrors = sitemapPages.flatMap((p, i) => (p.observed === "ok" ? [] : [`${p.observed}: ${paths[i]}`]));
 
-  const articles = paths.map((path, i) =>
+  const articles = watchPaths.map((path, i) =>
     buildArticle({
       path,
       entry: entryMap === null ? null : entryMap.get(path) ?? { yesterday: 0, sameWeekdayLastWeek: 0, last7: 0, prev7: 0 },
       http: { status: pages[i].status, retried: pages[i].retried, observed: pages[i].observed },
       html: pages[i].html,
       today,
+      inSitemap: i < paths.length,
     }),
   );
 
@@ -172,7 +182,7 @@ async function main() {
   const sources = {
     ga4: { ok: ga4.error === null, error: ga4.error },
     sitemap: { ok: sitemap.error === null && overflow.length === 0, count: paths.length, error: errorText(sitemapErrors) },
-    html: { ok: htmlErrors.length === 0 && sitemap.error === null, fetched: pages.filter((p) => p.observed === "ok").length, error: errorText(htmlErrors) },
+    html: { ok: htmlErrors.length === 0 && sitemap.error === null, fetched: sitemapPages.filter((p) => p.observed === "ok").length, error: errorText(htmlErrors) },
   };
   const report = buildReport({ today, windows, sources, articles });
   console.log(json ? JSON.stringify(report) : formatReport(report));
