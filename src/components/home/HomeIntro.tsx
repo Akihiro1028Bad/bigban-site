@@ -12,6 +12,8 @@ import type { ReactNode } from "react";
 const SESSION_KEY = "bigban-intro-played";
 /** ハイドレーション前に main を隠す html クラス (introScript が付与する) */
 const PENDING_CLASS = "intro-pending";
+/** マウント後にイントロ中のスクロールを固定する html クラス */
+const SCROLL_LOCK_CLASS = "intro-scroll-lock";
 // ロゴ表示時間 (入場 0.5s + hold 0.3s 相当)。マウントから unmount までの遅延。
 // ここから退場フェード 0.5s がかかるので、演出全体は約 1.3 秒。
 const LOGO_HOLD_MS = 800;
@@ -56,6 +58,22 @@ export default function HomeIntro({ children }: HomeIntroProps) {
   useEffect(() => {
     document.documentElement.classList.remove(PENDING_CLASS);
   }, []);
+
+  // イントロ再生中はスクロールを固定する。
+  // ハイドレーション前は intro-pending が担い、マウント後はこのクラスが
+  // isIntroComplete まで引き継ぐ。両者は同一コミットで入れ替わるため、
+  // ロックが途切れる瞬間はない。
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!shouldShowIntro || isIntroComplete) {
+      root.classList.remove(SCROLL_LOCK_CLASS);
+      return;
+    }
+    root.classList.add(SCROLL_LOCK_CLASS);
+    return () => {
+      root.classList.remove(SCROLL_LOCK_CLASS);
+    };
+  }, [shouldShowIntro, isIntroComplete]);
 
   // ロゴを出したことを記録し、LOGO_HOLD_MS 後に畳む。
   // 記録は shouldShowIntro が true のときだけ: false のときに書くと、

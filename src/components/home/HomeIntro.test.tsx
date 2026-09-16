@@ -202,4 +202,53 @@ describe("HomeIntro", () => {
     expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
     expect(screen.getByTestId("home-content")).toBeInTheDocument();
   });
+
+  it("イントロ再生中は intro-scroll-lock クラスを付ける", () => {
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(true);
+  });
+
+  it("イントロ完了で intro-scroll-lock クラスを外す", () => {
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
+  });
+
+  it("イントロ再生中に unmount しても intro-scroll-lock クラスが残らない", () => {
+    const { unmount } = render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    unmount();
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
+  });
+
+  it("イントロをスキップするときは intro-scroll-lock クラスを付けない", () => {
+    mockSessionStorage["bigban-intro-played"] = "true";
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
+  });
 });
