@@ -4,9 +4,8 @@ import { useServerInsertedHTML } from "next/navigation";
 
 export const browserDetectScript = `try{var u=navigator.userAgent,iOS=/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),safari=/Safari\\//.test(u),other=/CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser|DuckDuckGo|GSA|Instagram/.test(u);if(iOS&&safari&&!other)document.documentElement.setAttribute('data-browser','ios-safari')}catch(e){}`;
 
-// ホームのイントロは一旦 OFF (shouldPlayIntro 既定 false) のため、このスクリプトは
-// 現在どこからも出力されない。復活させるときは layout.tsx を
-// <PreHydrationScripts shouldPlayIntro /> にする。
+// ホーム初回訪問時のイントロ演出中だけ main を隠すためのスクリプト。
+// layout.tsx が shouldPlayIntro を渡しているときに出力される。
 //
 // 以下は再生する場合の挙動。intro-pending クラスはイントロ再生中だけ main を
 // visibility:hidden で隠す (FOUC 防止のため SSR HTML 段階で付与)。HomeIntro が mount したら

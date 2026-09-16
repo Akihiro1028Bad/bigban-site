@@ -38,13 +38,18 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
 }));
 
+const preHydrationProps: { shouldPlayIntro?: boolean }[] = [];
+
 vi.mock("@/components/PreHydrationScripts", async () => {
   const actual = await vi.importActual<
     typeof import("@/components/PreHydrationScripts")
   >("@/components/PreHydrationScripts");
   return {
     ...actual,
-    default: () => null,
+    default: (props: { shouldPlayIntro?: boolean }) => {
+      preHydrationProps.push(props);
+      return null;
+    },
   };
 });
 
@@ -155,6 +160,20 @@ describe("LocaleLayout", () => {
     const params = generateStaticParams();
 
     expect(params).toEqual([{ locale: "ja" }, { locale: "en" }]);
+  });
+
+  it("PreHydrationScripts に shouldPlayIntro を渡してイントロを有効にする", async () => {
+    preHydrationProps.length = 0;
+    const { default: LocaleLayout } = await import("./layout");
+
+    render(
+      await LocaleLayout({
+        children: <p>test content</p>,
+        params: Promise.resolve({ locale: "ja" }),
+      })
+    );
+
+    expect(preHydrationProps.at(0)?.shouldPlayIntro).toBe(true);
   });
 });
 

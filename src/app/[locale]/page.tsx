@@ -8,6 +8,7 @@ import SectionArcDivider from "@/components/SectionArcDivider";
 import StructuredData from "@/components/StructuredData";
 import { buildServices } from "@/lib/structured-data";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
 import HomeConcept from "@/components/home/HomeConcept";
@@ -72,11 +73,9 @@ export default async function Home({ params }: HomePageProps) {
   if (!locale) notFound();
   setRequestLocale(locale);
 
-  // 初回訪問時のイントロ演出 (HomeIntro + StarfieldWarpIntro) は一旦 OFF。
-  // コンポーネントは残してあるので、戻すときはここを <HomeIntro> で囲み直す。
-  // 手順は docs/superpowers/specs/2026-09-16-home-intro-disable-design.md を参照。
+  // 初回訪問時はロゴのイントロ演出を挟む (約 1.3 秒、1 セッション 1 回)。
   return (
-    <>
+    <HomeIntro>
       <StructuredData data={buildServices()} />
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
@@ -115,6 +114,6 @@ export default async function Home({ params }: HomePageProps) {
         <HomeAccess />
         <HomeFooter showColumns={isCmsColumnsEnabled()} />
       </main>
-    </>
+    </HomeIntro>
   );
 }

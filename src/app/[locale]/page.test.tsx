@@ -13,6 +13,11 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
+vi.mock("@/components/home/HomeIntro", () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="home-intro">{children}</div>
+  ),
+}));
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHero", () => ({
   default: () => <div data-testid="home-hero" />,
@@ -276,11 +281,12 @@ describe("Home Page", () => {
     expect(containsSuspense(element)).toBe(true);
   });
 
-  it("イントロ演出 (StarfieldWarp の canvas) を描画しない", async () => {
+  it("ページ全体を HomeIntro で包む", async () => {
     const { default: Home } = await import("./page");
     const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
-    const { container } = render(element);
+    render(element);
 
-    expect(container.querySelector("canvas")).toBeNull();
+    const intro = screen.getByTestId("home-intro");
+    expect(intro).toContainElement(screen.getByTestId("home-hero"));
   });
 });
