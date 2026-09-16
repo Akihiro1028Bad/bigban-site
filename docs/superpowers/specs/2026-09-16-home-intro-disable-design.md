@@ -28,8 +28,11 @@
 
 - `src/components/home/HomeIntro.tsx` — 再生制御 (phase 管理・ロゴ表示・sessionStorage・フェイルセーフ)
 - `src/components/intro/StarfieldWarpIntro.tsx` — canvas 本体 (drift → accel → hyperspace → burst)
-- `src/constants/intro.ts` — `INTRO_SESSION_KEY` / `INTRO_PENDING_CLASS`
 - `src/app/globals.css` L40 — `html.intro-pending main { visibility: hidden }`
+
+`intro-pending` クラスを付与するのは `introScript` のみで、剥がすのは同スクリプト内の
+6 秒フェイルセーフと `HomeIntro` の `useEffect` の 2 経路。`introScript` を出力しなければ
+そもそも付与されないため、`main` が隠れたまま残ることはない。
 
 なお同種の演出はホームのみで、ティザーページ (`/teaser`) には存在しない
 (`src/components/teaser/types.ts` の `AnimationPhase` 型を共有しているだけ)。
@@ -44,7 +47,7 @@
 
 ### やらないこと
 
-- `HomeIntro` / `StarfieldWarpIntro` / `constants/intro.ts` / `globals.css` の intro 系 CSS の削除
+- `HomeIntro` / `StarfieldWarpIntro` / `globals.css` の intro 系 CSS の削除
 - `HomeIntro.test.tsx` / `StarfieldWarpIntro.test.tsx` の削除
 - ホームのセクション並び替えなど、手元の作業ツリーにある他の変更の持ち込み
 - env フラグ (`NEXT_PUBLIC_*`) の新設
@@ -99,7 +102,10 @@ export default function PreHydrationScripts({ shouldPlayIntro = false }: PreHydr
 
 1. `page.tsx` で `HomeIntro` を import し直し、`<>` を `<HomeIntro>` に戻す
 2. `layout.tsx` の `<PreHydrationScripts />` を `<PreHydrationScripts shouldPlayIntro />` にする
-3. 上記 2 点のテストを戻す
+3. `page.test.tsx`: 「イントロ演出 (StarfieldWarp の canvas) を描画しない」ケースを削除し、
+   `@/components/home/HomeIntro` の `vi.mock` (children をそのまま返す passthrough) を戻す
+4. `PreHydrationScripts.test.tsx`: 既定で script 1 本を期待しているケースを、
+   `layout.tsx` の新しい既定に合わせて見直す
 
 もしくは該当 PR をまるごと revert する。
 
