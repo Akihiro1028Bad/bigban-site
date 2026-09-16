@@ -14,7 +14,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/components/home/HomeIntro", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="home-intro">{children}</div>
+  ),
 }));
 vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeHero", () => ({
@@ -277,5 +279,14 @@ describe("Home Page", () => {
       return containsSuspense(children);
     }
     expect(containsSuspense(element)).toBe(true);
+  });
+
+  it("ページ全体を HomeIntro で包む", async () => {
+    const { default: Home } = await import("./page");
+    const element = await Home({ params: Promise.resolve({ locale: "ja" }) });
+    render(element);
+
+    const intro = screen.getByTestId("home-intro");
+    expect(intro).toContainElement(screen.getByTestId("home-hero"));
   });
 });

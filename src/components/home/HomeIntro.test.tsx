@@ -2,27 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import HomeIntro from "./HomeIntro";
 
-// canvas mount 中の onPhaseChange を外部に露出させ、
-// canvas が unmount された後でも (連続発火テスト用に) 呼べるようにする。
-let capturedPhaseChange: ((phase: string) => void) | null = null;
-
-vi.mock("@/components/intro/StarfieldWarpIntro", () => ({
-  StarfieldWarpIntro: ({
-    onPhaseChange,
-  }: {
-    onPhaseChange: (phase: string) => void;
-  }) => {
-    capturedPhaseChange = onPhaseChange;
-    return (
-      <canvas
-        data-testid="starfield-warp-intro"
-        onClick={() => onPhaseChange("content")}
-        onDoubleClick={() => onPhaseChange("explode")}
-      />
-    );
-  },
-}));
-
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, ...rest } = props;
@@ -37,12 +16,28 @@ vi.mock("next/image", () => ({
   },
 }));
 
+const LOGO_ALT = "THE PICKLE BANG THEORY";
 const mockSessionStorage: Record<string, string> = {};
+
+function setReducedMotion(matches: boolean) {
+  (window.matchMedia as ReturnType<typeof vi.fn>).mockImplementation(
+    (query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
-  capturedPhaseChange = null;
+  document.documentElement.className = "";
   Object.keys(mockSessionStorage).forEach(
     (key) => delete mockSessionStorage[key]
   );
@@ -61,14 +56,23 @@ beforeEach(() => {
 });
 
 describe("HomeIntro", () => {
-  it("初回アクセス時にイントロを表示する", () => {
+  it("初回アクセス時にマウント直後からロゴを表示する", () => {
     render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    expect(screen.getByTestId("starfield-warp-intro")).toBeInTheDocument();
+    expect(screen.getByAltText(LOGO_ALT)).toBeInTheDocument();
     expect(screen.getByTestId("home-content")).toBeInTheDocument();
+  });
+
+  it("ワープ演出の canvas は描画しない", () => {
+    const { container } = render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    expect(container.querySelector("canvas")).toBeNull();
   });
 
   it("sessionStorageにフラグがある場合はイントロをスキップする", () => {
@@ -78,126 +82,84 @@ describe("HomeIntro", () => {
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    expect(screen.queryByTestId("starfield-warp-intro")).not.toBeInTheDocument();
+    expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
     expect(screen.getByTestId("home-content")).toBeInTheDocument();
   });
 
-  it("content以外のフェーズではロゴを表示しない", () => {
+  it("prefers-reduced-motion: reduce ではイントロを表示しない", () => {
+    setReducedMotion(true);
     render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    const canvas = screen.getByTestId("starfield-warp-intro");
-    act(() => {
-      canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    });
-    expect(
-      screen.queryByAltText("THE PICKLE BANG THEORY")
-    ).not.toBeInTheDocument();
+    expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
+    expect(screen.getByTestId("home-content")).toBeInTheDocument();
   });
 
-  it("contentフェーズでロゴを表示する", () => {
+  it("マウント時にsessionStorageへフラグを保存する", () => {
     render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    const canvas = screen.getByTestId("starfield-warp-intro");
-    act(() => {
-      canvas.click();
-    });
-    expect(screen.getByAltText("THE PICKLE BANG THEORY")).toBeInTheDocument();
-  });
-
-  it("contentフェーズでsessionStorageにフラグを保存する", () => {
-    render(
-      <HomeIntro>
-        <div data-testid="home-content">Home</div>
-      </HomeIntro>
-    );
-    const canvas = screen.getByTestId("starfield-warp-intro");
-    act(() => {
-      canvas.click();
-    });
     expect(mockSessionStorage["bigban-intro-played"]).toBe("true");
   });
 
-  it("contentフェーズ後 LOGO_HOLD_MS (800ms) 経過でイントロが unmount される", () => {
+  it("イントロをスキップするときはsessionStorageへ書き込まない", () => {
+    // セッション途中で reduced-motion を解除したユーザーに
+    // イントロが出なくなるのを防ぐ。
+    setReducedMotion(true);
     render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    const canvas = screen.getByTestId("starfield-warp-intro");
-    act(() => {
-      canvas.click();
-    });
+    expect(mockSessionStorage["bigban-intro-played"]).toBeUndefined();
+  });
+
+  it("LOGO_HOLD_MS (800ms) 経過でイントロが unmount される", () => {
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
     act(() => {
       vi.advanceTimersByTime(900);
     });
-    expect(screen.queryByTestId("starfield-warp-intro")).not.toBeInTheDocument();
-    expect(
-      screen.queryByAltText("THE PICKLE BANG THEORY"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
+    expect(screen.getByTestId("home-content")).toBeInTheDocument();
   });
 
-  it("contentフェーズに入った瞬間に canvas (StarfieldWarpIntro) が unmount される", () => {
-    // race を防ぐため、canvas は phase=content 受信即時に unmount し
-    // rAF 停止後の最終フレーム (黒) が残らないようにする。
+  it("FALLBACK_UNMOUNT_MS (3000ms) を過ぎてもイントロは畳まれたままになる", () => {
+    // hold timer と重複する保険。二重に isIntroComplete を立てても
+    // 表示が戻らないことを確認する。
     render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    const canvas = screen.getByTestId("starfield-warp-intro");
     act(() => {
-      canvas.click();
+      vi.advanceTimersByTime(3100);
     });
-    expect(screen.queryByTestId("starfield-warp-intro")).not.toBeInTheDocument();
-    // ロゴは独立レイヤーで表示される
-    expect(screen.getByAltText("THE PICKLE BANG THEORY")).toBeInTheDocument();
+    expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
   });
 
-  it("content フェーズが連続発火しても hold timer がリークしない (clearTimeout で上書き)", () => {
-    render(
+  it("イントロ再生中に unmount すると hold timer を片付ける (cleanup 分岐のカバレッジ)", () => {
+    // 主目的は cleanup 分岐を通してカバレッジ 100% を保つこと。
+    // clearTimeout の呼び出しは「cleanup が実際に走った」ことの smoke check で、
+    // リークしないこと自体を証明するものではない (unmount 後の setState は
+    // React 18 以降そもそも警告を出さないため、挙動として観測できない)。
+    const clearSpy = vi.spyOn(window, "clearTimeout");
+    const { unmount } = render(
       <HomeIntro>
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    // 1 回目: hold timer set (この瞬間 canvas は unmount される)
-    act(() => {
-      capturedPhaseChange?.("content");
-    });
-    // 2 回目: canvas は既に unmount 済だが captured handler を直接呼んで
-    // 既存 hold timer を clearTimeout で上書きする経路をカバーする。
-    act(() => {
-      capturedPhaseChange?.("content");
-    });
-    // 2 回目の setTimeout 後に unmount される
-    act(() => {
-      vi.advanceTimersByTime(900);
-    });
-    expect(
-      screen.queryByTestId("starfield-warp-intro"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("phase=content が来なくても FALLBACK_UNMOUNT_MS (6000ms) で必ず unmount される", () => {
-    // Framer Motion の race / canvas 暴走で phase=content が来ないケースの保険。
-    // ユーザーが永久に黒画面に閉じ込められないよう必ず復帰する。
-    render(
-      <HomeIntro>
-        <div data-testid="home-content">Home</div>
-      </HomeIntro>
-    );
-    expect(screen.getByTestId("starfield-warp-intro")).toBeInTheDocument();
-    act(() => {
-      vi.advanceTimersByTime(6100);
-    });
-    expect(
-      screen.queryByTestId("starfield-warp-intro"),
-    ).not.toBeInTheDocument();
+    clearSpy.mockClear();
+    unmount();
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
   });
 
   it("childrenを常に表示する", () => {
@@ -237,7 +199,56 @@ describe("HomeIntro", () => {
         <div data-testid="home-content">Home</div>
       </HomeIntro>
     );
-    expect(screen.queryByTestId("starfield-warp-intro")).not.toBeInTheDocument();
+    expect(screen.queryByAltText(LOGO_ALT)).not.toBeInTheDocument();
     expect(screen.getByTestId("home-content")).toBeInTheDocument();
+  });
+
+  it("イントロ再生中は intro-scroll-lock クラスを付ける", () => {
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(true);
+  });
+
+  it("イントロ完了で intro-scroll-lock クラスを外す", () => {
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
+  });
+
+  it("イントロ再生中に unmount しても intro-scroll-lock クラスが残らない", () => {
+    const { unmount } = render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    unmount();
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
+  });
+
+  it("イントロをスキップするときは intro-scroll-lock クラスを付けない", () => {
+    mockSessionStorage["bigban-intro-played"] = "true";
+    render(
+      <HomeIntro>
+        <div data-testid="home-content">Home</div>
+      </HomeIntro>
+    );
+    expect(
+      document.documentElement.classList.contains("intro-scroll-lock")
+    ).toBe(false);
   });
 });

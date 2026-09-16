@@ -73,6 +73,7 @@ export default async function Home({ params }: HomePageProps) {
   if (!locale) notFound();
   setRequestLocale(locale);
 
+  // 初回訪問時はロゴのイントロ演出を挟む (約 1.3 秒、1 セッション 1 回)。
   return (
     <HomeIntro>
       <StructuredData data={buildServices()} />

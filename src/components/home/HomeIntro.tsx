@@ -1,26 +1,29 @@
 "use client";
 
-import {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-} from "react";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
+
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { StarfieldWarpIntro } from "@/components/intro/StarfieldWarpIntro";
 
-import type { AnimationPhase } from "@/components/teaser/types";
-import type { ReactNode } from "react";
 import { EASE } from "@/constants/motion";
 
+import type { ReactNode } from "react";
+
 const SESSION_KEY = "bigban-intro-played";
-// ロゴ表示時間 (入場 0.5s + hold 0.3s 相当)。content 受信から unmount までの遅延。
+/** ハイドレーション前に main を隠す html クラス (introScript が付与する) */
+const PENDING_CLASS = "intro-pending";
+/** マウント後にイントロ中のスクロールを固定する html クラス */
+const SCROLL_LOCK_CLASS = "intro-scroll-lock";
+// ロゴ表示時間 (入場 0.5s + hold 0.3s 相当)。マウントから unmount までの遅延。
+// ここから退場フェード 0.5s がかかるので、演出全体は約 1.3 秒。
 const LOGO_HOLD_MS = 800;
-// フェイルセーフ: phase=content が永遠に来ないケースに備え、
-// マウントから一定時間で必ず unmount する。canvas total ~3.8s + 余裕で 6 秒。
-const FALLBACK_UNMOUNT_MS = 6000;
+// フェイルセーフ: このタイマーがするのは setIsIntroComplete(true) だけで、
+// それは LOGO_HOLD_MS の hold timer が既に済ませている。備えられるのは
+// hold 用 setTimeout 自体が何らかの理由で発火しないケースのみ (exit が
+// 止まった場合はこのタイマーが発火してもオーバーレイは畳まれない)。
+// ロゴのみの構成では hold timer と役割がほぼ重なるが、
+// 2026-09-16 オーナー判断で残置を決定。演出 1.3s に対し余裕を持たせた 3 秒。
+const FALLBACK_UNMOUNT_MS = 3000;
 
 interface HomeIntroProps {
   children: ReactNode;
@@ -36,56 +39,67 @@ export default function HomeIntro({ children }: HomeIntroProps) {
     /* istanbul ignore next -- SSR-only snapshot */
     () => false
   );
+  // イントロを出すかはマウント時に一度だけ決める。
+  // reduced-motion の判定は以前 StarfieldWarpIntro が持っていたが、
+  // canvas を外したのでここへ移した。
   const [shouldShowIntro] = useState(() => {
     try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return false;
+      }
       return sessionStorage.getItem(SESSION_KEY) !== "true";
     } catch {
       return false;
     }
   });
-  const [phase, setPhase] = useState<AnimationPhase>("dark");
   const [isIntroComplete, setIsIntroComplete] = useState(!shouldShowIntro);
-  // ロゴ hold 用 setTimeout の id 管理。unmount 時に確実に clearTimeout する
-  // (LOGO_HOLD_MS=800ms 以内のナビゲーション等で setIsIntroComplete が
-  // unmount 後に呼ばれるのを防ぐ)。
+  // hold 用 setTimeout の id。unmount 時に確実に clearTimeout し、
+  // 800ms 以内の離脱で unmount 後に setState が呼ばれるのを防ぐ。
   const logoHoldTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    document.documentElement.classList.remove("intro-pending");
+    document.documentElement.classList.remove(PENDING_CLASS);
   }, []);
 
-  // unmount 時に hold timer を必ず cleanup
+  // イントロ再生中はスクロールを固定する。
+  // ハイドレーション前は intro-pending が担い、マウント後はこのクラスが
+  // isIntroComplete まで引き継ぐ。両者は同一コミットで入れ替わるため、
+  // ロックが途切れる瞬間はない。
   useEffect(() => {
+    const root = document.documentElement;
+    if (!shouldShowIntro || isIntroComplete) {
+      root.classList.remove(SCROLL_LOCK_CLASS);
+      return;
+    }
+    root.classList.add(SCROLL_LOCK_CLASS);
+    return () => {
+      root.classList.remove(SCROLL_LOCK_CLASS);
+    };
+  }, [shouldShowIntro, isIntroComplete]);
+
+  // ロゴを出したことを記録し、LOGO_HOLD_MS 後に畳む。
+  // 記録は shouldShowIntro が true のときだけ: false のときに書くと、
+  // セッション途中で reduced-motion を解除したユーザーにイントロが出なくなる。
+  useEffect(() => {
+    if (!shouldShowIntro) return;
+    try {
+      sessionStorage.setItem(SESSION_KEY, "true");
+    } catch {
+      // sessionStorage unavailable
+    }
+    logoHoldTimerRef.current = window.setTimeout(() => {
+      setIsIntroComplete(true);
+      logoHoldTimerRef.current = null;
+    }, LOGO_HOLD_MS);
     return () => {
       if (logoHoldTimerRef.current !== null) {
         window.clearTimeout(logoHoldTimerRef.current);
         logoHoldTimerRef.current = null;
       }
     };
-  }, []);
+  }, [shouldShowIntro]);
 
-  const handlePhaseChange = useCallback((newPhase: AnimationPhase) => {
-    setPhase(newPhase);
-    if (newPhase === "content") {
-      try {
-        sessionStorage.setItem(SESSION_KEY, "true");
-      } catch {
-        // sessionStorage unavailable
-      }
-      // 既に hold timer が走っていれば上書き前にクリア (二重発火防止)
-      if (logoHoldTimerRef.current !== null) {
-        window.clearTimeout(logoHoldTimerRef.current);
-      }
-      logoHoldTimerRef.current = window.setTimeout(() => {
-        setIsIntroComplete(true);
-        logoHoldTimerRef.current = null;
-      }, LOGO_HOLD_MS);
-    }
-  }, []);
-
-  // フェイルセーフ: 何があっても必ず FALLBACK_UNMOUNT_MS で intro を畳む。
-  // - StarfieldWarpIntro の rAF が止まるなど phase=content が来ない場合
-  // - Framer Motion AnimatePresence の race で exit が発火しない場合
+  // フェイルセーフ: 何があっても FALLBACK_UNMOUNT_MS で intro を畳む。
   useEffect(() => {
     if (!shouldShowIntro) return;
     const id = window.setTimeout(() => {
@@ -112,18 +126,10 @@ export default function HomeIntro({ children }: HomeIntroProps) {
         )}
       </AnimatePresence>
 
-      {/* canvas (StarfieldWarp): phase=content の瞬間に即時 unmount。
-          これにより rAF 停止後の最後のフレーム (黒) が残らない。 */}
-      {!isIntroComplete && phase !== "content" && (
-        <div className="fixed inset-0 z-[100] pointer-events-none">
-          <StarfieldWarpIntro onPhaseChange={handlePhaseChange} />
-        </div>
-      )}
-
-      {/* ロゴ: phase=content から isIntroComplete まで独立レイヤーで表示。
-          自身も bg-black を持ち、黒背景の exit と同時に exit しても背景の黒が引き継がれる。 */}
+      {/* ロゴ: マウントから isIntroComplete まで。自身も bg-black を持ち、
+          黒背景の exit と同時に exit しても背景の黒が引き継がれる。 */}
       <AnimatePresence>
-        {phase === "content" && !isIntroComplete && (
+        {!isIntroComplete && (
           <motion.div
             key="intro-logo"
             className="fixed inset-0 z-[101] flex items-center justify-center pointer-events-none bg-black"
