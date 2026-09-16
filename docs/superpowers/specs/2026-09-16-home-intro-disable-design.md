@@ -3,6 +3,7 @@
 - 日付: 2026-09-16
 - 対象ブランチ: `develop` から新規に切る (例: `fix/disable-home-intro`)
 - ステータス: 設計合意済み / 実装計画待ち
+- **本書は差し替え済み**: 後続の `docs/superpowers/specs/2026-09-16-home-intro-logo-only-design.md` に方針が引き継がれている。以下は経緯の記録として残す。
 
 ## 1. 背景と目的
 
@@ -34,8 +35,10 @@
 6 秒フェイルセーフと `HomeIntro` の `useEffect` の 2 経路。`introScript` を出力しなければ
 そもそも付与されないため、`main` が隠れたまま残ることはない。
 
-なお同種の演出はホームのみで、ティザーページ (`/teaser`) には存在しない
-(`src/components/teaser/types.ts` の `AnimationPhase` 型を共有しているだけ)。
+なお同種の演出はティザーページ (`/teaser`) にも存在する。
+`src/app/[locale]/teaser/TeaserPage.tsx` が `StarfieldWarpIntro` を直接レンダリングしており、
+`src/components/teaser/types.ts` の `AnimationPhase` 型を共有しているだけの関係ではない。
+今回のスコープはホーム (`page.tsx` / `PreHydrationScripts`) のみで、ティザー側には手を入れない。
 
 ## 3. スコープ
 

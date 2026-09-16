@@ -17,10 +17,12 @@ const SCROLL_LOCK_CLASS = "intro-scroll-lock";
 // ロゴ表示時間 (入場 0.5s + hold 0.3s 相当)。マウントから unmount までの遅延。
 // ここから退場フェード 0.5s がかかるので、演出全体は約 1.3 秒。
 const LOGO_HOLD_MS = 800;
-// フェイルセーフ: hold timer が何らかの理由で畳まなかった場合の保険。
-// ロゴのみの構成では hold timer と役割が重なるが、AnimatePresence の exit が
-// 発火しない race に備えて残している (2026-09-16 オーナー判断で残置を決定)。
-// 演出 1.3s に対し余裕を持たせた 3 秒。
+// フェイルセーフ: このタイマーがするのは setIsIntroComplete(true) だけで、
+// それは LOGO_HOLD_MS の hold timer が既に済ませている。備えられるのは
+// hold 用 setTimeout 自体が何らかの理由で発火しないケースのみ (exit が
+// 止まった場合はこのタイマーが発火してもオーバーレイは畳まれない)。
+// ロゴのみの構成では hold timer と役割がほぼ重なるが、
+// 2026-09-16 オーナー判断で残置を決定。演出 1.3s に対し余裕を持たせた 3 秒。
 const FALLBACK_UNMOUNT_MS = 3000;
 
 interface HomeIntroProps {
