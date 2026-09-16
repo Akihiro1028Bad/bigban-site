@@ -9,13 +9,20 @@ export const browserDetectScript = `try{var u=navigator.userAgent,iOS=/iPhone|iP
 // 削除する設計だが、Framer Motion / hydration / Strict Mode の race で削除が
 // 走らないと永久に main が hidden = 真っ黒画面になるため、DOM レベルで
 // 必ず 6 秒で剥がれるフェイルセーフ setTimeout を併設する。
+// 現在ホームのイントロは一旦 OFF (shouldPlayIntro 既定 false) のため、このスクリプトは
+// 出力されない。復活させるときは layout.tsx で <PreHydrationScripts shouldPlayIntro /> にする。
 export const introScript = `try{var p=location.pathname;if((p==='/'||/^\\/[a-z]{2}\\/?$/.test(p))&&sessionStorage.getItem('bigban-intro-played')!=='true'&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.classList.add('intro-pending');setTimeout(function(){document.documentElement.classList.remove('intro-pending')},6000)}}catch(e){}`;
 
-export default function PreHydrationScripts() {
+interface PreHydrationScriptsProps {
+  /** ホーム初回訪問時のイントロ演出を再生するか。既定 false = OFF。 */
+  shouldPlayIntro?: boolean;
+}
+
+export default function PreHydrationScripts({ shouldPlayIntro = false }: PreHydrationScriptsProps) {
   useServerInsertedHTML(() => (
     <>
       <script suppressHydrationWarning>{browserDetectScript}</script>
-      <script suppressHydrationWarning>{introScript}</script>
+      {shouldPlayIntro && <script suppressHydrationWarning>{introScript}</script>}
     </>
   ));
   return null;
