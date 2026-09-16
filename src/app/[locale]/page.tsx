@@ -8,7 +8,6 @@ import SectionArcDivider from "@/components/SectionArcDivider";
 import StructuredData from "@/components/StructuredData";
 import { buildServices } from "@/lib/structured-data";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
-import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
 import HomeConcept from "@/components/home/HomeConcept";
@@ -74,7 +73,7 @@ export default async function Home({ params }: HomePageProps) {
   setRequestLocale(locale);
 
   return (
-    <HomeIntro>
+    <>
       <StructuredData data={buildServices()} />
       <main>
         <HomeNavigation showColumns={isCmsColumnsEnabled()} />
@@ -113,6 +112,6 @@ export default async function Home({ params }: HomePageProps) {
         <HomeAccess />
         <HomeFooter showColumns={isCmsColumnsEnabled()} />
       </main>
-    </HomeIntro>
+    </>
   );
 }
