@@ -72,6 +72,9 @@ export default async function Home({ params }: HomePageProps) {
   if (!locale) notFound();
   setRequestLocale(locale);
 
+  // 初回訪問時のイントロ演出 (HomeIntro + StarfieldWarpIntro) は一旦 OFF。
+  // コンポーネントは残してあるので、戻すときはここを <HomeIntro> で囲み直す。
+  // 手順は docs/superpowers/specs/2026-09-16-home-intro-disable-design.md を参照。
   return (
     <>
       <StructuredData data={buildServices()} />
