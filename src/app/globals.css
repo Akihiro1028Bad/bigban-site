@@ -41,6 +41,23 @@
     visibility: hidden;
   }
 
+  /* イントロ再生中はスクロールを固定する。
+     intro-pending     : ハイドレーション前 (PreHydrationScripts の introScript)
+     intro-scroll-lock : ハイドレーション後 (HomeIntro が isIntroComplete まで維持)
+     どちらもフェイルセーフで必ず剥がれるため、ロックが残り続けることはない。
+
+     既知のトレードオフ: クラシックスクロールバー環境 (Windows/Linux) では
+     解除時にスクロールバーが復帰して幅が ~15px 変わる。解除は黒背景の
+     フェードアウトと同時なのでほぼ目立たない。 */
+  html.intro-pending,
+  html.intro-scroll-lock,
+  html.intro-pending body,
+  html.intro-scroll-lock body {
+    overflow: hidden;
+    /* Android Chrome の pull-to-refresh でイントロ中にリロードされるのを防ぐ */
+    overscroll-behavior: none;
+  }
+
   body {
     font-family: var(--font-sans);
     font-feature-settings: "palt";

@@ -27,11 +27,27 @@ describe("PreHydrationScripts", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("registers a useServerInsertedHTML callback that emits both scripts", async () => {
+  it("既定ではブラウザ判定スクリプトのみを出力する (イントロは OFF)", async () => {
+    const { default: PreHydrationScripts, browserDetectScript } = await import(
+      "./PreHydrationScripts"
+    );
+
+    render(<PreHydrationScripts />);
+
+    const cb = state.callback;
+    if (!cb) throw new Error("useServerInsertedHTML callback was not captured");
+
+    const { container } = render(<>{cb()}</>);
+    const scripts = container.querySelectorAll("script");
+    expect(scripts.length).toBe(1);
+    expect(scripts[0].textContent).toBe(browserDetectScript);
+  });
+
+  it("shouldPlayIntro を渡したときだけイントロスクリプトも出力する", async () => {
     const { default: PreHydrationScripts, browserDetectScript, introScript } =
       await import("./PreHydrationScripts");
 
-    render(<PreHydrationScripts />);
+    render(<PreHydrationScripts shouldPlayIntro />);
 
     const cb = state.callback;
     if (!cb) throw new Error("useServerInsertedHTML callback was not captured");

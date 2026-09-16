@@ -134,7 +134,7 @@ export default async function LocaleLayout({
       suppressHydrationWarning
     >
       <body className="grain-overlay">
-        <PreHydrationScripts />
+        <PreHydrationScripts shouldPlayIntro />
         <StructuredData
           data={[
             buildWebSite(),
