@@ -4,6 +4,9 @@ export const routing = defineRouting({
   locales: ["ja", "en"],
   defaultLocale: "ja",
   localePrefix: "as-needed",
+  // middleware の Link ヘッダー hreflang は訳の有無を知らずに全ページへ en を出すため無効化。
+  // hreflang はページ metadata と sitemap が実在する locale だけを出している。
+  alternateLinks: false,
 });
 
 export type Locale = (typeof routing.locales)[number];
