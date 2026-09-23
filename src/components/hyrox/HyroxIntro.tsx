@@ -3,9 +3,10 @@
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import HyroxStations from "./HyroxStations";
 import { EASE } from "@/constants/motion";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
+import HyroxSectionTitle from "./HyroxSectionTitle";
+import HyroxStations from "./HyroxStations";
 
 
 interface HyroxIntroProps {
@@ -26,13 +27,7 @@ export default function HyroxIntro({ showColumnLink = false }: HyroxIntroProps) 
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em] text-text-light">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
-            {t("titleJa")}
-          </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <HyroxSectionTitle title={t("title")} titleJa={t("titleJa")} />
           <p className="mt-8 mx-auto text-text-gray text-sm lg:text-base leading-loose max-w-2xl">
             {t("lead")}
           </p>

@@ -12,7 +12,9 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
 describe("HyroxProgram", () => {
   it("PROGRAM 見出しを表示する", () => {
     renderWithIntl(<HyroxProgram />);
-    expect(screen.getByRole("heading", { name: "PROGRAM" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "PROGRAM 料金｜エリア利用料" }),
+    ).toBeInTheDocument();
   });
 
   it("ピックルと同一のコート料金テーブル（時間帯別・1時間あたり）を表示する", () => {

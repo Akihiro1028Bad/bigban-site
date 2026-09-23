@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  BUSINESS_HOURS,
   LABOLA_CALENDAR_BASE,
   LABOLA_CALENDAR_TABS,
   LABOLA_HYROX_URL,
@@ -62,5 +63,11 @@ describe("labola calendar constants", () => {
     expect(resolveCalendarTabKey("invalid")).toBe("pickleball");
     expect(resolveCalendarTabKey(undefined)).toBe("pickleball");
     expect(resolveCalendarTabKey(["hyrox"])).toBe("pickleball");
+  });
+});
+
+describe("BUSINESS_HOURS", () => {
+  it("毎日 06:00〜23:00", () => {
+    expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "23:00" });
   });
 });

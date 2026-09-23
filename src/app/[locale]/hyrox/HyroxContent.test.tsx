@@ -44,7 +44,9 @@ describe("HyroxContent", () => {
       "true",
     );
     expect(screen.getByTestId("footer")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "HYROX" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: /^HYROX/ }),
+    ).toBeInTheDocument();
   });
 
   it("コラム CMS 有効時、入門コラムへの内部リンクを描画する", () => {

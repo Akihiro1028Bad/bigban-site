@@ -12,7 +12,19 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
 describe("HyroxCoach", () => {
   it("セクションタイトル CREW を表示する", () => {
     renderWithIntl(<HyroxCoach />);
-    expect(screen.getByRole("heading", { name: "CREW" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: /^CREW/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("h2 に英語見出しと日本語(コーチ｜現HYROX日本代表 関吉大亮)を含む", () => {
+    renderWithIntl(<HyroxCoach />);
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "CREW コーチ｜現HYROX日本代表 関吉大亮",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("コーチ名・紹介文・プロフィールを表示する", () => {

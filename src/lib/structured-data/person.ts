@@ -1,4 +1,6 @@
-import { SITE_URL } from "@/constants/site";
+import { COACH_INSTAGRAM_URL, SITE_URL } from "@/constants/site";
+
+import type { Locale } from "@/i18n/routing";
 
 export interface PersonSchema {
   "@context": "https://schema.org";
@@ -17,6 +19,20 @@ const ORG_REF = { "@id": `${SITE_URL}/#organization` } as const;
 const INSTAGRAM_NISHIMURA = "https://www.instagram.com/akihiko.rst";
 const INSTAGRAM_YOSHIDA = "https://www.instagram.com/yuta_yoshida_pickleball";
 const BRAND = "THE PICKLE BANG THEORY";
+
+// ExerciseGym の employee から参照する。/hyrox ページでのみ出力する。
+export const SEKIYOSHI_ID = `${SITE_URL}/#person-sekiyoshi`;
+
+const SEKIYOSHI_TEXT: Record<Locale, { jobTitle: string; description: string }> = {
+  ja: {
+    jobTitle: `HYROX日本代表 / ${BRAND} メインコーチ`,
+    description: `日本におけるHYROXの先駆者であり、現HYROX日本代表。スパルタンレース初代日本王者、トライアスロンでも日本一に輝いたハイブリッドアスリート。${BRAND}（ザ ピックルバン セオリー）のHYROXメインコーチ。`,
+  },
+  en: {
+    jobTitle: `HYROX Japan National Team athlete / Head Coach at ${BRAND}`,
+    description: `A pioneer of HYROX in Japan and a current HYROX Japan National Team athlete. Spartan Race's first-ever Japanese champion and a national triathlon title holder. Head HYROX coach at ${BRAND}.`,
+  },
+};
 
 export function buildPersonNishimura(): PersonSchema {
   return {
@@ -54,6 +70,27 @@ export function buildPersonYoshida(): PersonSchema {
       "Crossminton",
       "Soft Tennis",
       "ラケットスポーツ",
+    ],
+  };
+}
+
+export function buildPersonSekiyoshi(locale: Locale): PersonSchema {
+  const text = SEKIYOSHI_TEXT[locale];
+  return {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": SEKIYOSHI_ID,
+    name: "関吉大亮",
+    alternateName: ["Daisuke Sekiyoshi", "せきよしだいすけ"],
+    jobTitle: text.jobTitle,
+    description: text.description,
+    worksFor: ORG_REF,
+    sameAs: [COACH_INSTAGRAM_URL],
+    knowsAbout: [
+      "HYROX",
+      "Functional Fitness",
+      "Spartan Race",
+      "Triathlon",
     ],
   };
 }

@@ -6,6 +6,20 @@ import {
   LABOLA_SHOP_URL,
   TENNISBEAR_EVENTS_URL,
 } from "@/constants/site";
+import {
+  FACILITY_LATITUDE,
+  FACILITY_LONGITUDE,
+  FACILITY_TELEPHONE,
+  buildFacilityAddress,
+  buildFacilityGeo,
+  buildFacilityOpeningHours,
+} from "./facilityLocation";
+
+import type {
+  GeoCoordinatesSchema,
+  OpeningHoursSpecificationSchema,
+  PostalAddressSchema,
+} from "./facilityLocation";
 
 export interface LocationFeatureSpecification {
   "@type": "LocationFeatureSpecification";
@@ -22,28 +36,12 @@ export interface SportsActivityLocationSchema {
   logo: string;
   image: string;
   sport: string;
-  address: {
-    "@type": "PostalAddress";
-    addressCountry: string;
-    postalCode: string;
-    addressRegion: string;
-    addressLocality: string;
-    streetAddress: string;
-  };
-  geo: {
-    "@type": "GeoCoordinates";
-    latitude: number;
-    longitude: number;
-  };
+  address: PostalAddressSchema;
+  geo: GeoCoordinatesSchema;
   telephone: string;
   email: string;
   priceRange: string;
-  openingHoursSpecification: Array<{
-    "@type": "OpeningHoursSpecification";
-    dayOfWeek: string[];
-    opens: string;
-    closes: string;
-  }>;
+  openingHoursSpecification: OpeningHoursSpecificationSchema[];
   sameAs: string[];
   parentOrganization: { "@id": string };
   potentialAction: {
@@ -66,9 +64,6 @@ const AMENITY_NAMES = [
   "無人チェックイン",
   "自動販売機",
 ] as const;
-
-const LATITUDE = 35.7239695;
-const LONGITUDE = 139.9317222;
 
 const ALTERNATE_NAMES = [
   "ザ ピックルバン セオリー",
@@ -102,38 +97,12 @@ export function buildSportsActivityLocation(
     logo: `${SITE_URL}/logos/yoko-neon.png`,
     image: `${SITE_URL}/images/facility.webp`,
     sport: "Pickleball",
-    address: {
-      "@type": "PostalAddress",
-      addressCountry: "JP",
-      postalCode: "272-0021",
-      addressRegion: "千葉県",
-      addressLocality: "市川市",
-      streetAddress: "八幡2-16-6 八幡ハタビル 6階",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: LATITUDE,
-      longitude: LONGITUDE,
-    },
-    telephone: "+81-90-5523-3879",
+    address: buildFacilityAddress(),
+    geo: buildFacilityGeo(),
+    telephone: FACILITY_TELEPHONE,
     email: "hello@rstagency.com",
     priceRange: "¥4980-¥7980",
-    openingHoursSpecification: [
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-          "Sunday",
-        ],
-        opens: "06:00",
-        closes: "23:00",
-      },
-    ],
+    openingHoursSpecification: buildFacilityOpeningHours(),
     sameAs: [...SAME_AS],
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
     potentialAction: {
@@ -145,7 +114,7 @@ export function buildSportsActivityLocation(
       name,
       value: true,
     })),
-    hasMap: `https://www.google.com/maps?q=${LATITUDE},${LONGITUDE}`,
+    hasMap: `https://www.google.com/maps?q=${FACILITY_LATITUDE},${FACILITY_LONGITUDE}`,
     // 会場での支払い手段(= /reserve の FAQ と同じ射程)。特商法ページは
     // 銀行振込を含む3種を法定表示しているが、あちらは請求・振込を伴う取引も
     // 含む網羅列挙なので、施設情報としてはここに載せない。

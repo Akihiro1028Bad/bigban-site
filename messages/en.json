@@ -87,8 +87,8 @@
       "siteName": "THE PICKLE BANG THEORY"
     },
     "hyrox": {
-      "title": "HYROX Training Area",
-      "description": "HYROX — the world series of fitness racing combining an 8 km run with 8 functional workouts. THE PICKLE BANG THEORY in Motoyawata has a dedicated training area on site.",
+      "title": "HYROX Official Training Club in Chiba | 1 min from Motoyawata Station",
+      "description": "An official HYROX Training Club gym in Chiba, a 1-minute walk from Motoyawata Station (JR Sobu Line / Toei Shinjuku Line). Equipment for all 8 official HYROX stations is permanently set up, and current HYROX Japan athlete Coach Daisuke Sekiyoshi leads classes here. First-timers can start with a trial session ({trialMinutes} min, {trialPrice}). Open {open}–{close}.",
       "keywords": [
         "HYROX",
         "HYROX Japan",
@@ -674,7 +674,8 @@
         "Athlete taking on the sled pull",
         "HYROX arena with athletes taking on wall balls",
         "Athletes running through the HYROX start gate"
-      ]
+      ],
+      "tagline": "Official HYROX Training Club gym in Motoyawata, Chiba"
     },
     "concept": {
       "words": [
@@ -686,7 +687,7 @@
     },
     "facility": {
       "title": "FACILITY",
-      "titleJa": "Equipment & Layout",
+      "titleJa": "Equipment | Built for all 8 official HYROX stations",
       "lead": "Fully equipped for all 8 official HYROX stations. Train along the same flow as the real race, moving station to station.",
       "equipmentTitle": "Equipment",
       "officialLabel": "Official",
@@ -714,7 +715,7 @@
         "wallball": {
           "name": "Wall Ball",
           "nameJa": "ウォールボール",
-          "spec": "Medicine ball, 4 / 6 / 9kg (target not official)"
+          "spec": "Medicine balls 4 / 6 / 9kg with official target (all HYROX divisions)"
         },
         "sandbag": {
           "name": "Sandbag",
@@ -743,7 +744,7 @@
     },
     "services": {
       "title": "SERVICES",
-      "titleJa": "Services",
+      "titleJa": "Trial sessions, classes & hourly rental",
       "lead": "Three ways to train, whatever your goal — from first-timers to athletes aiming for the race.",
       "reserveCta": "Book Now",
       "items": [
@@ -823,7 +824,7 @@
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "Program & Pricing",
+      "titleJa": "Pricing | Area rental",
       "rateLabel": "Area Rental",
       "perHour": "Hourly rate",
       "note": "Use the training area equipped for all 8 official HYROX stations.",
@@ -831,7 +832,7 @@
     },
     "coach": {
       "sectionTitle": "CREW",
-      "sectionTitleJa": "Meet the Crew",
+      "sectionTitleJa": "Coach | Current HYROX Japan athlete Daisuke Sekiyoshi",
       "name": "DAISUKE SEKIYOSHI",
       "nameKana": "関吉大亮",
       "nameEn": "関吉大亮",

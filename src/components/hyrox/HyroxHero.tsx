@@ -22,6 +22,7 @@ export default function HyroxHero() {
   const tc = useTranslations("HyroxPage.concept");
   const words = tc.raw("words") as string[];
   const alts = t.raw("imageAlts") as string[];
+  const titleJa = t("titleJa");
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -56,46 +57,38 @@ export default function HyroxHero() {
       <div className="absolute inset-0 bg-gradient-to-r from-deep-black/65 via-deep-black/15 to-transparent sm:from-deep-black/55 sm:via-deep-black/5" />
 
       <div className="relative mx-auto w-full max-w-6xl px-6 py-28 sm:py-32 lg:px-12">
-        {/* タイトル */}
-        <motion.h1
-          className="font-serif text-6xl font-black leading-none tracking-[0.06em] text-text-light sm:text-8xl lg:text-9xl"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, delay: 0.1, ease: EASE }}
-        >
-          {t("title")}
-        </motion.h1>
-        <motion.p
-          className="mt-3 text-sm tracking-[0.4em] text-text-gray sm:text-base"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.0, delay: 0.3, ease: EASE }}
-        >
-          {t("titleJa")}
-        </motion.p>
+        {/* タイトル: LCP 要素なので最初から表示した状態で描画する(フェードインしない)。
+            大きな「HYROX」の見た目は維持し、和名と検索語の一行は同じ h1 内の span にする。 */}
+        <h1 className="text-text-light">
+          <span className="block font-serif text-6xl font-black leading-none tracking-[0.06em] sm:text-8xl lg:text-9xl">
+            {t("title")}
+          </span>{" "}
+          {titleJa ? (
+            <>
+              <span className="mt-3 block text-sm font-normal tracking-[0.4em] text-text-gray sm:text-base">
+                {titleJa}
+              </span>{" "}
+            </>
+          ) : null}
+          <span className="mt-2 block text-xs font-bold tracking-[0.08em] text-text-light/85 sm:text-sm sm:tracking-[0.2em]">
+            {t("tagline")}
+          </span>
+        </h1>
 
-        {/* キネティックな4つの動詞 */}
+        {/* キネティックな3つの動詞(LCP 候補のため最初から表示) */}
         <div className="mt-10 flex flex-wrap gap-x-5 gap-y-1">
-          {words.map((word, i) => (
-            <motion.span
+          {words.map((word) => (
+            <span
               key={word}
               className="font-sans text-4xl font-black tracking-tight text-text-light sm:text-5xl lg:text-6xl"
-              initial={{ opacity: 0, y: 28 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.45 + i * 0.12, ease: EASE }}
             >
               {word}
-            </motion.span>
+            </span>
           ))}
         </div>
 
-        {/* 宣言文 */}
-        <motion.div
-          className="mt-10 max-w-2xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.0, delay: 1.0, ease: EASE }}
-        >
+        {/* 宣言文: モバイルで実測の LCP 要素のため、最初から表示した状態で描画する */}
+        <div className="mt-10 max-w-2xl">
           <div className="mb-6 h-[3px] w-16 bg-accent" />
           <p className="text-base leading-relaxed text-text-light sm:text-lg lg:text-xl">
             {tc.rich("body", {
@@ -105,7 +98,7 @@ export default function HyroxHero() {
               strong: (chunks) => <span className="font-bold">{chunks}</span>,
             })}
           </p>
-        </motion.div>
+        </div>
 
         {/* CTA: 予約案内ページ(/reserve)へ誘導 */}
         <motion.div

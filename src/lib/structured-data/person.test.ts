@@ -121,3 +121,60 @@ describe("buildPersonYoshida", () => {
     expect(schema.knowsAbout).toContain("Pickleball");
   });
 });
+
+describe("buildPersonSekiyoshi", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", PROD_URL);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("@id が /#person-sekiyoshi で、ExerciseGym の employee 参照と一致する", async () => {
+    const { buildPersonSekiyoshi } = await import("./person");
+    const { buildExerciseGym } = await import("./exerciseGym");
+    const schema = buildPersonSekiyoshi("ja");
+
+    expect(schema["@context"]).toBe("https://schema.org");
+    expect(schema["@type"]).toBe("Person");
+    expect(schema["@id"]).toBe(`${PROD_URL}/#person-sekiyoshi`);
+    expect(buildExerciseGym("ja").employee).toEqual({ "@id": schema["@id"] });
+  });
+
+  it("name に関吉大亮、alternateName に英名・かなを含む", async () => {
+    const { buildPersonSekiyoshi } = await import("./person");
+    const schema = buildPersonSekiyoshi("ja");
+
+    expect(schema.name).toBe("関吉大亮");
+    expect(schema.alternateName).toEqual(["Daisuke Sekiyoshi", "せきよしだいすけ"]);
+  });
+
+  it("ja の jobTitle は HYROX日本代表 / メインコーチ", async () => {
+    const { buildPersonSekiyoshi } = await import("./person");
+    const schema = buildPersonSekiyoshi("ja");
+
+    expect(schema.jobTitle).toBe(
+      "HYROX日本代表 / THE PICKLE BANG THEORY メインコーチ",
+    );
+    expect(schema.description).toContain("HYROX");
+  });
+
+  it("en の jobTitle・description は英語", async () => {
+    const { buildPersonSekiyoshi } = await import("./person");
+    const schema = buildPersonSekiyoshi("en");
+
+    expect(schema.jobTitle).toContain("Head Coach");
+    expect(schema.description).toContain("HYROX Japan");
+  });
+
+  it("sameAs に Instagram(tac_monk)、knowsAbout に HYROX、worksFor に組織を含む", async () => {
+    const { buildPersonSekiyoshi } = await import("./person");
+    const schema = buildPersonSekiyoshi("ja");
+
+    expect(schema.sameAs).toEqual(["https://www.instagram.com/tac_monk/"]);
+    expect(schema.knowsAbout).toContain("HYROX");
+    expect(schema.worksFor).toEqual({ "@id": `${PROD_URL}/#organization` });
+  });
+});

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import CourtPriceTable from "@/components/pricing/CourtPriceTable";
 import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
+import HyroxSectionTitle from "./HyroxSectionTitle";
 
 
 export default function HyroxProgram() {
@@ -20,13 +21,7 @@ export default function HyroxProgram() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em]">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs sm:text-sm tracking-[0.25em] text-text-gray">
-            {t("titleJa")}
-          </p>
-          <div className="mx-auto mt-4 w-14 h-[3px] bg-accent" />
+          <HyroxSectionTitle title={t("title")} titleJa={t("titleJa")} />
         </motion.div>
 
         {/* 料金ラベル（ピックルコートと共通） */}

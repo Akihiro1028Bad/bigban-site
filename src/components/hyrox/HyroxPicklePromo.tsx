@@ -32,11 +32,11 @@ export default function HyroxPicklePromo() {
               </span>
             </span>
             <h2 className="font-serif text-4xl font-black tracking-[0.1em] lg:text-5xl">
-              {t("title")}
+              {t("title")}{" "}
+              <span className="mt-2 block font-sans text-xs font-normal tracking-[0.2em] text-text-gray">
+                {t("titleJa")}
+              </span>
             </h2>
-            <p className="mt-2 text-xs tracking-[0.2em] text-text-gray">
-              {t("titleJa")}
-            </p>
             <p className="mt-5 text-sm leading-relaxed text-text-gray">
               {t("description")}
             </p>

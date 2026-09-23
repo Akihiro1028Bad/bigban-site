@@ -23,9 +23,8 @@ describe("HyroxPicklePromo", () => {
   it("PICKLEBALL 見出しと日本語併記を表示する", () => {
     renderWithIntl(<HyroxPicklePromo />);
     expect(
-      screen.getByRole("heading", { name: "PICKLEBALL" })
+      screen.getByRole("heading", { level: 2, name: "PICKLEBALL ピックルボール" })
     ).toBeInTheDocument();
-    expect(screen.getByText("ピックルボール")).toBeInTheDocument();
   });
 
   it("CTA がホーム（ピックル）へのリンク", () => {
