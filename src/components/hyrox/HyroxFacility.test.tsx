@@ -62,7 +62,17 @@ describe("HyroxFacility", () => {
   it("FACILITY 見出しを表示する", () => {
     renderFacility();
     expect(
-      screen.getByRole("heading", { name: "FACILITY" })
+      screen.getByRole("heading", { level: 2, name: /^FACILITY/ })
+    ).toBeInTheDocument();
+  });
+
+  it("h2 に英語見出しと日本語の検索語(設備・器具｜HYROX公式8種目に対応)を含む", () => {
+    renderFacility();
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "FACILITY 設備・器具｜HYROX公式8種目に対応",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -77,7 +87,7 @@ describe("HyroxFacility", () => {
       </NextIntlClientProvider>
     );
     expect(
-      screen.getByRole("heading", { name: "FACILITY" })
+      screen.getByRole("heading", { level: 2, name: /^FACILITY/ })
     ).toBeInTheDocument();
     for (const image of document.querySelectorAll("img")) {
       expect(image).toHaveAttribute("alt", "");
@@ -117,27 +127,26 @@ describe("HyroxFacility", () => {
     expect(
       screen.getByText("16 / 24 / 32kg（HYROX全クラス対応）"),
     ).toBeInTheDocument();
-    // スレッドはオモリ非公式、ウォールボールはターゲット非公式を明記
+    // スレッドはオモリ非公式を明記。ウォールボールはターゲットも公式品(2026-09-23〜)
     expect(
       screen.getByText(
         "プレート負荷調整式・最大202kg（HYROX全クラス対応／オモリは市販プレート）",
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("メディシンボール 4 / 6 / 9kg（ターゲットは非公式）"),
+      screen.getByText("メディシンボール 4 / 6 / 9kg・公式ターゲット（HYROX全クラス対応）"),
     ).toBeInTheDocument();
-    // 台数: ×2 が3点（スキーエルゴ/ローイング/スレッド）、一式が2点（ケトルベル/サンドバッグ）
+    // 台数: ×2 が3点（スキーエルゴ/ローイング/スレッド）、一式が3点（ケトルベル/ウォールボール/サンドバッグ）
     expect(screen.getAllByText("× 2")).toHaveLength(3);
-    expect(screen.getAllByText("一式")).toHaveLength(2);
+    expect(screen.getAllByText("一式")).toHaveLength(3);
   });
 
-  it("ウォールボールは数量表記（一式/×N）を出さない", () => {
+  it("ウォールボールはターゲットも公式品のため一式と表記する", () => {
     renderFacility();
-    // ウォールボールのカードには数量表記を付けない（ターゲット非公式のため一式扱いにしない）
     const wallball = screen.getByText("ウォールボール").closest("li");
     expect(wallball).not.toBeNull();
-    expect(wallball?.textContent).not.toContain("一式");
-    expect(wallball?.textContent).not.toMatch(/×/);
+    expect(wallball?.textContent).toContain("一式");
+    expect(wallball?.textContent).not.toContain("非公式");
   });
 
   it("ドットクリックで scrollTo が呼ばれる", () => {

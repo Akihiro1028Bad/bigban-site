@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COURT_PRICES } from "./pricing";
+import { COURT_PRICES, HYROX_LESSON_PRICES } from "./pricing";
 
 describe("COURT_PRICES", () => {
   it("6:00-9:00 / 9:00-17:00 / 17:00-23:00 の3時間帯を持つ", () => {
@@ -46,5 +46,15 @@ describe("COURT_PRICES", () => {
       expect(toNumber(row.weekdayMember)).toBeLessThan(toNumber(row.weekday));
       expect(toNumber(row.weekendMember)).toBeLessThan(toNumber(row.weekend));
     }
+  });
+});
+
+describe("HYROX_LESSON_PRICES", () => {
+  it("体験会 50分・3,000円、モーニングクラス 60分・3,000円、DAISUKE CLASS 60分・4,500円", () => {
+    expect(HYROX_LESSON_PRICES).toEqual({
+      trial: { minutes: 50, priceYen: 3000 },
+      morningClass: { minutes: 60, priceYen: 3000 },
+      daisukeClass: { minutes: 60, priceYen: 4500 },
+    });
   });
 });

@@ -6,7 +6,12 @@ import StructuredData from "@/components/StructuredData";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { parseKeywords } from "@/lib/og-utils";
-import { buildBreadcrumb, buildExerciseGym } from "@/lib/structured-data";
+import { buildHyroxDescriptionValues } from "@/lib/metadata/hyroxDescriptionValues";
+import {
+  buildBreadcrumb,
+  buildExerciseGym,
+  buildPersonSekiyoshi,
+} from "@/lib/structured-data";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import HyroxContent from "./HyroxContent";
@@ -26,7 +31,7 @@ export async function generateMetadata({
 
   return {
     title: t("hyrox.title"),
-    description: t("hyrox.description"),
+    description: t("hyrox.description", buildHyroxDescriptionValues(locale)),
     keywords,
     openGraph: buildPageOpenGraph({
       siteName: t("og.siteName"),
@@ -64,6 +69,7 @@ export default async function HyroxPage({ params }: HyroxPageProps) {
         data={buildBreadcrumb(locale, [{ name: "HYROX", path: "/hyrox" }])}
       />
       <StructuredData data={buildExerciseGym(locale)} />
+      <StructuredData data={buildPersonSekiyoshi(locale)} />
       <HyroxContent />
     </>
   );

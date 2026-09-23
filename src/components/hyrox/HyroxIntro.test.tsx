@@ -22,7 +22,9 @@ vi.mock("@/i18n/navigation", () => ({
 describe("HyroxIntro", () => {
   it("WHAT IS HYROX 見出しを表示する", () => {
     renderWithIntl(<HyroxIntro />);
-    expect(screen.getByRole("heading", { name: "WHAT IS HYROX" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "WHAT IS HYROX ハイロックスとは" }),
+    ).toBeInTheDocument();
   });
 
   it("キーナンバー表示は出さない", () => {

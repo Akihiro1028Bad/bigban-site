@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
+import HyroxSectionTitle from "./HyroxSectionTitle";
 import { reserveHref } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
@@ -44,13 +45,7 @@ export default function HyroxServices() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl font-black tracking-[0.15em] text-text-light sm:text-5xl lg:text-6xl">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
-            {t("titleJa")}
-          </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <HyroxSectionTitle title={t("title")} titleJa={t("titleJa")} />
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-loose text-text-gray lg:text-base">
             {t("lead")}
           </p>

@@ -98,8 +98,8 @@
       "siteName": "THE PICKLE BANG THEORY"
     },
     "hyrox": {
-      "title": "HYROX トレーニングエリア",
-      "description": "ランニングと8種目のファンクショナルワークアウトで競う世界的フィットネスレース HYROX。本八幡の THE PICKLE BANG THEORY は本格トレーニングエリアを併設。",
+      "title": "HYROX（ハイロックス）公式トレーニングジム｜千葉・本八幡駅徒歩1分",
+      "description": "HYROX公式トレーニングクラブに認定された、千葉・本八幡駅徒歩1分(JR総武線・都営新宿線)のトレーニングジム。公式8種目対応の器具を常設し、現HYROX日本代表・関吉大亮コーチのクラスも開催。初めての方は体験会({trialMinutes}分・{trialPrice})から。{open}〜{close}営業。",
       "keywords": [
         "HYROX",
         "ハイロックス",
@@ -688,7 +688,8 @@
         "スレッドプルに挑むアスリート",
         "HYROX大会会場とウォールボールに挑む選手たち",
         "HYROXのスタートゲートを駆け抜けるアスリート"
-      ]
+      ],
+      "tagline": "千葉・本八幡のHYROX公式トレーニングジム"
     },
     "concept": {
       "words": [
@@ -700,7 +701,7 @@
     },
     "facility": {
       "title": "FACILITY",
-      "titleJa": "設備・配置",
+      "titleJa": "設備・器具｜HYROX公式8種目に対応",
       "lead": "HYROX公式8種目に対応した本格器具を完備。実際のレースと同じ動線で、8つのステーションを巡るようにトレーニングできます。",
       "equipmentTitle": "設置器具",
       "officialLabel": "公式",
@@ -728,7 +729,7 @@
         "wallball": {
           "name": "Wall Ball",
           "nameJa": "ウォールボール",
-          "spec": "メディシンボール 4 / 6 / 9kg（ターゲットは非公式）"
+          "spec": "メディシンボール 4 / 6 / 9kg・公式ターゲット（HYROX全クラス対応）"
         },
         "sandbag": {
           "name": "Sandbag",
@@ -757,7 +758,7 @@
     },
     "services": {
       "title": "SERVICES",
-      "titleJa": "サービス",
+      "titleJa": "体験会・クラス・時間貸し",
       "lead": "初めての方から、大会出場を目指す方まで。目的に合わせて選べる3つのスタイル。",
       "reserveCta": "予約する",
       "items": [
@@ -837,7 +838,7 @@
     },
     "program": {
       "title": "PROGRAM",
-      "titleJa": "プログラム・料金",
+      "titleJa": "料金｜エリア利用料",
       "rateLabel": "エリア利用料",
       "perHour": "1時間あたりの料金",
       "note": "HYROX公式8種目に対応したトレーニングエリアをご利用いただけます。",
@@ -845,7 +846,7 @@
     },
     "coach": {
       "sectionTitle": "CREW",
-      "sectionTitleJa": "クルー",
+      "sectionTitleJa": "コーチ｜現HYROX日本代表 関吉大亮",
       "name": "関吉大亮",
       "nameKana": "せきよし だいすけ",
       "nameEn": "DAISUKE SEKIYOSHI",
