@@ -73,6 +73,10 @@ export function resolveCalendarTabKey(
     ?? LABOLA_CALENDAR_TABS[0].key;
 }
 
+// 営業時間（毎日・不定休）。構造化データ(SportsActivityLocation / ExerciseGym)と
+// 説明文の差し込みで共有する。schema.org の opens/closes と同じ HH:MM 形式。
+export const BUSINESS_HOURS = { opens: "06:00", closes: "23:00" } as const;
+
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 
 // 表示用のアカウント名（@付き）。URL と対で持ち、表記ゆれを防ぐ。

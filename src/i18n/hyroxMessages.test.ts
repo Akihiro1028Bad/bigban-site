@@ -44,4 +44,66 @@ describe("HYROX i18n messages", () => {
     expect(ja).not.toHaveProperty("HomeHyroxPromo");
     expect(en).not.toHaveProperty("HomeHyroxPromo");
   });
+
+  it("ja の Metadata.hyrox の title/description が公式トレーニングジム・本八幡・体験会を訴求する", () => {
+    const meta = ja.Metadata.hyrox;
+    expect(meta.title).toBe(
+      "HYROX（ハイロックス）公式トレーニングジム｜千葉・本八幡駅徒歩1分",
+    );
+    expect(meta.description).toContain("HYROX公式トレーニングクラブに認定");
+    expect(meta.description).toContain("本八幡駅徒歩1分");
+    expect(meta.description).toContain("関吉大亮");
+  });
+
+  it("en の Metadata.hyrox の title/description が Official Training Club・Motoyawata を訴求する", () => {
+    const meta = en.Metadata.hyrox;
+    expect(meta.title).toBe(
+      "HYROX Official Training Club in Chiba | 1 min from Motoyawata Station",
+    );
+    expect(meta.description).toContain("HYROX Training Club");
+    expect(meta.description).toContain("Motoyawata Station");
+    expect(meta.description).toContain("Daisuke Sekiyoshi");
+  });
+
+  it.each([
+    ["ja", ja.Metadata.hyrox.description],
+    ["en", en.Metadata.hyrox.description],
+  ])(
+    "%s の description は料金・時間・営業時間を直書きせず定数から差し込む",
+    (_locale, description) => {
+      for (const placeholder of [
+        "{trialMinutes}",
+        "{trialPrice}",
+        "{open}",
+        "{close}",
+      ]) {
+        expect(description).toContain(placeholder);
+      }
+      expect(description).not.toMatch(/\d{1,2}:\d{2}|3,000|50分|50 min/);
+    },
+  );
+
+  it("meta keywords は変更しない", () => {
+    expect(ja.Metadata.hyrox.keywords).toEqual([
+      "HYROX",
+      "ハイロックス",
+      "HYROX 市川",
+      "HYROX 本八幡",
+      "HYROX 千葉",
+      "HYROX ジム",
+      "HYROX トレーニング",
+      "HYROX 体験",
+      "ファンクショナルフィットネス",
+      "機能性トレーニング",
+    ]);
+    expect(en.Metadata.hyrox.keywords).toEqual([
+      "HYROX",
+      "HYROX Japan",
+      "HYROX Chiba",
+      "HYROX Motoyawata",
+      "HYROX training",
+      "functional fitness",
+      "fitness racing",
+    ]);
+  });
 });

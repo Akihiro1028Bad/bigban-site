@@ -32,3 +32,17 @@ export const COURT_PRICES: readonly CourtPriceRow[] = [
     weekendMember: "¥5,600",
   },
 ];
+
+// HYROX のレッスン・クラス料金（1回あたり・税込）と所要時間。
+// 説明文・構造化データ(priceRange)などはここを参照し、文言に金額を直書きしない。
+// 出典: ニュース hyrox-morning-trial-class-2026 / LaBOLA レッスン・クラス一覧(2026-09-23)。
+export interface HyroxLessonPrice {
+  minutes: number;
+  priceYen: number;
+}
+
+export const HYROX_LESSON_PRICES = {
+  trial: { minutes: 50, priceYen: 3000 },
+  morningClass: { minutes: 60, priceYen: 3000 },
+  daisukeClass: { minutes: 60, priceYen: 4500 },
+} as const satisfies Record<string, HyroxLessonPrice>;

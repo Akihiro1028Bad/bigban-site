@@ -8,6 +8,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { FACILITY_PHOTOS, HYROX_EQUIPMENT } from "./equipment";
 import { EASE } from "@/constants/motion";
+import HyroxSectionTitle from "./HyroxSectionTitle";
 
 
 export default function HyroxFacility() {
@@ -81,13 +82,7 @@ export default function HyroxFacility() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl font-black tracking-[0.15em] text-text-light sm:text-5xl lg:text-6xl">
-            {t("title")}
-          </h2>
-          <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
-            {t("titleJa")}
-          </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <HyroxSectionTitle title={t("title")} titleJa={t("titleJa")} />
         </motion.div>
 
         <motion.p
@@ -194,13 +189,11 @@ export default function HyroxFacility() {
                   <span className="text-sm font-bold text-text-light">
                     {t(`equipment.${item.key}.nameJa`)}
                   </span>
-                  {item.quantity !== null ? (
-                    <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent">
-                      {typeof item.quantity === "number"
-                        ? `× ${item.quantity}`
-                        : t("fullSet")}
-                    </span>
-                  ) : null}
+                  <span className="shrink-0 font-serif text-sm font-bold tracking-wider text-accent">
+                    {typeof item.quantity === "number"
+                      ? `× ${item.quantity}`
+                      : t("fullSet")}
+                  </span>
                 </div>
                 <span className="text-xs text-text-gray">
                   {t(`equipment.${item.key}.spec`)}

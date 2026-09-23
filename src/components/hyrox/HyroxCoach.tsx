@@ -7,6 +7,7 @@ import { COACH_INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
+import HyroxSectionTitle from "./HyroxSectionTitle";
 
 interface AchievementGroup {
   discipline: string;
@@ -30,13 +31,7 @@ export default function HyroxCoach() {
           viewport={{ once: true, margin: "-150px" }}
           transition={{ duration: 1.1, ease: EASE }}
         >
-          <h2 className="font-serif text-4xl font-black tracking-[0.15em] text-text-light sm:text-5xl lg:text-6xl">
-            {t("sectionTitle")}
-          </h2>
-          <p className="mt-3 text-xs tracking-[0.25em] text-text-gray sm:text-sm">
-            {t("sectionTitleJa")}
-          </p>
-          <div className="mx-auto mt-4 h-[3px] w-14 bg-accent" />
+          <HyroxSectionTitle title={t("sectionTitle")} titleJa={t("sectionTitleJa")} />
         </motion.div>
 
         {/* 上段：写真＋プロフィール／経歴 */}

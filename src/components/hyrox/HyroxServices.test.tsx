@@ -25,7 +25,17 @@ describe("HyroxServices", () => {
   it("SERVICES 見出しを表示する", () => {
     renderWithIntl(<HyroxServices />);
     expect(
-      screen.getByRole("heading", { name: "SERVICES" })
+      screen.getByRole("heading", { level: 2, name: /^SERVICES/ })
+    ).toBeInTheDocument();
+  });
+
+  it("h2 に英語見出しと日本語(体験会・クラス・時間貸し)を含む", () => {
+    renderWithIntl(<HyroxServices />);
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "SERVICES 体験会・クラス・時間貸し",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -83,7 +93,7 @@ describe("HyroxServices", () => {
       </NextIntlClientProvider>,
     );
     expect(
-      screen.getByRole("heading", { name: "SERVICES" }),
+      screen.getByRole("heading", { level: 2, name: /^SERVICES/ }),
     ).toBeInTheDocument();
     expect(screen.queryByText("AREA RENTAL")).not.toBeInTheDocument();
   });

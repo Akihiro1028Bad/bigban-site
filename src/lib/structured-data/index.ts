@@ -20,7 +20,11 @@ export type { WebSiteSchema } from "./website";
 export { buildServices } from "./service";
 export type { ServiceSchema } from "./service";
 
-export { buildPersonNishimura, buildPersonYoshida } from "./person";
+export {
+  buildPersonNishimura,
+  buildPersonYoshida,
+  buildPersonSekiyoshi,
+} from "./person";
 export type { PersonSchema } from "./person";
 
 export { buildExerciseGym } from "./exerciseGym";
