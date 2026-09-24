@@ -73,6 +73,14 @@ describe("HyroxServices", () => {
     expect(trackCtaClick).toHaveBeenNthCalledWith(3, "reserveEntry", "hyrox_services_group", "予約する");
   });
 
+  it("リード文で次戦 HYROX OSAKA（2027年1月）への準備を案内する", () => {
+    // seasonal.md の大会逆算マイルストーン(大阪2027)に基づく訴求。
+    // 日付は「2027年1月」までに留める(終了日は公式とメディアで表記が割れているため断定しない)。
+    renderWithIntl(<HyroxServices />);
+    expect(screen.getByText(/HYROX OSAKA/)).toBeInTheDocument();
+    expect(screen.getByText(/2027年1月/)).toBeInTheDocument();
+  });
+
   it("体験カードは持ち物（シューズ・ウェア）を案内し、「手ぶら」と書かない", () => {
     // 体験会はレンタルなし・ランニングシューズ持参のため、「手ぶら」表記は実態と矛盾する。
     renderWithIntl(<HyroxServices />);
