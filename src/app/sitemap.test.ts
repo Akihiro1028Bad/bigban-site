@@ -16,11 +16,11 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ6つ + ニュース一覧1つ = 7エントリ（slugなし時）", async () => {
+  it("静的ページ6つ + ニュース一覧1つ を ja/en それぞれ = 14エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(7);
+    expect(entries).toHaveLength(14);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
@@ -117,6 +117,45 @@ describe("sitemap", () => {
       expect(entry?.priority).toBe(route.priority);
       expect(entry?.changeFrequency).toBe(route.changeFrequency);
     }
+  });
+
+  it("en 版の静的ページとニュース一覧も独立した <url> エントリとして含む", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const urls = (await sitemap()).map((e) => e.url);
+
+    expect(urls).toContain(`${PROD_URL}/en`);
+    expect(urls).toContain(`${PROD_URL}/en/about`);
+    expect(urls).toContain(`${PROD_URL}/en/reserve`);
+    expect(urls).toContain(`${PROD_URL}/en/hyrox`);
+    expect(urls).toContain(`${PROD_URL}/en/contributors`);
+    expect(urls).toContain(`${PROD_URL}/en/tokushoho`);
+    expect(urls).toContain(`${PROD_URL}/en/news`);
+  });
+
+  it("en エントリは ja エントリと同じ alternates・priority・changeFrequency を持つ", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+
+    const pairs: [string, string][] = [
+      [PROD_URL, `${PROD_URL}/en`],
+      [`${PROD_URL}/hyrox`, `${PROD_URL}/en/hyrox`],
+      [`${PROD_URL}/news`, `${PROD_URL}/en/news`],
+    ];
+    for (const [jaUrl, enUrl] of pairs) {
+      const ja = entries.find((e) => e.url === jaUrl);
+      const en = entries.find((e) => e.url === enUrl);
+      expect(en).toBeDefined();
+      expect(en?.alternates).toEqual(ja?.alternates);
+      expect(en?.priority).toBe(ja?.priority);
+      expect(en?.changeFrequency).toBe(ja?.changeFrequency);
+    }
+  });
+
+  it("同じ URL のエントリを重複させない", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const urls = (await sitemap()).map((e) => e.url);
+
+    expect(new Set(urls).size).toBe(urls.length);
   });
 
   it("lastModified は設定しない", async () => {
@@ -248,8 +287,24 @@ describe("columns sitemap entries (flag 連動)", () => {
     const { default: sitemap } = await import("./sitemap");
     const urls = (await sitemap()).map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}/columns`);
+    expect(urls).toContain(`${PROD_URL}/en/columns`);
     expect(urls).toContain(`${PROD_URL}/columns/c1`);
     expect(urls).toContain(`${PROD_URL}/en/columns/c2`);
+  });
+
+  it("flag ON: en のコラム一覧は ja と同じ alternates を持つ", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => [],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+    const ja = entries.find((e) => e.url === `${PROD_URL}/columns`);
+    const en = entries.find((e) => e.url === `${PROD_URL}/en/columns`);
+    expect(en?.alternates).toEqual(ja?.alternates);
+    expect(en?.alternates?.languages?.en).toBe(`${PROD_URL}/en/columns`);
   });
 
   it("flag ON: 両 locale 揃った columns slug は alternates を出力", async () => {
