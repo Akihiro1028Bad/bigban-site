@@ -73,6 +73,13 @@ function indexEntry(segment: string): MetadataRoute.Sitemap[number] {
   };
 }
 
+/**
+ * ビルド時の静的生成だけだと、デプロイ後に microCMS で公開した記事が次の
+ * デプロイまで sitemap に載らない。Webhook の再生成に加え、1時間ごとにも
+ * 再生成して取りこぼしを自己修復する。
+ */
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = SITEMAP_ROUTES.map(
     ({ path, priority, changeFrequency }) => {

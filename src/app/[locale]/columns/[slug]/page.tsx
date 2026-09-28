@@ -77,7 +77,8 @@ export async function generateStaticParams() {
   // flag OFF のうちは静的生成しない (news 踏襲)。
   if (!isCmsColumnsEnabled()) return [];
   try {
-    return await getColumnSlugs();
+    const slugs = await getColumnSlugs();
+    return slugs.map(({ locale, slug }) => ({ locale, slug }));
   } catch {
     /* istanbul ignore next -- @preserve microCMS 未到達時の防御 (build 時のみ) */
     return [];

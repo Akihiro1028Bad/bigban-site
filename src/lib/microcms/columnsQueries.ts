@@ -114,6 +114,8 @@ export async function getColumnCategories(): Promise<ColumnCategory[]> {
 export interface ColumnSlug {
   locale: Locale;
   slug: string;
+  /** sitemap の <lastmod> に使う。 */
+  updatedAt: string;
 }
 
 /**
@@ -138,7 +140,7 @@ export async function getColumnSlugs(): Promise<ColumnSlug[]> {
         tags: ["columns", `columns-slugs-${locale}`],
       });
       for (const item of list.contents) {
-        results.push({ locale, slug: item.slug });
+        results.push({ locale, slug: item.slug, updatedAt: item.updatedAt });
       }
       offset += COLUMN_SLUGS_PAGE_LIMIT;
       if (offset >= list.totalCount || list.contents.length === 0) break;
