@@ -205,9 +205,10 @@ describe("columns queries", () => {
       });
       const { getColumnSlugs } = await import("./columnsQueries");
       const r = await getColumnSlugs();
+      // sitemap の <lastmod> に使うため updatedAt も返す。
       expect(r).toEqual([
-        { locale: "ja", slug: "a" },
-        { locale: "en", slug: "c" },
+        { locale: "ja", slug: "a", updatedAt: "2026-04-01T00:00:00.000Z" },
+        { locale: "en", slug: "c", updatedAt: "2026-04-01T00:00:00.000Z" },
       ]);
     });
   });
