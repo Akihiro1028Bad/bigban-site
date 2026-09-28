@@ -57,41 +57,52 @@ function detailEntries(
   });
 }
 
-/** 一覧 (index) ページのエントリ。 */
-function indexEntry(segment: string): MetadataRoute.Sitemap[number] {
-  return {
-    url: `${SITE_URL}/${segment}`,
-    changeFrequency: "weekly",
-    priority: 0.7,
+/**
+ * ja / en の両方が存在するページについて、言語版ごとに独立したエントリを組み立てる。
+ * Google は hreflang をサイトマップで宣言する場合、言語版ごとに <url>(<loc>) を
+ * 1つずつ置き、それぞれに同じ alternates を持たせることを求めている。
+ */
+function bilingualEntries(
+  jaUrl: string,
+  enUrl: string,
+  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"],
+  priority: number,
+): MetadataRoute.Sitemap {
+  return [jaUrl, enUrl].map((url) => ({
+    url,
+    changeFrequency,
+    priority,
     alternates: {
-      languages: {
-        ja: `${SITE_URL}/${segment}`,
-        en: `${SITE_URL}/en/${segment}`,
-        "x-default": `${SITE_URL}/${segment}`,
-      },
+      languages: { ja: jaUrl, en: enUrl, "x-default": jaUrl },
     },
-  };
+  }));
+}
+
+/** 一覧 (index) ページのエントリ。 */
+function indexEntries(segment: string): MetadataRoute.Sitemap {
+  return bilingualEntries(
+    `${SITE_URL}/${segment}`,
+    `${SITE_URL}/en/${segment}`,
+    "weekly",
+    0.7,
+  );
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticEntries: MetadataRoute.Sitemap = SITEMAP_ROUTES.map(
+  const staticEntries: MetadataRoute.Sitemap = SITEMAP_ROUTES.flatMap(
     ({ path, priority, changeFrequency }) => {
       const jaPath = path === "/" ? "" : path;
       const enPath = path === "/" ? "/en" : `/en${path}`;
-      const jaUrl = `${SITE_URL}${jaPath}`;
-      const enUrl = `${SITE_URL}${enPath}`;
-      return {
-        url: jaUrl,
+      return bilingualEntries(
+        `${SITE_URL}${jaPath}`,
+        `${SITE_URL}${enPath}`,
         changeFrequency,
         priority,
-        alternates: {
-          languages: { ja: jaUrl, en: enUrl, "x-default": jaUrl },
-        },
-      };
+      );
     },
   );
 
-  const newsIndex: MetadataRoute.Sitemap = [indexEntry("news")];
+  const newsIndex: MetadataRoute.Sitemap = indexEntries("news");
 
   let newsSlugs: LocaleSlug[] = [];
   try {
@@ -105,7 +116,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // columns はフラグ ON のときだけ列挙する (P4〜P6 前は出さない)。
   const columnsEntries: MetadataRoute.Sitemap = [];
   if (isCmsColumnsEnabled()) {
-    columnsEntries.push(indexEntry("columns"));
+    columnsEntries.push(...indexEntries("columns"));
     let columnSlugs: LocaleSlug[] = [];
     try {
       columnSlugs = await getColumnSlugs();
