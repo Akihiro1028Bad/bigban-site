@@ -58,6 +58,17 @@
       "excludedFiles": [
         "scripts/growth/gen-body-image.ts"
       ]
+    },
+    "scripts/growth/body-diff.ts": {
+      "reason": "記事本文の比較CLIの薄いI/O入口",
+      "guarantees": [
+        "scripts/growth/bodyDiff.test.ts"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "公開ページ取得・ファイル読込の結線はCI外(公開記事で手動確認済み)",
+      "excludedFiles": [
+        "scripts/growth/body-diff.ts"
+      ]
     }
   }
 }

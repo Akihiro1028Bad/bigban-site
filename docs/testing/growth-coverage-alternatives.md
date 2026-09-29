@@ -9,3 +9,4 @@
 | `scripts/growth/upload-media.ts` | `scripts/growth/media.test.ts` | alternative-test | 実環境固有の結線はCI外 |
 | `scripts/growth/gen-eyecatch.ts` | `scripts/growth/eyecatch.test.ts` | alternative-test | 実環境固有の結線はCI外 |
 | `scripts/growth/gen-body-image.ts` | `scripts/growth/body-image.test.ts` | alternative-test | 実環境固有の結線はCI外 |
+| `scripts/growth/body-diff.ts` | `scripts/growth/bodyDiff.test.ts` | alternative-test | 公開ページ取得・ファイル読込の結線はCI外(公開記事で手動確認済み) |

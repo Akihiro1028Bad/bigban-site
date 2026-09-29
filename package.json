@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "growth:upload-media": "tsx scripts/growth/upload-media.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
-    "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts"
+    "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
+    "growth:body-diff": "tsx scripts/growth/body-diff.ts"
   },
   "keywords": [],
   "author": "",
