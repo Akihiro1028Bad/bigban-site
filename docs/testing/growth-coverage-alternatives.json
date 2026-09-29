@@ -80,6 +80,17 @@
       "excludedFiles": [
         "scripts/early-morning/early-sync.ts"
       ]
+    },
+    "scripts/hyrox-class/hyrox-sync.ts": {
+      "reason": "HYROXクラス集計CLIの薄いI/O入口",
+      "guarantees": [
+        "scripts/hyrox-class/sync.test.ts"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外",
+      "excludedFiles": [
+        "scripts/hyrox-class/hyrox-sync.ts"
+      ]
     }
   }
 }

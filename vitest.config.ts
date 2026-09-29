@@ -62,6 +62,8 @@ export default defineConfig({
         "scripts/growth/body-diff.ts",
         // 早朝リピーター集計の実行入口(薄い I/O 入口)。ロジックは sync.ts でテスト済み。
         "scripts/early-morning/early-sync.ts",
+        // HYROX クラス集計の実行入口(薄い I/O 入口)。ロジックは sync.ts でテスト済み。
+        "scripts/hyrox-class/hyrox-sync.ts",
       ],
       thresholds: {
         statements: 100,
