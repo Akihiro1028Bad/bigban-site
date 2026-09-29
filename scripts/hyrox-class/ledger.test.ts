@@ -46,6 +46,19 @@ describe("toLedgerRow", () => {
     });
   });
 
+  it("台帳ページの既定値は 9/30 20:00 の DAISUKE CLASS の有効な予約", () => {
+    expect(toLedgerRow({ id: "p", properties: ledgerProps() })).toEqual({
+      reservationNo: "#100",
+      name: "架空一郎",
+      date: "2026-09-30",
+      startTime: "20:00",
+      isCancelled: false,
+      court: "HYROX",
+      kind: "イベント",
+      eventName: "HYROX TRAINING @ DAISUKE CLASS",
+    });
+  });
+
   it("キャンセルとスペース予約を読む", () => {
     expect(toLedgerRow(page({ status: "キャンセル", kind: "スペース", event: "" }))).toMatchObject({
       isCancelled: true,
