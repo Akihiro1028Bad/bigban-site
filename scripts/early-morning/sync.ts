@@ -2,7 +2,7 @@
 import type { FetchFn } from "../growth/http";
 import { buildAttendance } from "./attendance";
 import { EARLY_START_TIME, FETCH_INTERVAL_MS } from "./config";
-import { jstDate, jstDateTime } from "./dates";
+import { formatMonthDay, jstDate, jstDateTime } from "./dates";
 import { fetchEarlyReservations } from "./ledger";
 import { buildFlexMessage, selectLineEntries } from "./lineMessage";
 import { buildLineNotes } from "./lineNotes";
@@ -21,6 +21,7 @@ import {
   type WriteCounts,
 } from "./notionSync";
 import { fetchEarlyEventDetails } from "./tennisbear";
+import type { Session } from "./types";
 
 export interface SyncDeps {
   notion: NotionClient;
@@ -67,20 +68,35 @@ function addCounts(...all: WriteCounts[]): WriteCounts {
   );
 }
 
+const MAX_LISTED_MISSING_DATES = 5;
+
+/** 取得元の履歴が縮んだ(前回あった開催回が今回の計算にない)まま書き込むと過去分が壊れるので止める。 */
+function assertNoMissingSessions(existing: readonly { date: string }[], computed: readonly Session[]): void {
+  const computedDates = new Set(computed.map((session) => session.date));
+  const missing = [...new Set(existing.map((row) => row.date))]
+    .filter((date) => date !== "" && !computedDates.has(date))
+    .sort();
+  if (missing.length === 0) return;
+  const listed = missing.slice(0, MAX_LISTED_MISSING_DATES).map(formatMonthDay).join(", ");
+  throw new Error(`テニスベアの開催回が前回より欠けています: ${listed}`);
+}
+
 export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
   const today = jstDate(deps.now);
   const updatedAt = jstDateTime(deps.now);
   const { notion, ids } = deps;
 
-  const state = await step(deps, "Notion読み取り", () => readNotionState(notion, ids));
   const events = await step(deps, "テニスベア", () =>
     fetchEarlyEventDetails({ fetchFn: deps.fetchFn, sleep: deps.sleep, intervalMs: FETCH_INTERVAL_MS }),
   );
   const reservations = await step(deps, "予約台帳", () => fetchEarlyReservations(notion, ids.ledgerDb));
+  // スタッフ入力を古いスナップショットで上書きしないよう、外部取得のあと(書き込みの直前)に読む。
+  const state = await step(deps, "Notion読み取り", () => readNotionState(notion, ids));
 
   const links = deriveLinks(state.people);
   const absentKeys = deriveAbsentKeys(state.records, links);
   const attendance = buildAttendance({ events, reservations, links, absentKeys });
+  await step(deps, "テニスベア", async () => assertNoMissingSessions(state.sessions, attendance.sessions));
   const stats = computeStats({ people: attendance.people, records: attendance.records, sessions: attendance.sessions, today });
   const next = findNextSession(attendance.sessions, today);
   const peopleByKey = new Map(attendance.people.map((person) => [person.key, person]));

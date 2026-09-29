@@ -1,4 +1,4 @@
-/** 前夜 LINE 通知の Flex メッセージ。参加者一覧と各人の何回目かだけを載せる。 */
+/** 前夜 LINE 通知の Flex メッセージ。見出しのクラス、参加者一覧、各人の何回目(初参加は 🔰)と所見(note)を載せる。 */
 import { formatMonthDayTime, formatMonthDayWeekday, formatStartTime } from "./dates";
 import type { AttendanceRecord, Person, Session } from "./types";
 

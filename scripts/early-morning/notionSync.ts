@@ -9,7 +9,7 @@ import { z } from "zod";
 import { normalizeName, personKeyOfRecordKey, recordKey, tbKey } from "./identity";
 import type { FlexMessage } from "./lineMessage";
 import type { NotionClient } from "./notionClient";
-import { chunkText, prop, readMultiSelect, readNumber, readPlainText, readSelect } from "./notionProps";
+import { chunkText, prop, readCheckbox, readMultiSelect, readNumber, readPlainText, readSelect } from "./notionProps";
 import type { AttendanceRecord, NameLink, PersonStats, Session } from "./types";
 
 export interface NotionIdsLike {
@@ -26,6 +26,7 @@ export interface PeopleRow {
   lbName: string | null;
   rewarded: string[];
   memo: string;
+  isNextApplied: boolean;
   hash: string;
 }
 
@@ -90,6 +91,7 @@ export async function readNotionState(client: NotionClient, ids: NotionIdsLike):
       lbName: readPlainText(page, "LaBOLA氏名") || null,
       rewarded: readMultiSelect(page, "リワード済み"),
       memo: readPlainText(page, "メモ"),
+      isNextApplied: readCheckbox(page, "次回申込"),
       hash: readPlainText(page, HASH),
     })),
     records: recordPages.map((page) => {
@@ -210,11 +212,13 @@ export async function syncSessions(
 
 function personProperties(stats: PersonStats, rewarded: readonly string[]): Record<string, unknown> {
   const reached = stats.reachedMilestones.map(String);
+  // テニスベアの人で LaBOLA氏名 が未対応(null)のときは書かない: 実行中にスタッフが入力した氏名を消さないため。
+  const lbNameProperty = stats.lbName === null && stats.key.startsWith("tb:") ? {} : { LaBOLA氏名: prop.text(stats.lbName) };
   return {
     表示名: prop.title(stats.displayName),
     識別子: prop.text(stats.key),
     テニスベアID: prop.number(stats.tbId),
-    LaBOLA氏名: prop.text(stats.lbName),
+    ...lbNameProperty,
     累計: prop.number(stats.total),
     "初中級(火)": prop.number(stats.classCounts.初中級),
     "中級以上(木)": prop.number(stats.classCounts.中級以上),
@@ -226,6 +230,31 @@ function personProperties(stats: PersonStats, rewarded: readonly string[]): Reco
     次の節目: prop.text(stats.nextMilestone),
     到達節目: prop.multiSelect(reached),
     未渡し節目: prop.multiSelect(reached.filter((milestone) => !rewarded.includes(milestone))),
+  };
+}
+
+interface StaffColumnMerge {
+  rewarded: string[];
+  memo: string;
+  /** 書くべき列だけ。書くものがなければ null。 */
+  properties: Record<string, unknown> | null;
+}
+
+/**
+ * source のスタッフ入力列を target に引き継ぐ。リワード済みは和集合(変化したときだけ書く)、
+ * メモは target が空で source にあるときだけ書く(古いスナップショットで target のメモを上書きしない)。
+ */
+function mergeStaffColumns(target: PeopleRow, source: PeopleRow): StaffColumnMerge {
+  const rewarded = [...new Set([...target.rewarded, ...source.rewarded])].sort();
+  const isMemoTransferred = target.memo === "" && source.memo !== "";
+  const properties: Record<string, unknown> = {
+    ...(rewarded.join("\u0000") !== target.rewarded.join("\u0000") ? { リワード済み: prop.multiSelect(rewarded) } : {}),
+    ...(isMemoTransferred ? { メモ: prop.text(source.memo) } : {}),
+  };
+  return {
+    rewarded,
+    memo: isMemoTransferred ? source.memo : target.memo,
+    properties: Object.keys(properties).length > 0 ? properties : null,
   };
 }
 
@@ -247,15 +276,14 @@ async function archivePeopleDuplicates(
       kept.push(row);
       continue;
     }
-    const rewarded = [...new Set([...current.rewarded, ...row.rewarded])].sort();
-    const memo = current.memo || row.memo;
-    if (rewarded.join("\u0000") !== current.rewarded.join("\u0000") || memo !== current.memo) {
-      await client.updatePage(current.pageId, { リワード済み: prop.multiSelect(rewarded), メモ: prop.text(memo || null) });
+    const staff = mergeStaffColumns(current, row);
+    if (staff.properties) {
+      await client.updatePage(current.pageId, staff.properties);
       counts.updated += 1;
     }
     await client.archivePage(row.pageId);
     counts.archived += 1;
-    const merged: PeopleRow = { ...current, rewarded, memo };
+    const merged: PeopleRow = { ...current, rewarded: staff.rewarded, memo: staff.memo };
     byKey.set(row.key, merged);
     kept[kept.indexOf(current)] = merged;
   }
@@ -274,16 +302,32 @@ async function mergePeople(
     const targetKey = canonicalKey(source.key, names);
     const target = byKey.get(targetKey);
     if (targetKey === source.key || !target) continue;
-    const rewarded = [...new Set([...target.rewarded, ...source.rewarded])].sort();
-    const memo = target.memo || source.memo;
-    await client.updatePage(target.pageId, { リワード済み: prop.multiSelect(rewarded), メモ: prop.text(memo || null) });
+    const staff = mergeStaffColumns(target, source);
+    if (staff.properties) {
+      await client.updatePage(target.pageId, staff.properties);
+      counts.updated += 1;
+    }
     await client.archivePage(source.pageId);
-    counts.updated += 1;
     counts.archived += 1;
-    byKey.set(targetKey, { ...target, rewarded, memo });
+    byKey.set(targetKey, { ...target, rewarded: staff.rewarded, memo: staff.memo });
     byKey.delete(source.key);
   }
   return byKey;
+}
+
+/** 計算から消えた人(統合・重複でアーカイブした行を除く)の次回申込が true のままなら false に戻す。 */
+async function clearDroppedNextApplied(
+  client: NotionClient,
+  byKey: ReadonlyMap<string, PeopleRow>,
+  computedKeys: ReadonlySet<string>,
+  counts: WriteCounts,
+): Promise<void> {
+  for (const row of byKey.values()) {
+    if (computedKeys.has(row.key) || !row.isNextApplied) continue;
+    // ハッシュも空に戻す: 後で同じ値に戻ったとき、差分判定でハッシュが一致して書き戻されなくなるのを防ぐため。
+    await client.updatePage(row.pageId, { 次回申込: prop.checkbox(false), [HASH]: prop.text("") });
+    counts.updated += 1;
+  }
 }
 
 export async function syncPeople(
@@ -302,6 +346,7 @@ export async function syncPeople(
     const pageId = await upsert(client, ids.peopleDb, personProperties(person, row?.rewarded ?? []), row, counts);
     pageIdByKey.set(person.key, pageId);
   }
+  await clearDroppedNextApplied(client, byKey, new Set(stats.map((person) => person.key)), counts);
   return { pageIdByKey, counts };
 }
 
@@ -320,7 +365,7 @@ export async function syncRecords(
   const computedKeys = new Set(records.map((record) => record.key));
   for (const record of records) {
     const personPageId = pageIdByKey.get(record.personKey);
-    if (!personPageId) throw new Error(`参加記録の人 ${record.personKey} のページが見つかりません`);
+    if (!personPageId) throw new Error("参加記録の人のページが見つかりません");
     await upsert(
       client,
       ids.recordsDb,
@@ -367,7 +412,9 @@ const codeBlockSchema = z.object({ code: z.object({ rich_text: z.array(z.object(
 
 export async function readBridge(client: NotionClient, pageId: string): Promise<BridgePayload | null> {
   const blocks = await client.listChildren(pageId);
-  const code = blocks.map((block) => codeBlockSchema.safeParse(block)).find((parsed) => parsed.success);
+  // 書き込みは「新しいブロックを追加してから古いブロックを消す」ので、途中で失敗すると
+  // 古いブロックが残る。最新の内容は常に最後のコードブロックにある。
+  const code = blocks.map((block) => codeBlockSchema.safeParse(block)).filter((parsed) => parsed.success).at(-1);
   if (!code?.success) return null;
   try {
     const parsed = bridgeSchema.safeParse(JSON.parse(code.data.code.rich_text.map((part) => part.plain_text).join("")));
@@ -377,8 +424,9 @@ export async function readBridge(client: NotionClient, pageId: string): Promise<
   }
 }
 
+/** 先に新しいコードブロックを追加し、成功してから古いブロックを消す(追加に失敗しても前回の内容が残る)。 */
 export async function writeBridge(client: NotionClient, pageId: string, payload: BridgePayload): Promise<void> {
-  for (const block of await client.listChildren(pageId)) await client.deleteBlock(block.id);
+  const olderBlocks = await client.listChildren(pageId);
   await client.appendChildren(pageId, [
     {
       object: "block",
@@ -389,6 +437,7 @@ export async function writeBridge(client: NotionClient, pageId: string, payload:
       },
     },
   ]);
+  for (const block of olderBlocks) await client.deleteBlock(block.id);
 }
 
 export async function markBridgeFailed(client: NotionClient, pageId: string, failure: string, now: string): Promise<void> {

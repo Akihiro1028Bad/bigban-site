@@ -38,6 +38,7 @@ class FakeNotion implements NotionClient {
   pages = new Map<string, { db: string; properties: Record<string, unknown>; archived: boolean }>();
   blocks: NotionBlock[] = [];
   log: string[] = [];
+  failAppend = false;
   private seq = 0;
 
   seed(db: string, properties: Record<string, unknown>): string {
@@ -76,7 +77,8 @@ class FakeNotion implements NotionClient {
     this.log.push(`delete ${blockId}`);
   }
   async appendChildren(_blockId: string, children: readonly unknown[]) {
-    this.blocks = [...this.blocks, ...children.map((c, i) => ({ id: `blk${i}`, ...(c as Record<string, unknown>), type: "code" }))];
+    if (this.failAppend) throw new Error("append failed");
+    this.blocks = [...this.blocks, ...children.map((c) => ({ id: `blk${++this.seq}`, ...(c as Record<string, unknown>), type: "code" }))];
     this.log.push("append");
   }
 }
@@ -129,6 +131,7 @@ describe("readNotionState / deriveLinks / deriveAbsentKeys", () => {
       ["2026-09-22", "tb:8", false, null],
     ]);
     expect(state.sessions).toEqual([{ pageId: expect.any(String), date: "2026-09-22", hash: "s" }]);
+    expect(state.people.map((p) => p.isNextApplied)).toEqual([false, false]);
 
     const links = deriveLinks(state.people);
     expect(links).toEqual([{ tbId: 7, lbName: "テスト　太郎" }]);
@@ -310,6 +313,127 @@ describe("syncPeople", () => {
   });
 });
 
+describe("syncPeople のスタッフ列の保護", () => {
+  it("統合先にメモがあるときはメモを書かない(古いスナップショットで上書きしない)", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("テスト太郎"),
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text("先方のメモ"), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", {
+      識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"),
+      リワード済み: { multi_select: [{ name: "10" }] }, メモ: text("LaBOLA側のメモ"), 同期ハッシュ: text(""),
+    });
+    const state = await readNotionState(notion, ids);
+    await syncPeople(notion, ids, [stats("tb:7", { reachedMilestones: [5, 10] })], state.people, deriveLinks(state.people));
+    const mergeUpdate = notion.log.find((l) => l.startsWith(`update ${target}`))!;
+    expect(mergeUpdate).toBe(`update ${target} リワード済み`);
+    expect(readPlainText({ id: target, properties: notion.pages.get(target)!.properties }, "メモ")).toBe("先方のメモ");
+  });
+
+  it("統合でメモを引き継ぐときだけメモを書く", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("テスト太郎"), メモ: text(""), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", { 識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"), メモ: text("引き継ぐ"), 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    await syncPeople(notion, ids, [stats("tb:7")], state.people, deriveLinks(state.people));
+    expect(notion.log.find((l) => l.startsWith(`update ${target}`))).toBe(`update ${target} メモ`);
+  });
+
+  it("統合で書く内容(新しいリワード済み・引き継ぐメモ)がなければ更新しない", async () => {
+    const notion = new FakeNotion();
+    notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("テスト太郎"),
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text("先方"), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", {
+      識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"),
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text(""), 同期ハッシュ: text(""),
+    });
+    const state = await readNotionState(notion, ids);
+    const result = await syncPeople(notion, ids, [stats("tb:7")], state.people, deriveLinks(state.people));
+    expect(result.counts.archived).toBe(1);
+    expect(notion.log[0]).toBe("archive seed2");
+    expect(notion.log.filter((l) => l.startsWith("update seed1 リワード済み") || l.startsWith("update seed1 メモ"))).toEqual([]);
+  });
+
+  it("重複行の統合でも、残す行にメモがあればメモを書かない", async () => {
+    const notion = new FakeNotion();
+    const kept = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text("残す側"), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "10" }] }, メモ: text("重複側"), 同期ハッシュ: text(""),
+    });
+    const state = await readNotionState(notion, ids);
+    await syncPeople(notion, ids, [stats("tb:7", { reachedMilestones: [5, 10] })], state.people, []);
+    expect(notion.log.find((l) => l.startsWith(`update ${kept}`))).toBe(`update ${kept} リワード済み`);
+  });
+
+  it("重複行の統合でメモだけを引き継ぐときはメモだけを書く", async () => {
+    const notion = new FakeNotion();
+    const kept = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, メモ: text(""), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", { 識別子: text("tb:7"), テニスベアID: { number: 7 }, メモ: text("重複側"), 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    await syncPeople(notion, ids, [stats("tb:7")], state.people, []);
+    expect(notion.log.find((l) => l.startsWith(`update ${kept}`))).toBe(`update ${kept} メモ`);
+  });
+
+  it("テニスベアの人は LaBOLA氏名 を書かない(実行中にスタッフが入力した氏名を消さない)", async () => {
+    const notion = new FakeNotion();
+    const rowId = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("スタッフ入力"), 同期ハッシュ: text("old"),
+    });
+    const state = await readNotionState(notion, ids);
+    await syncPeople(notion, ids, [stats("tb:7", { lbName: null }), stats("tb:9", { lbName: null })], state.people, []);
+    expect(readPlainText({ id: rowId, properties: notion.pages.get(rowId)!.properties }, "LaBOLA氏名")).toBe("スタッフ入力");
+    const created = [...notion.pages.values()].find((p) => JSON.stringify(p.properties.識別子).includes("tb:9"))!;
+    expect(created.properties).not.toHaveProperty("LaBOLA氏名");
+  });
+
+  it("LaBOLA単独の人は LaBOLA氏名 を書く", async () => {
+    const notion = new FakeNotion();
+    await syncPeople(notion, ids, [stats("lb:テスト太郎", { lbName: "テスト太郎" })], [], []);
+    const created = [...notion.pages.values()][0];
+    expect(readPlainText({ id: "x", properties: created.properties }, "LaBOLA氏名")).toBe("テスト太郎");
+  });
+
+  it("計算から消えた人の次回申込が true のままなら false に戻してハッシュを空にする", async () => {
+    const notion = new FakeNotion();
+    const stale = notion.seed("people", {
+      識別子: text("tb:5"), テニスベアID: { number: 5 }, 次回申込: { checkbox: true }, 同期ハッシュ: text("old"),
+    });
+    const already = notion.seed("people", {
+      識別子: text("tb:6"), テニスベアID: { number: 6 }, 次回申込: { checkbox: false }, 同期ハッシュ: text("old"),
+    });
+    const state = await readNotionState(notion, ids);
+    const result = await syncPeople(notion, ids, [], state.people, []);
+    expect(result.counts).toEqual({ created: 0, updated: 1, archived: 0 });
+    expect(notion.log).toEqual([`update ${stale} 同期ハッシュ,次回申込`]);
+    expect(notion.pages.get(stale)!.properties.次回申込).toEqual({ checkbox: false });
+    expect(notion.pages.get(stale)!.properties.同期ハッシュ).toEqual({ rich_text: [] });
+    expect(notion.pages.get(already)!.properties.同期ハッシュ).toEqual(text("old"));
+  });
+
+  it("統合元としてアーカイブした行には次回申込の更新をしない", async () => {
+    const notion = new FakeNotion();
+    notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("テスト太郎"), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", { 識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"), 次回申込: { checkbox: true }, 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    const result = await syncPeople(notion, ids, [stats("tb:7")], state.people, deriveLinks(state.people));
+    expect(result.counts.archived).toBe(1);
+    expect(notion.log.some((l) => l.startsWith("update seed2"))).toBe(false);
+  });
+});
+
 describe("syncRecords", () => {
   it("作成・差分更新・統合元はアーカイブ・消えた記録は元データになし", async () => {
     const notion = new FakeNotion();
@@ -340,7 +464,9 @@ describe("syncRecords", () => {
 
   it("人のページが見つからなければエラー", async () => {
     const notion = new FakeNotion();
-    await expect(syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map(), [], [], new Set())).rejects.toThrow("tb:7");
+    const failure = syncRecords(notion, ids, [rec("2026-09-08", "lb:テスト太郎")], new Map(), [], [], new Set());
+    await expect(failure).rejects.toThrow("参加記録の人のページが見つかりません");
+    await expect(failure).rejects.not.toThrow("テスト太郎");
   });
 
   it("変化のない記録は書かない", async () => {
@@ -393,16 +519,46 @@ describe("bridge", () => {
     flex: { type: "flex", altText: "a", contents: { type: "bubble", note: "x".repeat(2500) } },
   };
 
-  it("既存ブロックを消して JSON コードブロック1つを書き、読み戻せる", async () => {
+  it("先に新しい JSON コードブロックを追加してから古いブロックを消し、読み戻せる", async () => {
     const notion = new FakeNotion();
     notion.blocks = [{ id: "old", type: "paragraph" }];
     await writeBridge(notion, "bridge", payload);
-    expect(notion.log).toEqual(["delete old", "append"]);
+    expect(notion.log).toEqual(["append", "delete old"]);
     expect(notion.blocks).toHaveLength(1);
     const code = notion.blocks[0] as unknown as { code: { rich_text: Array<{ text: { content: string } }> } };
     expect(code.code.rich_text.length).toBeGreaterThan(1);
     notion.blocks = [{ id: "b", type: "code", code: { rich_text: code.code.rich_text.map((t) => ({ plain_text: t.text.content })) } }];
     await expect(readBridge(notion, "bridge")).resolves.toEqual(payload);
+  });
+
+  it("追加に失敗しても前回のブロックが残り、前回の内容を読める", async () => {
+    const notion = new FakeNotion();
+    const previous = { ...payload, flex: null };
+    notion.blocks = [{ id: "old", type: "code", code: { rich_text: [{ plain_text: JSON.stringify(previous) }] } }];
+    notion.failAppend = true;
+    await expect(writeBridge(notion, "bridge", payload)).rejects.toThrow("append failed");
+    expect(notion.blocks.map((b) => b.id)).toEqual(["old"]);
+    expect(notion.log).toEqual([]);
+    await expect(readBridge(notion, "bridge")).resolves.toEqual(previous);
+  });
+
+  it("古いコードブロックが残っていても最後のコードブロック(最新)を読む", async () => {
+    const notion = new FakeNotion();
+    const older = { ...payload, nextDate: "2026-09-29", flex: null };
+    notion.blocks = [
+      { id: "a", type: "code", code: { rich_text: [{ plain_text: JSON.stringify(older) }] } },
+      { id: "b", type: "code", code: { rich_text: [{ plain_text: JSON.stringify(payload) }] } },
+    ];
+    await expect(readBridge(notion, "bridge")).resolves.toEqual(payload);
+  });
+
+  it("通常の書き込みではコードブロックがちょうど1つになる", async () => {
+    const notion = new FakeNotion();
+    await writeBridge(notion, "bridge", payload);
+    await writeBridge(notion, "bridge", { ...payload, nextDate: null });
+    expect(notion.blocks).toHaveLength(1);
+    expect(notion.log.filter((l) => l === "append")).toHaveLength(2);
+    expect(notion.log.filter((l) => l.startsWith("delete"))).toHaveLength(1);
   });
 
   it("コードブロックがない・JSON が壊れていれば null", async () => {

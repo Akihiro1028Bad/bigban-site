@@ -105,13 +105,16 @@ class MemoryNotion implements NotionClient {
     this.blocks = this.blocks.filter((b) => b.id !== blockId);
   }
   async appendChildren(_id: string, children: readonly unknown[]) {
-    this.blocks = children.map((c, i) => {
-      const block = c as { code: { rich_text: Array<{ text: { content: string } }> } };
-      return { id: `b${i}`, type: "code", code: { rich_text: block.code.rich_text.map((t) => ({ plain_text: t.text.content })) } };
-    });
+    this.blocks = [
+      ...this.blocks,
+      ...children.map((c) => {
+        const block = c as { code: { rich_text: Array<{ text: { content: string } }> } };
+        return { id: `b${++this.seq}`, type: "code", code: { rich_text: block.code.rich_text.map((t) => ({ plain_text: t.text.content })) } };
+      }),
+    ];
   }
   bridge(): Record<string, unknown> {
-    const code = this.blocks[0] as unknown as { code: { rich_text: Array<{ plain_text: string }> } };
+    const code = this.blocks[this.blocks.length - 1] as unknown as { code: { rich_text: Array<{ plain_text: string }> } };
     return JSON.parse(code.code.rich_text.map((t) => t.plain_text).join(""));
   }
 }
@@ -182,6 +185,43 @@ describe("runSync", () => {
     const notion = new MemoryNotion();
     notion.failOn = "listChildren";
     await expect(runSync({ notion, fetchFn: tennisbear(503), sleep: async () => undefined, now, ids })).rejects.toThrow("HTTP 503");
+  });
+
+  it("外部の取得中にスタッフが入力した人の行も読み込み済みとして扱う(Notion の読み取りは外部取得のあと)", async () => {
+    const notion = new MemoryNotion();
+    const base = tennisbear();
+    let seeded = false;
+    const fetchFn = vi.fn<FetchFn>(async (url, init) => {
+      if (!seeded) {
+        seeded = true;
+        notion.pages.set("staff-typed", {
+          db: "people",
+          properties: { 識別子: { rich_text: [{ plain_text: "tb:11" }] }, メモ: { rich_text: [{ plain_text: "取得中に入力" }] }, 同期ハッシュ: { rich_text: [] } },
+        });
+      }
+      return base(url, init);
+    });
+    await runSync({ notion, fetchFn, sleep: async () => undefined, now, ids });
+    const rows = [...notion.pages.values()].filter((p) => p.db === "people" && JSON.stringify(p.properties.識別子).includes("tb:11"));
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows[0].properties.メモ)).toContain("取得中に入力");
+  });
+
+  it("既存の開催回が取得結果から欠けていたら何も書かず、テニスベアの失敗として残す", async () => {
+    const notion = new MemoryNotion();
+    for (const [i, date] of ["2026-09-01", "2026-08-25", "2026-08-18", "2026-08-11", "2026-08-04", "2026-07-28"].entries()) {
+      notion.pages.set(`s${i}`, { db: "sessions", properties: { 開催日: { title: [{ plain_text: date }] }, 同期ハッシュ: { rich_text: [] } } });
+    }
+    notion.pages.set("blank", { db: "sessions", properties: { 開催日: { title: [] }, 同期ハッシュ: { rich_text: [] } } });
+    notion.pages.set("kept", { db: "sessions", properties: { 開催日: { title: [{ plain_text: "2026-09-29" }] }, 同期ハッシュ: { rich_text: [] } } });
+    const before = JSON.stringify([...notion.pages.entries()]);
+    await expect(runSync({ notion, fetchFn: tennisbear(), sleep: async () => undefined, now, ids })).rejects.toThrow(
+      "テニスベアの開催回が前回より欠けています: 7/28, 8/4, 8/11, 8/18, 8/25",
+    );
+    const bridge = notion.bridge();
+    expect(bridge).toMatchObject({ status: "failed" });
+    expect(String(bridge.failure).startsWith("テニスベア")).toBe(true);
+    expect(JSON.stringify([...notion.pages.entries()])).toBe(before);
   });
 
   it("Error 以外が投げられても文字列にして残す", async () => {

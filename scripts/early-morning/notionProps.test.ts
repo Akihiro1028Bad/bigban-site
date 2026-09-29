@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   chunkText,
   prop,
+  readCheckbox,
   readDate,
   readMultiSelect,
   readNumber,
@@ -23,6 +24,8 @@ const page: NotionPage = {
     節目: { type: "multi_select", multi_select: [{ name: "5" }, { name: "10" }] },
     日: { type: "date", date: { start: "2026-09-22" } },
     空日: { type: "date", date: null },
+    オン: { type: "checkbox", checkbox: true },
+    オフ: { type: "checkbox", checkbox: false },
   },
 };
 
@@ -45,6 +48,18 @@ describe("prop", () => {
     expect(chunkText("a".repeat(4001)).map((c) => c.length)).toEqual([2000, 2000, 1]);
     expect(chunkText("")).toEqual([]);
   });
+
+  it("絵文字が分割位置をまたぐときは絵文字を切らず、各塊は2000 UTF-16 単位以内に収める", () => {
+    const text = `${"a".repeat(1999)}🔰b`;
+    const chunks = chunkText(text);
+    expect(chunks).toEqual(["a".repeat(1999), "🔰b"]);
+    expect(chunks.every((chunk) => chunk.length <= 2000)).toBe(true);
+    expect(chunks.join("")).toBe(text);
+  });
+
+  it("1つで上限を超える文字だけになっても空の塊を作らない", () => {
+    expect(chunkText("a🔰", 1)).toEqual(["a", "🔰"]);
+  });
 });
 
 describe("read*", () => {
@@ -57,6 +72,8 @@ describe("read*", () => {
     expect(readMultiSelect(page, "節目")).toEqual(["5", "10"]);
     expect(readDate(page, "日")).toBe("2026-09-22");
     expect(readDate(page, "空日")).toBeNull();
+    expect(readCheckbox(page, "オン")).toBe(true);
+    expect(readCheckbox(page, "オフ")).toBe(false);
   });
 
   it("列がない・型が違うときは空の値", () => {
@@ -65,5 +82,6 @@ describe("read*", () => {
     expect(readSelect(page, "なし")).toBeNull();
     expect(readMultiSelect(page, "なし")).toEqual([]);
     expect(readDate(page, "なし")).toBeNull();
+    expect(readCheckbox(page, "なし")).toBe(false);
   });
 });

@@ -8,9 +8,18 @@ export interface NotionPage {
 
 const RICH_TEXT_LIMIT = 2000;
 
+/** コードポイント単位で区切り、各塊を size UTF-16 単位以内に収める(絵文字などのサロゲートペアを切らない)。 */
 export function chunkText(text: string, size = RICH_TEXT_LIMIT): string[] {
   const chunks: string[] = [];
-  for (let index = 0; index < text.length; index += size) chunks.push(text.slice(index, index + size));
+  let current = "";
+  for (const char of Array.from(text)) {
+    if (current !== "" && current.length + char.length > size) {
+      chunks.push(current);
+      current = "";
+    }
+    current += char;
+  }
+  if (current !== "") chunks.push(current);
   return chunks;
 }
 
@@ -37,6 +46,7 @@ const textPropSchema = z.union([
 const numberPropSchema = z.object({ number: z.number().nullable() });
 const selectPropSchema = z.object({ select: z.object({ name: z.string() }).nullable() });
 const multiSelectPropSchema = z.object({ multi_select: z.array(z.object({ name: z.string() })) });
+const checkboxPropSchema = z.object({ checkbox: z.boolean() });
 const datePropSchema = z.object({ date: z.object({ start: z.string() }).nullable() });
 
 export function readPlainText(page: NotionPage, name: string): string {
@@ -62,4 +72,9 @@ export function readMultiSelect(page: NotionPage, name: string): string[] {
 export function readDate(page: NotionPage, name: string): string | null {
   const parsed = datePropSchema.safeParse(page.properties[name]);
   return parsed.success ? (parsed.data.date?.start ?? null) : null;
+}
+
+export function readCheckbox(page: NotionPage, name: string): boolean {
+  const parsed = checkboxPropSchema.safeParse(page.properties[name]);
+  return parsed.success ? parsed.data.checkbox : false;
 }
