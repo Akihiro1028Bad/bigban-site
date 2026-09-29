@@ -249,6 +249,47 @@ describe("syncPeople", () => {
     const result = await syncPeople(notion, ids, [], state.people, [{ tbId: 99, lbName: "テスト太郎" }]);
     expect(result.counts).toEqual({ created: 0, updated: 0, archived: 0 });
   });
+
+  it("重複行のリワード済み・メモを残す行に引き継ぐ", async () => {
+    const notion = new FakeNotion();
+    const kept = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text(""), 同期ハッシュ: text(""),
+    });
+    const dup = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "10" }] }, メモ: text("重複行のメモ"), 同期ハッシュ: text(""),
+    });
+    const state = await readNotionState(notion, ids);
+
+    const result = await syncPeople(notion, ids, [stats("tb:7", { reachedMilestones: [5, 10] })], state.people, []);
+
+    expect(result.counts.archived).toBe(1);
+    expect(notion.pages.get(dup)!.archived).toBe(true);
+    const merged = notion.pages.get(kept)!.properties;
+    expect(merged.リワード済み).toEqual({ multi_select: [{ name: "10" }, { name: "5" }] });
+    expect(readPlainText({ id: kept, properties: merged }, "メモ")).toBe("重複行のメモ");
+    expect(merged.未渡し節目).toEqual({ multi_select: [] });
+  });
+
+  it("重複行のメモが両方空でもリワード済みの差分だけで引き継ぎを更新する", async () => {
+    const notion = new FakeNotion();
+    const kept = notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "5" }] }, メモ: text(""), 同期ハッシュ: text(""),
+    });
+    notion.seed("people", {
+      識別子: text("tb:7"), テニスベアID: { number: 7 },
+      リワード済み: { multi_select: [{ name: "10" }] }, メモ: text(""), 同期ハッシュ: text(""),
+    });
+    const state = await readNotionState(notion, ids);
+
+    await syncPeople(notion, ids, [stats("tb:7", { reachedMilestones: [5, 10] })], state.people, []);
+
+    const merged = notion.pages.get(kept)!.properties;
+    expect(merged.リワード済み).toEqual({ multi_select: [{ name: "10" }, { name: "5" }] });
+    expect(readPlainText({ id: kept, properties: merged }, "メモ")).toBe("");
+  });
 });
 
 describe("syncRecords", () => {
@@ -308,6 +349,20 @@ describe("syncRecords", () => {
     expect(counts.archived).toBe(1);
     expect(notion.pages.get(first)!.archived).toBe(false);
     expect(notion.pages.get(second)!.archived).toBe(true);
+  });
+
+  it("消えて「元データになし」になった記録が復活すると状態が申込に戻る", async () => {
+    const notion = new FakeNotion();
+    await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), [], [], new Set());
+    let state = await readNotionState(notion, ids);
+
+    await syncRecords(notion, ids, [], new Map([["tb:7", "p"]]), state.records, [], new Set());
+    state = await readNotionState(notion, ids);
+    expect(state.records[0].status).toBe("元データになし");
+
+    await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), state.records, [], new Set());
+    state = await readNotionState(notion, ids);
+    expect(state.records[0].status).toBe("申込");
   });
 });
 

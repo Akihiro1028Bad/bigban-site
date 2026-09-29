@@ -227,6 +227,39 @@ function personProperties(stats: PersonStats, rewarded: readonly string[]): Reco
   };
 }
 
+/**
+ * 人の重複行(同じ識別子)をアーカイブする際、スタッフ入力列(リワード済み・メモ)を
+ * 残す1行に引き継ぐ。一般的な archiveDuplicates と違い、値を捨てずに和集合・空欄補完する。
+ */
+async function archivePeopleDuplicates(
+  client: NotionClient,
+  rows: readonly PeopleRow[],
+  counts: WriteCounts,
+): Promise<PeopleRow[]> {
+  const byKey = new Map<string, PeopleRow>();
+  const kept: PeopleRow[] = [];
+  for (const row of rows) {
+    const current = byKey.get(row.key);
+    if (!current) {
+      byKey.set(row.key, row);
+      kept.push(row);
+      continue;
+    }
+    const rewarded = [...new Set([...current.rewarded, ...row.rewarded])].sort();
+    const memo = current.memo || row.memo;
+    if (rewarded.join("\u0000") !== current.rewarded.join("\u0000") || memo !== current.memo) {
+      await client.updatePage(current.pageId, { リワード済み: prop.multiSelect(rewarded), メモ: prop.text(memo || null) });
+      counts.updated += 1;
+    }
+    await client.archivePage(row.pageId);
+    counts.archived += 1;
+    const merged: PeopleRow = { ...current, rewarded, memo };
+    byKey.set(row.key, merged);
+    kept[kept.indexOf(current)] = merged;
+  }
+  return kept;
+}
+
 async function mergePeople(
   client: NotionClient,
   existing: readonly PeopleRow[],
@@ -259,7 +292,7 @@ export async function syncPeople(
   links: readonly NameLink[],
 ): Promise<{ pageIdByKey: Map<string, string>; counts: WriteCounts }> {
   const counts = emptyCounts();
-  const unique = await archiveDuplicates(client, existing, (row) => row.key, counts);
+  const unique = await archivePeopleDuplicates(client, existing, counts);
   const byKey = await mergePeople(client, unique, links, counts);
   const pageIdByKey = new Map<string, string>();
   for (const person of stats) {
@@ -311,7 +344,9 @@ export async function syncRecords(
       await client.archivePage(row.pageId);
       counts.archived += 1;
     } else if (row.status !== VANISHED) {
-      await client.updatePage(row.pageId, { 状態: prop.select(VANISHED) });
+      // ハッシュも空に戻す: 記録が元の値のまま復活したとき、upsert の差分判定でハッシュが
+      // 一致してしまい「元データになし」のまま書き換わらなくなるのを防ぐため。
+      await client.updatePage(row.pageId, { 状態: prop.select(VANISHED), [HASH]: prop.text("") });
       counts.updated += 1;
     }
   }
