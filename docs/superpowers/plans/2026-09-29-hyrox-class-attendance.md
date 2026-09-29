@@ -4,7 +4,7 @@
 
 **Goal:** 予約台帳から DAISUKE CLASS の参加を人単位で集計して Notion に貯め、開催日の 9:00 にコーチ入りの LINE グループへ当日の参加者・通算の何回目・所見を送る。
 
-**Architecture:** Mac のローカルルーチンが 08:30 に `npm run hyrox:sync` を実行する。スクリプトは Notion API で予約台帳(9列)を読み、イベント名で DAISUKE CLASS を抽出・クラス判定し、氏名(と別名)で名寄せして回数・状態・利用歴・所見を決定的に計算し、Notion の3 DB へ差分書き込みし、橋渡しページに当日の Flex JSON を置く。クラウドルーチンは 09:00 に橋渡しページを読み、今日が開催日ならそのまま LINE に push する。Notion クライアント・日付・氏名正規化・橋渡しの読み書きは `scripts/early-morning/` から直接 import する。
+**Architecture:** Mac のローカルルーチンが 08:30 に `npm run hyrox:sync` を実行する。スクリプトは Notion API で予約台帳(10列)を読み、イベント名で DAISUKE CLASS を抽出・クラス判定し、氏名(と別名)で名寄せして回数・状態・利用歴・所見を決定的に計算し、Notion の3 DB へ差分書き込みし、橋渡しページに当日の Flex JSON を置く。クラウドルーチンは 09:00 に橋渡しページを読み、今日が開催日ならそのまま LINE に push する。Notion クライアント・日付・氏名正規化・橋渡しの読み書きは `scripts/early-morning/` から直接 import する。
 
 **Tech Stack:** TypeScript(tsx 実行)、Vitest 4 + istanbul(カバレッジ100%)、zod 4、Notion REST API(2022-06-28)、LINE Messaging API(push)、Claude ローカル定期タスク + claude.ai クラウドルーチン。
 
@@ -21,7 +21,7 @@
 - 判定基準: 新顔=通算1〜2回(0回も新顔)、常連=直近28日に3回以上、ご無沙汰=通算3回以上かつ最終参加から28日以上。優先順 ご無沙汰 > 常連 > 新顔 > 通常。「直近28日」は `daysBetween(参加日, 今日) < 28`
 - 所見は設計書 §11 の6ルールを上から順に適用し、その回より前の参加(同じ日の前の回を含む)だけで決める。AI は使わない
 - 個人名はリポジトリ(コード・テスト・ログ・コミット・PR)に残さない。テストは架空の名前(「架空一郎」等)だけを使う。標準出力は件数のみ
-- 予約台帳からは9列(`予約番号 / 予約者 / 利用日 / 時間帯 / ステータス / 受付日時 / コート / 予約種別 / イベント名`)だけを `filter_properties` で取得する。電話番号・メール・住所・生年月日は取得しない
+- 予約台帳からは10列(`予約番号 / 予約者 / 利用日 / 時間帯 / ステータス / 受付日時 / コート / 予約種別 / イベント名 / 会員番号`)だけを `filter_properties` で取得する。電話番号・メール・住所・生年月日は取得しない。会員番号は名寄せ(同じ番号は同じ人)にだけ使い、Notion には書かない(2026-09-30 オーナー決定・Task M1 で追加。以降の9列の記述は10列に読み替える)
 - スタッフ入力列(① 別名・メモ、② 出欠)をルーチンは上書きしない。例外は3つだけ: 統合時のメモの空欄補完、統合時の別名の追記(統合元の別名を統合先の別名列へ足す。2026-09-30 オーナー決定)、欠席の書き写し(どれも値を消さない)
 - `scripts/early-morning/` のファイルは import するだけで、変更しない
 - TypeScript: `strict`、`any` 禁止、型のみの import は `import type`、`@ts-ignore` 禁止
@@ -39,7 +39,7 @@
 | `scripts/hyrox-class/types.ts` | 型(台帳の行・開催回・参加記録・人・集計値・別名) |
 | `scripts/hyrox-class/config.ts` | 判定基準とパターン(ここだけ直せば基準が変わる) |
 | `scripts/hyrox-class/classify.ts` | イベント名からの判定(DAISUKE か・クラス・利用歴の分類・短縮名) |
-| `scripts/hyrox-class/ledger.ts` | 予約台帳の読み取り(9列・テスト予約除外) |
+| `scripts/hyrox-class/ledger.ts` | 予約台帳の読み取り(10列・テスト予約除外) |
 | `scripts/hyrox-class/identity.ts` | 人・開催回・参加記録のキー、別名による名寄せ |
 | `scripts/hyrox-class/attendance.ts` | 台帳の行 → 開催回・参加記録(回次)・人 |
 | `scripts/hyrox-class/metrics.ts` | 参加の判定、状態、週連続、人ごとの集計 |
