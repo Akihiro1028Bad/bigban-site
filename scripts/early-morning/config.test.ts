@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { EARLY_START_TIME, MILESTONES, MILESTONE_STEP_AFTER_LAST, RULES } from "./config";
+import { EARLY_START_TIME, EXCLUDED_TB_USER_IDS, MILESTONES, MILESTONE_STEP_AFTER_LAST, RULES } from "./config";
 
 describe("config", () => {
   it("設計書の判定基準と一致する", () => {
@@ -15,5 +15,9 @@ describe("config", () => {
     });
     expect(MILESTONES).toEqual([5, 10, 20, 30, 50]);
     expect(MILESTONE_STEP_AFTER_LAST).toBe(50);
+  });
+
+  it("追加の除外スタッフは初期値では空", () => {
+    expect(EXCLUDED_TB_USER_IDS).toEqual([]);
   });
 });

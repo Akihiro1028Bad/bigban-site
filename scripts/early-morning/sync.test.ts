@@ -29,7 +29,7 @@ const circle = {
 function detail(id: number, start: string, userIds: number[]) {
   return {
     state: { feature: { event: { eventDetail: { EventDetail: { event: {
-      id, startDateTime: start, callOff: false, cancelUserList: [],
+      id, startDateTime: start, callOff: false, organizer: { id: 999 }, cancelUserList: [],
       participantList: userIds.map((uid) => ({
         eventUserStatusType: "APPROVE", guestUserFlg: false, applyDateTime: null, user: { id: uid, name: `テスト${uid}` },
       })),

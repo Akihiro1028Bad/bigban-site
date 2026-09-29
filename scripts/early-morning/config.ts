@@ -7,6 +7,9 @@ export const EARLY_START_TIME = "06:00";
 export const FETCH_INTERVAL_MS = 1000;
 export const FETCH_TIMEOUT_MS = 30_000;
 
+/** 主催者以外に参加者一覧から除外するスタッフのテニスベア ID。名前は書かない。 */
+export const EXCLUDED_TB_USER_IDS: readonly number[] = [];
+
 /** 状態判定の基準(開催回単位)。 */
 export const RULES = {
   recentWindow: 8,
