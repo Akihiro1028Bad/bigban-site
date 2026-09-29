@@ -107,6 +107,12 @@ export async function POST(request: Request): Promise<Response> {
   // 確実に再生成するため、root layout レベルで path invalidation を発火する。
   // "layout" 指定で / 配下 (ja/en 両方含む) すべてのルートが再生成対象になる。
   revalidatePath("/", "layout");
+  // sitemap.xml は metadata route でレイアウト配下にないため個別に再生成する。
+  revalidatePath("/sitemap.xml");
 
-  return NextResponse.json({ ok: true, revalidated: tags, paths: ["/"] });
+  return NextResponse.json({
+    ok: true,
+    revalidated: tags,
+    paths: ["/", "/sitemap.xml"],
+  });
 }

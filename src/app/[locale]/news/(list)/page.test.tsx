@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import {
   makeNewsItem,
   makeNewsList,
-} from "../../../../__mocks__/microcms-fixtures";
+} from "../../../../../__mocks__/microcms-fixtures";
 
 const getNewsListMock = vi.fn();
 const notFoundMock = vi.fn(() => {

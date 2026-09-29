@@ -132,6 +132,16 @@ describe("/api/revalidate POST", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
   });
 
+  it.each(["news", "columns", "column-categories"])(
+    "%s 通知時に sitemap.xml も再生成する (layout 配下外の metadata route)",
+    async (api) => {
+      const { POST } = await import("./route");
+      const res = await POST(makeRequest({ api, id: "abc" }));
+      expect(res.status).toBe(200);
+      expect(revalidatePathMock).toHaveBeenCalledWith("/sitemap.xml");
+    },
+  );
+
   it("api!=news のときは revalidatePath を呼ばない", async () => {
     const { POST } = await import("./route");
     await POST(makeRequest({ api: "other" }));
