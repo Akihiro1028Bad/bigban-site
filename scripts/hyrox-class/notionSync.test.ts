@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { readPlainText, readSelect } from "../early-morning/notionProps";
 import { FakeNotion } from "./fixtures/fakeNotion";
 import { select, text, title } from "./fixtures/notionProps";
+import { buildAliasMap, canonicalPersonKey } from "./identity";
 import {
   deriveAbsentKeys,
   deriveAliasLinks,
@@ -143,6 +144,63 @@ describe("syncPeople", () => {
     expect(notion.pages.get(duplicate)?.archived).toBe(true);
     expect(notion.pages.get(source)?.archived).toBe(true);
     expect(readPlainText(propsOf(notion, target), "メモ")).toBe("既存");
+  });
+
+  it("連鎖した別名は統合先へ引き継がれ、次の実行でもほどけない", async () => {
+    const notion = new FakeNotion();
+    notion.seed("people", { 識別子: text("lb:A"), 別名: text("B") });
+    const chained = notion.seed("people", { 識別子: text("lb:B"), 別名: text("C") });
+    const state = await readHyroxState(notion, ids);
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+
+    await syncPeople(notion, ids, [stats("lb:A")], state.people, aliasMap);
+
+    expect(notion.pages.get(chained)?.archived).toBe(true);
+    const target = notion.live("people").find((row) => readPlainText(row, "識別子") === "lb:A");
+    expect(readPlainText(target ?? { id: "", properties: {} }, "別名")).toBe("B、C");
+
+    const next = await readHyroxState(notion, ids);
+    const nextMap = buildAliasMap(deriveAliasLinks(next.people));
+    expect(canonicalPersonKey("lb:C", nextMap)).toBe("lb:A");
+  });
+
+  it("統合元に別名がなければ別名を書かない", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", { 識別子: text("lb:架空一郎"), 別名: text("かくう一郎") });
+    notion.seed("people", { 識別子: text("lb:かくう一郎"), メモ: text("膝に注意") });
+    const state = await readHyroxState(notion, ids);
+
+    await syncPeople(notion, ids, [stats("lb:架空一郎")], state.people, new Map([["lb:かくう一郎", "lb:架空一郎"]]));
+
+    expect(readPlainText(propsOf(notion, target), "別名")).toBe("かくう一郎");
+  });
+
+  it("統合先を指す別名は追記しない", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", { 識別子: text("lb:A"), 別名: text("B") });
+    const source = notion.seed("people", { 識別子: text("lb:B"), 別名: text("A") });
+    const state = await readHyroxState(notion, ids);
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+
+    await syncPeople(notion, ids, [stats("lb:A")], state.people, aliasMap);
+
+    expect(notion.pages.get(source)?.archived).toBe(true);
+    expect(readPlainText(propsOf(notion, target), "別名")).toBe("B");
+  });
+
+  it("メモと別名を移すときは1回の更新で書く", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", { 識別子: text("lb:A"), 別名: text("B") });
+    notion.seed("people", { 識別子: text("lb:B"), 別名: text("C"), メモ: text("膝に注意") });
+    const state = await readHyroxState(notion, ids);
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+
+    const { counts } = await syncPeople(notion, ids, [], state.people, aliasMap);
+
+    expect(counts.updated).toBe(1);
+    expect(notion.log.filter((entry) => entry === `update ${target}`)).toHaveLength(1);
+    expect(readPlainText(propsOf(notion, target), "メモ")).toBe("膝に注意");
+    expect(readPlainText(propsOf(notion, target), "別名")).toBe("B、C");
   });
 
   it("別名の統合先の行がまだ無ければ吸収しない", async () => {

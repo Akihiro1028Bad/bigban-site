@@ -1,11 +1,11 @@
 /**
  * HYROX 参加者の Notion 3 DB の読み取りと差分書き込み。
- * スタッフ入力列(別名・メモ・出欠)は、統合時のメモの空欄補完と欠席の書き写しを除いて書かない。
+ * スタッフ入力列(別名・メモ・出欠)は、統合時のメモの空欄補完・統合時の別名の追記・欠席の書き写しを除いて書かない。
  */
 import type { NotionClient } from "../early-morning/notionClient";
 import { prop, readCheckbox, readPlainText, readSelect } from "../early-morning/notionProps";
 import { hashOf, type WriteCounts } from "../early-morning/notionSync";
-import { canonicalPersonKey, personKeyOfRecordKey, recordKeyOf, sessionKeyOfRecordKey } from "./identity";
+import { canonicalPersonKey, personKeyOf, personKeyOfRecordKey, recordKeyOf, sessionKeyOfRecordKey, splitAliases } from "./identity";
 import type { AliasLink, ClassRecord, PersonStats, Session } from "./types";
 
 export interface HyroxNotionIds {
@@ -180,16 +180,39 @@ function personProperties(stats: PersonStats): Record<string, unknown> {
   };
 }
 
-/** source を target に吸収してアーカイブする。メモは target が空のときだけ移す(値を消さない)。 */
+/** target の別名の後ろに、source の別名のうち未登録で target 自身を指さないものを足す(既存の別名は消さない)。 */
+function mergeAliases(target: PeopleRow, source: PeopleRow): string[] {
+  const merged = splitAliases(target.alias);
+  const known = new Set(merged.map(personKeyOf));
+  for (const alias of splitAliases(source.alias)) {
+    const key = personKeyOf(alias);
+    if (key === target.key || known.has(key)) continue;
+    known.add(key);
+    merged.push(alias);
+  }
+  return merged;
+}
+
+/** source を target に吸収してアーカイブする。メモは target が空のときだけ移し、別名は追記する(値を消さない)。 */
 async function absorb(client: NotionClient, target: PeopleRow, source: PeopleRow, counts: WriteCounts): Promise<PeopleRow> {
   const isMemoTransferred = target.memo === "" && source.memo !== "";
-  if (isMemoTransferred) {
-    await client.updatePage(target.pageId, { メモ: prop.text(source.memo) });
+  const aliases = mergeAliases(target, source);
+  const isAliasAppended = aliases.length > splitAliases(target.alias).length;
+  const merged: PeopleRow = {
+    ...target,
+    memo: isMemoTransferred ? source.memo : target.memo,
+    alias: isAliasAppended ? aliases.join("、") : target.alias,
+  };
+  if (isMemoTransferred || isAliasAppended) {
+    await client.updatePage(target.pageId, {
+      ...(isMemoTransferred ? { メモ: prop.text(merged.memo) } : {}),
+      ...(isAliasAppended ? { 別名: prop.text(merged.alias) } : {}),
+    });
     counts.updated += 1;
   }
   await client.archivePage(source.pageId);
   counts.archived += 1;
-  return isMemoTransferred ? { ...target, memo: source.memo } : target;
+  return merged;
 }
 
 /** 同じ識別子の重複行と、別名に当たる人の行を統合先へ吸収する。 */
