@@ -4,9 +4,18 @@ import { readDate, readPlainText, readSelect, type NotionPage } from "../early-m
 import { EXCLUDED_RESERVATION_NOS } from "./config";
 import type { LedgerRow } from "./types";
 
-export const LEDGER_COLUMNS = ["予約番号", "予約者", "利用日", "時間帯", "ステータス", "受付日時", "コート", "予約種別", "イベント名"] as const;
+export const LEDGER_COLUMNS = ["予約番号", "予約者", "利用日", "時間帯", "ステータス", "受付日時", "コート", "予約種別", "イベント名", "会員番号"] as const;
 
 const START_TIME_LENGTH = 5;
+
+/** 会員番号なしを表す台帳の記載。 */
+const NO_MEMBER = "-";
+
+function readMemberNo(page: NotionPage): string | null {
+  // 台帳には「#99001」と「99001」が混在するため、全角・半角と先頭の # をそろえる
+  const memberNo = readPlainText(page, "会員番号").normalize("NFKC").trim().replace(/^#+/u, "").trim();
+  return memberNo === "" || memberNo === NO_MEMBER ? null : memberNo;
+}
 
 export function toLedgerRow(page: NotionPage): LedgerRow | null {
   const name = readPlainText(page, "予約者").trim();
@@ -24,6 +33,7 @@ export function toLedgerRow(page: NotionPage): LedgerRow | null {
     isCancelled: status === "キャンセル",
     court: readSelect(page, "コート"),
     kind,
+    memberNo: readMemberNo(page),
     eventName: readPlainText(page, "イベント名").trim(),
   };
 }

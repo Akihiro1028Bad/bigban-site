@@ -86,6 +86,7 @@ describe("buildNotes", () => {
       isCancelled: false,
       court: "HYROX",
       kind: "イベント",
+      memberNo: null,
       eventName: "HYROX体験会｜種目と器具を一通り体験できる50分（初心者OK）",
     };
 

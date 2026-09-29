@@ -42,6 +42,7 @@ describe("toLedgerRow", () => {
       isCancelled: false,
       court: "HYROX",
       kind: "イベント",
+      memberNo: null,
       eventName: "HYROX TRAINING @ DAISUKE CLASS ビギナーの部",
     });
   });
@@ -55,8 +56,27 @@ describe("toLedgerRow", () => {
       isCancelled: false,
       court: "HYROX",
       kind: "イベント",
+      memberNo: null,
       eventName: "HYROX TRAINING @ DAISUKE CLASS",
     });
+  });
+
+  it("会員番号を読む。空と「-」は null(会員番号がない行も有効な行)", () => {
+    expect(toLedgerRow(page({ member: " 99001 " }))?.memberNo).toBe("99001");
+    expect(toLedgerRow(page({ member: "-" }))?.memberNo).toBeNull();
+    expect(toLedgerRow(page({ member: "" }))?.memberNo).toBeNull();
+    expect(toLedgerRow(page({ member: null }))).not.toBeNull();
+  });
+
+  it.each([
+    ["#99001", "99001"],
+    [" ＃99001 ", "99001"],
+    ["##99001", "99001"],
+    ["９９００１", "99001"],
+    ["#", null],
+    ["＃-", null],
+  ])("会員番号「%s」は先頭の # を除いて正規化する(「#99001」と「99001」を同じ番号にする)", (member, expected) => {
+    expect(toLedgerRow(page({ member }))?.memberNo).toBe(expected);
   });
 
   it("キャンセルとスペース予約を読む", () => {
@@ -80,7 +100,7 @@ describe("toLedgerRow", () => {
 });
 
 describe("fetchLedgerRows", () => {
-  it("9列だけを指定して読み、テスト予約を除き、読めない行を数える", async () => {
+  it("10列だけを指定して読み、テスト予約を除き、読めない行を数える", async () => {
     const { client, queries } = stubNotion(
       [...LEDGER_COLUMNS, "電話番号"],
       [page({ no: "#100" }), page({ no: "#3" }), page({ no: "#101", name: "" })],

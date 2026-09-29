@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { readPlainText, type NotionPage } from "../early-morning/notionProps";
 import { readBridge } from "../early-morning/notionSync";
 import { FakeNotion } from "./fixtures/fakeNotion";
-import { ledgerProps } from "./fixtures/notionProps";
+import { ledgerProps, text } from "./fixtures/notionProps";
 import { LEDGER_COLUMNS } from "./ledger";
 import { runSync } from "./sync";
 
@@ -132,5 +133,31 @@ describe("runSync", () => {
 
     const bridge = await readBridge(notion, "bridge");
     expect(bridge?.failure).toBe("予約台帳: boom");
+  });
+
+  it("会員番号が同じ予約は、氏名の表記が違っても同じ人にまとめる(2回目と出て、別名に他方の表記が残る)", async () => {
+    const notion = new FakeNotion();
+    notion.columns = [...LEDGER_COLUMNS];
+    notion.seed("ledger", ledgerProps({ no: "#20", name: "架空一郎", member: "99001", date: "2026-09-23", slot: "20:00～21:00" }));
+    notion.seed("ledger", ledgerProps({ no: "#21", name: "架空壱郎", member: "99001", date: "2026-09-30", slot: "20:00～21:00" }));
+
+    // 会員番号が付く前に別々の人として作られていた行
+    notion.seed("people", { 識別子: text("lb:架空一郎") });
+    notion.seed("people", { 識別子: text("lb:架空壱郎"), メモ: text("膝に注意") });
+
+    // JST 2026-09-30(水) 08:30
+    const summary = await runSync({ notion, now: new Date("2026-09-29T23:30:00Z"), ids });
+
+    expect(summary.people).toBe(1);
+    expect(summary.records).toBe(2);
+    const bridge = await readBridge(notion, "bridge");
+    const flex = JSON.stringify(bridge?.flex);
+    expect(flex).toContain("2回目");
+    expect(flex).not.toContain("初めての方");
+    const people = notion.live("people");
+    expect(people).toHaveLength(1);
+    expect(readPlainText(people[0] as NotionPage, "識別子")).toBe("lb:架空一郎");
+    expect(readPlainText(people[0] as NotionPage, "別名")).toBe("架空壱郎");
+    expect(readPlainText(people[0] as NotionPage, "メモ")).toBe("膝に注意");
   });
 });

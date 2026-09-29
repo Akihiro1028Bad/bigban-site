@@ -5,7 +5,7 @@ import type { NotionClient } from "../early-morning/notionClient";
 import { markBridgeFailed, writeBridge, type WriteCounts } from "../early-morning/notionSync";
 import { buildAttendance, type Attendance } from "./attendance";
 import { buildHistoryIndex, historyBefore } from "./history";
-import { buildAliasMap } from "./identity";
+import { buildAliasMap, memberGroupsOf } from "./identity";
 import { fetchLedgerRows } from "./ledger";
 import { buildFlexMessage, selectEntries, type LineEntry } from "./lineMessage";
 import { buildNotes } from "./lineNotes";
@@ -97,7 +97,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
   const state = await step(deps, "Notion読み取り", () => readHyroxState(notion, ids));
 
   const { attendance, aliasMap, absentKeys, stats, nextDate, items } = await step(deps, "集計", async () => {
-    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people), memberGroupsOf(ledger.rows));
     const absentKeys = deriveAbsentKeys(state.records, aliasMap);
     const attendance = buildAttendance({ rows: ledger.rows, aliasMap, absentKeys });
     const historyIndex = buildHistoryIndex(ledger.rows, aliasMap);

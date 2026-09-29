@@ -6,7 +6,7 @@ export type ClassType = "ビギナー" | "通常" | "ダブルス";
 /** 予約台帳の予約種別。 */
 export type ReservationKind = "イベント" | "スペース";
 
-/** 予約台帳の1行(読む9列から必要なものだけ)。 */
+/** 予約台帳の1行(読む10列から必要なものだけ)。 */
 export interface LedgerRow {
   reservationNo: string;
   name: string;
@@ -17,6 +17,8 @@ export interface LedgerRow {
   isCancelled: boolean;
   court: string | null;
   kind: ReservationKind;
+  /** 予約台帳の会員番号。空・"-" は null。 */
+  memberNo: string | null;
   /** スペース予約・記帳漏れは空文字。 */
   eventName: string;
 }

@@ -12,6 +12,8 @@ export interface LedgerPageInput {
   court?: string | null;
   kind?: string | null;
   event?: string;
+  /** 会員番号。既定は null(空)。異なる架空名の既存フィクスチャが統合されないようにする。 */
+  member?: string | null;
 }
 
 /** 予約台帳の1ページ分のプロパティ。既定は 9/30 20:00 の DAISUKE CLASS の有効な予約。 */
@@ -25,6 +27,7 @@ export function ledgerProps(input: LedgerPageInput = {}): Record<string, unknown
     court: "HYROX",
     kind: "イベント",
     event: "HYROX TRAINING @ DAISUKE CLASS",
+    member: null,
     ...input,
   };
   return {
@@ -36,5 +39,6 @@ export function ledgerProps(input: LedgerPageInput = {}): Record<string, unknown
     コート: select(value.court),
     予約種別: select(value.kind),
     イベント名: text(value.event),
+    会員番号: text(value.member ?? ""),
   };
 }

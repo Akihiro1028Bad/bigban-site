@@ -13,6 +13,7 @@ function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
     isCancelled: false,
     court: "HYROX",
     kind: "イベント",
+    memberNo: null,
     eventName: "HYROX TRAINING @ DAISUKE CLASS",
     ...overrides,
   };
