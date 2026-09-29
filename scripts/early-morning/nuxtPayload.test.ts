@@ -41,7 +41,8 @@ describe("parseNuxtState", () => {
   });
 
   it.each([
-    ["関数呼び出しでない", "{a:1}"],
+    ["関数呼び出しでない(ブロック文)", "{a:1}"],
+    ["関数呼び出しでない(式)", "1"],
     ["呼び出し先が関数式でない", "foo(1)"],
     ["引数が識別子でない", "(function({a}){return {}}(1))"],
     ["本体が return 1文でない", "(function(a){a.x=1;return {}}(1))"],
@@ -54,6 +55,9 @@ describe("parseNuxtState", () => {
     ["正規表現", "(function(){return {x:/a/}}())"],
     ["テンプレート文字列", "(function(){return {x:`a`}}())"],
     ["メソッド", "(function(){return {m(){}}}())"],
+    ["式の後ろに余分な入力", "(function(){return {}}());alert(1)"],
+    ["async 関数", "(async function(){return {x:1}}())"],
+    ["ジェネレータ関数", "(function*(){return {}}())"],
   ])("%s はエラーにする", (_label, payload) => {
     expect(() => parseNuxtState(page(payload))).toThrow(NuxtPayloadError);
   });

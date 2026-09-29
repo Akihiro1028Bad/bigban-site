@@ -2,7 +2,7 @@
  * テニスベアの HTML に埋め込まれた window.__NUXT__ を、JS を実行せずに復元する。
  * acorn で構文解析し、実データに現れるノードだけを評価する。未知の構文は推測せずエラーにする。
  */
-import { parseExpressionAt } from "acorn";
+import { parse } from "acorn";
 
 const NUXT_PATTERN = /<script>window\.__NUXT__=([\s\S]*?);?<\/script>/;
 
@@ -107,10 +107,20 @@ function evaluate(value: AstNode, scope: Scope): unknown {
 
 /** HTML から window.__NUXT__ の値を復元する。 */
 export function parseNuxtState(html: string): unknown {
-  const root = node(parseExpressionAt(extractNuxtSource(html), 0, { ecmaVersion: 2022 }));
+  const source = extractNuxtSource(html);
+  const program = node(parse(source, { ecmaVersion: 2022 }));
+  const topLevelStatements = nodeList(program.body);
+  const onlyTopLevelStatement = topLevelStatements.length === 1 ? node(topLevelStatements[0]) : null;
+  if (!onlyTopLevelStatement || onlyTopLevelStatement.type !== "ExpressionStatement") {
+    throw new NuxtPayloadError("式の後ろに余分な入力があります");
+  }
+  const root = node(onlyTopLevelStatement.expression);
   if (root.type !== "CallExpression") throw new NuxtPayloadError("関数呼び出しではありません");
   const callee = node(root.callee);
   if (callee.type !== "FunctionExpression") throw new NuxtPayloadError("呼び出し先が関数式ではありません");
+  if (callee.async || callee.generator) {
+    throw new NuxtPayloadError("async / generator 関数には対応していません");
+  }
   const params = nodeList(callee.params).map((param) => identifierName(node(param)));
   const args = nodeList(root.arguments).map((arg) => evaluate(node(arg), new Map()));
   const scope = new Map(params.map((name, index) => [name, args[index]]));
