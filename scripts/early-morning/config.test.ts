@@ -1,18 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { CLASS_BY_WEEKDAY, EARLY_START_TIME, EXCLUDED_TB_USER_IDS, MILESTONES, MILESTONE_STEP_AFTER_LAST, RULES } from "./config";
+import {
+  CLASS_BY_WEEKDAY,
+  CLASS_RULES,
+  EARLY_START_TIME,
+  EXCLUDED_TB_USER_IDS,
+  MILESTONES,
+  MILESTONE_STEP_AFTER_LAST,
+  NOTE_LONG_GAP_DAYS,
+  RULES,
+} from "./config";
 
 describe("config", () => {
-  it("設計書の判定基準と一致する", () => {
+  it("設計書(14章)の判定基準と一致する", () => {
     expect(EARLY_START_TIME).toBe("06:00");
-    expect(RULES).toEqual({
-      recentWindow: 8,
-      regularMinInWindow: 4,
-      dormantMisses: 4,
-      dormantMinTotal: 3,
-      newMaxTotal: 2,
-    });
+    expect(RULES).toEqual({ newMaxTotal: 2 });
+    expect(CLASS_RULES).toEqual({ recentWindow: 4, regularMin: 3, dormantMisses: 4, dormantMinTotal: 3, perfectMin: 3 });
+    expect(NOTE_LONG_GAP_DAYS).toBe(28);
     expect(MILESTONES).toEqual([5, 10, 20, 30, 50]);
     expect(MILESTONE_STEP_AFTER_LAST).toBe(50);
   });

@@ -15,14 +15,22 @@ export const EXCLUDED_TB_USER_IDS: readonly number[] = [];
 /** 曜日番号(`getUTCDay()`、2=火、4=木)から開催回のクラスを引く。載っていない曜日は「その他」。 */
 export const CLASS_BY_WEEKDAY: Readonly<Record<number, ClassKey>> = { 2: "初中級", 4: "中級以上" };
 
-/** 状態判定の基準(開催回単位)。 */
+/** 全体の状態判定の基準(累計)。クラス別の基準は CLASS_RULES。 */
 export const RULES = {
-  recentWindow: 8,
-  regularMinInWindow: 4,
-  dormantMisses: 4,
-  dormantMinTotal: 3,
   newMaxTotal: 2,
 } as const;
+
+/** クラス別の判定基準(そのクラスの開催済みの回だけで数える)。 */
+export const CLASS_RULES = {
+  recentWindow: 4,
+  regularMin: 3,
+  dormantMisses: 4,
+  dormantMinTotal: 3,
+  perfectMin: 3,
+} as const;
+
+/** LINE の所見で「前回 M/D」を出す、最終参加からの日数。 */
+export const NOTE_LONG_GAP_DAYS = 28;
 
 /** 節目。最後の値より先は MILESTONE_STEP_AFTER_LAST ごと。 */
 export const MILESTONES = [5, 10, 20, 30, 50] as const;

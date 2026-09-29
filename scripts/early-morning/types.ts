@@ -91,7 +91,8 @@ export type PersonState = "新顔" | "常連" | "ご無沙汰" | "通常";
 /** 参加者の集計結果。 */
 export interface PersonStats extends Person {
   total: number;
-  recent: number;
+  /** クラス別の参加回数(その他の回は含まない)。 */
+  classCounts: Record<ClassKey, number>;
   streak: number;
   firstDate: string | null;
   lastDate: string | null;

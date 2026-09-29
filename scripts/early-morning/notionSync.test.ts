@@ -91,7 +91,7 @@ function stats(key: string, overrides: Partial<PersonStats> = {}): PersonStats {
     tbId: key.startsWith("tb:") ? Number(key.slice(3)) : null,
     lbName: null,
     total: 5,
-    recent: 4,
+    classCounts: { 初中級: 4, 中級以上: 1 },
     streak: 2,
     firstDate: "2026-08-04",
     lastDate: "2026-09-29",
@@ -205,6 +205,9 @@ describe("syncPeople", () => {
     expect(updated.未渡し節目).toEqual({ multi_select: [{ name: "10" }] });
     expect(updated.メモ).toEqual(text("スタッフのメモ"));
     expect(notion.log.find((l) => l.startsWith("update"))).not.toContain("リワード済み");
+    expect(updated["初中級(火)"]).toEqual({ number: 4 });
+    expect(updated["中級以上(木)"]).toEqual({ number: 1 });
+    expect(Object.keys(updated)).not.toContain("直近8回");
 
     const again = await readNotionState(notion, ids);
     const second = await syncPeople(notion, ids, [stats("tb:7", { reachedMilestones: [5, 10] }), stats("tb:9")], again.people, []);
