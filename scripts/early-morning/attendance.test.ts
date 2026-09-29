@@ -30,8 +30,8 @@ describe("buildAttendance", () => {
     });
 
     expect(result.sessions).toEqual([
-      { date: "2026-08-25", tbEventIds: [1, 2], isCallOff: false },
-      { date: "2026-09-01", tbEventIds: [3], isCallOff: false },
+      { date: "2026-08-25", tbEventIds: [1, 2], isCallOff: false, classType: "初中級" },
+      { date: "2026-09-01", tbEventIds: [3], isCallOff: false, classType: "初中級" },
     ]);
     expect(result.people).toEqual([
       { key: "tb:11", displayName: "新しい名前", tbId: 11, lbName: null },
@@ -46,7 +46,7 @@ describe("buildAttendance", () => {
 
   it("全イベント中止の日は中止の開催回で、記録を作らない", () => {
     const result = buildAttendance({ events: [event(1, "2026-08-27", [tb(11, "テスト太郎")], true)], reservations: [], links: [], absentKeys: new Set() });
-    expect(result.sessions).toEqual([{ date: "2026-08-27", tbEventIds: [1], isCallOff: true }]);
+    expect(result.sessions).toEqual([{ date: "2026-08-27", tbEventIds: [1], isCallOff: true, classType: "中級以上" }]);
     expect(result.records).toEqual([]);
   });
 

@@ -64,6 +64,13 @@ public/
 - **マージと公開は必ず人間**。記事・ニュースはルーチンでは書かず、brief をネタ案 DB に置いて執筆は対話で行う。
 - **アカウント例外**: クラウドルーチンの draft PR は**オーナーの GitHub 認可(GitHub App)**で作成される。下記 Push Account 規約は**ローカル対話での push にのみ適用**する。
 
+## 早朝ピックル リピーター集計
+
+> 設計書: `docs/superpowers/specs/2026-09-29-early-morning-repeaters-design.md` / スタッフ向け: `docs/operations/early-morning-repeaters.md`
+
+- ローカル定期タスク `early-morning-sync`(08:30/20:30)が `npm run early:sync` を実行し、Notion「早朝ピックル常連」配下を更新する。クラウドルーチン「早朝前夜通知」(21:00)が橋渡しページの Flex を LINE に送る(プロンプト正本: `docs/growth/routines/early-morning-notify.md`)
+- 個人名を置いてよいのは Notion「早朝ピックル常連」配下と LINE だけ。コード・テスト・ログ・コミットに実名を残さない
+
 ## Development Process — TDD
 
 Red -> Green -> Refactor cycle is mandatory for all development.

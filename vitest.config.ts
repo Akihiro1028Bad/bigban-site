@@ -60,6 +60,8 @@ export default defineConfig({
         "scripts/growth/gen-body-image.ts",
         // 記事本文の比較CLI(薄い I/O 入口)。純ロジックは bodyDiff.ts でテスト済み。
         "scripts/growth/body-diff.ts",
+        // 早朝リピーター集計の実行入口(薄い I/O 入口)。ロジックは sync.ts でテスト済み。
+        "scripts/early-morning/early-sync.ts",
       ],
       thresholds: {
         statements: 100,

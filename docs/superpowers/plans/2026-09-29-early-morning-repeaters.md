@@ -3982,3 +3982,119 @@ npm run early:sync
 - **設計書との対応**: 1章の突き合わせ→Task 12 Step 3 / 3章の構成→Task 11・13 / 4.1 テニスベア→Task 3・4 / 4.2 予約台帳(6列限定・開催回がない予約の除外・反映遅れの注記)→Task 6・7・9 / 5章 名寄せ・1回の定義→Task 6・7・10 / 6章 Notion 構成→Task 1・10 / 7章 判定→Task 8 / 8章 LINE→Task 9・13 / 9章 エラー処理→Task 5・10・11 / 10章 個人情報→Global Constraints・Task 1 Step 9・Task 13 / 11章 テスト→各 Task / 12章 人間作業→Task 1 Step 3・Task 13 Step 7 / 13章 確認事項→Task 3 Step 5・Task 4 Step 5
 - **型の一貫性**: `NotionIdsLike`(Task 10)+ `ledgerDb` / `peopleDbUrl` を `SyncDeps.ids`(Task 11)で使い、`NOTION_IDS`(Task 1)はその両方を満たす。`FlexMessage` は Task 9 で定義し Task 10 の `BridgePayload` で使う。`recordKey` / `personKeyOfRecordKey` は Task 6 で定義し Task 7・10 で使う。
 - **残す判断**: Notion ID(Task 1)と橋渡しページ ID(Task 13 Step 1)は作成時にしか決まらないため、確定手順と「山括弧が残っていたら未完了」という確認方法を書いた。
+
+---
+
+## 追補: クラス別集計・所見・主催者除外(Task 14〜18)
+
+> 設計書 §14(2026-09-29 オーナー決定)。**実行順: Task 14 → 15 → 16 → 17 → 18 → Task 12 Step 5(試し送信)→ Task 13**。Task 1〜11 と Task 12 Step 1〜4 は完了済み。
+> 既存のファイル・テストは TDD で直す(先に期待を変えたテストを書いて落とし、それから実装)。既存テストの期待値を変えるのは、この追補で仕様が変わった箇所だけ。
+
+### Task 14: 主催者の除外
+
+**Files:** Modify `scripts/early-morning/tennisbear.ts`, `scripts/early-morning/tennisbear.test.ts`, `scripts/early-morning/config.ts`, `scripts/early-morning/config.test.ts`
+
+**Interfaces:**
+- Produces: `config.ts` に `export const EXCLUDED_TB_USER_IDS: readonly number[] = [];`(JSDoc: 「主催者以外に参加者一覧から除外するスタッフのテニスベア ID。名前は書かない」)
+- Changes: `extractEventDetail(state: unknown, excludedUserIds: readonly number[] = EXCLUDED_TB_USER_IDS): TbEventDetail`
+
+仕様:
+- イベント詳細の schema に `organizer: z.object({ id: z.number().int() })` を追加する(`state.feature.event.eventDetail.EventDetail.event.organizer.id`、2026-09-29 に実データで確認済み)
+- `participantList` と `cancelUserList` の両方から、`user.id === organizer.id` または `excludedUserIds` に含まれる参加者を**取り除く**(`participants` に入れず、`ignoredStatusCount` にも数えない)
+- 取り除く判定はステータス判定より先に行う
+
+テスト(tennisbear.test.ts):
+- 既存の `eventState` ヘルパーに `organizer: { id: 999 }` を足し、既存テストの期待値は変えない
+- 追加: 主催者(id 999)が APPROVE で participantList にいても `participants` に出ない
+- 追加: `extractEventDetail(state, [11])` で id 11 の参加者が申込・キャンセルの両方から消える
+- 追加: 主催者が APPLYING のような未知の状態でも `ignoredStatusCount` に数えない
+- config.test.ts: `EXCLUDED_TB_USER_IDS` が空配列であることを確かめる
+
+コミット: `feat: 早朝集計から主催者と指定スタッフを除外する`
+
+### Task 15: 開催回のクラスと日付ヘルパー
+
+**Files:** Create `scripts/early-morning/classes.ts`, `scripts/early-morning/classes.test.ts`。Modify `types.ts`, `config.ts`, `config.test.ts`, `dates.ts`, `dates.test.ts`, `attendance.ts`, `attendance.test.ts`, `notionSync.ts`, `notionSync.test.ts`, `metrics.test.ts`, `lineMessage.test.ts`, `sync.test.ts`(Session の形が変わる箇所だけ)
+
+**Interfaces:**
+- `types.ts`: `export type SessionClass = "初中級" | "中級以上" | "その他";` / `export type ClassKey = Exclude<SessionClass, "その他">;` / `Session` に `classType: SessionClass` を追加
+- `config.ts`: `export const CLASS_BY_WEEKDAY: Readonly<Record<number, ClassKey>> = { 2: "初中級", 4: "中級以上" };`(キーは `getUTCDay()` の曜日番号。2=火、4=木)
+- `classes.ts`:
+  - `export const CLASS_WEEKDAY_LABEL: Readonly<Record<ClassKey, string>> = { 初中級: "火", 中級以上: "木" };`
+  - `export const CLASS_KEYS: readonly ClassKey[] = ["初中級", "中級以上"];`
+  - `export function classOfDate(date: string): SessionClass`(`YYYY-MM-DD` の曜日から。該当なしは `"その他"`)
+  - `export function otherClass(key: ClassKey): ClassKey`
+- `dates.ts` に追加: `formatMonthDay(date: string): string`(`2026-08-20` → `8/20`)、`addDays(date: string, days: number): string`(UTC で計算、`2026-09-30`+1 → `2026-10-01`)、`daysBetween(from: string, to: string): number`(`2026-08-20`→`2026-10-01` は 42)
+- `attendance.ts` の `buildSessions` が `classType: classOfDate(date)` を入れる
+- `notionSync.ts` の `syncSessions` が ③ に `クラス: prop.select(session.classType)` を書く
+
+テスト:
+- classes.test.ts: 2026-10-06(火)→初中級、2026-10-01(木)→中級以上、2026-06-24(水)/06-28(日)/06-29(月)→その他、`otherClass` の往復
+- dates.test.ts: 上の3関数の例、`addDays` の月またぎ
+- attendance.test.ts: sessions の期待値に `classType` を足す(日付の曜日どおり)
+- notionSync.test.ts: syncSessions で作られた行に `クラス` が入ること
+- 他のテストの Session フィクスチャに `classType` を足して tsc を通す(期待値の意味は変えない)
+
+コミット: `feat: 早朝の開催回に火曜初中級・木曜中級以上のクラスを持たせる`
+
+### Task 16: クラス別の判定と Notion の列
+
+**Files:** Create `scripts/early-morning/classStats.ts`, `scripts/early-morning/classStats.test.ts`。Modify `config.ts`, `config.test.ts`, `types.ts`, `metrics.ts`, `metrics.test.ts`, `notionSync.ts`, `notionSync.test.ts`, `sync.test.ts`(期待値が変わる箇所だけ)
+
+**Interfaces:**
+- `config.ts`: `RULES` を `{ newMaxTotal: 2 } as const` にし、`export const CLASS_RULES = { recentWindow: 4, regularMin: 3, dormantMisses: 4, dormantMinTotal: 3, perfectMin: 3 } as const;` を追加。`NOTE_LONG_GAP_DAYS = 28` も追加
+- `classStats.ts`:
+  - `export interface ClassStats { attended: number; heldSinceFirst: number; streak: number; recentAttended: number; firstDate: string | null; lastDate: string | null; missedSinceLast: number }`
+  - `export function computeClassStats(input: { personKey: string; records: readonly AttendanceRecord[]; sessions: readonly Session[]; classKey: ClassKey; before: string }): ClassStats` — `before` は**含まない**上限日。対象の開催回 = `!isCallOff && classType === classKey && date < before`(日付昇順)。参加 = その人の記録のうち `ordinal !== null` で対象の開催回の日付にあるもの。`heldSinceFirst` = 初参加日以降の対象開催回の数(参加なしなら 0)。`streak` = 最新の対象開催回から遡った連続参加数。`recentAttended` = 最新 `CLASS_RULES.recentWindow` 回のうち参加数。`missedSinceLast` = 最終参加日より後の対象開催回の数
+  - `export function isClassRegular(s: ClassStats): boolean`(`recentAttended >= regularMin`)
+  - `export function isClassDormant(s: ClassStats): boolean`(`attended >= dormantMinTotal && missedSinceLast >= dormantMisses`)
+  - `export function isPerfect(s: ClassStats): boolean`(`attended >= perfectMin && attended === heldSinceFirst`)
+- `types.ts` の `PersonStats`: `recent` を削除し、`classCounts: Record<ClassKey, number>` を追加
+- `metrics.ts` の `computeStats`: クラス別の値は `computeClassStats({..., before: addDays(today, 1)})` で求める。状態は設計書 §14.2 の順(参加しているクラス=`attended > 0` のクラス。それが1つ以上あり、すべて `isClassDormant` → ご無沙汰 / いずれか `isClassRegular` → 常連 / `total <= RULES.newMaxTotal` → 新顔 / それ以外 → 通常)。`total`・`streak`(全体)・節目・次回申込はこれまでどおり
+- `notionSync.ts` の `personProperties`: `直近8回` を書かない。代わりに `初中級(火)`・`中級以上(木)` に `classCounts` を書く
+
+テスト:
+- classStats.test.ts(架空の人・火木の開催回を作る): 皆勤(4回中4回で `isPerfect`)、休止期間(木曜の開催がない期間)をまたいでも `missedSinceLast` が増えないこと、火曜だけの人の木曜 `attended === 0`、中止回を数えないこと、`before` 当日を含まないこと、`isClassDormant` の境界(3回・4回あき)
+- metrics.test.ts: 火曜だけ皆勤の人が「常連」になる(旧基準では8回中4回で「常連」でも「通常」でもあり得た例)/ 木曜が休止中の木曜常連が「ご無沙汰」にならない / 火木両方の人で火曜ご無沙汰・木曜常連なら「常連」/ その他の回だけの人は新顔か通常 / `classCounts` の値
+- notionSync.test.ts: 人の行に `初中級(火)`・`中級以上(木)` が入り、`直近8回` を書かない
+
+コミット: `feat: 早朝の常連判定を火曜と木曜のクラス別にする`
+
+### Task 17: LINE の所見とクラス表示
+
+**Files:** Create `scripts/early-morning/lineNotes.ts`, `scripts/early-morning/lineNotes.test.ts`。Modify `lineMessage.ts`, `lineMessage.test.ts`, `sync.ts`, `sync.test.ts`
+
+**Interfaces:**
+- `lineNotes.ts`: `export function buildLineNotes(input: { session: Session; records: readonly AttendanceRecord[]; sessions: readonly Session[] }): Map<string, string>` — 翌日の回 `session` に「申込」で `ordinal !== null` の人ごとに所見を返す(キーは人キー)。所見は `session.date` を含まない過去のデータだけで作る
+- `lineMessage.ts`: `LineEntry` に `note: string` を追加。`selectLineEntries(session, records, people, notes: ReadonlyMap<string, string>)`(該当なしは `""`)。`buildFlexMessage` の入力に `classLabel: string | null` を追加し、見出し2行目を `${day} ${start}` + (`classLabel` があれば ` ${classLabel}`)にする。各行の下に `note` が空でなければ `{ type: "text", text: note, size: "xs", color: "#8A8A8A", wrap: true, margin: "none" }` を出す
+- `sync.ts`: `buildLineNotes` の結果を `selectLineEntries` に渡し、`classLabel` は `next.classType === "その他" ? null : next.classType`
+
+所見の文言(設計書 §14.4。C=その回のクラス、W=`CLASS_WEEKDAY_LABEL[C]`、s=C の `computeClassStats(before: session.date)`、o=もう一方のクラスの同じ値。日付は `formatMonthDay`):
+1. `ordinal === 1` → `初めての方。声かけをお願いします`(これだけ)
+2. `ordinal === 2` → `2回目（前回 ${M/D} が初参加）`(M/D=その人の全体の初参加日。これだけ)
+3. `session.classType === "その他"` → `""`
+4. 1つ目: `s.attended === 0` → `${W}曜は初参加` / `isPerfect(s)` → `${W}曜 皆勤（${s.firstDate}から${s.attended}回連続）` / `isClassDormant(s)` → `久しぶり（${W}曜は${s.lastDate}以来）` / それ以外 → `${W}曜 ${s.heldSinceFirst}回中${s.attended}回`
+5. 2つ目(1つ目が「初参加」「皆勤」「久しぶり」以外のときの連続は最優先): `s.streak >= 3` かつ皆勤でない → `${s.streak}回連続` / それ以外で `isClassRegular(o)` → `${Wo}曜も常連` / それ以外で `s.lastDate` があり `daysBetween(s.lastDate, session.date) >= NOTE_LONG_GAP_DAYS` かつ久しぶりでない → `前回 ${s.lastDate}`
+6. 1つ目と2つ目を `・` でつなぐ(2つ目がなければ1つ目だけ)
+
+lineNotes.test.ts(架空の人。2026-06〜10 の火木の開催回を組み、木曜は 9 月を休止にする):
+- 1回目 → `初めての方。声かけをお願いします`
+- 2回目 → `2回目（前回 9/22 が初参加）`
+- 火曜皆勤の人の火曜回 → `火曜 皆勤（8/4から8回連続）`
+- 木曜 12回中11回・7回連続(休止前)の人の木曜再開回 → `木曜 12回中11回・7回連続`
+- 木曜 11回中6回・前回 8/20 の人の 10/1 → `木曜 11回中6回・前回 8/20`
+- 火曜 11回中8回・木曜常連の人の火曜回 → `火曜 11回中8回・木曜も常連`
+- 火曜に初めて来る木曜常連 → `火曜は初参加・木曜も常連`
+- 火曜で3回参加後4回あいた人 → `久しぶり（火曜は M/D以来）`
+- その他の回 → `""`
+lineMessage.test.ts: 所見の行が出る/空なら出ない、見出しに `初中級` が付く/`classLabel: null` なら付かない
+sync.test.ts: 橋渡しの flex に所見とクラスが入る(既存の期待値は必要な箇所だけ更新)
+
+コミット: `feat: 早朝の前夜通知に参加者ごとの所見とクラスを出す`
+
+### Task 18: Notion の列の更新と実データでの再確認(コントローラ)
+
+1. Notion コネクタで ③ 早朝開催回に `クラス`(select: 初中級・中級以上・その他)、① 早朝常連に `初中級(火)`・`中級以上(木)`(number)を追加し、① の `直近8回` を削除する
+2. worktree で `npm run early:sync` を2回実行(2回目は作成0・アーカイブ0、更新は所見・列追加に伴う初回差分のみで、その次は0)
+3. 主催者の人の行(識別子 `tb:{organizer.id}`)は計算対象から外れて古い値のまま残るので、1回だけアーカイブする(参加記録は自動で「元データになし」になる)
+4. 次回回の flex を文字にしてオーナーに見せ、了解後に Task 12 Step 5(試し送信)へ

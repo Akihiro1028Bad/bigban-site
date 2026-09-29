@@ -47,12 +47,19 @@ export type Route = "テニスベア" | "LaBOLA" | "両方";
 /** 出欠記録のステータス。 */
 export type RecordStatus = "申込" | "キャンセル";
 
+/** 開催回のクラス。火曜=初中級、木曜=中級以上、それ以外の曜日=その他。 */
+export type SessionClass = "初中級" | "中級以上" | "その他";
+
+/** クラス別の判定に使うクラス(その他を除く)。 */
+export type ClassKey = Exclude<SessionClass, "その他">;
+
 /** 早朝開催の1回。 */
 export interface Session {
   /** JST の `YYYY-MM-DD`。 */
   date: string;
   tbEventIds: number[];
   isCallOff: boolean;
+  classType: SessionClass;
 }
 
 /** 参加者(テニスベア/LaBOLA 名寄せ後)。 */
@@ -84,7 +91,8 @@ export type PersonState = "新顔" | "常連" | "ご無沙汰" | "通常";
 /** 参加者の集計結果。 */
 export interface PersonStats extends Person {
   total: number;
-  recent: number;
+  /** クラス別の参加回数(その他の回は含まない)。 */
+  classCounts: Record<ClassKey, number>;
   streak: number;
   firstDate: string | null;
   lastDate: string | null;

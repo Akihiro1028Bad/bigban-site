@@ -1,4 +1,5 @@
 /** 両経路の申込を開催回・人・参加記録にまとめ、人ごとの回次を採番する。 */
+import { classOfDate } from "./classes";
 import { isoDatePart } from "./dates";
 import { buildLinkMap, normalizeName, recordKey, resolveLbKey, tbKey } from "./identity";
 import type {
@@ -49,6 +50,7 @@ function buildSessions(events: readonly TbEventDetail[]): Session[] {
       date,
       tbEventIds: list.map((event) => event.id).sort((a, b) => a - b),
       isCallOff: list.every((event) => event.isCallOff),
+      classType: classOfDate(date),
     }));
 }
 

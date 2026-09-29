@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 import type { FetchFn } from "../growth/http";
-import { CIRCLE_ID, EARLY_START_TIME, FETCH_TIMEOUT_MS, TENNISBEAR_BASE_URL } from "./config";
+import { CIRCLE_ID, EARLY_START_TIME, EXCLUDED_TB_USER_IDS, FETCH_TIMEOUT_MS, TENNISBEAR_BASE_URL } from "./config";
 import { isoTimePart } from "./dates";
 import { parseNuxtState } from "./nuxtPayload";
 import type { TbEventDetail, TbEventSummary, TbParticipant } from "./types";
@@ -48,6 +48,7 @@ const eventSchema = z.object({
               id: z.number().int(),
               startDateTime: z.string(),
               callOff: z.boolean(),
+              organizer: z.object({ id: z.number().int() }),
               participantList: z.array(participantSchema),
               cancelUserList: z.array(participantSchema),
             }),
@@ -89,12 +90,17 @@ function toParticipant(raw: RawParticipant, status: TbParticipant["status"]): Tb
   };
 }
 
-export function extractEventDetail(state: unknown): TbEventDetail {
+export function extractEventDetail(
+  state: unknown,
+  excludedUserIds: readonly number[] = EXCLUDED_TB_USER_IDS,
+): TbEventDetail {
   const event = parseWith(eventSchema, state, "イベント詳細").state.feature.event.eventDetail.EventDetail.event;
-  const approved = event.participantList.filter((p) => p.eventUserStatusType === "APPROVE");
-  const cancelled = event.cancelUserList.filter((p) => p.eventUserStatusType === "CANCEL");
-  const ignoredStatusCount =
-    event.participantList.length - approved.length + (event.cancelUserList.length - cancelled.length);
+  const isKept = (p: RawParticipant): boolean => p.user.id !== event.organizer.id && !excludedUserIds.includes(p.user.id);
+  const applied = event.participantList.filter(isKept);
+  const canceledList = event.cancelUserList.filter(isKept);
+  const approved = applied.filter((p) => p.eventUserStatusType === "APPROVE");
+  const cancelled = canceledList.filter((p) => p.eventUserStatusType === "CANCEL");
+  const ignoredStatusCount = applied.length - approved.length + (canceledList.length - cancelled.length);
   return {
     id: event.id,
     startAt: event.startDateTime,

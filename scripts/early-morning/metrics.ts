@@ -1,6 +1,9 @@
-/** 人ごとの累計・直近・連続・状態・節目を開催回単位で計算する。 */
+/** 人ごとの累計・連続・クラス別の値・状態・節目を開催回単位で計算する。 */
+import { addDays } from "./dates";
+import { computeClassStats, isClassDormant, isClassRegular } from "./classStats";
+import type { ClassStats } from "./classStats";
 import { MILESTONES, MILESTONE_STEP_AFTER_LAST, RULES } from "./config";
-import type { AttendanceRecord, Person, PersonState, PersonStats, Session } from "./types";
+import type { AttendanceRecord, ClassKey, Person, PersonState, PersonStats, Session } from "./types";
 
 const LAST_FIXED = MILESTONES[MILESTONES.length - 1];
 
@@ -22,9 +25,11 @@ export function findNextSession(sessions: readonly Session[], today: string): Se
   return sessions.find((session) => !session.isCallOff && session.date > today) ?? null;
 }
 
-function stateOf(total: number, recent: number, missedSinceLast: number): PersonState {
-  if (total >= RULES.dormantMinTotal && missedSinceLast >= RULES.dormantMisses) return "ご無沙汰";
-  if (recent >= RULES.regularMinInWindow) return "常連";
+/** 状態は設計書14.2の順。参加しているクラス(初中級/中級以上)だけを見る。 */
+function stateOf(total: number, byClass: Readonly<Record<ClassKey, ClassStats>>): PersonState {
+  const active = [byClass.初中級, byClass.中級以上].filter((stats) => stats.attended > 0);
+  if (active.length > 0 && active.every(isClassDormant)) return "ご無沙汰";
+  if (active.some(isClassRegular)) return "常連";
   if (total <= RULES.newMaxTotal) return "新顔";
   return "通常";
 }
@@ -38,7 +43,7 @@ export function computeStats(input: {
   const held = input.sessions
     .filter((session) => !session.isCallOff && session.date <= input.today)
     .map((session) => session.date);
-  const recentDates = held.slice(-RULES.recentWindow);
+  const before = addDays(input.today, 1);
   const next = findNextSession(input.sessions, input.today);
 
   const stats = input.people.map((person): PersonStats => {
@@ -51,17 +56,18 @@ export function computeStats(input: {
     const lastDate = dates[total - 1] ?? null;
     let streak = 0;
     for (let index = held.length - 1; index >= 0 && attended.has(held[index]); index -= 1) streak += 1;
-    const missedSinceLast = lastDate === null ? 0 : held.filter((date) => date > lastDate).length;
-    const recent = recentDates.filter((date) => attended.has(date)).length;
+    const classStatsOf = (classKey: ClassKey): ClassStats =>
+      computeClassStats({ personKey: person.key, records: input.records, sessions: input.sessions, classKey, before });
+    const byClass: Record<ClassKey, ClassStats> = { 初中級: classStatsOf("初中級"), 中級以上: classStatsOf("中級以上") };
     const upcoming = nextMilestone(total);
     return {
       ...person,
       total,
-      recent,
       streak,
+      classCounts: { 初中級: byClass.初中級.attended, 中級以上: byClass.中級以上.attended },
       firstDate: dates[0] ?? null,
       lastDate,
-      state: stateOf(total, recent, missedSinceLast),
+      state: stateOf(total, byClass),
       nextMilestone: `あと${upcoming - total}回で${upcoming}回`,
       reachedMilestones: milestonesUpTo(total),
       isNextApplied: next !== null && mine.some((record) => record.date === next.date && record.status === "申込"),

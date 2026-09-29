@@ -39,7 +39,14 @@ function eventState(id: number, start: string, participants: unknown[], cancels:
         event: {
           eventDetail: {
             EventDetail: {
-              event: { id, startDateTime: start, callOff, participantList: participants, cancelUserList: cancels },
+              event: {
+                id,
+                startDateTime: start,
+                callOff,
+                organizer: { id: 999 },
+                participantList: participants,
+                cancelUserList: cancels,
+              },
             },
           },
         },
@@ -109,6 +116,35 @@ describe("extractEventDetail", () => {
   it("キャンセル一覧に CANCEL 以外があれば数だけ数える", () => {
     const state = eventState(9, "2026-09-22T06:00:00.000+09:00", [], [user(14, "テスト四郎", "DECLINE")]);
     expect(extractEventDetail(state).ignoredStatusCount).toBe(1);
+  });
+
+  it("主催者は参加者に出さない", () => {
+    const state = eventState(9, "2026-09-22T06:00:00.000+09:00", [
+      user(999, "テスト主催", "APPROVE"),
+      user(11, "テスト太郎", "APPROVE"),
+    ]);
+    expect(extractEventDetail(state).participants.map((p) => p.userId)).toEqual([11]);
+  });
+
+  it("指定した ID は申込・キャンセルの両方から消える", () => {
+    const state = eventState(
+      9,
+      "2026-09-22T06:00:00.000+09:00",
+      [user(11, "テスト太郎", "APPROVE"), user(12, "テスト次郎", "APPROVE")],
+      [user(11, "テスト太郎", "CANCEL"), user(13, "テスト三郎", "CANCEL")],
+    );
+    const detail = extractEventDetail(state, [11]);
+    expect(detail.participants.map((p) => [p.userId, p.status])).toEqual([
+      [12, "APPROVE"],
+      [13, "CANCEL"],
+    ]);
+  });
+
+  it("主催者が未知の状態でも無視した数に入れない", () => {
+    const state = eventState(9, "2026-09-22T06:00:00.000+09:00", [user(999, "テスト主催", "APPLYING")]);
+    const detail = extractEventDetail(state);
+    expect(detail.ignoredStatusCount).toBe(0);
+    expect(detail.participants).toEqual([]);
   });
 
   it("形が違えばエラー", () => {

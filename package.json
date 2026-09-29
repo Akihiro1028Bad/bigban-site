@@ -15,7 +15,8 @@
     "growth:upload-media": "tsx scripts/growth/upload-media.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
     "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
-    "growth:body-diff": "tsx scripts/growth/body-diff.ts"
+    "growth:body-diff": "tsx scripts/growth/body-diff.ts",
+    "early:sync": "tsx scripts/early-morning/early-sync.ts"
   },
   "keywords": [],
   "author": "",

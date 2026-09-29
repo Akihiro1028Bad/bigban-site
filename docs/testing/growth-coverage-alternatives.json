@@ -69,6 +69,17 @@
       "excludedFiles": [
         "scripts/growth/body-diff.ts"
       ]
+    },
+    "scripts/early-morning/early-sync.ts": {
+      "reason": "早朝リピーター集計CLIの薄いI/O入口",
+      "guarantees": [
+        "scripts/early-morning/sync.test.ts"
+      ],
+      "kind": "alternative-test",
+      "residualRisk": "実環境固有の結線はCI外",
+      "excludedFiles": [
+        "scripts/early-morning/early-sync.ts"
+      ]
     }
   }
 }
