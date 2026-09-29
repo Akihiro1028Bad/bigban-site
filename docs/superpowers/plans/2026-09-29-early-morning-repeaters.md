@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript(tsx 実行)、Vitest 4 + istanbul(カバレッジ100%)、acorn(構文解析のみ)、zod 4、Notion REST API(2022-06-28)、LINE Messaging API(push)、Claude ローカル定期タスク + claude.ai クラウドルーチン。
 
-**設計書:** `docs/superpowers/specs/2026-09-29-early-morning-repeaters-design.md`(以下「設計書」)。
+**Spec:** `docs/superpowers/specs/2026-09-29-early-morning-repeaters-design.md`(以下「設計書」)。
 
 ## Global Constraints
 
@@ -20,10 +20,10 @@
 - 外部サイトの JS は実行しない(`vm` / `eval` / `new Function` 禁止)。acorn で解析し、許可したノードだけ評価する
 - 個人名はリポジトリ(コード・テスト・ログ・コミット・PR)に残さない。テストは架空の名前(「テスト太郎」等)だけを使う。標準出力は件数のみ
 - 予約台帳から電話番号・メール・住所・生年月日を取得しない(`filter_properties` で6列に限定)
-- スタッフ入力列(① リワード済み・メモ、② 出欠)をルーチンは上書きしない(統合時の和集合・空欄補完のみ例外)
+- スタッフ入力列(① リワード済み・メモ、② 出欠)をルーチンは上書きしない(例外は3つだけ: 統合時のリワード済みの和集合、メモの空欄補完、欠席の書き写し。どれも値を消さない)
 - テニスベアへのリクエストは1秒以上の間隔を空ける
 - TypeScript: `strict`、`any` 禁止、型のみの import は `import type`、`@ts-ignore` 禁止
-- テストは `// @vitest-environment node` を先頭に置き、`fetch` は注入した `FetchFn` のスタブで置き換える(`scripts/growth/http.ts` の既存パターン)
+- テストは `// @vitest-environment node` を先頭に置き、`fetch` は注入した `FetchFn` のスタブで置き換える(`scripts/growth/http.ts` の既存パターン)。CLAUDE.md の「API モックは MSW」は Web アプリ側のテスト向けと解釈し、`scripts/` 配下はリポジトリの既存パターンに揃える(2026-09-29 オーナー判断。設計書 §11 も同じ)
 - カバレッジ 100%(statements/branches/functions/lines)。CLI 入口だけ除外し、`docs/testing/growth-coverage-alternatives.{json,md}` に登録する
 - コミットメッセージは日本語・Conventional Commits・末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - push は AI アカウント `ttmakhr1028ai-art` のトークンを明示指定する(`gh auth switch` が定着しないため)
@@ -414,7 +414,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `scripts/early-morning/nuxtPayload.test.ts`
 
 **Interfaces:**
-- Produces: `class NuxtPayloadError extends Error`、`extractNuxtSource(html: string): string`、`parseNuxtState(html: string): unknown`
+- Produces: `class NuxtPayloadError extends Error`、`extractNuxtSource(html: string): string`、`parseNuxtState(html: string): unknown`、`node(value: unknown): AstNode` / `nodeList(value: unknown): Array<AstNode | null>`(構文木の形の検査。acorn の正常な出力では失敗側に届かないため、直接テストできるように export する)
 
 実データ(2026-09-29 調査)の構文: `(function(a,b,…){return {…}}(引数…))`。関数本体は `return` 1文のみ。値に現れるノードは ObjectExpression / Property / ArrayExpression / Literal / Identifier / UnaryExpression(`-`・`void`)だけ。
 
@@ -426,7 +426,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { NuxtPayloadError, extractNuxtSource, parseNuxtState } from "./nuxtPayload";
+import { NuxtPayloadError, extractNuxtSource, node, nodeList, parseNuxtState } from "./nuxtPayload";
 
 function page(payload: string): string {
   return `<html><body><div id="__nuxt"></div><script>window.__NUXT__=${payload};</script></body></html>`;
@@ -483,6 +483,15 @@ describe("parseNuxtState", () => {
     expect(() => parseNuxtState(page(payload))).toThrow(NuxtPayloadError);
   });
 });
+
+describe("構文木の形の検査", () => {
+  it("ノードでない値・配列でない値はエラー、正しい形はそのまま返す", () => {
+    expect(() => node(null)).toThrow(NuxtPayloadError);
+    expect(() => node({ type: 1 })).toThrow(NuxtPayloadError);
+    expect(() => nodeList("x")).toThrow(NuxtPayloadError);
+    expect(nodeList([null, { type: "Literal" }])).toEqual([null, { type: "Literal" }]);
+  });
+});
 ```
 
 - [ ] **Step 2: 失敗を確認する**
@@ -503,7 +512,7 @@ import { parseExpressionAt } from "acorn";
 
 const NUXT_PATTERN = /<script>window\.__NUXT__=([\s\S]*?);?<\/script>/;
 
-interface AstNode {
+export interface AstNode {
   type: string;
   [key: string]: unknown;
 }
@@ -521,12 +530,12 @@ function isNode(value: unknown): value is AstNode {
   return typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
 }
 
-function node(value: unknown): AstNode {
+export function node(value: unknown): AstNode {
   if (!isNode(value)) throw new NuxtPayloadError("構文木の形が想定と違います");
   return value;
 }
 
-function nodeList(value: unknown): Array<AstNode | null> {
+export function nodeList(value: unknown): Array<AstNode | null> {
   if (!Array.isArray(value)) throw new NuxtPayloadError("構文木の形が想定と違います");
   return value.map((item) => (item === null ? null : node(item)));
 }
@@ -1173,6 +1182,14 @@ describe("createNotionClient", () => {
 
     await expect(notion.getDatabase("db1")).resolves.toEqual({ properties: { 名前: { id: "t" } } });
     expect(sleep.mock.calls).toEqual([[3000], [1000]]);
+  });
+
+  it("headers のない応答でも1秒待って再試行する", async () => {
+    const noHeaders: HttpResponse = { ok: false, status: 500, json: async () => ({}), text: async () => "" };
+    const fetchFn = vi.fn<FetchFn>().mockResolvedValueOnce(noHeaders).mockResolvedValueOnce(res(200, { id: "p" }));
+    const { notion, sleep } = client(fetchFn);
+    await notion.updatePage("p", {});
+    expect(sleep).toHaveBeenCalledWith(1000);
   });
 
   it("Retry-After がなければ1秒", async () => {
@@ -1840,6 +1857,17 @@ describe("buildAttendance", () => {
     ]);
   });
 
+  it("対応表の人がテニスベアに出てこなければ、LaBOLA 氏名でテニスベア ID 付きの人を作る", () => {
+    const result = buildAttendance({
+      events: [event(3, "2026-09-08", [])],
+      reservations: [lb("#1", "テスト花子", "2026-09-08")],
+      links: [{ tbId: 99, lbName: "テスト花子" }],
+      absentKeys: new Set(),
+    });
+    expect(result.people).toEqual([{ key: "tb:99", displayName: "テスト花子", tbId: 99, lbName: "テスト花子" }]);
+    expect(result.records.map((r) => r.key)).toEqual(["2026-09-08_tb:99"]);
+  });
+
   it("申込日時がどれも無ければ null", () => {
     const result = buildAttendance({
       events: [event(3, "2026-09-08", [{ ...tb(11, "テスト太郎"), appliedAt: null }])],
@@ -1864,7 +1892,7 @@ Expected: FAIL(`Cannot find module './attendance'`)
 ```ts
 /** 両経路の申込を開催回・人・参加記録にまとめ、人ごとの回次を採番する。 */
 import { isoDatePart } from "./dates";
-import { buildLinkMap, recordKey, resolveLbKey, tbKey } from "./identity";
+import { buildLinkMap, normalizeName, recordKey, resolveLbKey, tbKey } from "./identity";
 import type {
   AttendanceRecord,
   LbReservation,
@@ -1989,7 +2017,8 @@ export function buildAttendance(input: AttendanceInput): AttendanceResult {
     }
     const key = resolveLbKey(reservation.name, linkMap);
     if (!people.has(key)) {
-      people.set(key, { key, displayName: reservation.name, tbId: null, lbName: reservation.name });
+      const linkedTbId = linkMap.get(normalizeName(reservation.name)) ?? null;
+      people.set(key, { key, displayName: reservation.name, tbId: linkedTbId, lbName: reservation.name });
     }
     entries.push({
       date: reservation.date,
@@ -2510,7 +2539,7 @@ PR タイトル `feat: 早朝リピーター集計の集計と通知文面を追
   - `deriveAbsentKeys(records: readonly RecordRow[], links: readonly NameLink[]): Set<string>`
   - `syncSessions(client, ids, sessions: readonly Session[], records: readonly AttendanceRecord[], existing: readonly SessionRow[]): Promise<WriteCounts>`
   - `syncPeople(client, ids, stats: readonly PersonStats[], existing: readonly PeopleRow[], links: readonly NameLink[]): Promise<{ pageIdByKey: Map<string, string>; counts: WriteCounts }>`
-  - `syncRecords(client, ids, records: readonly AttendanceRecord[], pageIdByKey: ReadonlyMap<string, string>, existing: readonly RecordRow[], links: readonly NameLink[]): Promise<WriteCounts>`
+  - `syncRecords(client, ids, records: readonly AttendanceRecord[], pageIdByKey: ReadonlyMap<string, string>, existing: readonly RecordRow[], links: readonly NameLink[], absentKeys: ReadonlySet<string>): Promise<WriteCounts>`
   - `readBridge(client, pageId: string): Promise<BridgePayload | null>`
   - `writeBridge(client, pageId: string, payload: BridgePayload): Promise<void>`
   - `markBridgeFailed(client, pageId: string, failure: string, now: string): Promise<void>`
@@ -2520,7 +2549,8 @@ PR タイトル `feat: 早朝リピーター集計の集計と通知文面を追
 - ① のスタッフ列(リワード済み・メモ)は通常書かない。`未渡し節目` = 到達節目 − リワード済み
 - 統合: `lb:{氏名}` の既存行の正規化氏名が対応表にあれば、その行を統合元とする。統合先(`tb:{id}`)のリワード済みに統合元の値を足し(和集合)、統合先のメモが空なら統合元のメモを入れ、統合元をアーカイブする
 - ② で計算結果にない既存行: 人キーが統合元の `lb:` キーならアーカイブ、それ以外は `状態` を「元データになし」に更新(既にそうなら何もしない)
-- ② の `出欠` は読むだけで書かない
+- ② の `出欠` は原則書かない。例外は `absentKeys` に入っている記録だけで、そのときは `出欠: 欠席` を書く(統合で作り直した行に欠席を引き継ぐため。空欄にする書き込みはしない)
+- 同じキーの既存行が2つ以上あれば(手動実行と定期実行の重なり)、最初の1つを残して残りをアーカイブする(①②③共通)
 - ④ の本文は JSON のコードブロック1つ。書き込みは既存ブロックを全削除してから追加
 
 - [ ] **Step 1: 失敗するテストを書く**
@@ -2670,6 +2700,15 @@ describe("readNotionState / deriveLinks / deriveAbsentKeys", () => {
 });
 
 describe("syncSessions", () => {
+  it("同じ開催日の行が重複していれば1つを残してアーカイブする", async () => {
+    const notion = new FakeNotion();
+    notion.seed("sessions", { 開催日: title("2026-09-22"), 同期ハッシュ: text("") });
+    notion.seed("sessions", { 開催日: title("2026-09-22"), 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    const counts = await syncSessions(notion, ids, [{ date: "2026-09-22", tbEventIds: [1], isCallOff: false }], [], state.sessions);
+    expect(counts).toEqual({ created: 0, updated: 1, archived: 1 });
+  });
+
   it("新しい回は作成、変化した回だけ更新", async () => {
     const notion = new FakeNotion();
     const sessionsInput = [
@@ -2734,6 +2773,29 @@ describe("syncPeople", () => {
     expect(merged.未渡し節目).toEqual({ multi_select: [] });
   });
 
+  it("統合先にメモがあれば残し、両方空ならメモは空", async () => {
+    for (const [targetMemo, sourceMemo, expected] of [["A", "B", "A"], ["", "", ""]] as const) {
+      const notion = new FakeNotion();
+      const target = notion.seed("people", {
+        識別子: text("tb:7"), テニスベアID: { number: 7 }, LaBOLA氏名: text("テスト太郎"), メモ: text(targetMemo), 同期ハッシュ: text(""),
+      });
+      notion.seed("people", { 識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"), メモ: text(sourceMemo), 同期ハッシュ: text("") });
+      const state = await readNotionState(notion, ids);
+      await syncPeople(notion, ids, [stats("tb:7")], state.people, deriveLinks(state.people));
+      expect(readPlainText({ id: target, properties: notion.pages.get(target)!.properties }, "メモ")).toBe(expected);
+    }
+  });
+
+  it("同じ識別子の行が重複していれば1つを残してアーカイブする", async () => {
+    const notion = new FakeNotion();
+    notion.seed("people", { 識別子: text("tb:7"), テニスベアID: { number: 7 }, 同期ハッシュ: text("") });
+    const dup = notion.seed("people", { 識別子: text("tb:7"), テニスベアID: { number: 7 }, 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    const result = await syncPeople(notion, ids, [stats("tb:7")], state.people, []);
+    expect(result.counts.archived).toBe(1);
+    expect(notion.pages.get(dup)!.archived).toBe(true);
+  });
+
   it("統合先の行がまだなければ統合しない", async () => {
     const notion = new FakeNotion();
     notion.seed("people", { 識別子: text("lb:テスト太郎"), LaBOLA氏名: text("テスト太郎"), 同期ハッシュ: text("") });
@@ -2758,6 +2820,7 @@ describe("syncRecords", () => {
       new Map([["tb:7", "pagePerson7"]]),
       state.records,
       [{ tbId: 7, lbName: "テスト太郎" }],
+      new Set(),
     );
 
     expect(counts).toEqual({ created: 2, updated: 1, archived: 1 });
@@ -2772,15 +2835,33 @@ describe("syncRecords", () => {
 
   it("人のページが見つからなければエラー", async () => {
     const notion = new FakeNotion();
-    await expect(syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map(), [], [])).rejects.toThrow("tb:7");
+    await expect(syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map(), [], [], new Set())).rejects.toThrow("tb:7");
   });
 
   it("変化のない記録は書かない", async () => {
     const notion = new FakeNotion();
-    await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), [], []);
+    await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), [], [], new Set());
     const state = await readNotionState(notion, ids);
-    const counts = await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), state.records, []);
+    const counts = await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), state.records, [], new Set());
     expect(counts).toEqual({ created: 0, updated: 0, archived: 0 });
+  });
+
+  it("欠席の記録には出欠を書き写す(統合で作り直した行でも欠席が消えない)", async () => {
+    const notion = new FakeNotion();
+    await syncRecords(notion, ids, [rec("2026-09-15", "tb:7", null)], new Map([["tb:7", "p"]]), [], [], new Set(["2026-09-15_tb:7"]));
+    const created = [...notion.pages.values()][0];
+    expect(created.properties.出欠).toEqual({ select: { name: "欠席" } });
+  });
+
+  it("同じキーの行が重複していれば1つを残してアーカイブする", async () => {
+    const notion = new FakeNotion();
+    const first = notion.seed("records", { キー: title("2026-09-08_tb:7"), 状態: { select: { name: "申込" } }, 同期ハッシュ: text("") });
+    const second = notion.seed("records", { キー: title("2026-09-08_tb:7"), 状態: { select: { name: "申込" } }, 同期ハッシュ: text("") });
+    const state = await readNotionState(notion, ids);
+    const counts = await syncRecords(notion, ids, [rec("2026-09-08", "tb:7")], new Map([["tb:7", "p"]]), state.records, [], new Set());
+    expect(counts.archived).toBe(1);
+    expect(notion.pages.get(first)!.archived).toBe(false);
+    expect(notion.pages.get(second)!.archived).toBe(true);
   });
 });
 
@@ -2809,6 +2890,8 @@ describe("bridge", () => {
     const notion = new FakeNotion();
     await expect(readBridge(notion, "bridge")).resolves.toBeNull();
     notion.blocks = [{ id: "b", type: "code", code: { rich_text: [{ plain_text: "{broken" }] } }];
+    await expect(readBridge(notion, "bridge")).resolves.toBeNull();
+    notion.blocks = [{ id: "b", type: "code", code: { rich_text: [{ plain_text: '{"foo":1}' }] } }];
     await expect(readBridge(notion, "bridge")).resolves.toBeNull();
   });
 
@@ -2860,7 +2943,7 @@ Expected: FAIL(`Cannot find module './notionSync'`)
 ```ts
 /**
  * Notion の早朝4オブジェクトの読み取りと差分書き込み。
- * スタッフ入力列(リワード済み・メモ・出欠)は統合時の和集合・空欄補完を除いて書かない。
+ * スタッフ入力列(リワード済み・メモ・出欠)は、統合時の和集合・空欄補完と欠席の書き写しを除いて書かない。
  */
 import { createHash } from "node:crypto";
 
@@ -3016,6 +3099,28 @@ async function upsert(
   return existing.pageId;
 }
 
+/** 同じキーの行が複数あれば最初の1つを残し、残りをアーカイブする。 */
+async function archiveDuplicates<T extends { pageId: string }>(
+  client: NotionClient,
+  rows: readonly T[],
+  keyOf: (row: T) => string,
+  counts: WriteCounts,
+): Promise<T[]> {
+  const seen = new Set<string>();
+  const kept: T[] = [];
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (seen.has(key)) {
+      await client.archivePage(row.pageId);
+      counts.archived += 1;
+      continue;
+    }
+    seen.add(key);
+    kept.push(row);
+  }
+  return kept;
+}
+
 export async function syncSessions(
   client: NotionClient,
   ids: NotionIdsLike,
@@ -3024,7 +3129,8 @@ export async function syncSessions(
   existing: readonly SessionRow[],
 ): Promise<WriteCounts> {
   const counts = emptyCounts();
-  const byDate = new Map(existing.map((row) => [row.date, row]));
+  const unique = await archiveDuplicates(client, existing, (row) => row.date, counts);
+  const byDate = new Map(unique.map((row) => [row.date, row]));
   for (const session of sessions) {
     const applicants = records.filter((record) => record.date === session.date && record.status === "申込").length;
     await upsert(
@@ -3096,7 +3202,8 @@ export async function syncPeople(
   links: readonly NameLink[],
 ): Promise<{ pageIdByKey: Map<string, string>; counts: WriteCounts }> {
   const counts = emptyCounts();
-  const byKey = await mergePeople(client, existing, links, counts);
+  const unique = await archiveDuplicates(client, existing, (row) => row.key, counts);
+  const byKey = await mergePeople(client, unique, links, counts);
   const pageIdByKey = new Map<string, string>();
   for (const person of stats) {
     const row = byKey.get(person.key);
@@ -3113,9 +3220,11 @@ export async function syncRecords(
   pageIdByKey: ReadonlyMap<string, string>,
   existing: readonly RecordRow[],
   links: readonly NameLink[],
+  absentKeys: ReadonlySet<string>,
 ): Promise<WriteCounts> {
   const counts = emptyCounts();
-  const byKey = new Map(existing.map((row) => [row.key, row]));
+  const unique = await archiveDuplicates(client, existing, (row) => row.key, counts);
+  const byKey = new Map(unique.map((row) => [row.key, row]));
   const computedKeys = new Set(records.map((record) => record.key));
   for (const record of records) {
     const personPageId = pageIdByKey.get(record.personKey);
@@ -3132,13 +3241,14 @@ export async function syncRecords(
         状態: prop.select(record.status),
         回次: prop.number(record.ordinal),
         元データ: prop.text(record.sources.join(", ")),
+        ...(absentKeys.has(record.key) ? { 出欠: prop.select("欠席") } : {}),
       },
       byKey.get(record.key),
       counts,
     );
   }
   const names = linkedNames(links);
-  for (const row of existing) {
+  for (const row of unique) {
     if (computedKeys.has(row.key)) continue;
     if (canonicalKey(row.personKey, names) !== row.personKey) {
       await client.archivePage(row.pageId);
@@ -3509,7 +3619,8 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
   const reservations = await step(deps, "予約台帳", () => fetchEarlyReservations(notion, ids.ledgerDb));
 
   const links = deriveLinks(state.people);
-  const attendance = buildAttendance({ events, reservations, links, absentKeys: deriveAbsentKeys(state.records, links) });
+  const absentKeys = deriveAbsentKeys(state.records, links);
+  const attendance = buildAttendance({ events, reservations, links, absentKeys });
   const stats = computeStats({ people: attendance.people, records: attendance.records, sessions: attendance.sessions, today });
   const next = findNextSession(attendance.sessions, today);
   const peopleByKey = new Map(attendance.people.map((person) => [person.key, person]));
@@ -3517,7 +3628,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
   const writes = await step(deps, "Notion書き込み", async () => {
     const sessionCounts = await syncSessions(notion, ids, attendance.sessions, attendance.records, state.sessions);
     const people = await syncPeople(notion, ids, stats, state.people, links);
-    const recordCounts = await syncRecords(notion, ids, attendance.records, people.pageIdByKey, state.records, links);
+    const recordCounts = await syncRecords(notion, ids, attendance.records, people.pageIdByKey, state.records, links, absentKeys);
     await writeBridge(notion, ids.bridgePage, {
       nextDate: next?.date ?? null,
       updatedAt,
@@ -3602,10 +3713,10 @@ main().catch((error: unknown) => {
 });
 ```
 
-`package.json` の `scripts` に追加(`growth:body-diff` の次の行):
+`package.json` の `scripts` の末尾に追加する。現在の最後の行 `"growth:body-diff": "tsx scripts/growth/body-diff.ts"` の行末にカンマを足し、その次の行に次の1行をカンマなしで置く(置いた後 `node -e 'require("./package.json")'` でエラーが出ないことを確かめる):
 
 ```json
-"early:sync": "tsx scripts/early-morning/early-sync.ts",
+"early:sync": "tsx scripts/early-morning/early-sync.ts"
 ```
 
 `vitest.config.ts` の `coverage.exclude` の末尾に追加:
@@ -3631,7 +3742,11 @@ main().catch((error: unknown) => {
     }
 ```
 
-`docs/testing/growth-coverage-alternatives.md` の対応表に、既存行と同じ書式で1行追加する(path `scripts/early-morning/early-sync.ts`、保証先 `scripts/early-morning/sync.test.ts`、理由「早朝リピーター集計CLIの薄いI/O入口」)。
+`docs/testing/growth-coverage-alternatives.md` の対応表(列は path / 保証先 / 種別 / 残存リスク)の最後の行の次に、次の1行を追加する:
+
+```markdown
+| `scripts/early-morning/early-sync.ts` | `scripts/early-morning/sync.test.ts` | alternative-test | 実環境固有の結線はCI外 |
+```
 
 - [ ] **Step 4: テストとカバレッジを確認する**
 
@@ -3730,9 +3845,10 @@ Expected: `200 {}`。LINE グループで表示を確認してもらい、見た
 5. 警告行があれば、`flex.contents.body.contents` の**先頭**に、行ごとに次のオブジェクトを挿入する(文言以外は変えない):
    `{"type":"text","text":"<警告行>","size":"xs","color":"#D64545","wrap":true}`
    Flex のそれ以外の部分は一切変更しない。
-6. 送信する(`payload.json` に書き出してから):
+6. 送信する。予約メールチェックと同じく、JSON は `payload.json` にファイルとして書き出してから送る(`jq` など追加のツールは使わない):
+   - `payload.json` の中身は `{"to": "<LINE_GROUP_ID の値>", "messages": [<手順5の後の flex>]}`。`LINE_GROUP_ID` の値は `printenv LINE_GROUP_ID` で読む
+   - 送信:
    ```
-   jq -n --arg to "$LINE_GROUP_ID" --slurpfile m flex.json '{to:$to, messages:$m}' > payload.json
    curl -s -o resp.txt -w "%{http_code}" -X POST https://api.line.me/v2/bot/message/push \
      -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary @payload.json
    ```
@@ -3772,6 +3888,12 @@ Notion「早朝ピックル常連」に、早朝ピックルの参加者が1人1
 - テニスベアのゲスト枠(「LBゲスト1」など)は数えません。LaBOLA 予約から直接数えるため、ゲスト枠の入力漏れがあっても回数は正しくなります
 - 同じ日に両方で申し込んでいても1回です
 - 「参加」は申込ベースです。来なかった回は「出欠」で外してください
+
+## 止め方
+
+- 通知だけ止める: claude.ai のルーチン一覧で「早朝前夜通知」を無効にする(集計は続く)
+- 集計も止める: Claude デスクトップの定期タスク `early-morning-sync` を無効にする
+- Notion のデータはそのまま残る。再開すれば全期間を数え直すので、止めていた間の分も自動で埋まる
 
 ## 困ったとき
 
@@ -3843,6 +3965,8 @@ npm run early:sync
 
 終了コードが 0 以外なら、標準エラーの内容と「Notion の『次回の早朝(通知橋渡し)』に失敗理由が記録されています」を報告してください。個人名はファイルに書かないでください。
 ```
+
+作成後、Mac がスリープ・停止していた時間帯をまたいだ翌日に `mcp__scheduled-tasks__list_task_runs`(taskId `early-morning-sync`)で実行履歴を確かめる。スリープ明けに取りこぼした回が実行されていなければ、`docs/operations/early-morning-repeaters.md` の「困ったとき」に「Mac を起動していなかった日は朝8:30の集計結果が前夜通知に使われる(24時間以内なので警告は出ない)」と追記する。
 
 - [ ] **Step 7: クラウドルーチンを作る(無効のまま)**
 
