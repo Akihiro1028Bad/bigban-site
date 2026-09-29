@@ -6,7 +6,7 @@ import { OG_IMAGE, SITE_URL } from "@/constants/site";
 import {
   makeParsedColumnItem,
   makeParsedColumnCategory,
-} from "../../../../__mocks__/columns-fixtures";
+} from "../../../../../__mocks__/columns-fixtures";
 import type { ColumnList } from "@/lib/microcms/columnsSchema";
 
 const getColumnsListMock = vi.fn();

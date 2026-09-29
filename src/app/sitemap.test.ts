@@ -166,6 +166,13 @@ describe("sitemap", () => {
       expect(entry.lastModified).toBeUndefined();
     }
   });
+
+  it("revalidate=3600 でデプロイを待たず1時間以内に再生成される", async () => {
+    // ビルド時の静的生成だけだと、デプロイ後に公開した記事が次のデプロイまで
+    // sitemap に載らない (2026-09-25 hyrox-training-start-guide で発生)。
+    const { revalidate } = await import("./sitemap");
+    expect(revalidate).toBe(3600);
+  });
 });
 
 describe("news sitemap entries", () => {
@@ -339,5 +346,21 @@ describe("columns sitemap entries (flag 連動)", () => {
     // 一覧 URL は入るが、詳細は空(取得失敗のフォールバック)。
     expect(urls).toContain(`${PROD_URL}/columns`);
     expect(urls.some((u) => /\/columns\/.+/.test(u))).toBe(false);
+  });
+
+  it("flag ON: updatedAt があれば columns 詳細に lastModified を出力する", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => [
+        { locale: "ja", slug: "c1", updatedAt: "2026-09-28T00:15:38.925Z" },
+      ],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const entry = (await sitemap()).find(
+      (e) => e.url === `${PROD_URL}/columns/c1`,
+    );
+    expect(entry?.lastModified).toBe("2026-09-28T00:15:38.925Z");
   });
 });

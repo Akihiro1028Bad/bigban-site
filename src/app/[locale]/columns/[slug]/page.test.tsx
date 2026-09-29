@@ -187,8 +187,10 @@ describe("ColumnDetailPage", () => {
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
-  it("generateStaticParams: flag ON は slug 一覧", async () => {
-    getColumnSlugsMock.mockResolvedValue([{ locale: "ja", slug: "a" }]);
+  it("generateStaticParams: flag ON は slug 一覧 (updatedAt はルートパラメータに含めない)", async () => {
+    getColumnSlugsMock.mockResolvedValue([
+      { locale: "ja", slug: "a", updatedAt: "2026-04-01T00:00:00.000Z" },
+    ]);
     const { generateStaticParams } = await import("./page");
     expect(await generateStaticParams()).toEqual([
       { locale: "ja", slug: "a" },

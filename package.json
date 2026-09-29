@@ -15,7 +15,8 @@
     "growth:upload-media": "tsx scripts/growth/upload-media.ts",
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
     "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
-    "growth:body-diff": "tsx scripts/growth/body-diff.ts"
+    "growth:body-diff": "tsx scripts/growth/body-diff.ts",
+    "early:sync": "tsx scripts/early-morning/early-sync.ts"
   },
   "keywords": [],
   "author": "",
@@ -54,6 +55,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-istanbul": "^4.1.2",
     "@vitest/coverage-v8": "^4.1.2",
+    "acorn": "^8.18.0",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.1",
