@@ -197,6 +197,7 @@ export async function syncSessions(
         開催日: prop.title(session.date),
         日付: prop.date(session.date),
         テニスベアイベントID: prop.text(session.tbEventIds.join(", ")),
+        クラス: prop.select(session.classType),
         中止: prop.checkbox(session.isCallOff),
         申込数: prop.number(applicants),
       },

@@ -1,3 +1,5 @@
+import type { ClassKey } from "./types";
+
 /** 早朝リピーター集計の固定値。判定基準を変えるときはこのファイルだけを直す。 */
 export const CIRCLE_ID = 36659;
 export const TENNISBEAR_BASE_URL = "https://www.tennisbear.net";
@@ -9,6 +11,9 @@ export const FETCH_TIMEOUT_MS = 30_000;
 
 /** 主催者以外に参加者一覧から除外するスタッフのテニスベア ID。名前は書かない。 */
 export const EXCLUDED_TB_USER_IDS: readonly number[] = [];
+
+/** 曜日番号(`getUTCDay()`、2=火、4=木)から開催回のクラスを引く。載っていない曜日は「その他」。 */
+export const CLASS_BY_WEEKDAY: Readonly<Record<number, ClassKey>> = { 2: "初中級", 4: "中級以上" };
 
 /** 状態判定の基準(開催回単位)。 */
 export const RULES = {

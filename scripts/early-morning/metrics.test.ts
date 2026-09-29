@@ -8,7 +8,7 @@ const DATES = [
   "2026-08-04", "2026-08-11", "2026-08-18", "2026-08-25", "2026-09-01",
   "2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29", "2026-10-06",
 ];
-const sessions: Session[] = DATES.map((date, i) => ({ date, tbEventIds: [i], isCallOff: date === "2026-09-01" }));
+const sessions: Session[] = DATES.map((date, i) => ({ date, tbEventIds: [i], isCallOff: date === "2026-09-01", classType: "初中級" }));
 
 function person(key: string): Person {
   return { key, displayName: key, tbId: null, lbName: null };

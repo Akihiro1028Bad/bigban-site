@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { NotionBlock, NotionClient } from "./notionClient";
-import { readPlainText, type NotionPage } from "./notionProps";
+import { readPlainText, readSelect, type NotionPage } from "./notionProps";
 import {
   deriveAbsentKeys,
   deriveLinks,
@@ -17,7 +17,7 @@ import {
   type BridgePayload,
   type RecordRow,
 } from "./notionSync";
-import type { AttendanceRecord, PersonStats } from "./types";
+import type { AttendanceRecord, PersonStats, Session } from "./types";
 
 const ids = { peopleDb: "people", recordsDb: "records", sessionsDb: "sessions", bridgePage: "bridge" };
 
@@ -151,15 +151,15 @@ describe("syncSessions", () => {
     notion.seed("sessions", { 開催日: title("2026-09-22"), 同期ハッシュ: text("") });
     notion.seed("sessions", { 開催日: title("2026-09-22"), 同期ハッシュ: text("") });
     const state = await readNotionState(notion, ids);
-    const counts = await syncSessions(notion, ids, [{ date: "2026-09-22", tbEventIds: [1], isCallOff: false }], [], state.sessions);
+    const counts = await syncSessions(notion, ids, [{ date: "2026-09-22", tbEventIds: [1], isCallOff: false, classType: "初中級" }], [], state.sessions);
     expect(counts).toEqual({ created: 0, updated: 1, archived: 1 });
   });
 
   it("新しい回は作成、変化した回だけ更新", async () => {
     const notion = new FakeNotion();
-    const sessionsInput = [
-      { date: "2026-09-22", tbEventIds: [1, 2], isCallOff: false },
-      { date: "2026-09-29", tbEventIds: [3], isCallOff: false },
+    const sessionsInput: Session[] = [
+      { date: "2026-09-22", tbEventIds: [1, 2], isCallOff: false, classType: "初中級" },
+      { date: "2026-09-29", tbEventIds: [3], isCallOff: false, classType: "初中級" },
     ];
     const counts1 = await syncSessions(notion, ids, sessionsInput, [rec("2026-09-22", "tb:1")], []);
     expect(counts1).toEqual({ created: 2, updated: 0, archived: 0 });
@@ -170,6 +170,21 @@ describe("syncSessions", () => {
 
     const counts3 = await syncSessions(notion, ids, sessionsInput, [rec("2026-09-22", "tb:1"), rec("2026-09-22", "tb:2")], state.sessions);
     expect(counts3).toEqual({ created: 0, updated: 1, archived: 0 });
+  });
+});
+
+describe("syncSessions のクラス列", () => {
+  it("開催回のクラスを クラス(select)に書く", async () => {
+    const notion = new FakeNotion();
+    const input: Session[] = [
+      { date: "2026-10-06", tbEventIds: [1], isCallOff: false, classType: "初中級" },
+      { date: "2026-10-01", tbEventIds: [2], isCallOff: false, classType: "中級以上" },
+      { date: "2026-06-24", tbEventIds: [3], isCallOff: false, classType: "その他" },
+    ];
+    await syncSessions(notion, ids, input, [], []);
+    const rows = await notion.queryAll("sessions");
+    const classes = new Map(rows.map((row) => [readPlainText(row, "開催日"), readSelect(row, "クラス")]));
+    expect(classes).toEqual(new Map([["2026-10-06", "初中級"], ["2026-10-01", "中級以上"], ["2026-06-24", "その他"]]));
   });
 });
 

@@ -15,7 +15,7 @@ const people = new Map<string, Person>(
 describe("selectLineEntries", () => {
   it("次回の申込だけを回数の多い順に並べ、初参加は最後", () => {
     const entries = selectLineEntries(
-      { date: "2026-10-06", tbEventIds: [1], isCallOff: false },
+      { date: "2026-10-06", tbEventIds: [1], isCallOff: false, classType: "初中級" },
       [
         record("A", 3),
         record("B", 1),
