@@ -164,6 +164,24 @@ describe("syncPeople", () => {
     expect(canonicalPersonKey("lb:C", nextMap)).toBe("lb:A");
   });
 
+  it("同じ別名を2行に書いても次の実行でほどけない", async () => {
+    const notion = new FakeNotion();
+    const target = notion.seed("people", { 識別子: text("lb:A"), 別名: text("X") });
+    const source = notion.seed("people", { 識別子: text("lb:B"), 別名: text("X") });
+    const state = await readHyroxState(notion, ids);
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+
+    await syncPeople(notion, ids, [stats("lb:A")], state.people, aliasMap);
+
+    expect(notion.pages.get(source)?.archived).toBe(true);
+    expect(readPlainText(propsOf(notion, target), "別名")).toBe("X、B");
+
+    const next = await readHyroxState(notion, ids);
+    const nextMap = buildAliasMap(deriveAliasLinks(next.people));
+    expect(canonicalPersonKey("lb:B", nextMap)).toBe("lb:A");
+    expect(canonicalPersonKey("lb:X", nextMap)).toBe("lb:A");
+  });
+
   it("統合元に別名がなければ別名を書かない", async () => {
     const notion = new FakeNotion();
     const target = notion.seed("people", { 識別子: text("lb:架空一郎"), 別名: text("かくう一郎") });

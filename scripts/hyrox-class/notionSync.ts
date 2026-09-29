@@ -180,11 +180,16 @@ function personProperties(stats: PersonStats): Record<string, unknown> {
   };
 }
 
-/** target の別名の後ろに、source の別名のうち未登録で target 自身を指さないものを足す(既存の別名は消さない)。 */
+const PERSON_KEY_PREFIX = "lb:";
+
+/**
+ * target の別名の後ろに、source 自身の名前と source の別名のうち、未登録で target 自身を指さないものを足す
+ * (既存の別名は消さない。source の名前も残すのは、アーカイブ後も次の実行で統合先に寄せ続けるため)。
+ */
 function mergeAliases(target: PeopleRow, source: PeopleRow): string[] {
   const merged = splitAliases(target.alias);
   const known = new Set(merged.map(personKeyOf));
-  for (const alias of splitAliases(source.alias)) {
+  for (const alias of [source.key.slice(PERSON_KEY_PREFIX.length), ...splitAliases(source.alias)]) {
     const key = personKeyOf(alias);
     if (key === target.key || known.has(key)) continue;
     known.add(key);
