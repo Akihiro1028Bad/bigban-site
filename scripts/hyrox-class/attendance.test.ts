@@ -84,6 +84,24 @@ describe("buildAttendance", () => {
     expect(result.sessions[0].eventName).toBe("HYROX TRAINING @ DAISUKE CLASS");
   });
 
+  it("開催回の代表は予約番号が最小の行にする(入力の順序や桁数に依らない)", () => {
+    const expected = "HYROX TRAINING @ DAISUKE CLASS";
+    const validRows = [
+      row({ reservationNo: "#10", eventName: "DAISUKE class（経験者）" }),
+      row({ reservationNo: "#9", eventName: expected }),
+      row({ reservationNo: "#11", eventName: "DAISUKE class（経験者）" }),
+    ];
+    const cancelledRows = [
+      row({ reservationNo: "#10", isCancelled: true, eventName: "DAISUKE class（経験者）" }),
+      row({ reservationNo: "#9", isCancelled: true, eventName: expected }),
+    ];
+
+    for (const rows of [validRows, [...validRows].reverse(), cancelledRows, [...cancelledRows].reverse()]) {
+      const result = buildAttendance({ rows, aliasMap: noAlias, absentKeys: noAbsent });
+      expect(result.sessions.map((session) => session.eventName)).toEqual([expected]);
+    }
+  });
+
   it("回次は日時順に数え、欠席の回は飛ばす", () => {
     const result = buildAttendance({
       rows: [row({ date: "2026-09-30" }), row({ date: "2026-09-23" }), row({ date: "2026-09-25" })],

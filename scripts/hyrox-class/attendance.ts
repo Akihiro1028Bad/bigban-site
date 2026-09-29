@@ -20,7 +20,9 @@ function buildSessions(rows: readonly LedgerRow[]): Session[] {
   for (const row of rows) groups.set(timeOf(row), [...(groups.get(timeOf(row)) ?? []), row]);
   return [...groups.entries()]
     .map(([key, group]) => {
-      const representative = group.find((row) => !row.isCancelled) ?? group[0];
+      // 代表は予約番号が最小の行(有効な予約があればその中から)。入力の順序で開催回の情報が変わらないようにする。
+      const ordered = [...group].sort((a, b) => a.reservationNo.localeCompare(b.reservationNo, "ja", { numeric: true }));
+      const representative = ordered.find((row) => !row.isCancelled) ?? ordered[0];
       return {
         key,
         date: representative.date,
@@ -65,7 +67,7 @@ function assignOrdinals(records: readonly ClassRecord[], absentKeys: ReadonlySet
   });
 }
 
-/** 表示名は最新の有効な予約の表記。有効な予約がなければ最新の予約の表記。 */
+/** 表示名は最新の有効な予約の表記。有効な予約がなければ最初の予約の表記。 */
 function buildPeople(rows: readonly LedgerRow[], aliasMap: ReadonlyMap<string, string>): Person[] {
   const latest = new Map<string, LedgerRow>();
   for (const row of [...rows].sort((a, b) => timeOf(a).localeCompare(timeOf(b)))) {

@@ -43,6 +43,10 @@ describe("stateOf", () => {
     expect(stateOf([rec("2026-09-10"), rec("2026-09-20"), rec(today)], today)).toBe("常連");
   });
 
+  it("28日前の参加は直近28日に数えない(28日前・20日前・今日の3回は常連にならない)", () => {
+    expect(stateOf([rec("2026-09-09"), rec("2026-09-17"), rec(today)], today)).toBe("通常");
+  });
+
   it("通算2回以下は新顔(0回も新顔)", () => {
     expect(stateOf([rec("2026-10-01")], today)).toBe("新顔");
     expect(stateOf([], today)).toBe("新顔");
