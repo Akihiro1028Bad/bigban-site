@@ -1,4 +1,4 @@
-/** LINE の所見(設計書 §11 の6ルール)。今日の回を含まない過去の参加だけで、決まった文言を作る。 */
+/** LINE の所見(設計書 §11 の6ルール)。その回より前の参加(同じ日の前の回を含む)だけで、決まった文言を作る。 */
 import { daysBetween, formatMonthDay } from "../early-morning/dates";
 import { CLASS_NOTE_LABELS, CLASS_ORDER, RULES } from "./config";
 import { historyBefore } from "./history";
@@ -14,7 +14,7 @@ function mostFrequentClass(prior: readonly ClassRecord[]): { classType: ClassTyp
   );
 }
 
-/** prior は今日より前の参加(日時順)。 */
+/** prior はその回より前の参加(日時順)。today は通知する日で、日数の計算に使う。 */
 export function noteFor(input: { classType: ClassType; prior: readonly ClassRecord[]; today: string; history: string }): string[] {
   const { prior, today } = input;
   if (prior.length === 0) {
@@ -37,7 +37,11 @@ export function noteFor(input: { classType: ClassType; prior: readonly ClassReco
   return [`直近${RULES.recentDays}日で${recent}回・${last}`];
 }
 
-/** 今日の各参加記録(申込で欠席でない)の所見。キーは参加記録のキー。 */
+/**
+ * 通知日(today)の各参加記録(申込で欠席でない)の所見。キーは参加記録のキー。
+ * 過去の参加は「その回より前」(sessionKey が小さい参加)で決めるので、同じ日の前の回に出た人は初参加扱いにならない。
+ * 利用歴(ルール1)は today より前の他の施設利用。
+ */
 export function buildNotes(input: {
   today: string;
   records: readonly ClassRecord[];
@@ -51,7 +55,7 @@ export function buildNotes(input: {
         record.key,
         noteFor({
           classType: record.classType,
-          prior: participations.filter((other) => other.personKey === record.personKey && other.date < input.today),
+          prior: participations.filter((other) => other.personKey === record.personKey && other.sessionKey < record.sessionKey),
           today: input.today,
           history: historyBefore(input.historyIndex, record.personKey, input.today),
         }),

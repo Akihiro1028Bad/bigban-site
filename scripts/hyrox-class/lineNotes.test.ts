@@ -96,4 +96,18 @@ describe("buildNotes", () => {
       [`${today}_20:00_lb:架空二郎`, ["初めての方。声かけをお願いします", "これまで: 体験会(9/22)"]],
     ]);
   });
+
+  it("同じ日の前の回も過去の参加として数える(初日に2回出る人は、2回目の回で初参加扱いにならない)", () => {
+    const first = `${today}_19:00`;
+    const second = `${today}_20:00`;
+    const records = [
+      rec(today, { key: `${first}_lb:架空一郎`, sessionKey: first, startTime: "19:00", classType: "ビギナー", ordinal: 1 }),
+      rec(today, { key: `${second}_lb:架空一郎`, sessionKey: second, startTime: "20:00", classType: "通常", ordinal: 2 }),
+    ];
+
+    const notes = buildNotes({ today, records, historyIndex: new Map() });
+
+    expect(notes.get(`${first}_lb:架空一郎`)).toEqual(["初めての方。声かけをお願いします", "施設の利用も初めて"]);
+    expect(notes.get(`${second}_lb:架空一郎`)).toEqual(["通常回は初めて(ビギナー1回)"]);
+  });
 });
