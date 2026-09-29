@@ -71,7 +71,7 @@ HYROX 固有の新規コードは `scripts/hyrox-class/` に置く: 台帳の抽
   2. `ダブルス` を含む → `ダブルス`
   3. それ以外 → `通常`
 - **開催回**: `利用日` + `時間帯` の開始時刻(先頭5文字)で1回とする。クラスはその回の属性(回に属する予約のイベント名から判定)。同日の 19:00 ビギナーと 20:00 通常は別の回
-- 開催回は台帳の予約から作る(LaBOLA のイベント一覧は読まない)。有効な予約が1件もない回は開催回として数えない
+- 開催回は台帳の予約から作る(LaBOLA のイベント一覧は読まない)。予約が全員キャンセルの回も ③ には申込数 0 で残し、LINE には載せない(状態の判定は日数で行うため、開催回の数は判定に使わない)
 
 ## 6. 台帳から読む列
 
@@ -158,11 +158,11 @@ DAISUKE CLASS 以外の台帳の行を、同じ正規化氏名(と別名)で引�
 
 ### ④ 通知橋渡しページ「今日の DAISUKE CLASS」
 
-本文は JSON のコードブロック1つだけ(毎回全体を置き換え)。
+本文は JSON のコードブロック1つだけ(毎回全体を置き換え)。形は早朝の橋渡しページと同じにし、`readBridge` / `writeBridge` / `markBridgeFailed` をそのまま使う。
 
 ```json
 {
-  "date": "2026-10-07",
+  "nextDate": "2026-10-07",
   "updatedAt": "2026-10-07T08:31:00+09:00",
   "status": "ok",
   "failure": null,
@@ -170,7 +170,7 @@ DAISUKE CLASS 以外の台帳の行を、同じ正規化氏名(と別名)で引�
 }
 ```
 
-- `date` は「今日(JST)」。今日の開催回がなければ `flex: null`
+- `nextDate` は「通知する日」= 今日(JST)。今日 LINE に載せる回がなければ `nextDate: null` / `flex: null`
 - 取得失敗時は `status: "failed"` と `failure` だけを書き換え、ほかは前回の値を残す
 
 ## 10. 判定ルール(初期値)
@@ -189,7 +189,7 @@ DAISUKE CLASS 以外の台帳の行を、同じ正規化氏名(と別名)で引�
 
 ## 11. LINE 通知
 
-- 送信: クラウドルーチン、毎日 09:00 JST。④の `date` が今日で `flex` があるときだけ送る。それ以外の日は何も送らない
+- 送信: クラウドルーチン、毎日 09:00 JST。④の `nextDate` が今日で `flex` があるときだけ送る。それ以外の日は何も送らない
 - 宛先: コーチ入りの HYROX 用グループ(`LINE_HYROX_GROUP_ID`)
 - 文面(Flex bubble。例の名前は架空):
 
@@ -222,7 +222,7 @@ DAISUKE CLASS 以外の台帳の行を、同じ正規化氏名(と別名)で引�
   5. 2週以上連続 → 「N週連続・前回 M/D」
   6. それ以外 → 「直近28日でN回・前回 M/D」
 - ④の `updatedAt` が今日より前なら、先頭に「⚠ 最新ではありません(最終更新 M/D HH:MM)」を足して送る
-- ④の `status` が `failed` なら、先頭に「⚠ 予約台帳の取得に失敗したため前回のデータです」を足して送る
+- ④の `status` が `failed` なら、先頭に「⚠ {failure の「:」より前(予約台帳 / Notion読み取り / Notion書き込み)}の処理に失敗したため前回のデータです」を足して送る
 - Notion のリンクには `?openExternalBrowser=1` を付ける
 
 ## 12. エラー処理
@@ -270,9 +270,10 @@ CLAUDE.md の TDD とカバレッジ 100% に従う。
 
 1. 設計書と実装計画(このブランチ、develop から作成)
 2. 早朝ピックル(`feature/early-morning-repeaters`)のマージ後、このブランチを develop に追従させて実装に入る
-3. PR は2本に分ける:
-   - (a) 集計と Notion 同期、`package.json` の `hyrox:sync`、分析 runbook(`docs/operations/interactive-analysis-runbook.md`)の「台帳の個人情報の扱い」への例外の追記
-   - (b) LINE Flex 生成と、クラウドルーチンのプロンプト `docs/growth/routines/hyrox-class-notify.md`(早朝の `early-morning-notify.md` と同じ形)
+3. PR は3本に分ける(早朝と同じ粒度。CLAUDE.md の PR 400 行目安に近づけるため):
+   - (a) 集計ロジック(台帳の抽出・クラス判定・名寄せ・回数・状態・利用歴・所見)。Notion にも LINE にも触れない純粋な関数とテスト
+   - (b) LINE Flex 生成・Notion 同期・実行入口、`package.json` の `hyrox:sync`、分析 runbook(`docs/operations/interactive-analysis-runbook.md`)の「台帳の個人情報の扱い」への例外の追記
+   - (c) クラウドルーチンのプロンプト `docs/growth/routines/hyrox-class-notify.md`(早朝の `early-morning-notify.md` と同じ形)とルーチンの作成
 
 ## 17. 検討した代替案
 
