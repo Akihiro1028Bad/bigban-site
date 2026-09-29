@@ -10,10 +10,10 @@
 1. 基準日を JST で確定する:
    `TOMORROW=$(TZ=Asia/Tokyo date -v+1d +%Y-%m-%d 2>/dev/null || TZ=Asia/Tokyo date -d tomorrow +%Y-%m-%d)`
    `NOW_EPOCH=$(date +%s)`
-2. Notion コネクタでページ「次回の早朝(通知橋渡し)」(ID: `3ea99efa346b81509137f63474f06afd`)を取得し、本文の JSON コードブロックを読む。キーは `nextDate` / `updatedAt` / `status` / `failure` / `flex`。
+2. Notion コネクタでページ「次回の早朝(通知橋渡し)」(ID: `3ea99efa346b81509137f63474f06afd`)を取得し、本文の JSON コードブロックを読む。コードブロックが複数あるときは**最後のもの**が最新。キーは `nextDate` / `updatedAt` / `status` / `failure` / `flex`。
 3. `nextDate` が `TOMORROW` と違う、または `flex` が null なら、何も送らずに終了する(これは正常)。
 4. 警告行を決める(該当するものを上から順に、最大2行):
-   - `status` が `"failed"` → `⚠ {failure の「:」より前}の取得に失敗したため前回のデータです`
+   - `status` が `"failed"` → `⚠ {failure の「:」より前}の処理に失敗したため前回のデータです`
    - `updatedAt` が現在より24時間以上前 → `⚠ 最新ではありません(最終更新 {updatedAt の M/D HH:MM})`
 5. 警告行があれば、`flex.contents.body.contents` の**先頭**に、行ごとに次のオブジェクトを挿入する(文言以外は変えない):
    `{"type":"text","text":"<警告行>","size":"xs","color":"#D64545","wrap":true}`
