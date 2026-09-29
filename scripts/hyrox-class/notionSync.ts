@@ -82,8 +82,21 @@ export async function readHyroxState(client: NotionClient, ids: HyroxNotionIds):
   };
 }
 
+const PERSON_KEY_PREFIX = "lb:";
+const MANAGED_RECORD_KEY = /^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}_lb:.+/u;
+
+/** ルーチンが管理する人の行(識別子が `lb:` + 名前)。スタッフが手で足した行は管理外で、一切触らない。 */
+function isManagedPerson(row: { key: string }): boolean {
+  return row.key.startsWith(PERSON_KEY_PREFIX) && row.key.length > PERSON_KEY_PREFIX.length;
+}
+
+/** ルーチンが管理する参加記録の行(キーが `YYYY-MM-DD_HH:MM_lb:名前`)。 */
+function isManagedRecord(row: { key: string }): boolean {
+  return MANAGED_RECORD_KEY.test(row.key);
+}
+
 export function deriveAliasLinks(people: readonly PeopleRow[]): AliasLink[] {
-  return people.filter((row) => row.alias !== "").map((row) => ({ personKey: row.key, alias: row.alias }));
+  return people.filter((row) => isManagedPerson(row) && row.alias !== "").map((row) => ({ personKey: row.key, alias: row.alias }));
 }
 
 /** スタッフが「欠席」を付けた参加記録のキー(統合先の人キーに寄せる)。 */
@@ -180,10 +193,8 @@ function personProperties(stats: PersonStats): Record<string, unknown> {
   };
 }
 
-const PERSON_KEY_PREFIX = "lb:";
-
 /**
- * target の別名の後ろに、source 自身の名前と source の別名のうち、未登録で target 自身を指さないものを足す
+ * target の別名の後ろに、source(管理する人の行なので識別子は `lb:` で始まる)自身の名前と source の別名のうち、未登録で target 自身を指さないものを足す
  * (既存の別名は消さない。source の名前も残すのは、アーカイブ後も次の実行で統合先に寄せ続けるため)。
  */
 function mergeAliases(target: PeopleRow, source: PeopleRow): string[] {
@@ -220,7 +231,7 @@ async function absorb(client: NotionClient, target: PeopleRow, source: PeopleRow
   return merged;
 }
 
-/** 同じ識別子の重複行と、別名に当たる人の行を統合先へ吸収する。 */
+/** 同じ識別子の重複行と、別名に当たる人の行を統合先へ吸収する。管理外の行は対象外(戻り値にも含めない)。 */
 async function mergePeople(
   client: NotionClient,
   rows: readonly PeopleRow[],
@@ -228,7 +239,7 @@ async function mergePeople(
   counts: WriteCounts,
 ): Promise<Map<string, PeopleRow>> {
   const byKey = new Map<string, PeopleRow>();
-  for (const row of rows) {
+  for (const row of rows.filter(isManagedPerson)) {
     const current = byKey.get(row.key);
     byKey.set(row.key, current ? await absorb(client, current, row, counts) : row);
   }
@@ -274,7 +285,7 @@ export async function syncRecords(
   absentKeys: ReadonlySet<string>,
 ): Promise<WriteCounts> {
   const counts = emptyCounts();
-  const unique = await archiveDuplicates(client, existing, counts);
+  const unique = await archiveDuplicates(client, existing.filter(isManagedRecord), counts);
   const byKey = new Map(unique.map((row) => [row.key, row]));
   for (const record of records) {
     const personPageId = pageIdByKey.get(record.personKey);

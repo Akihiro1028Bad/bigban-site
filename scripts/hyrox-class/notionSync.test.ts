@@ -86,6 +86,60 @@ describe("deriveAliasLinks / deriveAbsentKeys", () => {
   });
 });
 
+describe("手作りの行(識別子が lb: で始まらない行)", () => {
+  it("別名の対応に加えない", () => {
+    const people: PeopleRow[] = [
+      { pageId: "p1", key: "", alias: "架空一郎", memo: "", isNextApplied: false, hash: "" },
+      { pageId: "p2", key: "手入力", alias: "架空二郎", memo: "", isNextApplied: false, hash: "" },
+      { pageId: "p3", key: "lb:", alias: "架空三郎", memo: "", isNextApplied: false, hash: "" },
+      { pageId: "p4", key: "lb:架空四郎", alias: "かくう四郎", memo: "", isNextApplied: false, hash: "" },
+    ];
+
+    const links = deriveAliasLinks(people);
+
+    expect(links).toEqual([{ personKey: "lb:架空四郎", alias: "かくう四郎" }]);
+    expect([...buildAliasMap(links)]).toEqual([["lb:かくう四郎", "lb:架空四郎"]]);
+  });
+
+  it("統合・アーカイブ・更新の対象にしない(次回申込も外さない)", async () => {
+    const notion = new FakeNotion();
+    const blank1 = notion.seed("people", { 識別子: text(""), 別名: text("架空一郎"), メモ: text("手書き1"), 次回申込: { checkbox: true } });
+    const blank2 = notion.seed("people", { 識別子: text(""), メモ: text("手書き2") });
+    const manual = notion.seed("people", { 識別子: text("手入力"), 次回申込: { checkbox: true }, 同期ハッシュ: text("h") });
+    const target = notion.seed("people", { 識別子: text("lb:架空一郎") });
+    const state = await readHyroxState(notion, ids);
+    const aliasMap = buildAliasMap(deriveAliasLinks(state.people));
+
+    const { counts } = await syncPeople(notion, ids, [stats("lb:架空一郎")], state.people, aliasMap);
+
+    expect(aliasMap.size).toBe(0);
+    expect(counts).toEqual({ created: 0, updated: 1, archived: 0 });
+    for (const pageId of [blank1, blank2, manual]) {
+      expect(notion.pages.get(pageId)?.archived).toBeFalsy();
+      expect(notion.log).not.toContain(`update ${pageId}`);
+    }
+    expect(notion.log).toContain(`update ${target}`);
+    expect(notion.pages.get(blank1)?.properties.次回申込).toEqual({ checkbox: true });
+    expect(readPlainText(propsOf(notion, blank1), "メモ")).toBe("手書き1");
+  });
+
+  it("参加記録の手作りの行(キーが規定の形でない)は、重複でも元データになしでもそのままにする", async () => {
+    const notion = new FakeNotion();
+    const manual1 = notion.seed("records", { キー: title("手入力"), 状態: select("申込") });
+    const manual2 = notion.seed("records", { キー: title("手入力"), 状態: select("申込") });
+    const blank = notion.seed("records", { キー: title(""), 状態: select("申込") });
+    const state = await readHyroxState(notion, ids);
+
+    const counts = await syncRecords(notion, ids, [], new Map(), state.records, new Map(), new Set());
+
+    expect(counts).toEqual({ created: 0, updated: 0, archived: 0 });
+    for (const pageId of [manual1, manual2, blank]) {
+      expect(notion.pages.get(pageId)?.archived).toBeFalsy();
+      expect(notion.log).not.toContain(`update ${pageId}`);
+    }
+  });
+});
+
 describe("syncSessions", () => {
   it("開催回を作り、申込数は申込の人数。変化がなければ書かず、重複行はアーカイブする", async () => {
     const notion = new FakeNotion();
