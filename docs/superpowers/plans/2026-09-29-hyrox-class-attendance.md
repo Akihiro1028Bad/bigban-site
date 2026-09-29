@@ -19,10 +19,10 @@
 - 利用歴の分類はイベント名で行い、コートはスペース予約の分類にだけ使う(ミニシミュレーション・ピクロックスがピックルのコートで記帳されているため)
 - テスト予約 `#3`・`#16` は集計のすべてから除外する(`config.ts` の `EXCLUDED_RESERVATION_NOS`)
 - 判定基準: 新顔=通算1〜2回(0回も新顔)、常連=直近28日に3回以上、ご無沙汰=通算3回以上かつ最終参加から28日以上。優先順 ご無沙汰 > 常連 > 新顔 > 通常。「直近28日」は `daysBetween(参加日, 今日) < 28`
-- 所見は設計書 §11 の6ルールを上から順に適用し、今日の回を含まない過去の参加だけで決める。AI は使わない
+- 所見は設計書 §11 の6ルールを上から順に適用し、その回より前の参加(同じ日の前の回を含む)だけで決める。AI は使わない
 - 個人名はリポジトリ(コード・テスト・ログ・コミット・PR)に残さない。テストは架空の名前(「架空一郎」等)だけを使う。標準出力は件数のみ
 - 予約台帳からは9列(`予約番号 / 予約者 / 利用日 / 時間帯 / ステータス / 受付日時 / コート / 予約種別 / イベント名`)だけを `filter_properties` で取得する。電話番号・メール・住所・生年月日は取得しない
-- スタッフ入力列(① 別名・メモ、② 出欠)をルーチンは上書きしない。例外は2つだけ: 統合時のメモの空欄補完、欠席の書き写し(どちらも値を消さない)
+- スタッフ入力列(① 別名・メモ、② 出欠)をルーチンは上書きしない。例外は3つだけ: 統合時のメモの空欄補完、統合時の別名の追記(統合元の別名を統合先の別名列へ足す。2026-09-30 オーナー決定)、欠席の書き写し(どれも値を消さない)
 - `scripts/early-morning/` のファイルは import するだけで、変更しない
 - TypeScript: `strict`、`any` 禁止、型のみの import は `import type`、`@ts-ignore` 禁止
 - テストは `// @vitest-environment node` を先頭に置く。Notion を使うテストは偽物で置き換える: Task 2 は台帳の読み取り専用の小さな偽物(テストファイル内)、Task 9 以降は `scripts/hyrox-class/fixtures/fakeNotion.ts`(MSW は使わない。2026-09-29 オーナー判断、早朝と同じ)
@@ -603,6 +603,9 @@ EOF
 ---
 
 ### Task 3: キーと別名による名寄せ
+
+> 実装後の fix コミット(owner 決定)で buildAliasMap / absorb / runSync を変更した。最新はコードを正とする。
+
 
 **Files:**
 - Create: `scripts/hyrox-class/identity.ts`
@@ -1873,6 +1876,9 @@ EOF
 
 ### Task 9: Notion 3 DB の読み取りと差分書き込み
 
+> 実装後の fix コミット(owner 決定)で buildAliasMap / absorb / runSync を変更した。最新はコードを正とする。
+
+
 **Files:**
 - Create: `scripts/hyrox-class/fixtures/fakeNotion.ts`
 - Create: `scripts/hyrox-class/notionSync.ts`
@@ -2502,6 +2508,9 @@ EOF
 ---
 
 ### Task 10: 1回分の実行
+
+> 実装後の fix コミット(owner 決定)で buildAliasMap / absorb / runSync を変更した。最新はコードを正とする。
+
 
 **Files:**
 - Create: `scripts/hyrox-class/sync.ts`
