@@ -35,6 +35,41 @@ describe("buildAliasMap / canonicalPersonKey / resolvePersonKey", () => {
   });
 });
 
+describe("buildAliasMap の相互・連鎖・重複", () => {
+  it("両方の行に互いの別名を入れても入れ替わらない", () => {
+    const aliasMap = buildAliasMap([
+      { personKey: "lb:架空一郎", alias: "かくう一郎" },
+      { personKey: "lb:かくう一郎", alias: "架空一郎" },
+    ]);
+    expect([...aliasMap]).toEqual([["lb:架空一郎", "lb:かくう一郎"]]);
+    expect(canonicalPersonKey("lb:架空一郎", aliasMap)).toBe("lb:かくう一郎");
+    expect(canonicalPersonKey("lb:かくう一郎", aliasMap)).toBe("lb:かくう一郎");
+  });
+
+  it("連鎖は最後まで寄せる", () => {
+    const aliasMap = buildAliasMap([
+      { personKey: "lb:A", alias: "B" },
+      { personKey: "lb:B", alias: "C" },
+    ]);
+    expect(canonicalPersonKey("lb:A", aliasMap)).toBe("lb:A");
+    expect(canonicalPersonKey("lb:B", aliasMap)).toBe("lb:A");
+    expect(canonicalPersonKey("lb:C", aliasMap)).toBe("lb:A");
+  });
+
+  it("同じ別名を2人に書いたら同じ人にまとめる", () => {
+    const aliasMap = buildAliasMap([
+      { personKey: "lb:A", alias: "X" },
+      { personKey: "lb:B", alias: "X" },
+    ]);
+    expect(canonicalPersonKey("lb:B", aliasMap)).toBe("lb:A");
+    expect(canonicalPersonKey("lb:X", aliasMap)).toBe("lb:A");
+  });
+
+  it("別名がなければ空の対応表になる", () => {
+    expect(buildAliasMap([]).size).toBe(0);
+  });
+});
+
 describe("開催回・参加記録のキー", () => {
   it("組み立てて分解できる", () => {
     const sessionKey = sessionKeyOf("2026-09-30", "20:00");
