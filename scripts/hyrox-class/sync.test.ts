@@ -44,7 +44,8 @@ describe("runSync", () => {
       sessions: 3,
       people: 3,
       records: 4,
-      todaySessions: 1,
+      nextDate: "2026-10-07",
+      nextSessions: 1,
       skippedRows: 0,
       missingEventName: 0,
       writes: { created: 10, updated: 0, archived: 0 },
@@ -67,12 +68,32 @@ describe("runSync", () => {
     expect(second.writes).toEqual({ created: 0, updated: 0, archived: 0 });
   });
 
-  it("今日 LINE に載せる回がなければ nextDate と flex は null", async () => {
+  it("今日に回がなく、あとの日にあれば、その日の分を置く(所見もその日の時点で作る)", async () => {
     const notion = setup();
+    notion.seed("ledger", ledgerProps({ no: "#15", name: "架空一郎", date: "2026-10-09", slot: "20:00～21:00" }));
 
+    // JST 2026-10-08(木) 08:30: 今日は回がなく、次は 10/9
     const summary = await runSync({ notion, now: new Date("2026-10-07T23:30:00Z"), ids });
 
-    expect(summary.todaySessions).toBe(0);
+    expect(summary.nextDate).toBe("2026-10-09");
+    expect(summary.nextSessions).toBe(1);
+    const bridge = await readBridge(notion, "bridge");
+    expect(bridge?.nextDate).toBe("2026-10-09");
+    const flex = JSON.stringify(bridge?.flex);
+    expect(flex).toContain("10/9");
+    expect(flex).toContain("20:00 通常  2名");
+    expect(flex).toContain("初めての方。声かけをお願いします");
+    expect(flex).toContain("直近28日で2回・前回 10/7");
+  });
+
+  it("今日以降に LINE に載せる回がなければ nextDate と flex は null", async () => {
+    const notion = setup();
+
+    // JST 2026-10-10(土) 08:30: 10/9 の回は過ぎている
+    const summary = await runSync({ notion, now: new Date("2026-10-09T23:30:00Z"), ids });
+
+    expect(summary.nextDate).toBeNull();
+    expect(summary.nextSessions).toBe(0);
     const bridge = await readBridge(notion, "bridge");
     expect(bridge?.nextDate).toBeNull();
     expect(bridge?.flex).toBeNull();

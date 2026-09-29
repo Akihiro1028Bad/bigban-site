@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const summary = await runSync({ notion, now: resolveNow(), ids: NOTION_IDS });
   process.stdout.write(
     [
-      `開催回 ${summary.sessions} / 人 ${summary.people} / 参加記録 ${summary.records} / 今日の回 ${summary.todaySessions}`,
+      `開催回 ${summary.sessions} / 人 ${summary.people} / 参加記録 ${summary.records} / 次回 ${summary.nextDate ?? "なし"} の回 ${summary.nextSessions}`,
       `書き込み 作成${summary.writes.created}・更新${summary.writes.updated}・アーカイブ${summary.writes.archived}`,
       `読めない台帳行 ${summary.skippedRows} / イベント名が空 ${summary.missingEventName}`,
       `所要 ${Math.round((Date.now() - startedAt) / 1000)} 秒`,
