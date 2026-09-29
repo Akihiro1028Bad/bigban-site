@@ -6,6 +6,8 @@ export interface LineEntry {
   displayName: string;
   ordinal: number;
   isLaBola: boolean;
+  /** その人の所見。なければ空文字。 */
+  note: string;
 }
 
 export interface FlexMessage {
@@ -21,6 +23,7 @@ export function selectLineEntries(
   session: Session,
   records: readonly AttendanceRecord[],
   people: ReadonlyMap<string, Person>,
+  notes: ReadonlyMap<string, string>,
 ): LineEntry[] {
   const entries = records
     .filter((record) => record.date === session.date && record.status === "申込" && record.ordinal !== null)
@@ -28,6 +31,7 @@ export function selectLineEntries(
       displayName: people.get(record.personKey)?.displayName ?? record.personKey,
       ordinal: record.ordinal as number,
       isLaBola: record.route !== "テニスベア",
+      note: notes.get(record.personKey) ?? "",
     }));
   return entries.sort((a, b) => {
     const aFirst = a.ordinal === 1 ? 1 : 0;
@@ -37,7 +41,7 @@ export function selectLineEntries(
 }
 
 function entryRow(entry: LineEntry) {
-  return {
+  const row = {
     type: "box",
     layout: "horizontal",
     margin: "sm",
@@ -46,20 +50,25 @@ function entryRow(entry: LineEntry) {
       { type: "text", text: entry.ordinal === 1 ? "初参加 🔰" : `${entry.ordinal}回目`, size: "sm", flex: 2, align: "end" },
     ],
   };
+  if (entry.note === "") return [row];
+  return [row, { type: "text", text: entry.note, size: "xs", color: MUTED, wrap: true, margin: "none" }];
 }
 
 export function buildFlexMessage(input: {
   sessionDate: string;
   startTime: string;
+  /** 見出しに添えるクラス名。付けないときは null。 */
+  classLabel: string | null;
   entries: readonly LineEntry[];
   updatedAt: string;
   notionUrl: string;
 }): FlexMessage {
   const day = formatMonthDayWeekday(input.sessionDate);
+  const heading = `${day} ${formatStartTime(input.startTime)}`;
   const count = input.entries.length;
   const rows =
     count > 0
-      ? input.entries.map(entryRow)
+      ? input.entries.flatMap(entryRow)
       : [{ type: "text", text: "まだ申込はありません", size: "sm", color: MUTED }];
   return {
     type: "flex",
@@ -73,7 +82,7 @@ export function buildFlexMessage(input: {
         paddingAll: "16px",
         contents: [
           { type: "text", text: "明日の早朝ピックル", color: "#FFFFFF", size: "sm" },
-          { type: "text", text: `${day} ${formatStartTime(input.startTime)}`, color: "#FFFFFF", weight: "bold", size: "lg", margin: "sm" },
+          { type: "text", text: input.classLabel === null ? heading : `${heading} ${input.classLabel}`, color: "#FFFFFF", weight: "bold", size: "lg", margin: "sm" },
         ],
       },
       body: {

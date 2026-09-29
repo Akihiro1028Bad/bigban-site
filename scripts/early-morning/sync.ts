@@ -5,6 +5,7 @@ import { EARLY_START_TIME, FETCH_INTERVAL_MS } from "./config";
 import { jstDate, jstDateTime } from "./dates";
 import { fetchEarlyReservations } from "./ledger";
 import { buildFlexMessage, selectLineEntries } from "./lineMessage";
+import { buildLineNotes } from "./lineNotes";
 import { computeStats, findNextSession } from "./metrics";
 import type { NotionClient } from "./notionClient";
 import {
@@ -97,7 +98,13 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
         ? buildFlexMessage({
             sessionDate: next.date,
             startTime: EARLY_START_TIME,
-            entries: selectLineEntries(next, attendance.records, peopleByKey),
+            classLabel: next.classType === "その他" ? null : next.classType,
+            entries: selectLineEntries(
+              next,
+              attendance.records,
+              peopleByKey,
+              buildLineNotes({ session: next, records: attendance.records, sessions: attendance.sessions }),
+            ),
             updatedAt,
             notionUrl: ids.peopleDbUrl,
           })

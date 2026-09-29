@@ -19,12 +19,14 @@ function html(state: unknown): string {
   return `<script>window.__NUXT__=(function(){return ${JSON.stringify(state)}}());</script>`;
 }
 
-const circle = {
-  state: { feature: { circle: { circleDetail: { CircleOrganizedEvents: {
-    circleOrganizedFutureEventList: [{ id: 2, startDatetimeString: "2026-10-06T06:00:00.000+09:00", callOff: false }],
-    circleOrganizedPastEventList: [{ id: 1, startDatetimeString: "2026-09-29T06:00:00.000+09:00", callOff: false }],
-  } } } } },
-};
+function circleWith(nextStart: string) {
+  return {
+    state: { feature: { circle: { circleDetail: { CircleOrganizedEvents: {
+      circleOrganizedFutureEventList: [{ id: 2, startDatetimeString: nextStart, callOff: false }],
+      circleOrganizedPastEventList: [{ id: 1, startDatetimeString: "2026-09-29T06:00:00.000+09:00", callOff: false }],
+    } } } } },
+  };
+}
 
 function detail(id: number, start: string, userIds: number[]) {
   return {
@@ -41,12 +43,12 @@ function res(body: string, status = 200): HttpResponse {
   return { ok: status < 400, status, json: async () => ({}), text: async () => body };
 }
 
-function tennisbear(status = 200): FetchFn {
+function tennisbear(status = 200, nextStart = "2026-10-06T06:00:00.000+09:00"): FetchFn {
   return vi.fn<FetchFn>(async (url) => {
     if (status !== 200) return res("", status);
-    if (url.endsWith("/events")) return res(html(circle));
+    if (url.endsWith("/events")) return res(html(circleWith(nextStart)));
     if (url.endsWith("/event/1/info")) return res(html(detail(1, "2026-09-29T06:00:00.000+09:00", [11, 12])));
-    return res(html(detail(2, "2026-10-06T06:00:00.000+09:00", [11])));
+    return res(html(detail(2, nextStart, [11])));
   });
 }
 
@@ -135,9 +137,21 @@ describe("runSync", () => {
     expect(bridge).toMatchObject({ nextDate: "2026-10-06", updatedAt: "2026-10-05T20:30:00+09:00", status: "ok", failure: null });
     expect(JSON.stringify(bridge.flex)).toContain("テスト11");
     expect(JSON.stringify(bridge.flex)).toContain("2回目");
+    expect(JSON.stringify(bridge.flex)).toContain("2回目（前回 9/29 が初参加）");
+    expect(JSON.stringify(bridge.flex)).toContain("10/6(火) 6:00 初中級");
 
     const again = await runSync({ notion, fetchFn: tennisbear(), sleep: async () => undefined, now, ids });
     expect(again.writes).toEqual({ created: 0, updated: 0, archived: 0 });
+  });
+
+  it("次回がクラスのない曜日の開催回なら、見出しにクラスを付けず所見も出さない", async () => {
+    const notion = new MemoryNotion();
+    const fetchFn = tennisbear(200, "2026-10-07T06:00:00.000+09:00");
+    await runSync({ notion, fetchFn, sleep: async () => undefined, now, ids });
+    const flex = JSON.stringify(notion.bridge().flex);
+    expect(flex).toContain("10/7(水) 6:00");
+    expect(flex).not.toContain("初中級");
+    expect(flex).not.toContain("中級以上");
   });
 
   it("次回の開催回がなければ nextDate と flex は null", async () => {
