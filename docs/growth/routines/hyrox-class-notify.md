@@ -23,14 +23,20 @@
 6. 警告行があれば、`flex.contents.body.contents` の**先頭**に、行ごとに次のオブジェクトを挿入する(文言以外は変えない):
    `{"type":"text","text":"<警告行>","size":"xs","color":"#D64545","wrap":true}`
    Flex のそれ以外の部分は一切変更しない。
-7. 送信する。個人名を含む一時ファイルはリポジトリの外に置く。最初に `WORK=$(mktemp -d)` を作り、JSON は `$WORK/payload.json` にファイルとして書き出してから送る(`jq` など追加のツールは使わない)。どの終わり方でも(送信成功・200 以外・途中の失敗)、最後に必ず `rm -rf "$WORK"` で消す:
-   - `$WORK/payload.json` の中身は `{"to": "<LINE_HYROX_GROUP_ID の値>", "messages": [<手順6の後の flex>]}`。値は `printenv LINE_HYROX_GROUP_ID` で読む
-   - 送信:
+7. 送信する。個人名を含む一時ファイルはリポジトリの外に置く。シェル変数は Bash の呼び出しをまたいで残らないことがあるので、**一時ディレクトリの作成・`payload.json` の書き出し・curl での送信・HTTP コードの確認・`rm -rf "$WORK"` を、必ず1回の Bash コマンド(下の1つのブロック)で実行する**。分けて実行しない。`jq` など追加のツールは使わない。トークンは表示しない。
+   - `<手順6の後の flex>` の部分にだけ、手順6の後の Flex JSON をそのまま貼る(ヒアドキュメントは `'JSON'` でクォートしたまま。`to` は `printenv LINE_HYROX_GROUP_ID` の値がシェルで入る)
+   - 200 以外のときは、HTTP コードと `resp.txt` の本文(LINE のエラー文。個人名は含まれない)が出力されるので、それを報告に含めて終了する
    ```
-   curl -s -o "$WORK/resp.txt" -w "%{http_code}" -X POST https://api.line.me/v2/bot/message/push \
-     -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary @"$WORK/payload.json"
+   WORK=$(mktemp -d) && {
+     printf '{"to":"%s","messages":[' "$(printenv LINE_HYROX_GROUP_ID)"
+     cat <<'JSON'
+   <手順6の後の flex>
+   JSON
+     printf ']}'
+   } > "$WORK/payload.json"
+   code=$(curl -s -o "$WORK/resp.txt" -w "%{http_code}" -X POST https://api.line.me/v2/bot/message/push \
+     -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary @"$WORK/payload.json"); echo "HTTP $code"; [ "$code" = 200 ] || cat "$WORK/resp.txt"; rm -rf "$WORK"
    ```
-   200 以外なら、HTTP コードと `$WORK/resp.txt` の本文を報告に含めてから `$WORK` を消して終了する(resp.txt の本文に個人名は含まれない)。
 
 ## 禁止
 
