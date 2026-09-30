@@ -3041,6 +3041,8 @@ EOF
 
 ### Task 12: クラウドルーチンのプロンプトと作成(PR (c))
 
+> 2026-09-30 オーナー決定で集計もクラウドルーチンに統合した(8:45 の1本)。ローカル定期実行(Task 13 Step 3)は行わない。最新は `docs/growth/routines/hyrox-class-notify.md` と設計書 §3 を正とする。
+
 **Files:**
 - Create: `docs/growth/routines/hyrox-class-notify.md`
 
@@ -3120,6 +3122,8 @@ EOF
 ---
 
 ### Task 13: 試し送り・ローカル定期実行・有効化
+
+> 2026-09-30 オーナー決定で集計もクラウドルーチンに統合した(8:45 の1本)。ローカル定期実行(Task 13 Step 3)は行わない。最新は `docs/growth/routines/hyrox-class-notify.md` と設計書 §3 を正とする。
 
 **Files:** なし(運用設定。リポジトリは変更しない)
 
