@@ -9,8 +9,8 @@ export const HYROX_SHORT_NAMES = ["体験会", "モーニングクラス", "ミ�
 export const HYROX_EVENT_FALLBACK = "HYROXイベント";
 export const HYROX_COURT = "HYROX";
 export const PICKLE_COURTS: readonly string[] = ["A:アルテミス", "B:ビックバン", "C:コメット"];
-/** テスト予約(2026-09-29 のイベント名の埋め戻しで確認)。集計のすべてから除外する。 */
-export const EXCLUDED_RESERVATION_NOS: readonly string[] = ["#3", "#16"];
+/** テスト予約(2026-09-29 のイベント名の埋め戻しと 2026-09-30 の実データ確認で特定)。集計のすべてから除外する。 */
+export const EXCLUDED_RESERVATION_NOS: readonly string[] = ["#2", "#3", "#14", "#16", "#86", "#87", "#103", "#104", "#105"];
 
 export const RULES = {
   newMaxTotal: 2,

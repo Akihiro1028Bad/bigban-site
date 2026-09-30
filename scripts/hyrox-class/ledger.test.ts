@@ -113,6 +113,19 @@ describe("fetchLedgerRows", () => {
     expect(queries).toEqual([{ db: "ledger", filterPropertyIds: [...LEDGER_COLUMNS] }]);
   });
 
+  it("実データで見つかったテスト予約9件をすべて除く", async () => {
+    const excluded = ["#2", "#3", "#14", "#16", "#86", "#87", "#103", "#104", "#105"];
+    const { client } = stubNotion(
+      LEDGER_COLUMNS,
+      [...excluded.map((no) => page({ no })), page({ no: "#100" })],
+    );
+
+    const result = await fetchLedgerRows(client, "ledger");
+
+    expect(result.rows.map((row) => row.reservationNo)).toEqual(["#100"]);
+    expect(result.skipped).toBe(0);
+  });
+
   it("列が欠けていたら失敗する", async () => {
     const { client } = stubNotion(
       LEDGER_COLUMNS.filter((name) => name !== "イベント名"),

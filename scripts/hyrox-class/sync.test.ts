@@ -31,7 +31,7 @@ function setup(): FakeNotion {
     "ledger",
     ledgerProps({ no: "#13", name: "架空二郎", date: "2026-09-22", slot: "09:00～09:50", event: "HYROX体験会｜種目と器具を一通り体験できる50分（初心者OK）" }),
   );
-  notion.seed("ledger", ledgerProps({ no: "#14", name: "架空三郎", date: "2026-10-09", slot: "20:00～21:00" }));
+  notion.seed("ledger", ledgerProps({ no: "#30", name: "架空三郎", date: "2026-10-09", slot: "20:00～21:00" }));
   return notion;
 }
 
