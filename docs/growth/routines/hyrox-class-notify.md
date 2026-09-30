@@ -1,7 +1,7 @@
 # HYROX DAISUKE CLASS 集計と当日通知(クラウドルーチン)
 
 > 毎日 08:45 JST に実行(予約メールチェック 08:08 の記帳の後)。リポジトリ(develop)で集計してから、今日が開催日なら、コーチ入りの LINE グループへ送る。それ以外の日は集計だけして送らない(沈黙が正常)。
-> 集計が失敗しても、前日の集計で置いた当日分があれば警告付きで送る。
+> 集計が失敗しても、前日の集計で置いた当日分があれば警告付きで送る。ただし開催日が連続する日(土日など)は、前日の集計が置くのは前日自身の日付なので、当日の集計が失敗すると何も送られない(報告に集計の失敗が出る)。
 > 設計: `docs/superpowers/specs/2026-09-29-hyrox-class-attendance-design.md` §3 / §11
 > このファイルが正本。クラウドルーチンにはこの本文をそのまま貼っている。直したらルーチンも同じ内容に更新する。
 
@@ -14,7 +14,7 @@
    `MISSING` があれば、送らずに報告して終了する。
 1. 基準日を JST で確定する:
    `TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)`
-2. リポジトリのルートで `npm ci --no-audit --no-fund` のあと `npm run hyrox:sync` を実行する。標準出力は件数だけ(個人名は出ない)なので、そのまま報告に含めてよい。終了コードが 0 以外でも手順3へ進む(失敗は橋渡しページに記録され、手順5の警告になる)。`npm ci` 自体が失敗した場合も手順3へ進む。
+2. リポジトリのルートで `npm ci --no-audit --no-fund` のあと `npm run hyrox:sync` を実行する。標準出力は件数だけ(個人名は出ない)なので、そのまま報告に含めてよい。終了コードが 0 以外でも手順3へ進む。`npm run hyrox:sync` が失敗したときは橋渡しページの `status` が失敗になり、手順5で「処理に失敗した」と「最新ではありません」の両方の警告が付くことがある。`npm ci` が失敗したときはスクリプトが動かず橋渡しは ok のままなので、「最新ではありません」の警告だけになる。どちらも報告に失敗の内容を含める。
 3. Notion コネクタでページ「今日の DAISUKE CLASS(通知橋渡し)」(ID: `3ea99efa346b81f49801c4a72cf75539`)を取得し、本文の JSON コードブロックを読む。コードブロックが複数あるときは**最後のもの**が最新。キーは `nextDate` / `updatedAt` / `status` / `failure` / `flex`。Notion に到達できないときは、送らずに報告して終了する。
 4. `nextDate` が `TODAY` と違う、または `flex` が null なら、何も送らずに終了する(これは正常)。
 5. 警告行を決める(該当するものを上から順に、最大2行):
@@ -23,14 +23,14 @@
 6. 警告行があれば、`flex.contents.body.contents` の**先頭**に、行ごとに次のオブジェクトを挿入する(文言以外は変えない):
    `{"type":"text","text":"<警告行>","size":"xs","color":"#D64545","wrap":true}`
    Flex のそれ以外の部分は一切変更しない。
-7. 送信する。JSON は `payload.json` にファイルとして書き出してから送る(`jq` など追加のツールは使わない):
-   - `payload.json` の中身は `{"to": "<LINE_HYROX_GROUP_ID の値>", "messages": [<手順6の後の flex>]}`。値は `printenv LINE_HYROX_GROUP_ID` で読む
+7. 送信する。個人名を含む一時ファイルはリポジトリの外に置く。最初に `WORK=$(mktemp -d)` を作り、JSON は `$WORK/payload.json` にファイルとして書き出してから送る(`jq` など追加のツールは使わない)。どの終わり方でも(送信成功・200 以外・途中の失敗)、最後に必ず `rm -rf "$WORK"` で消す:
+   - `$WORK/payload.json` の中身は `{"to": "<LINE_HYROX_GROUP_ID の値>", "messages": [<手順6の後の flex>]}`。値は `printenv LINE_HYROX_GROUP_ID` で読む
    - 送信:
    ```
-   curl -s -o resp.txt -w "%{http_code}" -X POST https://api.line.me/v2/bot/message/push \
-     -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary @payload.json
+   curl -s -o "$WORK/resp.txt" -w "%{http_code}" -X POST https://api.line.me/v2/bot/message/push \
+     -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary @"$WORK/payload.json"
    ```
-   200 以外なら、HTTP コードと resp.txt の本文を報告して終了する。
+   200 以外なら、HTTP コードと `$WORK/resp.txt` の本文を報告に含めてから `$WORK` を消して終了する(resp.txt の本文に個人名は含まれない)。
 
 ## 禁止
 

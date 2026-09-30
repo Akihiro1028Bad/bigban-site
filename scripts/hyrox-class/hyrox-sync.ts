@@ -3,8 +3,9 @@
  *
  *   npm run hyrox:sync
  *
- * .env.local の NOTION_TOKEN を使う。標準出力は件数だけ(個人名は出さない)。
- * HYROX_SYNC_TODAY=YYYY-MM-DD を付けると、その日の 08:30 JST として実行する(LINE の試し送り専用。
+ * クラウドルーチン(毎日 08:45 JST)から実行される。NOTION_TOKEN は環境変数から読み、
+ * ローカルで実行するときは .env.local から読む。標準出力は件数だけ(個人名は出さない)。
+ * HYROX_SYNC_TODAY=YYYY-MM-DD を付けると、その日の朝として実行する(LINE の試し送り専用。
  * Notion の集計値もその日時点になるので、試し送りのあとは付けずにもう一度実行して戻す)。
  * 終了コード: 0 = 成功 / 1 = 失敗(Notion の橋渡しページに理由を残している)。
  * 薄い配線のためテスト対象外(ロジックは sync.ts でテスト済み)。
@@ -37,7 +38,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 async function main(): Promise<void> {
   loadEnvLocal();
   const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error("NOTION_TOKEN を .env.local に設定してください。");
+  if (!token) throw new Error("NOTION_TOKEN が未設定です(ローカルは .env.local、クラウドは環境変数に設定してください)。");
   const notion = createNotionClient({ token, fetchFn: defaultFetch, sleep });
   const startedAt = Date.now();
   const summary = await runSync({ notion, now: resolveNow(), ids: NOTION_IDS });
