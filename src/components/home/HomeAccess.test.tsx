@@ -60,7 +60,7 @@ describe("HomeAccess", () => {
       </NextIntlClientProvider>
     );
     expect(screen.getByText(/6:00/)).toBeInTheDocument();
-    expect(screen.getByText(/23:00/)).toBeInTheDocument();
+    expect(screen.getByText(/25:00/)).toBeInTheDocument();
   });
 
   it("3つの駅アクセスを表示する", () => {

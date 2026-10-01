@@ -80,8 +80,10 @@ describe("HomePricing", () => {
     expect(screen.getByText("6:00-9:00")).toBeInTheDocument();
     expect(screen.getByText("9:00-17:00")).toBeInTheDocument();
     expect(screen.getByText("17:00-23:00")).toBeInTheDocument();
+    expect(screen.getByText("23:00-25:00")).toBeInTheDocument();
     expect(screen.getByText("¥4,980")).toBeInTheDocument();
-    expect(screen.getByText("¥5,980")).toBeInTheDocument();
+    expect(screen.getByText("¥3,980")).toBeInTheDocument();
+    expect(screen.getAllByText("¥5,980")).toHaveLength(2);
     const prices7980 = screen.getAllByText("¥7,980");
     expect(prices7980.length).toBeGreaterThanOrEqual(3);
   });
@@ -189,10 +191,11 @@ describe("HomePricing", () => {
         <HomePricing />
       </NextIntlClientProvider>
     );
-    // 3行 × 平日/週末の6セルすべてに「PBT CLUB会員」ラベル付きの価格が並ぶ。
-    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(6);
+    // 4行 × 平日/週末の8セルすべてに「PBT CLUB会員」ラベル付きの価格が並ぶ。
+    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(8);
+    expect(screen.getByText("¥2,800")).toBeInTheDocument();
     expect(screen.getByText("¥3,500")).toBeInTheDocument();
-    expect(screen.getByText("¥4,200")).toBeInTheDocument();
+    expect(screen.getAllByText("¥4,200")).toHaveLength(2);
     expect(screen.getAllByText("¥5,600")).toHaveLength(4);
   });
 

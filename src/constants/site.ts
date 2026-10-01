@@ -28,6 +28,15 @@ export const LABOLA_PICKLEBALL_URL =
 // HYROX のご予約（labola・HYROX タブ）。
 export const LABOLA_HYROX_URL = labolaCurrentWeekUrl("H Y R O X");
 
+// 1日表示(日付指定)。LaBOLA の月日はゼロ埋めなし。tabName は labola 管理画面の
+// カテゴリ名と完全一致。予約ボタンの「今日」と日付ボタンで使う。
+export function labolaDayUrl(
+  tabName: string,
+  date: { year: number; month: number; day: number },
+): string {
+  return `${LABOLA_SHOP_BASE}/calendar/${date.year}/${date.month}/${date.day}/?tab_name=${encodeURIComponent(tabName)}`;
+}
+
 // レッスン / クラスのご予約（labola・スクール予約）。
 // コート/HYROX の calendar_week（枠貸し）とは別系統の event/school パス。
 export const LABOLA_SCHOOL_URL =
@@ -73,9 +82,21 @@ export function resolveCalendarTabKey(
     ?? LABOLA_CALENDAR_TABS[0].key;
 }
 
+// タブのキーから labola 登録名を引く。LABOLA_CALENDAR_TABS の並び順に依存しない。
+export function labolaTabNameOf(key: LabolaCalendarTabKey): string {
+  return LABOLA_CALENDAR_TABS.filter((tab) => tab.key === key)[0].tabName;
+}
+
 // 営業時間（毎日・不定休）。構造化データ(SportsActivityLocation / ExerciseGym)と
 // 説明文の差し込みで共有する。schema.org の opens/closes と同じ HH:MM 形式。
-export const BUSINESS_HOURS = { opens: "06:00", closes: "23:00" } as const;
+// closes は翌日1:00（深夜をまたぐ。表示は ja 25:00 / en 1:00 AM）。
+export const BUSINESS_HOURS = { opens: "06:00", closes: "01:00" } as const;
+
+// 本文用の営業時間表記（ja は 25:00 表記、en は 12 時間表記）。
+export const BUSINESS_HOURS_DISPLAY = {
+  ja: { open: "6:00", close: "25:00" },
+  en: { open: "6:00 AM", close: "1:00 AM" },
+} as const;
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 

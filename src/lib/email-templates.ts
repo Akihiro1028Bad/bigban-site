@@ -54,7 +54,7 @@ export function buildAutoReplyHtml(params: AutoReplyParams): string {
   <tr><td align="center" style="padding:0 40px 40px;color:#8A8A8A;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.8;">
     <p style="margin:0 0 4px;color:#F5F2EE;font-size:13px;letter-spacing:0.1em;">THE PICKLE BANG THEORY</p>
     <p style="margin:0 0 4px;">千葉県市川市八幡2-16-6 八幡ハタビル 6階</p>
-    <p style="margin:0 0 4px;">営業時間: 6:00 - 23:00</p>
+    <p style="margin:0 0 4px;">営業時間: 6:00 - 25:00</p>
     <p style="margin:0;">Instagram: <a href="https://www.instagram.com/thepicklebangtheory/" style="color:#C8FF00;text-decoration:none;">@thepicklebangtheory</a></p>
   </td></tr>
 
@@ -82,6 +82,6 @@ ${params.message}
 
 THE PICKLE BANG THEORY
 千葉県市川市八幡2-16-6 八幡ハタビル 6階
-営業時間: 6:00 - 23:00
+営業時間: 6:00 - 25:00
 Instagram: @thepicklebangtheory`;
 }
