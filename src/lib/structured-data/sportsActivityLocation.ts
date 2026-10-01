@@ -71,7 +71,7 @@ const ALTERNATE_NAMES = [
 ] as const;
 
 const DESCRIPTION =
-  "千葉県市川市 本八幡駅徒歩1分、営業時間6:00-23:00のインドアピックルボール施設。クロスミントン世界王者 西村昭彦がプロデュース。DecoTurfハードコート3面、トレーニングエリア併設、無人チェックインで利用可能。レッスン、大会、リーグ、イベント会場としても利用可能。";
+  "千葉県市川市 本八幡駅徒歩1分、営業時間6:00-25:00のインドアピックルボール施設。クロスミントン世界王者 西村昭彦がプロデュース。DecoTurfハードコート3面、トレーニングエリア併設、無人チェックインで利用可能。レッスン、大会、リーグ、イベント会場としても利用可能。";
 
 const SLOGAN = "小さなディンクから、大きなムーブメントへ。";
 
@@ -101,7 +101,7 @@ export function buildSportsActivityLocation(
     geo: buildFacilityGeo(),
     telephone: FACILITY_TELEPHONE,
     email: "hello@rstagency.com",
-    priceRange: "¥4980-¥7980",
+    priceRange: "¥3980-¥7980",
     openingHoursSpecification: buildFacilityOpeningHours(),
     sameAs: [...SAME_AS],
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
