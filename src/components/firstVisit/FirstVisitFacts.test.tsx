@@ -3,6 +3,15 @@ import { screen } from "@testing-library/react";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 import FirstVisitFacts from "./FirstVisitFacts";
 
+describe("FirstVisitFacts(英語)", () => {
+  it("営業時間は12時間表記で出す", () => {
+    renderWithIntl(<FirstVisitFacts />, { locale: "en" });
+    expect(
+      screen.getByText("6:00 AM–1:00 AM, open every day"),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("FirstVisitFacts", () => {
   it("見出しと9項目の定義リストを表示する", () => {
     const { container } = renderWithIntl(<FirstVisitFacts />);
@@ -47,7 +56,8 @@ describe("FirstVisitFacts", () => {
     for (const word of ["天井", "照明", "駐車場なし"]) {
       expect(text).not.toContain(word);
     }
-    expect(text).toContain("年中無休");
+    expect(text).toContain("6:00–25:00・年中無休");
+    expect(text).not.toContain("23:00");
     expect(text).toContain("シャワーはありません");
   });
 });

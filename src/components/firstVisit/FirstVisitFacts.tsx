@@ -1,8 +1,11 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
-import { BOOKING_WINDOW_DAYS } from "@/constants/firstVisit";
+import {
+  BOOKING_WINDOW_DAYS,
+  businessHoursValues,
+} from "@/constants/firstVisit";
 
 import FirstVisitSection from "./FirstVisitSection";
 
@@ -20,6 +23,10 @@ const FACT_KEYS = [
 
 export default function FirstVisitFacts() {
   const t = useTranslations("FirstVisit.facts");
+  const values = {
+    ...BOOKING_WINDOW_DAYS,
+    ...businessHoursValues(useLocale()),
+  };
 
   return (
     <FirstVisitSection
@@ -37,7 +44,7 @@ export default function FirstVisitFacts() {
               {t(`items.${key}.label`)}
             </dt>
             <dd className="text-sm leading-relaxed text-text-light/70">
-              {t(`items.${key}.value`, BOOKING_WINDOW_DAYS)}
+              {t(`items.${key}.value`, values)}
             </dd>
           </div>
         ))}

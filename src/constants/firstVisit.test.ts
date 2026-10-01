@@ -4,6 +4,7 @@ import {
   BOOKING_WINDOW_DAYS,
   FIRST_VISIT_PATH,
   PARTY_SIZE_EXAMPLE,
+  businessHoursValues,
   formatYen,
   parseYen,
   perPersonRows,
@@ -46,6 +47,16 @@ describe("formatYen", () => {
   });
 });
 
+describe("businessHoursValues", () => {
+  it("日本語は 25:00 表記、それ以外は12時間表記(営業時間の定数が単一ソース)", () => {
+    expect(businessHoursValues("ja")).toEqual({ open: "6:00", close: "25:00" });
+    expect(businessHoursValues("en")).toEqual({
+      open: "6:00 AM",
+      close: "1:00 AM",
+    });
+  });
+});
+
 describe("perPersonRows", () => {
   it("COURT_PRICES の全行を既定4人で割った表を返す", () => {
     const rows = perPersonRows();
@@ -56,6 +67,14 @@ describe("perPersonRows", () => {
       timeSlot: "6:00-9:00",
       weekday: "¥1,250",
       weekend: "¥2,000",
+    });
+  });
+  it("深夜帯(23:00-25:00)も同じ料金表から4人で割る", () => {
+    const night = perPersonRows().find((r) => r.timeSlot === "23:00-25:00");
+    expect(night).toEqual({
+      timeSlot: "23:00-25:00",
+      weekday: "¥1,000",
+      weekend: "¥1,500",
     });
   });
   it("人数を指定できる", () => {

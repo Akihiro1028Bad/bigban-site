@@ -85,7 +85,7 @@
     },
     "firstVisit": {
       "title": "First Visit — How it works, what to bring, pricing",
-      "description": "A one-page guide for first-timers and all-beginner groups: how it works, what to bring and rent, per-person price estimates, and when booking opens. 1 min from Motoyawata Station, open 6:00–23:00, every day."
+      "description": "A one-page guide for first-timers and all-beginner groups: how it works, what to bring and rent, per-person price estimates, and when booking opens. 1 min from Motoyawata Station, open {open}–{close}, every day."
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
@@ -301,7 +301,7 @@
         },
         "hours": {
           "label": "Hours",
-          "value": "6:00–23:00, open every day"
+          "value": "{open}–{close}, open every day"
         },
         "facility": {
           "label": "Facility",

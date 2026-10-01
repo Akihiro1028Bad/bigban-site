@@ -11,7 +11,10 @@ import FirstVisitPricing from "@/components/firstVisit/FirstVisitPricing";
 import FirstVisitNext from "@/components/firstVisit/FirstVisitNext";
 import FirstVisitFaq from "@/components/firstVisit/FirstVisitFaq";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
-import { FIRST_VISIT_PATH } from "@/constants/firstVisit";
+import {
+  FIRST_VISIT_PATH,
+  businessHoursValues,
+} from "@/constants/firstVisit";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
@@ -37,7 +40,7 @@ export async function generateMetadata({
 
   return {
     title: t("firstVisit.title"),
-    description: t("firstVisit.description"),
+    description: t("firstVisit.description", businessHoursValues(locale)),
     openGraph: buildPageOpenGraph({
       siteName: t("og.siteName"),
       url: canonicalUrl,

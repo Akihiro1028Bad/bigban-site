@@ -1,4 +1,5 @@
 import { COURT_PRICES } from "@/constants/pricing";
+import { BUSINESS_HOURS_DISPLAY } from "@/constants/site";
 
 export const FIRST_VISIT_PATH = "/first-visit";
 export const HYROX_PATH = "/hyrox";
@@ -14,6 +15,15 @@ export const PARTY_SIZE_EXAMPLE = 4;
 
 // 予約の受付開始日(何日前から)。出典: ニュース pbt-club-membership(2026-08-03)。時刻は書かない。
 export const BOOKING_WINDOW_DAYS = { general: 14, member: 30 } as const;
+
+// 本文・メタデータに差し込む営業時間(ja は 25:00 表記、それ以外は 12 時間表記)。
+// 営業時間の単一ソースは site.ts の BUSINESS_HOURS_DISPLAY。
+export function businessHoursValues(locale: string): {
+  open: string;
+  close: string;
+} {
+  return locale === "ja" ? BUSINESS_HOURS_DISPLAY.ja : BUSINESS_HOURS_DISPLAY.en;
+}
 
 export function parseYen(price: string): number {
   const digits = price.replace(/[^0-9]/g, "");

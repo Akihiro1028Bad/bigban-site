@@ -56,12 +56,18 @@ describe("FirstVisitPage generateMetadata", () => {
   });
 
   it("日本語で canonical/og:url を /first-visit で返す", async () => {
-    mockGetTranslations.mockResolvedValue(buildMockT());
+    const t = vi.fn(buildMockT());
+    mockGetTranslations.mockResolvedValue(t);
     const { generateMetadata } = await import("./page");
     const metadata = await generateMetadata({
       params: Promise.resolve({ locale: "ja" }),
     });
 
+    // 営業時間は定数から差し込む(文言に直書きしない)
+    expect(t).toHaveBeenCalledWith("firstVisit.description", {
+      open: "6:00",
+      close: "25:00",
+    });
     expect(metadata.title).toBe("translated:firstVisit.title");
     expect(metadata.description).toBe("translated:firstVisit.description");
     expect(metadata.alternates?.canonical).toBe(

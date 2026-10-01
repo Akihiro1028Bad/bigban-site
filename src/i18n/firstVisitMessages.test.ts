@@ -10,6 +10,8 @@ const FORBIDDEN = [
   "駐車場なし",
   "説明役",
   "体育館",
+  "23:00",
+  "11 PM",
 ];
 
 function flatten(value: unknown): string[] {

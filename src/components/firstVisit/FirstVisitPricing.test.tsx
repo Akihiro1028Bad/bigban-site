@@ -22,8 +22,11 @@ describe("FirstVisitPricing", () => {
       name: "4人で割った1人あたり(1時間)",
     });
     expect(within(table).getByText("¥1,250")).toBeInTheDocument();
-    expect(within(table).getByText("¥1,500")).toBeInTheDocument();
+    expect(within(table).getAllByText("¥1,500").length).toBeGreaterThan(0);
     expect(within(table).getAllByText("¥2,000").length).toBeGreaterThan(0);
+    // 深夜帯(23:00-25:00)の行
+    expect(within(table).getByText("23:00-25:00")).toBeInTheDocument();
+    expect(within(table).getByText("¥1,000")).toBeInTheDocument();
   });
 
   it("4人は例であり人数上限の規定ではないと注記する", () => {
