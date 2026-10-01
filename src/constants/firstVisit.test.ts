@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { COURT_PRICES } from "@/constants/pricing";
+import { PBT_CLUB_PATH } from "@/constants/pbtClub";
 import {
   BOOKING_WINDOW_DAYS,
   FIRST_VISIT_PATH,
   PARTY_SIZE_EXAMPLE,
+  PBT_CLUB_LINK_PATH,
   businessHoursValues,
   formatYen,
   parseYen,
@@ -16,6 +18,11 @@ describe("firstVisit 定数", () => {
     expect(FIRST_VISIT_PATH).toBe("/first-visit");
     expect(BOOKING_WINDOW_DAYS).toEqual({ general: 14, member: 30 });
     expect(PARTY_SIZE_EXAMPLE).toBe(4);
+  });
+
+  it("PBT CLUB への入口は PBT CLUB ページ(#429)を指す", () => {
+    expect(PBT_CLUB_LINK_PATH).toBe("/pbt-club");
+    expect(PBT_CLUB_LINK_PATH).toBe(PBT_CLUB_PATH);
   });
 });
 

@@ -16,11 +16,11 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ7つ + ニュース一覧1つ を ja/en それぞれ = 16エントリ（slugなし時）", async () => {
+  it("静的ページ8つ + ニュース一覧1つ を ja/en それぞれ = 18エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(16);
+    expect(entries).toHaveLength(18);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
