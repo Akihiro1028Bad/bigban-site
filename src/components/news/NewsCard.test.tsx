@@ -166,4 +166,36 @@ describe("NewsCard", () => {
     expect(t.tagName).toBe("TIME");
     expect(t).toHaveAttribute("dateTime", "2026-04-01");
   });
+
+  it("eventEndAt を過ぎた記事に「終了」バッジを出す", () => {
+    render(
+      <NewsCard
+        item={makeParsedNewsItem({ eventEndAt: "2020-01-01T00:00:00.000Z" })}
+        locale="ja"
+      />,
+    );
+    expect(screen.getByText("終了")).toBeInTheDocument();
+  });
+
+  it("英語では Ended バッジ", () => {
+    render(
+      <NewsCard
+        item={makeParsedNewsItem({ eventEndAt: "2020-01-01T00:00:00.000Z" })}
+        locale="en"
+      />,
+    );
+    expect(screen.getByText("Ended")).toBeInTheDocument();
+  });
+
+  it("eventEndAt が未来・未設定ならバッジを出さない", () => {
+    const { rerender } = render(
+      <NewsCard
+        item={makeParsedNewsItem({ eventEndAt: "2099-01-01T00:00:00.000Z" })}
+        locale="ja"
+      />,
+    );
+    expect(screen.queryByText("終了")).toBeNull();
+    rerender(<NewsCard item={makeParsedNewsItem()} locale="ja" />);
+    expect(screen.queryByText("終了")).toBeNull();
+  });
 });

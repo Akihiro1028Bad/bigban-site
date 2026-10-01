@@ -505,3 +505,80 @@ describe("CTA / Schedule timeline / time 要素", () => {
     });
   });
 });
+
+describe("sanitizeNewsHtml — shouldUnlinkBookingLinks(終了イベントの予約先リンク除去)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  function toDom(html: string): HTMLElement {
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    return root;
+  }
+
+  it("既定では予約先リンクを残す", () => {
+    const out = sanitizeNewsHtml(
+      '<p><a href="https://yoyaku.labola.jp/r/shop/3473/">予約</a></p>',
+      STRICT_HTML_CONFIG,
+    );
+    expect(toDom(out).querySelector("a")).not.toBeNull();
+  });
+
+  it.each([
+    ["STRICT", STRICT_HTML_CONFIG],
+    ["RICH", RICH_EDITOR_CONFIG],
+  ] as const)(
+    "%s: 予約先リンクだけ外し、他のリンクは target/rel 付きで残す",
+    (_name, config) => {
+      const out = sanitizeNewsHtml(
+        '<p><a href="https://labola.jp/x">予約</a> <a href="https://www.thepicklebang.com/reserve">案内</a></p>',
+        config,
+        { shouldUnlinkBookingLinks: true },
+      );
+      const dom = toDom(out);
+      expect(dom.textContent).toBe("予約 案内");
+      const links = dom.querySelectorAll("a");
+      expect(links).toHaveLength(1);
+      expect(links[0].getAttribute("href")).toBe(
+        "https://www.thepicklebang.com/reserve",
+      );
+      expect(links[0].getAttribute("rel")).toBe("noopener noreferrer");
+    },
+  );
+
+  it("属性値の中に <a ...> 風の文字列があっても、on* 属性が生えない(回帰)", () => {
+    const attack =
+      '<p title="<a x" href="https://labola.jp/">" onmouseover="alert(document.domain)//</p><a href="https://example.com/">z</a>';
+    const out = sanitizeNewsHtml(attack, STRICT_HTML_CONFIG, {
+      shouldUnlinkBookingLinks: true,
+    });
+    const dom = toDom(out);
+    expect(dom.querySelector("[onmouseover]")).toBeNull();
+    expect(out).not.toMatch(/<[a-z][^>]*\sonmouseover=/i);
+    // 後続の本物のリンクは影響を受けない
+    expect(dom.querySelector('a[href="https://example.com/"]')).not.toBeNull();
+  });
+
+  it("data-href が予約先でも、href が他サイトならリンクを残す", () => {
+    const out = sanitizeNewsHtml(
+      '<a data-href="https://labola.jp/x" href="https://example.com/">z</a>',
+      STRICT_HTML_CONFIG,
+      { shouldUnlinkBookingLinks: true },
+    );
+    expect(
+      toDom(out).querySelector('a[href="https://example.com/"]'),
+    ).not.toBeNull();
+  });
+
+  it("属性値に > を含む予約先リンクも、かけらを残さず外す", () => {
+    const out = sanitizeNewsHtml(
+      '<p><a title="A>B" href="https://labola.jp/x">予約</a>後ろ</p>',
+      STRICT_HTML_CONFIG,
+      { shouldUnlinkBookingLinks: true },
+    );
+    const dom = toDom(out);
+    expect(dom.querySelector("a")).toBeNull();
+    expect(dom.textContent).toBe("予約後ろ");
+  });
+});
