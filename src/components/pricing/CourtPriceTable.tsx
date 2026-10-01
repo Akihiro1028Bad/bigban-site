@@ -4,11 +4,9 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { EASE } from "@/constants/motion";
+import { PBT_CLUB_PATH } from "@/constants/pbtClub";
 import { COURT_PRICES } from "@/constants/pricing";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
-
-// PBT CLUB 会員制度の告知ニュース記事 (microCMS slug: pbt-club-membership)。
-const PBT_CLUB_NEWS_PATH = "/news/pbt-club-membership";
 
 // コートレンタル料金テーブル（HomePricing / HyroxProgram 共用）。
 interface CourtPriceTableProps {
@@ -95,7 +93,7 @@ export default function CourtPriceTable({
       <p className="mt-4 text-text-gray text-xs leading-relaxed">
         {t("memberLegend")}{" "}
         <Link
-          href={PBT_CLUB_NEWS_PATH}
+          href={PBT_CLUB_PATH}
           onClick={() =>
             trackCtaClick("contentClick", pbtClubLocation, "pbt-club")
           }

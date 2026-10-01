@@ -209,3 +209,23 @@ describe("newsListSchema", () => {
     expect(p.contents).toEqual([]);
   });
 });
+
+describe("newsItemSchema eventEndAt", () => {
+  it("eventEndAt を文字列として受け取る", () => {
+    const parsed = newsItemSchema.parse({
+      ...validItem,
+      eventEndAt: "2026-09-23T14:59:00.000Z",
+    });
+    expect(parsed.eventEndAt).toBe("2026-09-23T14:59:00.000Z");
+  });
+
+  it("eventEndAt が無いとき undefined になる(後方互換)", () => {
+    const parsed = newsItemSchema.parse(validItem);
+    expect(parsed.eventEndAt).toBeUndefined();
+  });
+
+  it("eventEndAt が null のとき undefined に正規化される", () => {
+    const parsed = newsItemSchema.parse({ ...validItem, eventEndAt: null });
+    expect(parsed.eventEndAt).toBeUndefined();
+  });
+});

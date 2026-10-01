@@ -75,13 +75,13 @@ describe("buildServices", () => {
     expect(rental?.serviceType).toBe("コートレンタル");
   });
 
-  it("コートレンタルに価格帯(¥4,980〜¥7,980)の Offer を付与する", async () => {
+  it("コートレンタルに価格帯(¥3,980〜¥7,980)の Offer を付与する", async () => {
     const { buildServices } = await import("./service");
     const rental = buildServices().find((s) => s.name === "コートレンタル");
     expect(rental?.offers?.priceSpecification).toMatchObject({
       "@type": "PriceSpecification",
       priceCurrency: "JPY",
-      minPrice: 4980,
+      minPrice: 3980,
       maxPrice: 7980,
     });
   });

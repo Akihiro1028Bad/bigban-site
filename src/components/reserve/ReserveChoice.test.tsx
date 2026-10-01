@@ -1,12 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
-import {
-  LABOLA_PICKLEBALL_URL,
-  LABOLA_HYROX_URL,
-  LABOLA_SCHOOL_URL,
-} from "@/constants/site";
+import { LABOLA_SCHOOL_URL, labolaDayUrl } from "@/constants/site";
 import ReserveChoice from "./ReserveChoice";
 
 const trackCtaClick = vi.fn();
@@ -16,14 +12,28 @@ vi.mock("@/lib/analytics/trackEvent", () => ({
   trackLabolaEntry: (...args: unknown[]) => trackLabolaEntry(...args),
 }));
 
+// 2026-10-01 木曜 12:00 JST。日付ボタン・今日の1日表示はこの日付で固定する。
+const TODAY = { year: 2026, month: 10, day: 1 };
+const COURT_TODAY_URL = labolaDayUrl("ピックルボールコート", TODAY);
+const HYROX_TODAY_URL = labolaDayUrl("H Y R O X", TODAY);
+
 describe("ReserveChoice", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T03:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it.each(["hyrox", "pickleball"] as const)("%s の目的を先頭の案内に保持する", (initialTab) => {
     renderWithIntl(<ReserveChoice initialTab={initialTab} />);
     expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
       initialTab === "hyrox" ? "HYROXエリア" : "ピックルボールコート",
     );
     expect(screen.getAllByRole("link")[0]).toHaveAttribute("href",
-      initialTab === "hyrox" ? LABOLA_HYROX_URL : LABOLA_PICKLEBALL_URL);
+      initialTab === "hyrox" ? HYROX_TODAY_URL : COURT_TODAY_URL);
   });
 
   it("ピックルボールコートの予約案内文を表示する", () => {
@@ -51,18 +61,18 @@ describe("ReserveChoice", () => {
     ).toBeInTheDocument();
   });
 
-  it("コートの予約は labola（ピックルタブ）へ外部リンクする", () => {
+  it("コートの予約は labola（ピックルタブ）の今日の1日表示へ外部リンクする", () => {
     renderWithIntl(<ReserveChoice />);
     const link = screen.getByRole("link", { name: /コートの予約/ });
-    expect(link).toHaveAttribute("href", LABOLA_PICKLEBALL_URL);
+    expect(link).toHaveAttribute("href", COURT_TODAY_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("エリアの予約は labola（HYROXタブ）へ外部リンクする", () => {
+  it("エリアの予約は labola（HYROXタブ）の今日の1日表示へ外部リンクする", () => {
     renderWithIntl(<ReserveChoice />);
     const link = screen.getByRole("link", { name: /エリアの予約/ });
-    expect(link).toHaveAttribute("href", LABOLA_HYROX_URL);
+    expect(link).toHaveAttribute("href", HYROX_TODAY_URL);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
@@ -114,11 +124,29 @@ describe("ReserveChoice", () => {
 
   it("移行前の予約先(RESERVA)への導線を残さない", () => {
     renderWithIntl(<ReserveChoice />);
-    const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(4);
-    for (const link of links) {
+    for (const link of screen.getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toMatch(/reserva\.be/);
     }
+  });
+
+  it("日付ボタンは枠貸しの2枚(コート・HYROXエリア)だけに並ぶ", () => {
+    renderWithIntl(<ReserveChoice />);
+    const groups = screen.getAllByRole("group", {
+      name: "日付を選んで空き状況を見る",
+    });
+    expect(groups).toHaveLength(2);
+    // 木曜: 今日・明日・土・日 の4件ずつ
+    expect(screen.getAllByRole("link", { name: /^今日 / })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: /^日曜 / })).toHaveLength(2);
+    // レッスン・イベントのカードは従来どおり(日付ボタンなし)
+    expect(
+      screen.getByRole("link", { name: /レッスンの予約/ }),
+    ).toHaveAttribute("href", LABOLA_SCHOOL_URL);
+  });
+
+  it("ビジター予約の注記は LaBOLA へ進む3枚にだけ付く", () => {
+    renderWithIntl(<ReserveChoice />);
+    expect(screen.getAllByText(/会員登録なしで予約できます/)).toHaveLength(3);
   });
 
   it("3種類の外部予約クリックを reservation_click として計測する", async () => {

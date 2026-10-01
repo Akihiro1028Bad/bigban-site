@@ -24,6 +24,7 @@ interface NewsBodyRendererProps {
   isFirstImageLcp?: boolean;
   locale?: Locale;
   articleSlug?: string;
+  shouldUnlinkBookingLinks?: boolean;
 }
 
 const ARTICLE_BODY_CTA_LOCATION = "article_body_cta";
@@ -228,6 +229,7 @@ export function NewsBodyRenderer({
   isFirstImageLcp = false,
   locale = "ja",
   articleSlug,
+  shouldUnlinkBookingLinks = false,
 }: NewsBodyRendererProps) {
   const handleBodyClick: MouseEventHandler<HTMLDivElement> | undefined =
     articleSlug
@@ -250,7 +252,10 @@ export function NewsBodyRenderer({
   if (displayMode === "html") {
     if (bodyHtml.trim().length > 0) {
       return renderBody(
-        sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+        sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, {
+          isFirstImageLcp,
+          shouldUnlinkBookingLinks,
+        }),
         handleBodyClick,
       );
     }
@@ -259,7 +264,10 @@ export function NewsBodyRenderer({
         "[NewsBodyRenderer] displayMode=html だが bodyHtml が空のため body (rich) にフォールバック",
       );
       return renderBody(
-        sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+        sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, {
+          isFirstImageLcp,
+          shouldUnlinkBookingLinks,
+        }),
         handleBodyClick,
       );
     }
@@ -268,13 +276,19 @@ export function NewsBodyRenderer({
 
   if (body.trim().length > 0) {
     return renderBody(
-      sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+      sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, {
+        isFirstImageLcp,
+        shouldUnlinkBookingLinks,
+      }),
       handleBodyClick,
     );
   }
   if (bodyHtml.trim().length > 0) {
     return renderBody(
-      sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+      sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, {
+        isFirstImageLcp,
+        shouldUnlinkBookingLinks,
+      }),
       handleBodyClick,
     );
   }

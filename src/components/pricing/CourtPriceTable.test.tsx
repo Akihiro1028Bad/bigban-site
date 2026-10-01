@@ -41,14 +41,18 @@ describe("CourtPriceTable", () => {
   it("通常料金を表示する", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
     expect(screen.getByText("¥4,980")).toBeInTheDocument();
-    expect(screen.getByText("¥5,980")).toBeInTheDocument();
+    expect(screen.getByText("¥3,980")).toBeInTheDocument();
+    // 平日 9:00-17:00 と 深夜帯の週末 ¥5,980
+    expect(screen.getAllByText("¥5,980")).toHaveLength(2);
     expect(screen.getAllByText("¥7,980")).toHaveLength(4);
   });
 
-  it("平日の会員価格 ¥3,500 / ¥4,200 / ¥5,600 を表示する", () => {
+  it("会員価格 ¥2,800 / ¥3,500 / ¥4,200 / ¥5,600 を表示する", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
+    expect(screen.getByText(memberPrice("PBT CLUB会員 ¥2,800"))).toBeInTheDocument();
     expect(screen.getByText(memberPrice("PBT CLUB会員 ¥3,500"))).toBeInTheDocument();
-    expect(screen.getByText(memberPrice("PBT CLUB会員 ¥4,200"))).toBeInTheDocument();
+    // 平日 9:00-17:00 の1件 + 深夜帯の週末 ¥4,200
+    expect(screen.getAllByText(memberPrice("PBT CLUB会員 ¥4,200"))).toHaveLength(2);
     // 平日 17:00-23:00 の1件 + 土日祝の3件
     expect(screen.getAllByText(memberPrice("PBT CLUB会員 ¥5,600"))).toHaveLength(4);
   });
@@ -64,20 +68,20 @@ describe("CourtPriceTable", () => {
 
   it("ラベルと金額は別 span で、それぞれ途中改行しない", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
-    // 3行 × 平日/週末の6セル分。ラベル・金額とも whitespace-nowrap で保護する。
+    // 4行 × 平日/週末の8セル分。ラベル・金額とも whitespace-nowrap で保護する。
     const labels = screen.getAllByText("PBT CLUB会員");
-    expect(labels).toHaveLength(6);
+    expect(labels).toHaveLength(8);
     for (const label of labels) {
       expect(label.className).toContain("whitespace-nowrap");
     }
-    const memberAmount = screen.getByText("¥4,200");
+    const memberAmount = screen.getByText("¥2,800");
     expect(memberAmount.className).toContain("whitespace-nowrap");
   });
 
   it("時間帯セルは途中改行しない", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
     // 会員価格で料金列が広がるため、時間帯が「6:00-」「9:00」に割れるのを防ぐ。
-    for (const timeSlot of ["6:00-9:00", "9:00-17:00", "17:00-23:00"]) {
+    for (const timeSlot of ["6:00-9:00", "9:00-17:00", "17:00-23:00", "23:00-25:00"]) {
       expect(screen.getByText(timeSlot).className).toContain(
         "whitespace-nowrap",
       );
@@ -93,12 +97,12 @@ describe("CourtPriceTable", () => {
     ).toBeInTheDocument();
   });
 
-  it("PBT CLUB 詳細記事へのリンクを表示する", () => {
+  it("PBT CLUB 専用ページへのリンクを表示する", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
     const link = screen.getByRole("link", {
       name: /PBT CLUBについて詳しく見る/,
     });
-    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    expect(link).toHaveAttribute("href", "/pbt-club");
   });
 
   it("詳細リンククリックで contentClick を pbtClubLocation 付きで計測する", async () => {

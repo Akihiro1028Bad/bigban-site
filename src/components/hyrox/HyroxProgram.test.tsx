@@ -17,13 +17,20 @@ describe("HyroxProgram", () => {
     ).toBeInTheDocument();
   });
 
+  it("NEXT RACE のボタンのアンカー先として id=program を持つ", () => {
+    const { container } = renderWithIntl(<HyroxProgram />);
+    expect(container.querySelector("section#program")).toBeInTheDocument();
+  });
+
   it("ピックルと同一のコート料金テーブル（時間帯別・1時間あたり）を表示する", () => {
     renderWithIntl(<HyroxProgram />);
     expect(screen.getByText("エリア利用料")).toBeInTheDocument();
     expect(screen.getByText("1時間あたりの料金")).toBeInTheDocument();
     expect(screen.getByText("6:00-9:00")).toBeInTheDocument();
+    expect(screen.getByText("23:00-25:00")).toBeInTheDocument();
     expect(screen.getByText("¥4,980")).toBeInTheDocument();
-    expect(screen.getByText("¥5,980")).toBeInTheDocument();
+    expect(screen.getByText("¥3,980")).toBeInTheDocument();
+    expect(screen.getAllByText("¥5,980")).toHaveLength(2);
     expect(screen.getAllByText("¥7,980").length).toBeGreaterThan(0);
     expect(screen.getByText("平日")).toBeInTheDocument();
     expect(screen.getByText("週末・祝日")).toBeInTheDocument();
@@ -49,8 +56,9 @@ describe("HyroxProgram", () => {
 
   it("ピックルと同じ PBT CLUB 会員価格を表示する", () => {
     renderWithIntl(<HyroxProgram />);
-    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(6);
-    expect(screen.getByText("¥4,200")).toBeInTheDocument();
+    expect(screen.getAllByText("PBT CLUB会員")).toHaveLength(8);
+    expect(screen.getByText("¥2,800")).toBeInTheDocument();
+    expect(screen.getAllByText("¥4,200")).toHaveLength(2);
     expect(screen.getAllByText("¥5,600")).toHaveLength(4);
   });
 
@@ -60,7 +68,7 @@ describe("HyroxProgram", () => {
     const link = screen.getByRole("link", {
       name: /PBT CLUBについて詳しく見る/,
     });
-    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    expect(link).toHaveAttribute("href", "/pbt-club");
     link.addEventListener("click", (event) => event.preventDefault());
     await userEvent.click(link);
     expect(trackCtaClick).toHaveBeenCalledWith(

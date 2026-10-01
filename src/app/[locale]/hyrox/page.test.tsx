@@ -62,7 +62,7 @@ describe("Hyrox generateMetadata", () => {
     expect(metadata.description).toBe("translated:hyrox.description");
     expect(calls).toContainEqual([
       "hyrox.description",
-      { trialMinutes: 50, trialPrice: "3,000円", open: "6:00", close: "23:00" },
+      { trialMinutes: 50, trialPrice: "3,000円", open: "6:00", close: "25:00" },
     ]);
   });
 
@@ -93,6 +93,11 @@ describe("Hyrox Page", () => {
     const element = await HyroxPage({ params: Promise.resolve({ locale: "ja" }) });
     const { container } = render(element);
     expect(container).toBeTruthy();
+  });
+
+  it("クローラが見る HTML が古くなりすぎないよう 1 時間ごとに再生成する", async () => {
+    const { revalidate } = await import("./page");
+    expect(revalidate).toBe(3600);
   });
 
   it("不正 locale で notFound", async () => {

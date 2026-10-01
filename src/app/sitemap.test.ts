@@ -27,6 +27,7 @@ describe("sitemap", () => {
     expect(urls).toContain(`${PROD_URL}/reserve`);
     expect(urls).toContain(`${PROD_URL}/first-visit`);
     expect(urls).toContain(`${PROD_URL}/hyrox`);
+    expect(urls).toContain(`${PROD_URL}/pbt-club`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
     expect(urls).toContain(`${PROD_URL}/contributors`);
     expect(urls).toContain(`${PROD_URL}/news`);
@@ -39,6 +40,16 @@ describe("sitemap", () => {
     const hyrox = entries.find((e) => e.url === `${PROD_URL}/hyrox`);
     expect(hyrox).toBeDefined();
     expect(hyrox?.alternates?.languages?.en).toBe(`${PROD_URL}/en/hyrox`);
+  });
+
+  it("/pbt-club を ja/en alternates 付きで含む", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+
+    const pbtClub = entries.find((e) => e.url === `${PROD_URL}/pbt-club`);
+    expect(pbtClub).toBeDefined();
+    expect(pbtClub?.alternates?.languages?.en).toBe(`${PROD_URL}/en/pbt-club`);
+    expect(entries.some((e) => e.url === `${PROD_URL}/en/pbt-club`)).toBe(true);
   });
 
   it("/teaser / /facility / /services は sitemap に含まれない", async () => {

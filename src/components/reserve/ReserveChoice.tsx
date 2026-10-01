@@ -4,16 +4,16 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
-import { trackCtaClick, trackLabolaEntry } from "@/lib/analytics/trackEvent";
 import {
+  labolaTabNameOf,
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
   TENNISBEAR_EVENTS_URL,
-  EXTERNAL_LINK_PROPS,
 } from "@/constants/site";
 import type { LabolaCalendarTabKey } from "@/constants/site";
 import type { LabolaEntryKind } from "@/lib/analytics/labolaEvents";
+import ReserveCardActions from "./ReserveCardActions";
 
 interface ChoiceCard {
   tagKey: string;
@@ -26,6 +26,9 @@ interface ChoiceCard {
   // イベント/スクール申込は遷移先が labola ではないため未指定
   // (指定すると labola のファネル集計に無関係な流入が混ざる)。
   labolaEntryKind?: LabolaEntryKind;
+  // 指定したカードだけ、メインボタンを「今日の1日表示」にして日付ボタンを並べる
+  // (枠貸し=calendar 系のカードのみ)。labola のカテゴリ名はキーから引く。
+  calendarTabKey?: LabolaCalendarTabKey;
 }
 
 // 旧予約システム(RESERVA)からの移行は完了済みで、予約先は labola に一本化されている。
@@ -39,6 +42,7 @@ const COURT_CARD: ChoiceCard = {
   href: LABOLA_PICKLEBALL_URL,
   location: "reserve_choice_august",
   labolaEntryKind: "rental",
+  calendarTabKey: "pickleball",
 };
 
 // 早朝ピックルボール等の主催イベント / スクールの申込。枠貸しの labola とは別導線。
@@ -63,6 +67,7 @@ const HYROX_AREA_CARD: ChoiceCard = {
   href: LABOLA_HYROX_URL,
   location: "reserve_choice_hyrox_area",
   labolaEntryKind: "rental",
+  calendarTabKey: "hyrox",
 };
 
 const HYROX_LESSON_CARD: ChoiceCard = {
@@ -105,20 +110,17 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
           <p className="mt-2 flex-1 text-sm leading-relaxed text-text-gray sm:mt-3">
             {t(card.descKey)}
           </p>
-          <a
-            href={card.href}
-            {...EXTERNAL_LINK_PROPS}
-            onClick={() => {
-              trackCtaClick("reservation", card.location, t(card.ctaKey));
-              if (card.labolaEntryKind) trackLabolaEntry(card.labolaEntryKind);
-            }}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3.5 text-sm font-bold tracking-[0.15em] text-deep-black transition-all hover:gap-3 hover:bg-accent/90 sm:mt-8 sm:py-4"
-          >
-            {t(card.ctaKey)}
-            <span aria-hidden className="text-base leading-none">
-              →
-            </span>
-          </a>
+          <ReserveCardActions
+            ctaLabel={t(card.ctaKey)}
+            fallbackHref={card.href}
+            location={card.location}
+            labolaEntryKind={card.labolaEntryKind}
+            tabName={
+              card.calendarTabKey === undefined
+                ? undefined
+                : labolaTabNameOf(card.calendarTabKey)
+            }
+          />
         </motion.div>
       ))}
     </div>

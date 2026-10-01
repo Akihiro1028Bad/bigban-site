@@ -498,4 +498,106 @@ describe("NewsDetailPage", () => {
       expect(meta.openGraph).not.toHaveProperty("images");
     });
   });
+
+  describe("終了したイベント(eventEndAt)", () => {
+    const ENDED = "2020-01-01T00:00:00.000Z";
+    const LIVE = "2099-01-01T00:00:00.000Z";
+    const bookingBody =
+      '<p><a href="https://yoyaku.labola.jp/r/shop/3473/">LaBOLAで申込</a> <a href="https://www.thepicklebang.com/reserve">本文内の予約案内</a></p>';
+
+    it("終了で、バッジ・帯が出て、予約先リンクが外れる", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({
+          slug: "ended",
+          eventEndAt: ENDED,
+          bodyHtml: bookingBody,
+        }),
+      );
+      await renderPage({ locale: "ja", slug: "ended" });
+
+      expect(screen.getByText("終了")).toBeInTheDocument();
+      expect(screen.getByRole("note")).toHaveTextContent(
+        "このお知らせの期間は終了しました。",
+      );
+      expect(screen.queryByRole("link", { name: "LaBOLAで申込" })).toBeNull();
+      expect(screen.getByText(/LaBOLAで申込/)).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "本文内の予約案内" }),
+      ).toBeInTheDocument();
+    });
+
+    it("英語は Ended と英語の帯", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({ locale: "en", slug: "ended", eventEndAt: ENDED }),
+      );
+      await renderPage({ locale: "en", slug: "ended" });
+      expect(screen.getByText("Ended")).toBeInTheDocument();
+      expect(screen.getByRole("note")).toHaveTextContent(
+        "The period for this announcement has ended.",
+      );
+    });
+
+    it("未終了では何も変わらない", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({ slug: "live", eventEndAt: LIVE, bodyHtml: bookingBody }),
+      );
+      await renderPage({ locale: "ja", slug: "live" });
+      expect(screen.queryByText("終了")).toBeNull();
+      expect(screen.queryByRole("note")).toBeNull();
+      expect(
+        screen.getByRole("link", { name: "LaBOLAで申込" }),
+      ).toBeInTheDocument();
+    });
+
+    it("終了時、予約先の externalLink ボタンは出さない", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({
+          slug: "ended-ext",
+          eventEndAt: ENDED,
+          externalLink: {
+            label: "テニスベアで申込",
+            url: "https://www.tennisbear.net/events/1",
+          },
+        }),
+      );
+      await renderPage({ locale: "ja", slug: "ended-ext" });
+      expect(
+        screen.queryByRole("link", { name: /テニスベアで申込/ }),
+      ).toBeNull();
+    });
+
+    it("終了しても、予約先以外の externalLink ボタンは残す", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({
+          slug: "ended-other",
+          eventEndAt: ENDED,
+          externalLink: {
+            label: "開催レポート",
+            url: "https://www.instagram.com/p/abc/",
+          },
+        }),
+      );
+      await renderPage({ locale: "ja", slug: "ended-other" });
+      expect(
+        screen.getByRole("link", { name: /開催レポート/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("未終了なら予約先の externalLink ボタンを出す", async () => {
+      getNewsDetailMock.mockResolvedValue(
+        makeNewsItem({
+          slug: "live-ext",
+          eventEndAt: LIVE,
+          externalLink: {
+            label: "テニスベアで申込",
+            url: "https://www.tennisbear.net/events/1",
+          },
+        }),
+      );
+      await renderPage({ locale: "ja", slug: "live-ext" });
+      expect(
+        screen.getByRole("link", { name: /テニスベアで申込/ }),
+      ).toBeInTheDocument();
+    });
+  });
 });

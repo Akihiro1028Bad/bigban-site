@@ -172,7 +172,7 @@ export function TeaserContent({ logoSrc }: TeaserContentProps) {
           {[
             { label: "LOCATION", value: "本八幡駅 徒歩1分", href: GOOGLE_BUSINESS_PROFILE_URL },
             { label: "COURTS", value: "プロ仕様ハードコート 3面" },
-            { label: "OPEN", value: "6:00 – 23:00" },
+            { label: "OPEN", value: "6:00 – 25:00" },
             { label: "FOUNDER", value: "西村昭彦", href: "https://www.instagram.com/akihiko.rst" },
           ].map((fact) => (
             <div key={fact.label} className="flex items-baseline gap-3 py-2">

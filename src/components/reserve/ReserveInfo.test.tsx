@@ -17,7 +17,7 @@ function renderWithIntl(ui: ReactElement) {
 describe("ReserveInfo", () => {
   it("営業時間とアクセスを表示する", () => {
     renderWithIntl(<ReserveInfo />);
-    expect(screen.getByText("6:00 – 23:00（不定休）")).toBeInTheDocument();
+    expect(screen.getByText("6:00 – 25:00（不定休）")).toBeInTheDocument();
     expect(screen.getByText("本八幡駅 徒歩1分")).toBeInTheDocument();
   });
 

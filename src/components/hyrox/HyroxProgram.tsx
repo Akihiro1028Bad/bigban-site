@@ -12,7 +12,7 @@ export default function HyroxProgram() {
   const t = useTranslations("HyroxPage.program");
 
   return (
-    <section className="bg-deep-black pb-12 lg:pb-16 text-text-light">
+    <section id="program" className="scroll-mt-24 bg-deep-black pb-12 lg:pb-16 text-text-light">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <motion.div
           className="mb-10 text-center"
