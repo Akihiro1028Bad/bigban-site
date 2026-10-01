@@ -16,6 +16,7 @@
     "growth:gen-eyecatch": "tsx scripts/growth/gen-eyecatch.ts",
     "growth:gen-body-image": "tsx scripts/growth/gen-body-image.ts",
     "growth:body-diff": "tsx scripts/growth/body-diff.ts",
+    "analytics:weekly": "tsx scripts/analytics/weekly/weekly-health.ts",
     "early:sync": "tsx scripts/early-morning/early-sync.ts",
     "hyrox:sync": "tsx scripts/hyrox-class/hyrox-sync.ts"
   },
@@ -30,6 +31,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
