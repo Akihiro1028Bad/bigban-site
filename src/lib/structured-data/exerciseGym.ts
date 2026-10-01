@@ -1,7 +1,6 @@
 import { COURT_PRICES, HYROX_LESSON_PRICES } from "@/constants/pricing";
 import { SITE_URL } from "@/constants/site";
 import {
-  FACILITY_TELEPHONE,
   buildFacilityAddress,
   buildFacilityGeo,
   buildFacilityOpeningHours,
@@ -28,7 +27,6 @@ export interface ExerciseGymSchema {
   areaServed: { "@type": "AdministrativeArea"; name: string };
   address: PostalAddressSchema;
   geo: GeoCoordinatesSchema;
-  telephone: string;
   openingHoursSpecification: OpeningHoursSpecificationSchema[];
   priceRange: string;
   employee: { "@id": string };
@@ -70,7 +68,6 @@ export function buildExerciseGym(locale: Locale): ExerciseGymSchema {
     areaServed: { "@type": "AdministrativeArea", name: "千葉県市川市" },
     address: buildFacilityAddress(),
     geo: buildFacilityGeo(),
-    telephone: FACILITY_TELEPHONE,
     openingHoursSpecification: buildFacilityOpeningHours(),
     priceRange: buildPriceRange(),
     employee: { "@id": SEKIYOSHI_ID },

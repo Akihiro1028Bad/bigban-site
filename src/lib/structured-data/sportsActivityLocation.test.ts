@@ -64,13 +64,13 @@ describe("buildSportsActivityLocation", () => {
     });
   });
 
-  it("電話番号を国際形式で返す", async () => {
+  it("電話番号を構造化データに含めない(問い合わせはフォーム・LINE)", async () => {
     const { buildSportsActivityLocation } = await import(
       "./sportsActivityLocation"
     );
     const schema = buildSportsActivityLocation("ja");
 
-    expect(schema.telephone).toBe("+81-90-5523-3879");
+    expect(schema).not.toHaveProperty("telephone");
   });
 
   it("営業時間（全曜日 06:00-翌01:00）を返す", async () => {

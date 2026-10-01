@@ -214,7 +214,7 @@
     "info": {
       "heading": "INFORMATION",
       "hoursLabel": "Hours",
-      "hoursValue": "6:00 AM – 1:00 AM (irregular holidays)",
+      "hoursValue": "6:00 AM – 1:00 AM (open every day)",
       "accessLabel": "Access",
       "accessStation": "1 min from Motoyawata Station",
       "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
@@ -227,7 +227,8 @@
         "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
         "Late arrivals are accommodated only within the reserved time slot.",
         "Rental paddles are available for ¥500 each (up to 6 per court).",
-        "Rental shoes are not available."
+        "Rental shoes are not available.",
+        "Shower facilities are not available."
       ]
     },
     "guide": {
@@ -275,7 +276,7 @@
         },
         {
           "question": "What payment methods do you accept?",
-          "answer": "On-site payments can be made by credit card or PayPay."
+          "answer": "Payment is made online in advance when you book (credit card or PayPay)."
         }
       ]
     }
@@ -594,7 +595,7 @@
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-    "hours": "Hours: 6:00 AM – 1:00 AM (Irregular holidays)",
+    "hours": "Hours: 6:00 AM – 1:00 AM (Open every day)",
     "routes": {
       "jr": {
         "line": "JR Sobu Line",
@@ -809,7 +810,7 @@
     "cardPayment": "Card Payment",
     "cardPaymentValue": "First payment at signup; monthly payments on the 20th thereafter",
     "returns": "Returns / Exchanges / Cancellations",
-    "returnsValue": "Not accepted except for defective products",
+    "returnsValue": "Not accepted except for defective products. Cancellations and changes to court and event bookings follow the rules set by the booking system (LaBOLA); please check the details when you book.",
     "deadline": "Claim Deadline",
     "deadlineValue": "Within 2 weeks of purchase",
     "shippingCost": "Return Shipping",

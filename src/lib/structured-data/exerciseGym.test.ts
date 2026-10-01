@@ -16,12 +16,12 @@ describe("buildExerciseGym", () => {
     expect(schema.url).toBe("http://localhost:3000/en/hyrox");
   });
 
-  it("住所・座標・電話・営業時間が SportsActivityLocation と一致する(二重管理しない)", () => {
+  it("住所・座標・営業時間が SportsActivityLocation と一致する(二重管理しない)", () => {
     const gym = buildExerciseGym("ja");
     const facility = buildSportsActivityLocation("ja");
     expect(gym.address).toEqual(facility.address);
     expect(gym.geo).toEqual(facility.geo);
-    expect(gym.telephone).toBe(facility.telephone);
+    expect(gym).not.toHaveProperty("telephone");
     expect(gym.openingHoursSpecification).toEqual(
       facility.openingHoursSpecification,
     );

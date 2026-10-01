@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
+import enMessages from "../../../messages/en.json";
 import HomeAccess from "./HomeAccess";
 
 const trackCtaClick = vi.fn();
@@ -61,6 +62,30 @@ describe("HomeAccess", () => {
     );
     expect(screen.getByText(/6:00/)).toBeInTheDocument();
     expect(screen.getByText(/25:00/)).toBeInTheDocument();
+  });
+
+  it("営業時間は年中無休を示し「不定休」を含めない", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeAccess />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByText("営業時間：6:00 – 25:00（年中無休）")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/不定休/)).not.toBeInTheDocument();
+  });
+
+  it("英語ロケールの営業時間は年中無休を示す", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <HomeAccess />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByText("Hours: 6:00 AM – 1:00 AM (Open every day)")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/irregular/i)).not.toBeInTheDocument();
   });
 
   it("3つの駅アクセスを表示する", () => {
