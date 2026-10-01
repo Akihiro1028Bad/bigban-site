@@ -98,6 +98,10 @@
       "title": "PBT CLUB｜月額会員の料金・特典・損益分岐",
       "description": "PBT CLUB は月額¥10,000（税込）の会員制度。コート・HYROXエリアの会員料金（1時間 ¥2,800〜¥5,600）、30日前からの先行予約、ポイント2倍が付きます。平日17:00〜23:00・土日祝の6:00〜23:00なら月5時間以上のご利用で元が取れます。"
     },
+    "private": {
+      "title": "貸切・法人",
+      "description": "THE PICKLE BANG THEORY の貸切・法人利用のご案内。3面のコート、トレーニングエリア、ラウンジスペースを含む施設全体の貸切をご相談いただけます。本八幡駅徒歩1分、毎日{open}–{close}営業。"
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -294,6 +298,77 @@
       ]
     }
   },
+  "Private": {
+    "hero": {
+      "title": "PRIVATE & CORPORATE",
+      "subtitle": "貸切・法人利用",
+      "lead": "3面のコートや、トレーニングエリア・ラウンジスペースを含む施設全体の貸切を承ります。まずはご希望の日時とご人数をお知らせください。"
+    },
+    "scope": {
+      "heading": "ご利用いただける内容",
+      "items": {
+        "court": {
+          "title": "コートの貸切",
+          "description": "3面のコートを、コート単位でも施設全体でも貸切にできます。サーフェスはデコターフです。"
+        },
+        "facility": {
+          "title": "施設全体の貸切",
+          "description": "HYROX公式8種目に対応したトレーニングエリアやラウンジスペースを含む、施設全体の貸切もご相談ください。"
+        },
+        "showCourt": {
+          "title": "ショーコート形式",
+          "description": "レイアウトを変更して、1面のショーコートとしてもご利用いただけます。"
+        },
+        "amenities": {
+          "title": "設備",
+          "description": "ラウンジスペース、男女別更衣室、自動販売機をご利用いただけます。"
+        }
+      }
+    },
+    "guide": {
+      "heading": "人数・時間帯・料金",
+      "items": {
+        "people": {
+          "title": "ご人数",
+          "description": "ご人数に応じて、ご利用いただくコートの面数や範囲をご提案します。まずはおおよその人数をお知らせください。"
+        },
+        "hours": {
+          "title": "時間帯",
+          "description": "営業時間 {open}–{close}(毎日)の中で、ご希望の日時をご相談ください。"
+        },
+        "price": {
+          "title": "料金",
+          "description": "お問い合わせください。ご希望の内容に合わせてご案内します。"
+        }
+      }
+    },
+    "flow": {
+      "heading": "ご利用の流れ",
+      "steps": {
+        "inquiry": {
+          "title": "お問い合わせ",
+          "description": "フォームに、ご希望の日時・ご人数・ご利用目的をご記入のうえ送信してください。"
+        },
+        "contact": {
+          "title": "ご連絡",
+          "description": "担当者からメールでご連絡します。"
+        },
+        "confirm": {
+          "title": "内容のご確認",
+          "description": "料金・お支払い・キャンセルなどの条件は、お問い合わせの際にご案内します。"
+        },
+        "use": {
+          "title": "ご利用",
+          "description": "ご予定の日時にお越しください。"
+        }
+      }
+    },
+    "cta": {
+      "title": "貸切・法人利用のご相談",
+      "description": "ご希望の日時・ご人数・ご利用目的をご記入ください。",
+      "button": "お問い合わせフォームへ"
+    }
+  },
   "HomeHero": {
     "headline1": "ピックルボールの",
     "headline2": "ビッグバンが",
@@ -439,9 +514,9 @@
     "memberDetailLink": "PBT CLUBについて詳しく見る",
     "rentalPaddleNote": "レンタルパドル 1本 ¥500（1コートにつき6本まで）／レンタルシューズの貸出はございません",
     "hyroxRateNote": "HYROXエリアレンタルも同一料金です（4名まで／5名目以降は1名につき+¥1,000）",
-    "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切をご希望、法人利用ご希望の場合は",
-    "contactUs": "お問い合わせ",
-    "pleaseContact": "ください。",
+    "privateFacilityNote": "トレーニングエリアやラウンジスペースを含む施設全ての貸切、法人利用をご希望の場合は",
+    "contactUs": "貸切・法人のご案内",
+    "pleaseContact": "をご覧ください。",
     "titleJa": "料金プラン",
     "reserveCta": "コートを予約する"
   },
@@ -633,6 +708,7 @@
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "特定商取引法に基づく表記",
     "contributors": "クラウドファンディング支援者",
+    "privateCorporate": "貸切・法人",
     "address": "〒272-0021 千葉県市川市八幡2-16-6 八幡ハタビル 6階",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -769,6 +845,7 @@
       "categoryDefault": "選択してください",
       "categoryCourt": "コート予約",
       "categoryLesson": "レッスンについて",
+      "categoryPrivate": "貸切・法人",
       "categoryPress": "取材依頼",
       "categoryOther": "その他",
       "sendMessage": "SEND MESSAGE",

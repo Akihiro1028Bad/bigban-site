@@ -194,6 +194,15 @@ describe("HomeFooter", () => {
     expect(link).toHaveAttribute("href", "/contributors");
   });
 
+  it("貸切・法人ページへのリンクを表示する", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByRole("link", { name: "貸切・法人" })).toHaveAttribute("href", "/private");
+  });
+
   it("フッターに HYROX ページへのリンクがある", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>

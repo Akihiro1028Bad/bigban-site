@@ -68,6 +68,20 @@ describe("POST /api/contact", () => {
     expect(replyArg.text).toContain("山田太郎");
   });
 
+  it("種別 private(貸切・法人)を受理し、件名と本文にラベルを入れる", async () => {
+    mockSend.mockResolvedValue({ data: { id: "email_123" }, error: null });
+
+    const { POST } = await import("./route");
+    const response = await POST(
+      createRequest({ ...VALID_BODY, category: "private" }),
+    );
+
+    expect(response.status).toBe(201);
+    const adminArg = mockSend.mock.calls[0][0];
+    expect(adminArg.subject).toBe("【貸切・法人】山田太郎様からのお問い合わせ");
+    expect(adminArg.text).toContain("カテゴリ: 貸切・法人");
+  });
+
   it("名前なしで400を返す", async () => {
     const { POST } = await import("./route");
     const response = await POST(

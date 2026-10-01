@@ -130,6 +130,12 @@ export default function HomeFooter({ showColumns = false }: HomeFooterProps) {
             >
               {tFooter("contributors")}
             </Link>
+            <Link
+              href="/private"
+              className="text-xs text-text-gray hover:text-text-light transition-colors"
+            >
+              {tFooter("privateCorporate")}
+            </Link>
           </div>
           <p className="text-xs text-text-gray">
             {tFooter("address")}

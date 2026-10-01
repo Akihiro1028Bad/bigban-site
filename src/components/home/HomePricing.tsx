@@ -78,7 +78,7 @@ export default function HomePricing() {
             <p className="text-text-gray text-sm">
               {t("privateFacilityNote")}
               <Link
-                href="/about#contact"
+                href="/private"
                 onClick={() => trackCtaClick("price", "home_pricing")}
                 className="text-accent hover:underline"
               >

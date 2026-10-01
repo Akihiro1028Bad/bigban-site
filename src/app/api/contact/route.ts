@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { isContactCategory, type ContactCategory } from "@/constants/contact";
 import { buildAutoReplyHtml, buildAutoReplyText } from "@/lib/email-templates";
 
 interface ContactRequestBody {
@@ -12,11 +13,10 @@ interface ContactRequestBody {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const VALID_CATEGORIES = new Set(["court", "lesson", "press", "other"]);
-
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<ContactCategory, string> = {
   court: "コート予約",
   lesson: "レッスン",
+  private: "貸切・法人",
   press: "取材",
   other: "その他",
 };
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!category || !VALID_CATEGORIES.has(category)) {
+  if (!isContactCategory(category)) {
     return NextResponse.json(
       { success: false, error: "カテゴリを選択してください" },
       { status: 400 },
@@ -58,8 +58,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // category is validated against VALID_CATEGORIES, all of which have labels
-  const categoryLabel = CATEGORY_LABELS[category] as string;
+  const categoryLabel = CATEGORY_LABELS[category];
 
   const textLines = [
     `名前: ${name}`,

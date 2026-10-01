@@ -87,6 +87,10 @@
       "title": "PBT CLUB | Membership rates, perks and break-even hours",
       "description": "PBT CLUB is a ¥10,000/month (tax included) membership. Member rates for the courts and HYROX area (¥2,800–¥5,600 per hour), booking 30 days ahead, and double PBT points. On weekdays 17:00–23:00 and weekends/holidays 6:00–23:00, it pays for itself at 5 hours or more a month."
     },
+    "private": {
+      "title": "Private & Corporate",
+      "description": "Private and corporate bookings at THE PICKLE BANG THEORY — our three courts, or the whole facility including the training area and lounge. 1 min from Motoyawata Station, open {open}–{close} every day."
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -280,6 +284,77 @@
       ]
     }
   },
+  "Private": {
+    "hero": {
+      "title": "PRIVATE & CORPORATE",
+      "subtitle": "Private & Corporate Use",
+      "lead": "We take private bookings of our three courts, or the whole facility including the training area and lounge. Start by telling us your preferred date and number of guests."
+    },
+    "scope": {
+      "heading": "What you can book",
+      "items": {
+        "court": {
+          "title": "Court rental",
+          "description": "Reserve our three courts, either individually or together with the whole facility. The surface is DecoTurf."
+        },
+        "facility": {
+          "title": "Whole-facility rental",
+          "description": "Ask us about renting the whole facility, including the HYROX training area (built for the eight official HYROX stations) and the lounge."
+        },
+        "showCourt": {
+          "title": "Show-court layout",
+          "description": "The layout can be changed to a single show court."
+        },
+        "amenities": {
+          "title": "Amenities",
+          "description": "A lounge, separate changing rooms for men and women, and a vending machine are available."
+        }
+      }
+    },
+    "guide": {
+      "heading": "Guests, hours & pricing",
+      "items": {
+        "people": {
+          "title": "Number of guests",
+          "description": "We will suggest how many courts and which areas to use based on your group size. Please tell us roughly how many people are coming."
+        },
+        "hours": {
+          "title": "Hours",
+          "description": "Tell us your preferred date and time within our opening hours, {open}–{close}, every day."
+        },
+        "price": {
+          "title": "Pricing",
+          "description": "Please contact us. We will guide you based on your plans."
+        }
+      }
+    },
+    "flow": {
+      "heading": "How it works",
+      "steps": {
+        "inquiry": {
+          "title": "Inquiry",
+          "description": "Send the form with your preferred date, number of guests and purpose."
+        },
+        "contact": {
+          "title": "We reply",
+          "description": "Our staff will reply by email."
+        },
+        "confirm": {
+          "title": "Confirm the details",
+          "description": "We will explain pricing, payment and cancellation terms when you contact us."
+        },
+        "use": {
+          "title": "Your event",
+          "description": "Come to the facility at the agreed time."
+        }
+      }
+    },
+    "cta": {
+      "title": "Plan a private or corporate booking",
+      "description": "Please include your preferred date, number of guests and purpose.",
+      "button": "Go to the inquiry form"
+    }
+  },
   "HomeHero": {
     "headline1": "The Big Bang",
     "headline2": "of Pickleball",
@@ -425,8 +500,8 @@
     "memberDetailLink": "Learn more about PBT CLUB",
     "rentalPaddleNote": "Rental paddles ¥500 each (up to 6 per court). Rental shoes are not available.",
     "hyroxRateNote": "The HYROX training area rents at the same rates (up to 4 people; +¥1,000 per additional person)",
-    "privateFacilityNote": "For full facility private bookings including training area and lounge, or corporate use, please",
-    "contactUs": "contact us",
+    "privateFacilityNote": "For full facility private bookings including the training area and lounge, or corporate use, see",
+    "contactUs": "Private & Corporate details",
     "pleaseContact": ".",
     "titleJa": "Pricing Plans",
     "reserveCta": "RESERVE A COURT"
@@ -619,6 +694,7 @@
     "copyright": "© 2026 RST Agency Inc.",
     "tokushoho": "Specified Commercial Transactions Act",
     "contributors": "Contributors",
+    "privateCorporate": "Private & Corporate",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba 272-0021",
     "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
     "newsletter": {
@@ -755,6 +831,7 @@
       "categoryDefault": "Please select",
       "categoryCourt": "Court Reservation",
       "categoryLesson": "About Lessons",
+      "categoryPrivate": "Private / Corporate",
       "categoryPress": "Press Inquiry",
       "categoryOther": "Other",
       "sendMessage": "SEND MESSAGE",

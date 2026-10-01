@@ -124,14 +124,14 @@ describe("HomePricing", () => {
     ).toBeInTheDocument();
   });
 
-  it("貸切・法人利用の案内とリンクを表示する", () => {
+  it("貸切・法人利用の案内リンクは専用ページ /private を指す", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomePricing />
       </NextIntlClientProvider>
     );
-    const link = screen.getByText("お問い合わせ");
-    expect(link.closest("a")).toHaveAttribute("href", "/about#contact");
+    const link = screen.getByRole("link", { name: "貸切・法人のご案内" });
+    expect(link).toHaveAttribute("href", "/private");
   });
 
   it("bg-deep-black背景を持つ", () => {
@@ -144,14 +144,14 @@ describe("HomePricing", () => {
     expect(section?.className).toContain("bg-deep-black");
   });
 
-  it("お問い合わせCTAクリックで price_click を計測する", async () => {
+  it("貸切・法人のご案内リンクのクリックで price_click を計測する", async () => {
     trackCtaClick.mockClear();
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomePricing />
       </NextIntlClientProvider>
     );
-    const link = document.querySelector('a[href="/about#contact"]');
+    const link = document.querySelector('a[href="/private"]');
     link?.addEventListener("click", (event) => event.preventDefault());
     await userEvent.click(link!);
     expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
@@ -219,16 +219,6 @@ describe("HomePricing", () => {
     );
   });
 
-  it("貸切・法人利用のお問い合わせリンクは維持される", () => {
-    render(
-      <NextIntlClientProvider locale="ja" messages={jaMessages}>
-        <HomePricing />
-      </NextIntlClientProvider>
-    );
-    expect(
-      document.querySelector('a[href="/about#contact"]')
-    ).toBeInTheDocument();
-  });
 });
 
 /** issue #404: 320px で見出しが枠(272px)を超えないよう、sm 未満だけ流体サイズにする。 */
