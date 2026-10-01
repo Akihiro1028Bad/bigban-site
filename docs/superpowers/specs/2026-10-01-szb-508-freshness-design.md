@@ -33,7 +33,7 @@
 | 場所 | 変更 |
 |---|---|
 | 一覧カード `NewsCard`(ホーム最新ニュース `HomeLatestNews`・ホーム `HomeNews`・about のニュースも同じバッジ部品を使う) | カテゴリ表示の隣に「終了」バッジ(英語は "Ended")。灰色の枠で、カテゴリ色と区別する |
-| 詳細 `news/[slug]` | カテゴリ行にバッジ+本文冒頭に帯「このイベントは終了しました。最新の開催情報は〔ニュース一覧〕〔予約ページ〕へ」(英語: "This event has ended. Check the latest information on the [News] or [Reserve] page.")。リンクは言語別(`/news` `/reserve` ・ `/en/news` `/en/reserve`) |
+| 詳細 `news/[slug]` | カテゴリ行にバッジ+本文冒頭に帯「このお知らせの期間は終了しました。最新の開催情報は〔ニュース一覧〕・〔予約ページ〕をご確認ください。」(英語: "The period for this announcement has ended. Check the latest information on the [News] or [Reserve] page.")。お盆・シルバーウィークなど期間の営業案内にも `eventEndAt` を入れる運用のため、イベント限定でない文言にしている。リンクは言語別(`/news` `/reserve` ・ `/en/news` `/en/reserve`) |
 | 詳細の本文 | 予約先ドメインの `<a>` はテキストだけ残して**リンクを外す**(取り消し線なし)。対象は `labola.jp`(サブドメイン含む)と `tennisbear.net`。サイト内リンク・その他の外部リンク・SNS埋め込みは触らない |
 | 詳細の `externalLink`(末尾ボタン) | 終了済みかつ URL が予約先ドメインなら**ボタンごと非表示**。予約先以外ならそのまま |
 
@@ -44,7 +44,7 @@
 | ファイル | 役割 |
 |---|---|
 | `src/lib/news/ended.ts` | `isNewsEnded`(終了判定) |
-| `src/lib/news/unlinkBookingLinks.ts` | `unlinkBookingLinks(html)`・`isBookingUrl(url)`。サニタイズ済み HTML から予約先リンクを外す |
+| `src/lib/news/unlinkBookingLinks.ts` | `unlinkBookingAnchors(root)`・`isBookingUrl(url)`。**DOM 上で**予約先リンクを外す(文字列の正規表現は使わない)。`sanitizeNewsHtml` の `shouldUnlinkBookingLinks` オプションから、1回目のサニタイズ(`RETURN_DOM_FRAGMENT`)→DOM で除去→文字列化→2回目のサニタイズ、の順で呼ばれる |
 | `src/lib/news/endedLabels.ts` | 「終了」「Ended」・帯の文言・行き先パス |
 | `src/components/news/NewsEndedBadge.tsx` | バッジ(カード・詳細で共用) |
 | `src/components/news/NewsEndedNotice.tsx` | 詳細の帯 |
@@ -88,3 +88,8 @@
 - 新しい依存の追加: **なし**
 - コード diff は 400 行未満の見込み(テスト込みで超えそうなら分割を司令塔に相談)
 - 検証: `npm run test:coverage`・`npm run lint`・`npx tsc --noEmit`・dev サーバー(ポート 3203)で 375px / 1440px のスクリーンショット(終了あり・なしの両方。本番に書けないため、ローカルでは microCMS の取得結果を差し替えた状態で確認する)
+
+## 10. 改訂(PR #519 レビュー対応)
+
+- 予約先リンクの除去を「サニタイズ後の HTML に正規表現」から「DOM 上で除去して再サニタイズ」に変更した。正規表現だと、属性値の中の `<a ...>` 風の文字列を本物のリンクと誤認し、後続の属性が壊れて on* 属性が生える経路ができるため(`<` `>` は属性値の中でエスケープされない)。`a[href]` セレクタは `data-href` に当たらず、`<a>` 自身の属性値に `>` があっても影響されない
+- 帯の文言をイベント限定でない表現に変更(§3)

@@ -7,7 +7,7 @@ describe("NewsEndedNotice", () => {
   it("日本語: 終了の告知とニュース一覧・予約ページへのリンク", () => {
     render(<NewsEndedNotice locale="ja" />);
     expect(screen.getByRole("note")).toHaveTextContent(
-      "このイベントは終了しました。",
+      "このお知らせの期間は終了しました。",
     );
     expect(screen.getByRole("link", { name: "ニュース一覧" })).toHaveAttribute(
       "href",
@@ -21,7 +21,7 @@ describe("NewsEndedNotice", () => {
 
   it("英語: ロケール接頭辞つきのリンク", () => {
     render(<NewsEndedNotice locale="en" />);
-    expect(screen.getByRole("note")).toHaveTextContent("This event has ended.");
+    expect(screen.getByRole("note")).toHaveTextContent("The period for this announcement has ended.");
     expect(screen.getByRole("link", { name: "News" })).toHaveAttribute(
       "href",
       "/en/news",

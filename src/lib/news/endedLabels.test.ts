@@ -7,7 +7,7 @@ describe("getEndedLabels", () => {
     const labels = getEndedLabels("ja");
     expect(labels.badge).toBe("終了");
     expect(labels.message).toBe(
-      "このイベントは終了しました。最新の開催情報は",
+      "このお知らせの期間は終了しました。最新の開催情報は",
     );
     expect(labels.newsLabel).toBe("ニュース一覧");
     expect(labels.reserveLabel).toBe("予約ページ");

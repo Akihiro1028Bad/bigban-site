@@ -1,11 +1,6 @@
 // 終了したイベントの本文から外す、予約先ドメイン(サブドメイン含む)。
 const BOOKING_HOSTS = ["labola.jp", "tennisbear.net"] as const;
 
-// サニタイズ済み HTML を対象にする。属性値に `>` が入らない前提
-// (DOMPurify のシリアライズで `&gt;` になる)。
-const ANCHOR_RE = /<a\s([^>]*)>([\s\S]*?)<\/a>/gi;
-const HREF_RE = /\bhref="([^"]*)"/i;
-
 export function isBookingUrl(url: string): boolean {
   let hostname: string;
   try {
@@ -19,12 +14,14 @@ export function isBookingUrl(url: string): boolean {
 }
 
 /**
- * 予約先ドメイン宛ての <a> タグを外し、中身(テキスト・装飾)だけを残す。
+ * DOM 上で、予約先ドメイン宛ての <a> を外し、中身(テキスト・装飾)だけを残す。
+ * 文字列の正規表現では属性値の中の `<a ...>` 風の文字列を誤認するため、
+ * 必ずパース済みの DOM を対象にする(`a[href]` は data-href には当たらない)。
  * サイト内リンク・SNS・その他の外部リンクには触れない。
  */
-export function unlinkBookingLinks(html: string): string {
-  return html.replace(ANCHOR_RE, (whole, attrs: string, inner: string) => {
-    const href = HREF_RE.exec(attrs)?.[1];
-    return href && isBookingUrl(href) ? inner : whole;
-  });
+export function unlinkBookingAnchors(root: ParentNode): void {
+  for (const anchor of Array.from(root.querySelectorAll("a[href]"))) {
+    if (!isBookingUrl(String(anchor.getAttribute("href")))) continue;
+    anchor.replaceWith(...Array.from(anchor.childNodes));
+  }
 }

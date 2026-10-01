@@ -10,7 +10,6 @@ import {
   STRICT_HTML_CONFIG,
   sanitizeNewsHtml,
 } from "@/lib/news/sanitize";
-import { unlinkBookingLinks } from "@/lib/news/unlinkBookingLinks";
 import type { NewsItem } from "@/lib/microcms/schema";
 
 import { InstagramEmbed } from "./embeds/InstagramEmbed";
@@ -232,15 +231,6 @@ export function NewsBodyRenderer({
   articleSlug,
   shouldUnlinkBookingLinks = false,
 }: NewsBodyRendererProps) {
-  // サニタイズ後に、終了イベントでは予約先リンクを外す。
-  const prepareHtml = (
-    raw: string,
-    config: typeof STRICT_HTML_CONFIG | typeof RICH_EDITOR_CONFIG,
-  ): string => {
-    const safe = sanitizeNewsHtml(raw, config, { isFirstImageLcp });
-    return shouldUnlinkBookingLinks ? unlinkBookingLinks(safe) : safe;
-  };
-
   const handleBodyClick: MouseEventHandler<HTMLDivElement> | undefined =
     articleSlug
       ? (event) => {
@@ -262,7 +252,10 @@ export function NewsBodyRenderer({
   if (displayMode === "html") {
     if (bodyHtml.trim().length > 0) {
       return renderBody(
-        prepareHtml(bodyHtml, STRICT_HTML_CONFIG),
+        sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, {
+          isFirstImageLcp,
+          shouldUnlinkBookingLinks,
+        }),
         handleBodyClick,
       );
     }
@@ -271,7 +264,10 @@ export function NewsBodyRenderer({
         "[NewsBodyRenderer] displayMode=html だが bodyHtml が空のため body (rich) にフォールバック",
       );
       return renderBody(
-        prepareHtml(body, RICH_EDITOR_CONFIG),
+        sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, {
+          isFirstImageLcp,
+          shouldUnlinkBookingLinks,
+        }),
         handleBodyClick,
       );
     }
@@ -280,13 +276,19 @@ export function NewsBodyRenderer({
 
   if (body.trim().length > 0) {
     return renderBody(
-      prepareHtml(body, RICH_EDITOR_CONFIG),
+      sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, {
+        isFirstImageLcp,
+        shouldUnlinkBookingLinks,
+      }),
       handleBodyClick,
     );
   }
   if (bodyHtml.trim().length > 0) {
     return renderBody(
-      prepareHtml(bodyHtml, STRICT_HTML_CONFIG),
+      sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, {
+        isFirstImageLcp,
+        shouldUnlinkBookingLinks,
+      }),
       handleBodyClick,
     );
   }

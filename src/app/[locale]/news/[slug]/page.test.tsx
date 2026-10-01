@@ -517,7 +517,7 @@ describe("NewsDetailPage", () => {
 
       expect(screen.getByText("終了")).toBeInTheDocument();
       expect(screen.getByRole("note")).toHaveTextContent(
-        "このイベントは終了しました。",
+        "このお知らせの期間は終了しました。",
       );
       expect(screen.queryByRole("link", { name: "LaBOLAで申込" })).toBeNull();
       expect(screen.getByText(/LaBOLAで申込/)).toBeInTheDocument();
@@ -533,7 +533,7 @@ describe("NewsDetailPage", () => {
       await renderPage({ locale: "en", slug: "ended" });
       expect(screen.getByText("Ended")).toBeInTheDocument();
       expect(screen.getByRole("note")).toHaveTextContent(
-        "This event has ended.",
+        "The period for this announcement has ended.",
       );
     });
 

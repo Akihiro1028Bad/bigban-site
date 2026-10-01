@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **改訂メモ(PR #519 レビュー対応)**: Task 2 の `unlinkBookingLinks(html)`(正規表現)と Task 4 の `prepareHtml` は、実装時に **DOM 方式**(`unlinkBookingAnchors(root)` を `sanitizeNewsHtml` の `shouldUnlinkBookingLinks` オプションから呼ぶ)へ置き換えた。帯の文言は「このお知らせの期間は終了しました。」/ "The period for this announcement has ended." に変更。以下のコードブロックは当初案で、確定版は設計書 §10 と実装を参照。
+
 **Goal:** microCMS の `eventEndAt` を過ぎたニュースを、描画のたびに自動で「終了」表示にし、予約先(labola.jp / tennisbear.net)へのリンクを外す。
 
 **Architecture:** 判定(`isNewsEnded`)・リンク除去(`unlinkBookingLinks`)・文言(`endedLabels`)を `src/lib/news/` の純関数・定数に切り出し、表示部品(`NewsEndedBadge`・`NewsEndedNotice`)を `src/components/news/` に置く。既存の `NewsCard`・`HomeLatestNews`・`NewsBodyRenderer`・詳細ページに最小差分で組み込む。ホーム・一覧・詳細はすべて `force-dynamic` なので再描画の仕組みは不要。

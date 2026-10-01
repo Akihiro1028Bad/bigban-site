@@ -14,7 +14,7 @@ export interface EndedLabels {
 const LABELS: Record<Locale, EndedLabels> = {
   ja: {
     badge: "終了",
-    message: "このイベントは終了しました。最新の開催情報は",
+    message: "このお知らせの期間は終了しました。最新の開催情報は",
     newsLabel: "ニュース一覧",
     reserveLabel: "予約ページ",
     separator: "・",
@@ -24,7 +24,7 @@ const LABELS: Record<Locale, EndedLabels> = {
   },
   en: {
     badge: "Ended",
-    message: "This event has ended. Check the latest information on the ",
+    message: "The period for this announcement has ended. Check the latest information on the ",
     newsLabel: "News",
     reserveLabel: "Reserve",
     separator: " or ",

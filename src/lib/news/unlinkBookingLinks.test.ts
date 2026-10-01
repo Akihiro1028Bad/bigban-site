@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isBookingUrl, unlinkBookingLinks } from "./unlinkBookingLinks";
+import { isBookingUrl, unlinkBookingAnchors } from "./unlinkBookingLinks";
 
 describe("isBookingUrl", () => {
   it.each([
@@ -24,49 +24,66 @@ describe("isBookingUrl", () => {
   });
 });
 
-describe("unlinkBookingLinks", () => {
+function unlink(html: string): string {
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  unlinkBookingAnchors(root);
+  return root.innerHTML;
+}
+
+describe("unlinkBookingAnchors", () => {
   it("予約先宛ての <a> はテキストだけ残す", () => {
-    const html =
-      '<p><a href="https://yoyaku.labola.jp/r/shop/3473/" target="_blank" rel="noopener">予約はこちら</a></p>';
-    expect(unlinkBookingLinks(html)).toBe("<p>予約はこちら</p>");
+    expect(
+      unlink(
+        '<p><a href="https://yoyaku.labola.jp/r/shop/3473/" target="_blank" rel="noopener">予約はこちら</a></p>',
+      ),
+    ).toBe("<p>予約はこちら</p>");
   });
 
   it("テニスベア宛てもテキストだけ残す", () => {
     expect(
-      unlinkBookingLinks(
-        '<a href="https://www.tennisbear.net/events/1">申込</a>',
-      ),
+      unlink('<a href="https://www.tennisbear.net/events/1">申込</a>'),
     ).toBe("申込");
   });
 
   it("中の装飾タグは保持する", () => {
     expect(
-      unlinkBookingLinks(
-        '<a href="https://labola.jp/x"><strong>今すぐ</strong>予約</a>',
-      ),
+      unlink('<a href="https://labola.jp/x"><strong>今すぐ</strong>予約</a>'),
     ).toBe("<strong>今すぐ</strong>予約");
   });
 
   it("サイト内リンク・SNS・その他の外部リンクは変更しない", () => {
     const html =
       '<a href="https://www.thepicklebang.com/reserve">予約</a><a href="https://www.instagram.com/x/">IG</a>';
-    expect(unlinkBookingLinks(html)).toBe(html);
+    expect(unlink(html)).toBe(html);
   });
 
   it("href の無い <a> は変更しない", () => {
     const html = '<a class="note">注</a>';
-    expect(unlinkBookingLinks(html)).toBe(html);
+    expect(unlink(html)).toBe(html);
+  });
+
+  it("data-href だけが予約先で、href が他サイトのリンクは外さない", () => {
+    const html =
+      '<a data-href="https://labola.jp/x" href="https://example.com/">z</a>';
+    expect(unlink(html)).toBe(html);
+  });
+
+  it("属性値に > を含む予約先リンクも、かけらを残さず外す", () => {
+    expect(
+      unlink('<a title="A>B" href="https://labola.jp/x">予約</a>後ろ'),
+    ).toBe("予約後ろ");
   });
 
   it("複数のリンクを個別に判定する", () => {
-    const html =
-      '<a href="https://labola.jp/a">A</a>と<a href="https://www.thepicklebang.com/news">B</a>と<a href="https://www.tennisbear.net/c">C</a>';
-    expect(unlinkBookingLinks(html)).toBe(
-      'Aと<a href="https://www.thepicklebang.com/news">B</a>とC',
-    );
+    expect(
+      unlink(
+        '<a href="https://labola.jp/a">A</a>と<a href="https://www.thepicklebang.com/news">B</a>と<a href="https://www.tennisbear.net/c">C</a>',
+      ),
+    ).toBe('Aと<a href="https://www.thepicklebang.com/news">B</a>とC');
   });
 
   it("リンクの無い HTML はそのまま返す", () => {
-    expect(unlinkBookingLinks("<p>本文</p>")).toBe("<p>本文</p>");
+    expect(unlink("<p>本文</p>")).toBe("<p>本文</p>");
   });
 });
