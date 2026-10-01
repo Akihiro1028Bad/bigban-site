@@ -47,7 +47,7 @@ describe("分析CLI（実際の.env.localを読まずMSWでAPIを再現）", () 
   it("LaBOLA 段別を、自動アクセスを除いた値つきで出す", async () => {
     const { stdout } = await run(["--days", "7"]);
     expect(stdout).toContain("## LaBOLA 段別ユーザー数(自動アクセス除外つき・参考値)");
-    expect(stdout).toContain("週カレンダー  全体=");
+    expect(stdout).toContain("カレンダー合計  全体=");
   });
   it("不正な組み合わせはAPIを呼ぶ前に拒否する", async () => {
     await expect(run(["--json"])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining("--monitor-only") });
