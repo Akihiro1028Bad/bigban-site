@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   BUSINESS_HOURS,
+  BUSINESS_HOURS_DISPLAY,
   LABOLA_CALENDAR_BASE,
   LABOLA_CALENDAR_TABS,
   LABOLA_HYROX_URL,
@@ -69,8 +70,15 @@ describe("labola calendar constants", () => {
 });
 
 describe("BUSINESS_HOURS", () => {
-  it("毎日 06:00〜23:00", () => {
-    expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "23:00" });
+  it("毎日 06:00〜翌01:00", () => {
+    expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "01:00" });
+  });
+
+  it("表示用は ja が 25:00、en が 1:00 AM", () => {
+    expect(BUSINESS_HOURS_DISPLAY).toEqual({
+      ja: { open: "6:00", close: "25:00" },
+      en: { open: "6:00 AM", close: "1:00 AM" },
+    });
   });
 });
 

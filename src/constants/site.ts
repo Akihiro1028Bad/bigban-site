@@ -89,7 +89,14 @@ export function labolaTabNameOf(key: LabolaCalendarTabKey): string {
 
 // 営業時間（毎日・不定休）。構造化データ(SportsActivityLocation / ExerciseGym)と
 // 説明文の差し込みで共有する。schema.org の opens/closes と同じ HH:MM 形式。
-export const BUSINESS_HOURS = { opens: "06:00", closes: "23:00" } as const;
+// closes は翌日1:00（深夜をまたぐ。表示は ja 25:00 / en 1:00 AM）。
+export const BUSINESS_HOURS = { opens: "06:00", closes: "01:00" } as const;
+
+// 本文用の営業時間表記（ja は 25:00 表記、en は 12 時間表記）。
+export const BUSINESS_HOURS_DISPLAY = {
+  ja: { open: "6:00", close: "25:00" },
+  en: { open: "6:00 AM", close: "1:00 AM" },
+} as const;
 
 export const INSTAGRAM_URL = "https://www.instagram.com/thepicklebangtheory";
 

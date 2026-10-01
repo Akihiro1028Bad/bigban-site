@@ -27,11 +27,11 @@ describe("buildExerciseGym", () => {
     );
   });
 
-  it("毎日 06:00〜23:00 の営業時間を持つ", () => {
+  it("毎日 06:00〜翌01:00 の営業時間を持つ", () => {
     const [hours] = buildExerciseGym("ja").openingHoursSpecification;
     expect(hours.dayOfWeek).toHaveLength(7);
     expect(hours.opens).toBe("06:00");
-    expect(hours.closes).toBe("23:00");
+    expect(hours.closes).toBe("01:00");
   });
 
   it("画像・価格帯・コーチ(employee)を持つ", () => {

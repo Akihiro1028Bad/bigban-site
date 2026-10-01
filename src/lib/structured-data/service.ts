@@ -44,7 +44,7 @@ const COURT_RENTAL_OFFER: OfferSchema = {
   priceSpecification: {
     "@type": "PriceSpecification",
     priceCurrency: "JPY",
-    minPrice: 4980,
+    minPrice: 3980,
     maxPrice: 7980,
   },
 };
@@ -53,7 +53,7 @@ const SERVICE_DEFINITIONS: readonly ServiceDefinition[] = [
   {
     name: "コートレンタル",
     description:
-      "時間貸しのレンタルコート。無人チェックインで手軽に予約・利用可能。早朝6:00から深夜23:00まで。",
+      "時間貸しのレンタルコート。無人チェックインで手軽に予約・利用可能。早朝6:00から深夜25:00まで。",
     serviceType: "コートレンタル",
     offers: COURT_RENTAL_OFFER,
   },

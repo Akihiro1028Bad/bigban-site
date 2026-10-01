@@ -54,7 +54,7 @@ describe("ReserveFaq", () => {
     expect(screen.getByText("よくある質問")).toBeInTheDocument();
     expect(screen.getByText("営業時間は？")).toBeInTheDocument();
     expect(
-      screen.getByText("早朝6:00から深夜23:00まで営業しています。"),
+      screen.getByText("早朝6:00から深夜25:00まで営業しています。"),
     ).toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe("ReserveFaq", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "時間帯・曜日により、1時間あたり ¥4,980〜¥7,980 です。HYROXエリアの利用料もコートと同額です（4名まで／5名目以降は1名につき+¥1,000）。月額¥10,000（税込）の会員制度「PBT CLUB」の会員価格なら、いずれも ¥3,500〜¥5,600 になります（月20時間まで）。",
+        "時間帯・曜日により、1時間あたり ¥3,980〜¥7,980 です。HYROXエリアの利用料もコートと同額です（4名まで／5名目以降は1名につき+¥1,000）。月額¥10,000（税込）の会員制度「PBT CLUB」の会員価格なら、いずれも ¥2,800〜¥5,600 になります（月20時間まで）。",
       ),
     ).toBeInTheDocument();
   });
@@ -182,7 +182,7 @@ describe("ReserveFaq", () => {
   it("英語の会員価格が1時間あたりの料金だと分かる表記になっている", () => {
     renderWithIntl(<ReserveFaq />, { messages: enMessages, locale: "en" });
     const answer = screen.getByText(/per hour/).textContent ?? "";
-    expect(answer).toMatch(/¥3,500 to ¥5,600 per hour/);
+    expect(answer).toMatch(/¥2,800 to ¥5,600 per hour/);
   });
 
   it("FAQPage 構造化データ(JSON-LD)を出力する", () => {
