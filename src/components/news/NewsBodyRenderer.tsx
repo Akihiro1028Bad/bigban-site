@@ -10,6 +10,7 @@ import {
   STRICT_HTML_CONFIG,
   sanitizeNewsHtml,
 } from "@/lib/news/sanitize";
+import { unlinkBookingLinks } from "@/lib/news/unlinkBookingLinks";
 import type { NewsItem } from "@/lib/microcms/schema";
 
 import { InstagramEmbed } from "./embeds/InstagramEmbed";
@@ -24,6 +25,7 @@ interface NewsBodyRendererProps {
   isFirstImageLcp?: boolean;
   locale?: Locale;
   articleSlug?: string;
+  shouldUnlinkBookingLinks?: boolean;
 }
 
 const ARTICLE_BODY_CTA_LOCATION = "article_body_cta";
@@ -228,7 +230,17 @@ export function NewsBodyRenderer({
   isFirstImageLcp = false,
   locale = "ja",
   articleSlug,
+  shouldUnlinkBookingLinks = false,
 }: NewsBodyRendererProps) {
+  // サニタイズ後に、終了イベントでは予約先リンクを外す。
+  const prepareHtml = (
+    raw: string,
+    config: typeof STRICT_HTML_CONFIG | typeof RICH_EDITOR_CONFIG,
+  ): string => {
+    const safe = sanitizeNewsHtml(raw, config, { isFirstImageLcp });
+    return shouldUnlinkBookingLinks ? unlinkBookingLinks(safe) : safe;
+  };
+
   const handleBodyClick: MouseEventHandler<HTMLDivElement> | undefined =
     articleSlug
       ? (event) => {
@@ -250,7 +262,7 @@ export function NewsBodyRenderer({
   if (displayMode === "html") {
     if (bodyHtml.trim().length > 0) {
       return renderBody(
-        sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+        prepareHtml(bodyHtml, STRICT_HTML_CONFIG),
         handleBodyClick,
       );
     }
@@ -259,7 +271,7 @@ export function NewsBodyRenderer({
         "[NewsBodyRenderer] displayMode=html だが bodyHtml が空のため body (rich) にフォールバック",
       );
       return renderBody(
-        sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+        prepareHtml(body, RICH_EDITOR_CONFIG),
         handleBodyClick,
       );
     }
@@ -268,13 +280,13 @@ export function NewsBodyRenderer({
 
   if (body.trim().length > 0) {
     return renderBody(
-      sanitizeNewsHtml(body, RICH_EDITOR_CONFIG, { isFirstImageLcp }),
+      prepareHtml(body, RICH_EDITOR_CONFIG),
       handleBodyClick,
     );
   }
   if (bodyHtml.trim().length > 0) {
     return renderBody(
-      sanitizeNewsHtml(bodyHtml, STRICT_HTML_CONFIG, { isFirstImageLcp }),
+      prepareHtml(bodyHtml, STRICT_HTML_CONFIG),
       handleBodyClick,
     );
   }
