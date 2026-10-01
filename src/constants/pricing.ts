@@ -1,6 +1,7 @@
 // コートレンタル料金（HomePricing / HyroxProgram で共有）。
 // weekdayMember / weekendMember は月額会員制度「PBT CLUB」の会員価格（税込）。
 // 出典: 2026-08-03 公開のニュース記事（slug: pbt-club-membership）。
+// 深夜帯 23:00-25:00 は 2026-10 営業時間延長（オーナー確認 2026-10-01）。
 export interface CourtPriceRow {
   timeSlot: string;
   weekday: string;
@@ -30,6 +31,13 @@ export const COURT_PRICES: readonly CourtPriceRow[] = [
     weekdayMember: "¥5,600",
     weekend: "¥7,980",
     weekendMember: "¥5,600",
+  },
+  {
+    timeSlot: "23:00-25:00",
+    weekday: "¥3,980",
+    weekdayMember: "¥2,800",
+    weekend: "¥5,980",
+    weekendMember: "¥4,200",
   },
 ];
 
