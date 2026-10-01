@@ -23,9 +23,9 @@ describe("PbtClubHero", () => {
   it("月会費と会員料金のレンジ、差額・上限を含む説明を表示する", () => {
     renderWithIntl(<PbtClubHero />);
     expect(screen.getByText("¥10,000")).toBeInTheDocument();
-    expect(screen.getByText("¥3,500〜¥5,600")).toBeInTheDocument();
+    expect(screen.getByText("¥2,800〜¥5,600")).toBeInTheDocument();
     expect(
-      screen.getByText(/1時間あたり ¥1,480〜¥2,380 安くなります。会員料金の適用は月20時間までです。/),
+      screen.getByText(/1時間あたり ¥1,180〜¥2,380 安くなります。会員料金の適用は月20時間までです。/),
     ).toBeInTheDocument();
   });
 
@@ -52,7 +52,7 @@ describe("PbtClubHero", () => {
   it("英語ロケールでも描画できる", () => {
     renderWithIntl(<PbtClubHero />, { locale: "en" });
     expect(screen.getByText("Monthly membership")).toBeInTheDocument();
-    expect(screen.getByText("¥3,500〜¥5,600")).toBeInTheDocument();
+    expect(screen.getByText("¥2,800〜¥5,600")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Join PBT CLUB" }),
     ).toBeInTheDocument();

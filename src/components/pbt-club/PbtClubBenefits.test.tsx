@@ -16,7 +16,7 @@ describe("PbtClubBenefits", () => {
 
   it("差額・予約開始日・ポイント還元率を確定値から表示する", () => {
     renderWithIntl(<PbtClubBenefits />);
-    expect(screen.getByText(/1時間あたり ¥1,480〜¥2,380 です/)).toBeInTheDocument();
+    expect(screen.getByText(/1時間あたり ¥1,180〜¥2,380 です/)).toBeInTheDocument();
     expect(
       screen.getByText(/一般予約は14日前から、会員は30日前から予約できます/),
     ).toBeInTheDocument();

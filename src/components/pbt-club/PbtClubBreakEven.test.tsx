@@ -9,18 +9,18 @@ describe("PbtClubBreakEven", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "月何時間で元が取れる？" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("平日 6:00-9:00")).toBeInTheDocument();
-    expect(screen.getByText("平日 9:00-17:00")).toBeInTheDocument();
-    expect(screen.getByText("平日 17:00-23:00 / 土日祝 終日")).toBeInTheDocument();
-    expect(screen.getByText("月7時間以上")).toBeInTheDocument();
-    expect(screen.getByText("月6時間以上")).toBeInTheDocument();
-    expect(screen.getByText("月5時間以上")).toBeInTheDocument();
+    const cards = screen.getAllByRole("listitem").map((li) => li.textContent);
+    expect(cards).toEqual([
+      "平日 6:00-9:00月7時間以上で元が取れる損益分岐 約6.8時間",
+      "平日 9:00-17:00 / 土日祝 23:00-25:00月6時間以上で元が取れる損益分岐 約5.6時間",
+      "平日 17:00-23:00 / 土日祝 6:00-23:00月5時間以上で元が取れる損益分岐 約4.2時間",
+      "平日 23:00-25:00月9時間以上で元が取れる損益分岐 約8.5時間",
+    ]);
   });
 
   it("正確な損益分岐(約X.X時間)を補足として表示する", () => {
     renderWithIntl(<PbtClubBreakEven />);
-    expect(screen.getByText("損益分岐 約6.8時間")).toBeInTheDocument();
-    expect(screen.getByText("損益分岐 約5.6時間")).toBeInTheDocument();
+    expect(screen.getByText("損益分岐 約8.5時間")).toBeInTheDocument();
     expect(screen.getByText("損益分岐 約4.2時間")).toBeInTheDocument();
   });
 
@@ -35,8 +35,9 @@ describe("PbtClubBreakEven", () => {
     renderWithIntl(<PbtClubBreakEven />, { locale: "en" });
     expect(screen.getByText("5+ hours a month")).toBeInTheDocument();
     expect(screen.getByText("Break-even: about 4.2 hours")).toBeInTheDocument();
+    expect(screen.getByText("9+ hours a month")).toBeInTheDocument();
     expect(
-      screen.getByText("Weekdays 17:00-23:00 / Weekends/holidays all day"),
+      screen.getByText("Weekdays 17:00-23:00 / Weekends/holidays 6:00-23:00"),
     ).toBeInTheDocument();
   });
 });

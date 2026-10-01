@@ -1,6 +1,5 @@
 import { useTranslations } from "next-intl";
 
-import { COURT_PRICES } from "@/constants/pricing";
 import { formatYen } from "@/lib/pbtClub/breakeven";
 import { PBT_CLUB_RATE_ROWS } from "@/lib/pbtClub/rates";
 
@@ -37,7 +36,7 @@ export default function PbtClubRates() {
                     className={`border-b border-white/[0.04] ${i % 2 === 1 ? "bg-white/[0.02]" : ""}`}
                   >
                     <td className="px-2 py-4 sm:py-5 text-center text-xs font-medium text-text-light sm:text-sm sm:px-4">
-                      {slotLabel(row, COURT_PRICES.length, tSlots)}
+                      {slotLabel(row, tSlots)}
                     </td>
                     <td className="px-2 py-4 sm:py-5 text-center text-base font-bold sm:text-lg text-text-light sm:px-4">
                       {formatYen(row.normalYen)}

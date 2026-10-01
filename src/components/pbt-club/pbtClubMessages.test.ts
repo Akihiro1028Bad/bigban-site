@@ -6,7 +6,8 @@ import {
   PBT_CLUB_POINT_RATE_PERCENT,
 } from "@/constants/pbtClub";
 import { COURT_PRICES } from "@/constants/pricing";
-import { buildRateRows, formatYen } from "@/lib/pbtClub/breakeven";
+import { formatYen } from "@/lib/pbtClub/breakeven";
+import { PBT_CLUB_PEAK_ROW } from "@/lib/pbtClub/rates";
 import jaMessages from "../../../messages/ja.json";
 import enMessages from "../../../messages/en.json";
 
@@ -28,8 +29,7 @@ interface FaqItem {
   answer: string;
 }
 
-const peakRow = buildRateRows(COURT_PRICES, PBT_CLUB_MONTHLY_FEE_YEN).at(-1);
-if (!peakRow) throw new Error("料金行が空");
+const peakRow = PBT_CLUB_PEAK_ROW;
 
 describe("PbtClub 文言", () => {
   it("ja と en でキー構造が一致する", () => {
@@ -76,7 +76,17 @@ describe("PbtClub 文言", () => {
     expect(text).toContain(`${PBT_CLUB_POINT_RATE_PERCENT}%`);
   });
 
-  it("メタ説明の損益分岐が計算値(平日夜・土日祝)と一致する", () => {
+  it("FAQ の会員料金が料金表(深夜帯を含む)の全行と一致する", () => {
+    for (const messages of [jaMessages, enMessages]) {
+      const answer = (messages.PbtClub.faq.items as FaqItem[])[1].answer;
+      for (const row of COURT_PRICES) {
+        expect(answer).toContain(row.weekdayMember);
+        expect(answer).toContain(row.weekendMember);
+      }
+    }
+  });
+
+  it("メタ説明の損益分岐が計算値(通常料金が最も高い時間帯)と一致する", () => {
     expect(jaMessages.Metadata.pbtClub.description).toContain(
       `月${peakRow.breakEvenHours}時間`,
     );

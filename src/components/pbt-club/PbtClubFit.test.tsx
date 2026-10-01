@@ -29,7 +29,7 @@ describe("PbtClubFit", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "平日夜・土日祝の利用が月4時間以下の方（会費を含めると通常料金のほうが安くなります）",
+        "平日17:00〜23:00・土日祝の6:00〜23:00の利用が月4時間以下の方（会費を含めると通常料金のほうが安くなります）",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("会員料金の適用は月20時間までです。")).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("PbtClubFit", () => {
     renderWithIntl(<PbtClubFit />, { locale: "en" });
     expect(screen.getByText("Play regularly")).toBeInTheDocument();
     expect(
-      screen.getByText(/Play 4 hours or less a month on weekday evenings/),
+      screen.getByText(/Play 4 hours or less a month on weekdays 17:00–23:00/),
     ).toBeInTheDocument();
   });
 });

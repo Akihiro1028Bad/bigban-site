@@ -26,21 +26,23 @@ describe("parseYen / formatYen", () => {
 describe("buildRateRows(確定料金)", () => {
   const rows = buildRateRows(COURT_PRICES, PBT_CLUB_MONTHLY_FEE_YEN);
 
-  it("平日夜と土日祝は同額なので3行にまとまり、出現順を保つ", () => {
+  it("同額の時間帯は平日・土日祝をまたいで1行にまとまり、出現順を保つ", () => {
     expect(rows.map((r) => [r.normalYen, r.memberYen])).toEqual([
       [4980, 3500],
       [5980, 4200],
       [7980, 5600],
+      [3980, 2800],
     ]);
   });
 
   it("差額と損益分岐を計算する(整数は切り上げ・小数は1桁で補足できる)", () => {
-    expect(rows.map((r) => r.savingPerHourYen)).toEqual([1480, 1780, 2380]);
-    expect(rows.map((r) => r.breakEvenHours)).toEqual([7, 6, 5]);
+    expect(rows.map((r) => r.savingPerHourYen)).toEqual([1480, 1780, 2380, 1180]);
+    expect(rows.map((r) => r.breakEvenHours)).toEqual([7, 6, 5, 9]);
     expect(rows.map((r) => r.exactBreakEvenHours.toFixed(1))).toEqual([
       "6.8",
       "5.6",
       "4.2",
+      "8.5",
     ]);
   });
 
@@ -53,6 +55,11 @@ describe("buildRateRows(確定料金)", () => {
       "9:00-17:00",
       "17:00-23:00",
     ]);
+    // 土日祝の深夜は平日 9-17 時と同額なので同じ行に入る
+    expect(rows[1].weekdaySlots).toEqual(["9:00-17:00"]);
+    expect(rows[1].weekendSlots).toEqual(["23:00-25:00"]);
+    expect(rows[3].weekdaySlots).toEqual(["23:00-25:00"]);
+    expect(rows[3].weekendSlots).toEqual([]);
   });
 
   it("損益分岐がちょうど整数ならその時間を返す(切り上げで増えない)", () => {
@@ -114,9 +121,9 @@ describe("summarizeRates", () => {
     expect(
       summarizeRates(buildRateRows(COURT_PRICES, PBT_CLUB_MONTHLY_FEE_YEN)),
     ).toEqual({
-      memberMinYen: 3500,
+      memberMinYen: 2800,
       memberMaxYen: 5600,
-      savingMinYen: 1480,
+      savingMinYen: 1180,
       savingMaxYen: 2380,
     });
   });

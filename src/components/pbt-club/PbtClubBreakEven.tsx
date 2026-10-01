@@ -1,7 +1,6 @@
 import { useTranslations } from "next-intl";
 
 import { PBT_CLUB_MONTHLY_FEE_YEN, PBT_CLUB_MONTHLY_HOUR_CAP } from "@/constants/pbtClub";
-import { COURT_PRICES } from "@/constants/pricing";
 import { formatYen } from "@/lib/pbtClub/breakeven";
 import { PBT_CLUB_RATE_ROWS } from "@/lib/pbtClub/rates";
 
@@ -22,14 +21,14 @@ export default function PbtClubBreakEven() {
             {t("lead", { fee: formatYen(PBT_CLUB_MONTHLY_FEE_YEN) })}
           </p>
 
-          <ul className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {PBT_CLUB_RATE_ROWS.map((row) => (
               <li
                 key={`${row.normalYen}-${row.memberYen}`}
                 className="border border-white/10 bg-white/[0.02] px-6 py-6"
               >
                 <p className="text-sm font-medium text-text-light">
-                  {slotLabel(row, COURT_PRICES.length, tSlots)}
+                  {slotLabel(row, tSlots)}
                 </p>
                 <p className="mt-4 text-3xl font-bold text-accent">
                   {t("threshold", { hours: row.breakEvenHours })}

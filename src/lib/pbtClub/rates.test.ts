@@ -7,9 +7,9 @@ import {
 } from "./rates";
 
 describe("PBT CLUB の共通料金行", () => {
-  it("確定料金から3行を作り、集計を返す", () => {
-    expect(PBT_CLUB_RATE_ROWS).toHaveLength(3);
-    expect(PBT_CLUB_RATE_SUMMARY.memberMinYen).toBe(3500);
+  it("確定料金から4行を作り、集計を返す", () => {
+    expect(PBT_CLUB_RATE_ROWS).toHaveLength(4);
+    expect(PBT_CLUB_RATE_SUMMARY.memberMinYen).toBe(2800);
   });
 
   it("最も通常料金が高い行を平日夜・土日祝として返す", () => {
