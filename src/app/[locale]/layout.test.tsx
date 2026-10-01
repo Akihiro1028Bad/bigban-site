@@ -53,6 +53,10 @@ vi.mock("@/components/PreHydrationScripts", async () => {
   };
 });
 
+vi.mock("@vercel/speed-insights/next", () => ({
+  SpeedInsights: () => <div data-testid="speed-insights" />,
+}));
+
 vi.mock("../../globals.css", () => ({}));
 
 import { setRequestLocale } from "next-intl/server";
@@ -91,6 +95,19 @@ describe("LocaleLayout", () => {
 
     expect(screen.getByText("test content")).toBeInTheDocument();
     expect(setRequestLocale).toHaveBeenCalledWith("ja");
+  });
+
+  it("実ユーザーの表示速度を測る Speed Insights を描画する", async () => {
+    const { default: LocaleLayout } = await import("./layout");
+
+    render(
+      await LocaleLayout({
+        children: <p>speed</p>,
+        params: Promise.resolve({ locale: "ja" }),
+      })
+    );
+
+    expect(screen.getByTestId("speed-insights")).toBeInTheDocument();
   });
 
   it("exposes a browser-detection script that sets data-browser for iOS Safari", async () => {

@@ -13,7 +13,7 @@ beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "pbt-analysis-cli-")));
   const destination = join(root, "scripts/analytics");
   await mkdir(destination, { recursive: true });
-  for (const file of ["query.mjs", "monitoring.mjs", "articleMetrics.mjs", "ctaEvents.mjs"]) {
+  for (const file of ["query.mjs", "monitoring.mjs", "articleMetrics.mjs", "ctaEvents.mjs", "hosts.mjs", "labolaFunnel.mjs"]) {
     await copyFile(resolve("scripts/analytics", file), join(destination, file));
   }
 });
@@ -38,6 +38,16 @@ describe("分析CLI（実際の.env.localを読まずMSWでAPIを再現）", () 
     const { stdout } = await run(["--days", "28"]);
     expect(stdout).toContain("reservation_click  今期=30 前期=10 (+200%)");
     expect(stdout).toContain("100PVあたり");
+  });
+  it("ページ別PVとチャネル別セッションはサイトのホストに絞り、見出しに(サイト)と書く", async () => {
+    const { stdout } = await run(["--days", "28"]);
+    expect(stdout).toContain("## GA4 ページ別PV(サイト・上位・前期比)");
+    expect(stdout).toContain("## GA4 チャネル別セッション(サイト・前期比)");
+  });
+  it("LaBOLA 段別を、自動アクセスを除いた値つきで出す", async () => {
+    const { stdout } = await run(["--days", "7"]);
+    expect(stdout).toContain("## LaBOLA 段別ユーザー数(自動アクセス除外つき・参考値)");
+    expect(stdout).toContain("カレンダー合計  全体=");
   });
   it("不正な組み合わせはAPIを呼ぶ前に拒否する", async () => {
     await expect(run(["--json"])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining("--monitor-only") });

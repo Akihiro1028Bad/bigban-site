@@ -16,6 +16,8 @@ import {
   sumEntrySessions,
 } from "./articleMetrics.mjs";
 import { CTA_EVENTS } from "./ctaEvents.mjs";
+import { SITE_HOST, hostFilter } from "./hosts.mjs";
+import { collectLabolaFunnel, formatLabolaFunnel } from "./labolaFunnel.mjs";
 import { collectMonitoring, formatMonitoring } from "./monitoring.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -169,13 +171,14 @@ async function main() {
         dateRanges: [d],
         dimensions: [{ name: "pagePath" }],
         metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+        dimensionFilter: hostFilter(SITE_HOST),
         orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
         limit: 30,
       })
     )
   );
   const prevPv = new Map((pagesPrev.rows ?? []).map((r) => [r.dimensionValues[0].value, +r.metricValues[0].value]));
-  console.log("\n## GA4 ページ別PV(上位・前期比)");
+  console.log("\n## GA4 ページ別PV(サイト・上位・前期比)");
   for (const r of (pages.rows ?? []).slice(0, isMonthly ? 15 : 10)) {
     const p = r.dimensionValues[0].value;
     const pv = +r.metricValues[0].value;
@@ -189,13 +192,14 @@ async function main() {
         dateRanges: [d],
         dimensions: [{ name: "sessionDefaultChannelGroup" }],
         metrics: [{ name: "sessions" }],
+        dimensionFilter: hostFilter(SITE_HOST),
         orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         limit: 10,
       })
     )
   );
   const prevCh = new Map((chPrev.rows ?? []).map((r) => [r.dimensionValues[0].value, +r.metricValues[0].value]));
-  console.log("\n## GA4 チャネル別セッション(前期比)");
+  console.log("\n## GA4 チャネル別セッション(サイト・前期比)");
   for (const r of ch.rows ?? []) {
     const k = r.dimensionValues[0].value;
     const s = +r.metricValues[0].value;
@@ -227,19 +231,10 @@ async function main() {
     if (locs.length > 8) console.log(`  …他${locs.length - 8}件`);
   }
 
-  const funnel = await ga4({
-    dateRanges: [cur],
-    dimensions: [{ name: "pagePath" }],
-    metrics: [{ name: "screenPageViews" }],
-    dimensionFilter: { filter: { fieldName: "pagePath", stringFilter: { matchType: "CONTAINS", value: "/r/booking/" } } },
-    orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-    limit: 10,
-  });
-  if ((funnel.rows ?? []).length > 0) {
-    console.log("\n## 予約ページ別PV(参考値・同一セッションの通過率ではない)");
-    for (const r of funnel.rows ?? [])
-      console.log(`${r.dimensionValues[0].value}  PV=${r.metricValues[0].value}`);
-  }
+  const labolaFunnel = await collectLabolaFunnel(ga4, cur);
+  console.log("\n## LaBOLA 段別ユーザー数(自動アクセス除外つき・参考値)");
+  console.log("(各段のユーザー数を独立に数えた値。『前段から』は同一ユーザーの通過率ではない。自動アクセス=画面800x600かつLinux)");
+  console.log(formatLabolaFunnel(labolaFunnel));
 
   // --- GSC ---
   const all = await gsc({ ...cur, dimensions: ["query"], rowLimit: 200 });
@@ -269,6 +264,7 @@ async function main() {
         dateRanges: [d],
         dimensions: [{ name: "landingPagePlusQueryString" }],
         metrics: [{ name: "sessions" }],
+        dimensionFilter: hostFilter(SITE_HOST),
         orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         limit: 250,
       })

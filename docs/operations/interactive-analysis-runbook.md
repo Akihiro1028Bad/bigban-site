@@ -53,7 +53,10 @@ Claude Code をこのリポジトリで開き、「週次分析やろう」と�
 ```bash
 node scripts/analytics/query.mjs            # 週次(直近7日 vs 前7日)
 node scripts/analytics/query.mjs --days 28  # 月初(28日窓 + SEO詳細)
+npm run analytics:weekly                    # 計測の健全性(GA4 予約完了と台帳の週次突合・テニスベア申込・CrUX)
 ```
+
+`query.mjs` のページ別PV・チャネル別・入口セッションは**サイト(www.thepicklebang.com)だけ**を数え、LaBOLA の動きは「## LaBOLA 段別ユーザー数」に分けて出る(画面800x600かつLinuxの自動アクセスを除いた値つき)。`npm run analytics:weekly` は画面に出すだけで、個人情報は出ない・どこにも書き込まない。設定の手順と読み方は `docs/operations/measurement-repair-checklist.md`。
 
 ## ②' 実験レーンの判定と補充(施策台帳 v2)
 
