@@ -6,24 +6,11 @@ import { Link } from "@/i18n/navigation";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import { EXTERNAL_LINK_PROPS, INSTAGRAM_URL } from "@/constants/site";
 
-interface GuideStep {
-  title: string;
-  body: string;
-}
-
-function isGuideStep(value: unknown): value is GuideStep {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.title === "string" && typeof record.body === "string";
-}
-
-// 英語話者向けの案内。LaBOLA・テニスベアの画面は日本語のみなので、押す場所を日本語の
-// ボタン名つきで説明する。/en/reserve だけに表示する。
+// 英語話者向けの補足案内。LaBOLA・テニスベアの画面が日本語のみであること、支払い・
+// キャンセル、テニスベア、問い合わせ先を伝える。予約の手順は ReserveVisitorGuide が担う。
+// /en/reserve だけに表示する。
 export default function ReserveEnglishGuide() {
   const t = useTranslations("Reserve.englishGuide");
-  // t.raw は unknown を返すため、システム境界として配列と各要素の形を検証する。
-  const rawSteps = t.raw("steps");
-  const steps = Array.isArray(rawSteps) ? rawSteps.filter(isGuideStep) : [];
 
   return (
     <section
@@ -40,26 +27,11 @@ export default function ReserveEnglishGuide() {
         <p className="text-sm leading-relaxed text-text-light/80">{t("notice")}</p>
 
         <h3 className="mt-8 text-base font-bold text-text-light">
-          {t("labolaHeading")}
+          {t("paymentHeading")}
         </h3>
-        <ol className="mt-4 space-y-4">
-          {steps.map((step, index) => (
-            <li key={step.title} className="flex gap-4">
-              <span
-                aria-hidden
-                className="pt-0.5 font-serif text-lg leading-none text-accent"
-              >
-                {index + 1}
-              </span>
-              <div>
-                <p className="text-sm font-bold text-text-light">{step.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-text-gray">
-                  {step.body}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <p className="mt-2 text-sm leading-relaxed text-text-gray">
+          {t("paymentBody")}
+        </p>
 
         <h3 className="mt-8 text-base font-bold text-text-light">
           {t("tennisbearHeading")}

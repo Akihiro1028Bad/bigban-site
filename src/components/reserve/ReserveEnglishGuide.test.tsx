@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
+import { fireEvent, screen } from "@testing-library/react";
 
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
-import enMessages from "../../../messages/en.json";
 import ReserveEnglishGuide from "./ReserveEnglishGuide";
 
 const trackCtaClick = vi.fn();
@@ -28,10 +26,12 @@ describe("ReserveEnglishGuide", () => {
     expect(screen.getByText(/are in Japanese only/)).toBeInTheDocument();
   });
 
-  it("LaBOLA の手順を4ステップの順序つきリストで出し、ビジター予約と支払いを案内する", () => {
+  it("手順はビジター予約の案内に任せ、支払い方法とキャンセル方針だけを案内する", () => {
     renderWithIntl(<ReserveEnglishGuide />, { locale: "en" });
-    expect(screen.getAllByRole("listitem")).toHaveLength(4);
-    expect(screen.getByText(/ビジターで予約/)).toBeInTheDocument();
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    expect(
+      screen.getByRole("heading", { name: /Payment and cancellation/ }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/credit card or PayPay/)).toBeInTheDocument();
   });
 
@@ -58,35 +58,5 @@ describe("ReserveEnglishGuide", () => {
       "reserve_english_guide",
       "dm",
     );
-  });
-
-  it("steps が配列でない場合は手順を描画しない", () => {
-    const broken = JSON.parse(JSON.stringify(enMessages)) as typeof enMessages;
-    (broken.Reserve.englishGuide as unknown as { steps: unknown }).steps =
-      "not-an-array";
-    render(
-      <NextIntlClientProvider locale="en" messages={broken}>
-        <ReserveEnglishGuide />
-      </NextIntlClientProvider>,
-    );
-    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
-  });
-
-  it("形の崩れた要素は読み飛ばし、正しい要素だけを描画する", () => {
-    const broken = JSON.parse(JSON.stringify(enMessages)) as typeof enMessages;
-    (broken.Reserve.englishGuide as unknown as { steps: unknown }).steps = [
-      "text",
-      null,
-      { title: 1, body: "x" },
-      { title: "a", body: 2 },
-      { title: "ok", body: "fine" },
-    ];
-    render(
-      <NextIntlClientProvider locale="en" messages={broken}>
-        <ReserveEnglishGuide />
-      </NextIntlClientProvider>,
-    );
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByText("ok")).toBeInTheDocument();
   });
 });

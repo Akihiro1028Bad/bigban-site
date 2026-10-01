@@ -4,7 +4,7 @@ import { buildFaqPage } from "./faqPage";
 describe("buildFaqPage", () => {
   it("FAQPage スキーマを生成する", () => {
     const schema = buildFaqPage([
-      { question: "営業時間は？", answer: "6:00〜23:00" },
+      { question: "営業時間は？", answer: "6:00〜25:00" },
     ]);
     expect(schema["@context"]).toBe("https://schema.org");
     expect(schema["@type"]).toBe("FAQPage");

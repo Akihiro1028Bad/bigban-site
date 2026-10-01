@@ -9,6 +9,7 @@ import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
 import { shouldShowColumns } from "@/lib/columns/visibility";
 import ReserveHero from "@/components/reserve/ReserveHero";
+import ReserveVisitorGuide from "@/components/reserve/ReserveVisitorGuide";
 import ReserveChoice from "@/components/reserve/ReserveChoice";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
@@ -104,6 +105,7 @@ export default async function ReservePage({
       />
       <HomeNavigation showColumns={await shouldShowColumns(locale)} />
       <ReserveHero />
+      <ReserveVisitorGuide />
       {reserveBody}
       {/* LaBOLA・テニスベアは日本語のみ。英語ページでだけ、押す場所を日本語のボタン名つきで案内する。 */}
       {locale === "en" && <ReserveEnglishGuide />}

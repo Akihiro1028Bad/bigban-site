@@ -26,6 +26,9 @@ vi.mock("@/components/home/HomeFooter", () => ({
   default: () => <footer data-testid="home-footer" />,
 }));
 vi.mock("@/components/reserve/ReserveHero", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveVisitorGuide", () => ({
+  default: () => <section data-testid="reserve-visitor-guide" />,
+}));
 vi.mock("@/components/reserve/ReserveChoice", () => ({
   default: ({ initialTab }: { initialTab?: string }) => <section aria-label={`予約案内:${initialTab}`} />,
 }));
@@ -175,6 +178,25 @@ describe("ReservePage", () => {
       }),
     );
     expect(screen.queryByTestId("english-guide")).not.toBeInTheDocument();
+  });
+
+  it("予約のしかた(ビジター案内)を予約案内の直前に掲出する", async () => {
+    const { default: ReservePage } = await import("./page");
+    const element = await ReservePage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
+    });
+    render(element);
+
+    const guide = screen.getByTestId("reserve-visitor-guide");
+    const choice = screen.getByRole("region", { name: "予約案内:pickleball" });
+    const info = screen.getByTestId("reserve-info");
+    expect(guide.compareDocumentPosition(choice)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(choice.compareDocumentPosition(info)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("FAQ を ReserveInfo の後に掲出する", async () => {

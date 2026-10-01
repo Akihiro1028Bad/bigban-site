@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   BUSINESS_HOURS,
+  BUSINESS_HOURS_DISPLAY,
   LABOLA_CALENDAR_BASE,
   LABOLA_CALENDAR_TABS,
   LABOLA_HYROX_URL,
   LABOLA_PICKLEBALL_URL,
   buildLabolaCalendarSrc,
+  labolaDayUrl,
+  labolaTabNameOf,
   reserveHref,
   resolveCalendarTabKey,
 } from "./site";
@@ -67,7 +70,34 @@ describe("labola calendar constants", () => {
 });
 
 describe("BUSINESS_HOURS", () => {
-  it("毎日 06:00〜23:00", () => {
-    expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "23:00" });
+  it("毎日 06:00〜翌01:00", () => {
+    expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "01:00" });
+  });
+
+  it("表示用は ja が 25:00、en が 1:00 AM", () => {
+    expect(BUSINESS_HOURS_DISPLAY).toEqual({
+      ja: { open: "6:00", close: "25:00" },
+      en: { open: "6:00 AM", close: "1:00 AM" },
+    });
+  });
+});
+
+describe("labolaTabNameOf", () => {
+  it("タブのキーから labola 登録名を引く(並び順に依存しない)", () => {
+    expect(labolaTabNameOf("pickleball")).toBe("ピックルボールコート");
+    expect(labolaTabNameOf("hyrox")).toBe("H Y R O X");
+  });
+});
+
+describe("labolaDayUrl", () => {
+  it("月日をゼロ埋めせず、タブ名をエンコードして1日表示 URL を作る", () => {
+    expect(
+      labolaDayUrl("ピックルボールコート", { year: 2026, month: 10, day: 5 }),
+    ).toBe(
+      `https://yoyaku.labola.jp/r/shop/3473/calendar/2026/10/5/?tab_name=${encodeURIComponent("ピックルボールコート")}`,
+    );
+    expect(labolaDayUrl("H Y R O X", { year: 2026, month: 11, day: 20 })).toBe(
+      "https://yoyaku.labola.jp/r/shop/3473/calendar/2026/11/20/?tab_name=H%20Y%20R%20O%20X",
+    );
   });
 });

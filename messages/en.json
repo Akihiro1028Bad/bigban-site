@@ -2,7 +2,7 @@
   "Metadata": {
     "home": {
       "title": "Indoor Pickleball Courts 1 Min from Motoyawata Station | THE PICKLE BANG THEORY",
-      "description": "Indoor pickleball courts in Ichikawa, Chiba, just a 1-minute walk from Motoyawata Station. Three indoor courts, open from 6:00 to 23:00. A space for everyone from beginners to advanced players.",
+      "description": "Indoor pickleball courts in Ichikawa, Chiba, just a 1-minute walk from Motoyawata Station. Three indoor courts, open from 6:00 AM to 1:00 AM. A space for everyone from beginners to advanced players.",
       "keywords": [
         "pickleball",
         "pickleball court",
@@ -81,7 +81,7 @@
     },
     "reserve": {
       "title": "Reservation",
-      "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00–23:00."
+      "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00 AM–1:00 AM."
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
@@ -126,10 +126,10 @@
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
     "mobileMenuAria": "Mobile menu",
-    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00-23:00",
+    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00 AM–1:00 AM",
     "instagramAria": "THE PICKLE BANG THEORY on Instagram",
     "followUs": "Follow us",
-    "menuHours": "OPEN DAILY 6:00–23:00"
+    "menuHours": "OPEN DAILY 6:00 AM–1:00 AM"
   },
   "HyroxCampaign": {
     "title": "Opening & Chiba Tournament Support Campaign",
@@ -167,7 +167,25 @@
       "lessonKicker": "LESSON / CLASS",
       "lessonHeading": "Lessons / Classes",
       "lessonDesc": "Book HYROX small-group coaching classes and trial sessions here.",
-      "lessonCta": "Book a lesson"
+      "lessonCta": "Book a lesson",
+      "visitorNote": "No membership needed. On the login screen, scroll down and choose “ビジターで予約” (Book as a visitor).",
+      "quickDate": {
+        "heading": "Pick a date to see open slots",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "saturday": "Sat",
+        "sunday": "Sun",
+        "chip": "{label} {month}/{day}",
+        "weekday": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        }
+      }
     },
     "steps": {
       "heading": "How to Book",
@@ -192,7 +210,7 @@
     "info": {
       "heading": "INFORMATION",
       "hoursLabel": "Hours",
-      "hoursValue": "6:00 – 23:00 (irregular holidays)",
+      "hoursValue": "6:00 AM – 1:00 AM (irregular holidays)",
       "accessLabel": "Access",
       "accessStation": "1 min from Motoyawata Station",
       "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
@@ -210,26 +228,9 @@
     },
     "englishGuide": {
       "heading": "Booking in English",
-      "notice": "Our booking pages on LaBOLA (courts, the HYROX area and lessons) and Tennis Bear (events) are in Japanese only. Here is how to get through them.",
-      "labolaHeading": "Courts, the HYROX area and lessons (LaBOLA)",
-      "steps": [
-        {
-          "title": "Pick an open slot",
-          "body": "Press a booking button above. LaBOLA opens in a new tab, in Japanese. Tap an open slot (marked 〇) in the calendar."
-        },
-        {
-          "title": "Choose “Reserve as a visitor”",
-          "body": "The first screen is a login page. You do not need an account: scroll to the very bottom and tap “ビジターで予約” (Reserve as a visitor)."
-        },
-        {
-          "title": "Check your booking (STEP 1: 予約内容)",
-          "body": "Choose your end time, add options such as rental paddles or extra people in the HYROX area, and check the price."
-        },
-        {
-          "title": "Enter your details and pay (STEP 2–4)",
-          "body": "Follow the on-screen steps to enter your details and confirm. Payment is online prepayment (credit card or PayPay) through LaBOLA, and cancellations follow LaBOLA's policy."
-        }
-      ],
+      "notice": "Our booking pages on LaBOLA (courts, the HYROX area and lessons) and Tennis Bear (events) are in Japanese only. The steps above walk you through them; here are a few more things to know.",
+      "paymentHeading": "Payment and cancellation (LaBOLA)",
+      "paymentBody": "Payment is online prepayment (credit card or PayPay) through LaBOLA, and cancellations follow LaBOLA's policy.",
       "tennisbearHeading": "Events and school sessions (Tennis Bear)",
       "tennisbearBody": "The event pages are also in Japanese only. Open the event you want — its name, date and fee are shown on the event page — and follow the on-screen application steps.",
       "helpHeading": "Stuck?",
@@ -237,12 +238,24 @@
       "contactCta": "Contact form",
       "instagramCta": "Instagram"
     },
+    "guide": {
+      "kicker": "HOW TO BOOK",
+      "heading": "Booking through LaBOLA needs no membership",
+      "step1Title": "Pick a date and an open slot",
+      "step1Body": "Each booking button opens the LaBOLA calendar. Choose a date, then tap an open slot.",
+      "step2Title": "Choose “ビジターで予約” (Book as a visitor) at the bottom of the login screen",
+      "step2Body": "If you are not a member, scroll down on the login screen and press “ビジターで予約”. You can book without registering.",
+      "step3Title": "Enter your booking details and confirm",
+      "step3Body": "Follow the on-screen instructions.",
+      "registerHeading": "If you are registering as a LaBOLA member (free)",
+      "registerBody": "If the confirmation email does not arrive, check your spam folder, your email rejection settings, and the address you entered. If it still does not arrive, you can go ahead and book as a visitor first."
+    },
     "faq": {
       "heading": "FAQ",
       "items": [
         {
           "question": "What are your opening hours?",
-          "answer": "We're open from 6:00 in the morning until 23:00 at night."
+          "answer": "We're open from 6:00 in the morning until 1:00 AM."
         },
         {
           "question": "How do I make a reservation?",
@@ -250,7 +263,7 @@
         },
         {
           "question": "How much is court rental?",
-          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate as the courts (up to 4 people; +¥1,000 per additional person). With PBT CLUB membership (¥10,000/month, tax included), both come to ¥3,500 to ¥5,600 per hour for up to 20 hours a month."
+          "answer": "From ¥3,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate as the courts (up to 4 people; +¥1,000 per additional person). With PBT CLUB membership (¥10,000/month, tax included), both come to ¥2,800 to ¥5,600 per hour for up to 20 hours a month."
         },
         {
           "question": "Where are you located?",
@@ -259,6 +272,14 @@
         {
           "question": "I'm a beginner — is that okay?",
           "answer": "Absolutely. We offer trial sessions and small-group lessons, and our coaches guide you from the basics."
+        },
+        {
+          "question": "Can I book without registering as a member?",
+          "answer": "Yes. On the login screen, scroll down and choose “ビジターで予約” (Book as a visitor) to book without registering."
+        },
+        {
+          "question": "The membership registration email has not arrived.",
+          "answer": "Please check your spam folder, your email rejection settings, and that the address you entered is correct. If it still does not arrive, you can go ahead and book as a visitor (“ビジターで予約”) instead. If the problem continues, contact us through the contact form on this site or by Instagram DM."
         },
         {
           "question": "What payment methods do you accept?",
@@ -279,7 +300,7 @@
   "HomeLead": {
     "kicker": "ABOUT THE FACILITY",
     "deck": "<strong>THE PICKLE BANG THEORY</strong> is an indoor pickleball facility in Ichikawa, Chiba, a one-minute walk from <nb>Motoyawata Station</nb>.",
-    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 to 23:00. The venue is fully air-conditioned, so you can play whatever the weather or season.",
+    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 AM to 1:00 AM. The venue is fully air-conditioned, so you can play whatever the weather or season.",
     "bodyHyrox": "It also houses a training area certified as an official HYROX training gym.",
     "sideLabel": "Our Facility"
   },
@@ -316,7 +337,7 @@
       "heading": "Facility Information",
       "hours": {
         "label": "Hours",
-        "value": "6:00–23:00"
+        "value": "6:00 AM–1:00 AM"
       },
       "access": {
         "label": "Access",
@@ -353,7 +374,7 @@
     "courtRental": {
       "titleJa": "Court Rental",
       "titleEn": "COURT RENTAL",
-      "description": "Book a DecoTurf hard court — the surface used at international tournaments — by the hour. Unmanned check-in, open from 6:00 AM to 11:00 PM.",
+      "description": "Book a DecoTurf hard court — the surface used at international tournaments — by the hour. Unmanned check-in, open from 6:00 AM to 1:00 AM.",
       "cta": "Book a court",
       "imageAlt": "Indoor pickleball court"
     },
@@ -455,7 +476,7 @@
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-    "hours": "Hours: 6:00 AM – 11:00 PM (Irregular holidays)",
+    "hours": "Hours: 6:00 AM – 1:00 AM (Irregular holidays)",
     "routes": {
       "jr": {
         "line": "JR Sobu Line",
@@ -625,7 +646,7 @@
       "address": "Address",
       "hours": "Hours",
       "addressValue": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-      "hoursValue": "6:00 – 23:00"
+      "hoursValue": "6:00 AM – 1:00 AM"
     }
   },
   "HomeContributors": {
@@ -781,7 +802,7 @@
           "key": "rental",
           "titleEn": "AREA RENTAL",
           "titleJa": "Hourly rental",
-          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 to 23:00.",
+          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 AM to 1:00 AM.",
           "imageAlt": "An athlete driving the sled"
         },
         {
