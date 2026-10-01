@@ -192,7 +192,7 @@ describe("MobileMenu", () => {
     const ig = screen.getByRole("link", { name: "THE PICKLE BANG THEORY の Instagram" });
     expect(ig).toHaveAttribute("href", "https://www.instagram.com/thepicklebangtheory");
     expect(ig).toHaveAttribute("target", "_blank");
-    expect(screen.getByText("本八幡駅 徒歩1分・6:00-23:00営業")).toBeInTheDocument();
+    expect(screen.getByText("本八幡駅 徒歩1分・6:00-25:00営業")).toBeInTheDocument();
   });
 
   it("Instagramクリックを計測する", () => {
@@ -268,7 +268,7 @@ describe("MobileMenu", () => {
   it("英語ロケールではアクセス情報が英語になる", () => {
     renderMenu({ locale: "en", isJa: false });
     expect(
-      screen.getByText("1 min from Motoyawata Sta. · Open 6:00-23:00")
+      screen.getByText("1 min from Motoyawata Sta. · Open 6:00 AM–1:00 AM")
     ).toBeInTheDocument();
   });
 
@@ -376,7 +376,7 @@ describe("MobileMenu", () => {
 
   it("予約CTAの直上に営業時間を添える", () => {
     renderMenu();
-    const hours = screen.getByText("営業時間 6:00–23:00");
+    const hours = screen.getByText("営業時間 6:00–25:00");
     const reserve = screen.getByRole("link", { name: /RESERVE/ });
     // 予約を押す直前に開いている時間が目に入るよう、CTA より前に置く。
     expect(
@@ -387,7 +387,7 @@ describe("MobileMenu", () => {
 
   it("英語ロケールでは営業時間も英語表記にする", () => {
     renderMenu({ locale: "en", isJa: false });
-    expect(screen.getByText("OPEN DAILY 6:00–23:00")).toBeInTheDocument();
+    expect(screen.getByText("OPEN DAILY 6:00 AM–1:00 AM")).toBeInTheDocument();
   });
 
   // --- アクセシビリティ: モーダルダイアログのフォーカス管理 ---

@@ -62,7 +62,7 @@ describe("Hyrox generateMetadata", () => {
     expect(metadata.description).toBe("translated:hyrox.description");
     expect(calls).toContainEqual([
       "hyrox.description",
-      { trialMinutes: 50, trialPrice: "3,000円", open: "6:00", close: "23:00" },
+      { trialMinutes: 50, trialPrice: "3,000円", open: "6:00", close: "25:00" },
     ]);
   });
 

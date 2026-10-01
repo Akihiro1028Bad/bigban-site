@@ -2,7 +2,7 @@
   "Metadata": {
     "home": {
       "title": "Indoor Pickleball Courts 1 Min from Motoyawata Station | THE PICKLE BANG THEORY",
-      "description": "Indoor pickleball courts in Ichikawa, Chiba, just a 1-minute walk from Motoyawata Station. Three indoor courts, open from 6:00 to 23:00. A space for everyone from beginners to advanced players.",
+      "description": "Indoor pickleball courts in Ichikawa, Chiba, just a 1-minute walk from Motoyawata Station. Three indoor courts, open from 6:00 AM to 1:00 AM. A space for everyone from beginners to advanced players.",
       "keywords": [
         "pickleball",
         "pickleball court",
@@ -81,7 +81,7 @@
     },
     "reserve": {
       "title": "Reservation",
-      "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00–23:00."
+      "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00 AM–1:00 AM."
     },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
@@ -126,10 +126,10 @@
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
     "mobileMenuAria": "Mobile menu",
-    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00-23:00",
+    "menuAccess": "1 min from Motoyawata Sta. · Open 6:00 AM–1:00 AM",
     "instagramAria": "THE PICKLE BANG THEORY on Instagram",
     "followUs": "Follow us",
-    "menuHours": "OPEN DAILY 6:00–23:00"
+    "menuHours": "OPEN DAILY 6:00 AM–1:00 AM"
   },
   "HyroxCampaign": {
     "title": "Opening & Chiba Tournament Support Campaign",
@@ -192,7 +192,7 @@
     "info": {
       "heading": "INFORMATION",
       "hoursLabel": "Hours",
-      "hoursValue": "6:00 – 23:00 (irregular holidays)",
+      "hoursValue": "6:00 AM – 1:00 AM (irregular holidays)",
       "accessLabel": "Access",
       "accessStation": "1 min from Motoyawata Station",
       "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
@@ -213,7 +213,7 @@
       "items": [
         {
           "question": "What are your opening hours?",
-          "answer": "We're open from 6:00 in the morning until 23:00 at night."
+          "answer": "We're open from 6:00 in the morning until 1:00 AM."
         },
         {
           "question": "How do I make a reservation?",
@@ -221,7 +221,7 @@
         },
         {
           "question": "How much is court rental?",
-          "answer": "From ¥4,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate as the courts (up to 4 people; +¥1,000 per additional person). With PBT CLUB membership (¥10,000/month, tax included), both come to ¥3,500 to ¥5,600 per hour for up to 20 hours a month."
+          "answer": "From ¥3,980 to ¥7,980 per hour, depending on the time slot and day of the week. The HYROX area is the same rate as the courts (up to 4 people; +¥1,000 per additional person). With PBT CLUB membership (¥10,000/month, tax included), both come to ¥2,800 to ¥5,600 per hour for up to 20 hours a month."
         },
         {
           "question": "Where are you located?",
@@ -250,7 +250,7 @@
   "HomeLead": {
     "kicker": "ABOUT THE FACILITY",
     "deck": "<strong>THE PICKLE BANG THEORY</strong> is an indoor pickleball facility in Ichikawa, Chiba, a one-minute walk from <nb>Motoyawata Station</nb>.",
-    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 to 23:00. The venue is fully air-conditioned, so you can play whatever the weather or season.",
+    "body": "Three DecoTurf hard courts — the surface used at international tournaments — are open from 6:00 AM to 1:00 AM. The venue is fully air-conditioned, so you can play whatever the weather or season.",
     "bodyHyrox": "It also houses a training area certified as an official HYROX training gym.",
     "sideLabel": "Our Facility"
   },
@@ -287,7 +287,7 @@
       "heading": "Facility Information",
       "hours": {
         "label": "Hours",
-        "value": "6:00–23:00"
+        "value": "6:00 AM–1:00 AM"
       },
       "access": {
         "label": "Access",
@@ -324,7 +324,7 @@
     "courtRental": {
       "titleJa": "Court Rental",
       "titleEn": "COURT RENTAL",
-      "description": "Book a DecoTurf hard court — the surface used at international tournaments — by the hour. Unmanned check-in, open from 6:00 AM to 11:00 PM.",
+      "description": "Book a DecoTurf hard court — the surface used at international tournaments — by the hour. Unmanned check-in, open from 6:00 AM to 1:00 AM.",
       "cta": "Book a court",
       "imageAlt": "Indoor pickleball court"
     },
@@ -426,7 +426,7 @@
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-    "hours": "Hours: 6:00 AM – 11:00 PM (Irregular holidays)",
+    "hours": "Hours: 6:00 AM – 1:00 AM (Irregular holidays)",
     "routes": {
       "jr": {
         "line": "JR Sobu Line",
@@ -596,7 +596,7 @@
       "address": "Address",
       "hours": "Hours",
       "addressValue": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-      "hoursValue": "6:00 – 23:00"
+      "hoursValue": "6:00 AM – 1:00 AM"
     }
   },
   "HomeContributors": {
@@ -752,7 +752,7 @@
           "key": "rental",
           "titleEn": "AREA RENTAL",
           "titleJa": "時間制レンタル",
-          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 to 23:00.",
+          "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 AM to 1:00 AM.",
           "imageAlt": "An athlete driving the sled"
         },
         {

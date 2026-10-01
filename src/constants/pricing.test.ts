@@ -2,24 +2,27 @@ import { describe, it, expect } from "vitest";
 import { COURT_PRICES, HYROX_LESSON_PRICES } from "./pricing";
 
 describe("COURT_PRICES", () => {
-  it("6:00-9:00 / 9:00-17:00 / 17:00-23:00 の3時間帯を持つ", () => {
+  it("6:00-9:00 / 9:00-17:00 / 17:00-23:00 / 23:00-25:00 の4時間帯を持つ", () => {
     expect(COURT_PRICES.map((row) => row.timeSlot)).toEqual([
       "6:00-9:00",
       "9:00-17:00",
       "17:00-23:00",
+      "23:00-25:00",
     ]);
   });
 
-  it("通常料金（非会員）は据え置き", () => {
+  it("通常料金（非会員）。深夜帯 23:00-25:00 は平日 ¥3,980 / 週末 ¥5,980", () => {
     expect(COURT_PRICES.map((row) => row.weekday)).toEqual([
       "¥4,980",
       "¥5,980",
       "¥7,980",
+      "¥3,980",
     ]);
     expect(COURT_PRICES.map((row) => row.weekend)).toEqual([
       "¥7,980",
       "¥7,980",
       "¥7,980",
+      "¥5,980",
     ]);
   });
 
@@ -28,14 +31,16 @@ describe("COURT_PRICES", () => {
       "¥3,500",
       "¥4,200",
       "¥5,600",
+      "¥2,800",
     ]);
   });
 
-  it("土日・祝日の PBT CLUB 会員価格は終日 ¥5,600", () => {
+  it("土日・祝日の PBT CLUB 会員価格は日中 ¥5,600、深夜帯 ¥4,200", () => {
     expect(COURT_PRICES.map((row) => row.weekendMember)).toEqual([
       "¥5,600",
       "¥5,600",
       "¥5,600",
+      "¥4,200",
     ]);
   });
 
