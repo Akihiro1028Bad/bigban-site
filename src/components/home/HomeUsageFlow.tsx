@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
+import { Link } from "@/i18n/navigation";
+import { FIRST_VISIT_PATH } from "@/constants/firstVisit";
 import { EASE } from "@/constants/motion";
 
 import type { ReactNode } from "react";
@@ -24,7 +26,8 @@ const RICH_TAGS = {
  * 「予約 → 入館 → プレー」の3手だけを示して初回予約の心理障壁を下げる。
  *
  * 新規CTAは置かない。直後の PRICING が予約CTAを持っており、
- * ここに並べると同一画面でCTAの階層が二重になる。
+ * ここに並べると同一画面でCTAの階層が二重になる。補助の導線として、
+ * 初めての方向けページ(/first-visit)へのテキストリンクだけを末尾に置く。
  */
 const STEP_KEYS = ["reserve", "visit", "play"] as const;
 
@@ -87,6 +90,12 @@ export default function HomeUsageFlow() {
             </motion.li>
           ))}
         </ol>
+        <Link
+          href={FIRST_VISIT_PATH}
+          className="mt-8 inline-block text-xs tracking-[0.2em] text-accent underline-offset-4 hover:underline"
+        >
+          {t("firstVisitLink")}
+        </Link>
       </div>
     </section>
   );

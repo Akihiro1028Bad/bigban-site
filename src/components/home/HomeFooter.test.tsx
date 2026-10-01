@@ -109,13 +109,14 @@ describe("HomeFooter", () => {
     ).toBeInTheDocument();
   });
 
-  it("8つのナビリンクを表示する", () => {
+  it("9つのナビリンクを表示する", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomeFooter />
       </NextIntlClientProvider>
     );
     const links = [
+      { name: "FIRST VISIT", href: "/first-visit" },
       { name: "CONCEPT", href: "/#concept" },
       { name: "FACILITY", href: "/#facility" },
       { name: "SERVICES", href: "/#services" },

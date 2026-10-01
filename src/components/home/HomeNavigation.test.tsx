@@ -46,6 +46,7 @@ function renderWithIntl(ui: ReactElement, locale: "ja" | "en" = "ja") {
 }
 
 const NAV_ITEMS = [
+  { label: "FIRST VISIT", href: "/first-visit" },
   { label: "CONCEPT", href: "/#concept" },
   { label: "FACILITY", href: "/#facility" },
   { label: "SERVICES", href: "/#services" },
@@ -81,7 +82,7 @@ describe("HomeNavigation", () => {
     expect(logos).toHaveLength(1);
   });
 
-  it("8つのデスクトップナビリンクと正しいhrefを表示する", () => {
+  it("9つのデスクトップナビリンクと正しいhrefを表示する", () => {
     renderWithIntl(<HomeNavigation />);
     const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
     for (const item of NAV_ITEMS) {
@@ -90,6 +91,14 @@ describe("HomeNavigation", () => {
       expect(link).toHaveAttribute("href", item.href);
       expect(nav).toContainElement(link);
     }
+  });
+
+  it("FIRST VISIT がナビの先頭(CONCEPT の前)に配置される", () => {
+    renderWithIntl(<HomeNavigation />);
+    const nav = screen.getByRole("navigation", { name: "メインナビゲーション" });
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(hrefs[0]).toBe("/first-visit");
+    expect(hrefs[1]).toBe("/#concept");
   });
 
   it("NEWSリンクがPRICINGとABOUTの間に配置される", () => {

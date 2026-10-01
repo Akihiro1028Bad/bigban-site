@@ -94,6 +94,10 @@
       "title": "予約",
       "description": "THE PICKLE BANG THEORY の予約案内ページ。コート利用・イベント/スクール・HYROXエリア・レッスンの予約先をご案内します。本八幡駅徒歩1分、6:00–23:00営業。"
     },
+    "firstVisit": {
+      "title": "はじめての方へ｜ご利用の流れ・持ち物・料金の目安",
+      "description": "ピックルボールが初めての方・全員初心者のグループへ。ご利用の流れ、持ち物とレンタル、4人で割った1人あたり料金の目安、予約の受付開始日までを1ページでご案内します。本八幡駅徒歩1分、6:00–23:00・年中無休。"
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -123,6 +127,7 @@
     "columns": "COLUMN",
     "about": "ABOUT",
     "access": "ACCESS",
+    "firstVisit": "FIRST VISIT",
     "reserve": "RESERVE",
     "reserveJa": "予約",
     "contact": "CONTACT",
@@ -136,6 +141,7 @@
     "columnsJa": "コラム",
     "aboutJa": "私たちについて",
     "accessJa": "アクセス",
+    "firstVisitJa": "はじめての方へ",
     "mainNav": "メインナビゲーション",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる",
@@ -250,6 +256,145 @@
           "answer": "現地でのお支払いは、クレジットカード・PayPay がご利用いただけます。"
         }
       ]
+    }
+  },
+  "FirstVisit": {
+    "hero": {
+      "kicker": "FIRST VISIT",
+      "title": "はじめての方へ",
+      "lead": "ピックルボールが初めてでも、全員初心者のグループでも楽しめます。持ち物はノーマーキングシューズだけ。予約はオンラインで、当日は予約時間になったらそのまま入館できます。",
+      "rulesNote": "ルールは事前に確認できます。",
+      "rulesLink": "ピックルボールの始め方を読む",
+      "cta": "コートを予約する"
+    },
+    "flow": {
+      "heading": "ご利用の流れ",
+      "headingEn": "HOW IT WORKS",
+      "steps": {
+        "reserve": {
+          "title": "予約する",
+          "description": "予約サイトで日時を選びます。コートは1時間単位で借りられます。"
+        },
+        "pay": {
+          "title": "オンラインで支払う",
+          "description": "予約時に、クレジットカードまたは PayPay で事前にお支払いいただきます。"
+        },
+        "enter": {
+          "title": "入館する",
+          "description": "本八幡駅から徒歩1分。予約時間になったらそのまま入館できます。"
+        },
+        "play": {
+          "title": "プレーする",
+          "description": "ノーマーキングシューズに履き替えてプレー。パドルはレンタルもあります。"
+        }
+      }
+    },
+    "facts": {
+      "heading": "ご利用の前に",
+      "headingEn": "GOOD TO KNOW",
+      "items": {
+        "bring": {
+          "label": "持ち物",
+          "value": "ノーマーキングシューズ(シューズの貸出はありません)"
+        },
+        "rental": {
+          "label": "レンタル",
+          "value": "パドル 1本 ¥500(1コートにつき6本まで)"
+        },
+        "bookingOpens": {
+          "label": "予約の受付開始",
+          "value": "一般のご予約は{general}日前から、PBT CLUB会員は{member}日前からです。"
+        },
+        "cancel": {
+          "label": "キャンセル・変更",
+          "value": "予約システム(LaBOLA)の規定に従います。予約時にご確認ください。"
+        },
+        "solo": {
+          "label": "1人で参加したい",
+          "value": "1人での参加は施設主催のイベントへ。日程は最新情報をご確認ください。"
+        },
+        "hours": {
+          "label": "営業時間",
+          "value": "6:00–23:00・年中無休"
+        },
+        "facility": {
+          "label": "施設",
+          "value": "全天候型インドア・空調完備。デコターフのコート3面。男女別更衣室・ラウンジ・自動販売機があります。シャワーはありません。"
+        },
+        "car": {
+          "label": "お車の方",
+          "value": "近隣のコインパーキングをご利用ください。"
+        },
+        "late": {
+          "label": "遅れたとき",
+          "value": "開始時刻に遅れても、ご予約枠の時間内でのご利用となります。"
+        }
+      }
+    },
+    "pricing": {
+      "heading": "料金の目安",
+      "headingEn": "PRICING",
+      "intro": "料金は1コート・1時間あたりです(税込)。ダブルスなら4人で割ると、1人あたりの目安は次のとおりです。",
+      "perPersonLabel": "4人で割った1人あたり(1時間)",
+      "timeSlot": "時間帯",
+      "weekday": "平日",
+      "weekend": "週末・祝日",
+      "note": "4人で割った一例で、人数の上限を定めるものではありません。レンタル用品は別料金です。"
+    },
+    "next": {
+      "heading": "次の一歩",
+      "headingEn": "NEXT STEP",
+      "items": {
+        "reserve": {
+          "title": "コートを予約する",
+          "description": "空き状況の確認と予約はこちらから。",
+          "cta": "予約案内へ"
+        },
+        "hyrox": {
+          "title": "HYROX を試す",
+          "description": "体験・クラス・エリア利用のご案内です。",
+          "cta": "HYROX を見る"
+        },
+        "pbtClub": {
+          "title": "PBT CLUB",
+          "description": "よく使う方向けの月額会員制度です。",
+          "cta": "PBT CLUB を見る"
+        }
+      }
+    },
+    "faq": {
+      "heading": "よくある質問",
+      "headingEn": "FAQ",
+      "items": {
+        "allBeginners": {
+          "question": "全員初心者でも大丈夫ですか?",
+          "answer": "はい。ルールは事前に確認でき、初めての方向けの体験・トライアルや少人数制レッスンもご用意しています。"
+        },
+        "solo": {
+          "question": "1人でも参加できますか?",
+          "answer": "1人での参加は施設主催のイベントへ。日程は最新情報をご確認ください。"
+        },
+        "bring": {
+          "question": "持ち物は何が必要ですか?",
+          "answer": "ノーマーキングシューズをご持参ください(貸出はありません)。パドルは1本 ¥500 でレンタルできます。"
+        },
+        "bookingOpens": {
+          "question": "何日前から予約できますか?",
+          "answer": "一般のご予約は{general}日前から、PBT CLUB会員は{member}日前からです。"
+        },
+        "cancel": {
+          "question": "キャンセルはできますか?",
+          "answer": "予約システム(LaBOLA)の規定に従います。予約時にご確認ください。"
+        },
+        "payment": {
+          "question": "支払い方法は?",
+          "answer": "予約時にオンラインで事前にお支払いいただきます(クレジットカード・PayPay)。"
+        },
+        "car": {
+          "question": "お車で行けますか?",
+          "answer": "近隣のコインパーキングをご利用ください。"
+        }
+      }
     }
   },
   "HomeHero": {
@@ -383,7 +528,8 @@
         "title": "プレー開始",
         "description": "ノーマーキングソールのシューズをご持参ください。パドルはレンタル(1本 ¥500)もあります。"
       }
-    }
+    },
+    "firstVisitLink": "はじめての方へ詳しく"
   },
   "HomePricing": {
     "title": "PRICING",

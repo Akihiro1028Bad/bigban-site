@@ -115,6 +115,7 @@ function renderMenu(opts: Options = {}) {
 }
 
 const NAV = [
+  { name: "FIRST VISIT", href: "/first-visit" },
   { name: "CONCEPT", href: "/#concept" },
   { name: "FACILITY", href: "/#facility" },
   { name: "SERVICES", href: "/#services" },
@@ -146,7 +147,7 @@ describe("MobileMenu", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("8つのナビリンクと正しいhrefを表示する", () => {
+  it("9つのナビリンクと正しいhrefを表示する", () => {
     renderMenu();
     for (const item of NAV) {
       const link = screen.getByRole("link", { name: item.name });

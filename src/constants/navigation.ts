@@ -1,6 +1,7 @@
 // グローバルナビゲーション項目（ヘッダー・モバイルメニュー・フッターで共有）。
 // kind: "anchor" はトップページ内アンカー、"page" は独立ページ遷移。
 export const NAV_ITEMS = [
+  { id: "firstVisit", kind: "page", href: "/first-visit" },
   { id: "concept", kind: "anchor", href: "/#concept" },
   { id: "facility", kind: "anchor", href: "/#facility" },
   { id: "services", kind: "anchor", href: "/#services" },

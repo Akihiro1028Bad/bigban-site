@@ -117,9 +117,12 @@ describe("HomeUsageFlow", () => {
     expect(container.textContent).not.toContain("手ぶら");
   });
 
-  it("新規CTAリンクを増やさない（直後のPRICINGに予約CTAがあるため）", () => {
+  it("予約CTAを増やさない（直後のPRICINGに予約CTAがあるため）。リンクは「はじめての方へ」だけ", () => {
     renderJa();
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    const links = screen.queryAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/first-visit",
+    ]);
   });
 
   it("英語ロケールでも3ステップを表示する", () => {
@@ -160,5 +163,25 @@ describe("HomeUsageFlow", () => {
     ).toBeInTheDocument();
     // 英語はスペースで折り返せるため nb を入れない。
     expect(container.querySelectorAll(".whitespace-nowrap")).toHaveLength(0);
+  });
+});
+
+describe("HomeUsageFlow の「はじめての方へ」リンク", () => {
+  it("はじめての方へのページを指す", () => {
+    renderJa();
+    expect(
+      screen.getByRole("link", { name: "はじめての方へ詳しく" }),
+    ).toHaveAttribute("href", "/first-visit");
+  });
+
+  it("英語では英文のリンク文言を出す", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <HomeUsageFlow />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      screen.getByRole("link", { name: "New here? Read the first-visit guide" }),
+    ).toHaveAttribute("href", "/first-visit");
   });
 });

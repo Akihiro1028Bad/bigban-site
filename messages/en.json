@@ -83,6 +83,10 @@
       "title": "Reservation",
       "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00–23:00."
     },
+    "firstVisit": {
+      "title": "First Visit — How it works, what to bring, pricing",
+      "description": "A one-page guide for first-timers and all-beginner groups: how it works, what to bring and rent, per-person price estimates, and when booking opens. 1 min from Motoyawata Station, open 6:00–23:00, every day."
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -109,6 +113,7 @@
     "columns": "COLUMN",
     "about": "ABOUT",
     "access": "ACCESS",
+    "firstVisit": "FIRST VISIT",
     "reserve": "RESERVE",
     "reserveJa": "予約",
     "contact": "CONTACT",
@@ -122,6 +127,7 @@
     "columnsJa": "",
     "aboutJa": "",
     "accessJa": "",
+    "firstVisitJa": "",
     "mainNav": "Main Navigation",
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
@@ -236,6 +242,145 @@
           "answer": "On-site payments can be made by credit card or PayPay."
         }
       ]
+    }
+  },
+  "FirstVisit": {
+    "hero": {
+      "kicker": "FIRST VISIT",
+      "title": "First Visit",
+      "lead": "New to pickleball, or a group of total beginners? You'll have a great time. All you bring is non-marking shoes. Book online, and on the day just walk in at your booked time.",
+      "rulesNote": "You can check the rules beforehand.",
+      "rulesLink": "Read the beginner's guide (Japanese)",
+      "cta": "Book a court"
+    },
+    "flow": {
+      "heading": "How it works",
+      "headingEn": "HOW IT WORKS",
+      "steps": {
+        "reserve": {
+          "title": "Book",
+          "description": "Pick your date and time on the booking site. Courts are rented by the hour."
+        },
+        "pay": {
+          "title": "Pay online",
+          "description": "Pay in advance when you book, by credit card or PayPay."
+        },
+        "enter": {
+          "title": "Walk in",
+          "description": "One minute on foot from Motoyawata Station. Just walk in at your booked time."
+        },
+        "play": {
+          "title": "Play",
+          "description": "Change into non-marking shoes and play. Rental paddles are available."
+        }
+      }
+    },
+    "facts": {
+      "heading": "Good to know",
+      "headingEn": "GOOD TO KNOW",
+      "items": {
+        "bring": {
+          "label": "What to bring",
+          "value": "Non-marking shoes (rental shoes are not available)"
+        },
+        "rental": {
+          "label": "Rentals",
+          "value": "Paddles ¥500 each (up to 6 per court)"
+        },
+        "bookingOpens": {
+          "label": "When booking opens",
+          "value": "General bookings open {general} days ahead; PBT CLUB members {member} days ahead."
+        },
+        "cancel": {
+          "label": "Cancel or change",
+          "value": "Follows the booking system's (LaBOLA) policy. Please check when you book."
+        },
+        "solo": {
+          "label": "Coming alone",
+          "value": "To join on your own, look for our facility-hosted events. Please check for the latest schedule."
+        },
+        "hours": {
+          "label": "Hours",
+          "value": "6:00–23:00, open every day"
+        },
+        "facility": {
+          "label": "Facility",
+          "value": "All-weather indoor with air conditioning. Three DecoTurf courts. Men's and women's changing rooms, a lounge and vending machines. There are no showers."
+        },
+        "car": {
+          "label": "By car",
+          "value": "Please use a nearby coin parking lot."
+        },
+        "late": {
+          "label": "Running late",
+          "value": "If you arrive after the start time, you can still use the rest of your booked slot."
+        }
+      }
+    },
+    "pricing": {
+      "heading": "Pricing guide",
+      "headingEn": "PRICING",
+      "intro": "Prices are per court, per hour (tax included). Split among four for doubles, the per-person estimate is as follows.",
+      "perPersonLabel": "Per person when split 4 ways (1 hour)",
+      "timeSlot": "Time",
+      "weekday": "Weekday",
+      "weekend": "Weekend / holiday",
+      "note": "This is one example split four ways, not a cap on group size. Rentals are extra."
+    },
+    "next": {
+      "heading": "Next step",
+      "headingEn": "NEXT STEP",
+      "items": {
+        "reserve": {
+          "title": "Book a court",
+          "description": "Check availability and book.",
+          "cta": "Booking guide"
+        },
+        "hyrox": {
+          "title": "Try HYROX",
+          "description": "Trials, classes and area rental.",
+          "cta": "See HYROX"
+        },
+        "pbtClub": {
+          "title": "PBT CLUB",
+          "description": "A monthly membership for regular players.",
+          "cta": "See PBT CLUB"
+        }
+      }
+    },
+    "faq": {
+      "heading": "FAQ",
+      "headingEn": "FAQ",
+      "items": {
+        "allBeginners": {
+          "question": "Are all-beginner groups OK?",
+          "answer": "Yes. You can check the rules beforehand, and we offer beginner trials and small-group lessons."
+        },
+        "solo": {
+          "question": "Can I come alone?",
+          "answer": "To join on your own, look for our facility-hosted events. Please check for the latest schedule."
+        },
+        "bring": {
+          "question": "What should I bring?",
+          "answer": "Please bring non-marking shoes (rental shoes are not available). Paddles can be rented for ¥500 each."
+        },
+        "bookingOpens": {
+          "question": "How far ahead can I book?",
+          "answer": "General bookings open {general} days ahead; PBT CLUB members {member} days ahead."
+        },
+        "cancel": {
+          "question": "Can I cancel?",
+          "answer": "Follows the booking system's (LaBOLA) policy. Please check when you book."
+        },
+        "payment": {
+          "question": "How do I pay?",
+          "answer": "You pay online in advance when you book (credit card or PayPay)."
+        },
+        "car": {
+          "question": "Can I come by car?",
+          "answer": "Please use a nearby coin parking lot."
+        }
+      }
     }
   },
   "HomeHero": {
@@ -369,7 +514,8 @@
         "title": "Start Playing",
         "description": "Bring shoes with non-marking soles. Rental paddles are available (¥500 each)."
       }
-    }
+    },
+    "firstVisitLink": "New here? Read the first-visit guide"
   },
   "HomePricing": {
     "title": "PRICING",
