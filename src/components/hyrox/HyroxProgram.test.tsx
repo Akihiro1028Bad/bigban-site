@@ -17,6 +17,11 @@ describe("HyroxProgram", () => {
     ).toBeInTheDocument();
   });
 
+  it("NEXT RACE のボタンのアンカー先として id=program を持つ", () => {
+    const { container } = renderWithIntl(<HyroxProgram />);
+    expect(container.querySelector("section#program")).toBeInTheDocument();
+  });
+
   it("ピックルと同一のコート料金テーブル（時間帯別・1時間あたり）を表示する", () => {
     renderWithIntl(<HyroxProgram />);
     expect(screen.getByText("エリア利用料")).toBeInTheDocument();

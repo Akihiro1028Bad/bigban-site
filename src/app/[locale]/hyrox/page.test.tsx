@@ -95,6 +95,11 @@ describe("Hyrox Page", () => {
     expect(container).toBeTruthy();
   });
 
+  it("クローラが見る HTML が古くなりすぎないよう 1 時間ごとに再生成する", async () => {
+    const { revalidate } = await import("./page");
+    expect(revalidate).toBe(3600);
+  });
+
   it("不正 locale で notFound", async () => {
     const { default: HyroxPage } = await import("./page");
     await expect(

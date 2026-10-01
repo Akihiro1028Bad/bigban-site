@@ -7,8 +7,10 @@ import HyroxServices from "@/components/hyrox/HyroxServices";
 import HyroxIntro from "@/components/hyrox/HyroxIntro";
 import HyroxFilm from "@/components/hyrox/HyroxFilm";
 import HyroxCoach from "@/components/hyrox/HyroxCoach";
+import HyroxNextRace from "@/components/hyrox/HyroxNextRace";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
+import { currentTimeMs } from "@/lib/hyroxRaces";
 
 export default function HyroxContent() {
   const showColumns = isCmsColumnsEnabled();
@@ -23,6 +25,7 @@ export default function HyroxContent() {
         <HyroxIntro showColumnLink={showColumns} />
         <HyroxFilm />
         <HyroxCoach />
+        <HyroxNextRace initialNowMs={currentTimeMs()} />
         <HyroxProgram />
         <HyroxPicklePromo />
       </main>
