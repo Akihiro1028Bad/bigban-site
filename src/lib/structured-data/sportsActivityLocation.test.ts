@@ -73,7 +73,7 @@ describe("buildSportsActivityLocation", () => {
     expect(schema.telephone).toBe("+81-90-5523-3879");
   });
 
-  it("営業時間（全曜日 06:00-23:00）を返す", async () => {
+  it("営業時間（全曜日 06:00-翌01:00）を返す", async () => {
     const { buildSportsActivityLocation } = await import(
       "./sportsActivityLocation"
     );
@@ -92,7 +92,7 @@ describe("buildSportsActivityLocation", () => {
           "Sunday",
         ],
         opens: "06:00",
-        closes: "23:00",
+        closes: "01:00",
       },
     ]);
   });
@@ -103,7 +103,7 @@ describe("buildSportsActivityLocation", () => {
     );
     const schema = buildSportsActivityLocation("ja");
 
-    expect(schema.priceRange).toBe("¥4980-¥7980");
+    expect(schema.priceRange).toBe("¥3980-¥7980");
   });
 
   it("sport: Pickleball を含む", async () => {
@@ -233,7 +233,7 @@ describe("buildSportsActivityLocation", () => {
 
     expect(schema.description).toContain("本八幡");
     expect(schema.description).toContain("ピックルボール");
-    expect(schema.description).toContain("6:00-23:00");
+    expect(schema.description).toContain("6:00-25:00");
     expect(schema.description).not.toContain("24時間");
   });
 

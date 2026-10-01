@@ -27,7 +27,7 @@ describe("buildHyroxDescriptionValues", () => {
       trialMinutes: 50,
       trialPrice: "3,000円",
       open: "6:00",
-      close: "23:00",
+      close: "25:00",
     });
   });
 
@@ -43,7 +43,7 @@ describe("buildHyroxDescriptionValues", () => {
       "./hyroxDescriptionValues"
     );
     expect(describeHyrox("ja", buildHyroxDescriptionValues("ja"))).toBe(
-      "HYROX公式トレーニングクラブに認定された、千葉・本八幡駅徒歩1分(JR総武線・都営新宿線)のトレーニングジム。公式8種目対応の器具を常設し、現HYROX日本代表・関吉大亮コーチのクラスも開催。初めての方は体験会(50分・3,000円)から。6:00〜23:00営業。",
+      "HYROX公式トレーニングクラブに認定された、千葉・本八幡駅徒歩1分(JR総武線・都営新宿線)のトレーニングジム。公式8種目対応の器具を常設し、現HYROX日本代表・関吉大亮コーチのクラスも開催。初めての方は体験会(50分・3,000円)から。6:00〜25:00営業。",
     );
   });
 
@@ -53,7 +53,7 @@ describe("buildHyroxDescriptionValues", () => {
     );
     const description = describeHyrox("en", buildHyroxDescriptionValues("en"));
     expect(description).toContain("(50 min, ¥3,000)");
-    expect(description).toContain("Open 6:00–23:00.");
+    expect(description).toContain("Open 6:00 AM–1:00 AM.");
   });
 
   it("料金・営業時間の定数を変えると description と構造化データが追従する", async () => {
@@ -76,6 +76,10 @@ describe("buildHyroxDescriptionValues", () => {
       return {
         ...actual,
         BUSINESS_HOURS: { opens: "07:00", closes: "22:00" },
+        BUSINESS_HOURS_DISPLAY: {
+          ja: { open: "7:00", close: "22:00" },
+          en: { open: "7:00 AM", close: "10:00 PM" },
+        },
       };
     });
     const { buildHyroxDescriptionValues } = await import(
