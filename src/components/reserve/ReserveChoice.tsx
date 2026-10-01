@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import HyroxCampaign from "@/components/hyrox/HyroxCampaign";
 import { EASE } from "@/constants/motion";
 import {
-  LABOLA_CALENDAR_TABS,
+  labolaTabNameOf,
   LABOLA_PICKLEBALL_URL,
   LABOLA_HYROX_URL,
   LABOLA_SCHOOL_URL,
@@ -26,9 +26,9 @@ interface ChoiceCard {
   // イベント/スクール申込は遷移先が labola ではないため未指定
   // (指定すると labola のファネル集計に無関係な流入が混ざる)。
   labolaEntryKind?: LabolaEntryKind;
-  // 指定したカードだけ、メインボタンを「今日の1日表示」にして日付ボタンを並べる。
-  // 値は labola 管理画面のカテゴリ名(枠貸し=calendar 系のカードのみ)。
-  tabName?: string;
+  // 指定したカードだけ、メインボタンを「今日の1日表示」にして日付ボタンを並べる
+  // (枠貸し=calendar 系のカードのみ)。labola のカテゴリ名はキーから引く。
+  calendarTabKey?: LabolaCalendarTabKey;
 }
 
 // 旧予約システム(RESERVA)からの移行は完了済みで、予約先は labola に一本化されている。
@@ -42,7 +42,7 @@ const COURT_CARD: ChoiceCard = {
   href: LABOLA_PICKLEBALL_URL,
   location: "reserve_choice_august",
   labolaEntryKind: "rental",
-  tabName: LABOLA_CALENDAR_TABS[0].tabName,
+  calendarTabKey: "pickleball",
 };
 
 // 早朝ピックルボール等の主催イベント / スクールの申込。枠貸しの labola とは別導線。
@@ -67,7 +67,7 @@ const HYROX_AREA_CARD: ChoiceCard = {
   href: LABOLA_HYROX_URL,
   location: "reserve_choice_hyrox_area",
   labolaEntryKind: "rental",
-  tabName: LABOLA_CALENDAR_TABS[1].tabName,
+  calendarTabKey: "hyrox",
 };
 
 const HYROX_LESSON_CARD: ChoiceCard = {
@@ -115,7 +115,11 @@ function ChoiceCardGrid({ cards }: { cards: readonly ChoiceCard[] }) {
             fallbackHref={card.href}
             location={card.location}
             labolaEntryKind={card.labolaEntryKind}
-            tabName={card.tabName}
+            tabName={
+              card.calendarTabKey === undefined
+                ? undefined
+                : labolaTabNameOf(card.calendarTabKey)
+            }
           />
         </motion.div>
       ))}

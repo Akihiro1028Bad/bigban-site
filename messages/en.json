@@ -228,14 +228,14 @@
     },
     "guide": {
       "kicker": "HOW TO BOOK",
-      "heading": "How to book (no membership needed)",
+      "heading": "Booking through LaBOLA needs no membership",
       "step1Title": "Pick a date and an open slot",
-      "step1Body": "Choose a date with the buttons below to open that day's availability, then tap an open slot.",
+      "step1Body": "Each booking button opens the LaBOLA calendar. Choose a date, then tap an open slot.",
       "step2Title": "Choose “ビジターで予約” (Book as a visitor) at the bottom of the login screen",
       "step2Body": "If you are not a member, scroll down on the login screen and press “ビジターで予約”. You can book without registering.",
       "step3Title": "Enter your booking details and confirm",
       "step3Body": "Follow the on-screen instructions.",
-      "registerHeading": "If you are registering as a member (free)",
+      "registerHeading": "If you are registering as a LaBOLA member (free)",
       "registerBody": "If the confirmation email does not arrive, check your spam folder, your email rejection settings, and the address you entered. If it still does not arrive, you can go ahead and book as a visitor first."
     },
     "faq": {

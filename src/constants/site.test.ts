@@ -7,6 +7,7 @@ import {
   LABOLA_PICKLEBALL_URL,
   buildLabolaCalendarSrc,
   labolaDayUrl,
+  labolaTabNameOf,
   reserveHref,
   resolveCalendarTabKey,
 } from "./site";
@@ -70,6 +71,13 @@ describe("labola calendar constants", () => {
 describe("BUSINESS_HOURS", () => {
   it("毎日 06:00〜23:00", () => {
     expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "23:00" });
+  });
+});
+
+describe("labolaTabNameOf", () => {
+  it("タブのキーから labola 登録名を引く(並び順に依存しない)", () => {
+    expect(labolaTabNameOf("pickleball")).toBe("ピックルボールコート");
+    expect(labolaTabNameOf("hyrox")).toBe("H Y R O X");
   });
 });
 
