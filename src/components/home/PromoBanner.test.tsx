@@ -39,10 +39,10 @@ describe("PromoBanner", () => {
     ).toBeInTheDocument();
   });
 
-  it("会員制度のニュース記事にリンクする", () => {
+  it("PBT CLUB の専用ページにリンクする", () => {
     renderWithIntl(<PromoBanner />, "ja");
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    expect(link).toHaveAttribute("href", "/pbt-club");
     expect(link).not.toHaveAttribute("target", "_blank");
   });
 
