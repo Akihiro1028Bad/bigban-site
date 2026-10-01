@@ -60,9 +60,11 @@ export default function HomeFooter({ showColumns = false }: HomeFooterProps) {
                 className="h-8 w-auto"
               />
             </Link>
-            <p className="mt-3 text-xs tracking-[0.2em] text-text-gray">
-              {tFooter("brandJa")}
-            </p>
+            {tFooter("brandJa") ? (
+              <p className="mt-3 text-xs tracking-[0.2em] text-text-gray">
+                {tFooter("brandJa")}
+              </p>
+            ) : null}
             <a
               href={INSTAGRAM_URL}
               {...EXTERNAL_LINK_PROPS}

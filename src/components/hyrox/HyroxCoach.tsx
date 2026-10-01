@@ -72,12 +72,16 @@ export default function HyroxCoach() {
             <h3 className="font-serif text-4xl font-black tracking-[0.08em] text-text-light sm:text-5xl">
               {t("name")}
             </h3>
-            <p className="mt-2 text-xs tracking-[0.2em] text-text-gray">
-              {t("nameKana")}
-            </p>
-            <p className="mt-1 text-xs tracking-[0.3em] text-text-gray">
-              {t("nameEn")}
-            </p>
+            {t("nameKana") ? (
+              <p className="mt-2 text-xs tracking-[0.2em] text-text-gray">
+                {t("nameKana")}
+              </p>
+            ) : null}
+            {t("nameEn") ? (
+              <p className="mt-1 text-xs tracking-[0.3em] text-text-gray">
+                {t("nameEn")}
+              </p>
+            ) : null}
             <a
               href={COACH_INSTAGRAM_URL}
               {...EXTERNAL_LINK_PROPS}
@@ -139,9 +143,11 @@ export default function HyroxCoach() {
                   <span className="font-serif text-base font-black tracking-wide text-accent sm:text-lg">
                     {group.discipline}
                   </span>
-                  <span className="text-[11px] tracking-wide text-text-gray">
-                    {group.disciplineJa}
-                  </span>
+                  {group.disciplineJa ? (
+                    <span className="text-[11px] tracking-wide text-text-gray">
+                      {group.disciplineJa}
+                    </span>
+                  ) : null}
                 </div>
                 {group.note ? (
                   <p className="mt-0.5 text-[11px] tracking-wide text-text-gray">

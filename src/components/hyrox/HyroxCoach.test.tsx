@@ -103,3 +103,13 @@ describe("HyroxCoach", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("HyroxCoach(英語)", () => {
+  it("英語では副題・名前の和文行を出さない", () => {
+    renderWithIntl(<HyroxCoach />, { locale: "en" });
+    expect(document.body.textContent).not.toMatch(/[぀-ヿ一-鿿]/);
+    expect(
+      screen.getByRole("heading", { name: "DAISUKE SEKIYOSHI" }),
+    ).toBeInTheDocument();
+  });
+});

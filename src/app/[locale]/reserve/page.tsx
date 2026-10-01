@@ -7,11 +7,12 @@ import { buildBreadcrumb } from "@/lib/structured-data";
 import StructuredData from "@/components/StructuredData";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
-import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import ReserveHero from "@/components/reserve/ReserveHero";
 import ReserveChoice from "@/components/reserve/ReserveChoice";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
+import ReserveEnglishGuide from "@/components/reserve/ReserveEnglishGuide";
 import ReserveInfo from "@/components/reserve/ReserveInfo";
 import ReserveFaq from "@/components/reserve/ReserveFaq";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
@@ -101,9 +102,11 @@ export default async function ReservePage({
       <StructuredData
         data={buildBreadcrumb(locale, [{ name: "Reserve", path: "/reserve" }])}
       />
-      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+      <HomeNavigation showColumns={await shouldShowColumns(locale)} />
       <ReserveHero />
       {reserveBody}
+      {/* LaBOLA・テニスベアは日本語のみ。英語ページでだけ、押す場所を日本語のボタン名つきで案内する。 */}
+      {locale === "en" && <ReserveEnglishGuide />}
       <ReserveInfo />
       <ReserveFaq />
       <HomeFooter />

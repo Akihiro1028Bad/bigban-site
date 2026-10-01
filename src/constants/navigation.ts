@@ -40,3 +40,6 @@ export function navItemsFor(showColumns: boolean): readonly NavItem[] {
 export const SECTION_IDS: readonly string[] = NAV_ITEMS.filter(
   (item) => item.kind === "anchor",
 ).map((item) => item.id);
+
+/** ヘッダー・モバイルメニューの予約ボタンの GA ラベル。表示文言(言語で変わる)と切り離し、系列を保つ。 */
+export const RESERVE_ENTRY_ANALYTICS_LABEL = "予約";

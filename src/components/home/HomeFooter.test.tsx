@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import jaMessages from "../../../messages/ja.json";
+import enMessages from "../../../messages/en.json";
 import { INSTAGRAM_URL } from "@/constants/site";
 
 import HomeFooter from "./HomeFooter";
@@ -258,5 +259,25 @@ describe("HomeFooter", () => {
     const firstChild = footer.firstElementChild;
     expect(firstChild).not.toBeNull();
     expect(firstChild?.className).toContain("h-px");
+  });
+});
+
+describe("HomeFooter のブランド副題(言語別)", () => {
+  it("英語ではカナ表記の行を出さない", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByText(/ザ ピックルバン セオリー/)).not.toBeInTheDocument();
+  });
+
+  it("日本語ではカナ表記を出す", () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HomeFooter />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(/ザ ピックルバン セオリー/)).toBeInTheDocument();
   });
 });

@@ -31,6 +31,13 @@ vi.mock("@/components/reserve/ReserveChoice", () => ({
 }));
 vi.mock("@/components/reserve/ReserveSteps", () => ({ default: () => null }));
 vi.mock("@/components/reserve/ReserveCalendar", () => ({ default: () => null }));
+vi.mock("@/components/reserve/ReserveEnglishGuide", () => ({
+  default: () => <section data-testid="english-guide" />,
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
 vi.mock("@/components/reserve/ReserveInfo", () => ({
   default: () => <section data-testid="reserve-info" />,
 }));
@@ -125,6 +132,49 @@ describe("ReservePage", () => {
       "data-show-columns",
       "true",
     );
+  });
+
+  it("英語でコラムを出さない(0件)とき、ナビへ showColumns=false を渡す", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { default: ReservePage } = await import("./page");
+    render(
+      await ReservePage({
+        params: Promise.resolve({ locale: "en" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(screen.getByTestId("home-navigation")).toHaveAttribute(
+      "data-show-columns",
+      "false",
+    );
+    shouldShowColumnsMock.mockResolvedValue(true);
+  });
+
+  it("英語では予約カードの後に英語の予約案内を出す", async () => {
+    const { default: ReservePage } = await import("./page");
+    render(
+      await ReservePage({
+        params: Promise.resolve({ locale: "en" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    const guide = screen.getByTestId("english-guide");
+    const info = screen.getByTestId("reserve-info");
+    expect(
+      guide.compareDocumentPosition(info) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("日本語では英語の予約案内を出さない", async () => {
+    const { default: ReservePage } = await import("./page");
+    render(
+      await ReservePage({
+        params: Promise.resolve({ locale: "ja" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    expect(screen.queryByTestId("english-guide")).not.toBeInTheDocument();
   });
 
   it("FAQ を ReserveInfo の後に掲出する", async () => {

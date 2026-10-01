@@ -8,7 +8,18 @@ vi.mock("next-intl/server", () => ({
   setRequestLocale: vi.fn(),
 }));
 
-vi.mock("./TokushohoContent", () => ({ default: () => null }));
+const tokushohoContentMock = vi.fn();
+vi.mock("./TokushohoContent", () => ({
+  default: (props: unknown) => {
+    tokushohoContentMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
+
 vi.mock("@/components/StructuredData", () => ({ default: () => null }));
 vi.mock("@/lib/structured-data", () => ({
   buildBreadcrumb: vi.fn().mockReturnValue({}),
@@ -120,5 +131,31 @@ describe("Tokushoho Page", () => {
     });
     const { container } = render(element);
     expect(container).toBeTruthy();
+  });
+});
+
+describe("Tokushoho Page のコラム表示", () => {
+  beforeEach(() => {
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    tokushohoContentMock.mockClear();
+  });
+
+  it("COLUMN ナビの表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { default: TokushohoPage } = await import("./page");
+    render(await TokushohoPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(tokushohoContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
+  });
+
+  it("日本語では shouldShowColumns('ja') を使う", async () => {
+    const { default: TokushohoPage } = await import("./page");
+    render(await TokushohoPage({ params: Promise.resolve({ locale: "ja" }) }));
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("ja");
+    expect(tokushohoContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: true }),
+    );
   });
 });

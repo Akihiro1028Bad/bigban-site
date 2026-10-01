@@ -304,7 +304,7 @@ describe("columns sitemap entries (flag 連動)", () => {
       isCmsColumnsEnabled: () => true,
     }));
     vi.doMock("@/lib/microcms/columnsQueries", () => ({
-      getColumnSlugs: async () => [],
+      getColumnSlugs: async () => [{ locale: "en", slug: "c2" }],
     }));
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
@@ -312,6 +312,22 @@ describe("columns sitemap entries (flag 連動)", () => {
     const en = entries.find((e) => e.url === `${PROD_URL}/en/columns`);
     expect(en?.alternates).toEqual(ja?.alternates);
     expect(en?.alternates?.languages?.en).toBe(`${PROD_URL}/en/columns`);
+  });
+
+  it("flag ON でも英語コラムが0件なら /en/columns を出さず、/columns は hreflang なしの単独エントリ", async () => {
+    vi.doMock("@/config/featureFlags", () => ({
+      isCmsColumnsEnabled: () => true,
+    }));
+    vi.doMock("@/lib/microcms/columnsQueries", () => ({
+      getColumnSlugs: async () => [{ locale: "ja", slug: "c1" }],
+    }));
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
+    expect(urls).not.toContain(`${PROD_URL}/en/columns`);
+    const ja = entries.find((e) => e.url === `${PROD_URL}/columns`);
+    expect(ja).toBeDefined();
+    expect(ja?.alternates).toBeUndefined();
   });
 
   it("flag ON: 両 locale 揃った columns slug は alternates を出力", async () => {

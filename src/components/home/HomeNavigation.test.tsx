@@ -208,6 +208,28 @@ describe("HomeNavigation", () => {
     expect(mockPush).toHaveBeenCalledWith("/", { locale: "en" });
   });
 
+  it("localeSwitchPath があるとき、言語切替はそのパスへ移動する(相手言語版が無い記事)", () => {
+    mockPush.mockClear();
+    mockPathname = "/news/ja-only-article";
+    renderWithIntl(<HomeNavigation localeSwitchPath="/news" />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "EN" })[0]);
+
+    expect(mockPush).toHaveBeenCalledWith("/news", { locale: "en" });
+    mockPathname = "/";
+  });
+
+  it("localeSwitchPath が無いとき、言語切替は現在のパスのまま", () => {
+    mockPush.mockClear();
+    mockPathname = "/hyrox";
+    renderWithIntl(<HomeNavigation />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "EN" })[0]);
+
+    expect(mockPush).toHaveBeenCalledWith("/hyrox", { locale: "en" });
+    mockPathname = "/";
+  });
+
   it("JPクリック（既にja）ではrouter.pushは呼ばれない", () => {
     mockPush.mockClear();
     renderWithIntl(<HomeNavigation />);
@@ -447,5 +469,41 @@ describe("HomeNavigation", () => {
     sessionStorage.removeItem("bigban-crowdfunding-dismissed");
     renderWithIntl(<HomeNavigation />);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("HomeNavigation の予約ボタン表記(言語別)", () => {
+  beforeEach(() => {
+    sessionStorage.setItem("bigban-crowdfunding-dismissed", "true");
+    trackCtaClick.mockClear();
+  });
+
+  it("英語では和文の副題を出さず RESERVE を主ラベルにする", () => {
+    renderWithIntl(<HomeNavigation />, "en");
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    expect(reserveLinks.length).toBeGreaterThan(0);
+    reserveLinks.forEach((link) => {
+      expect(link.textContent).not.toMatch(/予約/);
+    });
+  });
+
+  it("日本語では従来どおり「予約」と RESERVE を併記する", () => {
+    renderWithIntl(<HomeNavigation />, "ja");
+    const reserveLinks = screen.getAllByRole("link", { name: /RESERVE/ });
+    expect(reserveLinks.length).toBeGreaterThan(0);
+    reserveLinks.forEach((link) => {
+      expect(link.textContent).toMatch(/予約/);
+      expect(link.textContent).toMatch(/RESERVE/);
+    });
+  });
+
+  it("英語でも予約ボタンのGAラベルは日本語の「予約」のまま(系列を保つ)", () => {
+    renderWithIntl(<HomeNavigation />, "en");
+    fireEvent.click(screen.getAllByRole("link", { name: /RESERVE/ })[0]);
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      expect.any(String),
+      "予約",
+    );
   });
 });

@@ -2,8 +2,10 @@ import { getTranslations } from "next-intl/server";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { LATEST_NEWS_FRESH_DAYS } from "@/constants/news";
 import { getNewsList } from "@/lib/microcms/queries";
 import { resolveCategories } from "@/lib/news/categories";
+import { hasFreshNews } from "@/lib/news/freshness";
 
 import type { NewsItem } from "@/lib/microcms/schema";
 
@@ -51,6 +53,14 @@ export default async function HomeLatestNews({
   }
 
   if (items.length === 0) return null;
+
+  // 英語は記事が少なく、古い終了イベントが帯に残りがちなので、新しい記事が無ければ帯ごと出さない。
+  if (
+    locale === "en" &&
+    !hasFreshNews(items, new Date(), LATEST_NEWS_FRESH_DAYS)
+  ) {
+    return null;
+  }
 
   const t = await getTranslations({ locale, namespace: "HomeLatestNews" });
 

@@ -14,7 +14,8 @@ import { buildBreadcrumb } from "@/lib/structured-data";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import { newsLabel } from "@/lib/news/label";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
-import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
+import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import { EXTERNAL_LINK_PROPS, SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
 import {
@@ -23,6 +24,7 @@ import {
   getNewsSlugs,
 } from "@/lib/microcms/queries";
 import type { NewsItem } from "@/lib/microcms/schema";
+import { resolveLocaleSwitchPath } from "@/lib/i18n/localeSwitch";
 import { resolveCategories } from "@/lib/news/categories";
 
 // 画面プレビュー (?draftKey=&contentId=) は searchParams を使うため、
@@ -170,6 +172,21 @@ export default async function NewsDetailPage({
     previewItem ?? (await getNewsDetail({ locale, slug }));
   if (!item) notFound();
 
+  // 相手言語版が無い記事で言語切替を押しても 404 にならないよう、相手言語の一覧へ逃がす。
+  // プレビューは公開前の下書きなので相手言語を問い合わせない。
+  const otherLocale: Locale = locale === "ja" ? "en" : "ja";
+  const counterpart = previewItem
+    ? null
+    : await getNewsDetail({ locale: otherLocale, slug });
+  const localeSwitchPath = previewItem
+    ? undefined
+    : resolveLocaleSwitchPath({
+        section: "news",
+        hasCounterpart: counterpart !== null,
+        // news セクションでは参照されない(コラム一覧への分岐にだけ使う)。
+        counterpartShowsColumns: false,
+      });
+
   const cats = resolveCategories(item.category);
   const backHref = locale === "ja" ? "/news" : "/en/news";
   const backLabel =
@@ -178,7 +195,10 @@ export default async function NewsDetailPage({
   return (
     <>
       {previewItem && <PreviewBanner locale={locale} />}
-      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+      <HomeNavigation
+        showColumns={await shouldShowColumns(locale)}
+        localeSwitchPath={localeSwitchPath}
+      />
       {/* 構造化データは公開版のみ。プレビューは noindex のため出力しない。 */}
       {!previewItem && (
         <>
