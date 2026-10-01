@@ -1,15 +1,13 @@
 import { useTranslations } from "next-intl";
 import { TrackedLink } from "@/components/analytics/TrackedLink";
-
-// PBT CLUB 会員制度の告知ニュース記事 (microCMS slug: pbt-club-membership)。
-const PBT_CLUB_NEWS_PATH = "/news/pbt-club-membership";
+import { PBT_CLUB_PATH } from "@/constants/pbtClub";
 
 export default function PromoBanner() {
   const t = useTranslations("PromoBanner");
 
   return (
     <TrackedLink
-      href={PBT_CLUB_NEWS_PATH}
+      href={PBT_CLUB_PATH}
       eventKey="contentClick"
       location="promo_banner"
       label={t("textPbtClub")}

@@ -94,6 +94,10 @@
       "title": "予約",
       "description": "THE PICKLE BANG THEORY の予約案内ページ。コート利用・イベント/スクール・HYROXエリア・レッスンの予約先をご案内します。本八幡駅徒歩1分、6:00–23:00営業。"
     },
+    "pbtClub": {
+      "title": "PBT CLUB｜月額会員の料金・特典・損益分岐",
+      "description": "PBT CLUB は月額¥10,000（税込）の会員制度。コート・HYROXエリアの会員料金（1時間 ¥3,500〜¥5,600）、30日前からの先行予約、ポイント2倍が付きます。平日夜・土日祝なら月5時間以上のご利用で元が取れます。"
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -152,7 +156,7 @@
   },
   "PromoBanner": {
     "textPbtClub": "🎉 スポーツの秋は屋内コートで｜PBT CLUB会員で約30%OFF",
-    "ariaLabelPbtClub": "スポーツの秋は屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。ニュース記事へ移動します"
+    "ariaLabelPbtClub": "スポーツの秋は屋内コートで。PBT CLUB会員でコート利用料が約30%OFF。PBT CLUBのページへ移動します"
   },
   "Reserve": {
     "hero": {
@@ -402,6 +406,133 @@
     "pleaseContact": "ください。",
     "titleJa": "料金プラン",
     "reserveCta": "コートを予約する"
+  },
+  "PbtClub": {
+    "hero": {
+      "label": "MEMBERSHIP",
+      "title": "PBT CLUB",
+      "subtitle": "月額会員制度",
+      "lead": "月額会費で、コート・HYROXエリアの利用料が1時間あたり {savingMin}〜{savingMax} 安くなります。会員料金の適用は月{cap}時間までです。",
+      "feeLabel": "月会費",
+      "feeNote": "税込・月額",
+      "rateLabel": "会員料金（1時間あたり）",
+      "joinCta": "PBT CLUBに入会する",
+      "joinNote": "入会は LaBOLA の入会ページからお手続きください"
+    },
+    "benefits": {
+      "heading": "BENEFITS",
+      "headingJa": "3つの特典",
+      "discount": {
+        "title": "コート利用料金が約30%OFF",
+        "body": "通常料金との差額は、1時間あたり {savingMin}〜{savingMax} です。ピックルボールコートとHYROXエリアで共通です。"
+      },
+      "advance": {
+        "title": "{member}日前から先行予約",
+        "body": "一般予約は{general}日前から、会員は{member}日前から予約できます。予約枠の確保を保証するものではありません。"
+      },
+      "points": {
+        "title": "PBTポイント2倍付与",
+        "body": "ご利用料金の{rate}%を還元します。貯まったポイントは施設利用などにご利用いただけます。"
+      }
+    },
+    "breakEven": {
+      "heading": "BREAK-EVEN",
+      "headingJa": "月何時間で元が取れる？",
+      "lead": "月会費 {fee} を含めて、通常料金より安くなる利用時間の目安です。ご利用の時間帯で確認してください。",
+      "threshold": "月{hours}時間以上",
+      "thresholdNote": "で元が取れる",
+      "exact": "損益分岐 約{hours}時間",
+      "formula": "計算式: 月会費 ÷（通常料金 − 会員料金）",
+      "note": "レンタル用品・ポイント還元は含めていません。時間帯をまたいで使う場合は、それぞれの料金で計算してください。会員料金の適用は月{cap}時間までです。"
+    },
+    "slots": {
+      "weekday": "平日 {slot}",
+      "weekend": "土日祝 {slot}",
+      "weekendAllDay": "土日祝 終日"
+    },
+    "rates": {
+      "heading": "RATES",
+      "headingJa": "会員料金表",
+      "columns": {
+        "slot": "時間帯",
+        "normal": "通常料金",
+        "member": "PBT CLUB会員",
+        "saving": "1時間の差額"
+      },
+      "note": "ピックルボールコート／HYROXエリア共通（1時間あたり・税込）"
+    },
+    "comparison": {
+      "heading": "MONTHLY COST",
+      "headingJa": "月の支払額の比較",
+      "lead": "平日17時以降または土日祝に利用する場合の例です。通常料金は1時間 {normal}、会員料金は1時間 {member} で計算しています。レンタル用品等は含めず、ポイント還元も差し引いていません。",
+      "columns": {
+        "hours": "月の利用時間",
+        "normal": "通常利用",
+        "member": "会費＋会員利用料",
+        "result": "比較"
+      },
+      "hoursValue": "{hours}時間",
+      "result": {
+        "normal": "通常利用が{amount}安い",
+        "member": "会員利用が{amount}安い",
+        "same": "同額"
+      }
+    },
+    "fit": {
+      "heading": "FIT",
+      "headingJa": "向いている方・通常料金が合う方",
+      "good": {
+        "heading": "PBT CLUBが向いている方",
+        "items": [
+          "定期的にご利用される方",
+          "人気の時間帯を優先的に予約したい方",
+          "ピックルボール・HYROXを継続的に楽しみたい方",
+          "お得な料金で何度も利用したい方"
+        ]
+      },
+      "notGood": {
+        "heading": "通常料金のほうが合う方",
+        "lowUse": "平日夜・土日祝の利用が月{hours}時間以下の方（会費を含めると通常料金のほうが安くなります）",
+        "capNote": "会員料金の適用は月{cap}時間までです。"
+      }
+    },
+    "join": {
+      "heading": "JOIN",
+      "headingJa": "入会する",
+      "body": "入会は LaBOLA の入会ページからお手続きください。最新の条件・お手続きは入会ページでご確認ください。",
+      "cta": "PBT CLUBに入会する",
+      "reserveBody": "まずは通常料金でコートを使ってみたい方はこちら",
+      "reserveCta": "コートを予約する"
+    },
+    "faq": {
+      "heading": "よくある質問",
+      "items": [
+        {
+          "question": "会費はいくらですか？",
+          "answer": "月額¥10,000（税込）です。"
+        },
+        {
+          "question": "どの施設・時間帯で会員料金を使えますか？",
+          "answer": "ピックルボールコートとHYROXエリアで共通です。平日 6:00〜9:00 は ¥3,500、9:00〜17:00 は ¥4,200、17:00〜23:00 と土日祝は ¥5,600 です（いずれも1時間あたり・税込）。"
+        },
+        {
+          "question": "会員料金は月に何時間まで使えますか？",
+          "answer": "月20時間までです。"
+        },
+        {
+          "question": "予約はいつから取れますか？",
+          "answer": "一般予約は14日前から、会員は30日前から予約できます。予約枠の確保を保証するものではありません。"
+        },
+        {
+          "question": "ポイントはどのように貯まりますか？",
+          "answer": "ご利用料金の2%を還元します。貯まったポイントは施設利用などにご利用いただけます。"
+        },
+        {
+          "question": "入会するにはどうすればよいですか？",
+          "answer": "LaBOLA の入会ページからお手続きください。最新の条件・お手続きは入会ページでご確認ください。"
+        }
+      ]
+    }
   },
   "HomeNews": {
     "title": "NEWS",
