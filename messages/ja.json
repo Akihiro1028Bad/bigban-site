@@ -874,6 +874,26 @@
         "description": "メディシンボールを、スクワットの勢いで壁の的へ100回投げる。レースを締めくくる最後の種目。"
       }
     },
+    "nextRace": {
+      "title": "NEXT RACE",
+      "titleJa": "次のHYROX大会",
+      "lead": "HYROX公式8種目に対応したトレーニングエリアで、大会に向けた練習ができます。",
+      "daysUntil": "開催まで あと {days} 日",
+      "ongoing": "開催中",
+      "cta": "練習エリアの料金を見る",
+      "officialLink": "大会の公式ページ(HYROX)",
+      "note": "日程・販売状況は HYROX 公式サイトの発表をご確認ください。",
+      "races": {
+        "osaka2027": {
+          "name": "BYD HYROX Osaka",
+          "location": "大阪・インテックス大阪"
+        },
+        "nagoya2027": {
+          "name": "HYROX Nagoya",
+          "location": "名古屋・ポートメッセなごや"
+        }
+      }
+    },
     "program": {
       "title": "PROGRAM",
       "titleJa": "料金｜エリア利用料",

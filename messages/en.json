@@ -860,6 +860,26 @@
         "description": "100 wall-ball throws from a squat. The final test before the line."
       }
     },
+    "nextRace": {
+      "title": "NEXT RACE",
+      "titleJa": "Next HYROX race",
+      "lead": "Train for race day in our area equipped for all 8 official HYROX stations.",
+      "daysUntil": "{days, plural, one {# day to go} other {# days to go}}",
+      "ongoing": "Happening now",
+      "cta": "See area rental rates",
+      "officialLink": "Official race page (HYROX)",
+      "note": "Dates and ticket availability: please check the official HYROX website.",
+      "races": {
+        "osaka2027": {
+          "name": "BYD HYROX Osaka",
+          "location": "Osaka · INTEX Osaka"
+        },
+        "nagoya2027": {
+          "name": "HYROX Nagoya",
+          "location": "Nagoya · Port Messe Nagoya"
+        }
+      }
+    },
     "program": {
       "title": "PROGRAM",
       "titleJa": "Pricing | Area rental",
