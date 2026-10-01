@@ -6,6 +6,7 @@ import {
   LABOLA_HYROX_URL,
   LABOLA_PICKLEBALL_URL,
   buildLabolaCalendarSrc,
+  labolaDayUrl,
   reserveHref,
   resolveCalendarTabKey,
 } from "./site";
@@ -69,5 +70,18 @@ describe("labola calendar constants", () => {
 describe("BUSINESS_HOURS", () => {
   it("毎日 06:00〜23:00", () => {
     expect(BUSINESS_HOURS).toEqual({ opens: "06:00", closes: "23:00" });
+  });
+});
+
+describe("labolaDayUrl", () => {
+  it("月日をゼロ埋めせず、タブ名をエンコードして1日表示 URL を作る", () => {
+    expect(
+      labolaDayUrl("ピックルボールコート", { year: 2026, month: 10, day: 5 }),
+    ).toBe(
+      `https://yoyaku.labola.jp/r/shop/3473/calendar/2026/10/5/?tab_name=${encodeURIComponent("ピックルボールコート")}`,
+    );
+    expect(labolaDayUrl("H Y R O X", { year: 2026, month: 11, day: 20 })).toBe(
+      "https://yoyaku.labola.jp/r/shop/3473/calendar/2026/11/20/?tab_name=H%20Y%20R%20O%20X",
+    );
   });
 });

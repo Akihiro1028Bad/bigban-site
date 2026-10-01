@@ -28,6 +28,15 @@ export const LABOLA_PICKLEBALL_URL =
 // HYROX のご予約（labola・HYROX タブ）。
 export const LABOLA_HYROX_URL = labolaCurrentWeekUrl("H Y R O X");
 
+// 1日表示(日付指定)。LaBOLA の月日はゼロ埋めなし。tabName は labola 管理画面の
+// カテゴリ名と完全一致。予約ボタンの「今日」と日付ボタンで使う。
+export function labolaDayUrl(
+  tabName: string,
+  date: { year: number; month: number; day: number },
+): string {
+  return `${LABOLA_SHOP_BASE}/calendar/${date.year}/${date.month}/${date.day}/?tab_name=${encodeURIComponent(tabName)}`;
+}
+
 // レッスン / クラスのご予約（labola・スクール予約）。
 // コート/HYROX の calendar_week（枠貸し）とは別系統の event/school パス。
 export const LABOLA_SCHOOL_URL =

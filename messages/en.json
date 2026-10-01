@@ -167,7 +167,25 @@
       "lessonKicker": "LESSON / CLASS",
       "lessonHeading": "Lessons / Classes",
       "lessonDesc": "Book HYROX small-group coaching classes and trial sessions here.",
-      "lessonCta": "Book a lesson"
+      "lessonCta": "Book a lesson",
+      "visitorNote": "No membership needed. On the login screen, scroll down and choose “ビジターで予約” (Book as a visitor).",
+      "quickDate": {
+        "heading": "Pick a date to see open slots",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "saturday": "Sat",
+        "sunday": "Sun",
+        "chip": "{label} {month}/{day}",
+        "weekday": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        }
+      }
     },
     "steps": {
       "heading": "How to Book",
@@ -208,6 +226,18 @@
         "Rental shoes are not available."
       ]
     },
+    "guide": {
+      "kicker": "HOW TO BOOK",
+      "heading": "How to book (no membership needed)",
+      "step1Title": "Pick a date and an open slot",
+      "step1Body": "Choose a date with the buttons below to open that day's availability, then tap an open slot.",
+      "step2Title": "Choose “ビジターで予約” (Book as a visitor) at the bottom of the login screen",
+      "step2Body": "If you are not a member, scroll down on the login screen and press “ビジターで予約”. You can book without registering.",
+      "step3Title": "Enter your booking details and confirm",
+      "step3Body": "Follow the on-screen instructions.",
+      "registerHeading": "If you are registering as a member (free)",
+      "registerBody": "If the confirmation email does not arrive, check your spam folder, your email rejection settings, and the address you entered. If it still does not arrive, you can go ahead and book as a visitor first."
+    },
     "faq": {
       "heading": "FAQ",
       "items": [
@@ -230,6 +260,14 @@
         {
           "question": "I'm a beginner — is that okay?",
           "answer": "Absolutely. We offer trial sessions and small-group lessons, and our coaches guide you from the basics."
+        },
+        {
+          "question": "Can I book without registering as a member?",
+          "answer": "Yes. On the login screen, scroll down and choose “ビジターで予約” (Book as a visitor) to book without registering."
+        },
+        {
+          "question": "The membership registration email has not arrived.",
+          "answer": "Please check your spam folder, your email rejection settings, and that the address you entered is correct. If it still does not arrive, you can go ahead and book as a visitor (“ビジターで予約”) instead. If the problem continues, contact us through the contact form on this site or by Instagram DM."
         },
         {
           "question": "What payment methods do you accept?",

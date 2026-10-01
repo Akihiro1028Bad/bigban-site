@@ -9,6 +9,7 @@ import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
 import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import ReserveHero from "@/components/reserve/ReserveHero";
+import ReserveVisitorGuide from "@/components/reserve/ReserveVisitorGuide";
 import ReserveChoice from "@/components/reserve/ReserveChoice";
 import ReserveSteps from "@/components/reserve/ReserveSteps";
 import ReserveCalendar from "@/components/reserve/ReserveCalendar";
@@ -103,6 +104,7 @@ export default async function ReservePage({
       />
       <HomeNavigation showColumns={isCmsColumnsEnabled()} />
       <ReserveHero />
+      <ReserveVisitorGuide />
       {reserveBody}
       <ReserveInfo />
       <ReserveFaq />

@@ -67,6 +67,31 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
+  it("会員登録なしでの予約と、登録メールが届かないときの対処を案内する", () => {
+    renderWithIntl(<ReserveFaq />);
+    expect(
+      screen.getByText("会員登録しなくても予約できますか？"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/「ビジターで予約」を選ぶと、会員登録なしで予約できます/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("会員登録のメールが届きません")).toBeInTheDocument();
+    expect(screen.getByText(/迷惑メールフォルダ.*お問い合わせフォーム/)).toBeInTheDocument();
+  });
+
+  it("英語でも会員登録なしの予約とメール未着の対処を案内する", () => {
+    renderWithIntl(<ReserveFaq />, {
+      messages: enMessages as unknown,
+      locale: "en",
+    });
+    expect(
+      screen.getByText("Can I book without registering as a member?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("The membership registration email has not arrived."),
+    ).toBeInTheDocument();
+  });
+
   it("予約方法の回答が現行の4つの予約先を案内する", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
@@ -168,6 +193,7 @@ describe("ReserveFaq", () => {
     expect(script).not.toBeNull();
     expect(script?.textContent ?? "").toContain("FAQPage");
     expect(script?.textContent ?? "").toContain("営業時間は？");
+    expect(script?.textContent ?? "").toContain("会員登録のメールが届きません");
   });
 
   it("items が配列でない場合も見出しのみ描画する（フォールバック）", () => {
