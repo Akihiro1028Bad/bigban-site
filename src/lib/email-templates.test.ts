@@ -27,7 +27,7 @@ describe("buildAutoReplyHtml", () => {
     const html = buildAutoReplyHtml(BASE_PARAMS);
     expect(html).toContain("千葉県市川市八幡2-16-6");
     expect(html).toContain("6:00");
-    expect(html).toContain("23:00");
+    expect(html).toContain("25:00");
   });
 
   it("HTMLエスケープされる", () => {

@@ -78,7 +78,7 @@ describe("TeaserContent", () => {
 
     expect(screen.getByText("本八幡駅 徒歩1分")).toBeInTheDocument();
     expect(screen.getByText("プロ仕様ハードコート 3面")).toBeInTheDocument();
-    expect(screen.getByText("6:00 – 23:00")).toBeInTheDocument();
+    expect(screen.getByText("6:00 – 25:00")).toBeInTheDocument();
     expect(screen.getByText("西村昭彦")).toBeInTheDocument();
   });
 
