@@ -859,6 +859,20 @@
       ],
       "tagline": "Official HYROX Training Club gym in Motoyawata, Chiba"
     },
+    "trial": {
+      "title": "OFFICIAL",
+      "titleJa": "Official HYROX Training Club & trial session",
+      "certified": "THE PICKLE BANG THEORY was certified as an official HYROX Training Club in August 2026. As an official HYROX training gym, we have equipment for all eight official stations installed year-round.",
+      "cardTitle": "HYROX Trial Session",
+      "cardMeta": "{minutes} min · {price}",
+      "cardDescription": "For first-timers. Our staff walk you through the HYROX stations and how to use the equipment.",
+      "cardNote": "Please bring running shoes and training wear (rentals are not available).",
+      "schedule": "Upcoming dates are listed on LaBOLA.",
+      "scheduleCta": "See upcoming dates",
+      "reserveCta": "Book a trial session",
+      "newTab": "(opens in a new tab)",
+      "newsCta": "Read the certification announcement"
+    },
     "concept": {
       "words": [
         "Run.",

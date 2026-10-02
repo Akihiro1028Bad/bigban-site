@@ -861,6 +861,20 @@
       ],
       "tagline": "千葉・本八幡のHYROX公式トレーニングジム"
     },
+    "trial": {
+      "title": "OFFICIAL",
+      "titleJa": "HYROX公式トレーニングクラブ認定・体験会",
+      "certified": "THE PICKLE BANG THEORY は、2026年8月にHYROX公式トレーニングクラブ（HYROX Training Club）に認定されました。HYROX公式トレーニングジムとして、公式8種目に対応した器具を常設しています。",
+      "cardTitle": "HYROX体験会",
+      "cardMeta": "{minutes}分・{price}",
+      "cardDescription": "HYROXが初めての方向けの体験会です。HYROXの種目と器具の使い方を、スタッフが一通りご案内します。",
+      "cardNote": "ランニングシューズとトレーニングウェアをご持参ください（レンタルはありません）。",
+      "schedule": "開催日は、お知らせとLaBOLAでご案内しています。",
+      "scheduleCta": "開催日のお知らせを見る",
+      "reserveCta": "体験会を予約する",
+      "newTab": "（新しいタブで開きます）",
+      "newsCta": "認定のお知らせを読む"
+    },
     "concept": {
       "words": [
         "走る。",
