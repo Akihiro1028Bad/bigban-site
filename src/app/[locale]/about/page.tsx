@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import StructuredData from "@/components/StructuredData";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { shouldShowColumns } from "@/lib/columns/visibility";
+import { isContactCategory } from "@/constants/contact";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
@@ -26,11 +27,12 @@ export const dynamic = "force-dynamic";
 
 interface AboutPageProps {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ category?: string | string[] }>;
 }
 
 export async function generateMetadata({
   params,
-}: AboutPageProps): Promise<Metadata> {
+}: Pick<AboutPageProps, "params">): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Metadata" });
   const keywords = parseKeywords(t.raw("about.keywords"));
@@ -57,12 +59,19 @@ export async function generateMetadata({
   };
 }
 
-export default async function AboutPage({ params }: AboutPageProps) {
+export default async function AboutPage({
+  params,
+  searchParams,
+}: AboutPageProps) {
   const { locale: rawLocale } = await params;
   const locale = parseLocale(rawLocale);
   if (!locale) notFound();
   setRequestLocale(locale);
   const showColumns = await shouldShowColumns(locale);
+
+  // /about?category=private#contact で種別をプリセレクトする。未知の値・配列は未選択。
+  const { category } = await searchParams;
+  const initialCategory = isContactCategory(category) ? category : "";
 
   let newsItems: NewsItem[] = [];
   if (isCmsNewsEnabled()) {
@@ -88,6 +97,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
         newsItems={newsItems}
         locale={locale}
         showColumns={showColumns}
+        initialCategory={initialCategory}
       />
     </>
   );

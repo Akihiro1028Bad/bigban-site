@@ -149,6 +149,30 @@ describe("AboutPage", () => {
     expect(screen.getByText("SEND MESSAGE")).toBeInTheDocument();
   });
 
+  it("お問い合わせ種別に「貸切・法人」の選択肢がある", () => {
+    renderWithIntl(<AboutPage />);
+    expect(
+      screen.getByRole("option", { name: "貸切・法人" }),
+    ).toHaveValue("private");
+  });
+
+  it("EN では Private / Corporate の選択肢が出る", () => {
+    renderWithIntl(<AboutPage />, "en");
+    expect(
+      screen.getByRole("option", { name: "Private / Corporate" }),
+    ).toHaveValue("private");
+  });
+
+  it("initialCategory=private なら種別が「貸切・法人」で始まる", () => {
+    renderWithIntl(<AboutPage initialCategory="private" />);
+    expect(screen.getByLabelText("お問い合わせ種別")).toHaveValue("private");
+  });
+
+  it("initialCategory 未指定なら種別は未選択で始まる", () => {
+    renderWithIntl(<AboutPage />);
+    expect(screen.getByLabelText("お問い合わせ種別")).toHaveValue("");
+  });
+
   it("Instagramリンクが設定されている", () => {
     renderWithIntl(<AboutPage />);
     // フッターにも公式Instagram導線があるため、CONTACT 側（ハンドルのみが

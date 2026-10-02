@@ -120,15 +120,45 @@ describe("About Page", () => {
     const { default: AboutPage } = await import("./page");
     const element = await AboutPage({
       params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
     });
     const { container } = render(element);
     expect(container).toBeTruthy();
   });
 
+  it("有効な category を initialCategory として渡す", async () => {
+    const { default: AboutPage } = await import("./page");
+    const element = await AboutPage({
+      params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({ category: "private" }),
+    });
+    render(element);
+    expect(aboutContentMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialCategory: "private" }),
+    );
+  });
+
+  it("不正な category・配列は無視して未選択にする", async () => {
+    const { default: AboutPage } = await import("./page");
+    for (const category of ["unknown", ["private", "court"]]) {
+      const element = await AboutPage({
+        params: Promise.resolve({ locale: "ja" }),
+        searchParams: Promise.resolve({ category }),
+      });
+      render(element);
+      expect(aboutContentMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ initialCategory: "" }),
+      );
+    }
+  });
+
   it("不正 locale で notFound", async () => {
     const { default: AboutPage } = await import("./page");
     await expect(
-      AboutPage({ params: Promise.resolve({ locale: "fr" }) }),
+      AboutPage({
+        params: Promise.resolve({ locale: "fr" }),
+        searchParams: Promise.resolve({}),
+      }),
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
@@ -159,6 +189,7 @@ describe("About Page", () => {
     const { default: AboutPage } = await import("./page");
     const element = await AboutPage({
       params: Promise.resolve({ locale: "ja" }),
+      searchParams: Promise.resolve({}),
     });
     render(element);
     expect(getNewsListMock).toHaveBeenCalledWith(
@@ -176,7 +207,12 @@ describe("About Page のコラム表示", () => {
   it("COLUMN ナビの表示は shouldShowColumns(現在の言語)に従う", async () => {
     shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
     const { default: AboutPage } = await import("./page");
-    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+    render(
+      await AboutPage({
+        params: Promise.resolve({ locale: "en" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
     expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
     expect(aboutContentMock).toHaveBeenCalledWith(
       expect.objectContaining({ showColumns: false }),

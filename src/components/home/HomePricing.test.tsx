@@ -124,14 +124,14 @@ describe("HomePricing", () => {
     ).toBeInTheDocument();
   });
 
-  it("貸切・法人利用の案内とリンクを表示する", () => {
+  it("貸切・法人利用の案内リンクは、種別「貸切・法人」を選んだ状態のフォームを指す", () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
         <HomePricing />
       </NextIntlClientProvider>
     );
     const link = screen.getByText("お問い合わせ");
-    expect(link.closest("a")).toHaveAttribute("href", "/about#contact");
+    expect(link.closest("a")).toHaveAttribute("href", "/about?category=private#contact");
   });
 
   it("bg-deep-black背景を持つ", () => {
@@ -151,7 +151,7 @@ describe("HomePricing", () => {
         <HomePricing />
       </NextIntlClientProvider>
     );
-    const link = document.querySelector('a[href="/about#contact"]');
+    const link = document.querySelector('a[href="/about?category=private#contact"]');
     link?.addEventListener("click", (event) => event.preventDefault());
     await userEvent.click(link!);
     expect(trackCtaClick).toHaveBeenCalledWith("price", "home_pricing");
@@ -226,7 +226,7 @@ describe("HomePricing", () => {
       </NextIntlClientProvider>
     );
     expect(
-      document.querySelector('a[href="/about#contact"]')
+      document.querySelector('a[href="/about?category=private#contact"]')
     ).toBeInTheDocument();
   });
 });

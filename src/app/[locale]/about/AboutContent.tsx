@@ -16,6 +16,7 @@ import { formEntryLabel } from "@/lib/analytics/events";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 
 import type { FormEvent } from "react";
+import type { ContactCategory as ContactCategoryValue } from "@/constants/contact";
 import type { NewsItem } from "@/lib/microcms/schema";
 import { EASE } from "@/constants/motion";
 
@@ -47,6 +48,7 @@ function useCategories(): ContactCategory[] {
     { value: "", label: t("contact.categoryDefault") },
     { value: "court", label: t("contact.categoryCourt") },
     { value: "lesson", label: t("contact.categoryLesson") },
+    { value: "private", label: t("contact.categoryPrivate") },
     { value: "press", label: t("contact.categoryPress") },
     { value: "other", label: t("contact.categoryOther") },
   ];
@@ -84,6 +86,8 @@ interface AboutContentProps {
   locale?: "ja" | "en";
   /** COLUMN ナビリンク表示フラグ(server で shouldShowColumns(locale) を渡す)。既定 false。 */
   showColumns?: boolean;
+  /** `/about?category=` で指定された種別(検証済み)。未指定は "" = 未選択。 */
+  initialCategory?: ContactCategoryValue | "";
 }
 
 /* istanbul ignore next -- @preserve デフォルト引数は呼び出し側で常に props を渡すため到達不可 */
@@ -91,6 +95,7 @@ export default function AboutContent({
   newsItems = [],
   locale = "ja",
   showColumns = false,
+  initialCategory = "",
 }: AboutContentProps = {}) {
   const t = useTranslations("About");
   const categories = useCategories();
@@ -595,7 +600,7 @@ export default function AboutContent({
                 </div>
                 <div>
                   <label htmlFor="about-contact-category" className="sr-only">{t("contact.labelCategory")}</label>
-                  <select id="about-contact-category" name="category" required className={`${inputClass} cursor-pointer`} defaultValue="">
+                  <select id="about-contact-category" name="category" required className={`${inputClass} cursor-pointer`} defaultValue={initialCategory}>
                     {categories.map((cat) => (
                       <option key={cat.value} value={cat.value} disabled={cat.value === ""}>{cat.label}</option>
                     ))}
