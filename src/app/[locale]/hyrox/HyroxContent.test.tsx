@@ -94,4 +94,20 @@ describe("HyroxContent", () => {
     const programIndex = between.indexOf(program.closest("section") as HTMLElement);
     expect(programIndex - nextRaceIndex).toBe(1);
   });
+
+  it("HyroxTrial が Hero の直後・Facility の前に並ぶ", async () => {
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
+    const hero = screen.getByRole("heading", { level: 1, name: /^HYROX/ });
+    const trial = screen.getByRole("heading", {
+      level: 2,
+      name: /HYROX公式トレーニングクラブ認定・体験会/,
+    });
+    const facility = screen.getByTestId("facility");
+    expect(
+      hero.compareDocumentPosition(trial) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      trial.compareDocumentPosition(facility) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });

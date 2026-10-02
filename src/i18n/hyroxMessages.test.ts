@@ -106,4 +106,15 @@ describe("HYROX i18n messages", () => {
       "fitness racing",
     ]);
   });
+
+  it("HyroxPage.trial は ja/en とも同じキーを持ち、cardMeta に差し込み口がある", () => {
+    type TrialMessages = { HyroxPage: { trial: Record<string, string> } };
+    const jaTrial = (ja as unknown as TrialMessages).HyroxPage.trial;
+    const enTrial = (en as unknown as TrialMessages).HyroxPage.trial;
+    expect(Object.keys(enTrial)).toEqual(Object.keys(jaTrial));
+    expect(jaTrial.cardMeta).toContain("{minutes}");
+    expect(jaTrial.cardMeta).toContain("{price}");
+    expect(enTrial.cardMeta).toContain("{minutes}");
+    expect(enTrial.cardMeta).toContain("{price}");
+  });
 });

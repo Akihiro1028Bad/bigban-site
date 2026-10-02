@@ -11,6 +11,7 @@ import HyroxCoach from "@/components/hyrox/HyroxCoach";
 import HyroxNextRace from "@/components/hyrox/HyroxNextRace";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
+import HyroxTrial from "@/components/hyrox/HyroxTrial";
 import { currentTimeMs } from "@/lib/hyroxRaces";
 
 interface HyroxContentProps {
@@ -26,6 +27,7 @@ export default async function HyroxContent({ locale }: HyroxContentProps) {
       <HomeNavigation showColumns={showColumns} />
       <main>
         <HyroxHero />
+        <HyroxTrial />
         <HyroxFacility />
         <HyroxServices />
         <HyroxIntro showColumnLink={showColumns} />
