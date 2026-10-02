@@ -82,6 +82,19 @@ describe("TokushohoContent", () => {
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
     });
 
+    it("予約のキャンセル・変更は LaBOLA の規定に従う旨を追記している", () => {
+      renderWithIntl(<TokushohoContent />);
+      expect(
+        screen.getByText(
+          /不良品以外不可。ただし、コート・イベントのご予約のキャンセル・変更は、予約システム（LaBOLA）に定める規定に従います。詳細は予約時にご確認ください。/
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByText("商品購入より2週間以内")).toBeInTheDocument();
+      expect(
+        screen.getByText("お客様にご負担いただきます")
+      ).toBeInTheDocument();
+    });
+
     it("全16項目が表示される", () => {
       renderWithIntl(<TokushohoContent />);
       const terms = screen.getAllByRole("term");
@@ -99,6 +112,15 @@ describe("TokushohoContent", () => {
       renderWithIntl(<TokushohoContent />, "en");
       expect(
         screen.getByRole("heading", { name: "Specified Commercial Transactions Act" })
+      ).toBeInTheDocument();
+    });
+
+    it("英語でも予約のキャンセル・変更は LaBOLA の規定に従う旨を追記している", () => {
+      renderWithIntl(<TokushohoContent />, "en");
+      expect(
+        screen.getByText(
+          /Not accepted except for defective products\. Cancellations and changes to court and event bookings follow the rules set by the booking system \(LaBOLA\); please check the details when you book\./
+        )
       ).toBeInTheDocument();
     });
 
