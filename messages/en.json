@@ -1046,6 +1046,45 @@
       "note": "Use the training area equipped for all 8 official HYROX stations.",
       "partyNote": "Listed rates cover up to 4 people. Each additional person from the 5th onward is +¥1,000."
     },
+    "faq": {
+      "title": "FAQ",
+      "titleJa": "Frequently asked questions",
+      "items": {
+        "certified": {
+          "question": "Is this an official HYROX training gym?",
+          "answer": "Yes. THE PICKLE BANG THEORY was certified as an official HYROX Training Club in August 2026. We keep equipment for all eight official HYROX stations permanently on site."
+        },
+        "whatIs": {
+          "question": "What is HYROX?",
+          "answer": "HYROX is an indoor fitness race: eight rounds of a 1 km run followed by one workout station. Races are held around the world."
+        },
+        "beginner": {
+          "question": "Can beginners take part?",
+          "answer": "Yes. In the trial session for first-timers ({trialMinutes} min, {trialPrice}), our staff walk you through the HYROX stations and how to use the equipment."
+        },
+        "price": {
+          "question": "How much does it cost?",
+          "answer": "The trial session is {trialMinutes} min for {trialPrice}. The HYROX area can be rented by the hour for {rentalMin} to {rentalMax} per hour (up to 4 people; +¥1,000 per person from the 5th). For class prices, please check each class page on LaBOLA."
+        },
+        "bring": {
+          "question": "What should I bring?",
+          "answer": "Please bring running shoes and training clothes (rentals are not available). Bring a drink and a towel as well."
+        },
+        "reserve": {
+          "question": "How do I book?",
+          "answer": "Please sign up for trial sessions and classes from the class and school list on LaBOLA. The HYROX area can be booked by the hour from the HYROX area reservation page on LaBOLA. Payment is made online in advance (credit card or PayPay)."
+        },
+        "access": {
+          "question": "Where are you and when are you open?",
+          "answer": "We are a 1-minute walk from the north exit of Motoyawata Station on the JR Sobu Line, 3 minutes from Motoyawata Station on the Toei Shinjuku Line, and 5 minutes from Keisei Yawata Station on the Keisei Main Line. We are open from {open} to {close}."
+        }
+      }
+    },
+    "access": {
+      "title": "ACCESS",
+      "titleJa": "Access",
+      "newTab": "(opens in a new tab)"
+    },
     "coach": {
       "sectionTitle": "CREW",
       "sectionTitleJa": "Coach | Current HYROX Japan athlete Daisuke Sekiyoshi",

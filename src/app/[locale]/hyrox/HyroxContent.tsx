@@ -10,6 +10,8 @@ import HyroxFilm from "@/components/hyrox/HyroxFilm";
 import HyroxCoach from "@/components/hyrox/HyroxCoach";
 import HyroxNextRace from "@/components/hyrox/HyroxNextRace";
 import HyroxProgram from "@/components/hyrox/HyroxProgram";
+import HyroxFaq from "@/components/hyrox/HyroxFaq";
+import HyroxAccess from "@/components/hyrox/HyroxAccess";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
 import HyroxTrial from "@/components/hyrox/HyroxTrial";
 import { currentTimeMs } from "@/lib/hyroxRaces";
@@ -35,6 +37,8 @@ export default async function HyroxContent({ locale }: HyroxContentProps) {
         <HyroxCoach />
         <HyroxNextRace initialNowMs={currentTimeMs()} />
         <HyroxProgram />
+        <HyroxFaq />
+        <HyroxAccess />
         <HyroxPicklePromo />
       </main>
       <HomeFooter />
