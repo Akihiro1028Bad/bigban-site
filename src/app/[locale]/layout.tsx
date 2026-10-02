@@ -1,6 +1,7 @@
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import GoogleAnalyticsTag from "@/components/GoogleAnalyticsTag";
 import { SITE_URL, OG_IMAGE } from "@/constants/site";
 import PreHydrationScripts from "@/components/PreHydrationScripts";
@@ -148,6 +149,7 @@ export default async function LocaleLayout({
           {children}
         </NextIntlClientProvider>
         <Analytics />
+        <SpeedInsights />
         <GoogleAnalyticsTag />
       </body>
     </html>

@@ -20,6 +20,7 @@ export interface RawNewsItem {
   body?: string;
   eyecatch?: { url: string; width: number; height: number };
   externalLink?: { label: string; url: string };
+  eventEndAt?: string | null;
 }
 
 export interface RawNewsList {

@@ -97,12 +97,12 @@ describe("CourtPriceTable", () => {
     ).toBeInTheDocument();
   });
 
-  it("PBT CLUB 詳細記事へのリンクを表示する", () => {
+  it("PBT CLUB 専用ページへのリンクを表示する", () => {
     renderWithIntl(<CourtPriceTable pbtClubLocation="home_pricing_pbt_club" />);
     const link = screen.getByRole("link", {
       name: /PBT CLUBについて詳しく見る/,
     });
-    expect(link).toHaveAttribute("href", "/news/pbt-club-membership");
+    expect(link).toHaveAttribute("href", "/pbt-club");
   });
 
   it("詳細リンククリックで contentClick を pbtClubLocation 付きで計測する", async () => {

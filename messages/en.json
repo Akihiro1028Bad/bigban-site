@@ -83,6 +83,10 @@
       "title": "Reservation",
       "description": "Reservation guide for THE PICKLE BANG THEORY — court rental, events, the HYROX area, and lessons. 1 min from Motoyawata Station, open 6:00 AM–1:00 AM."
     },
+    "pbtClub": {
+      "title": "PBT CLUB | Membership rates, perks and break-even hours",
+      "description": "PBT CLUB is a ¥10,000/month (tax included) membership. Member rates for the courts and HYROX area (¥2,800–¥5,600 per hour), booking 30 days ahead, and double PBT points. On weekdays 17:00–23:00 and weekends/holidays 6:00–23:00, it pays for itself at 5 hours or more a month."
+    },
     "og": {
       "siteName": "THE PICKLE BANG THEORY"
     },
@@ -138,7 +142,7 @@
   },
   "PromoBanner": {
     "textPbtClub": "🎉 Autumn is for sport on our indoor courts | ~30% OFF with PBT CLUB",
-    "ariaLabelPbtClub": "Autumn is for sport on our indoor courts. About 30% off court fees with PBT CLUB. Go to the news article"
+    "ariaLabelPbtClub": "Autumn is for sport on our indoor courts. About 30% off court fees with PBT CLUB. Go to the PBT CLUB page"
   },
   "Reserve": {
     "hero": {
@@ -210,7 +214,7 @@
     "info": {
       "heading": "INFORMATION",
       "hoursLabel": "Hours",
-      "hoursValue": "6:00 AM – 1:00 AM (irregular holidays)",
+      "hoursValue": "6:00 AM – 1:00 AM (open every day)",
       "accessLabel": "Access",
       "accessStation": "1 min from Motoyawata Station",
       "accessAddress": "6F Yawata Hata Bldg., 2-16-6 Yawata, Ichikawa, Chiba 272-0021"
@@ -223,7 +227,8 @@
         "Cancellations and changes follow the booking system's policy. Please check at the time of booking.",
         "Late arrivals are accommodated only within the reserved time slot.",
         "Rental paddles are available for ¥500 each (up to 6 per court).",
-        "Rental shoes are not available."
+        "Rental shoes are not available.",
+        "Shower facilities are not available."
       ]
     },
     "englishGuide": {
@@ -283,7 +288,7 @@
         },
         {
           "question": "What payment methods do you accept?",
-          "answer": "On-site payments can be made by credit card or PayPay."
+          "answer": "Payment is made online in advance when you book (credit card or PayPay)."
         }
       ]
     }
@@ -439,6 +444,132 @@
     "titleJa": "Pricing Plans",
     "reserveCta": "RESERVE A COURT"
   },
+  "PbtClub": {
+    "hero": {
+      "label": "MEMBERSHIP",
+      "title": "PBT CLUB",
+      "subtitle": "Monthly membership",
+      "lead": "With the monthly fee, court and HYROX area rates drop by {savingMin}–{savingMax} per hour. Member rates apply for up to {cap} hours a month.",
+      "feeLabel": "Monthly fee",
+      "feeNote": "Tax included, per month",
+      "rateLabel": "Member rate (per hour)",
+      "joinCta": "Join PBT CLUB",
+      "joinNote": "Sign up on the LaBOLA membership page"
+    },
+    "benefits": {
+      "heading": "BENEFITS",
+      "headingJa": "Three perks",
+      "discount": {
+        "title": "About 30% off court fees",
+        "body": "You save {savingMin}–{savingMax} per hour compared with the regular rate. The same rates apply to the pickleball courts and the HYROX area."
+      },
+      "advance": {
+        "title": "Book {member} days ahead",
+        "body": "Regular bookings open {general} days ahead; members can book {member} days ahead. A slot is not guaranteed."
+      },
+      "points": {
+        "title": "Double PBT points",
+        "body": "We return {rate}% of what you spend as points. Points can be used toward facility use and more."
+      }
+    },
+    "breakEven": {
+      "heading": "BREAK-EVEN",
+      "headingJa": "How many hours to break even?",
+      "lead": "A guide to when membership costs less than regular rates, including the {fee} monthly fee. Check the time slot you use.",
+      "threshold": "{hours}+ hours a month",
+      "thresholdNote": "to break even",
+      "exact": "Break-even: about {hours} hours",
+      "formula": "Formula: monthly fee ÷ (regular rate − member rate)",
+      "note": "Rental items and point rewards are not included. If you play in several time slots, calculate each at its own rate. Member rates apply for up to {cap} hours a month."
+    },
+    "slots": {
+      "weekday": "Weekdays {slot}",
+      "weekend": "Weekends/holidays {slot}"
+    },
+    "rates": {
+      "heading": "RATES",
+      "headingJa": "Member rates",
+      "columns": {
+        "slot": "Time slot",
+        "normal": "Regular rate",
+        "member": "PBT CLUB member",
+        "saving": "Savings per hour"
+      },
+      "note": "Same for the pickleball courts and the HYROX area (per hour, tax included)"
+    },
+    "comparison": {
+      "heading": "MONTHLY COST",
+      "headingJa": "Monthly cost compared",
+      "lead": "An example for weekdays 17:00–23:00 and weekends/holidays 6:00–23:00, calculated at {normal} per hour regular and {member} per hour for members. Rental items are not included, and point rewards are not deducted.",
+      "columns": {
+        "hours": "Hours per month",
+        "normal": "Regular",
+        "member": "Fee + member rate",
+        "result": "Comparison"
+      },
+      "hoursValue": "{hours} hours",
+      "result": {
+        "normal": "Regular is {amount} cheaper",
+        "member": "Membership is {amount} cheaper",
+        "same": "Same cost"
+      }
+    },
+    "fit": {
+      "heading": "FIT",
+      "headingJa": "Who it suits",
+      "good": {
+        "heading": "PBT CLUB suits you if you",
+        "items": [
+          "Play regularly",
+          "Want first pick of popular time slots",
+          "Want to keep enjoying pickleball and HYROX",
+          "Want to play often at a better rate"
+        ]
+      },
+      "notGood": {
+        "heading": "Regular rates suit you if you",
+        "lowUse": "Play {hours} hours or less a month on weekdays 17:00–23:00 or weekends/holidays 6:00–23:00 (including the fee, regular rates cost less)",
+        "capNote": "Member rates apply for up to {cap} hours a month."
+      }
+    },
+    "join": {
+      "heading": "JOIN",
+      "headingJa": "Join",
+      "body": "Sign up on the LaBOLA membership page. Please check that page for the latest terms and procedures.",
+      "cta": "Join PBT CLUB",
+      "reserveBody": "Want to try the courts at the regular rate first?",
+      "reserveCta": "Book a court"
+    },
+    "faq": {
+      "heading": "FAQ",
+      "items": [
+        {
+          "question": "How much is the membership fee?",
+          "answer": "¥10,000 per month (tax included)."
+        },
+        {
+          "question": "Where and when do member rates apply?",
+          "answer": "They apply to both the pickleball courts and the HYROX area (per hour, tax included). On weekdays: ¥3,500 for 6:00–9:00, ¥4,200 for 9:00–17:00, ¥5,600 for 17:00–23:00 and ¥2,800 for 23:00–25:00. On weekends/holidays: ¥5,600 for 6:00–23:00 and ¥4,200 for 23:00–25:00. Late-night hours also count toward the 20-hour monthly limit."
+        },
+        {
+          "question": "How many hours a month get the member rate?",
+          "answer": "Up to 20 hours a month."
+        },
+        {
+          "question": "How far ahead can I book?",
+          "answer": "Regular bookings open 14 days ahead; members can book 30 days ahead. A slot is not guaranteed."
+        },
+        {
+          "question": "How do points work?",
+          "answer": "We return 2% of what you spend as points. Points can be used toward facility use and more."
+        },
+        {
+          "question": "How do I join?",
+          "answer": "Sign up on the LaBOLA membership page. Please check that page for the latest terms and procedures."
+        }
+      ]
+    }
+  },
   "HomeNews": {
     "title": "NEWS",
     "titleJa": "News",
@@ -476,7 +607,7 @@
     "companyName": "THE PICKLE BANG THEORY",
     "postalCode": "〒272-0021",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba",
-    "hours": "Hours: 6:00 AM – 1:00 AM (Irregular holidays)",
+    "hours": "Hours: 6:00 AM – 1:00 AM (Open every day)",
     "routes": {
       "jr": {
         "line": "JR Sobu Line",
@@ -691,7 +822,7 @@
     "cardPayment": "Card Payment",
     "cardPaymentValue": "First payment at signup; monthly payments on the 20th thereafter",
     "returns": "Returns / Exchanges / Cancellations",
-    "returnsValue": "Not accepted except for defective products",
+    "returnsValue": "Not accepted except for defective products. Cancellations and changes to court and event bookings follow the rules set by the booking system (LaBOLA); please check the details when you book.",
     "deadline": "Claim Deadline",
     "deadlineValue": "Within 2 weeks of purchase",
     "shippingCost": "Return Shipping",
@@ -870,6 +1001,26 @@
         "name": "Wall Balls",
         "nameJa": "Wall Balls",
         "description": "100 wall-ball throws from a squat. The final test before the line."
+      }
+    },
+    "nextRace": {
+      "title": "NEXT RACE",
+      "titleJa": "Next HYROX race",
+      "lead": "Train for race day in our area equipped for all 8 official HYROX stations.",
+      "daysUntil": "{days, plural, one {# day to go} other {# days to go}}",
+      "ongoing": "Happening now",
+      "cta": "See area rental rates",
+      "officialLink": "Official race page (HYROX)",
+      "note": "Dates and ticket availability: please check the official HYROX website.",
+      "races": {
+        "osaka2027": {
+          "name": "BYD HYROX Osaka",
+          "location": "Osaka · INTEX Osaka"
+        },
+        "nagoya2027": {
+          "name": "HYROX Nagoya",
+          "location": "Nagoya · Port Messe Nagoya"
+        }
       }
     },
     "program": {

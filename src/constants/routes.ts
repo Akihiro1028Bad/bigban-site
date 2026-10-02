@@ -19,6 +19,7 @@ export const SITEMAP_ROUTES: readonly RouteConfig[] = [
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
   { path: "/reserve", priority: 0.9, changeFrequency: "monthly" },
   { path: "/hyrox", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/pbt-club", priority: 0.7, changeFrequency: "monthly" },
   { path: "/contributors", priority: 0.5, changeFrequency: "yearly" },
   { path: "/tokushoho", priority: 0.2, changeFrequency: "yearly" },
 ] as const;

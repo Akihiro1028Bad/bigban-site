@@ -8,11 +8,15 @@ import HomeFooter from "@/components/home/HomeFooter";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import { NewsArticleJsonLd } from "@/components/news/NewsArticleJsonLd";
 import { NewsBodyRenderer } from "@/components/news/NewsBodyRenderer";
+import { NewsEndedBadge } from "@/components/news/NewsEndedBadge";
+import { NewsEndedNotice } from "@/components/news/NewsEndedNotice";
 import { TrackedLink } from "@/components/analytics/TrackedLink";
 import StructuredData from "@/components/StructuredData";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
+import { isNewsEnded } from "@/lib/news/ended";
 import { newsLabel } from "@/lib/news/label";
+import { isBookingUrl } from "@/lib/news/unlinkBookingLinks";
 import { PreviewBanner } from "@/components/news/PreviewBanner";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { shouldShowColumns } from "@/lib/columns/visibility";
@@ -188,6 +192,11 @@ export default async function NewsDetailPage({
       });
 
   const cats = resolveCategories(item.category);
+  const isEnded = isNewsEnded(item.eventEndAt);
+  // 終了したイベントでは、予約先への申込ボタンを出さない。
+  const shouldShowExternalLink =
+    item.externalLink !== undefined &&
+    !(isEnded && isBookingUrl(item.externalLink.url));
   const backHref = locale === "ja" ? "/news" : "/en/news";
   const backLabel =
     locale === "ja" ? "← ニュース一覧へ" : "← News index";
@@ -234,6 +243,7 @@ export default async function NewsDetailPage({
               ))}
             </div>
           )}
+          {isEnded && <NewsEndedBadge locale={locale} />}
           <time dateTime={(item.publishedAt ?? item.createdAt).slice(0, 10)}>
             {formatDate(item.publishedAt ?? item.createdAt)}
           </time>
@@ -256,6 +266,7 @@ export default async function NewsDetailPage({
           </div>
         )}
         <div className="mt-10">
+          {isEnded && <NewsEndedNotice locale={locale} />}
           <NewsBodyRenderer
             displayMode={item.displayMode}
             bodyHtml={item.bodyHtml ?? ""}
@@ -263,9 +274,10 @@ export default async function NewsDetailPage({
             isFirstImageLcp={!item.eyecatch}
             locale={locale}
             articleSlug={item.slug}
+            shouldUnlinkBookingLinks={isEnded}
           />
         </div>
-        {item.externalLink && (
+        {shouldShowExternalLink && item.externalLink && (
           <div className="mt-10">
             <TrackedLink
               href={item.externalLink.url}

@@ -310,6 +310,51 @@ describe("HomeLatestNews", () => {
       "news",
     );
   });
+
+  it("終了した記事に「終了」バッジを出し、未終了の記事には出さない", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [
+        makeParsedNewsItem({
+          id: "ended",
+          slug: "ended",
+          title: "終わった告知",
+          eventEndAt: "2020-01-01T00:00:00.000Z",
+        }),
+        makeParsedNewsItem({
+          id: "live",
+          slug: "live",
+          title: "開催中の告知",
+          eventEndAt: "2099-01-01T00:00:00.000Z",
+        }),
+      ],
+      totalCount: 2,
+      offset: 0,
+      limit: 3,
+    });
+
+    await renderHomeLatestNews("ja");
+
+    expect(screen.getAllByText("終了")).toHaveLength(1);
+  });
+
+  it("英語では Ended バッジを出す", async () => {
+    getNewsListMock.mockResolvedValueOnce({
+      contents: [
+        makeParsedNewsItem({
+          id: "ended",
+          slug: "ended",
+          eventEndAt: "2020-01-01T00:00:00.000Z",
+        }),
+      ],
+      totalCount: 1,
+      offset: 0,
+      limit: 3,
+    });
+
+    await renderHomeLatestNews("en");
+
+    expect(screen.getByText("Ended")).toBeInTheDocument();
+  });
 });
 
 describe("HomeLatestNews の鮮度ルール(英語のみ)", () => {

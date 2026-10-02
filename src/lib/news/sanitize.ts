@@ -1,6 +1,7 @@
 import DOMPurify from "isomorphic-dompurify";
 
 import { EMBED_PROVIDER_IDS } from "./embeds/registry";
+import { unlinkBookingAnchors } from "./unlinkBookingLinks";
 
 /* istanbul ignore next -- @preserve jsdom 環境では DOMPurify は常にサポートされるため到達不可 */
 if (!DOMPurify.isSupported) {
@@ -287,6 +288,27 @@ function filterClasses(html: string, allowed: Set<string>): string {
 
 export interface SanitizeOptions {
   isFirstImageLcp?: boolean;
+  /** 終了したイベントの本文から、予約先(labola.jp / tennisbear.net)宛てのリンクを外す。 */
+  shouldUnlinkBookingLinks?: boolean;
+}
+
+/**
+ * 1回目のサニタイズで得た DOM 上で予約先リンクを外し、文字列に戻して
+ * 2回目のサニタイズを通す(シリアライズの揺れを再サニタイズで吸収する)。
+ * 文字列の正規表現でリンクを削らない(属性値内の `<a ...>` 風文字列による誤認を避ける)。
+ */
+function unlinkBookingLinksViaDom(
+  html: string,
+  config: typeof STRICT_HTML_CONFIG | typeof RICH_EDITOR_CONFIG,
+): string {
+  const fragment = DOMPurify.sanitize(html, {
+    ...config,
+    RETURN_DOM_FRAGMENT: true,
+  });
+  unlinkBookingAnchors(fragment);
+  const container = fragment.ownerDocument.createElement("div");
+  container.appendChild(fragment);
+  return container.innerHTML;
 }
 
 export function sanitizeNewsHtml(
@@ -294,7 +316,10 @@ export function sanitizeNewsHtml(
   config: typeof STRICT_HTML_CONFIG | typeof RICH_EDITOR_CONFIG,
   options: SanitizeOptions = {},
 ): string {
-  let result = DOMPurify.sanitize(html, config) as unknown as string;
+  const source = options.shouldUnlinkBookingLinks
+    ? unlinkBookingLinksViaDom(html, config)
+    : html;
+  let result = DOMPurify.sanitize(source, config) as unknown as string;
 
   // class allowlist は STRICT / RICH 両モード共通で適用
   // (RICH モードで任意の class が通ると Tailwind ユーティリティでの

@@ -29,8 +29,6 @@ export interface OpeningHoursSpecificationSchema {
 export const FACILITY_LATITUDE = 35.7239695;
 export const FACILITY_LONGITUDE = 139.9317222;
 
-export const FACILITY_TELEPHONE = "+81-90-5523-3879";
-
 export function buildFacilityAddress(): PostalAddressSchema {
   return {
     "@type": "PostalAddress",

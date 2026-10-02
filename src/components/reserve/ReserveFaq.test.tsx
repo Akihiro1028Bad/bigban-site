@@ -101,13 +101,14 @@ describe("ReserveFaq", () => {
     ).toBeInTheDocument();
   });
 
-  it("支払い方法の回答がクレジットカードと PayPay を案内する", () => {
+  it("支払い方法の回答が事前のオンライン決済(カード・PayPay)を案内する", () => {
     renderWithIntl(<ReserveFaq />);
     expect(
       screen.getByText(
-        "現地でのお支払いは、クレジットカード・PayPay がご利用いただけます。",
+        "お支払いは、ご予約時にオンラインで事前決済となります（クレジットカード・PayPay がご利用いただけます）。",
       ),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/現地/)).not.toBeInTheDocument();
   });
 
   it.each([
@@ -151,8 +152,11 @@ describe("ReserveFaq", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("On-site payments can be made by credit card or PayPay."),
+      screen.getByText(
+        "Payment is made online in advance when you book (credit card or PayPay).",
+      ),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/on-site/i)).not.toBeInTheDocument();
   });
 
   it("question/answer が揃わない要素を捨てて描画と JSON-LD から除く", () => {

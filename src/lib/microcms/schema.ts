@@ -101,6 +101,8 @@ export const newsItemSchema = z.object({
     .nullish()
     .transform((v) => v ?? undefined)
     .optional(),
+  // 終了日時(microCMS の「日時」フィールド。任意)。過ぎると「終了」表示になる。
+  eventEndAt: optionalString,
 });
 export type NewsItem = z.infer<typeof newsItemSchema>;
 

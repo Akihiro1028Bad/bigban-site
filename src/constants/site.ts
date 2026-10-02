@@ -87,7 +87,7 @@ export function labolaTabNameOf(key: LabolaCalendarTabKey): string {
   return LABOLA_CALENDAR_TABS.filter((tab) => tab.key === key)[0].tabName;
 }
 
-// 営業時間（毎日・不定休）。構造化データ(SportsActivityLocation / ExerciseGym)と
+// 営業時間（年中無休）。構造化データ(SportsActivityLocation / ExerciseGym)と
 // 説明文の差し込みで共有する。schema.org の opens/closes と同じ HH:MM 形式。
 // closes は翌日1:00（深夜をまたぐ。表示は ja 25:00 / en 1:00 AM）。
 export const BUSINESS_HOURS = { opens: "06:00", closes: "01:00" } as const;

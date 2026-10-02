@@ -16,6 +16,9 @@ import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
 import HyroxContent from "./HyroxContent";
 
+// 次の大会表示(HyroxNextRace)が古い HTML のまま残らないよう 1 時間ごとに再生成する
+export const revalidate = 3600;
+
 interface HyroxPageProps {
   params: Promise<{ locale: string }>;
 }

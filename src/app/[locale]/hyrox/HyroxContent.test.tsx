@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithIntl } from "@/test-utils/intl-wrapper";
 
@@ -42,6 +42,10 @@ describe("HyroxContent", () => {
     shouldShowColumnsMock.mockReset().mockResolvedValue(true);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("Nav・Footer・HYROX 見出しを描画する", async () => {
     renderWithIntl(await HyroxContent({ locale: "ja" }));
     expect(screen.getByTestId("nav")).toHaveAttribute(
@@ -73,5 +77,21 @@ describe("HyroxContent", () => {
     expect(
       screen.queryByRole("link", { name: /beginner's guide/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("NEXT RACE は PROGRAM(料金)の直前に並ぶ", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T00:00:00+09:00"));
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
+    const nextRace = screen.getByRole("heading", { level: 2, name: /^NEXT RACE/ });
+    const program = screen.getByRole("heading", { level: 2, name: /^PROGRAM/ });
+    expect(
+      nextRace.compareDocumentPosition(program) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const between = Array.from(document.querySelectorAll("main > section"));
+    const nextRaceIndex = between.indexOf(nextRace.closest("section") as HTMLElement);
+    const programIndex = between.indexOf(program.closest("section") as HTMLElement);
+    expect(programIndex - nextRaceIndex).toBe(1);
   });
 });

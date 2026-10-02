@@ -9,7 +9,6 @@ import {
 import {
   FACILITY_LATITUDE,
   FACILITY_LONGITUDE,
-  FACILITY_TELEPHONE,
   buildFacilityAddress,
   buildFacilityGeo,
   buildFacilityOpeningHours,
@@ -38,7 +37,6 @@ export interface SportsActivityLocationSchema {
   sport: string;
   address: PostalAddressSchema;
   geo: GeoCoordinatesSchema;
-  telephone: string;
   email: string;
   priceRange: string;
   openingHoursSpecification: OpeningHoursSpecificationSchema[];
@@ -99,7 +97,6 @@ export function buildSportsActivityLocation(
     sport: "Pickleball",
     address: buildFacilityAddress(),
     geo: buildFacilityGeo(),
-    telephone: FACILITY_TELEPHONE,
     email: "hello@rstagency.com",
     priceRange: "¥3980-¥7980",
     openingHoursSpecification: buildFacilityOpeningHours(),

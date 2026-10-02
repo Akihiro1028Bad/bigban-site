@@ -16,16 +16,17 @@ describe("sitemap", () => {
     vi.doUnmock("@/lib/microcms/queries");
   });
 
-  it("静的ページ6つ + ニュース一覧1つ を ja/en それぞれ = 14エントリ（slugなし時）", async () => {
+  it("静的ページ7つ + ニュース一覧1つ を ja/en それぞれ = 16エントリ（slugなし時）", async () => {
     const { default: sitemap } = await import("./sitemap");
     const entries = await sitemap();
 
-    expect(entries).toHaveLength(14);
+    expect(entries).toHaveLength(16);
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${PROD_URL}`);
     expect(urls).toContain(`${PROD_URL}/about`);
     expect(urls).toContain(`${PROD_URL}/reserve`);
     expect(urls).toContain(`${PROD_URL}/hyrox`);
+    expect(urls).toContain(`${PROD_URL}/pbt-club`);
     expect(urls).toContain(`${PROD_URL}/tokushoho`);
     expect(urls).toContain(`${PROD_URL}/contributors`);
     expect(urls).toContain(`${PROD_URL}/news`);
@@ -38,6 +39,16 @@ describe("sitemap", () => {
     const hyrox = entries.find((e) => e.url === `${PROD_URL}/hyrox`);
     expect(hyrox).toBeDefined();
     expect(hyrox?.alternates?.languages?.en).toBe(`${PROD_URL}/en/hyrox`);
+  });
+
+  it("/pbt-club を ja/en alternates 付きで含む", async () => {
+    const { default: sitemap } = await import("./sitemap");
+    const entries = await sitemap();
+
+    const pbtClub = entries.find((e) => e.url === `${PROD_URL}/pbt-club`);
+    expect(pbtClub).toBeDefined();
+    expect(pbtClub?.alternates?.languages?.en).toBe(`${PROD_URL}/en/pbt-club`);
+    expect(entries.some((e) => e.url === `${PROD_URL}/en/pbt-club`)).toBe(true);
   });
 
   it("/teaser / /facility / /services は sitemap に含まれない", async () => {

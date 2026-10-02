@@ -1,8 +1,11 @@
 import Image from "next/image";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
+import { isNewsEnded } from "@/lib/news/ended";
 import { resolveCategories } from "@/lib/news/categories";
 import type { NewsItem } from "@/lib/microcms/schema";
+
+import { NewsEndedBadge } from "./NewsEndedBadge";
 
 type Locale = "ja" | "en";
 
@@ -29,6 +32,7 @@ export function NewsCard({ item, locale }: NewsCardProps) {
   const placeholderColor = cats[0]?.color ?? "#8A8A8A";
   const dateIso = item.publishedAt ?? item.createdAt;
   const date = formatDate(dateIso);
+  const isEnded = isNewsEnded(item.eventEndAt);
 
   return (
     <TrackedLink
@@ -78,6 +82,7 @@ export function NewsCard({ item, locale }: NewsCardProps) {
               ))}
             </div>
           )}
+          {isEnded && <NewsEndedBadge locale={locale} />}
           <time dateTime={date.iso}>{date.display}</time>
         </div>
         <h3 className="text-text-light text-base lg:text-lg font-bold leading-snug line-clamp-2">

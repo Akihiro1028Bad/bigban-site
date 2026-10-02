@@ -532,3 +532,43 @@ describe("NewsBodyRenderer", () => {
     });
   });
 });
+
+describe("NewsBodyRenderer shouldUnlinkBookingLinks", () => {
+  const html =
+    '<p><a href="https://yoyaku.labola.jp/r/shop/3473/">予約はこちら</a> <a href="https://www.thepicklebang.com/reserve">予約ページ</a></p>';
+
+  it("既定では予約先リンクを残す", () => {
+    render(<NewsBodyRenderer displayMode="html" bodyHtml={html} body="" />);
+    expect(
+      screen.getByRole("link", { name: "予約はこちら" }),
+    ).toBeInTheDocument();
+  });
+
+  it("true なら予約先リンクだけ外し、テキストは残す", () => {
+    render(
+      <NewsBodyRenderer
+        displayMode="html"
+        bodyHtml={html}
+        body=""
+        shouldUnlinkBookingLinks
+      />,
+    );
+    expect(screen.queryByRole("link", { name: "予約はこちら" })).toBeNull();
+    expect(screen.getByText(/予約はこちら/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "予約ページ" }),
+    ).toBeInTheDocument();
+  });
+
+  it("リッチテキスト本文でも外す", () => {
+    render(
+      <NewsBodyRenderer
+        displayMode="rich"
+        bodyHtml=""
+        body={html}
+        shouldUnlinkBookingLinks
+      />,
+    );
+    expect(screen.queryByRole("link", { name: "予約はこちら" })).toBeNull();
+  });
+});

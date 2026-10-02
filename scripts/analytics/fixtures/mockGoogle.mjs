@@ -9,6 +9,7 @@ const server = setupServer(
   http.post("https://analyticsdata.googleapis.com/v1beta/properties/123:runReport", async ({ request }) => {
     if (process.env.TEST_GOOGLE_FAILURE === "ga4") return new HttpResponse(null, { status: 503 });
     const body = await request.json();
+    if (!body.dimensions) return HttpResponse.json({ rows: [{ metricValues: [{ value: "7" }] }] });
     const current = body.dateRanges[0].endDate === yesterday;
     if (body.dimensions[0].name === "eventName") {
       const event = row("reservation_click", current ? 30 : 10);

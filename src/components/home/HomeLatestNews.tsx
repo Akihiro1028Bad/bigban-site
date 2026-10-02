@@ -1,10 +1,12 @@
 import { getTranslations } from "next-intl/server";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
+import { NewsEndedBadge } from "@/components/news/NewsEndedBadge";
 import { isCmsNewsEnabled } from "@/config/featureFlags";
 import { LATEST_NEWS_FRESH_DAYS } from "@/constants/news";
 import { getNewsList } from "@/lib/microcms/queries";
 import { resolveCategories } from "@/lib/news/categories";
+import { isNewsEnded } from "@/lib/news/ended";
 import { hasFreshNews } from "@/lib/news/freshness";
 
 import type { NewsItem } from "@/lib/microcms/schema";
@@ -102,6 +104,7 @@ export default async function HomeLatestNews({
             // 設計判断: 1行に収める帯なので、複数カテゴリでも先頭のみをチップ表示する。
             // 全件表示は一覧ページの NewsCard に委ねる。
             const category = resolveCategories(item.category)[0];
+            const isEnded = isNewsEnded(item.eventEndAt);
 
             return (
               <li key={item.id}>
@@ -129,6 +132,12 @@ export default async function HomeLatestNews({
                       >
                         {locale === "ja" ? category.labelJa : category.labelEn}
                       </span>
+                    )}
+                    {isEnded && (
+                      <NewsEndedBadge
+                        locale={locale}
+                        className="px-1.5 text-[9px] tracking-wider sm:text-[10px]"
+                      />
                     )}
                   </div>
                   <span className="line-clamp-2 text-xs font-bold leading-relaxed transition-colors group-hover:text-accent sm:line-clamp-1 sm:text-sm">
