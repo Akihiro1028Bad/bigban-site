@@ -27,15 +27,22 @@ export default function HyroxPicklePromo() {
           <div className="flex flex-col justify-center px-8 py-10 lg:px-12 lg:py-16">
             <span className="mb-3 text-[10px] uppercase tracking-[0.3em] text-accent">
               {t("kicker")}
-              <span className="ml-2 normal-case tracking-normal text-text-gray">
-                {t("kickerJa")}
-              </span>
+              {t("kickerJa") ? (
+                <span className="ml-2 normal-case tracking-normal text-text-gray">
+                  {t("kickerJa")}
+                </span>
+              ) : null}
             </span>
             <h2 className="font-serif text-4xl font-black tracking-[0.1em] lg:text-5xl">
-              {t("title")}{" "}
-              <span className="mt-2 block font-sans text-xs font-normal tracking-[0.2em] text-text-gray">
-                {t("titleJa")}
-              </span>
+              {t("title")}
+              {t("titleJa") ? (
+                <>
+                  {" "}
+                  <span className="mt-2 block font-sans text-xs font-normal tracking-[0.2em] text-text-gray">
+                    {t("titleJa")}
+                  </span>
+                </>
+              ) : null}
             </h2>
             <p className="mt-5 text-sm leading-relaxed text-text-gray">
               {t("description")}

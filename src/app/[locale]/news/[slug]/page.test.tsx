@@ -37,11 +37,19 @@ vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: isCmsNewsEnabledMock,
   isCmsColumnsEnabled: () => false,
 }));
+const homeNavigationMock = vi.fn();
 vi.mock("@/components/home/HomeNavigation", () => ({
-  default: () => null,
+  default: (props: unknown) => {
+    homeNavigationMock(props);
+    return null;
+  },
 }));
 vi.mock("@/components/home/HomeFooter", () => ({
   default: () => null,
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
 }));
 vi.mock("@/lib/analytics/trackEvent", () => ({
   trackCtaClick: (...args: unknown[]) => trackCtaClickMock(...args),
@@ -599,5 +607,56 @@ describe("NewsDetailPage", () => {
         screen.getByRole("link", { name: /テニスベアで申込/ }),
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe("NewsDetailPage の言語切替の行き先", () => {
+  beforeEach(() => {
+    getNewsDetailMock.mockReset();
+    getNewsByContentIdMock.mockReset();
+    homeNavigationMock.mockClear();
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    isCmsNewsEnabledMock.mockReturnValue(true);
+  });
+
+  it("ナビの COLUMN 表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    getNewsDetailMock.mockResolvedValue(makeNewsItem({ slug: "both", locale: "en" }));
+    await renderPage({ locale: "en", slug: "both" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
+  });
+
+  it("相手言語版が無い記事では、相手言語のニュース一覧を切替先として渡す", async () => {
+    getNewsDetailMock.mockImplementation(
+      async ({ locale }: { locale: string }) =>
+        locale === "ja" ? makeNewsItem({ slug: "ja-only" }) : null,
+    );
+    await renderPage({ locale: "ja", slug: "ja-only" });
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: "/news" }),
+    );
+  });
+
+  it("相手言語版がある記事では切替先を指定しない(同じ記事の相手版へ)", async () => {
+    getNewsDetailMock.mockResolvedValue(makeNewsItem({ slug: "both" }));
+    await renderPage({ locale: "ja", slug: "both" });
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: undefined }),
+    );
+  });
+
+  it("プレビュー表示では相手言語を問い合わせず、切替先も指定しない", async () => {
+    getNewsByContentIdMock.mockResolvedValue(makeNewsItem({ slug: "x" }));
+    await renderPage(
+      { locale: "ja", slug: "x" },
+      { contentId: "g-abc", draftKey: "dk-1" },
+    );
+    expect(getNewsDetailMock).not.toHaveBeenCalled();
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: undefined }),
+    );
   });
 });

@@ -40,8 +40,16 @@ vi.mock("@/config/featureFlags", () => ({
   isCmsNewsEnabled: isCmsNewsEnabledMock,
   isCmsColumnsEnabled: () => false,
 }));
+const homeNavigationMock = vi.fn();
 vi.mock("@/components/home/HomeNavigation", () => ({
-  default: () => null,
+  default: (props: unknown) => {
+    homeNavigationMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
 }));
 vi.mock("@/components/home/HomeFooter", () => ({
   default: () => null,
@@ -188,5 +196,24 @@ describe("NewsPage", () => {
     });
     expect(meta.title).toContain("News");
     expect(meta.description).toContain("Latest");
+  });
+});
+
+describe("NewsPage のコラム表示", () => {
+  beforeEach(() => {
+    getNewsListMock.mockReset();
+    isCmsNewsEnabledMock.mockReturnValue(true);
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    homeNavigationMock.mockClear();
+  });
+
+  it("ナビの COLUMN 表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    getNewsListMock.mockResolvedValue(makeNewsList([]));
+    await renderPage({ locale: "en" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
   });
 });

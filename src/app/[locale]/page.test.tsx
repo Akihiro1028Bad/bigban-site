@@ -18,7 +18,18 @@ vi.mock("@/components/home/HomeIntro", () => ({
     <div data-testid="home-intro">{children}</div>
   ),
 }));
-vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
+const homeNavigationMock = vi.fn();
+vi.mock("@/components/home/HomeNavigation", () => ({
+  default: (props: unknown) => {
+    homeNavigationMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
+
 vi.mock("@/components/home/HomeHero", () => ({
   default: () => <div data-testid="home-hero" />,
 }));
@@ -51,7 +62,13 @@ vi.mock("@/components/home/HomeColumns", () => ({
 vi.mock("@/components/home/HomeAbout", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeContributors", () => ({ default: () => null }));
 vi.mock("@/components/home/HomeAccess", () => ({ default: () => null }));
-vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
+const homeFooterMock = vi.fn();
+vi.mock("@/components/home/HomeFooter", () => ({
+  default: (props: unknown) => {
+    homeFooterMock(props);
+    return null;
+  },
+}));
 vi.mock("@/components/SectionArcDivider", () => ({
   default: ({ variant = "apex" }: { variant?: string }) => (
     <div data-testid="section-arc-divider" data-variant={variant} />
@@ -288,5 +305,26 @@ describe("Home Page", () => {
 
     const intro = screen.getByTestId("home-intro");
     expect(intro).toContainElement(screen.getByTestId("home-hero"));
+  });
+});
+
+describe("Home Page のコラム表示", () => {
+  beforeEach(() => {
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    homeNavigationMock.mockClear();
+    homeFooterMock.mockClear();
+  });
+
+  it("ナビとフッターの COLUMN 表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { default: Home } = await import("./page");
+    render(await Home({ params: Promise.resolve({ locale: "en" }) }));
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
+    expect(homeFooterMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
   });
 });

@@ -82,7 +82,7 @@ function SectionHeader({ number, labelEn, id }: SectionHeaderProps) {
 interface AboutContentProps {
   newsItems?: NewsItem[];
   locale?: "ja" | "en";
-  /** COLUMN ナビリンク表示フラグ(server で isCmsColumnsEnabled() を渡す)。既定 false。 */
+  /** COLUMN ナビリンク表示フラグ(server で shouldShowColumns(locale) を渡す)。既定 false。 */
   showColumns?: boolean;
 }
 

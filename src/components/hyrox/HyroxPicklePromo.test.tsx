@@ -46,3 +46,13 @@ describe("HyroxPicklePromo", () => {
     );
   });
 });
+
+describe("HyroxPicklePromo(英語)", () => {
+  it("英語では見出しの日本語併記を出さない", () => {
+    renderWithIntl(<HyroxPicklePromo />, { locale: "en" });
+    expect(document.body.textContent).not.toMatch(/[぀-ヿ一-鿿]/);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "PICKLEBALL" }),
+    ).toBeInTheDocument();
+  });
+});

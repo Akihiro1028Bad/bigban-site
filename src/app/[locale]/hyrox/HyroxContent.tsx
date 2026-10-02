@@ -1,6 +1,7 @@
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeFooter from "@/components/home/HomeFooter";
-import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import type { Locale } from "@/i18n/routing";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import HyroxHero from "@/components/hyrox/HyroxHero";
 import HyroxFacility from "@/components/hyrox/HyroxFacility";
 import HyroxServices from "@/components/hyrox/HyroxServices";
@@ -12,8 +13,13 @@ import HyroxProgram from "@/components/hyrox/HyroxProgram";
 import HyroxPicklePromo from "@/components/hyrox/HyroxPicklePromo";
 import { currentTimeMs } from "@/lib/hyroxRaces";
 
-export default function HyroxContent() {
-  const showColumns = isCmsColumnsEnabled();
+interface HyroxContentProps {
+  locale: Locale;
+}
+
+export default async function HyroxContent({ locale }: HyroxContentProps) {
+  // 英語はコラムが0件の間、ナビのリンクも入門コラムへの内部リンク(404になる)も出さない。
+  const showColumns = await shouldShowColumns(locale);
 
   return (
     <>

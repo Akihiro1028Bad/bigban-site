@@ -13,7 +13,18 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-vi.mock("./AboutContent", () => ({ default: () => null }));
+const aboutContentMock = vi.fn();
+vi.mock("./AboutContent", () => ({
+  default: (props: unknown) => {
+    aboutContentMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
+
 vi.mock("@/components/StructuredData", () => ({ default: () => null }));
 vi.mock("@/lib/structured-data", () => ({
   buildBreadcrumb: vi.fn().mockReturnValue({}),
@@ -152,6 +163,23 @@ describe("About Page", () => {
     render(element);
     expect(getNewsListMock).toHaveBeenCalledWith(
       expect.objectContaining({ locale: "ja", limit: 3, offset: 0 }),
+    );
+  });
+});
+
+describe("About Page のコラム表示", () => {
+  beforeEach(() => {
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    aboutContentMock.mockClear();
+  });
+
+  it("COLUMN ナビの表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(aboutContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
     );
   });
 });

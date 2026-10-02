@@ -88,6 +88,17 @@ function indexEntries(segment: string): MetadataRoute.Sitemap {
   );
 }
 
+/** 英語コラムが0件のときの一覧エントリ(日本語のみ・hreflang なし)。 */
+function japaneseOnlyIndexEntry(segment: string): MetadataRoute.Sitemap {
+  return [
+    {
+      url: `${SITE_URL}/${segment}`,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+  ];
+}
+
 /**
  * ビルド時の静的生成だけだと、デプロイ後に microCMS で公開した記事が次の
  * デプロイまで sitemap に載らない。Webhook の再生成に加え、1時間ごとにも
@@ -123,13 +134,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // columns はフラグ ON のときだけ列挙する (P4〜P6 前は出さない)。
   const columnsEntries: MetadataRoute.Sitemap = [];
   if (isCmsColumnsEnabled()) {
-    columnsEntries.push(...indexEntries("columns"));
     let columnSlugs: LocaleSlug[] = [];
     try {
       columnSlugs = await getColumnSlugs();
     } catch {
       columnSlugs = [];
     }
+    // 英語コラムが0件の間は、空の /en/columns を載せず、日本語一覧も hreflang なしにする。
+    const hasEnglishColumns = columnSlugs.some(({ locale }) => locale === "en");
+    columnsEntries.push(
+      ...(hasEnglishColumns
+        ? indexEntries("columns")
+        : japaneseOnlyIndexEntry("columns")),
+    );
     columnsEntries.push(...detailEntries("columns", columnSlugs));
   }
 

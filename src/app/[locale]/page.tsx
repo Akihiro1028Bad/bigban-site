@@ -7,7 +7,7 @@ import { parseKeywords } from "@/lib/og-utils";
 import SectionArcDivider from "@/components/SectionArcDivider";
 import StructuredData from "@/components/StructuredData";
 import { buildServices } from "@/lib/structured-data";
-import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import HomeIntro from "@/components/home/HomeIntro";
 import HomeNavigation from "@/components/home/HomeNavigation";
 import HomeHero from "@/components/home/HomeHero";
@@ -72,13 +72,14 @@ export default async function Home({ params }: HomePageProps) {
   const locale = parseLocale(rawLocale);
   if (!locale) notFound();
   setRequestLocale(locale);
+  const showColumns = await shouldShowColumns(locale);
 
   // 初回訪問時はロゴのイントロ演出を挟む (約 1.3 秒、1 セッション 1 回)。
   return (
     <HomeIntro>
       <StructuredData data={buildServices()} />
       <main>
-        <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+        <HomeNavigation showColumns={showColumns} />
         <HomeHero />
         {/* 最新の動きを一目で伝える帯。見出しとリンク数行だけの短い帯なので、
             ヒーロー直下に置いても下の FACILITY の本文としての優位は損なわない。 */}
@@ -112,7 +113,7 @@ export default async function Home({ params }: HomePageProps) {
         <HomeContributors />
         <SectionArcDivider variant="descent" />
         <HomeAccess />
-        <HomeFooter showColumns={isCmsColumnsEnabled()} />
+        <HomeFooter showColumns={showColumns} />
       </main>
     </HomeIntro>
   );

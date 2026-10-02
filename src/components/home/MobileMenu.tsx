@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { INSTAGRAM_URL, EXTERNAL_LINK_PROPS } from "@/constants/site";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { EASE } from "@/constants/motion";
-import { NAV_ITEMS } from "@/constants/navigation";
+import { NAV_ITEMS, RESERVE_ENTRY_ANALYTICS_LABEL } from "@/constants/navigation";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import LanguageToggle from "./LanguageToggle";
 
@@ -124,6 +124,8 @@ export default function MobileMenu({
   navItems = NAV_ITEMS,
 }: MobileMenuProps) {
   const t = useTranslations("Navigation");
+  // reserveJa が空(英語)のときは RESERVE を主ラベルにし、和文の副題を出さない。
+  const reserveSub = t("reserveJa");
 
   // メニュー表示中は背面のスクロールを固定
   useEffect(() => {
@@ -336,17 +338,19 @@ export default function MobileMenu({
               <Link
                 href={reserveHref}
                 onClick={() => {
-                  trackCtaClick("reserveEntry", "mobile_menu_reserve", t("reserveJa"));
+                  trackCtaClick("reserveEntry", "mobile_menu_reserve", RESERVE_ENTRY_ANALYTICS_LABEL);
                   onLinkClick();
                 }}
                 className="group flex w-full items-center justify-center gap-2 bg-accent py-4 text-deep-black hover:gap-3 motion-safe:transition-all"
               >
                 <span className="text-sm font-bold tracking-[0.2em]">
-                  {t("reserveJa")}
+                  {reserveSub || t("reserve")}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-deep-black/60">
-                  {t("reserve")}
-                </span>
+                {reserveSub ? (
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-deep-black/60">
+                    {t("reserve")}
+                  </span>
+                ) : null}
                 <span aria-hidden className="text-base leading-none">
                   →
                 </span>

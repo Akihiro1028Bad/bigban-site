@@ -37,7 +37,17 @@ vi.mock("next-intl/server", () => ({
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: isCmsColumnsEnabledMock,
 }));
-vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
+const homeNavigationMock = vi.fn();
+vi.mock("@/components/home/HomeNavigation", () => ({
+  default: (props: unknown) => {
+    homeNavigationMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 vi.mock("@/components/news/NewsBodyRenderer", () => ({
   NewsBodyRenderer: (props: unknown) => {
@@ -472,5 +482,71 @@ describe("ColumnDetailPage", () => {
     );
     expect(screen.getByTestId("preview-banner")).toBeInTheDocument();
     expect(readJsonLdAll()).toHaveLength(0);
+  });
+});
+
+describe("ColumnDetailPage の言語切替の行き先", () => {
+  beforeEach(() => {
+    getColumnDetailMock.mockReset();
+    getColumnByContentIdMock.mockReset();
+    homeNavigationMock.mockClear();
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    isCmsColumnsEnabledMock.mockReturnValue(true);
+  });
+
+  it("相手言語版が無く、相手言語でコラムを出すなら、相手言語のコラム一覧を渡す", async () => {
+    getColumnDetailMock.mockImplementation(
+      async ({ locale }: { locale: string }) =>
+        locale === "en" ? makeParsedColumnItem({ slug: "en-only", locale: "en" }) : null,
+    );
+    await renderPage({ locale: "en", slug: "en-only" });
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: "/columns" }),
+    );
+  });
+
+  it("相手言語版が無く、相手言語(英語)にコラムが0件なら、ニュース一覧を渡す", async () => {
+    shouldShowColumnsMock.mockImplementation(async (locale: string) => locale === "ja");
+    getColumnDetailMock.mockImplementation(
+      async ({ locale }: { locale: string }) =>
+        locale === "ja" ? makeParsedColumnItem({ slug: "ja-only" }) : null,
+    );
+    await renderPage({ locale: "ja", slug: "ja-only" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: "/news" }),
+    );
+  });
+
+  it("相手言語版がある記事では切替先を指定しない", async () => {
+    getColumnDetailMock.mockResolvedValue(makeParsedColumnItem({ slug: "both" }));
+    await renderPage({ locale: "ja", slug: "both" });
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: undefined }),
+    );
+  });
+
+  it("プレビュー表示では相手言語を問い合わせず、切替先も指定しない", async () => {
+    getColumnByContentIdMock.mockResolvedValue(makeParsedColumnItem({ slug: "x" }));
+    await renderPage(
+      { locale: "ja", slug: "x" },
+      { contentId: "g-abc", draftKey: "dk-1" },
+    );
+    expect(getColumnDetailMock).not.toHaveBeenCalled();
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ localeSwitchPath: undefined }),
+    );
+  });
+
+  it("ナビのコラム表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (locale: string) => locale === "ja");
+    getColumnDetailMock.mockResolvedValue(
+      makeParsedColumnItem({ slug: "both", locale: "en" }),
+    );
+    await renderPage({ locale: "en", slug: "both" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
   });
 });

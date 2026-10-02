@@ -20,8 +20,9 @@ vi.mock("@/components/home/HomeNavigation", () => ({
     <nav data-testid="nav" data-show-columns={showColumns} />
   ),
 }));
-vi.mock("@/config/featureFlags", () => ({
-  isCmsColumnsEnabled: () => true,
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
 }));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => <footer data-testid="footer" /> }));
 // HyroxFacility は Embla（ResizeObserver 依存）を使うため、構成確認用にスタブ化
@@ -37,12 +38,16 @@ vi.mock("@/i18n/navigation", () => ({
 import HyroxContent from "./HyroxContent";
 
 describe("HyroxContent", () => {
+  beforeEach(() => {
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("Nav・Footer・HYROX 見出しを描画する", () => {
-    renderWithIntl(<HyroxContent />);
+  it("Nav・Footer・HYROX 見出しを描画する", async () => {
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
     expect(screen.getByTestId("nav")).toHaveAttribute(
       "data-show-columns",
       "true",
@@ -53,17 +58,31 @@ describe("HyroxContent", () => {
     ).toBeInTheDocument();
   });
 
-  it("コラム CMS 有効時、入門コラムへの内部リンクを描画する", () => {
-    renderWithIntl(<HyroxContent />);
+  it("日本語でコラムを出すとき、入門コラムへの内部リンクを描画する", async () => {
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("ja");
     expect(
       screen.getByRole("link", { name: /ハイロックスとは/ }),
     ).toHaveAttribute("href", "/columns/hyrox-beginners-guide");
   });
 
-  it("NEXT RACE は PROGRAM(料金)の直前に並ぶ", () => {
+  it("英語でコラムを出さない(0件)とき、ナビにも入門コラムリンクにも出さない(404を作らない)", async () => {
+    shouldShowColumnsMock.mockResolvedValue(false);
+    renderWithIntl(await HyroxContent({ locale: "en" }), { locale: "en" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(screen.getByTestId("nav")).toHaveAttribute(
+      "data-show-columns",
+      "false",
+    );
+    expect(
+      screen.queryByRole("link", { name: /beginner's guide/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("NEXT RACE は PROGRAM(料金)の直前に並ぶ", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-01T00:00:00+09:00"));
-    renderWithIntl(<HyroxContent />);
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
     const nextRace = screen.getByRole("heading", { level: 2, name: /^NEXT RACE/ });
     const program = screen.getByRole("heading", { level: 2, name: /^PROGRAM/ });
     expect(

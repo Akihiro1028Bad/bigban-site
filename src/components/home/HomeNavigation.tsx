@@ -6,7 +6,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { RESERVE_PATH } from "@/constants/site";
-import { SECTION_IDS, navItemsFor } from "@/constants/navigation";
+import {
+  SECTION_IDS,
+  RESERVE_ENTRY_ANALYTICS_LABEL,
+  navItemsFor,
+} from "@/constants/navigation";
 import { trackCtaClick } from "@/lib/analytics/trackEvent";
 import PromoBanner from "./PromoBanner";
 import MobileMenu from "./MobileMenu";
@@ -16,9 +20,14 @@ import LanguageToggle from "./LanguageToggle";
 interface HomeNavigationProps {
   /** コラム機能(USE_CMS_COLUMNS)有効時に COLUMN リンクを出す。既定 false=非表示。 */
   showColumns?: boolean;
+  /** 相手言語版が無い記事詳細で、言語切替の行き先(ロケールなしのパス)。未指定は現在のパス。 */
+  localeSwitchPath?: string;
 }
 
-export default function HomeNavigation({ showColumns = false }: HomeNavigationProps) {
+export default function HomeNavigation({
+  showColumns = false,
+  localeSwitchPath,
+}: HomeNavigationProps) {
   const navItems = navItemsFor(showColumns);
   const locale = useLocale();
   const t = useTranslations("Navigation");
@@ -71,13 +80,16 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
   const handleSwitchLocale = useCallback(
     (targetLocale: "ja" | "en") => {
       if (targetLocale !== locale) {
-        router.push(pathname, { locale: targetLocale });
+        router.push(localeSwitchPath ?? pathname, { locale: targetLocale });
       }
     },
-    [locale, pathname, router]
+    [locale, localeSwitchPath, pathname, router]
   );
 
   const isJa = locale === "ja";
+  // reserveJa が空(英語)のときは RESERVE を主ラベルにし、和文の副題を出さない。
+  const reserveSub = t("reserveJa");
+  const reservePrimary = reserveSub || t("reserve");
   const isHyrox = pathname === "/hyrox";
   // 予約導線は内部の予約案内ページ(/reserve)。予約カテゴリごとの labola 導線を案内する。
   const reserveTo = RESERVE_PATH;
@@ -149,15 +161,17 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
               右上のフローティングメニュートグルと重ならないよう右マージンを確保 */}
           <Link
             href={reserveTo}
-            onClick={() => trackCtaClick("reserveEntry", "home_nav_mobile", t("reserveJa"))}
+            onClick={() => trackCtaClick("reserveEntry", "home_nav_mobile", RESERVE_ENTRY_ANALYTICS_LABEL)}
             className="mr-12 inline-flex items-center gap-1.5 bg-accent px-4 py-2 text-deep-black xl:hidden"
           >
             <span className="text-[11px] font-bold tracking-widest">
-              {t("reserveJa")}
+              {reservePrimary}
             </span>
-            <span className="text-[8px] font-bold uppercase tracking-widest text-deep-black/60">
-              {t("reserve")}
-            </span>
+            {reserveSub ? (
+              <span className="text-[8px] font-bold uppercase tracking-widest text-deep-black/60">
+                {t("reserve")}
+              </span>
+            ) : null}
           </Link>
 
           {/* Desktop: Right side */}
@@ -168,15 +182,17 @@ export default function HomeNavigation({ showColumns = false }: HomeNavigationPr
             />
             <Link
               href={reserveTo}
-              onClick={() => trackCtaClick("reserveEntry", "home_nav_desktop", t("reserveJa"))}
+              onClick={() => trackCtaClick("reserveEntry", "home_nav_desktop", RESERVE_ENTRY_ANALYTICS_LABEL)}
               className="inline-flex items-center gap-1.5 bg-accent text-deep-black px-5 py-2"
             >
               <span className="text-xs font-bold tracking-widest">
-                {t("reserveJa")}
+                {reservePrimary}
               </span>
-              <span className="text-[9px] font-bold uppercase tracking-widest text-deep-black/60">
-                {t("reserve")}
-              </span>
+              {reserveSub ? (
+                <span className="text-[9px] font-bold uppercase tracking-widest text-deep-black/60">
+                  {t("reserve")}
+                </span>
+              ) : null}
             </Link>
           </div>
 

@@ -3,7 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 
 import StructuredData from "@/components/StructuredData";
-import { isCmsColumnsEnabled, isCmsNewsEnabled } from "@/config/featureFlags";
+import { isCmsNewsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import { ABOUT_NEWS_LIMIT } from "@/constants/news";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale } from "@/i18n/routing";
@@ -61,6 +62,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
   const locale = parseLocale(rawLocale);
   if (!locale) notFound();
   setRequestLocale(locale);
+  const showColumns = await shouldShowColumns(locale);
 
   let newsItems: NewsItem[] = [];
   if (isCmsNewsEnabled()) {
@@ -85,7 +87,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
       <AboutContent
         newsItems={newsItems}
         locale={locale}
-        showColumns={isCmsColumnsEnabled()}
+        showColumns={showColumns}
       />
     </>
   );

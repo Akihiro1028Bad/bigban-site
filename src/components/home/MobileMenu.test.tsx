@@ -491,3 +491,22 @@ describe("MobileMenu", () => {
     trigger.remove();
   });
 });
+
+describe("MobileMenu の予約ボタン表記(言語別)", () => {
+  it("英語では和文の副題を出さず RESERVE を主ラベルにする", () => {
+    renderMenu({ locale: "en", isJa: false });
+    const reserve = screen.getByRole("link", { name: /RESERVE/ });
+    expect(reserve.textContent).not.toMatch(/予約/);
+  });
+
+  it("英語でも予約ボタンのGAラベルは日本語の「予約」のまま", () => {
+    trackCtaClick.mockClear();
+    renderMenu({ locale: "en", isJa: false });
+    fireEvent.click(screen.getByRole("link", { name: /RESERVE/ }));
+    expect(trackCtaClick).toHaveBeenCalledWith(
+      "reserveEntry",
+      "mobile_menu_reserve",
+      "予約",
+    );
+  });
+});

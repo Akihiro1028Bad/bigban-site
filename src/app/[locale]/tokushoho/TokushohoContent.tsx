@@ -30,7 +30,7 @@ const HREF_MAP: Readonly<Record<string, string>> = {
 };
 
 interface TokushohoContentProps {
-  /** COLUMN ナビリンク表示フラグ(server で isCmsColumnsEnabled() を渡す)。既定 false。 */
+  /** COLUMN ナビリンク表示フラグ(server で shouldShowColumns(locale) を渡す)。既定 false。 */
   showColumns?: boolean;
 }
 

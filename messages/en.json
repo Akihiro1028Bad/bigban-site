@@ -114,7 +114,7 @@
     "about": "ABOUT",
     "access": "ACCESS",
     "reserve": "RESERVE",
-    "reserveJa": "予約",
+    "reserveJa": "",
     "contact": "CONTACT",
     "hyrox": "HYROX",
     "conceptJa": "",
@@ -207,7 +207,7 @@
       "scrollHint": "Scroll to see all hours",
       "tablistLabel": "Reservation category",
       "tabs": {
-        "pickleball": "ピックルボールコート",
+        "pickleball": "Pickleball Court",
         "hyrox": "H Y R O X"
       }
     },
@@ -230,6 +230,18 @@
         "Rental shoes are not available.",
         "Shower facilities are not available."
       ]
+    },
+    "englishGuide": {
+      "heading": "Booking in English",
+      "notice": "Our booking pages on LaBOLA (courts, the HYROX area and lessons) and Tennis Bear (events) are in Japanese only. The steps above walk you through them; here are a few more things to know.",
+      "paymentHeading": "Payment and cancellation (LaBOLA)",
+      "paymentBody": "Payment is online prepayment (credit card or PayPay) through LaBOLA, and cancellations follow LaBOLA's policy.",
+      "tennisbearHeading": "Events and school sessions (Tennis Bear)",
+      "tennisbearBody": "The event pages are also in Japanese only. Open the event you want — its name, date and fee are shown on the event page — and follow the on-screen application steps.",
+      "helpHeading": "Stuck?",
+      "helpBody": "Contact us through the contact form or on Instagram (DM).",
+      "contactCta": "Contact form",
+      "instagramCta": "Instagram"
     },
     "guide": {
       "kicker": "HOW TO BOOK",
@@ -621,7 +633,7 @@
     "tokushoho": "Specified Commercial Transactions Act",
     "contributors": "Contributors",
     "address": "2-16-6 Yawata Hata Bldg. 6F, Yawata, Ichikawa City, Chiba 272-0021",
-    "brandJa": "THE PICKLE BANG THEORY ／ ザ ピックルバン セオリー",
+    "brandJa": "",
     "newsletter": {
       "heading": "Newsletter",
       "description": "Stay updated with our latest news and campaigns.",
@@ -863,32 +875,32 @@
       "equipment": {
         "skierg": {
           "name": "SkiErg",
-          "nameJa": "スキーエルゴ",
+          "nameJa": "SkiErg",
           "spec": "Concept2 SkiErg"
         },
         "rowing": {
           "name": "Rowing Machine",
-          "nameJa": "ローイングマシン",
+          "nameJa": "Rowing Machine",
           "spec": "Concept2 RowErg"
         },
         "sled": {
           "name": "Weight Sled",
-          "nameJa": "スレッド",
+          "nameJa": "Weight Sled",
           "spec": "Plate-loaded, up to 202kg (all HYROX divisions; commercial plates)"
         },
         "kettlebell": {
           "name": "Kettlebell",
-          "nameJa": "ケトルベル",
+          "nameJa": "Kettlebell",
           "spec": "16 / 24 / 32kg (all HYROX divisions)"
         },
         "wallball": {
           "name": "Wall Ball",
-          "nameJa": "ウォールボール",
+          "nameJa": "Wall Ball",
           "spec": "Medicine balls 4 / 6 / 9kg with official target (all HYROX divisions)"
         },
         "sandbag": {
           "name": "Sandbag",
-          "nameJa": "サンドバッグ",
+          "nameJa": "Sandbag",
           "spec": "10–30kg"
         }
       },
@@ -920,21 +932,21 @@
         {
           "key": "rental",
           "titleEn": "AREA RENTAL",
-          "titleJa": "時間制レンタル",
+          "titleJa": "Hourly rental",
           "description": "Rent the HYROX area by the hour and train at your own pace with all the equipment. Open from 6:00 AM to 1:00 AM.",
           "imageAlt": "An athlete driving the sled"
         },
         {
           "key": "trial",
           "titleEn": "TRIAL",
-          "titleJa": "体験・トライアル",
+          "titleJa": "Trial session",
           "description": "A trial session for first-timers. Our staff walk you through the HYROX stations and how to use each piece of equipment. Bring running shoes and training wear (no rentals available).",
           "imageAlt": "Performing wall balls"
         },
         {
           "key": "group",
           "titleEn": "GROUP SESSION",
-          "titleJa": "グループセッション",
+          "titleJa": "Group session",
           "description": "Small-group coached classes. Take on an authentic program with friends—covering technique and tips for each station plus race-day advice. Sessions are tailored to each participant's level, so beginners are welcome too.",
           "imageAlt": "Athletes training together"
         }
@@ -1023,8 +1035,8 @@
       "sectionTitle": "CREW",
       "sectionTitleJa": "Coach | Current HYROX Japan athlete Daisuke Sekiyoshi",
       "name": "DAISUKE SEKIYOSHI",
-      "nameKana": "関吉大亮",
-      "nameEn": "関吉大亮",
+      "nameKana": "",
+      "nameEn": "",
       "intro": "A pioneer of HYROX in Japan and a current HYROX Team Japan athlete — Spartan Race's first-ever Japanese champion and a national triathlon title holder, and one of Japan's finest hybrid athletes.",
       "profile": "Born June 25, 1985 · From Chiba, Japan",
       "achievementsTitle": "ACHIEVEMENTS",
@@ -1032,7 +1044,7 @@
       "achievements": [
         {
           "discipline": "HYROX",
-          "disciplineJa": "ハイロックス",
+          "disciplineJa": "",
           "note": "Japan National Team, 2024–",
           "items": [
             "World Championship 2026 — Mixed Doubles age 40–44: 7th",
@@ -1045,7 +1057,7 @@
         },
         {
           "discipline": "SPARTAN RACE",
-          "disciplineJa": "スパルタンレース",
+          "disciplineJa": "",
           "note": "Japan National Team, 2017–2023",
           "items": [
             "Inaugural Japan Champion",
@@ -1056,7 +1068,7 @@
         },
         {
           "discipline": "TRIATHLON",
-          "disciplineJa": "トライアスロン",
+          "disciplineJa": "",
           "note": "",
           "items": [
             "2022 Age-Group Japan National Championship, Sprint — Annual Ranking: 1st",
@@ -1077,9 +1089,9 @@
     },
     "picklePromo": {
       "kicker": "MAIN FACILITY",
-      "kickerJa": "メイン施設",
+      "kickerJa": "",
       "title": "PICKLEBALL",
-      "titleJa": "ピックルボール",
+      "titleJa": "",
       "description": "This is THE PICKLE BANG THEORY, a premium indoor pickleball facility — 1 min from Motoyawata Station. Come experience pickleball on our pro-spec courts.",
       "cta": "Discover Pickleball",
       "courtImageAlt": "Pickleball courts at THE PICKLE BANG THEORY"

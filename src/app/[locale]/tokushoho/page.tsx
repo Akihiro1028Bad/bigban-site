@@ -3,7 +3,7 @@ import { SITE_URL } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
 import TokushohoContent from "./TokushohoContent";
 import StructuredData from "@/components/StructuredData";
-import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import { buildBreadcrumb } from "@/lib/structured-data";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 
@@ -47,6 +47,7 @@ export async function generateMetadata({
 export default async function TokushohoPage({ params }: TokushohoPageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const showColumns = await shouldShowColumns(locale === "en" ? "en" : "ja");
 
   const breadcrumbName =
     locale === "ja" ? "特定商取引法に基づく表記" : "Legal Notice";
@@ -58,7 +59,7 @@ export default async function TokushohoPage({ params }: TokushohoPageProps) {
           { name: breadcrumbName, path: "/tokushoho" },
         ])}
       />
-      <TokushohoContent showColumns={isCmsColumnsEnabled()} />
+      <TokushohoContent showColumns={showColumns} />
     </>
   );
 }

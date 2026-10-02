@@ -55,7 +55,17 @@ vi.mock("next-intl/server", () => ({
 vi.mock("@/config/featureFlags", () => ({
   isCmsColumnsEnabled: isCmsColumnsEnabledMock,
 }));
-vi.mock("@/components/home/HomeNavigation", () => ({ default: () => null }));
+const homeNavigationMock = vi.fn();
+vi.mock("@/components/home/HomeNavigation", () => ({
+  default: (props: unknown) => {
+    homeNavigationMock(props);
+    return null;
+  },
+}));
+const shouldShowColumnsMock = vi.fn(async (_locale: string) => true);
+vi.mock("@/lib/columns/visibility", () => ({
+  shouldShowColumns: (locale: string) => shouldShowColumnsMock(locale),
+}));
 vi.mock("@/components/home/HomeFooter", () => ({ default: () => null }));
 
 function listOf(items: ReturnType<typeof makeParsedColumnItem>[], total?: number): ColumnList {
@@ -92,6 +102,8 @@ describe("ColumnsPage", () => {
     getColumnCategoriesMock.mockReset();
     notFoundMock.mockClear();
     isCmsColumnsEnabledMock.mockReturnValue(true);
+    shouldShowColumnsMock.mockReset().mockResolvedValue(true);
+    homeNavigationMock.mockClear();
     routerPushMock.mockClear();
     getColumnCategoriesMock.mockResolvedValue([
       makeParsedColumnCategory({ id: "start" }),
@@ -241,6 +253,49 @@ describe("ColumnsPage", () => {
       en: `${SITE_URL}/en/columns`,
       "x-default": `${SITE_URL}/columns`,
     });
+  });
+
+  it("generateMetadata: 英語コラムが0件のとき /en/columns は noindex で hreflang を出さない", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { generateMetadata } = await import("./page");
+    const en = await generateMetadata({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    expect(en.robots).toEqual({ index: false, follow: true });
+    expect(en.alternates?.canonical).toBe(`${SITE_URL}/en/columns`);
+    expect(en.alternates?.languages).toBeUndefined();
+  });
+
+  it("generateMetadata: 英語コラムが0件でも日本語 /columns は index のまま、hreflang は出さない", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    const { generateMetadata } = await import("./page");
+    const ja = await generateMetadata({
+      params: Promise.resolve({ locale: "ja" }),
+    });
+    expect(ja.robots).toBeUndefined();
+    expect(ja.alternates?.languages).toBeUndefined();
+  });
+
+  it("generateMetadata: 英語コラムが1件以上あれば en も index で hreflang あり", async () => {
+    const { generateMetadata } = await import("./page");
+    const en = await generateMetadata({
+      params: Promise.resolve({ locale: "en" }),
+    });
+    expect(en.robots).toBeUndefined();
+    expect(en.alternates?.languages).toMatchObject({
+      ja: `${SITE_URL}/columns`,
+      en: `${SITE_URL}/en/columns`,
+    });
+  });
+
+  it("ナビのコラム表示は shouldShowColumns(現在の言語)に従う", async () => {
+    shouldShowColumnsMock.mockImplementation(async (l: string) => l === "ja");
+    getColumnsListMock.mockResolvedValue(listOf([]));
+    await renderPage({ locale: "en" });
+    expect(shouldShowColumnsMock).toHaveBeenCalledWith("en");
+    expect(homeNavigationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showColumns: false }),
+    );
   });
 
   it("generateMetadata: en の canonical は /en/columns", async () => {

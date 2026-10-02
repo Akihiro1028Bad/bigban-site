@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -60,6 +60,13 @@ describe("HomeLatestNews", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isCmsNewsEnabledMock.mockReturnValue(true);
+    // 記事フィクスチャの公開日(2026-04-01)から14日後に固定する(英語の鮮度ルールの対象内)。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-04-15T00:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("ヒーロー直下に置く帯として内側に py-8 lg:py-10 を持つ", async () => {
@@ -347,5 +354,43 @@ describe("HomeLatestNews", () => {
     await renderHomeLatestNews("en");
 
     expect(screen.getByText("Ended")).toBeInTheDocument();
+  });
+});
+
+describe("HomeLatestNews の鮮度ルール(英語のみ)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isCmsNewsEnabledMock.mockReturnValue(true);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T00:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const listOf = (publishedAt: string, locale: "ja" | "en") => ({
+    contents: [makeParsedNewsItem({ id: "a", slug: "a", locale, publishedAt })],
+    totalCount: 1,
+    offset: 0,
+    limit: 3,
+  });
+
+  it("英語で30日以内の記事が1本も無ければ帯を出さない", async () => {
+    getNewsListMock.mockResolvedValueOnce(listOf("2026-08-17T00:00:00.000Z", "en"));
+    const { container } = await renderHomeLatestNews("en");
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("英語で30日以内の記事が1本でもあれば帯を出す", async () => {
+    getNewsListMock.mockResolvedValueOnce(listOf("2026-09-20T00:00:00.000Z", "en"));
+    await renderHomeLatestNews("en");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("日本語は古い記事だけでも帯を出す(挙動を変えない)", async () => {
+    getNewsListMock.mockResolvedValueOnce(listOf("2026-08-17T00:00:00.000Z", "ja"));
+    await renderHomeLatestNews("ja");
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 });

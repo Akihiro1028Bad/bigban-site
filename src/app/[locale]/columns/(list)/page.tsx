@@ -13,6 +13,7 @@ import { COLUMN_PAGE_SIZE } from "@/constants/columns";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale, routing } from "@/i18n/routing";
 import { columnsLabel } from "@/lib/columns/label";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnCategories,
@@ -63,9 +64,13 @@ export async function generateMetadata({
   // canonical は news 一覧と同様、?category= / ?page= を含めない自己参照 URL。
   // 絞り込み・ページ送りはすべて一覧 1 ページ目に正規化する。
   const canonicalUrl = columnsIndexUrl(locale);
+  // 英語コラムが0件の間は空の /en/columns を noindex にし、hreflang も出さない。
+  const hasEnglishColumns = await shouldShowColumns("en");
+  const isIndexable = locale === "en" ? hasEnglishColumns : true;
   return {
     title,
     description,
+    ...(isIndexable ? {} : { robots: { index: false, follow: true } }),
     openGraph: buildPageOpenGraph({
       siteName: t("og.siteName"),
       url: canonicalUrl,
@@ -73,11 +78,15 @@ export async function generateMetadata({
     }),
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        ja: `${SITE_URL}/columns`,
-        en: `${SITE_URL}/en/columns`,
-        "x-default": `${SITE_URL}/columns`,
-      },
+      ...(hasEnglishColumns
+        ? {
+            languages: {
+              ja: `${SITE_URL}/columns`,
+              en: `${SITE_URL}/en/columns`,
+              "x-default": `${SITE_URL}/columns`,
+            },
+          }
+        : {}),
     },
   };
 }
@@ -126,7 +135,7 @@ export default async function ColumnsPage({
           { name: columnsLabel(locale), path: "/columns" },
         ])}
       />
-      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+      <HomeNavigation showColumns={await shouldShowColumns(locale)} />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-12 py-8 lg:py-12">
           <p className="text-xs tracking-[0.3em] text-text-gray uppercase mb-4">

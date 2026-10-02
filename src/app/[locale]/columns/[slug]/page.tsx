@@ -18,6 +18,8 @@ import { isCmsColumnsEnabled } from "@/config/featureFlags";
 import { SITE_URL } from "@/constants/site";
 import { parseLocale, type Locale } from "@/i18n/routing";
 import { columnsLabel } from "@/lib/columns/label";
+import { shouldShowColumns } from "@/lib/columns/visibility";
+import { resolveLocaleSwitchPath } from "@/lib/i18n/localeSwitch";
 import { buildPageOpenGraph } from "@/lib/metadata/pageOpenGraph";
 import {
   getColumnByContentId,
@@ -161,6 +163,21 @@ export default async function ColumnDetailPage({
   const item = previewItem ?? (await getColumnDetail({ locale, slug }));
   if (!item) notFound();
 
+  // 言語切替の行き先: 相手言語版が無いと同じパスは 404 になるので、中身のある一覧へ逃がす。
+  // プレビューは公開前の下書きなので相手言語を問い合わせない。
+  const otherLocale: Locale = locale === "ja" ? "en" : "ja";
+  const counterpart = previewItem
+    ? null
+    : await getColumnDetail({ locale: otherLocale, slug });
+  const localeSwitchPath = previewItem
+    ? undefined
+    : resolveLocaleSwitchPath({
+        section: "columns",
+        hasCounterpart: counterpart !== null,
+        counterpartShowsColumns: await shouldShowColumns(otherLocale),
+      });
+  const showColumns = await shouldShowColumns(locale);
+
   const category = item.category;
   const backHref = locale === "ja" ? "/columns" : "/en/columns";
   const backLabel = locale === "ja" ? "← コラム一覧へ" : "← Column index";
@@ -185,7 +202,10 @@ export default async function ColumnDetailPage({
           />
         </>
       )}
-      <HomeNavigation showColumns={isCmsColumnsEnabled()} />
+      <HomeNavigation
+        showColumns={showColumns}
+        localeSwitchPath={localeSwitchPath}
+      />
       <main className="min-h-screen bg-deep-black text-text-light pt-[calc(6rem+var(--promo-banner-h))] lg:pt-[calc(7rem+var(--promo-banner-h))] pb-16 lg:pb-24">
         <article className="mx-auto max-w-3xl px-6 lg:px-12 py-8 lg:py-12">
           <Link

@@ -73,7 +73,7 @@ export default async function HyroxPage({ params }: HyroxPageProps) {
       />
       <StructuredData data={buildExerciseGym(locale)} />
       <StructuredData data={buildPersonSekiyoshi(locale)} />
-      <HyroxContent />
+      <HyroxContent locale={locale} />
     </>
   );
 }

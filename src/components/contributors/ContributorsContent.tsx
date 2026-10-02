@@ -69,7 +69,7 @@ function ContributorCell({ contributor }: ContributorCellProps) {
 }
 
 interface ContributorsContentProps {
-  /** COLUMN ナビリンク表示フラグ(server で isCmsColumnsEnabled() を渡す)。既定 false。 */
+  /** COLUMN ナビリンク表示フラグ(server で shouldShowColumns(locale) を渡す)。既定 false。 */
   readonly showColumns?: boolean;
 }
 

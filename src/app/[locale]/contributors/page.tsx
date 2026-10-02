@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import StructuredData from "@/components/StructuredData";
 import ContributorsContent from "@/components/contributors/ContributorsContent";
-import { isCmsColumnsEnabled } from "@/config/featureFlags";
+import { shouldShowColumns } from "@/lib/columns/visibility";
 import { SITE_URL } from "@/constants/site";
 import { parseKeywords } from "@/lib/og-utils";
 import { buildBreadcrumb } from "@/lib/structured-data";
@@ -48,6 +48,7 @@ export async function generateMetadata({
 export default async function ContributorsPage({ params }: ContributorsPageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const showColumns = await shouldShowColumns(locale === "en" ? "en" : "ja");
 
   const breadcrumbName = locale === "ja" ? "クラウドファンディング支援者" : "Contributors";
 
@@ -58,7 +59,7 @@ export default async function ContributorsPage({ params }: ContributorsPageProps
           { name: breadcrumbName, path: "/contributors" },
         ])}
       />
-      <ContributorsContent showColumns={isCmsColumnsEnabled()} />
+      <ContributorsContent showColumns={showColumns} />
     </>
   );
 }
