@@ -1048,6 +1048,45 @@
       "note": "HYROX公式8種目に対応したトレーニングエリアをご利用いただけます。",
       "partyNote": "表示料金は4名までのご利用に対する金額です。5名目以降は1名につき+¥1,000で追加いただけます。"
     },
+    "faq": {
+      "title": "FAQ",
+      "titleJa": "よくある質問",
+      "items": {
+        "certified": {
+          "question": "ここはHYROX公式のトレーニングジムですか？",
+          "answer": "はい。THE PICKLE BANG THEORY は、2026年8月にHYROX公式トレーニングクラブ（HYROX Training Club）に認定されました。HYROX公式8種目に対応した器具を常設しています。"
+        },
+        "whatIs": {
+          "question": "HYROX（ハイロックス）とはどんな競技ですか？",
+          "answer": "1kmのランニングと8種目のワークアウトを交互に8回ずつ行う、屋内のフィットネスレースです。世界各地で大会が開かれています。"
+        },
+        "beginner": {
+          "question": "初めてでも参加できますか？",
+          "answer": "はい。初めての方向けの体験会（{trialMinutes}分・{trialPrice}）で、HYROXの種目と器具の使い方をスタッフが一通りご案内します。"
+        },
+        "price": {
+          "question": "料金はいくらですか？",
+          "answer": "体験会は{trialMinutes}分・{trialPrice}です。HYROXエリアの時間貸しは1時間あたり{rentalMin}〜{rentalMax}です（4名まで。5名目以降は1名につき+¥1,000）。クラスの料金は、LaBOLAの各回のページでご確認ください。"
+        },
+        "bring": {
+          "question": "持ち物は何が必要ですか？",
+          "answer": "ランニングシューズとトレーニングウェアをご持参ください（レンタルはありません）。飲み物とタオルもお持ちください。"
+        },
+        "reserve": {
+          "question": "予約方法を教えてください",
+          "answer": "体験会・クラスは、LaBOLAのクラス・スクール一覧からお申し込みください。HYROXエリアの時間貸しは、LaBOLAのHYROXエリアの予約ページから予約できます。お支払いはオンラインの事前決済（クレジットカード・PayPay）です。"
+        },
+        "access": {
+          "question": "アクセスと営業時間は？",
+          "answer": "JR総武線「本八幡駅」北口から徒歩1分、都営新宿線「本八幡駅」から徒歩3分、京成本線「京成八幡駅」から徒歩5分です。営業時間は{open}〜{close}です。"
+        }
+      }
+    },
+    "access": {
+      "title": "ACCESS",
+      "titleJa": "アクセス",
+      "newTab": "（新しいタブで開きます）"
+    },
     "coach": {
       "sectionTitle": "CREW",
       "sectionTitleJa": "コーチ｜現HYROX日本代表 関吉大亮",

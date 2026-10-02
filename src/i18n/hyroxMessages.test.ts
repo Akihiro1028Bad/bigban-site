@@ -11,6 +11,13 @@ function keysOf(obj: unknown): string[] {
   );
 }
 
+function deepKeys(obj: unknown): unknown {
+  if (typeof obj !== "object" || obj === null) return null;
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, deepKeys(v)]),
+  );
+}
+
 describe("HYROX i18n messages", () => {
   it("ja に Navigation.hyrox / Metadata.hyrox がある", () => {
     expect((ja.Navigation as Record<string, unknown>).hyrox).toBeTypeOf("string");
@@ -116,5 +123,16 @@ describe("HYROX i18n messages", () => {
     expect(jaTrial.cardMeta).toContain("{price}");
     expect(enTrial.cardMeta).toContain("{minutes}");
     expect(enTrial.cardMeta).toContain("{price}");
+  });
+
+  it("HyroxPage.faq / access は ja/en で同じキー構造を持つ", () => {
+    const pick = (m: unknown, key: "faq" | "access") =>
+      (m as { HyroxPage: Record<string, unknown> }).HyroxPage[key];
+    for (const key of ["faq", "access"] as const) {
+      expect(pick(ja, key)).toBeDefined();
+      expect(JSON.stringify(deepKeys(pick(en, key)))).toBe(
+        JSON.stringify(deepKeys(pick(ja, key))),
+      );
+    }
   });
 });

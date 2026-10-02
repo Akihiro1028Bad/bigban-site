@@ -95,6 +95,21 @@ describe("HyroxContent", () => {
     expect(programIndex - nextRaceIndex).toBe(1);
   });
 
+  it("PROGRAM → FAQ → ACCESS → PICKLEBALL の順に並ぶ", async () => {
+    renderWithIntl(await HyroxContent({ locale: "ja" }));
+    const sections = Array.from(document.querySelectorAll("main > section"));
+    const indexOf = (name: RegExp) =>
+      sections.indexOf(
+        screen
+          .getByRole("heading", { level: 2, name })
+          .closest("section") as HTMLElement,
+      );
+    const program = indexOf(/^PROGRAM/);
+    expect(indexOf(/^FAQ/)).toBe(program + 1);
+    expect(indexOf(/^ACCESS/)).toBe(program + 2);
+    expect(indexOf(/^PICKLEBALL/)).toBe(program + 3);
+  });
+
   it("HyroxTrial が Hero の直後・Facility の前に並ぶ", async () => {
     renderWithIntl(await HyroxContent({ locale: "ja" }));
     const hero = screen.getByRole("heading", { level: 1, name: /^HYROX/ });
